@@ -8,7 +8,8 @@
     "build-production": "browserify index.ts --standalone P2PMediaLoader -p [ tsify --noImplicitAny ] | babili > p2p-media-loader.js"
   },
   "dependencies": {
-    "bittorrent-tracker": "9.2.3"
+    "bittorrent-tracker": "9.2.3",
+    "m3u8-parser": "3.0.0"
   },
   "devDependencies": {
     "@types/node": "^6.0.81",
