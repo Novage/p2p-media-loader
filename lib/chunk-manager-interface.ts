@@ -1,7 +1,9 @@
 interface ChunkManagerInterface {
 
-    onHlsPlaylist(url: string): void;
-    onChunk(name: string): void;
+    //on(eventName: string | symbol, listener: Function): this;
+
+    loadHlsPlaylist(url: string): void;
+    loadChunk(name: string): void;
 
 }
 
