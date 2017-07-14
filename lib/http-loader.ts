@@ -84,7 +84,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
                 this.downloadedFiles.push(file);
                 this.emit("file_loaded", file);
             } else {
-                this.emit("file_error", event);
+                this.emit("file_error", file.url, event);
             }
 
             this.loadFileQueue();
@@ -92,7 +92,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
 
         request.onerror = (event: any) => {
             this.xhrRequests.delete(file.url);
-            this.emit("file_error", event);
+            this.emit("file_error", file.url, event);
             this.loadFileQueue();
         };
 
