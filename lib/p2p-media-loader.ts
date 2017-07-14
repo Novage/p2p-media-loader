@@ -3,11 +3,11 @@ import HttpLoader from "./http-loader";
 
 export default class P2PMediaLoader {
 
-    chunkManager: ChunkManager;
+    private chunkManager: ChunkManager;
 
-    constructor();
+    public constructor();
 
-    constructor(chunkManager?: ChunkManager) {
+    public constructor(chunkManager?: ChunkManager) {
         if (chunkManager) {
             this.chunkManager = chunkManager;
         } else {

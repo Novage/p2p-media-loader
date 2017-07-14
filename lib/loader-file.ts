@@ -1,9 +1,9 @@
-export class LoaderFile {
+export default class LoaderFile {
 
-    url: string;
-    data: ArrayBuffer;
+    public url: string;
+    public data: ArrayBuffer;
 
-    constructor(url: string) {
+    public constructor(url: string) {
         this.url = url;
     }
 

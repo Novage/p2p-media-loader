@@ -1,16 +1,16 @@
 import LoaderInterface from "./loader-interface";
 import {EventEmitter} from "events";
-import {LoaderFile} from "./loader-file";
+import LoaderFile from "./loader-file";
 
 export default class HttpLoader extends EventEmitter implements LoaderInterface {
 
-    fileQueue: LoaderFile[];
+    private fileQueue: LoaderFile[];
 
-    constructor() {
+    public constructor() {
         super();
     }
 
-    load(files: LoaderFile[]): void {
+    public load(files: LoaderFile[]): void {
         this.fileQueue = [...files];
         this.fileQueue.forEach((file) => {
             this.loadFile(file);
@@ -23,8 +23,12 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         request.responseType = "arraybuffer";
 
         request.onload = (event: any) => {
-            file.data = event.target.response;
-            this.emit("file_loaded", file);
+            if (event.target.status === 200) {
+                file.data = event.target.response;
+                this.emit("file_loaded", file);
+            } else {
+                console.warn("The file could not be loaded", event);
+            }
         };
 
         request.send();

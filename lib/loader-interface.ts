@@ -1,4 +1,4 @@
-import {LoaderFile} from "./loader-file";
+import LoaderFile from "./loader-file";
 
 interface LoaderInterface {
 
