@@ -19,7 +19,7 @@
 </head>
 <body>
 
-    <video id="video"></video>
+    <video id="video" controls></video>
 
     <script>
 
@@ -32,6 +32,7 @@
             hls.attachMedia(video);
             hls.on(Hls.Events.MANIFEST_PARSED, function() {
                 video.play();
+                video.volume = 0.01;
             });
         }
 

@@ -26,8 +26,20 @@ export default class P2PMediaLoader {
         return this.chunkManager.loadHlsPlaylist(url);
     }
 
-    public async loadChunk(url: string) {
+    public loadChunk(url: string) {
         return this.chunkManager.loadChunk(url);
+    }
+
+    public abortChunk(url: string) {
+        return this.chunkManager.abortChunk(url);
+    }
+
+    public addListener(event: string, listener: Function) {
+        this.chunkManager.on(event, listener);
+    }
+
+    public removeListener(event: string, listener: Function) {
+        this.chunkManager.removeListener(event, listener);
     }
 
     public processHlsPlaylist(url: string, content: string) {
