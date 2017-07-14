@@ -1,10 +1,41 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
     <meta charset="UTF-8">
+
     <script src="p2p-media-loader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
+    <style>
+        #video {
+            width: 720px;
+            margin-left: auto;
+            margin-right: auto;
+            display: block;
+        }
+    </style>
+
 </head>
 <body>
-<script>new P2PMediaLoader();</script>
+
+    <video id="video"></video>
+
+    <script>
+
+        if (Hls.isSupported()) {
+            var p2pml = new P2PMediaLoader();
+
+            var video = document.getElementById('video');
+            var hls = new Hls({ loader: p2pml.getHlsJsLoader(), debug: true });
+            hls.loadSource('https://wowza.peer5.com/live/smil:ski.smil/playlist.m3u8');
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                video.play();
+            });
+        }
+
+    </script>
+
 </body>
 </html>

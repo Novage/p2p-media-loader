@@ -29,7 +29,6 @@ export default class ChunkManager /*extends EventEmitter*/ implements ChunkManag
 
     public async loadHlsPlaylist(url: string) {
         console.log("loadHlsPlaylist", url);
-
         const existingPlaylist = this.playlists.get(url);
         if (existingPlaylist && !existingPlaylist.manifest) {
             console.warn("Playlist is still loading");
@@ -46,7 +45,7 @@ export default class ChunkManager /*extends EventEmitter*/ implements ChunkManag
         }
     }
 
-    public loadChunk(url: string): void {
+    public async loadChunk(url: string) {
         console.log("loadChunk", url);
         //this.loader.load(name, {...callbacks});
     }
