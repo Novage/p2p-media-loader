@@ -18,6 +18,15 @@ export default class ChunkManager /*extends EventEmitter*/ implements ChunkManag
         this.loader.on("file_loaded", this.onFileLoaded);
     }
 
+    public processHlsPlaylist(url: string, content: string) {
+        const playlist = new Playlist(url);
+        this.playlists.set(url, playlist);
+        const parser = new m3u8Parser.Parser();
+        parser.push(content);
+        parser.end();
+        playlist.manifest = parser.manifest;
+    }
+
     public async loadHlsPlaylist(url: string) {
         console.log("onHlsPlaylist", url);
 
@@ -28,13 +37,8 @@ export default class ChunkManager /*extends EventEmitter*/ implements ChunkManag
         }
 
         try {
-            const playlist = new Playlist(url);
-            this.playlists.set(url, playlist);
             const content = await Utils.loadFile(url);
-            const parser = new m3u8Parser.Parser();
-            parser.push(content);
-            parser.end();
-            playlist.manifest = parser.manifest;
+            this.processHlsPlaylist(url, content);
             return content;
         } catch (e) {
             this.playlists.delete(url);
