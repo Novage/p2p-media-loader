@@ -85,7 +85,7 @@ export default class ChunkManager extends EventEmitter implements ChunkManagerIn
     }
 
     private onFileError(url: string, error: any): void {
-        this.emit("chunk_load_error", url, error);
+        this.emitChunkLoadError(url, error);
     }
 
     private emitChunkLoadSuccess(file: LoaderFile): void {
