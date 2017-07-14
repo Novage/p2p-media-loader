@@ -28,7 +28,7 @@ export default class ChunkManager /*extends EventEmitter*/ implements ChunkManag
     }
 
     public async loadHlsPlaylist(url: string) {
-        console.log("onHlsPlaylist", url);
+        console.log("loadHlsPlaylist", url);
 
         const existingPlaylist = this.playlists.get(url);
         if (existingPlaylist && !existingPlaylist.manifest) {
@@ -37,7 +37,7 @@ export default class ChunkManager /*extends EventEmitter*/ implements ChunkManag
         }
 
         try {
-            const content = await Utils.loadFile(url);
+            const content = await Utils.fetchContent(url);
             this.processHlsPlaylist(url, content);
             return content;
         } catch (e) {
@@ -46,8 +46,8 @@ export default class ChunkManager /*extends EventEmitter*/ implements ChunkManag
         }
     }
 
-    public loadChunk(name: string): void {
-        console.log("onChunk", name);
+    public loadChunk(url: string): void {
+        console.log("loadChunk", url);
         //this.loader.load(name, {...callbacks});
     }
 

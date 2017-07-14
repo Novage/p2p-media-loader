@@ -3,7 +3,7 @@ interface ChunkManagerInterface {
     //on(eventName: string | symbol, listener: Function): this;
 
     loadHlsPlaylist(url: string): void;
-    loadChunk(name: string): void;
+    loadChunk(url: string): void;
 
 }
 

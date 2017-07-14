@@ -1,6 +1,6 @@
 export default class Utils {
 
-    public static async loadFile(url: string): Promise<string> {
+    public static async fetchContent(url: string): Promise<string> {
         return new Promise<string>((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             xhr.onreadystatechange = () => {
