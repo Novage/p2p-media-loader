@@ -4,6 +4,7 @@ import ChunkManagerInterface from "./chunk-manager-interface";
 import LoaderInterface from "./loader-interface";
 import LoaderFile from "./loader-file";
 import Utils from "./utils";
+import LoaderEvents from "./loader-events";
 
 const m3u8Parser = require("m3u8-parser");
 
@@ -16,8 +17,8 @@ export default class ChunkManager extends EventEmitter implements ChunkManagerIn
     public constructor(loader: LoaderInterface) {
         super();
         this.loader = loader;
-        this.loader.on("file_loaded", this.onFileLoaded.bind(this));
-        this.loader.on("file_error", this.onFileError.bind(this));
+        this.loader.on(LoaderEvents.FileLoaded, this.onFileLoaded.bind(this));
+        this.loader.on(LoaderEvents.FileError, this.onFileError.bind(this));
     }
 
     public processHlsPlaylist(url: string, content: string): void {

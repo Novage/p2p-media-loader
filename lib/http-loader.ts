@@ -1,6 +1,7 @@
 import LoaderInterface from "./loader-interface";
 import LoaderFile from "./loader-file";
 import {EventEmitter} from "events";
+import LoaderEvents from "./loader-events";
 
 export default class HttpLoader extends EventEmitter implements LoaderInterface {
 
@@ -16,7 +17,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
     /**
      * Adds files to the download queue.
      * Cancels the download of previous ones if they are not in the new queue.
-     * The result of the downloading will be emitted via file_loaded or file_error events.
+     * The result of the downloading will be emitted via file_loaded or file_error of {LoaderEvents}.
      *
      * @param {LoaderFile[]} files Files to download.
      */
@@ -40,7 +41,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         this.fileQueue.forEach((file) => {
             const downloadedFile = this.downloadedFiles.find((f) => f.url === file.url);
             if (downloadedFile) {
-                this.emit("file_loaded", downloadedFile);
+                this.emit(LoaderEvents.FileLoaded, downloadedFile);
             }
         });
 
@@ -82,9 +83,9 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
             if (event.target.status === 200) {
                 file.data = event.target.response;
                 this.downloadedFiles.push(file);
-                this.emit("file_loaded", file);
+                this.emit(LoaderEvents.FileLoaded, file);
             } else {
-                this.emit("file_error", file.url, event);
+                this.emit(LoaderEvents.FileError, file.url, event);
             }
 
             this.loadFileQueue();
@@ -92,7 +93,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
 
         request.onerror = (event: any) => {
             this.xhrRequests.delete(file.url);
-            this.emit("file_error", file.url, event);
+            this.emit(LoaderEvents.FileError, file.url, event);
             this.loadFileQueue();
         };
 
