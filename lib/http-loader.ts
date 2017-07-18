@@ -41,7 +41,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         this.fileQueue.forEach((file) => {
             const downloadedFile = this.downloadedFiles.find((f) => f.url === file.url);
             if (downloadedFile) {
-                this.emit(LoaderEvents.FileLoaded, downloadedFile);
+                this.emitFileLoaded(downloadedFile);
             }
         });
 
@@ -83,7 +83,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
             if (event.target.status === 200) {
                 file.data = event.target.response;
                 this.downloadedFiles.push(file);
-                this.emit(LoaderEvents.FileLoaded, file);
+                this.emitFileLoaded(file);
             } else {
                 this.emit(LoaderEvents.FileError, file.url, event);
             }
@@ -100,5 +100,19 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         request.send();
         return request;
     }
+
+    /**
+     * Emits {LoaderEvents.FileLoaded} event with copy of loaded file.
+     *
+     * @param {LoaderFile} file Input file
+     */
+    private emitFileLoaded(file: LoaderFile) {
+        const fileCopy = new LoaderFile(file.url);
+        fileCopy.data = file.data.slice(0);
+
+        this.emit(LoaderEvents.FileLoaded, fileCopy);
+    }
+
+
 
 }
