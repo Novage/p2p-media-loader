@@ -10,7 +10,7 @@ export default class ChunkManager implements ChunkManagerInterface {
 
     private loader: LoaderInterface;
     private playlists: Map<string, Playlist> = new Map();
-    private chunks: Map<string, Chunk> = new Map();
+    private chunk: Chunk | null = null;
 
     public constructor(loader: LoaderInterface) {
         this.loader = loader;
@@ -32,64 +32,48 @@ export default class ChunkManager implements ChunkManagerInterface {
             return content;
         } catch (e) {
             this.playlists.delete(url);
-            console.error("Failed to load HLS playlist", e);
             throw e;
         }
     }
 
     public loadChunk(url: string, onSuccess: Function, onError: Function): void {
-        const newChunks: Chunk[] = [];
+        const files: LoaderFile[] = [];
         const { playlist, chunkIndex } = this.getChunkLocation(url);
         if (playlist) {
             const segments: any[] = playlist.manifest.segments;
             for (let i = chunkIndex; i < segments.length; ++i) {
-                const chunkUrl = playlist.baseUrl + segments[ i ].uri;
-                const chunk = this.chunks.get(chunkUrl);
-                newChunks.push(
-                    chunkUrl === url
-                        ? new Chunk(chunkUrl, onSuccess, onError)
-                        : chunk
-                            ? chunk
-                            : new Chunk(chunkUrl)
-                );
+                const fileUrl = playlist.baseUrl + segments[ i ].uri;
+                files.push(new LoaderFile(fileUrl));
             }
         } else {
-            newChunks.push(new Chunk(url, onSuccess, onError));
+            files.push(new LoaderFile(url));
         }
 
-        this.chunks.clear();
-        for (const c of newChunks) {
-            this.chunks.set(c.url, c);
-        }
-
-        this.loader.load(newChunks.map((c) => new LoaderFile(c.url)));
+        this.chunk = new Chunk(files[ 0 ].url, onSuccess, onError);
+        this.loader.load(files);
     }
 
     public abortChunk(url: string): void {
-        this.chunks.delete(url);
+        if (this.chunk && this.chunk.url === url) {
+            this.chunk = null;
+        }
     }
 
     private onFileLoaded(file: LoaderFile): void {
-        const chunk = this.chunks.get(file.url);
-        if (chunk) {
-            if (chunk.onSuccess) {
-                chunk.onSuccess(file.data);
-                this.chunks.delete(file.url);
-            } else {
-                chunk.data = file.data;
+        if (this.chunk && this.chunk.url === file.url) {
+            if (this.chunk.onSuccess) {
+                this.chunk.onSuccess(file.data);
             }
+            this.chunk = null;
         }
     }
 
     private onFileError(url: string, error: any): void {
-        const chunk = this.chunks.get(url);
-        if (chunk) {
-            if (chunk.onError) {
-                chunk.onError(error);
-                this.chunks.delete(url);
-            } else {
-                chunk.error = error;
+        if (this.chunk && this.chunk.url === url) {
+            if (this.chunk.onError) {
+                this.chunk.onError(error);
             }
+            this.chunk = null;
         }
     }
 
@@ -139,21 +123,13 @@ class Playlist {
 class Chunk {
 
     public url: string;
-    public data: ArrayBuffer;
-    public error: any;
     public onSuccess: Function;
     public onError: Function;
 
-    public constructor(url: string, onSuccess?: Function, onError?: Function) {
+    public constructor(url: string, onSuccess: Function, onError: Function) {
         this.url = url;
-
-        if (onSuccess) {
-            this.onSuccess = onSuccess;
-        }
-
-        if (onError) {
-            this.onError = onError;
-        }
+        this.onSuccess = onSuccess;
+        this.onError = onError;
     }
 
 }

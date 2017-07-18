@@ -28,7 +28,8 @@
 
             var video = document.getElementById('video');
             var hls = new Hls({ loader: p2pml.getHlsJsLoader()/*, debug: true*/ });
-            hls.loadSource('https://wowza.peer5.com/live/smil:ski.smil/playlist.m3u8');
+            hls.loadSource('https://wowza.peer5.com/live/smil:ski.smil/playlist.m3u8'); // live
+            //hls.loadSource('https://video-dev.github.io/streams/x36xhzz/x36xhzz.m3u8'); // VOD
             hls.attachMedia(video);
             hls.on(Hls.Events.MANIFEST_PARSED, function() {
                 video.play();
