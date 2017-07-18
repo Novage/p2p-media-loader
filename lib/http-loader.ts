@@ -1,17 +1,22 @@
 import LoaderInterface from "./loader-interface";
 import LoaderFile from "./loader-file";
-import {EventEmitter} from "events";
 import LoaderEvents from "./loader-events";
+import MediaManagerInterface from "./media-manager-interface";
+import {EventEmitter} from "events";
 
 export default class HttpLoader extends EventEmitter implements LoaderInterface {
 
     private readonly simultaneousLoads = 2;
-    private xhrRequests: Map<string, XMLHttpRequest> = new Map();
     private fileQueue: LoaderFile[] = [];
     private downloadedFiles: LoaderFile[] = [];
+    private httpManager: MediaManagerInterface;
 
-    public constructor() {
+    public constructor(httpManager: MediaManagerInterface) {
         super();
+
+        this.httpManager = httpManager;
+        this.httpManager.on(LoaderEvents.FileLoaded, this.onFileLoaded.bind(this));
+        this.httpManager.on(LoaderEvents.FileError, this.onFileError.bind(this));
     }
 
     /**
@@ -26,11 +31,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         // stop all xhr requests for files that are not in the new load
         this.fileQueue.forEach((file) => {
             if (files.findIndex((f) => f.url === file.url) === -1) {
-                const xhr = this.xhrRequests.get(file.url);
-                if (xhr) {
-                    xhr.abort();
-                    this.xhrRequests.delete(file.url);
-                }
+                this.httpManager.abort(file);
             }
         });
 
@@ -58,47 +59,26 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
      */
     private loadFileQueue(): void {
         this.fileQueue.forEach((file) => {
-            if (this.xhrRequests.size < this.simultaneousLoads &&
-                !this.xhrRequests.has(file.url) && this.downloadedFiles.findIndex((f) => f.url === file.url) === -1) {
+            if (this.httpManager.getActiveDownloadsCount() < this.simultaneousLoads &&
+                !this.httpManager.isDownloading(file) && this.downloadedFiles.findIndex((f) => f.url === file.url) === -1) {
 
-                this.xhrRequests.set(file.url, this.loadFile(file));
+                this.httpManager.download(file);
             }
         });
     }
 
-    /**
-     * Loads the specified file.
-     *
-     * @param {LoaderFile} file File to download.
-     * @returns {XMLHttpRequest} An instance of XMLHttpRequest.
-     */
-    private loadFile(file: LoaderFile): XMLHttpRequest {
-        const request = new XMLHttpRequest();
-        request.open("GET", file.url, true);
-        request.responseType = "arraybuffer";
+    private onFileLoaded(file: LoaderFile) {
+        const downloadedFile = this.downloadedFiles.find(f => f.url === file.url);
+        if (!downloadedFile) {
+            this.downloadedFiles.push(file);
+            this.emitFileLoaded(file);
+        }
+        this.loadFileQueue();
+    }
 
-        request.onload = (event: any) => {
-            this.xhrRequests.delete(file.url);
-
-            if (event.target.status === 200) {
-                file.data = event.target.response;
-                this.downloadedFiles.push(file);
-                this.emitFileLoaded(file);
-            } else {
-                this.emit(LoaderEvents.FileError, file.url, event);
-            }
-
-            this.loadFileQueue();
-        };
-
-        request.onerror = (event: any) => {
-            this.xhrRequests.delete(file.url);
-            this.emit(LoaderEvents.FileError, file.url, event);
-            this.loadFileQueue();
-        };
-
-        request.send();
-        return request;
+    private onFileError(url: string, event: any) {
+        this.emit(LoaderEvents.FileLoaded, url, event);
+        this.loadFileQueue();
     }
 
     /**

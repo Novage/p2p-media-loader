@@ -1,44 +1,38 @@
 import LoaderInterface from "./loader-interface";
 import LoaderFile from "./loader-file";
-import {EventEmitter} from "events";
 import LoaderEvents from "./loader-events";
-
-interface BaseLoader {
-
-    on(eventName: string | symbol, listener: Function): this;
-    start(file: LoaderFile): void;
-    stop(file: LoaderFile): void;
-    isLoading(file: LoaderFile): boolean;
-    maxActiveDownloads(): number;
-
-}
+import MediaManagerInterface from "./media-manager-interface";
+import {EventEmitter} from "events";
 
 export default class HybridLoader extends EventEmitter implements LoaderInterface {
 
-    private httpLoader: BaseLoader;
-    private p2pLoader: BaseLoader;
+    private httpManager: MediaManagerInterface;
+    private p2pManager: MediaManagerInterface;
 
-    private readonly minFilesCount = 2;
+    private readonly requiredFilesCount = 2;
+    private readonly bufferFilesCount = 1;
     private fileQueue: LoaderFile[] = [];
     private downloadedFiles: LoaderFile[] = [];
 
-    public constructor(httpLoader: BaseLoader, p2pLoader: BaseLoader) {
+    public constructor(httpManager: MediaManagerInterface, p2pManager: MediaManagerInterface) {
         super();
 
-        this.httpLoader = httpLoader;
-        this.p2pLoader = p2pLoader;
+        this.httpManager = httpManager;
+        httpManager.on(LoaderEvents.FileLoaded, this.onFileLoaded.bind(this));
+        httpManager.on(LoaderEvents.FileError, this.onFileError.bind(this));
 
-        httpLoader.on(LoaderEvents.FileLoaded, this.onFileLoaded.bind(this));
-        p2pLoader.on(LoaderEvents.FileLoaded, this.onFileLoaded.bind(this));
+        this.p2pManager = p2pManager;
+        p2pManager.on(LoaderEvents.FileLoaded, this.onFileLoaded.bind(this));
+        p2pManager.on(LoaderEvents.FileError, this.onFileError.bind(this));
     }
 
     load(files: LoaderFile[]): void {
 
         // stop all http requests and p2p downloads for files that are not in the new load
-        this.fileQueue.forEach((file) => {
-            if (files.findIndex((f) => f.url === file.url) === -1) {
-                this.httpLoader.stop(file);
-                this.p2pLoader.stop(file);
+        this.fileQueue.forEach(file => {
+            if (files.findIndex(f => f.url === file.url) === -1) {
+                this.httpManager.abort(file);
+                this.p2pManager.abort(file);
             }
         });
 
@@ -46,10 +40,10 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.fileQueue = [...files];
 
         // emit file loaded event if the file has already been downloaded
-        this.fileQueue.forEach((file) => {
-            const downloadedFile = this.downloadedFiles.find((f) => f.url === file.url);
+        this.fileQueue.forEach(file => {
+            const downloadedFile = this.downloadedFiles.find(f => f.url === file.url);
             if (downloadedFile) {
-                this.emit(LoaderEvents.FileLoaded, downloadedFile);
+                this.emitFileLoaded(downloadedFile);
             }
         });
 
@@ -60,31 +54,50 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private processFileQueue(): void {
         for (let i = 0; i < this.fileQueue.length; i++) {
             const file = this.fileQueue[i];
-            if (this.downloadedFiles.findIndex((f) => f.url === file.url) === -1) {
-                if (i < this.minFilesCount) {
+            if (this.downloadedFiles.findIndex(f => f.url === file.url) === -1) {
+                if (i < this.requiredFilesCount) {
                     // force load required files via http
-                    this.p2pLoader.stop(file);
-                    this.httpLoader.start(file);
-                } else if (!this.httpLoader.isLoading(file)) {
+                    this.p2pManager.abort(file);
+                    this.httpManager.download(file);
+                } else if (!this.httpManager.isDownloading(file)) {
                     // try load files via p2p if http loading is not started
-                    this.p2pLoader.start(file);
+                    this.p2pManager.download(file);
                 }
             }
         }
 
         // load random file to buffer
-        const pendingQueue = this.fileQueue.filter((file) => !this.httpLoader.isLoading(file) && !this.p2pLoader.isLoading(file));
-        if (pendingQueue.length > 0 && this.httpLoader.maxActiveDownloads() < this.minFilesCount + 1) {
+        const pendingQueue = this.fileQueue.filter(file =>
+            this.downloadedFiles.findIndex(f => f.url === file.url) === -1 &&
+            !this.httpManager.isDownloading(file) &&
+            !this.p2pManager.isDownloading(file));
+
+        if (pendingQueue.length > 0 && this.httpManager.getActiveDownloadsCount() <= this.requiredFilesCount + this.bufferFilesCount) {
             const random_index = Math.floor(Math.random() * (pendingQueue.length + 1));
-            this.httpLoader.start(pendingQueue[random_index]);
+            this.httpManager.download(pendingQueue[random_index]);
         }
     }
 
     private onFileLoaded(file: LoaderFile) {
-        const downloadedFile = this.downloadedFiles.find((f) => f.url === file.url);
+        const downloadedFile = this.downloadedFiles.find(f => f.url === file.url);
         if (!downloadedFile) {
             this.downloadedFiles.push(file);
+            this.emitFileLoaded(file);
         }
+        this.processFileQueue();
     }
+
+    private onFileError(url: string, event: any) {
+        this.emit(LoaderEvents.FileLoaded, url, event);
+        this.processFileQueue();
+    }
+
+    private emitFileLoaded(file: LoaderFile) {
+        const fileCopy = new LoaderFile(file.url);
+        fileCopy.data = file.data.slice(0);
+
+        this.emit(LoaderEvents.FileLoaded, fileCopy);
+    }
+
 
 }
