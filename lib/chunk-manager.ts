@@ -18,18 +18,25 @@ export default class ChunkManager implements ChunkManagerInterface {
         this.loader.on(LoaderEvents.FileError, this.onFileError.bind(this));
     }
 
-    public processHlsPlaylist(url: string, content: string): void {
+    public processHlsPlaylist(url: string, content: string): Playlist {
         const parser = new m3u8Parser.Parser();
         parser.push(content);
         parser.end();
-        this.playlists.set(url, new Playlist(url, parser.manifest));
+        const playlist = new Playlist(url, parser.manifest);
+        this.playlists.set(url, playlist);
+        return playlist;
     }
 
     public async loadHlsPlaylist(url: string): Promise<string> {
         try {
             const content = await Utils.fetchContent(url);
-            this.processHlsPlaylist(url, content);
-            return content;
+            const playlist = this.processHlsPlaylist(url, content);
+            if (playlist.limitedContentAvail()) {
+                const limit = Math.trunc(playlist.manifest.segments.length / 2);
+                return playlist.getLimitedContent(limit);
+            } else {
+                return content;
+            }
         } catch (e) {
             this.playlists.delete(url);
             throw e;
@@ -116,6 +123,44 @@ class Playlist {
         }
 
         return -1;
+    }
+
+    public limitedContentAvail(): boolean {
+        const m = this.manifest;
+        return !m.endList && m.segments.length > 0;
+    }
+
+    public getLimitedContent(limit: number): string {
+        if (!this.limitedContentAvail()) {
+            throw "Limited content allowed only for Live playlist with segments";
+        }
+
+        const m = this.manifest;
+        let content = "#EXTM3U\n#EXT-X-VERSION:3\n";
+
+        if (m.playlistType) {
+            content += "#EXT-X-PLAYLIST-TYPE:" + m.playlistType + "\n";
+        }
+
+        if (m.targetDuration) {
+            content += "#EXT-X-TARGETDURATION:" + m.targetDuration + "\n";
+        }
+
+        if (m.mediaSequence) {
+            content += "#EXT-X-MEDIA-SEQUENCE:" + m.mediaSequence + "\n";
+        }
+
+        if (m.discontinuitySequence) {
+            content += "#EXT-X-DISCONTINUITY-SEQUENCE:" + m.discontinuitySequence + "\n";
+        }
+
+        for (let i = 0; i < m.segments.length - limit; ++i) {
+            const s = m.segments[ i ];
+            content += "#EXTINF:" + s.duration + "\n";
+            content += s.uri + "\n";
+        }
+
+        return content;
     }
 
 }
