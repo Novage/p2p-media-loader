@@ -57,7 +57,7 @@ export default class ChunkManager implements ChunkManagerInterface {
         }
 
         this.chunk = new Chunk(files[ 0 ].url, onSuccess, onError);
-        this.loader.load(files);
+        this.loader.load(files, playlist ? playlist.url : url);
     }
 
     public abortChunk(url: string): void {

@@ -3,6 +3,7 @@ import HttpLoader from "./http-loader";
 import HlsJsLoader from "./hlsjs-loader";
 //import HybridLoader from "./hybrid-loader";
 import HttpMediaManager from "./http-media-manager";
+//import P2PMediaManager from "./p2p-media-manager";
 const getHlsJsLoaderMaker = require("./hlsjs-loader-maker");
 
 export default class P2PMediaLoader {
@@ -16,7 +17,7 @@ export default class P2PMediaLoader {
             this.chunkManager = chunkManager;
         } else {
             const httpManager = new HttpMediaManager();
-            //const p2pManager = new HttpMediaManager();
+            //const p2pManager = new P2PMediaManager();
             const loader = new HttpLoader(httpManager);
             //const loader = new HybridLoader(httpManager, p2pManager);
             this.chunkManager = new ChunkManager(loader);

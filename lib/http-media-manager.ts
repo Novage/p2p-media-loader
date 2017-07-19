@@ -12,6 +12,9 @@ export default class HttpMediaManager extends EventEmitter implements MediaManag
     }
 
     public download(file: LoaderFile): void {
+        if (this.isDownloading(file)) {
+            return;
+        }
         const request = new XMLHttpRequest();
         request.open("GET", file.url, true);
         request.responseType = "arraybuffer";
@@ -50,6 +53,10 @@ export default class HttpMediaManager extends EventEmitter implements MediaManag
 
     public getActiveDownloadsCount(): number {
         return this.xhrRequests.size;
+    }
+
+    setPlaylistUrl(url: string): void {
+        throw new Error("Method not implemented.");
     }
 
 }

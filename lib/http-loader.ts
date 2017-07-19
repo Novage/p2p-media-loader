@@ -7,6 +7,7 @@ import {EventEmitter} from "events";
 export default class HttpLoader extends EventEmitter implements LoaderInterface {
 
     private readonly simultaneousLoads = 2;
+    private readonly downloadedFileExpiration = 1 * 60 * 1000; // milliseconds
     private fileQueue: LoaderFile[] = [];
     private downloadedFiles: LoaderFile[] = [];
     private httpManager: MediaManagerInterface;
@@ -26,7 +27,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
      *
      * @param {LoaderFile[]} files Files to download.
      */
-    public load(files: LoaderFile[]): void {
+    public load(files: LoaderFile[], playlistUrl: string): void {
 
         // stop all xhr requests for files that are not in the new load
         this.fileQueue.forEach((file) => {
@@ -47,6 +48,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         });
 
         this.loadFileQueue();
+        this.collectGarbage();
     }
 
     /**
@@ -60,14 +62,15 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
     private loadFileQueue(): void {
         this.fileQueue.forEach((file) => {
             if (this.httpManager.getActiveDownloadsCount() < this.simultaneousLoads &&
-                !this.httpManager.isDownloading(file) && this.downloadedFiles.findIndex((f) => f.url === file.url) === -1) {
+                !this.httpManager.isDownloading(file) &&
+                this.downloadedFiles.findIndex((f) => f.url === file.url) === -1) {
 
                 this.httpManager.download(file);
             }
         });
     }
 
-    private onFileLoaded(file: LoaderFile) {
+    private onFileLoaded(file: LoaderFile): void {
         const downloadedFile = this.downloadedFiles.find(f => f.url === file.url);
         if (!downloadedFile) {
             this.downloadedFiles.push(file);
@@ -76,7 +79,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         this.loadFileQueue();
     }
 
-    private onFileError(url: string, event: any) {
+    private onFileError(url: string, event: any): void {
         this.emit(LoaderEvents.FileLoaded, url, event);
         this.loadFileQueue();
     }
@@ -86,13 +89,25 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
      *
      * @param {LoaderFile} file Input file
      */
-    private emitFileLoaded(file: LoaderFile) {
+    private emitFileLoaded(file: LoaderFile): void {
         const fileCopy = new LoaderFile(file.url);
         fileCopy.data = file.data.slice(0);
 
+        this.updateLastAccessed(file.url);
         this.emit(LoaderEvents.FileLoaded, fileCopy);
     }
 
+    private updateLastAccessed(url: string): void {
+        const downloadedFile = this.downloadedFiles.find((f) => f.url === url);
+        if (downloadedFile) {
+            downloadedFile.lastAccessed = new Date().getTime();
+        }
+    }
+
+    private collectGarbage(): void {
+        const now = new Date().getTime();
+        this.downloadedFiles = this.downloadedFiles.filter((f) => now - f.lastAccessed < this.downloadedFileExpiration);
+    }
 
 
 }

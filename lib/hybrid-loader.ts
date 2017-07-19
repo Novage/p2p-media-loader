@@ -11,6 +11,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
     private readonly requiredFilesCount = 2;
     private readonly bufferFilesCount = 1;
+    private readonly downloadedFileExpiration = 2 * 60 * 1000; // milliseconds
     private fileQueue: LoaderFile[] = [];
     private downloadedFiles: LoaderFile[] = [];
 
@@ -26,7 +27,9 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         p2pManager.on(LoaderEvents.FileError, this.onFileError.bind(this));
     }
 
-    load(files: LoaderFile[]): void {
+    load(files: LoaderFile[], playlistUrl: string): void {
+
+        this.p2pManager.setPlaylistUrl(playlistUrl);
 
         // stop all http requests and p2p downloads for files that are not in the new load
         this.fileQueue.forEach(file => {
@@ -78,7 +81,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         }
     }
 
-    private onFileLoaded(file: LoaderFile) {
+    private onFileLoaded(file: LoaderFile): void {
         const downloadedFile = this.downloadedFiles.find(f => f.url === file.url);
         if (!downloadedFile) {
             this.downloadedFiles.push(file);
@@ -87,16 +90,30 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.processFileQueue();
     }
 
-    private onFileError(url: string, event: any) {
+    private onFileError(url: string, event: any): void {
         this.emit(LoaderEvents.FileLoaded, url, event);
         this.processFileQueue();
     }
 
-    private emitFileLoaded(file: LoaderFile) {
+    private emitFileLoaded(file: LoaderFile): void {
         const fileCopy = new LoaderFile(file.url);
         fileCopy.data = file.data.slice(0);
 
+        this.updateLastAccessed(file.url);
         this.emit(LoaderEvents.FileLoaded, fileCopy);
+    }
+
+    private updateLastAccessed(url: string): void {
+        const downloadedFile = this.downloadedFiles.find((f) => f.url === url);
+        if (downloadedFile) {
+            downloadedFile.lastAccessed = new Date().getTime();
+        }
+    }
+
+    private collectGarbage(): void {
+        const now = new Date().getTime();
+        this.downloadedFiles = this.downloadedFiles.filter((f) => now - f.lastAccessed < this.downloadedFileExpiration);
+        // TODO: if seeding to peers then stop
     }
 
 
