@@ -5,16 +5,22 @@
   "scripts": {
     "lint": "tslint -c tslint.json -p tsconfig.json",
     "build": "browserify index.ts --standalone P2PMediaLoader -p [ tsify --noImplicitAny ] > p2p-media-loader.js",
-    "build-production": "browserify index.ts --standalone P2PMediaLoader -p [ tsify --noImplicitAny ] | babili > p2p-media-loader.js"
+    "build-production": "browserify index.ts --standalone P2PMediaLoader -p [ tsify --noImplicitAny ] | babili > p2p-media-loader.js",
+    "test": "mocha -r ts-node/register test/*.test.ts"
   },
   "dependencies": {
     "bittorrent-tracker": "9.2.3",
     "m3u8-parser": "3.0.0"
   },
   "devDependencies": {
+    "@types/chai": "^4.0.1",
+    "@types/mocha": "^2.2.41",
     "@types/node": "^6.0.81",
     "babili": "^0.1.4",
     "browserify": "^14.4.0",
+    "chai": "^4.1.0",
+    "mocha": "^3.4.2",
+    "ts-node": "^3.2.0",
     "tsify": "^3.0.1",
     "tslint": "^5.5.0",
     "typescript": "^2.4.1"
