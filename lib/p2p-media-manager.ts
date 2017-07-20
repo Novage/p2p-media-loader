@@ -4,22 +4,43 @@ import {EventEmitter} from "events";
 import {createHash} from "crypto";
 const Client = require("bittorrent-tracker");
 
+class MediaPeer  {
+
+    files: Set<string> = new Set();
+    peer: any;
+
+    constructor(peer: any) {
+
+        this.peer = peer;
+
+    }
+
+}
+
 export default class P2PMediaManager extends EventEmitter implements MediaManagerInterface {
 
     private clients: Map<string, any> = new Map();
     private readonly announce = [ "wss://tracker.btorrent.xyz/" ];
-    private peers: Map<string, any> = new Map();
+    private peers: Map<string, MediaPeer> = new Map();
+    private files: Set<string> = new Set();
     private playlistUrl: string;
     private peerId: string;
 
     public constructor() {
         super();
-        this.peerId = this.generatePeerId();
+
+        const current_date = (new Date()).valueOf().toString();
+        const random = Math.random().toString();
+        this.peerId = createHash("sha1").update(current_date + random).digest("hex");
+
+        this.files.add("123");
+        this.files.add("345");
+        this.files.add("678");
+
         console.warn("peer", this.peerId);
     }
 
     public setPlaylistUrl(url: string): void {
-        //url = url + "_mod11";
         if (this.playlistUrl !== url) {
             this.playlistUrl = url ;
             this.addClient(createHash("sha1").update(url).digest("hex"));
@@ -27,9 +48,7 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
     }
 
     private addClient(infoHash: string): void {
-        const client = this.clients.get(infoHash);
-
-        if (!client) {
+        if (!this.clients.has(infoHash)) {
             const clientOptions = {
                 infoHash: infoHash,
                 peerId: this.peerId,
@@ -41,30 +60,24 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
             client.on("error", (error: any) => console.error("client error", error));
             client.on("warning", (error: any) => console.warn("client warning", error));
             client.on("update", (data: any) => console.log("client announce update"));
-            client.on("peer", this.onPeer.bind(this)); // once?
+            client.on("peer", this.onPeer.bind(this));
 
             client.start();
 
             this.clients.set(infoHash, client);
 
-            setTimeout(() => {
+            /*setTimeout(() => {
                 console.log("inquiring peers");
-                this.peers.forEach((peer) => {
-                    if (peer.connected) {
-                        peer.send({commange: "what_do_you_have?"});
+                this.peers.forEach((mediaPeer) => {
+                    if (mediaPeer.peer.connected) {
+                        mediaPeer.peer.send({commange: "what_do_you_have?"});
+                    } else {
+                        console.warn("peer is not connected, can't send data");
                     }
                 });
 
-            }, 20000);
-        } else {
-            client.update();
+            }, 20000);*/
         }
-    }
-
-    private generatePeerId() {
-        const current_date = (new Date()).valueOf().toString();
-        const random = Math.random().toString();
-        return createHash("sha1").update(current_date + random).digest("hex");
     }
 
     public download(file: LoaderFile): void {
@@ -82,38 +95,29 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
     }
 
     private onPeer(peer: any) {
-        console.log("onPeer", peer);
+        console.log("onPeer", peer.id);
         if (!this.peers.has(peer.id)) {
 
-            peer.on("signal", function (data: any) {
-                console.warn("signal", data);
+            peer.once("connect", () => {
+                peer.send(JSON.stringify({"files": Array.from(this.files), "from": this.peerId}));
             });
 
-            peer.on("connect", function () {
-                console.warn("connect");
-            });
-
-            peer.on("data", function (data: any) {
-                //var message = new TextDecoder("utf-8").decode(data);
-                console.warn("data recieved", data);
-            });
-
-            peer.on("stream", function () {
-                console.log("stream");
-            });
-
-            peer.on("close", () => {
-                console.warn("peer close");
-
+            peer.once("close", () => {
+                console.warn("peer disconnected", peer.id);
                 this.peers.delete(peer.id);
             });
 
-            peer.on("error", function () {
-                console.log("error");
+            peer.on("data", function (data: any) {
+                const dataString = new TextDecoder("utf-8").decode(data);
+                const dataObject = JSON.parse(dataString);
+                console.warn("data recieved ", dataObject);
             });
 
-            this.peers.set(peer.id, peer);
+            peer.on("error", function (error: any) {
+                console.error("error", error);
+            });
 
+            this.peers.set(peer.id, new MediaPeer(peer));
         }
     }
 

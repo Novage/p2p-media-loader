@@ -3,21 +3,23 @@ import LoaderFile from "./loader-file";
 import LoaderEvents from "./loader-events";
 import MediaManagerInterface from "./media-manager-interface";
 import {EventEmitter} from "events";
+import LoaderFileCacheManagerInterface from "./loader-file-cache-manger-interface";
 
 export default class HttpLoader extends EventEmitter implements LoaderInterface {
 
     private readonly simultaneousLoads = 2;
-    private readonly downloadedFileExpiration = 1 * 60 * 1000; // milliseconds
     private fileQueue: LoaderFile[] = [];
-    private downloadedFiles: LoaderFile[] = [];
+    private cacheManager: LoaderFileCacheManagerInterface;
     private httpManager: MediaManagerInterface;
 
-    public constructor(httpManager: MediaManagerInterface) {
+    public constructor(httpManager: MediaManagerInterface, cacheManager: LoaderFileCacheManagerInterface) {
         super();
 
         this.httpManager = httpManager;
         this.httpManager.on(LoaderEvents.FileLoaded, this.onFileLoaded.bind(this));
         this.httpManager.on(LoaderEvents.FileError, this.onFileError.bind(this));
+
+        this.cacheManager = cacheManager;
     }
 
     /**
@@ -41,14 +43,14 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
 
         // emit file loaded event if the file has already been downloaded
         this.fileQueue.forEach((file) => {
-            const downloadedFile = this.downloadedFiles.find((f) => f.url === file.url);
+            const downloadedFile = this.cacheManager.get(file.url);
             if (downloadedFile) {
                 this.emitFileLoaded(downloadedFile);
             }
         });
 
         this.loadFileQueue();
-        this.collectGarbage();
+        this.cacheManager.collectGarbage();
     }
 
     /**
@@ -63,7 +65,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         this.fileQueue.forEach((file) => {
             if (this.httpManager.getActiveDownloadsCount() < this.simultaneousLoads &&
                 !this.httpManager.isDownloading(file) &&
-                this.downloadedFiles.findIndex((f) => f.url === file.url) === -1) {
+                !this.cacheManager.has(file.url)) {
 
                 this.httpManager.download(file);
             }
@@ -71,11 +73,8 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
     }
 
     private onFileLoaded(file: LoaderFile): void {
-        const downloadedFile = this.downloadedFiles.find(f => f.url === file.url);
-        if (!downloadedFile) {
-            this.downloadedFiles.push(file);
-            this.emitFileLoaded(file);
-        }
+        this.cacheManager.set(file.url, file);
+        this.emitFileLoaded(file);
         this.loadFileQueue();
     }
 
@@ -90,24 +89,12 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
      * @param {LoaderFile} file Input file
      */
     private emitFileLoaded(file: LoaderFile): void {
+        // TODO: destructurization
         const fileCopy = new LoaderFile(file.url);
         fileCopy.data = file.data.slice(0);
 
-        this.updateLastAccessed(file.url);
+        this.cacheManager.updateLastAccessed(file.url);
         this.emit(LoaderEvents.FileLoaded, fileCopy);
     }
-
-    private updateLastAccessed(url: string): void {
-        const downloadedFile = this.downloadedFiles.find((f) => f.url === url);
-        if (downloadedFile) {
-            downloadedFile.lastAccessed = new Date().getTime();
-        }
-    }
-
-    private collectGarbage(): void {
-        const now = new Date().getTime();
-        this.downloadedFiles = this.downloadedFiles.filter((f) => now - f.lastAccessed < this.downloadedFileExpiration);
-    }
-
 
 }
