@@ -3,7 +3,6 @@ import LoaderFile from "./loader-file";
 
 export default class LoaderFileCacheManager implements LoaderFileCacheManagerInterface {
 
-    private readonly loaderFileExpiration = 1 * 60 * 1000; // milliseconds
     private files: Map<string, LoaderFile> = new Map();
 
     public get(key: string): LoaderFile | undefined {
@@ -18,16 +17,19 @@ export default class LoaderFileCacheManager implements LoaderFileCacheManagerInt
         this.files.set(key, value);
     }
 
+    public delete(key: string): boolean {
+        return this.files.delete(key);
+    }
+
+    public forEach(callbackfn: (value: LoaderFile, key: string, map: Map<string, LoaderFile>) => void, thisArg?: any): void {
+        this.files.forEach(callbackfn, thisArg);
+    }
+
     public updateLastAccessed(key: string): void {
         const file = this.get(key);
         if (file) {
             file.lastAccessed = new Date().getTime();
         }
-    }
-
-    public collectGarbage(): void {
-        const now = new Date().getTime();
-        //this.downloadedFiles = this.downloadedFiles.filter((f) => now - f.lastAccessed < this.loaderFileExpiration);
     }
 
 }

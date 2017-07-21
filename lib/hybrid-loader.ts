@@ -11,9 +11,9 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private p2pManager: MediaManagerInterface;
     private cacheManager: LoaderFileCacheManagerInterface;
 
+    private readonly loaderFileExpiration = 1 * 60 * 1000; // milliseconds
     private readonly requiredFilesCount = 2;
     private readonly bufferFilesCount = 1;
-    private readonly downloadedFileExpiration = 2 * 60 * 1000; // milliseconds
     private fileQueue: LoaderFile[] = [];
 
     public constructor(httpManager: MediaManagerInterface, p2pManager: MediaManagerInterface,
@@ -56,7 +56,9 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
         // run main processing algorithm
         this.processFileQueue();
-        this.cacheManager.collectGarbage();
+
+        // collect garbage
+        this.collectGarbage();
     }
 
     private processFileQueue(): void {
@@ -105,6 +107,15 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
         this.cacheManager.updateLastAccessed(file.url);
         this.emit(LoaderEvents.FileLoaded, fileCopy);
+    }
+
+    private collectGarbage(): void {
+        const now = new Date().getTime();
+        this.cacheManager.forEach((value, key) => {
+            if (now - value.lastAccessed > this.loaderFileExpiration) {
+                this.cacheManager.delete(key);
+            }
+        });
     }
 
 }

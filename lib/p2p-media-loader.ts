@@ -1,10 +1,10 @@
 import ChunkManager from "./chunk-manager";
-import HttpLoader from "./http-loader";
+//import HttpLoader from "./http-loader";
 import HlsJsLoader from "./hlsjs-loader";
-//import HybridLoader from "./hybrid-loader";
+import HybridLoader from "./hybrid-loader";
 import HttpMediaManager from "./http-media-manager";
 import LoaderFileCacheManager from "./loader-file-cache-manager";
-//import P2PMediaManager from "./p2p-media-manager";
+import P2PMediaManager from "./p2p-media-manager";
 const getHlsJsLoaderMaker = require("./hlsjs-loader-maker");
 
 export default class P2PMediaLoader {
@@ -19,9 +19,9 @@ export default class P2PMediaLoader {
         } else {
             const httpManager = new HttpMediaManager();
             const cacheManager = new LoaderFileCacheManager();
-            //const p2pManager = new P2PMediaManager();
-            const loader = new HttpLoader(httpManager, cacheManager);
-            //const loader = new HybridLoader(httpManager, p2pManager);
+            const p2pManager = new P2PMediaManager();
+            //const loader = new HttpLoader(httpManager, cacheManager);
+            const loader = new HybridLoader(httpManager, p2pManager, cacheManager);
             this.chunkManager = new ChunkManager(loader);
         }
     }

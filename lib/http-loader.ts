@@ -7,10 +7,12 @@ import LoaderFileCacheManagerInterface from "./loader-file-cache-manger-interfac
 
 export default class HttpLoader extends EventEmitter implements LoaderInterface {
 
-    private readonly simultaneousLoads = 2;
-    private fileQueue: LoaderFile[] = [];
     private cacheManager: LoaderFileCacheManagerInterface;
     private httpManager: MediaManagerInterface;
+
+    private readonly simultaneousLoads = 2;
+    private readonly loaderFileExpiration = 1 * 60 * 1000; // milliseconds
+    private fileQueue: LoaderFile[] = [];
 
     public constructor(httpManager: MediaManagerInterface, cacheManager: LoaderFileCacheManagerInterface) {
         super();
@@ -49,8 +51,11 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
             }
         });
 
+        // run main processing algorithm
         this.loadFileQueue();
-        this.cacheManager.collectGarbage();
+
+        // collect garbage
+        this.collectGarbage();
     }
 
     /**
@@ -96,5 +101,15 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         this.cacheManager.updateLastAccessed(file.url);
         this.emit(LoaderEvents.FileLoaded, fileCopy);
     }
+
+    private collectGarbage(): void {
+        const now = new Date().getTime();
+        this.cacheManager.forEach((value, key) => {
+            if (now - value.lastAccessed > this.loaderFileExpiration) {
+                this.cacheManager.delete(key);
+            }
+        });
+    }
+
 
 }
