@@ -58,7 +58,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.processFileQueue();
 
         // collect garbage
-        this.collectGarbage();
+        //this.collectGarbage();
     }
 
     private processFileQueue(): void {
