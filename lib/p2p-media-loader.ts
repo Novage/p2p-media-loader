@@ -19,7 +19,7 @@ export default class P2PMediaLoader {
         } else {
             const httpManager = new HttpMediaManager();
             const cacheManager = new LoaderFileCacheManager();
-            const p2pManager = new P2PMediaManager();
+            const p2pManager = new P2PMediaManager(cacheManager);
             //const loader = new HttpLoader(httpManager, cacheManager);
             const loader = new HybridLoader(httpManager, p2pManager, cacheManager);
             this.chunkManager = new ChunkManager(loader);

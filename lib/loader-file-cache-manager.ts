@@ -1,7 +1,9 @@
 import LoaderFileCacheManagerInterface from "./loader-file-cache-manger-interface";
 import LoaderFile from "./loader-file";
+import {EventEmitter} from "events";
+import CacheEvents from "./cache-events";
 
-export default class LoaderFileCacheManager implements LoaderFileCacheManagerInterface {
+export default class LoaderFileCacheManager extends EventEmitter implements LoaderFileCacheManagerInterface {
 
     private files: Map<string, LoaderFile> = new Map();
 
@@ -15,10 +17,16 @@ export default class LoaderFileCacheManager implements LoaderFileCacheManagerInt
 
     public set(key: string, value: LoaderFile): void {
         this.files.set(key, value);
+        this.emit(CacheEvents.CacheUpdated);
     }
 
-    public delete(key: string): boolean {
-        return this.files.delete(key);
+    public keys(): Array<string> {
+        return Array.from(this.files.keys());
+    }
+
+    public delete(key: string): void {
+        this.files.delete(key);
+        this.emit(CacheEvents.CacheUpdated);
     }
 
     public forEach(callbackfn: (value: LoaderFile, key: string, map: Map<string, LoaderFile>) => void, thisArg?: any): void {
