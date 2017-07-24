@@ -27,24 +27,24 @@ export default class P2PMediaLoader {
         }
     }
 
-    public getHlsJsLoader() {
+    public getHlsJsLoader(): any {
         return getHlsJsLoaderMaker(HlsJsLoader, this);
     }
 
-    public async loadHlsPlaylist(url: string) {
+    public async loadHlsPlaylist(url: string): Promise<string> {
         return this.chunkManager.loadHlsPlaylist(url);
     }
 
-    public loadChunk(url: string, onSuccess: Function, onError: Function) {
-        return this.chunkManager.loadChunk(url, onSuccess, onError);
+    public loadChunk(url: string, onSuccess: Function, onError: Function): void {
+        this.chunkManager.loadChunk(url, onSuccess, onError);
     }
 
-    public abortChunk(url: string) {
-        return this.chunkManager.abortChunk(url);
+    public abortChunk(url: string): void {
+        this.chunkManager.abortChunk(url);
     }
 
-    public processHlsPlaylist(url: string, content: string) {
-        return this.chunkManager.processHlsPlaylist(url, content);
+    public processHlsPlaylist(url: string, content: string): void {
+        this.chunkManager.processHlsPlaylist(url, content);
     }
 
 }
