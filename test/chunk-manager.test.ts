@@ -1,11 +1,11 @@
 import { expect } from "chai";
 
 import ChunkManager from "../lib/chunk-manager";
-import LoaderEvents from "../lib/loader-events";
+/*import LoaderEvents from "../lib/loader-events";
 import LoaderFile from "../lib/loader-file";
-import LoaderInterface from "../lib/loader-interface";
+import LoaderInterface from "../lib/loader-interface";*/
 
-class TestLoader implements LoaderInterface {
+/*class TestLoader implements LoaderInterface {
     subs: (string | symbol)[] = [];
     on(eventName: string | symbol, listener: Function): this {
         this.subs.push(eventName);
@@ -14,11 +14,11 @@ class TestLoader implements LoaderInterface {
     load(files: LoaderFile[]): void {
         throw new Error("Method not implemented.");
     }
-}
+}*/
 
 describe("ChunkManager", () => {
 
-    it("should subscribe to LoaderEvents", () => {
+    /*it("should subscribe to LoaderEvents", () => {
         const tl = new TestLoader();
         const cm = new ChunkManager(tl);
         expect(tl.subs.indexOf(LoaderEvents.FileLoaded)).to.be.gte(0);
@@ -33,6 +33,6 @@ describe("ChunkManager", () => {
         expect(pl.manifest).to.be.not.empty;
         expect(pl.manifest.segments).to.be.not.empty;
         expect(pl.manifest.segments.length).to.equal(2);
-    });
+    });*/
 
 });

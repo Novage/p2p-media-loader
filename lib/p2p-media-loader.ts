@@ -1,4 +1,5 @@
 import ChunkManager from "./chunk-manager";
+import ChunkManagerInterface from "./chunk-manager-interface";
 //import HttpLoader from "./http-loader";
 import HlsJsLoader from "./hlsjs-loader";
 import HybridLoader from "./hybrid-loader";
@@ -9,11 +10,11 @@ const getHlsJsLoaderMaker = require("./hlsjs-loader-maker");
 
 export default class P2PMediaLoader {
 
-    private chunkManager: ChunkManager;
+    private chunkManager: ChunkManagerInterface;
 
     public constructor();
 
-    public constructor(chunkManager?: ChunkManager) {
+    public constructor(chunkManager?: ChunkManagerInterface) {
         if (chunkManager) {
             this.chunkManager = chunkManager;
         } else {
