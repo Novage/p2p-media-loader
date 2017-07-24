@@ -11,6 +11,7 @@ export default class ChunkManager implements ChunkManagerInterface {
     private loader: LoaderInterface;
     private playlists: Map<string, Playlist> = new Map();
     private chunk: Chunk | null = null;
+    private currentFragment: string;
 
     public constructor(loader: LoaderInterface) {
         this.loader = loader;
@@ -38,6 +39,8 @@ export default class ChunkManager implements ChunkManagerInterface {
     }
 
     public loadChunk(url: string, onSuccess: Function, onError: Function): void {
+        // todo: rewrite bottom code; use currentlyPlayingFragment and url to get hot file list
+
         const files: LoaderFile[] = [];
         const { playlist, chunkIndex } = this.getChunkLocation(url);
         if (playlist) {
@@ -58,6 +61,11 @@ export default class ChunkManager implements ChunkManagerInterface {
         if (this.chunk && this.chunk.url === url) {
             this.chunk = null;
         }
+    }
+
+    public setCurrentFragment(url: string): void {
+        this.currentFragment = url;
+        console.log("#### setCurrentFragment RECEIVED VALUE", this.currentFragment);
     }
 
     private onFileLoaded(file: LoaderFile): void {
