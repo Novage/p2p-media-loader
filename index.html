@@ -37,7 +37,7 @@
                 video.volume = 0.01;
             });
             hls.on(Hls.Events.FRAG_CHANGED, function (event, data) {
-                var url = data && data.frag && data.frag.url ? data.frag.url : undefined;
+                var url = data && data.frag ? data.frag.url : undefined;
                 p2pml.setCurrentFragment(url);
             });
         }
