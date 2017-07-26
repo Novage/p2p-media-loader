@@ -39,13 +39,15 @@ export default class ChunkManager implements ChunkManagerInterface {
         }
     }
 
-    public loadChunk(url: string, onSuccess: Function, onError: Function): void {
+    public loadChunk(url: string, onSuccess?: Function, onError?: Function): void {
         const { playlist: loadingPlaylist, chunkIndex: loadingChunkIndex } = this.getChunkLocation(url);
         if (!loadingPlaylist) {
             // this should never happen in theory
             const e = "Requested chunk cannot be located in known playlists";
             console.error(e);
-            setTimeout(() => { onError(e); }, 0);
+            if (onError) {
+                setTimeout(() => { onError(e); }, 0);
+            }
             return;
         }
 
@@ -172,10 +174,10 @@ class Playlist {
 class Chunk {
 
     public url: string;
-    public onSuccess: Function;
-    public onError: Function;
+    public onSuccess?: Function;
+    public onError?: Function;
 
-    public constructor(url: string, onSuccess: Function, onError: Function) {
+    public constructor(url: string, onSuccess?: Function, onError?: Function) {
         this.url = url;
         this.onSuccess = onSuccess;
         this.onError = onError;

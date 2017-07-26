@@ -39,7 +39,7 @@ export default class P2PMediaLoader {
         return this.chunkManager.loadHlsPlaylist(url);
     }
 
-    public loadChunk(url: string, onSuccess: Function, onError: Function): void {
+    public loadChunk(url: string, onSuccess?: Function, onError?: Function): void {
         this.chunkManager.loadChunk(url, onSuccess, onError);
     }
 
