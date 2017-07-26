@@ -12,7 +12,7 @@ export default class ChunkManager implements ChunkManagerInterface {
     private playlists: Map<string, Playlist> = new Map();
     private chunk: Chunk | undefined = undefined;
     private prevChunkUrl: string | undefined = undefined;
-    private currentFragment: string | undefined = undefined;
+    private currentChunkUrl: string | undefined = undefined;
 
     public constructor(loader: LoaderInterface) {
         this.loader = loader;
@@ -59,9 +59,9 @@ export default class ChunkManager implements ChunkManagerInterface {
             && prevLoadingChunkIndex + 1 < loadingChunkIndex) {
             // seek forward
             hotChunkIndex = loadingChunkIndex;
-            this.currentFragment = undefined;
+            this.currentChunkUrl = undefined;
         } else {
-            const { playlist: playingPlaylist, chunkIndex: playingChunkIndex } = this.getChunkLocation(this.currentFragment);
+            const { playlist: playingPlaylist, chunkIndex: playingChunkIndex } = this.getChunkLocation(this.currentChunkUrl);
             if (playingPlaylist && playingPlaylist.url === loadingPlaylist.url) {
                 // seek backward OR buffering forward
                 hotChunkIndex = Math.min(loadingChunkIndex, playingChunkIndex);
@@ -104,8 +104,8 @@ export default class ChunkManager implements ChunkManagerInterface {
         }
     }
 
-    public setCurrentFragment(url: string | undefined): void {
-        this.currentFragment = url;
+    public setCurrentChunk(url: string | undefined): void {
+        this.currentChunkUrl = url;
     }
 
     private onFileLoaded(file: LoaderFile): void {

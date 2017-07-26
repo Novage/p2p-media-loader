@@ -4,7 +4,7 @@ interface ChunkManagerInterface {
     loadHlsPlaylist(url: string): Promise<string>;
     loadChunk(url: string, onSuccess?: Function, onError?: Function): void;
     abortChunk(url: string): void;
-    setCurrentFragment(url: string): void;
+    setCurrentChunk(url: string): void;
 
 }
 

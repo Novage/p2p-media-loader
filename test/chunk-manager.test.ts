@@ -6,7 +6,7 @@ import LoaderFile from "../lib/loader-file";
 import LoaderInterface from "../lib/loader-interface";
 import LoaderEvents from "../lib/loader-events";
 
-class LoaderInterfaceImpl implements LoaderInterface {
+class LoaderInterfaceEmptyImpl implements LoaderInterface {
     on(eventName: string | symbol, listener: Function): this { return this; }
     load(files: LoaderFile[]): void { }
 }
@@ -38,8 +38,8 @@ chunk-1048.ts
 
 describe("ChunkManager", () => {
 
-    it("should pass to LoaderInterface chunk list starting from loaded one", () => {
-        const loader = mock<LoaderInterface>(LoaderInterfaceImpl);
+    it("should pass to LoaderInterface chunk list starting from requested one", () => {
+        const loader = mock<LoaderInterface>(LoaderInterfaceEmptyImpl);
         const manager = new ChunkManager(instance(loader));
         manager.processHlsPlaylist(testPlaylist.url, testPlaylist.content);
         manager.loadChunk(testPlaylist.baseUrl + "chunk-1046.ts");
@@ -50,8 +50,38 @@ describe("ChunkManager", () => {
         ]), testPlaylist.url)).once();
     });
 
+    it("should pass to LoaderInterface chunk list starting from current chunk if its before requested one", () => {
+        const loader = mock<LoaderInterface>(LoaderInterfaceEmptyImpl);
+        const manager = new ChunkManager(instance(loader));
+        manager.processHlsPlaylist(testPlaylist.url, testPlaylist.content);
+        manager.setCurrentChunk(testPlaylist.baseUrl + "chunk-1044.ts");
+        manager.loadChunk(testPlaylist.baseUrl + "chunk-1046.ts");
+        verify(loader.load(deepEqual([
+            new LoaderFile(testPlaylist.baseUrl + "chunk-1044.ts"),
+            new LoaderFile(testPlaylist.baseUrl + "chunk-1045.ts"),
+            new LoaderFile(testPlaylist.baseUrl + "chunk-1046.ts"),
+            new LoaderFile(testPlaylist.baseUrl + "chunk-1047.ts"),
+            new LoaderFile(testPlaylist.baseUrl + "chunk-1048.ts")
+        ]), testPlaylist.url)).once();
+    });
+
+    it("should pass to LoaderInterface chunk list starting from requested one (ignoring current chunk) if previously requested chunk not contiguous", () => {
+        const loader = mock<LoaderInterface>(LoaderInterfaceEmptyImpl);
+        const manager = new ChunkManager(instance(loader));
+        manager.processHlsPlaylist(testPlaylist.url, testPlaylist.content);
+        manager.loadChunk(testPlaylist.baseUrl + "chunk-1042.ts");
+        manager.loadChunk(testPlaylist.baseUrl + "chunk-1043.ts");
+        manager.setCurrentChunk(testPlaylist.baseUrl + "chunk-1042.ts");
+        manager.loadChunk(testPlaylist.baseUrl + "chunk-1044.ts");
+        manager.loadChunk(testPlaylist.baseUrl + "chunk-1047.ts");
+        verify(loader.load(deepEqual([
+            new LoaderFile(testPlaylist.baseUrl + "chunk-1047.ts"),
+            new LoaderFile(testPlaylist.baseUrl + "chunk-1048.ts")
+        ]), testPlaylist.url)).once();
+    });
+
     it("should call onSuccess after chunk loading succeeded", () => {
-        const loader = mock<LoaderInterface>(LoaderInterfaceImpl);
+        const loader = mock<LoaderInterface>(LoaderInterfaceEmptyImpl);
 
         const onSuccess = sinon.spy();
         let fileLoadedListener: Function = () => { throw new Error("FileLoaded listener not set"); };
@@ -67,11 +97,11 @@ describe("ChunkManager", () => {
         manager.loadChunk(file.url, onSuccess);
         fileLoadedListener(file);
 
-        sinon.assert.calledWith(onSuccess, file.data);
+        onSuccess.calledWith(file.data);
     });
 
     it("should call onError after chunk loading failed", () => {
-        const loader = mock<LoaderInterface>(LoaderInterfaceImpl);
+        const loader = mock<LoaderInterface>(LoaderInterfaceEmptyImpl);
 
         const onError = sinon.spy();
         let fileErrorListener: Function = () => { throw new Error("FileError listener not set"); };
@@ -87,11 +117,11 @@ describe("ChunkManager", () => {
         manager.loadChunk(url, undefined, onError);
         fileErrorListener(url, error);
 
-        sinon.assert.calledWith(onError, error);
+        onError.calledWith(error);
     });
 
     it("should not call onSuccess nor onError after abortChunk call", () => {
-        const loader = mock<LoaderInterface>(LoaderInterfaceImpl);
+        const loader = mock<LoaderInterface>(LoaderInterfaceEmptyImpl);
 
         const onSuccess = sinon.spy();
         let fileLoadedListener: Function = () => { throw new Error("FileLoaded listener not set"); };

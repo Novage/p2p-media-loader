@@ -31,8 +31,8 @@ export default class P2PMediaLoader {
         return getHlsJsLoaderMaker(HlsJsLoader, this);
     }
 
-    public setCurrentFragment(url: string): void {
-        this.chunkManager.setCurrentFragment(url);
+    public setCurrentChunk(url: string): void {
+        this.chunkManager.setCurrentChunk(url);
     }
 
     public async loadHlsPlaylist(url: string): Promise<string> {
