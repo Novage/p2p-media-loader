@@ -59,7 +59,7 @@ export default class ChunkManager implements ChunkManagerInterface {
             hotChunkIndex = loadingChunkIndex;
             this.currentFragment = undefined;
         } else {
-            const {playlist: playingPlaylist, chunkIndex: playingChunkIndex} = this.getChunkLocation(this.currentFragment);
+            const { playlist: playingPlaylist, chunkIndex: playingChunkIndex } = this.getChunkLocation(this.currentFragment);
             if (playingPlaylist && playingPlaylist.url === loadingPlaylist.url) {
                 // seek backward OR buffering forward
                 hotChunkIndex = Math.min(loadingChunkIndex, playingChunkIndex);
@@ -83,7 +83,7 @@ export default class ChunkManager implements ChunkManagerInterface {
         this.prevChunkUrl = url;
 
         // debug {{{
-        const q: string[] = [];
+        /*const q: string[] = [];
         for (let i = 0; i < segments.length; ++i) {
             const u = loadingPlaylist.baseUrl + segments[ i ].uri;
             const id = u.substr(u.length - 6, 3); // use last 3 chars without ".ts"
@@ -92,7 +92,7 @@ export default class ChunkManager implements ChunkManagerInterface {
             const ld = u === url ? "-LOADING" : "";
             q.push(id + ht + pl + ld);
         }
-        console.log("CHUNKS", q);
+        console.log("CHUNKS", q);*/
         // }}}
     }
 
