@@ -15,6 +15,7 @@
   "devDependencies": {
     "@types/mocha": "^2.2.41",
     "@types/node": "^6.0.81",
+    "@types/sinon": "^2.3.3",
     "@types/text-encoding": "0.0.31",
     "babili": "^0.1.4",
     "browserify": "^14.4.0",
