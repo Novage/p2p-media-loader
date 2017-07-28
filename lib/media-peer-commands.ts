@@ -1,4 +1,4 @@
-enum PeerCommands {
+enum MediaPeerCommands {
     FileData = "file_data",
     FileAbsent = "file_absent",
     FilesMap = "files_map",
@@ -6,4 +6,4 @@ enum PeerCommands {
     CancelFileRequest = "cancel_file_request",
 }
 
-export default PeerCommands;
+export default MediaPeerCommands;

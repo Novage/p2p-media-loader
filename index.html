@@ -31,6 +31,8 @@
             hls.loadSource('https://wowza.peer5.com/live/smil:ski.smil/playlist.m3u8'); // live, 20 chunks ~5sec each
             //hls.loadSource('http://wms.shared.streamshow.it/carinatv/carinatv/playlist.m3u8'); // live, 3 chunks ~10 sec each
             //hls.loadSource('https://video-dev.github.io/streams/x36xhzz/x36xhzz.m3u8'); // VOD, 64 chunks
+            //hls.loadSource('https://wowza-cdn.streamroot.io/vodOriginSite/tears_of_steel720p.mp4/playlist.m3u8');
+            //hls.loadSource('http://cdn3.viblast.com/streams/hls/airshow/playlist.m3u8');
             hls.attachMedia(video);
             hls.on(Hls.Events.MANIFEST_PARSED, function() {
                 video.play();

@@ -10,7 +10,6 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
     private cacheManager: LoaderFileCacheManagerInterface;
     private httpManager: MediaManagerInterface;
 
-    private readonly simultaneousLoads = 2;
     private readonly loaderFileExpiration = 1 * 60 * 1000; // milliseconds
     private fileQueue: LoaderFile[] = [];
 
@@ -31,7 +30,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
      *
      * @param {LoaderFile[]} files Files to download.
      */
-    public load(files: LoaderFile[], playlistUrl: string): void {
+    public load(files: LoaderFile[], emitNowFileUrl: string, playlistUrl: string): void {
 
         // stop all xhr requests for files that are not in the new load
         this.fileQueue.forEach((file) => {
@@ -44,15 +43,13 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         this.fileQueue = [...files];
 
         // emit file loaded event if the file has already been downloaded
-        this.fileQueue.forEach((file) => {
-            const downloadedFile = this.cacheManager.get(file.url);
-            if (downloadedFile) {
-                this.emitFileLoaded(downloadedFile);
-            }
-        });
+        const downloadedFile = this.cacheManager.get(emitNowFileUrl);
+        if (downloadedFile) {
+            this.emitFileLoaded(downloadedFile);
+        }
 
         // run main processing algorithm
-        this.loadFileQueue();
+        this.processFileQueue();
 
         // collect garbage
         this.collectGarbage();
@@ -66,9 +63,9 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
      * - downloading of this file has not started yet;
      * - the file is not in the list of downloaded files.
      */
-    private loadFileQueue(): void {
+    private processFileQueue(): void {
         this.fileQueue.forEach((file) => {
-            if (this.httpManager.getActiveDownloadsCount() < this.simultaneousLoads &&
+            if (this.httpManager.getActiveDownloadsCount() < 1 &&
                 !this.httpManager.isDownloading(file) &&
                 !this.cacheManager.has(file.url)) {
 
@@ -80,12 +77,12 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
     private onFileLoaded(file: LoaderFile): void {
         this.cacheManager.set(file.url, file);
         this.emitFileLoaded(file);
-        this.loadFileQueue();
+        this.processFileQueue();
     }
 
     private onFileError(url: string, event: any): void {
-        this.emit(LoaderEvents.FileLoaded, url, event);
-        this.loadFileQueue();
+        this.emit(LoaderEvents.FileError, url, event);
+        this.processFileQueue();
     }
 
     /**

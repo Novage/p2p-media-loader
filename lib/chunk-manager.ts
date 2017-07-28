@@ -76,12 +76,10 @@ export default class ChunkManager implements ChunkManagerInterface {
         for (let i = hotChunkIndex; i < segments.length; ++i) {
             const fileUrl = loadingPlaylist.baseUrl + segments[ i ].uri;
             files.push(new LoaderFile(fileUrl));
-            if (fileUrl === url) {
-                this.chunk = new Chunk(fileUrl, onSuccess, onError);
-            }
         }
 
-        this.loader.load(files, loadingPlaylist.url);
+        this.chunk = new Chunk(url, onSuccess, onError);
+        this.loader.load(files, url, loadingPlaylist.url);
         this.prevChunkUrl = url;
 
         // debug {{{
