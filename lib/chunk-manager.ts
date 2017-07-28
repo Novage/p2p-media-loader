@@ -130,7 +130,7 @@ export default class ChunkManager implements ChunkManagerInterface {
         const files: LoaderFile[] = [];
         const segments: any[] = playlist.manifest.segments;
         for (let i = chunkIndex; i < segments.length; ++i) {
-            const fileUrl = playlist.baseUrl + segments[ i ].uri;
+            const fileUrl = playlist.getChunkAbsoluteUrl(i);
             files.push(new LoaderFile(fileUrl));
         }
 
@@ -178,6 +178,15 @@ class Playlist {
         }
 
         return -1;
+    }
+
+    public getChunkAbsoluteUrl(index: number): string {
+        const uri = this.manifest.segments[ index ].uri;
+        if (uri.startsWith("http://") || uri.startsWith("https://")) {
+            return uri;
+        } else {
+            return this.baseUrl + uri;
+        }
     }
 
 }
