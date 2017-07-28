@@ -37,7 +37,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         }, 1000);
     }
 
-    load(files: LoaderFile[], emitNowFileUrl: string, playlistUrl: string): void {
+    load(files: LoaderFile[], playlistUrl: string, emitNowFileUrl?: string): void {
         //console.log("load()", files.length, (files.length > 0 ? files[0].url : ""));
         this.p2pManager.setPlaylistUrl(playlistUrl);
 
@@ -53,9 +53,11 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.fileQueue = [...files];
 
         // emit file loaded event if the file has already been downloaded
-        const downloadedFile = this.cacheManager.get(emitNowFileUrl);
-        if (downloadedFile) {
-            this.emitFileLoaded(downloadedFile);
+        if (emitNowFileUrl) {
+            const downloadedFile = this.cacheManager.get(emitNowFileUrl);
+            if (downloadedFile) {
+                this.emitFileLoaded(downloadedFile);
+            }
         }
 
         // run main processing algorithm

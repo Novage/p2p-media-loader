@@ -8,7 +8,7 @@ import LoaderEvents from "../lib/loader-events";
 
 class LoaderInterfaceEmptyImpl implements LoaderInterface {
     on(eventName: string | symbol, listener: Function): this { return this; }
-    load(files: LoaderFile[], emitNowFileUrl: string, playlistUrl: string): void { }
+    load(files: LoaderFile[], playlistUrl: string, emitNowFileUrl?: string): void { }
 }
 
 const testPlaylist = {
@@ -47,7 +47,7 @@ describe("ChunkManager", () => {
             new LoaderFile(testPlaylist.baseUrl + "chunk-1046.ts"),
             new LoaderFile(testPlaylist.baseUrl + "chunk-1047.ts"),
             new LoaderFile(testPlaylist.baseUrl + "chunk-1048.ts")
-        ]), testPlaylist.baseUrl + "chunk-1046.ts", testPlaylist.url)).once();
+        ]), testPlaylist.url, testPlaylist.baseUrl + "chunk-1046.ts")).once();
     });
 
     it("should pass to LoaderInterface chunk list starting from current chunk if its before requested one", () => {
@@ -62,7 +62,7 @@ describe("ChunkManager", () => {
             new LoaderFile(testPlaylist.baseUrl + "chunk-1046.ts"),
             new LoaderFile(testPlaylist.baseUrl + "chunk-1047.ts"),
             new LoaderFile(testPlaylist.baseUrl + "chunk-1048.ts")
-        ]), testPlaylist.baseUrl + "chunk-1046.ts", testPlaylist.url)).once();
+        ]), testPlaylist.url, testPlaylist.baseUrl + "chunk-1046.ts")).once();
     });
 
     it("should pass to LoaderInterface chunk list starting from requested one (ignoring current chunk) if previously requested chunk not contiguous", () => {
@@ -77,7 +77,7 @@ describe("ChunkManager", () => {
         verify(loader.load(deepEqual([
             new LoaderFile(testPlaylist.baseUrl + "chunk-1047.ts"),
             new LoaderFile(testPlaylist.baseUrl + "chunk-1048.ts")
-        ]), testPlaylist.baseUrl + "chunk-1047.ts", testPlaylist.url)).once();
+        ]), testPlaylist.url, testPlaylist.baseUrl + "chunk-1047.ts")).once();
     });
 
     it("should call onSuccess after chunk loading succeeded", () => {

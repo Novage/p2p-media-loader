@@ -30,7 +30,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
      *
      * @param {LoaderFile[]} files Files to download.
      */
-    public load(files: LoaderFile[], emitNowFileUrl: string, playlistUrl: string): void {
+    public load(files: LoaderFile[], playlistUrl: string, emitNowFileUrl?: string): void {
 
         // stop all xhr requests for files that are not in the new load
         this.fileQueue.forEach((file) => {
@@ -43,9 +43,11 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         this.fileQueue = [...files];
 
         // emit file loaded event if the file has already been downloaded
-        const downloadedFile = this.cacheManager.get(emitNowFileUrl);
-        if (downloadedFile) {
-            this.emitFileLoaded(downloadedFile);
+        if (emitNowFileUrl) {
+            const downloadedFile = this.cacheManager.get(emitNowFileUrl);
+            if (downloadedFile) {
+                this.emitFileLoaded(downloadedFile);
+            }
         }
 
         // run main processing algorithm
