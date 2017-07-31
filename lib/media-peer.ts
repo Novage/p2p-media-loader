@@ -19,7 +19,7 @@ export default class MediaPeer extends EventEmitter {
     private files: Set<string> = new Set();
     private chunkSize = 15 * 1024;
     private requestFileResponseTimeout = 3000;
-    private requestFileResponseTimer: Timer;
+    private requestFileResponseTimers: Map<string, Timer> = new Map();
 
     // TODO: set according to MediaPeerCommands.Busy
     // TODO: clear by timeout
@@ -72,7 +72,7 @@ export default class MediaPeer extends EventEmitter {
                 break;
 
             case MediaPeerCommands.FileData:
-                clearTimeout(this.requestFileResponseTimer);
+                this.setResponseTimer(dataObject.url);
                 const tmpFileData = this.tmpFileData.get(dataObject.url);
 
                 if (tmpFileData) {
@@ -80,6 +80,7 @@ export default class MediaPeer extends EventEmitter {
                     tmpFileData.push(chunk);
 
                     if (dataObject.chunksCount === tmpFileData.length) {
+                        this.removeResponseTimer(dataObject.url);
                         tmpFileData.sort((a, b) => a.index - b.index);
 
                         const stringData = new Array<number>();
@@ -99,7 +100,7 @@ export default class MediaPeer extends EventEmitter {
 
             case MediaPeerCommands.FileAbsent:
                 //console.info(dataObject.command, dataObject, this.id);
-                clearTimeout(this.requestFileResponseTimer);
+                this.removeResponseTimer(dataObject.url);
                 this.tmpFileData.delete(dataObject.url);
                 this.files.delete(dataObject.url);
                 this.emit(MediaPeerEvents.DataFileAbsent, this, dataObject.url);
@@ -117,7 +118,6 @@ export default class MediaPeer extends EventEmitter {
 
     // TODO: move to LoaderFile
     private getLoaderFileChunks(file: LoaderFile): Array<LoaderFileChunk> {
-        //new Buffer((new Buffer(fileData)).toString("ucs2"), "ucs2").buffer.byteLength
         const jsonBufferData = new Buffer(file.data).toJSON().data;
         const chunks = new Array<LoaderFileChunk>();
 
@@ -143,6 +143,9 @@ export default class MediaPeer extends EventEmitter {
     }
 
     private sendCommand(command: any): boolean {
+/*        if (this.peer.bufferSize > 0) {
+            console.warn("bufferSize: ", this.peer.bufferSize);
+        }*/
         try {
             if (this.peer.connected) {
                 this.peer.write(JSON.stringify(command));
@@ -166,6 +169,7 @@ export default class MediaPeer extends EventEmitter {
     }
 
     public sendFileData(file: LoaderFile): void {
+        console.info("sending file...", file.url);
         const fileChunks = this.getLoaderFileChunks(file);
 
         for (let i = 0; i < fileChunks.length; i++) {
@@ -185,14 +189,9 @@ export default class MediaPeer extends EventEmitter {
     }
 
     public sendFileRequest(url: string): boolean {
+        //console.info("sending file request...", url);
         if (this.sendCommand({"command": MediaPeerCommands.FileRequest, "url": url})) {
-
-            this.requestFileResponseTimer = setTimeout(() => {
-                this.sendCancelFileRequest(url);
-                this.files.delete(url);
-                this.emit(MediaPeerEvents.DataFileAbsent, this, url);
-            }, this.requestFileResponseTimeout);
-
+            this.setResponseTimer(url);
             this.tmpFileData.set(url, new Array<LoaderFileChunk>());
             return true;
         }
@@ -202,6 +201,30 @@ export default class MediaPeer extends EventEmitter {
 
     public sendCancelFileRequest(url: string): boolean {
         return this.sendCommand({"command": MediaPeerCommands.CancelFileRequest, "url": url});
+    }
+
+    private setResponseTimer(url: string) {
+
+        let timer = this.requestFileResponseTimers.get(url);
+        if (timer) {
+            clearTimeout(timer);
+        }
+
+        timer = setTimeout(() => {
+                this.sendCancelFileRequest(url);
+                this.files.delete(url);
+                this.emit(MediaPeerEvents.DataFileAbsent, this, url);
+            },
+            this.requestFileResponseTimeout);
+
+        this.requestFileResponseTimers.set(url, timer);
+    }
+
+    private removeResponseTimer(url: string) {
+        let timer = this.requestFileResponseTimers.get(url);
+        if (timer) {
+            clearTimeout(timer);
+        }
     }
 
 }
