@@ -31,6 +31,7 @@ export default class HttpMediaManager extends EventEmitter implements MediaManag
         };
 
         request.onerror = (event: any) => {
+            // TODO: retry with timeout?
             this.xhrRequests.delete(file.url);
             this.emit(LoaderEvents.FileError, file.url, event);
         };

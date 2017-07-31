@@ -36,6 +36,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         this.fileQueue.forEach((file) => {
             if (files.findIndex((f) => f.url === file.url) === -1) {
                 this.httpManager.abort(file);
+                this.emit(LoaderEvents.FileAbort, file.url);
             }
         });
 

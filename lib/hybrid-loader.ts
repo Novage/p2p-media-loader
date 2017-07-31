@@ -38,7 +38,9 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     load(files: LoaderFile[], playlistUrl: string, emitNowFileUrl?: string): void {
-        //console.log("load()", files.length, (files.length > 0 ? files[0].url : ""));
+        //console.log("load()", files.length, files);
+        //console.log("emitNowFileUrl", emitNowFileUrl);
+        //console.log("--------------------------------------------------------------------------");
         this.p2pManager.setPlaylistUrl(playlistUrl);
 
         // stop all http requests and p2p downloads for files that are not in the new load
@@ -46,6 +48,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             if (files.findIndex(f => f.url === file.url) === -1) {
                 this.httpManager.abort(file);
                 this.p2pManager.abort(file);
+                this.emit(LoaderEvents.FileAbort, file.url);
             }
         });
 
