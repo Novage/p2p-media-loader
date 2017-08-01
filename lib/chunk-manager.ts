@@ -18,6 +18,7 @@ export default class ChunkManager implements ChunkManagerInterface {
         this.loader = loader;
         this.loader.on(LoaderEvents.FileLoaded, this.onFileLoaded.bind(this));
         this.loader.on(LoaderEvents.FileError, this.onFileError.bind(this));
+        this.loader.on(LoaderEvents.FileAbort, this.onFileAbort.bind(this));
     }
 
     public processHlsPlaylist(url: string, content: string): void {
@@ -108,6 +109,15 @@ export default class ChunkManager implements ChunkManagerInterface {
         if (this.chunk && this.chunk.url === url) {
             if (this.chunk.onError) {
                 this.chunk.onError(error);
+            }
+            this.chunk = undefined;
+        }
+    }
+
+    private onFileAbort(url: string): void {
+        if (this.chunk && this.chunk.url === url) {
+            if (this.chunk.onError) {
+                this.chunk.onError("Loading aborted");
             }
             this.chunk = undefined;
         }
