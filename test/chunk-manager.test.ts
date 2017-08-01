@@ -50,21 +50,6 @@ describe("ChunkManager", () => {
         ]), testPlaylist.url, testPlaylist.baseUrl + "chunk-1046.ts")).once();
     });
 
-    it("should pass to LoaderInterface chunk list starting from current chunk if its before requested one", () => {
-        const loader = mock<LoaderInterface>(LoaderInterfaceEmptyImpl);
-        const manager = new ChunkManager(instance(loader));
-        manager.processHlsPlaylist(testPlaylist.url, testPlaylist.content);
-        manager.setCurrentChunk(testPlaylist.baseUrl + "chunk-1044.ts");
-        manager.loadChunk(testPlaylist.baseUrl + "chunk-1046.ts");
-        verify(loader.load(deepEqual([
-            new LoaderFile(testPlaylist.baseUrl + "chunk-1044.ts"),
-            new LoaderFile(testPlaylist.baseUrl + "chunk-1045.ts"),
-            new LoaderFile(testPlaylist.baseUrl + "chunk-1046.ts"),
-            new LoaderFile(testPlaylist.baseUrl + "chunk-1047.ts"),
-            new LoaderFile(testPlaylist.baseUrl + "chunk-1048.ts")
-        ]), testPlaylist.url, testPlaylist.baseUrl + "chunk-1046.ts")).once();
-    });
-
     it("should pass to LoaderInterface chunk list starting from requested one (ignoring current chunk) if previously requested chunk not contiguous", () => {
         const loader = mock<LoaderInterface>(LoaderInterfaceEmptyImpl);
         const manager = new ChunkManager(instance(loader));

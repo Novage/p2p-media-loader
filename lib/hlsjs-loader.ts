@@ -17,7 +17,6 @@ export default class HlsJsLoader {
         this.context = context;
         this.callbacks = callbacks;
         this.url = context.url;
-        this.stats.trequest = performance.now();
         if (context.type === "manifest" || context.type === "level") {
             this.p2pml.loadHlsPlaylist(this.url)
                 .then((content: any) => { this.success(content); })
@@ -41,8 +40,10 @@ export default class HlsJsLoader {
     }
 
     private success(content: any): void {
-        this.stats.tfirst = performance.now();
-        this.stats.tload = performance.now();
+        // todo: report correct loading stats when they will be reported by p2pml.loadChunk
+        this.stats.trequest = performance.now();
+        this.stats.tfirst = this.stats.trequest + 500;
+        this.stats.tload = this.stats.trequest + 500;
         this.stats.loaded = content instanceof ArrayBuffer
             ? content.byteLength
             : content.length;

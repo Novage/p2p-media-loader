@@ -11,8 +11,9 @@ export default class ChunkManager implements ChunkManagerInterface {
     private loader: LoaderInterface;
     private playlists: Map<string, Playlist> = new Map();
     private chunk: Chunk | undefined = undefined;
-    private prevChunkUrl: string | undefined = undefined;
     private currentChunkUrl: string | undefined = undefined;
+    private prevLoadUrl: string | undefined = undefined;
+    private playQueue: string[] = [];
 
     public constructor(loader: LoaderInterface) {
         this.loader = loader;
@@ -52,29 +53,43 @@ export default class ChunkManager implements ChunkManagerInterface {
             return;
         }
 
-        let hotChunkIndex: number;
-
-        const { playlist: prevLoadingPlaylist, chunkIndex: prevLoadingChunkIndex } = this.getChunkLocation(this.prevChunkUrl);
-        if (prevLoadingPlaylist
-            && prevLoadingPlaylist.url === loadingPlaylist.url
-            && prevLoadingChunkIndex + 1 < loadingChunkIndex) {
-            // seek forward
-            hotChunkIndex = loadingChunkIndex;
-            this.currentChunkUrl = undefined;
-        } else {
-            const { playlist: playingPlaylist, chunkIndex: playingChunkIndex } = this.getChunkLocation(this.currentChunkUrl);
-            if (playingPlaylist && playingPlaylist.url === loadingPlaylist.url) {
-                // seek backward OR buffering forward
-                hotChunkIndex = Math.min(loadingChunkIndex, playingChunkIndex);
+        if (this.playQueue.length > 0) {
+            const prevChunkUrl = this.playQueue[ this.playQueue.length - 1 ];
+            const { playlist: prevLoadingPlaylist, chunkIndex: prevLoadingChunkIndex } = this.getChunkLocation(prevChunkUrl);
+            if (prevLoadingPlaylist && prevLoadingChunkIndex !== loadingChunkIndex - 1) {
+                console.log("#### load sequence BREAK");
+                this.playQueue = [];
             } else {
-                // initial prebuffering OR level switch
-                hotChunkIndex = loadingChunkIndex;
+                console.log("#### load sequential");
             }
+        } else {
+            console.log("#### load first");
         }
 
         this.chunk = new Chunk(url, onSuccess, onError);
-        this.loadFiles(loadingPlaylist, hotChunkIndex, url);
-        this.prevChunkUrl = url;
+        this.loadFiles(loadingPlaylist, loadingChunkIndex, url);
+        this.prevLoadUrl = url;
+    }
+
+    public setCurrentChunk(url?: string): void {
+        if (!url) {
+            return;
+        }
+
+        const urlIndex = this.playQueue.indexOf(url);
+        if (urlIndex < 0) {
+            console.log("#### play MISS");
+        } else {
+            console.log("#### play hit");
+            this.playQueue = this.playQueue.slice(urlIndex);
+        }
+
+        if (this.prevLoadUrl) {
+            const { playlist: loadingPlaylist, chunkIndex: loadingChunkIndex } = this.getChunkLocation(this.prevLoadUrl);
+            if (loadingPlaylist) {
+                this.loadFiles(loadingPlaylist, loadingChunkIndex);
+            }
+        }
     }
 
     public abortChunk(url: string): void {
@@ -83,21 +98,9 @@ export default class ChunkManager implements ChunkManagerInterface {
         }
     }
 
-    public setCurrentChunk(url?: string): void {
-        this.currentChunkUrl = url;
-
-        // we loadFiles only if currentChunkUrl is located in the same playlist as prevChunkUrl
-        const { playlist: prevLoadingPlaylist, chunkIndex: prevLoadingChunkIndex } = this.getChunkLocation(this.prevChunkUrl);
-        if (prevLoadingPlaylist) {
-            const { playlist: playingPlaylist, chunkIndex: playingChunkIndex } = this.getChunkLocation(this.currentChunkUrl);
-            if (playingPlaylist && playingPlaylist.url === prevLoadingPlaylist.url) {
-                this.loadFiles(playingPlaylist, playingChunkIndex);
-            }
-        }
-    }
-
     private onFileLoaded(file: LoaderFile): void {
         if (this.chunk && this.chunk.url === file.url) {
+            this.playQueue.push(file.url);
             if (this.chunk.onSuccess) {
                 this.chunk.onSuccess(file.data);
             }
@@ -138,6 +141,11 @@ export default class ChunkManager implements ChunkManagerInterface {
 
     private loadFiles(playlist: Playlist, chunkIndex: number, loadUrl?: string): void {
         const files: LoaderFile[] = [];
+
+        for (let i = 0; i < this.playQueue.length; ++i) {
+            files.push(new LoaderFile(this.playQueue[ i ]));
+        }
+
         const segments: any[] = playlist.manifest.segments;
         for (let i = chunkIndex; i < segments.length; ++i) {
             const fileUrl = playlist.getChunkAbsoluteUrl(i);
@@ -145,19 +153,7 @@ export default class ChunkManager implements ChunkManagerInterface {
         }
 
         this.loader.load(files, playlist.url, loadUrl);
-
-        // debug {{{
-        /*const q: string[] = [];
-        for (let i = 0; i < segments.length; ++i) {
-            const u = playlist.baseUrl + segments[ i ].uri;
-            const id = i; // u.substr(u.length - 6, 3); // use last 3 chars without ".ts"
-            const ht = i === chunkIndex ? "-HOT" : "";
-            const pl = u === this.currentChunkUrl ? "-PLAYING" : "";
-            const ld = u === loadUrl ? "-LOADING" : "";
-            q.push(id + ht + pl + ld);
-        }
-        console.log("CHUNKS", q);*/
-        // }}}
+        console.log("total files / play queue", files.length, this.playQueue.length);
     }
 
 }
