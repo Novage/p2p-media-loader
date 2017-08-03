@@ -4,7 +4,6 @@ import LoaderEvents from "./loader-events";
 import MediaManagerInterface from "./media-manager-interface";
 import LoaderFileCacheManagerInterface from "./loader-file-cache-manger-interface";
 import {EventEmitter} from "events";
-import {setInterval} from "timers";
 
 export default class HybridLoader extends EventEmitter implements LoaderInterface {
 
@@ -12,7 +11,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private p2pManager: MediaManagerInterface;
     private cacheManager: LoaderFileCacheManagerInterface;
 
-    private readonly loaderFileExpiration = 1 * 60 * 1000; // milliseconds
+    private readonly loaderFileExpiration = 3 * 60 * 1000; // milliseconds
     private readonly requiredFilesCount = 2;
     private readonly bufferFilesCount = 3;
     private fileQueue: LoaderFile[] = [];

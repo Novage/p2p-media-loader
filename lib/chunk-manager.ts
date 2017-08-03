@@ -57,13 +57,13 @@ export default class ChunkManager implements ChunkManagerInterface {
             const prevChunkUrl = this.playQueue[ this.playQueue.length - 1 ];
             const { playlist: prevLoadingPlaylist, chunkIndex: prevLoadingChunkIndex } = this.getChunkLocation(prevChunkUrl);
             if (prevLoadingPlaylist && prevLoadingChunkIndex !== loadingChunkIndex - 1) {
-                console.log("#### load sequence BREAK");
+                //console.log("#### load sequence BREAK");
                 this.playQueue = [];
             } else {
-                console.log("#### load sequential");
+                //console.log("#### load sequential");
             }
         } else {
-            console.log("#### load first");
+            //console.log("#### load first");
         }
 
         this.chunk = new Chunk(url, onSuccess, onError);
@@ -78,9 +78,9 @@ export default class ChunkManager implements ChunkManagerInterface {
 
         const urlIndex = this.playQueue.indexOf(url);
         if (urlIndex < 0) {
-            console.log("#### play MISS");
+            //console.log("#### play MISS");
         } else {
-            console.log("#### play hit");
+            //console.log("#### play hit");
             this.playQueue = this.playQueue.slice(urlIndex);
         }
 
@@ -153,7 +153,7 @@ export default class ChunkManager implements ChunkManagerInterface {
         }
 
         this.loader.load(files, playlist.url, loadUrl);
-        console.log("total files / play queue", files.length, this.playQueue.length);
+        //console.log("total files / play queue", files.length, this.playQueue.length);
     }
 
 }

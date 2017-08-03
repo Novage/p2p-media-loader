@@ -27,7 +27,7 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
         cacheManager.on(CacheEvents.CacheUpdated, this.onCacheUpdated.bind(this));
 
         const date = (new Date()).valueOf().toString();
-        const random = Math.random().toString(); // randombytes(10).toString('base64')
+        const random = Math.random().toString();
         this.peerId = createHash("sha1").update(date + random).digest("hex");
 
         //console.info("client peerId", this.peerId);
