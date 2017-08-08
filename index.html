@@ -24,16 +24,17 @@
     <script>
 
         if (Hls.isSupported()) {
-            var p2pml = new P2PMediaLoader();
+            var p2pml = new P2PMediaLoaderModule.P2PMediaLoader();
 
             var video = document.getElementById('video');
             var hls = new Hls({ loader: p2pml.getHlsJsLoader()/*debug: true*/ });
-            //hls.loadSource('https://wowza.peer5.com/live/smil:ski.smil/playlist.m3u8'); // stream, 20 chunks ~5sec each
-            //hls.loadSource('http://wms.shared.streamshow.it/carinatv/carinatv/playlist.m3u8'); // stream, 3 chunks ~10 sec each
-            hls.loadSource('https://video-dev.github.io/streams/x36xhzz/x36xhzz.m3u8'); // VOD, 64 chunks
-            //hls.loadSource('https://wowza-cdn.streamroot.io/vodOriginSite/tears_of_steel720p.mp4/playlist.m3u8'); // VOD, 368 chunks ~2 sec each
-            //hls.loadSource('http://cdn3.viblast.com/streams/hls/airshow/playlist.m3u8'); // stream, 3 chunks ~10 sec each
-            //hls.loadSource('http://zoomweblive-lh.akamaihd.net/i/Zoom-TIL-WAP/Zoomweb_1@348071/index_600_av-p.m3u8'); // stream, 178 chunks ~10 sec each
+            //hls.loadSource('https://wowza.peer5.com/live/smil:ski.smil/playlist.m3u8'); // live, 20 chunks ~5sec each
+            //hls.loadSource('http://wms.shared.streamshow.it/carinatv/carinatv/playlist.m3u8'); // live, 3 chunks ~10 sec each
+            //hls.loadSource('https://video-dev.github.io/streams/x36xhzz/x36xhzz.m3u8'); // VOD, 64 chunks
+            //hls.loadSource('https://wowza-cdn.streamroot.io/vodOriginSite/tears_of_steel720p.mp4/playlist.m3u8');
+            //hls.loadSource('http://cdn3.viblast.com/streams/hls/airshow/playlist.m3u8');
+            hls.loadSource('http://zoomweblive-lh.akamaihd.net/i/Zoom-TIL-WAP/Zoomweb_1@348071/index_600_av-p.m3u8'); // stream, 178 chunks ~10 sec each
+            //hls.nextLevel = 0;
             hls.attachMedia(video);
             hls.on(Hls.Events.MANIFEST_PARSED, function() {
                 video.play();

@@ -1,11 +1,13 @@
 {
   "name": "p2p-media-loader",
   "version": "0.0.1",
-  "main": "index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
+    "compile": "rimraf ./dist/ && tsc && cpr ./lib/*.js ./dist/",
     "lint": "tslint -c tslint.json -p tsconfig.json",
-    "build": "browserify index.ts --standalone P2PMediaLoader -p [ tsify --noImplicitAny ] > p2p-media-loader.js",
-    "build-production": "browserify index.ts --standalone P2PMediaLoader -p [ tsify --noImplicitAny ] | babili > p2p-media-loader.js",
+    "build": "npm run compile && browserify dist/index.js --standalone P2PMediaLoaderModule > p2p-media-loader.js",
+    "build-production": "npm run compile && browserify dist/index.js --standalone P2PMediaLoaderModule -p babili > p2p-media-loader.js",
     "test": "mocha -r ts-node/register test/*.test.ts"
   },
   "dependencies": {
@@ -19,7 +21,9 @@
     "@types/text-encoding": "0.0.31",
     "babili": "^0.1.4",
     "browserify": "^14.4.0",
+    "cpr": "^2.2.0",
     "mocha": "^3.4.2",
+    "rimraf": "^2.6.1",
     "sinon": "^2.4.0",
     "ts-mockito": "^2.0.2",
     "ts-node": "^3.2.0",

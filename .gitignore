@@ -1,4 +1,5 @@
 .idea/
 node_modules/
 p2p-media-loader.js
+dist
 .directory
