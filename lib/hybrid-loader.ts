@@ -70,12 +70,14 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private processFileQueue(): void {
-        for (let i = 0; i < this.fileQueue.length; i++) {
-            const file = this.fileQueue[i];
+        const startingPriority = this.fileQueue.length > 0 ? this.fileQueue[0].priority : 0;
+
+        for (let index = 0; index < this.fileQueue.length; index++) {
+            const file = this.fileQueue[index];
             if (!this.cacheManager.has(file.url)) {
-                if (i < this.requiredFilesCount) {
-                    // first file is urgent so stop all other http requests
-                    if (i === 0 && !this.httpManager.isDownloading(file) && this.httpManager.getActiveDownloadsCount() > 0) {
+                if (index < this.requiredFilesCount && this.requiredFilesCount > startingPriority) {
+                    // first file is urgent so stop all other http requests?
+                    if (index === 0 && !this.httpManager.isDownloading(file) && this.httpManager.getActiveDownloadsCount() > 0) {
                         this.fileQueue.forEach(file => this.httpManager.abort(file));
                     }
 
