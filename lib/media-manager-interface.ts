@@ -2,7 +2,7 @@ import LoaderFile from "./loader-file";
 
 interface MediaManagerInterface {
 
-    setPlaylistUrl(url: string): void;
+    setSwarmId(id: string): void;
     on(eventName: string | symbol, listener: Function): this;
     download(file: LoaderFile): void;
     abort(file: LoaderFile): void;

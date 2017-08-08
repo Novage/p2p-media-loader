@@ -36,11 +36,11 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         }, 1000);
     }
 
-    load(files: LoaderFile[], playlistUrl: string, emitNowFileUrl?: string): void {
+    load(files: LoaderFile[], swarmId: string, emitNowFileUrl?: string): void {
         //console.log("load()", files.length, files);
         //console.log("emitNowFileUrl", emitNowFileUrl);
         //console.log("--------------------------------------------------------------------------");
-        this.p2pManager.setPlaylistUrl(playlistUrl);
+        this.p2pManager.setSwarmId(swarmId);
 
         // stop all http requests and p2p downloads for files that are not in the new load
         this.fileQueue.forEach(file => {

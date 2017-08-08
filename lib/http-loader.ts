@@ -30,7 +30,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
      *
      * @param {LoaderFile[]} files Files to download.
      */
-    public load(files: LoaderFile[], playlistUrl: string, emitNowFileUrl?: string): void {
+    public load(files: LoaderFile[], swarmId: string, emitNowFileUrl?: string): void {
 
         // stop all xhr requests for files that are not in the new load
         this.fileQueue.forEach((file) => {

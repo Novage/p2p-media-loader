@@ -56,7 +56,7 @@ export default class HttpMediaManager extends EventEmitter implements MediaManag
         return this.xhrRequests.size;
     }
 
-    setPlaylistUrl(url: string): void {
+    setSwarmId(id: string): void {
         throw new Error("Method not implemented.");
     }
 

@@ -17,7 +17,7 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
     private readonly announce = [ "wss://tracker.btorrent.xyz/" ];
     private peers: Map<string, MediaPeer> = new Map();
     private peerFileRequests: Map<string, string> = new Map();
-    private playlistUrl: string;
+    private swarmId: string;
     private peerId: string;
 
     public constructor(cacheManager: LoaderFileCacheManagerInterface) {
@@ -33,15 +33,15 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
         //console.info("client peerId", this.peerId);
     }
 
-    public setPlaylistUrl(url: string): void {
-        if (this.playlistUrl !== url) {
-            this.playlistUrl = url;
-            //console.log("this.playlistUrl", this.playlistUrl);
+    public setSwarmId(id: string): void {
+        if (this.swarmId !== id) {
+            this.swarmId = id;
+            //console.log("this.swarmId", this.swarmId);
 
             if (this.client) {
                 this.client.stop();
             }
-            this.createClient(createHash("sha1").update(url).digest("hex"));
+            this.createClient(createHash("sha1").update(id).digest("hex"));
         }
     }
 
