@@ -5,8 +5,8 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "compile": "rimraf ./dist/ && tsc",
-    "lint": "tslint -c tslint.json -p tsconfig.json",
-    "build": "npm run compile && browserify dist/index.js --standalone p2pml > p2p-media-loader-core.js",
+    "lint": "tslint -c ./tslint.json -p ./tsconfig.json",
+    "build": "npm run compile && browserify -r ./dist/index.js:p2p-media-loader-core > p2p-media-loader-core.js",
     "build-production": "npm run compile && browserify dist/index.js --standalone p2pml -p babili > p2p-media-loader-core.js",
     "test": "mocha -r ts-node/register test/*.test.ts"
   },

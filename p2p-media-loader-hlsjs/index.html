@@ -4,6 +4,7 @@
 
     <meta charset="UTF-8">
 
+    <script src="p2p-media-loader-core.js"></script>
     <script src="p2p-media-loader-hlsjs.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
@@ -24,8 +25,17 @@
     <script>
 
         if (Hls.isSupported()) {
-            var hls = new Hls(/*{ debug: true }*/);
-            p2pml.hlsjs.initPlayer(hls);
+            var hls = new Hls();
+
+            var p2pml = require("p2p-media-loader-core");
+            p2pml.hlsjs = require("p2p-media-loader-hlsjs");
+
+            var p2pmlLoader = new p2pml.HybridLoader();
+            var chunkManager = new p2pml.hlsjs.ChunkManager(p2pmlLoader);
+            var hlsJsLoader = p2pml.hlsjs.createLoaderClass(chunkManager);
+
+            p2pml.hlsjs.initPlayer(hls, hlsJsLoader);
+
             //hls.loadSource("https://wowza.peer5.com/live/smil:ski.smil/playlist.m3u8"); // live, 20 chunks ~5sec each
             //hls.loadSource("http://wms.shared.streamshow.it/carinatv/carinatv/playlist.m3u8"); // live, 3 chunks ~10 sec each
             //hls.loadSource("https://video-dev.github.io/streams/x36xhzz/x36xhzz.m3u8"); // VOD, 64 chunks
