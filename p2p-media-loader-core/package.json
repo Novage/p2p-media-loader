@@ -1,5 +1,5 @@
 {
-  "name": "p2p-media-loader",
+  "name": "p2p-media-loader-core",
   "version": "0.0.1",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
