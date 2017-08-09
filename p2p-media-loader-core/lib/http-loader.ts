@@ -4,6 +4,8 @@ import LoaderEvents from "./loader-events";
 import MediaManagerInterface from "./media-manager-interface";
 import {EventEmitter} from "events";
 import LoaderFileCacheManagerInterface from "./loader-file-cache-manger-interface";
+import HttpMediaManager from "./http-media-manager";
+import LoaderFileCacheManager from "./loader-file-cache-manager";
 
 export default class HttpLoader extends EventEmitter implements LoaderInterface {
 
@@ -13,14 +15,14 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
     private readonly loaderFileExpiration = 1 * 60 * 1000; // milliseconds
     private fileQueue: LoaderFile[] = [];
 
-    public constructor(httpManager: MediaManagerInterface, cacheManager: LoaderFileCacheManagerInterface) {
+    public constructor() {
         super();
 
-        this.httpManager = httpManager;
+        this.httpManager = new HttpMediaManager();
         this.httpManager.on(LoaderEvents.FileLoaded, this.onFileLoaded.bind(this));
         this.httpManager.on(LoaderEvents.FileError, this.onFileError.bind(this));
 
-        this.cacheManager = cacheManager;
+        this.cacheManager = new LoaderFileCacheManager();
     }
 
     /**

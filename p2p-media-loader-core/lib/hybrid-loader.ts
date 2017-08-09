@@ -4,6 +4,9 @@ import LoaderEvents from "./loader-events";
 import MediaManagerInterface from "./media-manager-interface";
 import LoaderFileCacheManagerInterface from "./loader-file-cache-manger-interface";
 import {EventEmitter} from "events";
+import HttpMediaManager from "./http-media-manager";
+import P2PMediaManager from "./p2p-media-manager";
+import LoaderFileCacheManager from "./loader-file-cache-manager";
 
 export default class HybridLoader extends EventEmitter implements LoaderInterface {
 
@@ -16,20 +19,19 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private readonly bufferFilesCount = 3;
     private fileQueue: LoaderFile[] = [];
 
-    public constructor(httpManager: MediaManagerInterface, p2pManager: MediaManagerInterface,
-                       cacheManager: LoaderFileCacheManagerInterface) {
+    public constructor() {
         super();
 
-        this.httpManager = httpManager;
-        httpManager.on(LoaderEvents.FileLoaded, this.onFileLoaded.bind(this));
-        httpManager.on(LoaderEvents.FileError, this.onFileError.bind(this));
+        this.cacheManager = new LoaderFileCacheManager();
 
-        this.p2pManager = p2pManager;
-        p2pManager.on(LoaderEvents.FileLoaded, this.onFileLoaded.bind(this));
-        p2pManager.on(LoaderEvents.FileError, this.onFileError.bind(this));
-        p2pManager.on(LoaderEvents.ForceProcessing, this.processFileQueue.bind(this));
+        this.httpManager = new HttpMediaManager();
+        this.httpManager.on(LoaderEvents.FileLoaded, this.onFileLoaded.bind(this));
+        this.httpManager.on(LoaderEvents.FileError, this.onFileError.bind(this));
 
-        this.cacheManager = cacheManager;
+        this.p2pManager = new P2PMediaManager(this.cacheManager);
+        this.p2pManager.on(LoaderEvents.FileLoaded, this.onFileLoaded.bind(this));
+        this.p2pManager.on(LoaderEvents.FileError, this.onFileError.bind(this));
+        this.p2pManager.on(LoaderEvents.ForceProcessing, this.processFileQueue.bind(this));
 
         setInterval(() => {
             this.processFileQueue();
