@@ -1,17 +1,13 @@
-import ChunkManagerInterface from "./chunk-manager-interface";
-import LoaderEvents from "./loader-events";
-import LoaderFile from "./loader-file";
-import LoaderInterface from "./loader-interface";
+import {LoaderEvents, LoaderFile, LoaderInterface} from "p2p-media-loader-core";
 import Utils from "./utils";
 
 const m3u8Parser = require("m3u8-parser");
 
-export default class ChunkManager implements ChunkManagerInterface {
+export default class ChunkManager {
 
     private loader: LoaderInterface;
     private playlists: Map<string, Playlist> = new Map();
     private chunk: Chunk | undefined = undefined;
-    private currentChunkUrl: string | undefined = undefined;
     private prevLoadUrl: string | undefined = undefined;
     private playQueue: string[] = [];
 

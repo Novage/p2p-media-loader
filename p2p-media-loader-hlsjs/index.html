@@ -4,7 +4,7 @@
 
     <meta charset="UTF-8">
 
-    <script src="p2p-media-loader.js"></script>
+    <script src="p2p-media-loader-hlsjs.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
     <style>
@@ -24,10 +24,10 @@
     <script>
 
         if (Hls.isSupported()) {
-            var p2pml = new P2PMediaLoaderModule.P2PMediaLoader();
+            var hlsJsLoader = p2pml.hlsjs.getLoader();
 
             var video = document.getElementById('video');
-            var hls = new Hls({ loader: p2pml.getHlsJsLoader()/*debug: true*/ });
+            var hls = new Hls({ loader: hlsJsLoader/*debug: true*/ });
             //hls.loadSource('https://wowza.peer5.com/live/smil:ski.smil/playlist.m3u8'); // live, 20 chunks ~5sec each
             //hls.loadSource('http://wms.shared.streamshow.it/carinatv/carinatv/playlist.m3u8'); // live, 3 chunks ~10 sec each
             //hls.loadSource('https://video-dev.github.io/streams/x36xhzz/x36xhzz.m3u8'); // VOD, 64 chunks
@@ -42,7 +42,7 @@
             });
             hls.on(Hls.Events.FRAG_CHANGED, function (event, data) {
                 var url = data && data.frag ? data.frag.url : undefined;
-                p2pml.setCurrentChunk(url);
+                hlsJsLoader.getChunkManager().setCurrentChunk(url);
             });
         }
 

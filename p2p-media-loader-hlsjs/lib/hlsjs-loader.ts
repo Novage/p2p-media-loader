@@ -1,15 +1,15 @@
-import P2PMediaLoader from "./p2p-media-loader";
+import ChunkManager from "./chunk-manager";
 
 export default class HlsJsLoader {
 
-    private p2pml: P2PMediaLoader;
+    private chunkManager: ChunkManager;
     private stats: any;
     private context: any;
     private callbacks: any;
     private url: string;
 
-    public constructor(p2pml: P2PMediaLoader, settings_unused: any) {
-        this.p2pml = p2pml;
+    public constructor(chunkManager: ChunkManager, settings_unused: any) {
+        this.chunkManager = chunkManager;
         this.stats = {};
     }
 
@@ -18,11 +18,11 @@ export default class HlsJsLoader {
         this.callbacks = callbacks;
         this.url = context.url;
         if (context.type === "manifest" || context.type === "level") {
-            this.p2pml.loadHlsPlaylist(this.url)
+            this.chunkManager.loadHlsPlaylist(this.url)
                 .then((content: any) => { this.success(content); })
                 .catch((error: any) => { this.error(error); });
         } else if (context.frag) {
-            this.p2pml.loadChunk(this.url,
+            this.chunkManager.loadChunk(this.url,
                 (content: any) => { setTimeout(() => { this.success(content); }, 0); },
                 (error: any) => { setTimeout(() => { this.error(error); }, 0); }
             );
@@ -32,7 +32,7 @@ export default class HlsJsLoader {
     }
 
     public abort(): void {
-        this.p2pml.abortChunk(this.url);
+        this.chunkManager.abortChunk(this.url);
     }
 
     public destroy(): void {

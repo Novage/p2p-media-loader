@@ -1,0 +1,33 @@
+{
+  "name": "p2p-media-loader-hlsjs",
+  "version": "0.0.1",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "compile": "rimraf ./dist/ && tsc && cpr ./lib/*.js ./dist/",
+    "lint": "tslint -c tslint.json -p tsconfig.json",
+    "build": "npm run compile && browserify dist/index.js --standalone p2pml.hlsjs > p2p-media-loader-hlsjs.js",
+    "build-production": "npm run compile && browserify dist/index.js --standalone p2pml.hlsjs -p babili > p2p-media-loader-hlsjs.js",
+    "test": "mocha -r ts-node/register test/*.test.ts"
+  },
+  "dependencies": {
+    "p2p-media-loader": "../p2p-media-loader-core",
+    "m3u8-parser": "3.0.0"
+  },
+  "devDependencies": {
+    "@types/mocha": "^2.2.41",
+    "@types/node": "^6.0.81",
+    "@types/sinon": "^2.3.3",
+    "babili": "^0.1.4",
+    "browserify": "^14.4.0",
+    "cpr": "^2.2.0",
+    "mocha": "^3.4.2",
+    "rimraf": "^2.6.1",
+    "sinon": "^2.4.0",
+    "ts-mockito": "^2.0.2",
+    "ts-node": "^3.2.0",
+    "tsify": "^3.0.1",
+    "tslint": "^5.5.0",
+    "typescript": "^2.4.1"
+  }
+}
