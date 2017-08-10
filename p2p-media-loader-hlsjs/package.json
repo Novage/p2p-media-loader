@@ -8,7 +8,7 @@
     "compile": "rimraf ./dist/ && tsc && copyfiles -f ./lib/*.js ./dist/",
     "lint": "tslint -c ./tslint.json -p ./tsconfig.json",
     "build": "npm run compile && browserify -r ./dist/index.js:p2p-media-loader-hlsjs ./dist/browser-init.js --exclude p2p-media-loader-core > p2p-media-loader-hlsjs.js",
-    "refresh-core-dependency": "rimraf ./node_modules/p2p-media-loader-core/ && npm install && copyfiles -f ./node_modules/p2p-media-loader-core/p2p-media-loader-core.js ./",
+    "refresh-dependencies": "rimraf ./node_modules/p2p-media-loader-core/ && npm install && npm update && copyfiles -f ./node_modules/p2p-media-loader-core/p2p-media-loader-core.js ./",
     "test": "mocha -r ts-node/register test/*.test.ts"
   },
   "license": "MIT",
