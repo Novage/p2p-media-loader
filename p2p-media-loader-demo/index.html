@@ -6,6 +6,7 @@
 
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
 
+    <script src="p2p-graph.js"></script>
     <script src="p2p-media-loader-core.js"></script>
     <script src="p2p-media-loader-hlsjs.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
@@ -23,17 +24,41 @@
 <body >
 
 <video id="video" controls></video>
+<div id="graph" controls></div>
 
 <script>
 
-    if (Hls.isSupported()) {
-        var hls = new Hls();
-        p2pml.hlsjs.initPlayer(hls);
+    var P2PGraphClass = require("p2p-graph");
+    var P2PGraph = (function () {
+        function P2PGraph(selector, p2pLoader) {
+            this.graph = new P2PGraphClass(selector);
+            this.graph.add({id: "me", name: "You", me: true});
 
-/*        //Alternative initialization
+            p2pLoader.on("peer_connect", this.onPeerConnect.bind(this));
+            p2pLoader.on("peer_close", this.onPeerClose.bind(this));
+        }
+        P2PGraph.prototype.onPeerConnect = function (mediaPeer) {
+            var peer = mediaPeer.peer;
+            this.graph.add({ id: peer.id, name: peer.remoteAddress || 'Unknown' });
+            this.graph.connect("me", peer.id);
+        };
+        P2PGraph.prototype.onPeerClose = function (mediaPeer) {
+            var peer = mediaPeer.peer;
+            this.graph.disconnect("me", peer.id);
+            this.graph.remove(peer.id);
+        };
+        return P2PGraph;
+    }());
+
+    if (Hls.isSupported()) {
+
+        var hls = new Hls();
+
         var p2pmlLoader = new p2pml.HybridLoader();
         var chunkManager = new p2pml.hlsjs.ChunkManager(p2pmlLoader);
-        p2pml.hlsjs.initPlayer(hls, {"chunkManager": chunkManager});*/
+        p2pml.hlsjs.initPlayer(hls, {"chunkManager" : chunkManager});
+
+        new P2PGraph("#graph", p2pmlLoader);
 
         //hls.loadSource("https://wowza.peer5.com/live/smil:ski.smil/playlist.m3u8"); // live, 20 chunks ~5sec each
         //hls.loadSource("http://wms.shared.streamshow.it/carinatv/carinatv/playlist.m3u8"); // live, 3 chunks ~10 sec each
