@@ -4,28 +4,20 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "compile": "rimraf ./dist/ && tsc",
+    "compile": "rimraf ./dist/ && tsc && copyfiles -f ./lib/*.js ./dist/",
     "lint": "tslint -c ./tslint.json -p ./tsconfig.json",
-    "build": "npm run compile && browserify -r ./dist/index.js:p2p-media-loader-core > p2p-media-loader-core.js",
-    "build-production": "npm run compile && browserify dist/index.js --standalone p2pml -p babili > p2p-media-loader-core.js",
-    "test": "mocha -r ts-node/register test/*.test.ts"
+    "build": "npm run compile && browserify -r ./dist/index.js:p2p-media-loader-core ./dist/browser-init.js > p2p-media-loader-core.js"
   },
   "dependencies": {
     "bittorrent-tracker": "9.2.3"
   },
   "devDependencies": {
-    "@types/mocha": "^2.2.41",
     "@types/node": "^6.0.81",
-    "@types/sinon": "^2.3.3",
     "@types/text-encoding": "0.0.31",
-    "babili": "^0.1.4",
     "browserify": "^14.4.0",
-    "mocha": "^3.4.2",
+    "copyfiles": "^1.2.0",
     "rimraf": "^2.6.1",
-    "sinon": "^2.4.0",
-    "ts-mockito": "^2.0.2",
     "ts-node": "^3.2.0",
-    "tsify": "^3.0.1",
     "tslint": "^5.5.0",
     "typescript": "^2.4.1"
   }
