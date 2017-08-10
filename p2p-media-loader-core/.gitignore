@@ -1,5 +1,5 @@
 .idea/
 node_modules/
-p2p-media-loader.js
+p2p-media-loader-core.js
 dist
 .directory
