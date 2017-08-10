@@ -7,8 +7,8 @@ export default class ChunkManager {
 
     private loader: LoaderInterface;
     private playlists: Map<string, Playlist> = new Map();
-    private chunk: Chunk | undefined = undefined;
-    private prevLoadUrl: string | undefined = undefined;
+    private chunk?: Chunk = undefined;
+    private prevLoadUrl?: string = undefined;
     private playQueue: string[] = [];
 
     public constructor(loader: LoaderInterface) {
@@ -122,7 +122,7 @@ export default class ChunkManager {
         }
     }
 
-    private getChunkLocation(url: string | undefined): { playlist: Playlist | undefined, chunkIndex: number } {
+    private getChunkLocation(url?: string): { playlist?: Playlist, chunkIndex: number } {
         if (url) {
             for (const playlist of Array.from(this.playlists.values())) {
                 const chunkIndex = playlist.getChunkIndex(url);
