@@ -1,4 +1,4 @@
-function getHlsJsLoaderClass(HlsJsLoader, chunkManager) {
+function createHlsJsLoaderClass(HlsJsLoader, chunkManager) {
     function HlsJsLoaderClass(settings) {
         this.impl = new HlsJsLoader(chunkManager, settings);
         this.stats = this.impl.stats;
@@ -23,4 +23,4 @@ function getHlsJsLoaderClass(HlsJsLoader, chunkManager) {
     return HlsJsLoaderClass;
 }
 
-module.exports = getHlsJsLoaderClass;
+module.exports = createHlsJsLoaderClass;

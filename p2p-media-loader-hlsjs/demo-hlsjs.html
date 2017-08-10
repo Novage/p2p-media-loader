@@ -26,7 +26,7 @@
 
         if (Hls.isSupported()) {
             var hls = new Hls();
-            p2pml.hlsjs.initPlayer(hls);
+            p2pml.hlsjs.initHlsJsPlayer(hls);
 
             /*//Alternative initialization
             var p2pmlLoader = new p2pml.HybridLoader();
@@ -45,7 +45,7 @@
             hls.attachMedia(video);
             hls.on(Hls.Events.MANIFEST_PARSED, function() {
                 video.play();
-                video.volume = 0.01;
+                video.volume = 0.01; // 1%
             });
         }
 

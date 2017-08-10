@@ -16,4 +16,8 @@ export default class Utils {
         });
     }
 
+    public static isAbsoluteUrl(url: string): boolean {
+        return url.startsWith("http://") || url.startsWith("https://");
+    }
+
 }

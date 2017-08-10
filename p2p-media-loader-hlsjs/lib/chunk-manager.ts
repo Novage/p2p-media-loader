@@ -26,25 +26,44 @@ export default class ChunkManager {
         this.playlists.set(url, playlist);
     }
 
-    public async loadHlsPlaylist(url: string): Promise<string> {
+    public async loadHlsPlaylist(url: string, loadChildPlaylists: boolean = false): Promise<string> {
+        let content = "";
+
         try {
-            const content = await Utils.fetchContent(url);
+            content = await Utils.fetchContent(url);
             this.processHlsPlaylist(url, content);
-            return content;
         } catch (e) {
             this.playlists.delete(url);
             throw e;
         }
+
+        if (loadChildPlaylists) {
+            const playlist = this.playlists.get(url);
+            if (playlist) {
+                for (const childUrl of playlist.getChildPlaylistAbsoluteUrls()) {
+                    Utils.fetchContent(childUrl).then((childContent) => {
+                        this.processHlsPlaylist(childUrl, childContent);
+                    });
+                }
+            }
+        }
+
+        return content;
     }
 
-    public loadChunk(url: string, onSuccess?: Function, onError?: Function): void {
+    public loadChunk(url: string, onSuccess?: Function, onError?: Function, playlistMissRetries: number = 1): void {
         const { playlist: loadingPlaylist, chunkIndex: loadingChunkIndex } = this.getChunkLocation(url);
         if (!loadingPlaylist) {
-            // this should never happen in theory
-            const e = "Requested chunk cannot be located in known playlists";
-            console.error(e);
-            if (onError) {
-                setTimeout(() => { onError(e); }, 0);
+            const message = "Requested chunk cannot be located in known playlists";
+            if (playlistMissRetries > 0) {
+                const retryMs = 500;
+                console.warn(`${message}; retry in ${retryMs} ms...`);
+                setTimeout(() => { this.loadChunk(url, onSuccess, onError, playlistMissRetries - 1); }, retryMs);
+            } else {
+                console.error(message);
+                if (onError) {
+                    setTimeout(() => { onError(message); }, 0);
+                }
             }
             return;
         }
@@ -184,11 +203,22 @@ class Playlist {
 
     public getChunkAbsoluteUrl(index: number): string {
         const uri = this.manifest.segments[ index ].uri;
-        if (uri.startsWith("http://") || uri.startsWith("https://")) {
-            return uri;
-        } else {
-            return this.baseUrl + uri;
+        return Utils.isAbsoluteUrl(uri) ? uri : this.baseUrl + uri;
+    }
+
+    public getChildPlaylistAbsoluteUrls(): string[] {
+        const urls: string[] = [];
+
+        if (!this.manifest.playlists) {
+            return urls;
         }
+
+        for (const playlist of this.manifest.playlists) {
+            const url = playlist.uri;
+            urls.push(Utils.isAbsoluteUrl(url) ? url : this.baseUrl + url);
+        }
+
+        return urls;
     }
 
 }
