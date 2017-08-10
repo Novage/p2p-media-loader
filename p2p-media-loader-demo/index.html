@@ -12,26 +12,47 @@
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
     <style>
+        #videoUrlForm {
+            margin-top: 1em;
+        }
         #video {
-            width: 720px;
-            margin-left: auto;
-            margin-right: auto;
-            display: block;
+            max-width: 720px;
         }
     </style>
 
 </head>
-<body >
+<body class="container">
 
-<video id="video" controls></video>
-<div id="graph" controls></div>
+    <form class="form-horizontal" id="videoUrlForm">
+        <div class="form-group">
+            <label class="control-label col-sm-2" for="url">Video URL:</label>
+            <div class="col-sm-8">
+                <input type="text" class="form-control" id="url" placeholder="Please enter video url" required
+                    value="http://zoomweblive-lh.akamaihd.net/i/Zoom-TIL-WAP/Zoomweb_1@348071/index_600_av-p.m3u8" />
+            </div>
+            <div class="col-sm-2">
+                <button type="submit" class="btn btn-primary">Submit</button>
+            </div>
+        </div>
+    </form>
+
+    <video id="video" class="center-block" controls></video>
+
+    <div id="graph-container"></div>
 
 <script>
 
-    var P2PGraphClass = require("p2p-graph");
     var P2PGraph = (function () {
-        function P2PGraph(selector, p2pLoader) {
-            this.graph = new P2PGraphClass(selector);
+        var P2PGraphClass = require("p2p-graph");
+
+        function P2PGraph(containerId, p2pLoader) {
+            var graphElement =  document.createElement("div");
+            graphElement.id = "graph";
+
+            this.container = document.getElementById(containerId);
+            this.container.appendChild(graphElement);
+
+            this.graph = new P2PGraphClass("#graph");
             this.graph.add({id: "me", name: "You", me: true});
 
             p2pLoader.on("peer_connect", this.onPeerConnect.bind(this));
@@ -47,34 +68,47 @@
             this.graph.disconnect("me", peer.id);
             this.graph.remove(peer.id);
         };
+        P2PGraph.prototype.destroy = function () {
+            this.graph.destroy();
+            while (this.container.hasChildNodes()) {
+                this.container.removeChild(this.container.lastChild);
+            }
+        };
         return P2PGraph;
     }());
 
-    if (Hls.isSupported()) {
+    var videoUrlForm = document.getElementById("videoUrlForm");
+    videoUrlForm.addEventListener('submit', function(event){
+        event.preventDefault();
+        initDemo(videoUrlForm.url.value.trim());
+    });
 
-        var hls = new Hls();
+    var graph;
+    function initDemo(videoUrl) {
+        if (Hls.isSupported()) {
+            var hls = new Hls();
 
-        var p2pmlLoader = new p2pml.HybridLoader();
-        var chunkManager = new p2pml.hlsjs.ChunkManager(p2pmlLoader);
-        p2pml.hlsjs.initPlayer(hls, {"chunkManager" : chunkManager});
+            var p2pmlLoader = new p2pml.HybridLoader();
+            var chunkManager = new p2pml.hlsjs.ChunkManager(p2pmlLoader);
+            p2pml.hlsjs.initPlayer(hls, {"chunkManager" : chunkManager});
 
-        new P2PGraph("#graph", p2pmlLoader);
+            hls.loadSource(videoUrl);
 
-        //hls.loadSource("https://wowza.peer5.com/live/smil:ski.smil/playlist.m3u8"); // live, 20 chunks ~5sec each
-        //hls.loadSource("http://wms.shared.streamshow.it/carinatv/carinatv/playlist.m3u8"); // live, 3 chunks ~10 sec each
-        //hls.loadSource("https://video-dev.github.io/streams/x36xhzz/x36xhzz.m3u8"); // VOD, 64 chunks
-        //hls.loadSource("https://wowza-cdn.streamroot.io/vodOriginSite/tears_of_steel720p.mp4/playlist.m3u8");
-        //hls.loadSource("http://cdn3.viblast.com/streams/hls/airshow/playlist.m3u8");
-        hls.loadSource("http://zoomweblive-lh.akamaihd.net/i/Zoom-TIL-WAP/Zoomweb_1@348071/index_600_av-p.m3u8"); // stream, 178 chunks ~10 sec each
-        //hls.nextLevel = 0;
+            var video = document.getElementById("video");
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                video.play();
+                video.volume = 0.01;
+            });
 
-        var video = document.getElementById("video");
-        hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, function() {
-            video.play();
-            video.volume = 0.01;
-        });
+            if (graph) {
+                graph.destroy();
+            }
+            graph = new P2PGraph("graph-container", p2pmlLoader);
+        }
     }
+
+    initDemo(videoUrlForm.url.value.trim());
 
 </script>
 
