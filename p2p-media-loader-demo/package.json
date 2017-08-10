@@ -1,0 +1,22 @@
+{
+  "name": "p2p-media-loader-demo",
+  "description": "P2P Media Loader demo",
+  "version": "0.0.1",
+  "main": "index.js",
+  "scripts": {
+    "refresh-dependencies": "copyfiles -f ./node_modules/p2p-media-loader-core/p2p-media-loader-core.js ./ && copyfiles -f ./node_modules/p2p-media-loader-hlsjs/p2p-media-loader-hlsjs.js ./"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://git.witua.com/novage/p2p-media-loader.git"
+  },
+  "dependencies": {
+    "p2p-media-loader-core": "../p2p-media-loader-core",
+    "p2p-media-loader-hlsjs": "../p2p-media-loader-hlsjs"
+  },
+  "devDependencies": {
+    "browserify": "^14.4.0",
+    "copyfiles": "^1.2.0"
+  }
+}
