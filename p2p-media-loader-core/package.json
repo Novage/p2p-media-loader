@@ -1,5 +1,6 @@
 {
   "name": "p2p-media-loader-core",
+  "description": "P2P Media Loader core function",
   "version": "0.0.1",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -8,6 +9,11 @@
     "lint": "tslint -c ./tslint.json -p ./tsconfig.json",
     "build": "npm run compile && browserify -r ./dist/index.js:p2p-media-loader-core ./dist/browser-init.js > p2p-media-loader-core.js",
     "build-to-hlsjs": "npm run build && copyfiles -f ./p2p-media-loader-core.js ../p2p-media-loader-hlsjs/"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://git.witua.com/novage/p2p-media-loader.git"
   },
   "dependencies": {
     "bittorrent-tracker": "9.2.3"

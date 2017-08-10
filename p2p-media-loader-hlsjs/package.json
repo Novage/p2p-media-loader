@@ -1,5 +1,6 @@
 {
   "name": "p2p-media-loader-hlsjs",
+  "description": "P2P Media Loader hlsjs integration",
   "version": "0.0.1",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -7,9 +8,13 @@
     "compile": "rimraf ./dist/ && tsc && copyfiles -f ./lib/*.js ./dist/",
     "lint": "tslint -c ./tslint.json -p ./tsconfig.json",
     "build": "npm run compile && browserify -r ./dist/index.js:p2p-media-loader-hlsjs ./dist/browser-init.js --exclude p2p-media-loader-core > p2p-media-loader-hlsjs.js",
-    "build-core": "browserify -r p2p-media-loader-core ./node_modules/p2p-media-loader-core/dist/browser-init.js > p2p-media-loader-core.js",
-    "copy-core": "copyfiles -f ../p2p-media-loader-core/p2p-media-loader-core.js ./",
+    "refresh-core-dependency": "rimraf ./node_modules/p2p-media-loader-core/ && npm install && copyfiles -f ./node_modules/p2p-media-loader-core/p2p-media-loader-core.js ./",
     "test": "mocha -r ts-node/register test/*.test.ts"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://git.witua.com/novage/p2p-media-loader.git"
   },
   "dependencies": {
     "m3u8-parser": "3.0.0",
