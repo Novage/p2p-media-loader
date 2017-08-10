@@ -26,15 +26,12 @@
 
         if (Hls.isSupported()) {
             var hls = new Hls();
+            p2pml.hlsjs.initPlayer(hls);
 
-            /*
+            /*//Alternative initialization
             var p2pmlLoader = new p2pml.HybridLoader();
             var chunkManager = new p2pml.hlsjs.ChunkManager(p2pmlLoader);
-            var hlsJsLoader = p2pml.hlsjs.createLoaderClass(chunkManager);
-            p2pml.hlsjs.initPlayer(hls, hlsJsLoader);
-            */
-
-            p2pml.hlsjs.initPlayer(hls);
+            p2pml.hlsjs.initPlayer(hls, chunkManager);*/
 
             //hls.loadSource("https://wowza.peer5.com/live/smil:ski.smil/playlist.m3u8"); // live, 20 chunks ~5sec each
             //hls.loadSource("http://wms.shared.streamshow.it/carinatv/carinatv/playlist.m3u8"); // live, 3 chunks ~10 sec each
