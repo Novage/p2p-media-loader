@@ -55,7 +55,7 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
         this.client = new Client(clientOptions);
         this.client.on("error", (error: any) => console.error("client error", error));
         this.client.on("warning", (error: any) => console.warn("client warning", error));
-        this.client.on("update", (data: any) => console.log("client announce update"));
+        //this.client.on("update", (data: any) => console.log("client announce update"));
         this.client.on("peer", this.onClientPeer.bind(this));
         this.client.start();
     }
@@ -119,6 +119,7 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
 
     private onPeerConnect(mediaPeer: MediaPeer): void {
         mediaPeer.sendFilesMap(this.cacheManager.keys());
+        this.emit(MediaPeerEvents.Connect, mediaPeer);
     }
 
     private onPeerClose(mediaPeer: MediaPeer): void {
@@ -135,6 +136,8 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
         if (isUpdated) {
             this.emit(LoaderEvents.ForceProcessing);
         }
+
+        this.emit(MediaPeerEvents.Close, mediaPeer);
     }
 
     private onPeerError(mediaPeer: MediaPeer, error: any): void {

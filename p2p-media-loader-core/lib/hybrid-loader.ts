@@ -7,6 +7,8 @@ import {EventEmitter} from "events";
 import HttpMediaManager from "./http-media-manager";
 import P2PMediaManager from "./p2p-media-manager";
 import LoaderFileCacheManager from "./loader-file-cache-manager";
+import MediaPeerEvents from "./media-peer-events";
+import MediaPeer from "./media-peer";
 
 export default class HybridLoader extends EventEmitter implements LoaderInterface {
 
@@ -32,6 +34,8 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.p2pManager.on(LoaderEvents.FileLoaded, this.onFileLoaded.bind(this));
         this.p2pManager.on(LoaderEvents.FileError, this.onFileError.bind(this));
         this.p2pManager.on(LoaderEvents.ForceProcessing, this.processFileQueue.bind(this));
+        this.p2pManager.on(MediaPeerEvents.Connect, this.onPeerConnect.bind(this));
+        this.p2pManager.on(MediaPeerEvents.Close, this.onPeerClose.bind(this));
 
         setInterval(() => {
             this.processFileQueue();
@@ -149,6 +153,14 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
         this.cacheManager.updateLastAccessed(file.url);
         this.emit(LoaderEvents.FileLoaded, fileCopy);
+    }
+
+    private onPeerConnect(mediaPeer: MediaPeer): void {
+        this.emit(MediaPeerEvents.Connect, mediaPeer);
+    }
+
+    private onPeerClose(mediaPeer: MediaPeer): void {
+        this.emit(MediaPeerEvents.Close, mediaPeer);
     }
 
     private collectGarbage(): void {
