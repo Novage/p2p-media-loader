@@ -26,12 +26,18 @@
     <form class="form-horizontal" id="videoUrlForm">
         <div class="form-group">
             <label class="control-label col-sm-2" for="url">Video URL:</label>
-            <div class="col-sm-8">
+            <div class="col-sm-6">
                 <input type="text" class="form-control" id="url" placeholder="Please enter video url" required
                     value="http://zoomweblive-lh.akamaihd.net/i/Zoom-TIL-WAP/Zoomweb_1@348071/index_600_av-p.m3u8" />
             </div>
             <div class="col-sm-2">
-                <button type="submit" class="btn btn-primary">Submit</button>
+                <select class="form-control" id="type">
+                    <option value="hlsjs" selected>Hls.js</option>
+                    <option value="clappr">Clappr</option>
+                </select>
+            </div>
+            <div class="col-sm-2">
+                <button type="submit" class="btn btn-primary">Apply</button>
             </div>
         </div>
     </form>
@@ -42,21 +48,78 @@
 
 <script>
 
+    var DemoApp = (function () {
+        function DemoApp() {
+            var videoUrlForm = document.getElementById("videoUrlForm");
+            videoUrlForm.addEventListener('submit', this.onVideoUrlFormSubmit.bind(this));
+
+            this.videoUrl = videoUrlForm.url.value.trim();
+            this.playerType = videoUrlForm.type.value;
+
+            this.initVideoPlayer();
+        }
+
+        DemoApp.prototype.onVideoUrlFormSubmit = function (event) {
+            event.preventDefault();
+            this.videoUrl = event.currentTarget.url.value.trim();
+            this.playerType = event.currentTarget.type.value;
+            this.initVideoPlayer();
+        };
+
+        DemoApp.prototype.initVideoPlayer = function () {
+            switch (this.playerType) {
+                case 'hlsjs':
+                    this.initHlsJsPlayer();
+                    break;
+                case 'clappr':
+                    this.initClapprPlayer();
+                    break;
+            }
+        };
+
+        DemoApp.prototype.initHlsJsPlayer = function () {
+            if (Hls.isSupported()) {
+                var hls = new Hls();
+                var p2pmlLoader = new p2pml.HybridLoader();
+                var chunkManager = new p2pml.hlsjs.ChunkManager(p2pmlLoader);
+                p2pml.hlsjs.initHlsJsPlayer(hls, { "chunkManager": chunkManager });
+                hls.loadSource(this.videoUrl);
+                var video = document.getElementById("video");
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, function () {
+                    video.play();
+                    video.volume = 0;
+                });
+                this.initGraph(p2pmlLoader);
+            }
+        };
+
+        DemoApp.prototype.initClapprPlayer = function () {
+            console.log("init clappr");
+        };
+
+        DemoApp.prototype.initGraph = function (p2pLoader) {
+            if (this.graph) {
+                this.graph.destroy();
+            }
+            this.graph = new P2PGraph("graph-container");
+            p2pLoader.on("peer_connect", this.graph.onPeerConnect.bind(this.graph));
+            p2pLoader.on("peer_close", this.graph.onPeerClose.bind(this.graph));
+        };
+
+        return DemoApp;
+    }());
+
     var P2PGraph = (function () {
         var P2PGraphClass = require("p2p-graph");
-
-        function P2PGraph(containerId, p2pLoader) {
-            var graphElement =  document.createElement("div");
+        function P2PGraph(containerId) {
+            this.id = new Date().getTime();
+            var graphElement = document.createElement("div");
             graphElement.id = "graph";
-
             this.container = document.getElementById(containerId);
             this.container.appendChild(graphElement);
-
             this.graph = new P2PGraphClass("#graph");
-            this.graph.add({id: "me", name: "You", me: true});
-
-            p2pLoader.on("peer_connect", this.onPeerConnect.bind(this));
-            p2pLoader.on("peer_close", this.onPeerClose.bind(this));
+            this.graph.add({ id: "me", name: "You", me: true });
         }
         P2PGraph.prototype.onPeerConnect = function (mediaPeer) {
             var peer = mediaPeer.peer;
@@ -77,38 +140,7 @@
         return P2PGraph;
     }());
 
-    var videoUrlForm = document.getElementById("videoUrlForm");
-    videoUrlForm.addEventListener('submit', function(event){
-        event.preventDefault();
-        initDemo(videoUrlForm.url.value.trim());
-    });
-
-    var graph;
-    function initDemo(videoUrl) {
-        if (Hls.isSupported()) {
-            var hls = new Hls();
-
-            var p2pmlLoader = new p2pml.HybridLoader();
-            var chunkManager = new p2pml.hlsjs.ChunkManager(p2pmlLoader);
-            p2pml.hlsjs.initHlsJsPlayer(hls, {"chunkManager" : chunkManager});
-
-            hls.loadSource(videoUrl);
-
-            var video = document.getElementById("video");
-            hls.attachMedia(video);
-            hls.on(Hls.Events.MANIFEST_PARSED, function() {
-                video.play();
-                video.volume = 0.01;
-            });
-
-            if (graph) {
-                graph.destroy();
-            }
-            graph = new P2PGraph("graph-container", p2pmlLoader);
-        }
-    }
-
-    initDemo(videoUrlForm.url.value.trim());
+    new DemoApp();
 
 </script>
 
