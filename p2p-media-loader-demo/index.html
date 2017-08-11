@@ -10,6 +10,7 @@
     <script src="p2p-media-loader-core.js"></script>
     <script src="p2p-media-loader-hlsjs.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="https://cdn.jsdelivr.net/clappr/latest/clappr.min.js"></script>
 
     <style>
         #videoUrlForm {
@@ -17,6 +18,8 @@
         }
         #video {
             max-width: 720px;
+            margin-left: auto;
+            margin-right: auto;
         }
     </style>
 
@@ -42,31 +45,48 @@
         </div>
     </form>
 
-    <video id="video" class="center-block" controls></video>
+    <div id="video-container" class="text-center"></div>
 
     <div id="graph-container"></div>
+
+    <div id="graph"></div>
 
 <script>
 
     var DemoApp = (function () {
+
+        var P2PGraphClass = require("p2p-graph");
+
         function DemoApp() {
             var videoUrlForm = document.getElementById("videoUrlForm");
             videoUrlForm.addEventListener('submit', this.onVideoUrlFormSubmit.bind(this));
 
             this.videoUrl = videoUrlForm.url.value.trim();
             this.playerType = videoUrlForm.type.value;
+            this.videoContainer = document.getElementById("video-container");
 
-            this.initVideoPlayer();
+            this.graph = new P2PGraphClass("#graph");
+            this.graph.add({ id: "me", name: "You", me: true });
+
+            this.initDemo();
         }
 
         DemoApp.prototype.onVideoUrlFormSubmit = function (event) {
             event.preventDefault();
             this.videoUrl = event.currentTarget.url.value.trim();
             this.playerType = event.currentTarget.type.value;
-            this.initVideoPlayer();
+            this.initDemo();
         };
 
-        DemoApp.prototype.initVideoPlayer = function () {
+        DemoApp.prototype.initDemo = function () {
+
+            while (this.videoContainer.hasChildNodes()) {
+                this.videoContainer.removeChild(this.videoContainer.lastChild);
+            }
+
+            this.p2pmlLoader = new p2pml.HybridLoader();
+            this.chunkManager = new p2pml.hlsjs.ChunkManager(this.p2pmlLoader);
+
             switch (this.playerType) {
                 case 'hlsjs':
                     this.initHlsJsPlayer();
@@ -75,69 +95,67 @@
                     this.initClapprPlayer();
                     break;
             }
+
+            this.initGraph();
         };
 
         DemoApp.prototype.initHlsJsPlayer = function () {
             if (Hls.isSupported()) {
+                var video = document.createElement("video");
+                video.id = "video";
+                video.controls = true;
+                this.videoContainer.appendChild(video);
+
                 var hls = new Hls();
-                var p2pmlLoader = new p2pml.HybridLoader();
-                var chunkManager = new p2pml.hlsjs.ChunkManager(p2pmlLoader);
-                p2pml.hlsjs.initHlsJsPlayer(hls, { "chunkManager": chunkManager });
+                p2pml.hlsjs.initHlsJsPlayer(hls, { "chunkManager": this.chunkManager });
                 hls.loadSource(this.videoUrl);
-                var video = document.getElementById("video");
                 hls.attachMedia(video);
                 hls.on(Hls.Events.MANIFEST_PARSED, function () {
                     video.play();
                     video.volume = 0;
                 });
-                this.initGraph(p2pmlLoader);
             }
         };
 
         DemoApp.prototype.initClapprPlayer = function () {
-            console.log("init clappr");
+            var video = document.createElement("div");
+            video.id = "video";
+            this.videoContainer.appendChild(video);
+
+            var player = new Clappr.Player({
+                parentId: "#video",
+                source: this.videoUrl
+            });
+            p2pml.hlsjs.initClapprPlayer(player, { "chunkManager": this.chunkManager });
+            player.setVolume(0);
+            player.play();
         };
 
         DemoApp.prototype.initGraph = function (p2pLoader) {
-            if (this.graph) {
-                this.graph.destroy();
+            var nodes = this.graph.list();
+            for (var i = 0; i < nodes.length; i++) {
+                if (nodes[i].id !== "me") {
+                    this.graph.disconnect("me", nodes[i].id);
+                    this.graph.remove(nodes[i].id);
+                }
             }
-            this.graph = new P2PGraph("graph-container");
-            p2pLoader.on("peer_connect", this.graph.onPeerConnect.bind(this.graph));
-            p2pLoader.on("peer_close", this.graph.onPeerClose.bind(this.graph));
+
+            this.p2pmlLoader.on("peer_connect", this.onPeerConnect.bind(this));
+            this.p2pmlLoader.on("peer_close", this.onPeerClose.bind(this));
         };
 
-        return DemoApp;
-    }());
-
-    var P2PGraph = (function () {
-        var P2PGraphClass = require("p2p-graph");
-        function P2PGraph(containerId) {
-            this.id = new Date().getTime();
-            var graphElement = document.createElement("div");
-            graphElement.id = "graph";
-            this.container = document.getElementById(containerId);
-            this.container.appendChild(graphElement);
-            this.graph = new P2PGraphClass("#graph");
-            this.graph.add({ id: "me", name: "You", me: true });
-        }
-        P2PGraph.prototype.onPeerConnect = function (mediaPeer) {
+        DemoApp.prototype.onPeerConnect = function (mediaPeer) {
             var peer = mediaPeer.peer;
             this.graph.add({ id: peer.id, name: peer.remoteAddress || 'Unknown' });
             this.graph.connect("me", peer.id);
         };
-        P2PGraph.prototype.onPeerClose = function (mediaPeer) {
+        DemoApp.prototype.onPeerClose = function (mediaPeer) {
             var peer = mediaPeer.peer;
             this.graph.disconnect("me", peer.id);
             this.graph.remove(peer.id);
         };
-        P2PGraph.prototype.destroy = function () {
-            this.graph.destroy();
-            while (this.container.hasChildNodes()) {
-                this.container.removeChild(this.container.lastChild);
-            }
-        };
-        return P2PGraph;
+
+        return DemoApp;
     }());
 
     new DemoApp();
