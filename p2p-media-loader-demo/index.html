@@ -90,7 +90,7 @@
 
             var p2pmlLoader = new p2pml.HybridLoader();
             var chunkManager = new p2pml.hlsjs.ChunkManager(p2pmlLoader);
-            p2pml.hlsjs.initPlayer(hls, {"chunkManager" : chunkManager});
+            p2pml.hlsjs.initHlsJsPlayer(hls, {"chunkManager" : chunkManager});
 
             hls.loadSource(videoUrl);
 
