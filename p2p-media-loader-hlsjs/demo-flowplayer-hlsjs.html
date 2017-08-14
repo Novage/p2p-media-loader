@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+
+    <script src="p2p-media-loader-core.js"></script>
+    <script src="p2p-media-loader-hlsjs.js"></script>
+
+    <link rel="stylesheet" href="//releases.flowplayer.org/7.0.4/skin/skin.css">
+    <script src="//releases.flowplayer.org/7.0.4/flowplayer.min.js"></script>
+    <script src="//releases.flowplayer.org/hlsjs/flowplayer.hlsjs.light.min.js"></script>
+
+</head>
+<body>
+
+    <div id="video" class="fp-slim"></div>
+
+    <script>
+
+        var player = flowplayer("#video", {
+            autoplay: true,
+            volume: 0.01,
+            clip: {
+                sources: [{
+                    type: "application/x-mpegurl",
+                    live: true, src: "http://zoomweblive-lh.akamaihd.net/i/Zoom-TIL-WAP/Zoomweb_1@348071/index_600_av-p.m3u8"
+                    //live: true, src: "https://wowza.peer5.com/live/smil:ski.smil/playlist.m3u8"
+                    //src: "https://video-dev.github.io/streams/x36xhzz/x36xhzz.m3u8"
+                    //src: "//stream.flowplayer.org/bauhaus.m3u8"
+                }]
+            }
+        });
+
+        p2pml.hlsjs.initFlowplayerHlsJsPlayer(player);
+
+    </script>
+
+</body>
+</html>

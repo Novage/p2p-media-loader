@@ -45,4 +45,10 @@ export function initVideoJsContribHlsJsPlayer(player: any, settings: any = {}): 
     });
 }
 
+export function initFlowplayerHlsJsPlayer(player: any, settings: any = {}): void {
+    if (player && player.engine && player.engine.hlsjs) {
+        initHlsJsPlayer(player.engine.hlsjs, settings);
+    }
+}
+
 export {default as ChunkManager} from "./chunk-manager";
