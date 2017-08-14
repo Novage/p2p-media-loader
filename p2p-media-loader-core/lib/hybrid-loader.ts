@@ -27,11 +27,11 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.cacheManager = new LoaderFileCacheManager();
 
         this.httpManager = new HttpMediaManager();
-        this.httpManager.on(LoaderEvents.FileLoaded, this.onFileLoaded.bind(this));
+        this.httpManager.on(LoaderEvents.FileLoaded, this.onHttpFileLoaded.bind(this));
         this.httpManager.on(LoaderEvents.FileError, this.onFileError.bind(this));
 
         this.p2pManager = new P2PMediaManager(this.cacheManager);
-        this.p2pManager.on(LoaderEvents.FileLoaded, this.onFileLoaded.bind(this));
+        this.p2pManager.on(LoaderEvents.FileLoaded, this.onP2PFileLoaded.bind(this));
         this.p2pManager.on(LoaderEvents.FileError, this.onFileError.bind(this));
         this.p2pManager.on(LoaderEvents.ForceProcessing, this.processFileQueue.bind(this));
         this.p2pManager.on(MediaPeerEvents.Connect, this.onPeerConnect.bind(this));
@@ -135,6 +135,20 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
     }
 
+    private onHttpFileLoaded(file: LoaderFile): void {
+        if (!this.cacheManager.has(file.url)) {
+            this.emit("statistics_file_loaded", {"method": "http", "size": file.data.byteLength});
+        }
+        this.onFileLoaded(file);
+    }
+
+    private onP2PFileLoaded(file: LoaderFile): void {
+        if (!this.cacheManager.has(file.url)) {
+            this.emit("statistics_file_loaded", {"method": "p2p", "size": file.data.byteLength});
+        }
+        this.onFileLoaded(file);
+    }
+
     private onFileLoaded(file: LoaderFile): void {
         this.cacheManager.set(file.url, file);
         this.emitFileLoaded(file);
@@ -147,20 +161,16 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private emitFileLoaded(file: LoaderFile): void {
-        // TODO: destructurization
-        const fileCopy = new LoaderFile(file.url);
-        fileCopy.data = file.data.slice(0);
-
         this.cacheManager.updateLastAccessed(file.url);
-        this.emit(LoaderEvents.FileLoaded, fileCopy);
+        this.emit(LoaderEvents.FileLoaded, {"url": file.url, "data": file.data.slice(0)});
     }
 
     private onPeerConnect(mediaPeer: MediaPeer): void {
-        this.emit(MediaPeerEvents.Connect, mediaPeer);
+        this.emit("peer_connect", mediaPeer);
     }
 
     private onPeerClose(mediaPeer: MediaPeer): void {
-        this.emit(MediaPeerEvents.Close, mediaPeer);
+        this.emit("peer_close", mediaPeer);
     }
 
     private collectGarbage(): void {

@@ -1,0 +1,1095 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="5d07faf4-0f9d-4daa-9b42-7a9c220e5fab" name="Default" comment="">
+      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/p2p-media-loader-core/index.html" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/p2p-media-loader-core/lib/http-loader.ts" afterPath="$PROJECT_DIR$/p2p-media-loader-core/lib/http-loader.ts" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/p2p-media-loader-core/lib/hybrid-loader.ts" afterPath="$PROJECT_DIR$/p2p-media-loader-core/lib/hybrid-loader.ts" />
+    </list>
+    <ignored path="$PROJECT_DIR$/.tmp/" />
+    <ignored path="$PROJECT_DIR$/temp/" />
+    <ignored path="$PROJECT_DIR$/tmp/" />
+    <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
+    <option name="TRACKING_ENABLED" value="true" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileEditorManager">
+    <leaf>
+      <file leaf-file-name="http-loader.ts" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/lib/http-loader.ts">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="437">
+              <caret line="24" column="8" lean-forward="false" selection-start-line="24" selection-start-column="8" selection-end-line="24" selection-end-column="57" />
+              <folding>
+                <element signature="e#0#49#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="hybrid-loader.ts" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/lib/hybrid-loader.ts">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="494">
+              <caret line="33" column="13" lean-forward="false" selection-start-line="33" selection-start-column="13" selection-end-line="33" selection-end-column="13" />
+              <folding>
+                <element signature="e#0#49#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="index.html" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/index.html">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="171">
+              <caret line="9" column="0" lean-forward="true" selection-start-line="9" selection-start-column="0" selection-end-line="9" selection-end-column="0" />
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="http-media-manager.ts" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/lib/http-media-manager.ts">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="114">
+              <caret line="9" column="11" lean-forward="false" selection-start-line="9" selection-start-column="11" selection-end-line="9" selection-end-column="11" />
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
+    </leaf>
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="package_json" />
+        <option value="HTML File" />
+        <option value="JavaScript File" />
+        <option value="tsconfig.json" />
+        <option value="TypeScript File" />
+      </list>
+    </option>
+  </component>
+  <component name="FindInProjectRecents">
+    <findStrings>
+      <find>console.</find>
+      <find>parserOptions</find>
+      <find>TextDecoder</find>
+      <find>compil</find>
+      <find>module</find>
+      <find>outDir</find>
+      <find>m3u8Parser</find>
+      <find>declaration</find>
+      <find>compilerOptions</find>
+      <find>lint</find>
+      <find>hlsjs-loader-make</find>
+      <find>sett</find>
+      <find>p2pml</find>
+      <find>getHlsJsLoader</find>
+      <find>HlsJsLoaderMaker</find>
+      <find>HlsJsLoader</find>
+      <find>bind</find>
+      <find>getHlsJsLoaderMaker</find>
+      <find>exports</find>
+      <find>__esModule</find>
+      <find>esModule</find>
+      <find>require</find>
+      <find>src</find>
+      <find>cpr</find>
+      <find>MediaManagerInterface</find>
+      <find>LoaderFileChunk</find>
+      <find>Client</find>
+      <find>peerFileRequests</find>
+      <find>this.peers</find>
+      <find>fetchContent</find>
+    </findStrings>
+    <dirStrings>
+      <dir>$PROJECT_DIR$/lib</dir>
+      <dir>$PROJECT_DIR$</dir>
+      <dir>$PROJECT_DIR$/node_modules</dir>
+      <dir>$PROJECT_DIR$/p2p-media-loader-core/lib</dir>
+    </dirStrings>
+  </component>
+  <component name="Git.Settings">
+    <option name="UPDATE_TYPE" value="REBASE" />
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="IdeDocumentHistory">
+    <option name="CHANGED_PATHS">
+      <list>
+        <option value="$PROJECT_DIR$/lib/peer-manager.ts" />
+        <option value="$PROJECT_DIR$/lib/peer-manager-interface.ts" />
+        <option value="$PROJECT_DIR$/lib/loader-events-enum.ts" />
+        <option value="$PROJECT_DIR$/lib/p2p-loader.ts" />
+        <option value="$PROJECT_DIR$/lib/base-media-loader.ts" />
+        <option value="$PROJECT_DIR$/lib/p2p-meida-manager.ts" />
+        <option value="$PROJECT_DIR$/lib/media-cache-manager-interface.ts" />
+        <option value="$PROJECT_DIR$/lib/media-cache-manger-interface.ts" />
+        <option value="$PROJECT_DIR$/lib/media-cache-manager.ts" />
+        <option value="$PROJECT_DIR$/lib/loader-file-cache-manger-interface.ts" />
+        <option value="$PROJECT_DIR$/lib/cache-events.ts" />
+        <option value="$PROJECT_DIR$/lib/loader-file-cache-manager.ts" />
+        <option value="$PROJECT_DIR$/lib/peer-commands.ts" />
+        <option value="$PROJECT_DIR$/lib/p2p-media-loader.ts" />
+        <option value="$PROJECT_DIR$/p2p-media-loader.js" />
+        <option value="$PROJECT_DIR$/lib/media-peer-commands.ts" />
+        <option value="$PROJECT_DIR$/lib/media-peer-events.ts" />
+        <option value="$PROJECT_DIR$/test/chunk-manager.test.ts" />
+        <option value="$PROJECT_DIR$/lib/hlsjs-loader.ts" />
+        <option value="$PROJECT_DIR$/lib/loader-events.ts" />
+        <option value="$PROJECT_DIR$/lib/media-peer.ts" />
+        <option value="$PROJECT_DIR$/lib/p2p-graph-demo.ts" />
+        <option value="$PROJECT_DIR$/tslint.json" />
+        <option value="$PROJECT_DIR$/.babelrc" />
+        <option value="$PROJECT_DIR$/lib/chunk-manager.ts" />
+        <option value="$PROJECT_DIR$/lib/hello-world.ts" />
+        <option value="$PROJECT_DIR$/lib/index.ts" />
+        <option value="$PROJECT_DIR$/lib/somefile.ts" />
+        <option value="$PROJECT_DIR$/dist/p2p-media-loader.js" />
+        <option value="$PROJECT_DIR$/src/hlsjs-loader-maker.js" />
+        <option value="$PROJECT_DIR$/src/p2p-media-loader.ts" />
+        <option value="$PROJECT_DIR$/src/hlsjs-loader.ts" />
+        <option value="$PROJECT_DIR$/.gitignore" />
+        <option value="$PROJECT_DIR$/src/index.ts" />
+        <option value="$PROJECT_DIR$/index.html" />
+        <option value="$PROJECT_DIR$/index.ts" />
+        <option value="$PROJECT_DIR$/.npmignore" />
+        <option value="$PROJECT_DIR$/tsconfig.json" />
+        <option value="$PROJECT_DIR$/package.json" />
+        <option value="$PROJECT_DIR$/lib/loader-interface.ts" />
+        <option value="$PROJECT_DIR$/lib/http-loader.ts" />
+        <option value="$PROJECT_DIR$/lib/media-manager-interface.ts" />
+        <option value="$PROJECT_DIR$/lib/http-media-manager.ts" />
+        <option value="$PROJECT_DIR$/lib/p2p-media-manager.ts" />
+        <option value="$PROJECT_DIR$/lib/hybrid-loader.ts" />
+        <option value="$PROJECT_DIR$/lib/loader-file.ts" />
+        <option value="$PROJECT_DIR$/p2p-media-loader-core/lib/index.ts" />
+        <option value="$PROJECT_DIR$/p2p-media-loader-core/package.json" />
+        <option value="$PROJECT_DIR$/p2p-media-loader-core/lib/http-loader.ts" />
+        <option value="$PROJECT_DIR$/p2p-media-loader-core/lib/hybrid-loader.ts" />
+        <option value="$PROJECT_DIR$/p2p-media-loader-core/index.html" />
+      </list>
+    </option>
+  </component>
+  <component name="JsBuildToolGruntFileManager" detection-done="true" sorting="DEFINITION_ORDER" />
+  <component name="JsBuildToolPackageJson" detection-done="true" sorting="DEFINITION_ORDER">
+    <package-json value="$PROJECT_DIR$/p2p-media-loader-core/package.json" />
+  </component>
+  <component name="JsFlowSettings">
+    <service-enabled>false</service-enabled>
+    <exe-path />
+    <annotation-enable>false</annotation-enable>
+    <other-services-enabled>false</other-services-enabled>
+    <auto-save>true</auto-save>
+  </component>
+  <component name="JsGulpfileManager">
+    <detection-done>true</detection-done>
+    <sorting>DEFINITION_ORDER</sorting>
+  </component>
+  <component name="NodeModulesDirectoryManager">
+    <handled-path value="$PROJECT_DIR$/p2p-media-loader-core/node_modules" />
+  </component>
+  <component name="ProjectFrameBounds" extendedState="6">
+    <option name="width" value="1920" />
+    <option name="height" value="1044" />
+  </component>
+  <component name="ProjectInspectionProfilesVisibleTreeState">
+    <entry key="Project Default">
+      <profile-state>
+        <expanded-state>
+          <State>
+            <id />
+          </State>
+          <State>
+            <id>CSS</id>
+          </State>
+          <State>
+            <id>Code quality toolsCSS</id>
+          </State>
+          <State>
+            <id>Code quality toolsJavaScript</id>
+          </State>
+          <State>
+            <id>Code style issuesCSS</id>
+          </State>
+          <State>
+            <id>Control flow issuesJavaScript</id>
+          </State>
+          <State>
+            <id>DOM issuesJavaScript</id>
+          </State>
+          <State>
+            <id>General</id>
+          </State>
+          <State>
+            <id>GeneralJavaScript</id>
+          </State>
+          <State>
+            <id>HTML</id>
+          </State>
+          <State>
+            <id>Invalid elementsCSS</id>
+          </State>
+          <State>
+            <id>JavaScript</id>
+          </State>
+          <State>
+            <id>Probable bugsCSS</id>
+          </State>
+          <State>
+            <id>Pug/Jade</id>
+          </State>
+          <State>
+            <id>TypeScript</id>
+          </State>
+        </expanded-state>
+        <selected-state>
+          <State>
+            <id>AngularJS</id>
+          </State>
+        </selected-state>
+      </profile-state>
+    </entry>
+  </component>
+  <component name="ProjectView">
+    <navigator currentView="ProjectPane" proportions="" version="1">
+      <flattenPackages />
+      <showMembers />
+      <showModules />
+      <showLibraryContents />
+      <hideEmptyPackages />
+      <abbreviatePackageNames />
+      <autoscrollToSource />
+      <autoscrollFromSource />
+      <sortByType />
+      <manualOrder />
+      <foldersAlwaysOnTop value="true" />
+    </navigator>
+    <panes>
+      <pane id="Scratches" />
+      <pane id="ProjectPane">
+        <subPane>
+          <expand>
+            <path>
+              <item name="p2p-media-loader" type="b2602c69:ProjectViewProjectNode" />
+              <item name="p2p-media-loader" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="p2p-media-loader" type="b2602c69:ProjectViewProjectNode" />
+              <item name="p2p-media-loader" type="462c0819:PsiDirectoryNode" />
+              <item name="p2p-media-loader-hlsjs" type="462c0819:PsiDirectoryNode" />
+            </path>
+          </expand>
+          <select />
+        </subPane>
+      </pane>
+      <pane id="Scope" />
+    </panes>
+  </component>
+  <component name="PropertiesComponent">
+    <property name="last_opened_file_path" value="$USER_HOME$/IdeaProjects/bittorrent-tracker" />
+    <property name="nodejs_interpreter_path" value="/usr/bin/node" />
+    <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="HbShouldOpenHtmlAsHb" value="" />
+    <property name="DefaultHtmlFileTemplate" value="HTML File" />
+    <property name="settings.editor.selected.configurable" value="preferences.keymap" />
+    <property name="node.js.path.for.package.tslint" value="project" />
+    <property name="node.js.detected.package.tslint" value="true" />
+    <property name="node.js.selected.package.tslint" value="$PROJECT_DIR$/node_modules/tslint" />
+    <property name="typescript-compiler-editor-notification" value="false" />
+    <property name="node.js.path.for.package.eslint" value="project" />
+    <property name="node.js.detected.package.eslint" value="true" />
+    <property name="node.js.selected.package.eslint" value="" />
+    <property name="node.js.path.for.package.standard" value="project" />
+    <property name="node.js.detected.package.standard" value="true" />
+    <property name="node.js.selected.package.standard" value="" />
+    <property name="ignore_missing_gitignore" value="true" />
+  </component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/p2p-media-loader-hlsjs" />
+      <recent name="$PROJECT_DIR$/p2p-media-loader-hlsjs/lib" />
+      <recent name="$PROJECT_DIR$/p2p-media-loader-hlsjs/test" />
+      <recent name="$PROJECT_DIR$/p2pml-core" />
+      <recent name="$PROJECT_DIR$" />
+    </key>
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/p2p-media-loader-core" />
+      <recent name="$PROJECT_DIR$/dist" />
+    </key>
+  </component>
+  <component name="RunDashboard">
+    <option name="ruleStates">
+      <list>
+        <RuleState>
+          <option name="name" value="ConfigurationTypeDashboardGroupingRule" />
+        </RuleState>
+        <RuleState>
+          <option name="name" value="StatusDashboardGroupingRule" />
+        </RuleState>
+      </list>
+    </option>
+  </component>
+  <component name="RunManager" selected="npm.build">
+    <configuration default="true" type="js.build_tools.gulp" factoryName="Gulp.js">
+      <node-interpreter>project</node-interpreter>
+      <node-options />
+      <gulpfile />
+      <tasks />
+      <arguments />
+      <envs />
+    </configuration>
+    <configuration default="true" type="DartCommandLineRunConfigurationType" factoryName="Dart Command Line Application">
+      <method />
+    </configuration>
+    <configuration default="true" type="DartTestRunConfigurationType" factoryName="Dart Test">
+      <method />
+    </configuration>
+    <configuration default="true" type="JavaScriptTestRunnerJest" factoryName="Jest">
+      <node-interpreter value="project" />
+      <working-dir value="" />
+      <envs />
+      <scope-kind value="ALL" />
+      <method />
+    </configuration>
+    <configuration default="true" type="JavaScriptTestRunnerKarma" factoryName="Karma">
+      <config-file value="" />
+      <node-interpreter value="project" />
+      <envs />
+      <method />
+    </configuration>
+    <configuration default="true" type="JavaScriptTestRunnerProtractor" factoryName="Protractor">
+      <config-file value="" />
+      <node-interpreter value="project" />
+      <envs />
+      <method />
+    </configuration>
+    <configuration default="true" type="JavascriptDebugType" factoryName="JavaScript Debug">
+      <method />
+    </configuration>
+    <configuration default="true" type="NodeJSConfigurationType" factoryName="Node.js" path-to-node="project" working-dir="">
+      <method />
+    </configuration>
+    <configuration default="true" type="cucumber.js" factoryName="Cucumber.js">
+      <option name="cucumberJsArguments" value="" />
+      <option name="executablePath" />
+      <option name="filePath" />
+      <method />
+    </configuration>
+    <configuration default="true" type="js.build_tools.npm" factoryName="npm">
+      <command value="run" />
+      <scripts />
+      <node-interpreter value="project" />
+      <envs />
+      <method />
+    </configuration>
+    <configuration default="true" type="mocha-javascript-test-runner" factoryName="Mocha">
+      <node-interpreter>project</node-interpreter>
+      <node-options />
+      <working-directory />
+      <pass-parent-env>true</pass-parent-env>
+      <envs />
+      <ui />
+      <extra-mocha-options />
+      <test-kind>DIRECTORY</test-kind>
+      <test-directory />
+      <recursive>false</recursive>
+      <method />
+    </configuration>
+    <configuration name="build (1)" type="js.build_tools.npm" factoryName="npm" temporary="true" nameIsGenerated="true">
+      <package-json value="$PROJECT_DIR$/p2p-media-loader-core/package.json" />
+      <command value="run" />
+      <scripts>
+        <script value="build" />
+      </scripts>
+      <node-interpreter value="project" />
+      <envs />
+    </configuration>
+    <configuration name="build-production" type="js.build_tools.npm" factoryName="npm" temporary="true" nameIsGenerated="true">
+      <package-json value="$PROJECT_DIR$/package.json" />
+      <command value="run" />
+      <scripts>
+        <script value="build-production" />
+      </scripts>
+      <node-interpreter value="project" />
+      <envs />
+    </configuration>
+    <configuration name="build" type="js.build_tools.npm" factoryName="npm" temporary="true" nameIsGenerated="true">
+      <package-json value="$PROJECT_DIR$/package.json" />
+      <command value="run" />
+      <scripts>
+        <script value="build" />
+      </scripts>
+      <node-interpreter value="project" />
+      <envs />
+      <method>
+        <option name="RunConfigurationTask" enabled="true" run_configuration_name="lint" run_configuration_type="js.build_tools.npm" />
+      </method>
+    </configuration>
+    <configuration name="compile" type="js.build_tools.npm" factoryName="npm" temporary="true" nameIsGenerated="true">
+      <package-json value="$PROJECT_DIR$/package.json" />
+      <command value="run" />
+      <scripts>
+        <script value="compile" />
+      </scripts>
+      <node-interpreter value="project" />
+      <envs />
+    </configuration>
+    <configuration name="lint" type="js.build_tools.npm" factoryName="npm" nameIsGenerated="true">
+      <package-json value="$PROJECT_DIR$/package.json" />
+      <command value="run" />
+      <scripts>
+        <script value="lint" />
+      </scripts>
+      <node-interpreter value="project" />
+      <envs />
+    </configuration>
+    <configuration name="test" type="js.build_tools.npm" factoryName="npm" temporary="true" nameIsGenerated="true">
+      <package-json value="$PROJECT_DIR$/package.json" />
+      <command value="run" />
+      <scripts>
+        <script value="test" />
+      </scripts>
+      <node-interpreter value="project" />
+      <envs />
+    </configuration>
+    <list size="6">
+      <item index="0" class="java.lang.String" itemvalue="npm.lint" />
+      <item index="1" class="java.lang.String" itemvalue="npm.build" />
+      <item index="2" class="java.lang.String" itemvalue="npm.build-production" />
+      <item index="3" class="java.lang.String" itemvalue="npm.test" />
+      <item index="4" class="java.lang.String" itemvalue="npm.compile" />
+      <item index="5" class="java.lang.String" itemvalue="npm.build (1)" />
+    </list>
+    <recent_temporary>
+      <list size="5">
+        <item index="0" class="java.lang.String" itemvalue="npm.build (1)" />
+        <item index="1" class="java.lang.String" itemvalue="npm.build" />
+        <item index="2" class="java.lang.String" itemvalue="npm.compile" />
+        <item index="3" class="java.lang.String" itemvalue="npm.test" />
+        <item index="4" class="java.lang.String" itemvalue="npm.build-production" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="ShelveChangesManager" show_recycled="false">
+    <option name="remove_strategy" value="false" />
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="5d07faf4-0f9d-4daa-9b42-7a9c220e5fab" name="Default" comment="" />
+      <created>1499867836662</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1499867836662</updated>
+      <workItem from="1499867838210" duration="8462000" />
+      <workItem from="1499931147665" duration="12108000" />
+      <workItem from="1499943390411" duration="16794000" />
+      <workItem from="1500019679139" duration="24304000" />
+      <workItem from="1500277822717" duration="20345000" />
+      <workItem from="1500361775303" duration="20498000" />
+      <workItem from="1500450327204" duration="25117000" />
+      <workItem from="1500535713159" duration="10950000" />
+      <workItem from="1500558148412" duration="8031000" />
+      <workItem from="1500567742986" duration="3582000" />
+      <workItem from="1500623550774" duration="7240000" />
+      <workItem from="1500632561670" duration="19798000" />
+      <workItem from="1500884619457" duration="16720000" />
+      <workItem from="1500970991902" duration="5250000" />
+      <workItem from="1500979687630" duration="15411000" />
+      <workItem from="1501059380150" duration="12764000" />
+      <workItem from="1501139833436" duration="25148000" />
+      <workItem from="1501169198605" duration="5323000" />
+      <workItem from="1501227743579" duration="19502000" />
+      <workItem from="1501485142589" duration="13978000" />
+      <workItem from="1501570413252" duration="5212000" />
+      <workItem from="1501663071505" duration="191000" />
+      <workItem from="1501663280428" duration="8011000" />
+      <workItem from="1501753411484" duration="9221000" />
+      <workItem from="1501837615414" duration="1429000" />
+      <workItem from="1501840857691" duration="10756000" />
+      <workItem from="1501862607866" duration="605000" />
+      <workItem from="1501863275703" duration="653000" />
+      <workItem from="1502090974865" duration="17591000" />
+      <workItem from="1502190402219" duration="9311000" />
+      <workItem from="1502207428872" duration="304000" />
+      <workItem from="1502266233672" duration="2094000" />
+      <workItem from="1502268458539" duration="1693000" />
+    </task>
+    <task id="LOCAL-00001" summary="Initial project setup">
+      <created>1499943703312</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1499943703312</updated>
+    </task>
+    <task id="LOCAL-00002" summary="HttpLoader interface and implementation.">
+      <created>1499962487206</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1499962487206</updated>
+    </task>
+    <task id="LOCAL-00003" summary="Explicit access modifiers. LoaderFile default export.">
+      <created>1500022088253</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1500022088253</updated>
+    </task>
+    <task id="LOCAL-00004" summary="Enabled tslint rule &quot;no-non-null-assertion&quot;">
+      <created>1500034421888</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1500034421888</updated>
+    </task>
+    <task id="LOCAL-00005" summary="HttpLoader class functionality:&#10;- file loading in queue with order until queue end;&#10;- simultaneous file loading;&#10;- tracks downloaded files;&#10;- emits file response if file already downloaded;&#10;- cancel the loading of the old file queue.">
+      <created>1500038113738</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1500038113738</updated>
+    </task>
+    <task id="LOCAL-00006" summary="HttpLoader: changed arguments of file_error event.">
+      <created>1500046747889</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1500046747889</updated>
+    </task>
+    <task id="LOCAL-00007" summary="Added LoaderEvents enum.">
+      <created>1500287543179</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1500287543179</updated>
+    </task>
+    <task id="LOCAL-00008" summary="Added LoaderEvents enum.">
+      <created>1500287704042</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1500287704042</updated>
+    </task>
+    <task id="LOCAL-00009" summary="HybridLoader prototype.">
+      <created>1500367839785</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1500367839785</updated>
+    </task>
+    <task id="LOCAL-00010" summary="HttpLoader emit file loaded event returns copy of file:&#10;- The player himself clears the buffer and it leads to the bug when downloaded file has empty ArrayBuffer.">
+      <created>1500375297000</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1500375297000</updated>
+    </task>
+    <task id="LOCAL-00011" summary="HybridLoader and HttpLoader functionality:&#10;- common loading interface MediaManagerInterface;&#10;- HttpMediaManager class;&#10;- refactoring.">
+      <created>1500391547557</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1500391547557</updated>
+    </task>
+    <task id="LOCAL-00012" summary="P2PMediaManager prototype. Garbage collection.">
+      <created>1500479330317</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1500479330317</updated>
+    </task>
+    <task id="LOCAL-00013" summary="Created LoaderFileCacheManager. P2P data send test.">
+      <created>1500570806051</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1500570806051</updated>
+    </task>
+    <task id="LOCAL-00014" summary="Moved garbage collection to loaders.">
+      <created>1500627798397</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
+      <option name="project" value="LOCAL" />
+      <updated>1500627798397</updated>
+    </task>
+    <task id="LOCAL-00015" summary="P2P files map exchange.">
+      <created>1500635891362</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1500635891362</updated>
+    </task>
+    <task id="LOCAL-00016" summary="P2P files map exchange (added forgotten file).">
+      <created>1500636144390</created>
+      <option name="number" value="00016" />
+      <option name="presentableId" value="LOCAL-00016" />
+      <option name="project" value="LOCAL" />
+      <updated>1500636144390</updated>
+    </task>
+    <task id="LOCAL-00017" summary="P2P media manager (messaging, api methods).">
+      <created>1500653532694</created>
+      <option name="number" value="00017" />
+      <option name="presentableId" value="LOCAL-00017" />
+      <option name="project" value="LOCAL" />
+      <updated>1500653532694</updated>
+    </task>
+    <task id="LOCAL-00018" summary="Added TypeScipt sinon definitions.">
+      <created>1501153153888</created>
+      <option name="number" value="00018" />
+      <option name="presentableId" value="LOCAL-00018" />
+      <option name="project" value="LOCAL" />
+      <updated>1501153153889</updated>
+    </task>
+    <task id="LOCAL-00019" summary="Hybrid loader, P2P manger, media peer class: &#10;- hybrid loader algorithm;&#10;- p2p manager;&#10;- peers protocol;&#10;- updated test;&#10;- added demo stream sources;">
+      <created>1501233636496</created>
+      <option name="number" value="00019" />
+      <option name="presentableId" value="LOCAL-00019" />
+      <option name="project" value="LOCAL" />
+      <updated>1501233636496</updated>
+    </task>
+    <task id="LOCAL-00020" summary="Emit FileAbort event if the file was removed from the queue">
+      <created>1501485793442</created>
+      <option name="number" value="00020" />
+      <option name="presentableId" value="LOCAL-00020" />
+      <option name="project" value="LOCAL" />
+      <updated>1501485793442</updated>
+    </task>
+    <task id="LOCAL-00021" summary="Media Peer response time handling.">
+      <created>1501511215227</created>
+      <option name="number" value="00021" />
+      <option name="presentableId" value="LOCAL-00021" />
+      <option name="project" value="LOCAL" />
+      <updated>1501511215227</updated>
+    </task>
+    <task id="LOCAL-00022" summary="Fixed lint warning. Commented console statements.">
+      <created>1501760227193</created>
+      <option name="number" value="00022" />
+      <option name="presentableId" value="LOCAL-00022" />
+      <option name="project" value="LOCAL" />
+      <updated>1501760227193</updated>
+    </task>
+    <task id="LOCAL-00023" summary="The project is prepared for use in the NPM.">
+      <created>1502193605580</created>
+      <option name="number" value="00023" />
+      <option name="presentableId" value="LOCAL-00023" />
+      <option name="project" value="LOCAL" />
+      <updated>1502193605580</updated>
+    </task>
+    <task id="LOCAL-00024" summary="Renamed playlistUrl to swarmId.">
+      <created>1502197769284</created>
+      <option name="number" value="00024" />
+      <option name="presentableId" value="LOCAL-00024" />
+      <option name="project" value="LOCAL" />
+      <updated>1502197769284</updated>
+    </task>
+    <task id="LOCAL-00025" summary="Added LoaderFile priority.">
+      <created>1502206786231</created>
+      <option name="number" value="00025" />
+      <option name="presentableId" value="LOCAL-00025" />
+      <option name="project" value="LOCAL" />
+      <updated>1502206786231</updated>
+    </task>
+    <task id="LOCAL-00026" summary="Split multiple projects: core, hlsjs, demo">
+      <created>1502268293969</created>
+      <option name="number" value="00026" />
+      <option name="presentableId" value="LOCAL-00026" />
+      <option name="project" value="LOCAL" />
+      <updated>1502268293969</updated>
+    </task>
+    <task id="LOCAL-00027" summary="Splitting core and hlsjs projects">
+      <created>1502269343874</created>
+      <option name="number" value="00027" />
+      <option name="presentableId" value="LOCAL-00027" />
+      <option name="project" value="LOCAL" />
+      <updated>1502269343874</updated>
+    </task>
+    <option name="localTasksCounter" value="28" />
+    <servers />
+  </component>
+  <component name="TimeTrackingManager">
+    <option name="totallyTimeSpent" value="358396000" />
+  </component>
+  <component name="TodoView">
+    <todo-panel id="selected-file">
+      <is-autoscroll-to-source value="true" />
+    </todo-panel>
+    <todo-panel id="all">
+      <are-packages-shown value="true" />
+      <is-autoscroll-to-source value="true" />
+    </todo-panel>
+  </component>
+  <component name="ToolWindowManager">
+    <frame x="0" y="0" width="1920" height="1044" extended-state="6" />
+    <editor active="true" />
+    <layout>
+      <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32932165" sideWeight="0.5" order="10" side_tool="false" content_ui="tabs" />
+      <window_info id="Messages" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3293348" sideWeight="0.5" order="11" side_tool="false" content_ui="tabs" />
+      <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.24726477" sideWeight="0.3437006" order="0" side_tool="true" content_ui="tabs" />
+      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.24726477" sideWeight="0.6562994" order="5" side_tool="false" content_ui="tabs" />
+      <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.18052517" sideWeight="0.5856616" order="1" side_tool="false" content_ui="tabs" />
+      <window_info id="npm" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.26093832" sideWeight="0.45930234" order="0" side_tool="true" content_ui="tabs" />
+      <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.23741794" sideWeight="0.5651028" order="2" side_tool="false" content_ui="tabs" />
+      <window_info id="TypeScript" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32932165" sideWeight="0.49815497" order="6" side_tool="false" content_ui="tabs" />
+      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.26093832" sideWeight="0.5406977" order="3" side_tool="false" content_ui="combo" />
+      <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
+      <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.24986821" sideWeight="0.4941003" order="2" side_tool="false" content_ui="tabs" />
+      <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
+      <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="1" side_tool="true" content_ui="tabs" />
+      <window_info id="Cvs" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="8" side_tool="false" content_ui="tabs" />
+      <window_info id="Message" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
+      <window_info id="Commander" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
+      <window_info id="Inspection" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="9" side_tool="false" content_ui="tabs" />
+      <window_info id="Hierarchy" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="2" side_tool="false" content_ui="combo" />
+      <window_info id="Ant Build" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
+    </layout>
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="1" />
+  </component>
+  <component name="Vcs.Log.History.Properties">
+    <option name="COLUMN_ORDER">
+      <list>
+        <option value="0" />
+        <option value="2" />
+        <option value="3" />
+        <option value="1" />
+      </list>
+    </option>
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State>
+              <option name="RECENTLY_FILTERED_USER_GROUPS">
+                <collection />
+              </option>
+              <option name="RECENTLY_FILTERED_BRANCH_GROUPS">
+                <collection />
+              </option>
+              <option name="COLUMN_ORDER">
+                <list>
+                  <option value="0" />
+                  <option value="1" />
+                  <option value="2" />
+                  <option value="3" />
+                </list>
+              </option>
+            </State>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsContentAnnotationSettings">
+    <option name="myLimit" value="2678400000" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
+    <option name="CHECK_NEW_TODO" value="false" />
+    <MESSAGE value="HttpLoader interface and implementation." />
+    <MESSAGE value="Explicit access modifiers. LoaderFile default export." />
+    <MESSAGE value="Enabled tslint rule &quot;no-non-null-assertion&quot;" />
+    <MESSAGE value="HttpLoader class functionality:&#10;- file loading in queue with order until queue end;&#10;- simultaneous file loading;&#10;- tracks downloaded files;&#10;- emits file response if file already downloaded;&#10;- cancel the loading of the old file queue." />
+    <MESSAGE value="HttpLoader: changed arguments of file_error event." />
+    <MESSAGE value="Added LoaderEvents enum." />
+    <MESSAGE value="HybridLoader prototype." />
+    <MESSAGE value="HttpLoader emit file loaded event returns copy of file:&#10;- The player himself clears the buffer and it leads to the bug when downloaded file has empty ArrayBuffer." />
+    <MESSAGE value="HybridLoader and HttpLoader functionality:&#10;- common loading interface MediaManagerInterface;&#10;- HttpMediaManager class;&#10;- refactoring." />
+    <MESSAGE value="P2PMediaManager prototype. Garbage collection." />
+    <MESSAGE value="Created LoaderFileCacheManager. P2P data send test." />
+    <MESSAGE value="Moved garbage collection to loaders." />
+    <MESSAGE value="P2P files map exchange." />
+    <MESSAGE value="P2P files map exchange (added forgotten file)." />
+    <MESSAGE value="P2P media manager (messaging, api methods)." />
+    <MESSAGE value="Added TypeScipt sinon definitions." />
+    <MESSAGE value="Hybrid loader, P2P manger, media peer class: &#10;- hybrid loader algorithm;&#10;- p2p manager;&#10;- peers protocol;&#10;- updated test;&#10;- added demo stream sources;" />
+    <MESSAGE value="Emit FileAbort event if the file was removed from the queue" />
+    <MESSAGE value="Media Peer response time handling." />
+    <MESSAGE value="Fixed lint warning. Commented console statements." />
+    <MESSAGE value="The project is prepared for use in the NPM." />
+    <MESSAGE value="Renamed playlistUrl to swarmId." />
+    <MESSAGE value="Added LoaderFile priority." />
+    <MESSAGE value="Split multiple projects: core, hlsjs, demo" />
+    <MESSAGE value="Splitting core and hlsjs projects" />
+    <option name="LAST_COMMIT_MESSAGE" value="Splitting core and hlsjs projects" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <option name="time" value="4" />
+    </breakpoint-manager>
+    <watches-manager />
+  </component>
+  <component name="editorHistoryManager">
+    <entry file="file://$PROJECT_DIR$/node_modules/m3u8-parser/index.html" />
+    <entry file="file://$PROJECT_DIR$/node_modules/m3u8-parser/src/index.js" />
+    <entry file="file://$PROJECT_DIR$/lib/somefile.ts" />
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/lib/index.ts" />
+    <entry file="file://$PROJECT_DIR$/lib/hello-world.ts" />
+    <entry file="file://$PROJECT_DIR$/node_modules/m3u8-parser/package.json" />
+    <entry file="file://$PROJECT_DIR$/index_.js" />
+    <entry file="file://$PROJECT_DIR$/node_modules/tsify/index.js" />
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/tslint.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="76">
+          <caret line="4" column="11" lean-forward="false" selection-start-line="4" selection-start-column="11" selection-end-line="4" selection-end-column="11" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/node_modules/@types/node/index.d.ts" />
+    <entry file="file://$PROJECT_DIR$/dist/hybrid-loader.js" />
+    <entry file="file://$PROJECT_DIR$/dist/hybrid-loader.d.ts" />
+    <entry file="file://$PROJECT_DIR$/dist/chunk-manager.js" />
+    <entry file="file://$PROJECT_DIR$/dist/chunk-manager.d.ts" />
+    <entry file="file://$PROJECT_DIR$/dist/hlsjs-loader-maker.js" />
+    <entry file="file://$PROJECT_DIR$/dist/utils.d.ts" />
+    <entry file="file://$PROJECT_DIR$/dist/loader-events.d.ts" />
+    <entry file="file://$PROJECT_DIR$/dist/index.js" />
+    <entry file="file://$PROJECT_DIR$/dist/index.d.ts" />
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/.npmignore">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="57">
+          <caret line="3" column="0" lean-forward="false" selection-start-line="3" selection-start-column="0" selection-end-line="3" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/dist/utils.js" />
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/tsconfig.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="152">
+          <caret line="8" column="14" lean-forward="false" selection-start-line="8" selection-start-column="14" selection-end-line="8" selection-end-column="14" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/package.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="247">
+          <caret line="13" column="34" lean-forward="true" selection-start-line="13" selection-start-column="34" selection-end-line="13" selection-end-column="34" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/lib/media-peer.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-1668">
+          <caret line="120" column="30" lean-forward="false" selection-start-line="120" selection-start-column="15" selection-end-line="120" selection-end-column="30" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/lib/loader-file-cache-manager.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="475">
+          <caret line="28" column="17" lean-forward="false" selection-start-line="28" selection-start-column="13" selection-end-line="28" selection-end-column="17" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/lib/loader-file-cache-manger-interface.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="171">
+          <caret line="9" column="4" lean-forward="false" selection-start-line="9" selection-start-column="4" selection-end-line="9" selection-end-column="4" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/dist/p2p-media-loader.js" />
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader.js" />
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-hlsjs/index.html">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="494">
+          <caret line="26" column="56" lean-forward="false" selection-start-line="26" selection-start-column="56" selection-end-line="26" selection-end-column="56" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/lib/loader-file.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="95">
+          <caret line="5" column="31" lean-forward="false" selection-start-line="5" selection-start-column="31" selection-end-line="5" selection-end-column="31" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-hlsjs/index.html">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="380">
+          <caret line="26" column="63" lean-forward="false" selection-start-line="26" selection-start-column="49" selection-end-line="26" selection-end-column="63" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/.gitignore">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="95">
+          <caret line="5" column="0" lean-forward="true" selection-start-line="5" selection-start-column="0" selection-end-line="5" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/lib/loader-events.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="0">
+          <caret line="0" column="5" lean-forward="false" selection-start-line="0" selection-start-column="5" selection-end-line="0" selection-end-column="5" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/lib/chunk-manager-interface.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="0">
+          <caret line="0" column="10" lean-forward="false" selection-start-line="0" selection-start-column="10" selection-end-line="0" selection-end-column="10" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-hlsjs/lib/hlsjs-loader-maker.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="57">
+          <caret line="3" column="34" lean-forward="false" selection-start-line="3" selection-start-column="34" selection-end-line="3" selection-end-column="34" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-hlsjs/lib/hlsjs-loader.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="190">
+          <caret line="10" column="11" lean-forward="false" selection-start-line="10" selection-start-column="11" selection-end-line="10" selection-end-column="11" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/lib/loader-interface.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="95">
+          <caret line="5" column="26" lean-forward="false" selection-start-line="5" selection-start-column="16" selection-end-line="5" selection-end-column="26" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/lib/media-manager-interface.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="76">
+          <caret line="4" column="7" lean-forward="false" selection-start-line="4" selection-start-column="7" selection-end-line="4" selection-end-column="7" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/lib/p2p-media-loader.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="472">
+          <caret line="30" column="34" lean-forward="false" selection-start-line="30" selection-start-column="15" selection-end-line="30" selection-end-column="34" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-hlsjs/lib/utils.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="209">
+          <caret line="11" column="17" lean-forward="true" selection-start-line="10" selection-start-column="43" selection-end-line="11" selection-end-column="17" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/p2p-media-loader-core.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="219">
+          <caret line="260" column="0" lean-forward="false" selection-start-line="260" selection-start-column="0" selection-end-line="260" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-hlsjs/index.html">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="228">
+          <caret line="24" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="52" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/package.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="171">
+          <caret line="9" column="87" lean-forward="false" selection-start-line="9" selection-start-column="82" selection-end-line="9" selection-end-column="87" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/lib/index.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="0">
+          <caret line="0" column="29" lean-forward="false" selection-start-line="0" selection-start-column="19" selection-end-line="0" selection-end-column="29" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/lib/cache-events.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="95">
+          <caret line="5" column="0" lean-forward="false" selection-start-line="5" selection-start-column="0" selection-end-line="5" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-hlsjs/lib/chunk-manager.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="0">
+          <caret line="0" column="7" lean-forward="false" selection-start-line="0" selection-start-column="7" selection-end-line="0" selection-end-column="7" />
+          <folding>
+            <element signature="e#0#62#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/lib/p2p-media-manager.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="266">
+          <caret line="22" column="35" lean-forward="false" selection-start-line="22" selection-start-column="23" selection-end-line="22" selection-end-column="35" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/lib/http-media-manager.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="114">
+          <caret line="9" column="11" lean-forward="false" selection-start-line="9" selection-start-column="11" selection-end-line="9" selection-end-column="11" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/lib/http-loader.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="437">
+          <caret line="24" column="8" lean-forward="false" selection-start-line="24" selection-start-column="8" selection-end-line="24" selection-end-column="57" />
+          <folding>
+            <element signature="e#0#49#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/lib/hybrid-loader.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="494">
+          <caret line="33" column="13" lean-forward="false" selection-start-line="33" selection-start-column="13" selection-end-line="33" selection-end-column="13" />
+          <folding>
+            <element signature="e#0#49#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/p2p-media-loader-core/index.html">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="171">
+          <caret line="9" column="0" lean-forward="true" selection-start-line="9" selection-start-column="0" selection-end-line="9" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+  </component>
+</project>

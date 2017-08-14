@@ -25,13 +25,6 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         this.cacheManager = new LoaderFileCacheManager();
     }
 
-    /**
-     * Adds files to the download queue.
-     * Cancels the download of previous ones if they are not in the new queue.
-     * The result of the downloading will be emitted via file_loaded or file_error of {LoaderEvents}.
-     *
-     * @param {LoaderFile[]} files Files to download.
-     */
     public load(files: LoaderFile[], swarmId: string, emitNowFileUrl?: string): void {
 
         // stop all xhr requests for files that are not in the new load
@@ -60,14 +53,6 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         this.collectGarbage();
     }
 
-    /**
-     * Loops through the files queue and starts file loading. Also saves an instance of XMLHttpRequest of the uploaded file.
-     *
-     * Starts downloading if:
-     * - number of simultaneous downloads not exceeded;
-     * - downloading of this file has not started yet;
-     * - the file is not in the list of downloaded files.
-     */
     private processFileQueue(): void {
         this.fileQueue.forEach((file) => {
             if (this.httpManager.getActiveDownloadsCount() < 1 &&
@@ -90,18 +75,9 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         this.processFileQueue();
     }
 
-    /**
-     * Emits {LoaderEvents.FileLoaded} event with copy of loaded file.
-     *
-     * @param {LoaderFile} file Input file
-     */
     private emitFileLoaded(file: LoaderFile): void {
-        // TODO: destructurization
-        const fileCopy = new LoaderFile(file.url);
-        fileCopy.data = file.data.slice(0);
-
         this.cacheManager.updateLastAccessed(file.url);
-        this.emit(LoaderEvents.FileLoaded, fileCopy);
+        this.emit(LoaderEvents.FileLoaded, {"url": file.url, "data": file.data.slice(0)});
     }
 
     private collectGarbage(): void {

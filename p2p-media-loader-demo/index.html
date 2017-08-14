@@ -96,6 +96,7 @@
                     break;
             }
 
+            this.initChart();
             this.initGraph();
         };
 
@@ -131,6 +132,10 @@
             player.play();
         };
 
+        DemoApp.prototype.initChart = function () {
+            this.p2pmlLoader.on("statistics_file_loaded", this.onFileLoaded.bind(this));
+        };
+
         DemoApp.prototype.initGraph = function (p2pLoader) {
             var nodes = this.graph.list();
             for (var i = 0; i < nodes.length; i++) {
@@ -144,11 +149,16 @@
             this.p2pmlLoader.on("peer_close", this.onPeerClose.bind(this));
         };
 
+        DemoApp.prototype.onFileLoaded = function (data) {
+            console.log("file loaded", data);
+        };
+
         DemoApp.prototype.onPeerConnect = function (mediaPeer) {
             var peer = mediaPeer.peer;
             this.graph.add({ id: peer.id, name: peer.remoteAddress || 'Unknown' });
             this.graph.connect("me", peer.id);
         };
+
         DemoApp.prototype.onPeerClose = function (mediaPeer) {
             var peer = mediaPeer.peer;
             this.graph.disconnect("me", peer.id);
