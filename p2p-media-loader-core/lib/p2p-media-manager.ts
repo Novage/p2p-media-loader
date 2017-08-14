@@ -30,13 +30,13 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
         const random = Math.random().toString();
         this.peerId = createHash("sha1").update(date + random).digest("hex");
 
-        //console.info("client peerId", this.peerId);
+        console.info("peerId", this.peerId);
     }
 
     public setSwarmId(id: string): void {
         if (this.swarmId !== id) {
             this.swarmId = id;
-            //console.log("this.swarmId", this.swarmId);
+            console.info("swarm", this.swarmId);
 
             if (this.client) {
                 this.client.stop();
@@ -158,7 +158,6 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
     }
 
     private onPeerDataFileLoaded(mediaPeer: MediaPeer, file: LoaderFile): void {
-        //console.log("file loaded via p2p", file.url);
         this.peerFileRequests.delete(file.url);
         this.emit(LoaderEvents.FileLoaded, file);
     }
