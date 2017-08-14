@@ -137,14 +137,14 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
     private onHttpFileLoaded(file: LoaderFile): void {
         if (!this.cacheManager.has(file.url)) {
-            this.emit("statistics_file_loaded", {"method": "http", "size": file.data.byteLength});
+            this.emit("statistics_file_loaded", {"method": "http", "size": file.data.byteLength, timestamp: Date.now()});
         }
         this.onFileLoaded(file);
     }
 
     private onP2PFileLoaded(file: LoaderFile): void {
         if (!this.cacheManager.has(file.url)) {
-            this.emit("statistics_file_loaded", {"method": "p2p", "size": file.data.byteLength});
+            this.emit("statistics_file_loaded", {"method": "p2p", "size": file.data.byteLength, timestamp: Date.now()});
         }
         this.onFileLoaded(file);
     }

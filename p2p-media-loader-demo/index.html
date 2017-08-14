@@ -11,15 +11,25 @@
     <script src="p2p-media-loader-hlsjs.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="https://cdn.jsdelivr.net/clappr/latest/clappr.min.js"></script>
+    <script src="https://code.highcharts.com/highcharts.js"></script>
 
     <style>
-        #videoUrlForm {
+        body {
             margin-top: 1em;
+            margin-bottom: 3em;
+        }
+        #graph {
+            max-width: 1024px;
+            margin: 2em auto;
+            border: 1px solid #ccc;
         }
         #video {
-            max-width: 720px;
-            margin-left: auto;
-            margin-right: auto;
+            max-width: 1024px;
+            margin: 2em auto;
+        }
+        #chart {
+            max-width: 1024px;
+            margin: 2em auto;
         }
     </style>
 
@@ -47,9 +57,9 @@
 
     <div id="video-container" class="text-center"></div>
 
-    <div id="graph-container"></div>
-
     <div id="graph"></div>
+
+    <div id="chart"></div>
 
 <script>
 
@@ -67,6 +77,10 @@
 
             this.graph = new P2PGraphClass("#graph");
             this.graph.add({ id: "me", name: "You", me: true });
+
+            this.downloadStats = [];
+
+            setInterval(this.updateChartData.bind(this), 1000);
 
             this.initDemo();
         }
@@ -133,7 +147,107 @@
         };
 
         DemoApp.prototype.initChart = function () {
+            var self = this;
             this.p2pmlLoader.on("statistics_file_loaded", this.onFileLoaded.bind(this));
+
+            var stubData = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+
+            this.chart = Highcharts.chart("chart", {
+                chart: {
+                    type: "areaspline"
+                },
+                legend: {
+                    layout: 'vertical',
+                    align: 'left',
+                    verticalAlign: 'top',
+                    x: 60,
+                    y: 40,
+                    floating: true,
+                    borderWidth: 1,
+                    backgroundColor: '#FFFFFF',
+                    labelFormatter: function() {
+                        return this.name + ' - ' + this.yData[this.yData.length - 1] + 'Mbps';
+                    }
+                },
+                title: {
+                    text: 'Network'
+                },
+                tooltip: {
+                    enabled: false
+                },
+                xAxis: {
+                    title: {
+                        text: 'Time (s)'
+                    },
+                    labels: {
+                        formatter: function () {
+                            if (this.value >= 60) {
+                                return this.value - 60;
+                            }
+                            return '';
+                        }
+                    },
+                    tickmarkPlacement: false,
+                    categories: stubData
+                },
+                yAxis: {
+                    title: {
+                        text: 'Speed (Mbps)'
+                    },
+                    max: 10
+                },
+                plotOptions: {
+                    areaspline: {
+                        stacking: 'normal',
+                        marker: {
+                            enabled: false,
+                            states: {
+                                hover: {
+                                    enabled: false
+                                }
+                            }
+                        }
+                    }
+                },
+                series: [{
+                    name: 'P2P Speed',
+                    data: stubData,
+                    color: '#BDE587',
+                    fillOpacity: 1
+                }, {
+                    name: 'HTTP Speed',
+                    data: stubData,
+                    color: '#C0C0C0',
+                    fillOpacity: 1
+                }],
+                credits: {
+                    enabled: false
+                }
+            });
+        };
+
+        DemoApp.prototype.updateChartData = function () {
+            if (this.chart) {
+                var downloadSpeed = this.getDownloadSpeed();
+                var chart = this.chart;
+                var legend = this.chart.legend;
+                var series1 = this.chart.series[0];
+                var series2 = this.chart.series[1];
+                var yAxis = this.chart.yAxis[0];
+
+                var p2p = Math.round(downloadSpeed[0] / 1048576, 2);
+                var http = Math.round(downloadSpeed[1] / 1048576, 2);
+
+                if (p2p + http > yAxis.max) {
+                    yAxis.update({max: yAxis.max + 10});
+                }
+
+                series1.addPoint(p2p, false, true, false);
+                series2.addPoint(http, false, true, false);
+
+                chart.redraw(true);
+                legend.update();
+            }
         };
 
         DemoApp.prototype.initGraph = function (p2pLoader) {
@@ -149,8 +263,27 @@
             this.p2pmlLoader.on("peer_close", this.onPeerClose.bind(this));
         };
 
+        DemoApp.prototype.getDownloadSpeed = function () {
+            var startingPoint = Date.now() - 10000;
+            var httpSize = 0;
+            var p2pSize = 0;
+
+            for (var i = this.downloadStats.length - 1; i >= 0; i--) {
+                var stat = this.downloadStats[i];
+                if (stat.timestamp >= startingPoint) {
+                    if (stat.method === "p2p") {
+                        p2pSize += stat.size;
+                    } else if (stat.method === "http") {
+                        httpSize += stat.size;
+                    }
+                }
+            }
+
+            return [p2pSize, httpSize];
+        };
+
         DemoApp.prototype.onFileLoaded = function (data) {
-            console.log("file loaded", data);
+            this.downloadStats.push(data);
         };
 
         DemoApp.prototype.onPeerConnect = function (mediaPeer) {
