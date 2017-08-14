@@ -158,7 +158,10 @@
 
             this.chart = Highcharts.chart("chart", {
                 chart: {
-                    type: "areaspline"
+                    type: "areaspline",
+                    animation: {
+                        duration: 800
+                    }
                 },
                 legend: {
                     layout: 'vertical',
@@ -213,6 +216,11 @@
                                 }
                             }
                         }
+                    },
+                    series: {
+                        animation: {
+                            duration: 1000
+                        }
                     }
                 },
                 series: [{
@@ -248,10 +256,8 @@
                     yAxis.update({max: yAxis.max + 100});
                 }
 
-                series1.addPoint(p2p, false, true, false);
-                series2.addPoint(http, false, true, false);
-
-                chart.redraw(true);
+                series1.addPoint(p2p, false, true, true);
+                series2.addPoint(http, false, true, true);
                 legend.update();
             }
         };
