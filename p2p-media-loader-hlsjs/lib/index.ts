@@ -34,11 +34,14 @@ export function initClapprPlayer(player: any, settings: any = {}): void {
 
 export function initVideoJsContribHlsJsPlayer(player: any, settings: any = {}): void {
     player.ready(() => {
-        const chunkManager: ChunkManager = player.options_.html5.hlsjsConfig.loader.getChunkManager();
-        player.tech_.on("hlsFragChanged", function (event: any, data: any) {
-            const url = data && data.frag ? data.frag.url : undefined;
-            chunkManager.setCurrentChunk(url);
-        });
+        const html5 = player.options_.html5;
+        if (html5 && html5.hlsjsConfig && html5.hlsjsConfig.loader && typeof html5.hlsjsConfig.loader.getChunkManager === "function") {
+            const chunkManager: ChunkManager = html5.hlsjsConfig.loader.getChunkManager();
+            player.tech_.on("hlsFragChanged", function (event: any, data: any) {
+                const url = data && data.frag ? data.frag.url : undefined;
+                chunkManager.setCurrentChunk(url);
+            });
+        }
     });
 }
 
