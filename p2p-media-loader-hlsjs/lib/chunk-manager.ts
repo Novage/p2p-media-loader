@@ -54,12 +54,10 @@ export default class ChunkManager {
     public loadChunk(url: string, onSuccess?: Function, onError?: Function, playlistMissRetries: number = 1): void {
         const { playlist: loadingPlaylist, chunkIndex: loadingChunkIndex } = this.getChunkLocation(url);
         if (!loadingPlaylist) {
-            const message = "Requested chunk cannot be located in known playlists";
             if (playlistMissRetries > 0) {
-                const retryMs = 500;
-                console.warn(`${message}; retry in ${retryMs} ms...`);
-                setTimeout(() => { this.loadChunk(url, onSuccess, onError, playlistMissRetries - 1); }, retryMs);
+                setTimeout(() => { this.loadChunk(url, onSuccess, onError, playlistMissRetries - 1); }, 500);
             } else {
+                const message = "Requested chunk cannot be located in known playlists";
                 console.error(message);
                 if (onError) {
                     setTimeout(() => { onError(message); }, 0);
@@ -167,8 +165,30 @@ export default class ChunkManager {
             files.push(new LoaderFile(fileUrl));
         }
 
-        this.loader.load(files, playlist.url, loadUrl);
+        this.loader.load(files, this.getSwarmId(playlist), loadUrl);
         //console.log("total files / play queue", files.length, this.playQueue.length);
+    }
+
+    private getSwarmId(playlist: Playlist): string {
+        const master = this.getMasterPlaylist();
+        if (master && master.url !== playlist.url) {
+            const urls = master.getChildPlaylistAbsoluteUrls();
+            for (let i = 0; i < urls.length; ++i) {
+                if (urls[ i ] === playlist.url) {
+                    return master.url + "+" + i;
+                }
+            }
+        }
+
+        return playlist.url;
+    }
+
+    private getMasterPlaylist(): Playlist | undefined {
+        for (const playlist of Array.from(this.playlists.values())) {
+            if (!!playlist.manifest.playlists) {
+                return playlist;
+            }
+        }
     }
 
 }
@@ -193,7 +213,7 @@ class Playlist {
 
     public getChunkIndex(url: string): number {
         for (let i = 0; i < this.manifest.segments.length; ++i) {
-            if (url.endsWith(this.manifest.segments[ i ].uri)) {
+            if (url === this.getChunkAbsoluteUrl(i)) {
                 return i;
             }
         }
