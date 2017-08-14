@@ -19,16 +19,16 @@
             margin-bottom: 3em;
         }
         #graph {
-            max-width: 1024px;
+            max-width: 720px;
             margin: 2em auto;
             border: 1px solid #ccc;
         }
         #video {
-            max-width: 1024px;
+            max-width: 720px;
             margin: 2em auto;
         }
         #chart {
-            max-width: 1024px;
+            max-width: 720px;
             margin: 2em auto;
         }
     </style>
@@ -152,6 +152,10 @@
 
             var stubData = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
 
+            if (this.chart) {
+                this.chart.destroy();
+            }
+
             this.chart = Highcharts.chart("chart", {
                 chart: {
                     type: "areaspline"
@@ -166,7 +170,7 @@
                     borderWidth: 1,
                     backgroundColor: '#FFFFFF',
                     labelFormatter: function() {
-                        return this.name + ' - ' + this.yData[this.yData.length - 1] + 'Mbps';
+                        return this.name + ' - ' + this.yData[this.yData.length - 1] + 'Kbps';
                     }
                 },
                 title: {
@@ -177,13 +181,15 @@
                 },
                 xAxis: {
                     title: {
-                        text: 'Time (s)'
+                        text: 'Time',
+                        margin: 20
+
                     },
                     labels: {
                         formatter: function () {
-                            if (this.value >= 60) {
+                            /*if (this.value >= 60) {
                                 return this.value - 60;
-                            }
+                            }*/
                             return '';
                         }
                     },
@@ -192,9 +198,9 @@
                 },
                 yAxis: {
                     title: {
-                        text: 'Speed (Mbps)'
+                        text: 'Speed (Kbps)'
                     },
-                    max: 10
+                    max: 100
                 },
                 plotOptions: {
                     areaspline: {
@@ -235,11 +241,11 @@
                 var series2 = this.chart.series[1];
                 var yAxis = this.chart.yAxis[0];
 
-                var p2p = Math.round(downloadSpeed[0] / 1048576, 2);
-                var http = Math.round(downloadSpeed[1] / 1048576, 2);
+                var p2p = Math.round(downloadSpeed[0] / 1024, 2);
+                var http = Math.round(downloadSpeed[1] / 1024, 2);
 
                 if (p2p + http > yAxis.max) {
-                    yAxis.update({max: yAxis.max + 10});
+                    yAxis.update({max: yAxis.max + 100});
                 }
 
                 series1.addPoint(p2p, false, true, false);
@@ -279,7 +285,7 @@
                 }
             }
 
-            return [p2pSize, httpSize];
+            return [p2pSize / 10, httpSize / 10];
         };
 
         DemoApp.prototype.onFileLoaded = function (data) {
