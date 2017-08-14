@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+
+    <script src="p2p-media-loader-core.js"></script>
+    <script src="p2p-media-loader-hlsjs.js"></script>
+
+    <link href="http://vjs.zencdn.net/5.19.2/video-js.css" rel="stylesheet">
+    <script src="http://vjs.zencdn.net/5.19.2/video.js"></script>
+    <script src="https://unpkg.com/videojs-contrib-hls.js@3.0.2"></script>
+
+</head>
+<body>
+
+    <video id="video" class="video-js vjs-default-skin" width="600" height="300" preload="none" autoplay controls></video>
+
+    <script>
+
+        var player = videojs("video", { html5: { hlsjsConfig: { loader: p2pml.hlsjs.createLoaderClass() } } });
+
+        p2pml.hlsjs.initVideoJsContribHlsJsPlayer(player);
+
+        player.src({ src: "http://zoomweblive-lh.akamaihd.net/i/Zoom-TIL-WAP/Zoomweb_1@348071/index_600_av-p.m3u8", type: "application/x-mpegURL" });
+        //player.src({ src: "https://video-dev.github.io/streams/x36xhzz/x36xhzz.m3u8", type: "application/x-mpegURL" });
+
+        player.ready(function() {
+            player.volume(0.01); // 1%
+        });
+
+    </script>
+
+</body>
+</html>
