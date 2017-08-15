@@ -13,6 +13,13 @@
     <script src="https://cdn.jsdelivr.net/clappr/latest/clappr.min.js"></script>
     <script src="https://code.highcharts.com/highcharts.js"></script>
 
+    <link rel="stylesheet" href="//releases.flowplayer.org/7.0.4/skin/skin.css">
+    <script src="https://releases.flowplayer.org/7.0.4/flowplayer.min.js"></script>
+    <script src="https://releases.flowplayer.org/hlsjs/flowplayer.hlsjs.light.min.js"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mediaelement/4.2.5/mediaelementplayer.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mediaelement/4.2.5/mediaelement-and-player.min.js"></script>
+
     <style>
         body {
             margin-top: 1em;
@@ -47,6 +54,8 @@
                 <select class="form-control" id="type">
                     <option value="hlsjs" selected>Hls.js</option>
                     <option value="clappr">Clappr</option>
+                    <option value="flowplayer">Flowplayer</option>
+                    <option value="mediaelement">MediaElement</option>
                 </select>
             </div>
             <div class="col-sm-2">
@@ -104,6 +113,12 @@
                 case 'clappr':
                     this.initClapprPlayer();
                     break;
+                case 'flowplayer':
+                    this.initFlowplayerPlayer();
+                    break;
+                case 'mediaelement':
+                    this.initMediaElementPlayer();
+                    break;
             }
 
             this.initChart();
@@ -149,6 +164,51 @@
             player.play();
         };
 
+        DemoApp.prototype.initMediaElementPlayer = function () {
+
+            var video = document.createElement("video");
+            video.id = "video";
+            this.videoContainer.appendChild(video);
+
+            var player = new MediaElementPlayer("video", {
+                stretching: "responsive",
+                startVolume: 0,
+                hls: {
+                    loader: p2pml.hlsjs.createLoaderClass(this.chunkManager)
+                },
+                success: function (mediaElement) {
+                    p2pml.hlsjs.initMediaElementJsPlayer(mediaElement);
+                }
+            });
+
+            player.setSrc(this.videoUrl);
+            player.options.forceLive = true;
+
+            player.load();
+            player.play();
+        };
+
+        DemoApp.prototype.initFlowplayerPlayer = function () {
+            var video = document.createElement("div");
+            video.id = "video";
+            video.className = "fp-slim";
+            this.videoContainer.appendChild(video);
+
+            var player = flowplayer("#video", {
+                autoplay: true,
+                volume: 0,
+                clip: {
+                    sources: [{
+                        type: "application/x-mpegurl",
+                        live: true,
+                        src: this.videoUrl
+                    }]
+                }
+            });
+
+            p2pml.hlsjs.initFlowplayerHlsJsPlayer(player, { "chunkManager": this.chunkManager });
+        };
+
         DemoApp.prototype.initChart = function () {
             var self = this;
             this.p2pmlLoader.on(p2pml.LoaderEvents.ChunkBytesLoaded, this.onBytesLoaded.bind(this));
@@ -176,6 +236,12 @@
                     borderWidth: 1,
                     backgroundColor: '#FFFFFF',
                     labelFormatter: function() {
+                        if (this.name === "Total") {
+                            var p2pSeries = this.chart.series[1];
+                            var httpSeries = this.chart.series[2];
+                            var total = p2pSeries.yData[p2pSeries.yData.length - 1] +  httpSeries.yData[httpSeries.yData.length - 1];
+                            return this.name + ' - ' + total + ' Mbps';
+                        }
                         return this.name + ' - ' + this.yData[this.yData.length - 1] + ' Mbps';
                     }
                 },
@@ -221,14 +287,19 @@
                     }
                 },
                 series: [{
-                    name: 'P2P Speed',
+                    name: 'Total',
                     data: stubData,
-                    color: '#BDE587',
-                    fillOpacity: 1
+                    color: '#bde587',
+                    lineWidth: 4
                 }, {
-                    name: 'HTTP Speed',
+                    name: 'P2P',
                     data: stubData,
-                    color: '#C0C0C0',
+                    color: '#88b9ea',
+                    fillOpacity: 1,
+                }, {
+                    name: 'HTTP',
+                    data: stubData,
+                    color: '#eae288',
                     fillOpacity: 1
                 }],
                 credits: {
@@ -244,8 +315,9 @@
                 var p2p = Number((speed.p2p * 8 / 1000000).toFixed(2));
                 var http = Number((speed.http * 8 / 1000000).toFixed(2));
 
-                this.chart.series[0].addPoint(p2p, false, true, true);
-                this.chart.series[1].addPoint(http, false, true, true);
+                this.chart.series[0].addPoint(0, false, true, true);
+                this.chart.series[1].addPoint(p2p, false, true, true);
+                this.chart.series[2].addPoint(http, false, true, true);
                 this.chart.legend.update();
             }
         };
