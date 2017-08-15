@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+
+    <script src="p2p-media-loader-core.js"></script>
+    <script src="p2p-media-loader-hlsjs.js"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mediaelement/4.2.5/mediaelementplayer.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mediaelement/4.2.5/mediaelement-and-player.min.js"></script>
+
+</head>
+<body>
+
+    <video id="video"></video>
+
+    <script>
+
+        var player = new MediaElementPlayer("video", {
+            stretching: "responsive",
+            startVolume: 0.01,
+            hls: { loader: p2pml.hlsjs.createLoaderClass() },
+            success: function (mediaElement) {
+                p2pml.hlsjs.initMediaElementJsPlayer(mediaElement);
+            }
+        });
+
+        //player.setSrc("https://video-dev.github.io/streams/x36xhzz/x36xhzz.m3u8");
+        player.setSrc("http://zoomweblive-lh.akamaihd.net/i/Zoom-TIL-WAP/Zoomweb_1@348071/index_600_av-p.m3u8"); player.options.forceLive = true;
+        //player.setSrc("https://wowza.peer5.com/live/smil:ski.smil/playlist.m3u8"); player.options.forceLive = true;
+
+        player.load();
+        player.play();
+
+    </script>
+
+</body>
+</html>

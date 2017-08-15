@@ -32,12 +32,12 @@ export function initClapprPlayer(player: any, settings: any = {}): void {
     });
 }
 
-export function initVideoJsContribHlsJsPlayer(player: any, settings: any = {}): void {
+export function initVideoJsContribHlsJsPlayer(player: any): void {
     player.ready(() => {
         const html5 = player.options_.html5;
         if (html5 && html5.hlsjsConfig && html5.hlsjsConfig.loader && typeof html5.hlsjsConfig.loader.getChunkManager === "function") {
             const chunkManager: ChunkManager = html5.hlsjsConfig.loader.getChunkManager();
-            player.tech_.on("hlsFragChanged", function (event: any, data: any) {
+            player.tech_.on("hlsFragChanged", (event: any, data: any) => {
                 const url = data && data.frag ? data.frag.url : undefined;
                 chunkManager.setCurrentChunk(url);
             });
@@ -49,6 +49,17 @@ export function initFlowplayerHlsJsPlayer(player: any, settings: any = {}): void
     if (player && player.engine && player.engine.hlsjs) {
         initHlsJsPlayer(player.engine.hlsjs, settings);
     }
+}
+
+export function initMediaElementJsPlayer(mediaElement: any): void {
+    mediaElement.addEventListener("hlsFragChanged", (event: any) => {
+        const url = event.data && event.data.length > 1 && event.data[ 1 ].frag ? event.data[ 1 ].frag.url : undefined;
+        const hls = mediaElement.hlsPlayer;
+        if (hls && hls.config && hls.config.loader && typeof hls.config.loader.getChunkManager === "function") {
+            const chunkManager: ChunkManager = hls.config.loader.getChunkManager();
+            chunkManager.setCurrentChunk(url);
+        }
+    });
 }
 
 export {default as ChunkManager} from "./chunk-manager";
