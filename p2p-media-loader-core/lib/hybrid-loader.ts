@@ -27,13 +27,15 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.cacheManager = new LoaderFileCacheManager();
 
         this.httpManager = new HttpMediaManager();
-        this.httpManager.on(LoaderEvents.FileLoaded, this.onHttpFileLoaded.bind(this));
+        this.httpManager.on(LoaderEvents.FileLoaded, this.onFileLoaded.bind(this));
         this.httpManager.on(LoaderEvents.FileError, this.onFileError.bind(this));
+        this.httpManager.on(LoaderEvents.ChunkBytesLoaded, this.onChunkBytesLoaded.bind(this));
 
         this.p2pManager = new P2PMediaManager(this.cacheManager);
-        this.p2pManager.on(LoaderEvents.FileLoaded, this.onP2PFileLoaded.bind(this));
+        this.p2pManager.on(LoaderEvents.FileLoaded, this.onFileLoaded.bind(this));
         this.p2pManager.on(LoaderEvents.FileError, this.onFileError.bind(this));
         this.p2pManager.on(LoaderEvents.ForceProcessing, this.processFileQueue.bind(this));
+        this.p2pManager.on(LoaderEvents.ChunkBytesLoaded, this.onChunkBytesLoaded.bind(this));
         this.p2pManager.on(MediaPeerEvents.Connect, this.onPeerConnect.bind(this));
         this.p2pManager.on(MediaPeerEvents.Close, this.onPeerClose.bind(this));
 
@@ -135,18 +137,8 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
     }
 
-    private onHttpFileLoaded(file: LoaderFile): void {
-        if (!this.cacheManager.has(file.url)) {
-            this.emit("statistics_file_loaded", {"method": "http", "size": file.data.byteLength, timestamp: Date.now()});
-        }
-        this.onFileLoaded(file);
-    }
-
-    private onP2PFileLoaded(file: LoaderFile): void {
-        if (!this.cacheManager.has(file.url)) {
-            this.emit("statistics_file_loaded", {"method": "p2p", "size": file.data.byteLength, timestamp: Date.now()});
-        }
-        this.onFileLoaded(file);
+    private onChunkBytesLoaded(data: any): void {
+        this.emit(LoaderEvents.ChunkBytesLoaded, data);
     }
 
     private onFileLoaded(file: LoaderFile): void {
@@ -166,11 +158,11 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private onPeerConnect(mediaPeer: MediaPeer): void {
-        this.emit("peer_connect", mediaPeer);
+        this.emit(LoaderEvents.PeerConnect, mediaPeer);
     }
 
     private onPeerClose(mediaPeer: MediaPeer): void {
-        this.emit("peer_close", mediaPeer);
+        this.emit(LoaderEvents.PeerClose, mediaPeer);
     }
 
     private collectGarbage(): void {

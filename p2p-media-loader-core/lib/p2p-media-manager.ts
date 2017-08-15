@@ -73,6 +73,7 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
             mediaPeer.on(MediaPeerEvents.DataFileRequest, this.onPeerDataFileRequest.bind(this));
             mediaPeer.on(MediaPeerEvents.DataFileLoaded, this.onPeerDataFileLoaded.bind(this));
             mediaPeer.on(MediaPeerEvents.DataFileAbsent, this.onPeerDataFileAbsent.bind(this));
+            mediaPeer.on(LoaderEvents.ChunkBytesLoaded, this.onChunkBytesLoaded.bind(this));
 
             this.peers.set(peer.id, mediaPeer);
         } else {
@@ -115,6 +116,10 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
 
     private onCacheUpdated(): void {
         this.peers.forEach((mediaPeer) => mediaPeer.sendFilesMap(this.cacheManager.keys()));
+    }
+
+    private onChunkBytesLoaded(data: any): void {
+        this.emit(LoaderEvents.ChunkBytesLoaded, data);
     }
 
     private onPeerConnect(mediaPeer: MediaPeer): void {

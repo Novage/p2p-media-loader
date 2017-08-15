@@ -79,20 +79,16 @@
             this.graph.add({ id: "me", name: "You", me: true });
 
             this.downloadStats = [];
+            this.downloadSpeedTimespan = 15; // seconds
 
-            setInterval(this.updateChartData.bind(this), 1000);
+            setInterval(this.updateChartData.bind(this), 500);
 
-            this.initDemo();
+            this.restartDemo();
         }
 
-        DemoApp.prototype.onVideoUrlFormSubmit = function (event) {
-            event.preventDefault();
-            this.videoUrl = event.currentTarget.url.value.trim();
-            this.playerType = event.currentTarget.type.value;
-            this.initDemo();
-        };
+        DemoApp.prototype.restartDemo = function () {
 
-        DemoApp.prototype.initDemo = function () {
+            this.downloadStats = [];
 
             while (this.videoContainer.hasChildNodes()) {
                 this.videoContainer.removeChild(this.videoContainer.lastChild);
@@ -112,6 +108,13 @@
 
             this.initChart();
             this.initGraph();
+        };
+
+        DemoApp.prototype.onVideoUrlFormSubmit = function (event) {
+            event.preventDefault();
+            this.videoUrl = event.currentTarget.url.value.trim();
+            this.playerType = event.currentTarget.type.value;
+            this.restartDemo();
         };
 
         DemoApp.prototype.initHlsJsPlayer = function () {
@@ -148,9 +151,9 @@
 
         DemoApp.prototype.initChart = function () {
             var self = this;
-            this.p2pmlLoader.on("statistics_file_loaded", this.onFileLoaded.bind(this));
+            this.p2pmlLoader.on(p2pml.LoaderEvents.ChunkBytesLoaded, this.onBytesLoaded.bind(this));
 
-            var stubData = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+            var stubData = Array.apply(null, Array(120)).map(Number.prototype.valueOf,0);
 
             if (this.chart) {
                 this.chart.destroy();
@@ -160,7 +163,7 @@
                 chart: {
                     type: "areaspline",
                     animation: {
-                        duration: 800
+                        duration: 400
                     }
                 },
                 legend: {
@@ -173,7 +176,7 @@
                     borderWidth: 1,
                     backgroundColor: '#FFFFFF',
                     labelFormatter: function() {
-                        return this.name + ' - ' + this.yData[this.yData.length - 1] + 'Kbps';
+                        return this.name + ' - ' + this.yData[this.yData.length - 1] + ' Mbps';
                     }
                 },
                 title: {
@@ -186,24 +189,23 @@
                     title: {
                         text: 'Time',
                         margin: 20
-
                     },
                     labels: {
                         formatter: function () {
-                            /*if (this.value >= 60) {
-                                return this.value - 60;
-                            }*/
+                            if (this.value >= 600) {
+                                return (this.value - 600) / 10;
+                            }
                             return '';
                         }
                     },
                     tickmarkPlacement: false,
-                    categories: stubData
+                    categories: stubData,
+                    tickInterval: 20
                 },
                 yAxis: {
                     title: {
-                        text: 'Speed (Kbps)'
-                    },
-                    max: 100
+                        text: 'Speed (Mbps)'
+                    }
                 },
                 plotOptions: {
                     areaspline: {
@@ -215,11 +217,6 @@
                                     enabled: false
                                 }
                             }
-                        }
-                    },
-                    series: {
-                        animation: {
-                            duration: 1000
                         }
                     }
                 },
@@ -242,41 +239,19 @@
 
         DemoApp.prototype.updateChartData = function () {
             if (this.chart) {
-                var downloadSpeed = this.getDownloadSpeed();
-                var chart = this.chart;
-                var legend = this.chart.legend;
-                var series1 = this.chart.series[0];
-                var series2 = this.chart.series[1];
-                var yAxis = this.chart.yAxis[0];
+                var speed = this.getDownloadSpeed();
 
-                var p2p = Math.round(downloadSpeed[0] / 1024, 2);
-                var http = Math.round(downloadSpeed[1] / 1024, 2);
+                var p2p = Number((speed.p2p * 8 / 1000000).toFixed(2));
+                var http = Number((speed.http * 8 / 1000000).toFixed(2));
 
-                if (p2p + http > yAxis.max) {
-                    yAxis.update({max: yAxis.max + 100});
-                }
-
-                series1.addPoint(p2p, false, true, true);
-                series2.addPoint(http, false, true, true);
-                legend.update();
+                this.chart.series[0].addPoint(p2p, false, true, true);
+                this.chart.series[1].addPoint(http, false, true, true);
+                this.chart.legend.update();
             }
-        };
-
-        DemoApp.prototype.initGraph = function (p2pLoader) {
-            var nodes = this.graph.list();
-            for (var i = 0; i < nodes.length; i++) {
-                if (nodes[i].id !== "me") {
-                    this.graph.disconnect("me", nodes[i].id);
-                    this.graph.remove(nodes[i].id);
-                }
-            }
-
-            this.p2pmlLoader.on("peer_connect", this.onPeerConnect.bind(this));
-            this.p2pmlLoader.on("peer_close", this.onPeerClose.bind(this));
         };
 
         DemoApp.prototype.getDownloadSpeed = function () {
-            var startingPoint = Date.now() - 10000;
+            var startingPoint = Date.now() - (this.downloadSpeedTimespan * 1000);
             var httpSize = 0;
             var p2pSize = 0;
 
@@ -291,23 +266,40 @@
                 }
             }
 
-            return [p2pSize / 10, httpSize / 10];
+            return {p2p: p2pSize / this.downloadSpeedTimespan, http: httpSize / this.downloadSpeedTimespan};
         };
 
-        DemoApp.prototype.onFileLoaded = function (data) {
+        DemoApp.prototype.onBytesLoaded = function (data) {
             this.downloadStats.push(data);
+        };
+
+        DemoApp.prototype.initGraph = function (p2pLoader) {
+            var nodes = this.graph.list();
+            for (var i = 0; i < nodes.length; i++) {
+                if (nodes[i].id !== "me") {
+                    this.graph.disconnect("me", nodes[i].id);
+                    this.graph.remove(nodes[i].id);
+                }
+            }
+
+            this.p2pmlLoader.on(p2pml.LoaderEvents.PeerConnect, this.onPeerConnect.bind(this));
+            this.p2pmlLoader.on(p2pml.LoaderEvents.PeerClose, this.onPeerClose.bind(this));
         };
 
         DemoApp.prototype.onPeerConnect = function (mediaPeer) {
             var peer = mediaPeer.peer;
-            this.graph.add({ id: peer.id, name: peer.remoteAddress || 'Unknown' });
-            this.graph.connect("me", peer.id);
+            if (!this.graph.hasPeer([peer.id])) {
+                this.graph.add({id: peer.id, name: peer.remoteAddress || 'Unknown'});
+                this.graph.connect("me", peer.id);
+            }
         };
 
         DemoApp.prototype.onPeerClose = function (mediaPeer) {
             var peer = mediaPeer.peer;
-            this.graph.disconnect("me", peer.id);
-            this.graph.remove(peer.id);
+            if (this.graph.hasPeer([peer.id])) {
+                this.graph.disconnect("me", peer.id);
+                this.graph.remove(peer.id);
+            }
         };
 
         return DemoApp;

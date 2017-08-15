@@ -3,6 +3,7 @@ import {EventEmitter} from "events";
 import MediaPeerCommands from "./media-peer-commands";
 import Timer = NodeJS.Timer;
 import MediaPeerEvents from "./media-peer-events";
+import LoaderEvents from "./loader-events";
 
 class LoaderFileChunk {
 
@@ -95,6 +96,7 @@ export default class MediaPeer extends EventEmitter {
                         this.tmpFileData.delete(file.url);
                         this.emit(MediaPeerEvents.DataFileLoaded, this, file);
                     }
+                    this.emit(LoaderEvents.ChunkBytesLoaded, {"method": "p2p", "size": chunk.data.length, timestamp: Date.now()});
                 }
 
                 break;
