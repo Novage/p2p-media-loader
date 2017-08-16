@@ -327,16 +327,21 @@
             var httpSize = 0;
             var p2pSize = 0;
 
-            for (var i = this.downloadStats.length - 1; i >= 0; i--) {
+            var i = this.downloadStats.length;
+            while (i--) {
                 var stat = this.downloadStats[i];
-                if (stat.timestamp >= startingPoint) {
-                    if (stat.method === "p2p") {
-                        p2pSize += stat.size;
-                    } else if (stat.method === "http") {
-                        httpSize += stat.size;
-                    }
+                if (stat.timestamp < startingPoint) {
+                	break;
+                }
+
+                if (stat.method === "p2p") {
+                    p2pSize += stat.size;
+                } else if (stat.method === "http") {
+                    httpSize += stat.size;
                 }
             }
+
+            this.downloadStats.splice(0, i + 1);
 
             return {p2p: p2pSize / this.downloadSpeedTimespan, http: httpSize / this.downloadSpeedTimespan};
         };
