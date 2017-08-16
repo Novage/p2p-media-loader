@@ -11,6 +11,15 @@
     <script src="//releases.flowplayer.org/7.0.4/flowplayer.min.js"></script>
     <script src="//releases.flowplayer.org/hlsjs/flowplayer.hlsjs.light.min.js"></script>
 
+    <style>
+        #video {
+            width: 720px;
+            margin-left: auto;
+            margin-right: auto;
+            display: block;
+        }
+    </style>
+
 </head>
 <body>
 
@@ -23,11 +32,9 @@
             volume: 0.01,
             clip: {
                 sources: [{
+                    src: "https://nasa-i.akamaihd.net/hls/live/253565/NASA-NTV1-Public/master.m3u8",
                     type: "application/x-mpegurl",
-                    live: true, src: "http://zoomweblive-lh.akamaihd.net/i/Zoom-TIL-WAP/Zoomweb_1@348071/index_600_av-p.m3u8"
-                    //live: true, src: "https://wowza.peer5.com/live/smil:ski.smil/playlist.m3u8"
-                    //src: "https://video-dev.github.io/streams/x36xhzz/x36xhzz.m3u8"
-                    //src: "//stream.flowplayer.org/bauhaus.m3u8"
+                    live: true
                 }]
             }
         });

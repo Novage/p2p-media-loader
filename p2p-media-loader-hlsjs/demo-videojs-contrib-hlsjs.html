@@ -11,10 +11,19 @@
     <script src="http://vjs.zencdn.net/5.19.2/video.js"></script>
     <script src="https://unpkg.com/videojs-contrib-hls.js@3.0.2"></script>
 
+    <style>
+        #video {
+            max-width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+            display: block;
+        }
+    </style>
+
 </head>
 <body>
 
-    <video id="video" class="video-js vjs-default-skin" width="600" height="300" preload="none" autoplay controls></video>
+    <video id="video" class="video-js vjs-default-skin" preload="none" autoplay controls></video>
 
     <script>
 
@@ -22,8 +31,10 @@
 
         p2pml.hlsjs.initVideoJsContribHlsJsPlayer(player);
 
-        player.src({ src: "http://zoomweblive-lh.akamaihd.net/i/Zoom-TIL-WAP/Zoomweb_1@348071/index_600_av-p.m3u8", type: "application/x-mpegURL" });
-        //player.src({ src: "https://video-dev.github.io/streams/x36xhzz/x36xhzz.m3u8", type: "application/x-mpegURL" });
+        player.src({
+            src: "https://nasa-i.akamaihd.net/hls/live/253565/NASA-NTV1-Public/master.m3u8",
+            type: "application/x-mpegURL"
+        });
 
         player.ready(function() {
             player.volume(0.01); // 1%
