@@ -210,7 +210,6 @@
         };
 
         DemoApp.prototype.initChart = function () {
-            var self = this;
             this.p2pmlLoader.on(p2pml.LoaderEvents.ChunkBytesLoaded, this.onBytesLoaded.bind(this));
 
             var stubData = Array.apply(null, Array(120)).map(Number.prototype.valueOf,0);
