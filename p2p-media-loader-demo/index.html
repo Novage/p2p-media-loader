@@ -250,13 +250,12 @@
                     {name: "Total", color: "#bde587", data: [], renderer: 'area'},
                     {name: "P2P", color: "#88b9ea", data: [], renderer: 'area'},
                     {name: "Http", color: "#eae288", data: [], renderer: 'area'}
-
                 ]
             });
 
             new Rickshaw.Graph.Axis.X({
                 graph: this.chart,
-                tickFormat: function() { return ''}
+                tickFormat: function() { return ''; }
             });
 
             new Rickshaw.Graph.Axis.Y({
@@ -304,23 +303,23 @@
                 var speed = this.getDownloadSpeed();
                 var http = Number((speed.http * 8 / 1000000).toFixed(2));
                 var p2p = Number((speed.p2p * 8 / 1000000).toFixed(2));
-                var total = http + p2p;
+                var total = Number((http + p2p).toFixed(2));
                 var upload = 0;
 
                 var data0 = this.chart.series[0].data;
                 var data1 = this.chart.series[1].data;
                 var data2 = this.chart.series[2].data;
                 var data3 = this.chart.series[3].data;
-                var lastX = data0.length > 0 ? data0[data0.length - 1].x : -1;
+                var x = data0.length > 0 ? data0[data0.length - 1].x + 1 : 0;
 
                 data0.shift();
                 data1.shift();
                 data2.shift();
                 data3.shift();
-                data0.push({x: lastX + 1, y: upload});
-                data1.push({x: lastX + 1, y: total + 0.1});
-                data2.push({x: lastX + 1, y: total});
-                data3.push({x: lastX + 1, y: http});
+                data0.push({x: x, y: upload});
+                data1.push({x: x, y: total + 0.1});
+                data2.push({x: x, y: total});
+                data3.push({x: x, y: http});
                 this.chart.update();
 
                 this.formatChartLegendline(0, http);
@@ -380,7 +379,7 @@
 
         DemoApp.prototype.onPeerConnect = function (mediaPeer) {
             var peer = mediaPeer.peer;
-            if (!this.graph.hasPeer([peer.id])) {
+            if (!this.graph.hasPeer(peer.id)) {
                 this.graph.add({id: peer.id, name: peer.remoteAddress || 'Unknown'});
                 this.graph.connect("me", peer.id);
             }
@@ -388,7 +387,7 @@
 
         DemoApp.prototype.onPeerClose = function (mediaPeer) {
             var peer = mediaPeer.peer;
-            if (this.graph.hasPeer([peer.id])) {
+            if (this.graph.hasPeer(peer.id)) {
                 this.graph.disconnect("me", peer.id);
                 this.graph.remove(peer.id);
             }
