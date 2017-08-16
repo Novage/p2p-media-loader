@@ -31,7 +31,11 @@
             margin-bottom: 3em;
         }
         #video {
-            max-width: 100%;
+            width: 100%;
+        }
+        #level {
+            width: auto;
+            float: right;
         }
         #graph {
             max-width: 100%;
@@ -164,14 +168,20 @@
                 video.controls = true;
                 this.videoContainer.appendChild(video);
 
+                var level = document.createElement("select");
+                level.id = "level";
+                level.classList.add("form-control");
+                this.videoContainer.appendChild(level);
+
                 var hls = new Hls();
                 p2pml.hlsjs.initHlsJsPlayer(hls, { "chunkManager": this.chunkManager });
                 hls.loadSource(this.videoUrl);
                 hls.attachMedia(video);
                 hls.on(Hls.Events.MANIFEST_PARSED, function () {
+                    this.hlsLevelSwitcher.init(hls, level);
                     video.play();
                     video.volume = 0;
-                });
+                }.bind(this));
             }
         };
 
@@ -386,6 +396,59 @@
                 this.graph.disconnect("me", peer.id);
                 this.graph.remove(peer.id);
             }
+        };
+
+        DemoApp.prototype.hlsLevelSwitcher = {
+
+            auto: "Auto",
+            hls: undefined,
+            select: undefined,
+
+            init: function (hls, select) {
+                this.hls = hls;
+                this.select = select;
+
+                this._clearOptions();
+                this._addOption(this.auto);
+                hls.levelController.levels.forEach(function (e, i) {
+                    this._addOption(e.height + "p (" + Math.round(e.bitrate / 1000) + "k)", i);
+                }.bind(this));
+
+                hls.on(Hls.Events.LEVEL_SWITCHED, this._hlsLevelSwitch.bind(this));
+
+                this.select.addEventListener("change", function (event) {
+                    hls.currentLevel = event.target.selectedIndex - 1;
+                    this._hlsLevelSwitch();
+                }.bind(this));
+            },
+
+            _hlsLevelSwitch: function () {
+                var auto = this.select.querySelector("option:not([data-index])");
+                var curr = this.select.querySelector("option[data-index='" + this.hls.currentLevel + "']");
+                if (this.hls.autoLevelEnabled || this.hls.currentLevel === -1) {
+                    auto.selected = true;
+                    auto.text = curr ? curr.text + " (" + this.auto + ")" : this.auto;
+                } else {
+                    curr.selected = true;
+                    auto.text = this.auto;
+                }
+            },
+
+            _clearOptions: function () {
+                while (this.select.options.length) {
+                    this.select.remove(0);
+                }
+            },
+
+            _addOption: function (text, index) {
+                var option = document.createElement("option");
+                option.text = text;
+                if (index !== undefined) {
+                    option.dataset.index = index;
+                }
+                this.select.add(option);
+            }
+
         };
 
         return DemoApp;
