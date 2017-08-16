@@ -9,9 +9,14 @@
     <script src="p2p-graph.js"></script>
     <script src="p2p-media-loader-core.js"></script>
     <script src="p2p-media-loader-hlsjs.js"></script>
+
+    <link type="text/css" rel="stylesheet" href="http://code.shutterstock.com/rickshaw/rickshaw.min.css">
+    <script src="http://code.shutterstock.com/rickshaw/vendor/d3.min.js"></script>
+    <script src="http://code.shutterstock.com/rickshaw/vendor/d3.layout.min.js"></script>
+    <script src="http://code.shutterstock.com/rickshaw/rickshaw.min.js"></script>
+
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="https://cdn.jsdelivr.net/clappr/latest/clappr.min.js"></script>
-    <script src="https://code.highcharts.com/highcharts.js"></script>
 
     <link rel="stylesheet" href="//releases.flowplayer.org/7.0.4/skin/skin.css">
     <script src="https://releases.flowplayer.org/7.0.4/flowplayer.min.js"></script>
@@ -34,9 +39,29 @@
             max-width: 720px;
             margin: 2em auto;
         }
-        #chart {
+        #chart_container {
+            position: relative;
             max-width: 720px;
             margin: 2em auto;
+        }
+        #chart {
+            position: relative;
+            left: 40px;
+        }
+        #y_axis {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 40px;
+        }
+        #y_axis > svg {
+            overflow: visible;
+        }
+        #legend {
+            position: absolute;
+            top: 10px;
+            left: 50px;
+            z-index: 1;
         }
     </style>
 
@@ -48,7 +73,7 @@
             <label class="control-label col-sm-2" for="url">Video URL:</label>
             <div class="col-sm-6">
                 <input type="text" class="form-control" id="url" placeholder="Please enter video url" required
-                    value="http://zoomweblive-lh.akamaihd.net/i/Zoom-TIL-WAP/Zoomweb_1@348071/index_600_av-p.m3u8" />
+                    value="https://nasa-i.akamaihd.net/hls/live/253565/NASA-NTV1-Public/master.m3u8" />
             </div>
             <div class="col-sm-2">
                 <select class="form-control" id="type">
@@ -68,7 +93,11 @@
 
     <div id="graph"></div>
 
-    <div id="chart"></div>
+    <div id="chart_container">
+        <div id="legend"></div>
+        <div id="y_axis"></div>
+        <div id="chart"></div>
+    </div>
 
 <script>
 
@@ -87,11 +116,9 @@
             this.graph = new P2PGraphClass("#graph");
             this.graph.add({ id: "me", name: "You", me: true });
 
-            this.downloadStats = [];
-            this.downloadSpeedTimespan = 15; // seconds
+            this.downloadSpeedTimespan = 10; // seconds
 
-            setInterval(this.updateChartData.bind(this), 500);
-
+            this.initChart();
             this.restartDemo();
         }
 
@@ -104,6 +131,8 @@
             }
 
             this.p2pmlLoader = new p2pml.HybridLoader();
+            this.p2pmlLoader.on(p2pml.LoaderEvents.ChunkBytesLoaded, this.onBytesLoaded.bind(this));
+
             this.chunkManager = new p2pml.hlsjs.ChunkManager(this.p2pmlLoader);
 
             switch (this.playerType) {
@@ -121,8 +150,8 @@
                     break;
             }
 
-            this.initChart();
-            this.initGraph();
+            this.refreshChart();
+            this.refreshGraph();
         };
 
         DemoApp.prototype.onVideoUrlFormSubmit = function (event) {
@@ -209,115 +238,102 @@
             p2pml.hlsjs.initFlowplayerHlsJsPlayer(player, { "chunkManager": this.chunkManager });
         };
 
-        DemoApp.prototype.initChart = function () {
-            this.p2pmlLoader.on(p2pml.LoaderEvents.ChunkBytesLoaded, this.onBytesLoaded.bind(this));
+        DemoApp.prototype.initChart = function (event) {
+            this.chart = new Rickshaw.Graph({
+                element: document.querySelector("#chart"),
+                width: 680,
+                renderer: 'multi',
+                interpolation: "basis",
+                stack: false,
+                series: [
+                    {name: "Upload", color: "#ff0000", data: [], renderer: 'line'},
+                    {name: "Total", color: "#bde587", data: [], renderer: 'area'},
+                    {name: "P2P", color: "#88b9ea", data: [], renderer: 'area'},
+                    {name: "Http", color: "#eae288", data: [], renderer: 'area'}
 
-            var stubData = Array.apply(null, Array(120)).map(Number.prototype.valueOf,0);
-
-            if (this.chart) {
-                this.chart.destroy();
-            }
-
-            this.chart = Highcharts.chart("chart", {
-                chart: {
-                    type: "areaspline",
-                    animation: {
-                        duration: 400
-                    }
-                },
-                legend: {
-                    layout: 'vertical',
-                    align: 'left',
-                    verticalAlign: 'top',
-                    x: 60,
-                    y: 40,
-                    floating: true,
-                    borderWidth: 1,
-                    backgroundColor: '#FFFFFF',
-                    labelFormatter: function() {
-                        if (this.name === "Total") {
-                            var p2pSeries = this.chart.series[1];
-                            var httpSeries = this.chart.series[2];
-                            var total = p2pSeries.yData[p2pSeries.yData.length - 1] +  httpSeries.yData[httpSeries.yData.length - 1];
-                            return this.name + ' - ' + total + ' Mbps';
-                        }
-                        return this.name + ' - ' + this.yData[this.yData.length - 1] + ' Mbps';
-                    }
-                },
-                title: {
-                    text: 'Network'
-                },
-                tooltip: {
-                    enabled: false
-                },
-                xAxis: {
-                    title: {
-                        text: 'Time',
-                        margin: 20
-                    },
-                    labels: {
-                        formatter: function () {
-                            if (this.value >= 600) {
-                                return (this.value - 600) / 10;
-                            }
-                            return '';
-                        }
-                    },
-                    tickmarkPlacement: false,
-                    categories: stubData,
-                    tickInterval: 20
-                },
-                yAxis: {
-                    title: {
-                        text: 'Speed (Mbps)'
-                    }
-                },
-                plotOptions: {
-                    areaspline: {
-                        stacking: 'normal',
-                        marker: {
-                            enabled: false,
-                            states: {
-                                hover: {
-                                    enabled: false
-                                }
-                            }
-                        }
-                    }
-                },
-                series: [{
-                    name: 'Total',
-                    data: stubData,
-                    color: '#bde587',
-                    lineWidth: 4
-                }, {
-                    name: 'P2P',
-                    data: stubData,
-                    color: '#88b9ea',
-                    fillOpacity: 1,
-                }, {
-                    name: 'HTTP',
-                    data: stubData,
-                    color: '#eae288',
-                    fillOpacity: 1
-                }],
-                credits: {
-                    enabled: false
-                }
+                ]
             });
+
+            new Rickshaw.Graph.Axis.X({
+                graph: this.chart,
+                tickFormat: function() { return ''}
+            });
+
+            new Rickshaw.Graph.Axis.Y({
+                graph: this.chart,
+                orientation: 'left',
+                element: document.getElementById('y_axis')
+            });
+
+            this.legend = new Rickshaw.Graph.Legend({
+                graph: this.chart,
+                element: document.getElementById('legend')
+            });
+
+            this.chart.render();
+            setInterval(this.updateChartData.bind(this), 100);
+        };
+
+        DemoApp.prototype.refreshChart = function () {
+            var data0 = this.chart.series[0].data;
+            var data1 = this.chart.series[1].data;
+            var data2 = this.chart.series[2].data;
+            var data3 = this.chart.series[3].data;
+            var lastX = data0.length > 0 ? data0[data0.length - 1].x : -1;
+
+            var seriesDataMapper = function(currentValue, index) {
+                return {x: index + lastX + 1, y: 0};
+            };
+
+            data0.length = 0;
+            data1.length = 0;
+            data2.length = 0;
+            data3.length = 0;
+
+            var stubData = Array.apply(null, Array(200)).map(seriesDataMapper);
+            data0.push.apply(data0, stubData.slice(0));
+            data1.push.apply(data1, stubData.slice(0));
+            data2.push.apply(data2, stubData.slice(0));
+            data3.push.apply(data3, stubData.slice(0));
+
+            this.chart.update();
         };
 
         DemoApp.prototype.updateChartData = function () {
             if (this.chart) {
                 var speed = this.getDownloadSpeed();
-
-                var p2p = Number((speed.p2p * 8 / 1000000).toFixed(2));
                 var http = Number((speed.http * 8 / 1000000).toFixed(2));
+                var p2p = Number((speed.p2p * 8 / 1000000).toFixed(2));
+                var total = http + p2p;
+                var upload = 0;
 
-                this.chart.series[0].addPoint(0, false, true, true);
-                this.chart.series[1].addPoint(p2p, false, true, true);
-                this.chart.series[2].addPoint(http, false, true, true);
-                this.chart.legend.update();
+                var data0 = this.chart.series[0].data;
+                var data1 = this.chart.series[1].data;
+                var data2 = this.chart.series[2].data;
+                var data3 = this.chart.series[3].data;
+                var lastX = data0.length > 0 ? data0[data0.length - 1].x : -1;
+
+                data0.shift();
+                data1.shift();
+                data2.shift();
+                data3.shift();
+                data0.push({x: lastX + 1, y: upload});
+                data1.push({x: lastX + 1, y: total + 0.1});
+                data2.push({x: lastX + 1, y: total});
+                data3.push({x: lastX + 1, y: http});
+                this.chart.update();
+
+                this.formatChartLegendline(0, http);
+                this.formatChartLegendline(1, p2p);
+                this.formatChartLegendline(2, total);
+                this.formatChartLegendline(3, 0);
+            }
+        };
+
+        DemoApp.prototype.formatChartLegendline = function (index, speed) {
+            if (this.legend) {
+                var line = this.legend.lines[index];
+                line.element.childNodes[1].textContent = line.series.name + ' - '+ speed + ' Mbps';
             }
         };
 
@@ -349,7 +365,7 @@
             this.downloadStats.push(data);
         };
 
-        DemoApp.prototype.initGraph = function (p2pLoader) {
+        DemoApp.prototype.refreshGraph = function (p2pLoader) {
             var nodes = this.graph.list();
             for (var i = 0; i < nodes.length; i++) {
                 if (nodes[i].id !== "me") {
