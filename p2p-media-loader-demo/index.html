@@ -30,29 +30,24 @@
             margin-top: 1em;
             margin-bottom: 3em;
         }
-        #graph {
-            max-width: 720px;
-            margin: 2em auto;
-            border: 1px solid #ccc;
-        }
         #video {
-            max-width: 720px;
-            margin: 2em auto;
+            max-width: 100%;
+        }
+        #graph {
+            max-width: 100%;
+            overflow: hidden;
         }
         #chart_container {
             position: relative;
-            max-width: 720px;
-            margin: 2em auto;
-        }
-        #chart {
-            position: relative;
-            left: 40px;
+            margin: 3em auto;
+            padding: 0 20px;
+            max-width: 100%;
         }
         #y_axis {
             position: absolute;
             top: 0;
-            bottom: 0;
             width: 40px;
+            left: -20px;
         }
         #y_axis > svg {
             overflow: visible;
@@ -89,9 +84,10 @@
         </div>
     </form>
 
-    <div id="video-container" class="text-center"></div>
-
-    <div id="graph"></div>
+    <div class="row">
+        <div id="video_container" class="text-center col-sm-8"></div>
+        <div id="graph" class="col-sm-4"></div>
+    </div>
 
     <div id="chart_container">
         <div id="legend"></div>
@@ -111,7 +107,7 @@
 
             this.videoUrl = videoUrlForm.url.value.trim();
             this.playerType = videoUrlForm.type.value;
-            this.videoContainer = document.getElementById("video-container");
+            this.videoContainer = document.getElementById("video_container");
 
             this.graph = new P2PGraphClass("#graph");
             this.graph.add({ id: "me", name: "You", me: true });
@@ -241,7 +237,6 @@
         DemoApp.prototype.initChart = function (event) {
             this.chart = new Rickshaw.Graph({
                 element: document.querySelector("#chart"),
-                width: 680,
                 renderer: 'multi',
                 interpolation: "basis",
                 stack: false,
@@ -270,7 +265,7 @@
             });
 
             this.chart.render();
-            setInterval(this.updateChartData.bind(this), 100);
+            setInterval(this.updateChartData.bind(this), 500);
         };
 
         DemoApp.prototype.refreshChart = function () {
