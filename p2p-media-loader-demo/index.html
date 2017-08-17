@@ -255,10 +255,10 @@
                 interpolation: "basis",
                 stack: false,
                 series: [
-                    {name: "Upload", color: "#ff0000", data: [], renderer: 'line'},
                     {name: "Total", color: "#bde587", data: [], renderer: 'area'},
                     {name: "P2P", color: "#88b9ea", data: [], renderer: 'area'},
-                    {name: "Http", color: "#eae288", data: [], renderer: 'area'}
+                    {name: "Http", color: "#eae288", data: [], renderer: 'area'},
+                    {name: "Upload", color: "#dd4a68", data: [], renderer: 'line'}
                 ]
             });
 
@@ -325,16 +325,16 @@
                 data1.shift();
                 data2.shift();
                 data3.shift();
-                data0.push({x: x, y: upload});
-                data1.push({x: x, y: total + 0.1});
-                data2.push({x: x, y: total});
-                data3.push({x: x, y: http});
+                data0.push({x: x, y: total + 0.1});
+                data1.push({x: x, y: total});
+                data2.push({x: x, y: http});
+                data3.push({x: x, y: upload});
                 this.chart.update();
 
-                this.formatChartLegendline(0, http);
-                this.formatChartLegendline(1, p2p);
-                this.formatChartLegendline(2, total);
-                this.formatChartLegendline(3, 0);
+                this.formatChartLegendline(0, upload);
+                this.formatChartLegendline(1, http);
+                this.formatChartLegendline(2, p2p);
+                this.formatChartLegendline(3, total);
             }
         };
 
