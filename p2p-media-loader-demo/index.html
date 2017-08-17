@@ -94,12 +94,12 @@
         <form id="videoUrlForm">
             <div class="form-group">
                 <label for="url">Video URL:</label>
-                <input type="text" class="form-control" id="url" placeholder="Please enter video url" required
+                <input type="text" class="form-control" id="url" name="url" placeholder="Please enter video url" required
                        value="https://nasa-i.akamaihd.net/hls/live/253565/NASA-NTV1-Public/master.m3u8" />
             </div>
             <div class="form-group">
                 <label for="type">Player:</label>
-                <select class="form-control" id="type">
+                <select class="form-control" id="type" name="type">
                     <option value="hlsjs" selected>Hls.js</option>
                     <option value="clappr">Clappr</option>
                     <option value="flowplayer">Flowplayer</option>
@@ -113,7 +113,6 @@
     </div>
 </div>
 
-
 <script>
 
     var DemoApp = (function () {
@@ -121,9 +120,9 @@
         var P2PGraphClass = require("p2p-graph");
 
         function DemoApp() {
-            var videoUrlForm = document.getElementById("videoUrlForm");
-            videoUrlForm.addEventListener('submit', this.onVideoUrlFormSubmit.bind(this));
+            this.initForm();
 
+            var videoUrlForm = document.getElementById("videoUrlForm");
             this.videoUrl = videoUrlForm.url.value.trim();
             this.playerType = videoUrlForm.type.value;
             this.videoContainer = document.getElementById("video_container");
@@ -136,6 +135,25 @@
             this.initChart();
             this.restartDemo();
         }
+
+        DemoApp.prototype.initForm = function () {
+            var form = document.getElementById("videoUrlForm");
+            window.location.search.substr(1).split("&").forEach(function (e) {
+                var p = e.split("=");
+                if (p.length === 2) {
+                    var name = p[0];
+                    var value = window.decodeURIComponent(p[1]);
+                    switch (name) {
+                        case "url":
+                            form.url.value = value;
+                            break;
+                        case "type":
+                            form.type.value = value;
+                            break;
+                    }
+                }
+            });
+        };
 
         DemoApp.prototype.restartDemo = function () {
             this.downloadStats = [];
@@ -169,13 +187,6 @@
 
             this.refreshChart();
             this.refreshGraph();
-        };
-
-        DemoApp.prototype.onVideoUrlFormSubmit = function (event) {
-            event.preventDefault();
-            this.videoUrl = event.currentTarget.url.value.trim();
-            this.playerType = event.currentTarget.type.value;
-            this.restartDemo();
         };
 
         DemoApp.prototype.initHlsJsPlayer = function () {
@@ -261,12 +272,6 @@
         };
 
         DemoApp.prototype.initVideoJsContribHlsJsPlayer = function () {
-            // this destroys previous player instance; without it, player will not be created (reason: same player id)
-            // TODO: remove this code when general approach to destroy players will be implemented
-            if (videojs.getPlayers().video) {
-                videojs.getPlayers().video.dispose();
-            }
-
             var video = document.createElement("video");
             video.id = "video";
             video.controls = true;
