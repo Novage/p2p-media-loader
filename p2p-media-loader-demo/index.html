@@ -40,6 +40,8 @@
         #graph {
             max-width: 100%;
             overflow: hidden;
+            margin: 3em auto;
+            border: 1px solid #eee;
         }
         #chart_container {
             position: relative;
@@ -67,14 +69,26 @@
 </head>
 <body class="container">
 
-    <form class="form-horizontal" id="videoUrlForm">
-        <div class="form-group">
-            <label class="control-label col-sm-2" for="url">Video URL:</label>
-            <div class="col-sm-6">
+<h1>P2P Media Loader Demo</h1>
+
+<div class="row">
+    <div class="col-md-8">
+        <div id="video_container" class="text-center"></div>
+        <div id="chart_container">
+            <div id="legend"></div>
+            <div id="y_axis"></div>
+            <div id="chart"></div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <form id="videoUrlForm">
+            <div class="form-group">
+                <label for="url">Video URL:</label>
                 <input type="text" class="form-control" id="url" placeholder="Please enter video url" required
-                    value="https://nasa-i.akamaihd.net/hls/live/253565/NASA-NTV1-Public/master.m3u8" />
+                       value="https://nasa-i.akamaihd.net/hls/live/253565/NASA-NTV1-Public/master.m3u8" />
             </div>
-            <div class="col-sm-2">
+            <div class="form-group">
+                <label for="type">Player:</label>
                 <select class="form-control" id="type">
                     <option value="hlsjs" selected>Hls.js</option>
                     <option value="clappr">Clappr</option>
@@ -82,22 +96,12 @@
                     <option value="mediaelement">MediaElement</option>
                 </select>
             </div>
-            <div class="col-sm-2">
-                <button type="submit" class="btn btn-primary">Apply</button>
-            </div>
-        </div>
-    </form>
-
-    <div class="row">
-        <div id="video_container" class="text-center col-sm-8"></div>
-        <div id="graph" class="col-sm-4"></div>
+            <button type="submit" class="btn btn-primary">Apply</button>
+        </form>
+        <div id="graph"></div>
     </div>
+</div>
 
-    <div id="chart_container">
-        <div id="legend"></div>
-        <div id="y_axis"></div>
-        <div id="chart"></div>
-    </div>
 
 <script>
 
@@ -350,7 +354,7 @@
             while (i--) {
                 var stat = this.downloadStats[i];
                 if (stat.timestamp < startingPoint) {
-                	break;
+                    break;
                 }
 
                 if (stat.method === "p2p") {
