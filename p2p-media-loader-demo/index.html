@@ -302,10 +302,11 @@
                 renderer: 'multi',
                 interpolation: "basis",
                 stack: false,
+                strokeWidth: 5,
                 series: [
-                    {name: "Total", color: "#bde587", data: [], renderer: 'area'},
+                    {name: "Total", color: "#f64", data: [], renderer: 'line'},
                     {name: "P2P", color: "#88b9ea", data: [], renderer: 'area'},
-                    {name: "Http", color: "#eae288", data: [], renderer: 'area'}
+                    {name: "HTTP", color: "#eae288", data: [], renderer: 'area'}
                 ]
             });
 
@@ -366,7 +367,7 @@
                 data0.shift();
                 data1.shift();
                 data2.shift();
-                data0.push({x: x, y: total > 0 ? Number((total + 0.1).toFixed(2)) : 0});
+                data0.push({x: x, y: total});
                 data1.push({x: x, y: total});
                 data2.push({x: x, y: http});
                 this.chart.update();
