@@ -285,7 +285,6 @@
             var data0 = this.chart.series[0].data;
             var data1 = this.chart.series[1].data;
             var data2 = this.chart.series[2].data;
-            var data3 = this.chart.series[3].data;
             var lastX = data0.length > 0 ? data0[data0.length - 1].x : -1;
 
             var seriesDataMapper = function(currentValue, index) {
@@ -295,13 +294,11 @@
             data0.length = 0;
             data1.length = 0;
             data2.length = 0;
-            data3.length = 0;
 
             var stubData = Array.apply(null, Array(200)).map(seriesDataMapper);
             data0.push.apply(data0, stubData.slice(0));
             data1.push.apply(data1, stubData.slice(0));
             data2.push.apply(data2, stubData.slice(0));
-            data3.push.apply(data3, stubData.slice(0));
 
             this.chart.update();
         };
@@ -321,7 +318,7 @@
                 data0.shift();
                 data1.shift();
                 data2.shift();
-                data0.push({x: x, y: total > 0 ? total + 0.1 : 0});
+                data0.push({x: x, y: total > 0 ? Number((total + 0.1).toFixed(2)) : 0});
                 data1.push({x: x, y: total});
                 data2.push({x: x, y: http});
                 this.chart.update();
