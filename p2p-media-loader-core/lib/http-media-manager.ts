@@ -55,7 +55,7 @@ export default class HttpMediaManager extends EventEmitter implements MediaManag
         if (xhr) {
             xhr.abort();
             this.xhrRequests.delete(file.url);
-            console.warn("http file abort", file.url);
+            this.debug("http file abort", file.url);
         }
     }
 
