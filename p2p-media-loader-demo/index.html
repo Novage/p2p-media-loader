@@ -257,8 +257,7 @@
                 series: [
                     {name: "Total", color: "#bde587", data: [], renderer: 'area'},
                     {name: "P2P", color: "#88b9ea", data: [], renderer: 'area'},
-                    {name: "Http", color: "#eae288", data: [], renderer: 'area'},
-                    {name: "Upload", color: "#dd4a68", data: [], renderer: 'line'}
+                    {name: "Http", color: "#eae288", data: [], renderer: 'area'}
                 ]
             });
 
@@ -313,28 +312,23 @@
                 var http = Number((speed.http * 8 / 1000000).toFixed(2));
                 var p2p = Number((speed.p2p * 8 / 1000000).toFixed(2));
                 var total = Number((http + p2p).toFixed(2));
-                var upload = 0;
 
                 var data0 = this.chart.series[0].data;
                 var data1 = this.chart.series[1].data;
                 var data2 = this.chart.series[2].data;
-                var data3 = this.chart.series[3].data;
                 var x = data0.length > 0 ? data0[data0.length - 1].x + 1 : 0;
 
                 data0.shift();
                 data1.shift();
                 data2.shift();
-                data3.shift();
                 data0.push({x: x, y: total > 0 ? total + 0.1 : 0});
                 data1.push({x: x, y: total});
                 data2.push({x: x, y: http});
-                data3.push({x: x, y: upload});
                 this.chart.update();
 
-                this.formatChartLegendline(0, upload);
-                this.formatChartLegendline(1, http);
-                this.formatChartLegendline(2, p2p);
-                this.formatChartLegendline(3, total);
+                this.formatChartLegendline(0, http);
+                this.formatChartLegendline(1, p2p);
+                this.formatChartLegendline(2, total);
             }
         };
 
