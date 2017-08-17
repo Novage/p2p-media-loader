@@ -8,7 +8,6 @@
     "compile": "rimraf ./dist/ && tsc && copyfiles -f ./lib/*.js ./dist/",
     "lint": "tslint -c ./tslint.json -p ./tsconfig.json",
     "build": "npm run compile && browserify -r ./dist/index.js:p2p-media-loader-core ./dist/browser-init.js > p2p-media-loader-core.js",
-    "build-to-hlsjs": "npm run build && copyfiles -f ./p2p-media-loader-core.js ../p2p-media-loader-hlsjs/",
     "refresh-dependencies": "npm update"
   },
   "license": "MIT",
