@@ -12,7 +12,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
     private cacheManager: LoaderFileCacheManagerInterface;
     private httpManager: MediaManagerInterface;
 
-    private readonly loaderFileExpiration = 1 * 60 * 1000; // milliseconds
+    private readonly loaderFileExpiration = 5 * 60 * 1000; // milliseconds
     private fileQueue: LoaderFile[] = [];
 
     public constructor() {

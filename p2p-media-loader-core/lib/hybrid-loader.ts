@@ -9,6 +9,7 @@ import P2PMediaManager from "./p2p-media-manager";
 import LoaderFileCacheManager from "./loader-file-cache-manager";
 import MediaPeerEvents from "./media-peer-events";
 import MediaPeer from "./media-peer";
+import * as Debug from "debug";
 
 export default class HybridLoader extends EventEmitter implements LoaderInterface {
 
@@ -16,14 +17,14 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private p2pManager: MediaManagerInterface;
     private cacheManager: LoaderFileCacheManagerInterface;
 
-    private readonly loaderFileExpiration = 3 * 60 * 1000; // milliseconds
+    private readonly loaderFileExpiration = 5 * 60 * 1000; // milliseconds
     private readonly requiredFilesCount = 2;
     private readonly bufferFilesCount = 3;
     private fileQueue: LoaderFile[] = [];
+    private debug = Debug("p2ml:hybrid-loader");
 
     public constructor() {
         super();
-
         this.cacheManager = new LoaderFileCacheManager();
 
         this.httpManager = new HttpMediaManager();
@@ -40,22 +41,27 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.p2pManager.on(MediaPeerEvents.Close, this.onPeerClose.bind(this));
 
         setInterval(() => {
-            this.processFileQueue();
+            //this.processFileQueue();
         }, 1000);
     }
 
     load(files: LoaderFile[], swarmId: string, emitNowFileUrl?: string): void {
-        //console.log("load()", files.length, files);
-        //console.log("emitNowFileUrl", emitNowFileUrl);
-        //console.log("--------------------------------------------------------------------------");
+        this.debug("--------------------------------------------------------------------------");
         this.p2pManager.setSwarmId(swarmId);
 
         // stop all http requests and p2p downloads for files that are not in the new load
         this.fileQueue.forEach(file => {
             if (files.findIndex(f => f.url === file.url) === -1) {
+                this.debug("remove file", file.url);
                 this.httpManager.abort(file);
                 this.p2pManager.abort(file);
                 this.emit(LoaderEvents.FileAbort, file.url);
+            }
+        });
+
+        files.forEach(file => {
+            if (this.fileQueue.findIndex(f => f.url === file.url) === -1) {
+                this.debug("add file", file.url);
             }
         });
 
@@ -74,18 +80,20 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.processFileQueue();
 
         // collect garbage
-        //this.collectGarbage();
+        this.collectGarbage();
     }
 
     private processFileQueue(): void {
+        this.debug("processFileQueue");
         const startingPriority = this.fileQueue.length > 0 ? this.fileQueue[0].priority : 0;
 
         for (let index = 0; index < this.fileQueue.length; index++) {
             const file = this.fileQueue[index];
+            const filePriority = index + startingPriority;
             if (!this.cacheManager.has(file.url)) {
-                if (index < this.requiredFilesCount && this.requiredFilesCount > startingPriority) {
+                if (filePriority < this.requiredFilesCount) {
                     // first file is urgent so stop all other http requests?
-                    if (index === 0 && !this.httpManager.isDownloading(file) && this.httpManager.getActiveDownloadsCount() > 0) {
+                    if (filePriority === 0 && !this.httpManager.isDownloading(file) && this.httpManager.getActiveDownloadsCount() > 0) {
                         this.fileQueue.forEach(file => this.httpManager.abort(file));
                     }
 

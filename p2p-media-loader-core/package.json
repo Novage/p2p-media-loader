@@ -16,9 +16,11 @@
     "url": "https://git.witua.com/novage/p2p-media-loader.git"
   },
   "dependencies": {
-    "bittorrent-tracker": "9.2.3"
+    "bittorrent-tracker": "9.2.3",
+    "debug": "^3.0.0"
   },
   "devDependencies": {
+    "@types/debug": "0.0.30",
     "@types/node": "^6.0.81",
     "@types/text-encoding": "0.0.31",
     "browserify": "^14.4.0",

@@ -4,6 +4,7 @@ import MediaPeerCommands from "./media-peer-commands";
 import Timer = NodeJS.Timer;
 import MediaPeerEvents from "./media-peer-events";
 import LoaderEvents from "./loader-events";
+import * as Debug from "debug";
 
 class LoaderFileChunk {
 
@@ -21,6 +22,7 @@ export default class MediaPeer extends EventEmitter {
     private chunkSize = 4 * 1024;
     private requestFileResponseTimeout = 3000;
     private requestFileResponseTimers: Map<string, Timer> = new Map();
+    private debug = Debug("p2ml:media-peer");
 
     // TODO: set according to MediaPeerCommands.Busy
     // TODO: clear by timeout
@@ -51,25 +53,23 @@ export default class MediaPeer extends EventEmitter {
     }
 
     private onPeerData(data: any): void {
-        //console.log("data byte lengh", data.byteLength);
         const dataString = new TextDecoder("utf-8").decode(data);
         let dataObject;
         try {
             dataObject = JSON.parse(dataString);
         } catch (err) {
-            debugger;
+            this.debug(err);
+            return;
         }
 
         switch (dataObject.command) {
 
             case MediaPeerCommands.FilesMap:
-                //console.info(dataObject.command, dataObject, this.id);
                 this.files = new Set(dataObject.files);
                 this.emit(MediaPeerEvents.DataFilesMap);
                 break;
 
             case MediaPeerCommands.FileRequest:
-                //console.info(dataObject.command, dataObject, this.id);
                 this.emit(MediaPeerEvents.DataFileRequest, this, dataObject.url);
                 break;
 
@@ -102,7 +102,6 @@ export default class MediaPeer extends EventEmitter {
                 break;
 
             case MediaPeerCommands.FileAbsent:
-                //console.info(dataObject.command, dataObject, this.id);
                 this.removeResponseTimer(dataObject.url);
                 this.tmpFileData.delete(dataObject.url);
                 this.files.delete(dataObject.url);
@@ -110,7 +109,6 @@ export default class MediaPeer extends EventEmitter {
                 break;
 
             case MediaPeerCommands.CancelFileRequest:
-                //console.info(dataObject.command, dataObject, this.id, this.peer.bufferSize);
                 // TODO: peer stop sending buffer
                 break;
 
@@ -131,7 +129,6 @@ export default class MediaPeer extends EventEmitter {
             for (let i = 0; i < initialChunksCount; i++) {
                 const start = i * this.chunkSize;
                 const end = start + this.chunkSize;
-                //console.log("chunk size", jsonBufferData.slice(start, end).length);
                 chunks.push(new LoaderFileChunk(i, jsonBufferData.slice(start, end)));
             }
 
@@ -147,18 +144,13 @@ export default class MediaPeer extends EventEmitter {
     }
 
     private sendCommand(command: any): boolean {
-        if (this.peer.bufferSize > 0) {
-            //console.warn("bufferSize: ", this.peer.bufferSize);
-        }
         try {
             if (this.peer.connected) {
                 this.peer.write(JSON.stringify(command));
                 return true;
-            } else {
-                //console.warn("peer is not connected");
             }
-        } catch (error) {
-            //console.warn("sendCommand failed", error, command);
+        } catch (err) {
+            this.debug("sendCommand failed", err, command);
         }
 
         return false;
@@ -173,7 +165,6 @@ export default class MediaPeer extends EventEmitter {
     }
 
     public sendFileData(file: LoaderFile): void {
-        //console.info("sending file...", file.url);
         const fileChunks = this.getLoaderFileChunks(file);
 
         for (let i = 0; i < fileChunks.length; i++) {
@@ -193,7 +184,6 @@ export default class MediaPeer extends EventEmitter {
     }
 
     public sendFileRequest(url: string): boolean {
-        //console.info("sending file request...", url);
         if (this.sendCommand({"command": MediaPeerCommands.FileRequest, "url": url})) {
             this.setResponseTimer(url);
             this.tmpFileData.set(url, new Array<LoaderFileChunk>());
@@ -204,7 +194,6 @@ export default class MediaPeer extends EventEmitter {
     }
 
     public sendCancelFileRequest(url: string): boolean {
-        //console.log("sending cancel...", url);
         return this.sendCommand({"command": MediaPeerCommands.CancelFileRequest, "url": url});
     }
 

@@ -2,10 +2,12 @@ import MediaManagerInterface from "./media-manager-interface";
 import LoaderFile from "./loader-file";
 import LoaderEvents from "./loader-events";
 import {EventEmitter} from "events";
+import * as Debug from "debug";
 
 export default class HttpMediaManager extends EventEmitter implements MediaManagerInterface {
 
     private xhrRequests: Map<string, XMLHttpRequest> = new Map();
+    private debug = Debug("p2ml:http-media-manager");
 
     public constructor() {
         super();
@@ -15,6 +17,7 @@ export default class HttpMediaManager extends EventEmitter implements MediaManag
         if (this.isDownloading(file)) {
             return;
         }
+        this.debug("http file download", file.url);
         const request = new XMLHttpRequest();
         request.open("GET", file.url, true);
         request.responseType = "arraybuffer";
@@ -52,6 +55,7 @@ export default class HttpMediaManager extends EventEmitter implements MediaManag
         if (xhr) {
             xhr.abort();
             this.xhrRequests.delete(file.url);
+            console.warn("http file abort", file.url);
         }
     }
 

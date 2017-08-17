@@ -7,6 +7,7 @@ import CacheEvents from "./cache-events";
 import LoaderEvents from "./loader-events";
 import MediaPeer from "./media-peer";
 import MediaPeerEvents from "./media-peer-events";
+import * as Debug from "debug";
 const Client = require("bittorrent-tracker");
 
 export default class P2PMediaManager extends EventEmitter implements MediaManagerInterface {
@@ -19,6 +20,7 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
     private peerFileRequests: Map<string, string> = new Map();
     private swarmId: string;
     private peerId: string;
+    private debug = Debug("p2ml:p2p-media-manager");
 
     public constructor(cacheManager: LoaderFileCacheManagerInterface) {
         super();
@@ -30,13 +32,13 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
         const random = Math.random().toString();
         this.peerId = createHash("sha1").update(date + random).digest("hex");
 
-        console.info("peerId", this.peerId);
+        this.debug("peerId", this.peerId);
     }
 
     public setSwarmId(id: string): void {
         if (this.swarmId !== id) {
             this.swarmId = id;
-            console.info("swarm", this.swarmId);
+            this.debug("swarm", this.swarmId);
 
             if (this.client) {
                 this.client.stop();
@@ -53,15 +55,14 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
         };
 
         this.client = new Client(clientOptions);
-        this.client.on("error", (error: any) => console.error("client error", error));
-        this.client.on("warning", (error: any) => console.warn("client warning", error));
-        //this.client.on("update", (data: any) => console.log("client announce update"));
+        this.client.on("error", (error: any) => this.debug("client error", error));
+        this.client.on("warning", (error: any) => this.debug("client warning", error));
+        //this.client.on("update", (data: any) => this.debug("client announce update"));
         this.client.on("peer", this.onClientPeer.bind(this));
         this.client.start();
     }
 
     private onClientPeer(peer: any) {
-        //console.log("onPeer", peer.id);
         if (!this.peers.has(peer.id)) {
 
             const mediaPeer = new MediaPeer(peer);
@@ -77,7 +78,7 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
 
             this.peers.set(peer.id, mediaPeer);
         } else {
-            //console.log("peer exists");
+            //this.debug("peer exists");
         }
     }
 
@@ -91,7 +92,10 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
         });
 
         if (mediaPeer) {
+            this.debug("p2p file download", file.url);
             this.peerFileRequests.set(file.url, mediaPeer.id);
+        } else {
+            this.debug("p2p file not found", file.url);
         }
     }
 
@@ -103,6 +107,7 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
                 mediaPeer.sendCancelFileRequest(file.url);
             }
             this.peerFileRequests.delete(file.url);
+            this.debug("p2p file abort", file.url);
         }
     }
 
@@ -146,7 +151,7 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
     }
 
     private onPeerError(mediaPeer: MediaPeer, error: any): void {
-        //console.warn("onPeerError", mediaPeer, error);
+        this.debug("onPeerError", mediaPeer, error);
     }
 
     private onPeerDataFilesMap(): void {
