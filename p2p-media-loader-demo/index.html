@@ -15,15 +15,25 @@
     <script src="http://code.shutterstock.com/rickshaw/vendor/d3.layout.min.js"></script>
     <script src="http://code.shutterstock.com/rickshaw/rickshaw.min.js"></script>
 
+    <!-- HlsJs -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
+    <!-- Clappr -->
     <script src="https://cdn.jsdelivr.net/clappr/latest/clappr.min.js"></script>
 
+    <!-- Flowplayer -->
     <link rel="stylesheet" href="//releases.flowplayer.org/7.0.4/skin/skin.css">
     <script src="https://releases.flowplayer.org/7.0.4/flowplayer.min.js"></script>
     <script src="https://releases.flowplayer.org/hlsjs/flowplayer.hlsjs.light.min.js"></script>
 
+    <!-- MediaElement -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mediaelement/4.2.5/mediaelementplayer.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mediaelement/4.2.5/mediaelement-and-player.min.js"></script>
+
+    <!-- VideoJs-Contrib-HlsJs -->
+    <link href="http://vjs.zencdn.net/5.19.2/video-js.css" rel="stylesheet">
+    <script src="http://vjs.zencdn.net/5.19.2/video.js"></script>
+    <script src="https://unpkg.com/videojs-contrib-hls.js@3.0.2"></script>
 
     <style>
         body {
@@ -94,6 +104,7 @@
                     <option value="clappr">Clappr</option>
                     <option value="flowplayer">Flowplayer</option>
                     <option value="mediaelement">MediaElement</option>
+                    <option value="videojs-contrib-hlsjs">VideoJs-Contrib-HlsJs</option>
                 </select>
             </div>
             <button type="submit" class="btn btn-primary">Apply</button>
@@ -127,7 +138,6 @@
         }
 
         DemoApp.prototype.restartDemo = function () {
-
             this.downloadStats = [];
 
             while (this.videoContainer.hasChildNodes()) {
@@ -151,6 +161,9 @@
                     break;
                 case 'mediaelement':
                     this.initMediaElementPlayer();
+                    break;
+                case 'videojs-contrib-hlsjs':
+                    this.initVideoJsContribHlsJsPlayer();
                     break;
             }
 
@@ -204,7 +217,6 @@
         };
 
         DemoApp.prototype.initMediaElementPlayer = function () {
-
             var video = document.createElement("video");
             video.id = "video";
             this.videoContainer.appendChild(video);
@@ -246,6 +258,37 @@
             });
 
             p2pml.hlsjs.initFlowplayerHlsJsPlayer(player, { "chunkManager": this.chunkManager });
+        };
+
+        DemoApp.prototype.initVideoJsContribHlsJsPlayer = function () {
+            // this destroys previous player instance; without it, player will not be created (reason: same player id)
+            // TODO: remove this code when general approach to destroy players will be implemented
+            if (videojs.getPlayers().video) {
+                videojs.getPlayers().video.dispose();
+            }
+
+            var video = document.createElement("video");
+            video.id = "video";
+            video.controls = true;
+            video.preload = "none";
+            video.className = "video-js vjs-default-skin";
+            this.videoContainer.appendChild(video);
+
+            var player = videojs("video", { html5: { hlsjsConfig: {
+                loader: p2pml.hlsjs.createLoaderClass(this.chunkManager)
+            } } });
+
+            p2pml.hlsjs.initVideoJsContribHlsJsPlayer(player);
+
+            player.src({
+                type: "application/x-mpegURL",
+                src: this.videoUrl
+            });
+
+            player.ready(function() {
+                player.volume(0);
+                player.play();
+            });
         };
 
         DemoApp.prototype.initChart = function (event) {
