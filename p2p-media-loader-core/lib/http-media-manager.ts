@@ -19,10 +19,11 @@ export default class HttpMediaManager extends EventEmitter implements MediaManag
         request.open("GET", file.url, true);
         request.responseType = "arraybuffer";
 
-        let bytesLoaded = 0;
+        let prevBytesLoaded = 0;
         request.onprogress = (event: any) => {
-            bytesLoaded = event.loaded - bytesLoaded;
+            const bytesLoaded = event.loaded - prevBytesLoaded;
             this.emit(LoaderEvents.ChunkBytesLoaded, {"method": "http", "size": bytesLoaded, timestamp: Date.now()});
+            prevBytesLoaded = event.loaded;
         };
 
         request.onload = (event: any) => {

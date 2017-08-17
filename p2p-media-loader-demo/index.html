@@ -221,7 +221,7 @@
             });
 
             player.setSrc(this.videoUrl);
-            player.options.forceLive = true;
+            //player.options.forceLive = true;
 
             player.load();
             player.play();
@@ -239,7 +239,7 @@
                 clip: {
                     sources: [{
                         type: "application/x-mpegurl",
-                        live: true,
+                        //live: true,
                         src: this.videoUrl
                     }]
                 }
@@ -325,7 +325,7 @@
                 data1.shift();
                 data2.shift();
                 data3.shift();
-                data0.push({x: x, y: total + 0.1});
+                data0.push({x: x, y: total > 0 ? total + 0.1 : 0});
                 data1.push({x: x, y: total});
                 data2.push({x: x, y: http});
                 data3.push({x: x, y: upload});
