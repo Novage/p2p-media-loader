@@ -3,6 +3,8 @@ import ChunkManager from "./chunk-manager";
 import HlsJsLoader from "./hlsjs-loader";
 const createHlsJsLoaderClass = require("./hlsjs-loader-class");
 
+const defaultLiveSyncDuration = 60;
+
 export function createLoaderClass(chunkManager?: ChunkManager): any {
     const manager: ChunkManager = chunkManager || new ChunkManager(new HybridLoader());
     return createHlsJsLoaderClass(HlsJsLoader, manager);
@@ -11,6 +13,7 @@ export function createLoaderClass(chunkManager?: ChunkManager): any {
 export function initHlsJsPlayer(player: any, settings: any = {}): void {
     const chunkManager: ChunkManager = settings.chunkManager || new ChunkManager(new HybridLoader());
     player.config.loader = createLoaderClass(chunkManager);
+    player.config.liveSyncDuration = defaultLiveSyncDuration;
 
     player.on("hlsFragChanged", function (event: any, data: any) {
         const url = data && data.frag ? data.frag.url : undefined;
@@ -34,9 +37,10 @@ export function initClapprPlayer(player: any, settings: any = {}): void {
 
 export function initVideoJsContribHlsJsPlayer(player: any): void {
     player.ready(() => {
-        const html5 = player.options_.html5;
-        if (html5 && html5.hlsjsConfig && html5.hlsjsConfig.loader && typeof html5.hlsjsConfig.loader.getChunkManager === "function") {
-            const chunkManager: ChunkManager = html5.hlsjsConfig.loader.getChunkManager();
+        const options = player.tech_.options_;
+        if (options && options.hlsjsConfig && options.hlsjsConfig.loader && typeof options.hlsjsConfig.loader.getChunkManager === "function") {
+            const chunkManager: ChunkManager = options.hlsjsConfig.loader.getChunkManager();
+            options.hlsjsConfig.liveSyncDuration = defaultLiveSyncDuration;
             player.tech_.on("hlsFragChanged", (event: any, data: any) => {
                 const url = data && data.frag ? data.frag.url : undefined;
                 chunkManager.setCurrentChunk(url);
@@ -52,6 +56,9 @@ export function initFlowplayerHlsJsPlayer(player: any, settings: any = {}): void
 }
 
 export function initMediaElementJsPlayer(mediaElement: any): void {
+    mediaElement.addEventListener("hlsManifestParsed", (event: any) => {
+        mediaElement.hlsPlayer.config.liveSyncDuration = defaultLiveSyncDuration;
+    });
     mediaElement.addEventListener("hlsFragChanged", (event: any) => {
         const url = event.data && event.data.length > 1 && event.data[ 1 ].frag ? event.data[ 1 ].frag.url : undefined;
         const hls = mediaElement.hlsPlayer;
