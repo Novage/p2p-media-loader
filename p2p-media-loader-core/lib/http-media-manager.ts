@@ -7,7 +7,7 @@ import * as Debug from "debug";
 export default class HttpMediaManager extends EventEmitter implements MediaManagerInterface {
 
     private xhrRequests: Map<string, XMLHttpRequest> = new Map();
-    private debug = Debug("p2ml:http-media-manager");
+    private debug = Debug("p2pml:http-media-manager");
 
     public constructor() {
         super();

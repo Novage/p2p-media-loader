@@ -21,7 +21,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private readonly lastFileProbability = 0.1;
     private readonly bufferFilesCount = 20;
     private fileQueue: LoaderFile[] = [];
-    private debug = Debug("p2ml:hybrid-loader");
+    private debug = Debug("p2pml:hybrid-loader");
 
     public constructor() {
         super();
@@ -65,13 +65,21 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         });
 
         // renew file queue
+        this.fileQueue = [];
+        files.forEach(file => {
+            this.fileQueue.push(new LoaderFile(file.url, file.priority));
+        });
+
         this.fileQueue = [...files];
 
         // emit file loaded event if the file has already been downloaded
         if (emitNowFileUrl) {
             const downloadedFile = this.cacheManager.get(emitNowFileUrl);
             if (downloadedFile) {
+                this.debug("emitNowFileUrl found in cache")
                 this.emitFileLoaded(downloadedFile);
+            } else {
+                this.debug("emitNowFileUrl not found in cache")
             }
         }
 
@@ -125,7 +133,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
                         fileForHttpDownload = pendingQueue[0];
                     }
                 } else {
-                    const random_index = Math.floor(Math.random() * pendingQueue.length);
+                    const random_index = Math.floor(Math.random() * Math.min(pendingQueue.length, this.bufferFilesCount));
                     fileForHttpDownload = pendingQueue[random_index];
                 }
 
@@ -156,6 +164,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private emitFileLoaded(file: LoaderFile): void {
         this.cacheManager.updateLastAccessed(file.url);
         this.emit(LoaderEvents.FileLoaded, {"url": file.url, "data": file.data.slice(0)});
+        this.debug("emitFileLoaded", file.url);
     }
 
     private onPeerConnect(mediaPeer: MediaPeer): void {

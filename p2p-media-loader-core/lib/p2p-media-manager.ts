@@ -20,7 +20,7 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
     private peerFileRequests: Map<string, string> = new Map();
     private swarmId: string;
     private peerId: string;
-    private debug = Debug("p2ml:p2p-media-manager");
+    private debug = Debug("p2pml:p2p-media-manager");
 
     public constructor(cacheManager: LoaderFileCacheManagerInterface) {
         super();
@@ -98,7 +98,7 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
             this.debug("p2p file download", file.url);
             this.peerFileRequests.set(file.url, mediaPeer.id);
         } else {
-            this.debug("p2p file not found", file.url);
+            //this.debug("p2p file not found", file.url);
         }
     }
 

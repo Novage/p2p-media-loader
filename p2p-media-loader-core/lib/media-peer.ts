@@ -22,7 +22,7 @@ export default class MediaPeer extends EventEmitter {
     private chunkSize = 4 * 1024;
     private requestFileResponseTimeout = 3000;
     private requestFileResponseTimers: Map<string, Timer> = new Map();
-    private debug = Debug("p2ml:media-peer");
+    private debug = Debug("p2pml:media-peer");
 
     // TODO: set according to MediaPeerCommands.Busy
     // TODO: clear by timeout
