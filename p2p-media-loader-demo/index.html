@@ -449,6 +449,13 @@
             select: undefined,
 
             init: function (hls, select) {
+                if (hls.levelController.levels.length < 2) {
+                    select.style.display = "none";
+                    return;
+                } else {
+                    select.style.display = "block";
+                }
+
                 this.hls = hls;
                 this.select = select;
 
