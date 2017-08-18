@@ -157,7 +157,7 @@ export default class MediaPeer extends EventEmitter {
     }
 
     public destroy(): void {
-        if (this.peer.isConnected()) {
+        if (this.peer.connected) {
             this.peer.destroy();
         }
     }
