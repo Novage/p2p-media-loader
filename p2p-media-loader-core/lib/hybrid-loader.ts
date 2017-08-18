@@ -16,17 +16,16 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private httpManager: MediaManagerInterface;
     private p2pManager: MediaManagerInterface;
     private cacheManager: LoaderFileCacheManagerInterface;
-
     private readonly loaderFileExpiration = 5 * 60 * 1000; // milliseconds
     private readonly requiredFilesCount = 2;
-    private readonly bufferFilesCount = 3;
+    private readonly lastFileProbability = 0.1;
+    private readonly bufferFilesCount = 20;
     private fileQueue: LoaderFile[] = [];
     private debug = Debug("p2ml:hybrid-loader");
 
     public constructor() {
         super();
         this.cacheManager = new LoaderFileCacheManager();
-
         this.httpManager = new HttpMediaManager();
         this.httpManager.on(LoaderEvents.FileLoaded, this.onFileLoaded.bind(this));
         this.httpManager.on(LoaderEvents.FileError, this.onFileError.bind(this));
@@ -40,14 +39,14 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.p2pManager.on(MediaPeerEvents.Connect, this.onPeerConnect.bind(this));
         this.p2pManager.on(MediaPeerEvents.Close, this.onPeerClose.bind(this));
 
-        setInterval(() => {
+        //setInterval(() => {
             //this.processFileQueue();
-        }, 1000);
+        //}, 1000);
     }
 
     load(files: LoaderFile[], swarmId: string, emitNowFileUrl?: string): void {
-        this.debug("--------------------------------------------------------------------------");
         this.p2pManager.setSwarmId(swarmId);
+        this.debug("load files", files, this.fileQueue, emitNowFileUrl);
 
         // stop all http requests and p2p downloads for files that are not in the new load
         this.fileQueue.forEach(file => {
@@ -84,15 +83,14 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private processFileQueue(): void {
-        this.debug("processFileQueue");
         const startingPriority = this.fileQueue.length > 0 ? this.fileQueue[0].priority : 0;
+        this.debug("processFileQueue - starting priority: " + startingPriority);
 
         for (let index = 0; index < this.fileQueue.length; index++) {
             const file = this.fileQueue[index];
             const filePriority = index + startingPriority;
             if (!this.cacheManager.has(file.url)) {
                 if (filePriority < this.requiredFilesCount) {
-                    // first file is urgent so stop all other http requests?
                     if (filePriority === 0 && !this.httpManager.isDownloading(file) && this.httpManager.getActiveDownloadsCount() > 0) {
                         this.fileQueue.forEach(file => this.httpManager.abort(file));
                     }
@@ -104,18 +102,6 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
                 } else if (!this.httpManager.isDownloading(file) && this.p2pManager.getActiveDownloadsCount() < 3) {
                     this.p2pManager.download(file);
                 }
-
-                /*if (this.httpManager.getActiveDownloadsCount() < 1) {
-                    this.httpManager.download(file);
-                }*/
-
-                /*if (this.p2pManager.getActiveDownloadsCount() === 0 && this.httpManager.getActiveDownloadsCount() === 0) {
-                    this.p2pManager.download(file);
-
-                    if (this.p2pManager.getActiveDownloadsCount() === 0) {
-                        this.httpManager.download(file);
-                    }
-                }*/
             }
 
             if (this.httpManager.getActiveDownloadsCount() === 1 && this.p2pManager.getActiveDownloadsCount() === 3) {
@@ -125,20 +111,27 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
 
         if (this.httpManager.getActiveDownloadsCount() === 0 && this.p2pManager.getActiveDownloadsCount() === 0) {
-            // load random file to buffer via http
-            const downloadedFilesCount = this.fileQueue.reduce((sum, file) => {
-                return sum + (this.cacheManager.has(file.url) ? 1 : 0);
-            }, 0);
+            const pendingQueue = this.fileQueue.filter(file =>
+                !this.cacheManager.has(file.url) &&
+                !this.httpManager.isDownloading(file) &&
+                !this.p2pManager.isDownloading(file));
+            const downloadedFilesCount = this.fileQueue.length - pendingQueue.length;
 
-            if (downloadedFilesCount < this.bufferFilesCount) {
-                const pendingQueue = this.fileQueue.filter(file =>
-                    !this.cacheManager.has(file.url) &&
-                    !this.httpManager.isDownloading(file) &&
-                    !this.p2pManager.isDownloading(file));
+            if (pendingQueue.length > 0 && downloadedFilesCount < this.bufferFilesCount) {
+                let fileForHttpDownload: LoaderFile | null = null;
 
-                if (pendingQueue.length > 0) {
+                if (pendingQueue.length === 1 && pendingQueue[0].url === this.fileQueue[this.fileQueue.length - 1].url) {
+                    if (Math.random() <= this.lastFileProbability) {
+                        fileForHttpDownload = pendingQueue[0];
+                    }
+                } else {
                     const random_index = Math.floor(Math.random() * pendingQueue.length);
-                    this.httpManager.download(pendingQueue[random_index]);
+                    fileForHttpDownload = pendingQueue[random_index];
+                }
+
+                if (fileForHttpDownload) {
+                    this.debug("Random HTTP download:");
+                    this.httpManager.download(fileForHttpDownload);
                 }
             }
         }

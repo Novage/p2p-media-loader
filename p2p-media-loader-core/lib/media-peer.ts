@@ -156,6 +156,12 @@ export default class MediaPeer extends EventEmitter {
         return false;
     }
 
+    public destroy(): void {
+        if (this.peer.isConnected()) {
+            this.peer.destroy();
+        }
+    }
+
     public hasFile(url: string): boolean {
         return this.files.has(url);
     }

@@ -42,6 +42,9 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
 
             if (this.client) {
                 this.client.stop();
+                this.client.destroy();
+                this.peers.forEach((mediaPeer) => mediaPeer.destroy());
+                this.peers.clear();
             }
             this.createClient(createHash("sha1").update(id).digest("hex"));
         }
@@ -57,7 +60,7 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
         this.client = new Client(clientOptions);
         this.client.on("error", (error: any) => this.debug("client error", error));
         this.client.on("warning", (error: any) => this.debug("client warning", error));
-        //this.client.on("update", (data: any) => this.debug("client announce update"));
+        this.client.on("update", (data: any) => this.debug("client announce update", data));
         this.client.on("peer", this.onClientPeer.bind(this));
         this.client.start();
     }
