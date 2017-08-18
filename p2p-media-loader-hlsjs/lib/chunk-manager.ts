@@ -154,15 +154,12 @@ export default class ChunkManager {
 
     private loadFiles(playlist: Playlist, chunkIndex: number, loadUrl?: string): void {
         const files: LoaderFile[] = [];
-
-        for (let i = 0; i < this.playQueue.length; ++i) {
-            files.push(new LoaderFile(this.playQueue[ i ]));
-        }
-
         const segments: any[] = playlist.manifest.segments;
+
+        let priority = Math.max(0, this.playQueue.length - 1);
         for (let i = chunkIndex; i < segments.length; ++i) {
             const fileUrl = playlist.getChunkAbsoluteUrl(i);
-            files.push(new LoaderFile(fileUrl));
+            files.push(new LoaderFile(fileUrl, priority++));
         }
 
         this.loader.load(files, this.getSwarmId(playlist), loadUrl);
