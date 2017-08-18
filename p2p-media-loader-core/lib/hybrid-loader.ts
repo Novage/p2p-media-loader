@@ -23,7 +23,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private fileQueue: LoaderFile[] = [];
     private debug = Debug("p2pml:hybrid-loader");
 
-    public constructor() {
+    public constructor(settings: any = {}) {
         super();
         this.cacheManager = new LoaderFileCacheManager();
         this.httpManager = new HttpMediaManager();

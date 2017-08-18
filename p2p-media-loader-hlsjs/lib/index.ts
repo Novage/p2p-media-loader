@@ -5,19 +5,18 @@ const createHlsJsLoaderClass = require("./hlsjs-loader-class");
 
 const defaultLiveSyncDuration = 60;
 
-export function createLoaderClass(chunkManager?: ChunkManager): any {
-    const manager: ChunkManager = chunkManager || new ChunkManager(new HybridLoader());
+export function createLoaderClass(settings: any = {}): any {
+    const manager: ChunkManager = settings.chunkManager || new ChunkManager(new HybridLoader(settings.loaderSettings));
     return createHlsJsLoaderClass(HlsJsLoader, manager);
 }
 
 export function initHlsJsPlayer(player: any, settings: any = {}): void {
-    const chunkManager: ChunkManager = settings.chunkManager || new ChunkManager(new HybridLoader());
-    player.config.loader = createLoaderClass(chunkManager);
+    player.config.loader = createLoaderClass(settings);
     player.config.liveSyncDuration = defaultLiveSyncDuration;
 
     player.on("hlsFragChanged", function (event: any, data: any) {
         const url = data && data.frag ? data.frag.url : undefined;
-        chunkManager.setCurrentChunk(url);
+        player.config.loader.getChunkManager().setCurrentChunk(url);
     });
 }
 
