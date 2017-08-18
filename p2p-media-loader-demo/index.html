@@ -455,7 +455,17 @@
                 this._clearOptions();
                 this._addOption(this.auto);
                 hls.levelController.levels.forEach(function (e, i) {
-                    this._addOption(e.height + "p (" + Math.round(e.bitrate / 1000) + "k)", i);
+                    var name = [];
+                    if (e.height) {
+                        name.push(e.height + "p");
+                    }
+                    if (e.bitrate) {
+                        name.push(Math.round(e.bitrate / 1000) + "k");
+                    }
+                    if (name.length === 0) {
+                        name.push("Quality #" + i);
+                    }
+                    this._addOption(name.join(" / "), i);
                 }.bind(this));
 
                 hls.on(Hls.Events.LEVEL_SWITCHED, this._hlsLevelSwitch.bind(this));
