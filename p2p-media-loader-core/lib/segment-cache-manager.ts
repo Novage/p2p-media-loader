@@ -24,8 +24,8 @@ export default class SegmentCacheManager extends EventEmitter implements Segment
         return Array.from(this.segments.keys());
     }
 
-    public delete(key: string): void {
-        this.segments.delete(key);
+    public delete(keys: string[]): void {
+        keys.forEach(key => this.segments.delete(key));
         this.emit(CacheEvents.CacheUpdated);
     }
 

@@ -177,11 +177,15 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
     private collectGarbage(): void {
         const now = new Date().getTime();
+        let keys: string[] = [];
+
         this.cacheManager.forEach((value, key) => {
             if (now - value.lastAccessed > this.segmentExpiration) {
-                this.cacheManager.delete(key);
+                keys.push(key);
             }
         });
+
+        this.cacheManager.delete(keys);
     }
 
 }
