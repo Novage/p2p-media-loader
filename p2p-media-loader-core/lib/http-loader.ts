@@ -86,7 +86,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
 
     private collectGarbage(): void {
         const now = new Date().getTime();
-        let keys: string[] = [];
+        const keys: string[] = [];
 
         this.cacheManager.forEach((value, key) => {
             if (now - value.lastAccessed > this.segmentExpiration) {

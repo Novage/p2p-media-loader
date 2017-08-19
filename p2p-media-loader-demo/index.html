@@ -132,6 +132,12 @@
 
             this.downloadSpeedTimespan = 10; // seconds
 
+            this.loaderSettings = {
+                segmentIdGenerator: function(url) {
+                    return url;
+                }
+            };
+
             this.initChart();
             this.restartDemo();
         }
@@ -162,7 +168,7 @@
                 this.videoContainer.removeChild(this.videoContainer.lastChild);
             }
 
-            this.p2pmlLoader = new p2pml.HybridLoader();
+            this.p2pmlLoader = new p2pml.HybridLoader(this.loaderSettings);
             this.p2pmlLoader.on(p2pml.LoaderEvents.PieceBytesLoaded, this.onBytesLoaded.bind(this));
 
             this.segmentManager = new p2pml.hlsjs.SegmentManager(this.p2pmlLoader);

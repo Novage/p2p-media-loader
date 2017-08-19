@@ -22,9 +22,16 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private readonly bufferSegmentsCount = 20;
     private segmentsQueue: Segment[] = [];
     private debug = Debug("p2pml:hybrid-loader");
+    private settings = {
+        segmentIdGenerator: (url: string): string => url
+    };
 
     public constructor(settings: any = {}) {
         super();
+
+        const {segmentIdGenerator} = settings;
+        Object.assign(this.settings, {segmentIdGenerator});
+
         this.cacheManager = new SegmentCacheManager();
         this.httpManager = new HttpMediaManager();
         this.httpManager.on(LoaderEvents.SegmentLoaded, this.onSegmentLoaded.bind(this));

@@ -210,6 +210,7 @@ export default class MediaPeer extends EventEmitter {
             clearTimeout(timer);
         }
 
+        // TODO: check MediaPeerEvents.DataSegmentAbsent
         timer = setTimeout(() => {
                 this.sendCancelSegmentRequest(url);
                 this.segments.delete(url);
