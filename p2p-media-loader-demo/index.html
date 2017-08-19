@@ -163,7 +163,7 @@
             }
 
             this.p2pmlLoader = new p2pml.HybridLoader();
-            this.p2pmlLoader.on(p2pml.LoaderEvents.ChunkBytesLoaded, this.onBytesLoaded.bind(this));
+            this.p2pmlLoader.on(p2pml.LoaderEvents.PieceBytesLoaded, this.onBytesLoaded.bind(this));
 
             this.chunkManager = new p2pml.hlsjs.ChunkManager(this.p2pmlLoader);
 

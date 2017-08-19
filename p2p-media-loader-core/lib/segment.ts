@@ -1,4 +1,4 @@
-export default class LoaderFile {
+export default class Segment {
 
     public url: string;
     public data: ArrayBuffer;

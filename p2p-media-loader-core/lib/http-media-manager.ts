@@ -1,5 +1,5 @@
 import MediaManagerInterface from "./media-manager-interface";
-import LoaderFile from "./loader-file";
+import Segment from "./segment";
 import LoaderEvents from "./loader-events";
 import {EventEmitter} from "events";
 import * as Debug from "debug";
@@ -13,54 +13,54 @@ export default class HttpMediaManager extends EventEmitter implements MediaManag
         super();
     }
 
-    public download(file: LoaderFile): void {
-        if (this.isDownloading(file)) {
+    public download(segment: Segment): void {
+        if (this.isDownloading(segment)) {
             return;
         }
-        this.debug("http file download", file.url);
+        this.debug("http segment download", segment.url);
         const request = new XMLHttpRequest();
-        request.open("GET", file.url, true);
+        request.open("GET", segment.url, true);
         request.responseType = "arraybuffer";
 
         let prevBytesLoaded = 0;
         request.onprogress = (event: any) => {
             const bytesLoaded = event.loaded - prevBytesLoaded;
-            this.emit(LoaderEvents.ChunkBytesLoaded, {"method": "http", "size": bytesLoaded, timestamp: Date.now()});
+            this.emit(LoaderEvents.PieceBytesLoaded, {"method": "http", "size": bytesLoaded, timestamp: Date.now()});
             prevBytesLoaded = event.loaded;
         };
 
         request.onload = (event: any) => {
-            this.xhrRequests.delete(file.url);
+            this.xhrRequests.delete(segment.url);
 
             if (event.target.status === 200) {
-                file.data = event.target.response;
-                this.emit(LoaderEvents.FileLoaded, file);
+                segment.data = event.target.response;
+                this.emit(LoaderEvents.SegmentLoaded, segment);
             } else {
-                this.emit(LoaderEvents.FileError, file.url, event);
+                this.emit(LoaderEvents.SegmentError, segment.url, event);
             }
         };
 
         request.onerror = (event: any) => {
             // TODO: retry with timeout?
-            this.xhrRequests.delete(file.url);
-            this.emit(LoaderEvents.FileError, file.url, event);
+            this.xhrRequests.delete(segment.url);
+            this.emit(LoaderEvents.SegmentError, segment.url, event);
         };
 
-        this.xhrRequests.set(file.url, request);
+        this.xhrRequests.set(segment.url, request);
         request.send();
     }
 
-    public abort(file: LoaderFile): void {
-        const xhr = this.xhrRequests.get(file.url);
+    public abort(segment: Segment): void {
+        const xhr = this.xhrRequests.get(segment.url);
         if (xhr) {
             xhr.abort();
-            this.xhrRequests.delete(file.url);
-            this.debug("http file abort", file.url);
+            this.xhrRequests.delete(segment.url);
+            this.debug("http segment abort", segment.url);
         }
     }
 
-    public isDownloading(file: LoaderFile): boolean {
-        return this.xhrRequests.has(file.url);
+    public isDownloading(segment: Segment): boolean {
+        return this.xhrRequests.has(segment.url);
     }
 
     public getActiveDownloadsCount(): number {

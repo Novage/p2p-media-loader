@@ -1,9 +1,9 @@
 enum MediaPeerCommands {
-    FileData = "file_data",
-    FileAbsent = "file_absent",
-    FilesMap = "files_map",
-    FileRequest = "file_request",
-    CancelFileRequest = "cancel_file_request",
+    SegmentData = "segment_data",
+    SegmentAbsent = "segment_absent",
+    SegmentsMap = "segments_map",
+    SegmentRequest = "segment_request",
+    CancelSegmentRequest = "cancel_segment_request",
 }
 
 export default MediaPeerCommands;

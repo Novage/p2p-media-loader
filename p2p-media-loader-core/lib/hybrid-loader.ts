@@ -1,12 +1,12 @@
 import LoaderInterface from "./loader-interface";
-import LoaderFile from "./loader-file";
+import Segment from "./segment";
 import LoaderEvents from "./loader-events";
 import MediaManagerInterface from "./media-manager-interface";
-import LoaderFileCacheManagerInterface from "./loader-file-cache-manger-interface";
+import SegmentCacheManagerInterface from "./segment-cache-manger-interface";
+import SegmentCacheManager from "./segment-cache-manager";
 import {EventEmitter} from "events";
 import HttpMediaManager from "./http-media-manager";
 import P2PMediaManager from "./p2p-media-manager";
-import LoaderFileCacheManager from "./loader-file-cache-manager";
 import MediaPeerEvents from "./media-peer-events";
 import MediaPeer from "./media-peer";
 import * as Debug from "debug";
@@ -15,100 +15,100 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
     private httpManager: MediaManagerInterface;
     private p2pManager: MediaManagerInterface;
-    private cacheManager: LoaderFileCacheManagerInterface;
-    private readonly loaderFileExpiration = 5 * 60 * 1000; // milliseconds
-    private readonly requiredFilesCount = 2;
-    private readonly lastFileProbability = 0.1;
-    private readonly bufferFilesCount = 20;
-    private fileQueue: LoaderFile[] = [];
+    private cacheManager: SegmentCacheManagerInterface;
+    private readonly segmentExpiration = 5 * 60 * 1000; // milliseconds
+    private readonly requiredSegmentsCount = 2;
+    private readonly lastSegmentProbability = 0.1;
+    private readonly bufferSegmentsCount = 20;
+    private segmentsQueue: Segment[] = [];
     private debug = Debug("p2pml:hybrid-loader");
 
     public constructor(settings: any = {}) {
         super();
-        this.cacheManager = new LoaderFileCacheManager();
+        this.cacheManager = new SegmentCacheManager();
         this.httpManager = new HttpMediaManager();
-        this.httpManager.on(LoaderEvents.FileLoaded, this.onFileLoaded.bind(this));
-        this.httpManager.on(LoaderEvents.FileError, this.onFileError.bind(this));
-        this.httpManager.on(LoaderEvents.ChunkBytesLoaded, this.onChunkBytesLoaded.bind(this));
+        this.httpManager.on(LoaderEvents.SegmentLoaded, this.onSegmentLoaded.bind(this));
+        this.httpManager.on(LoaderEvents.SegmentError, this.onSegmentError.bind(this));
+        this.httpManager.on(LoaderEvents.PieceBytesLoaded, this.onPieceBytesLoaded.bind(this));
 
         this.p2pManager = new P2PMediaManager(this.cacheManager);
-        this.p2pManager.on(LoaderEvents.FileLoaded, this.onFileLoaded.bind(this));
-        this.p2pManager.on(LoaderEvents.FileError, this.onFileError.bind(this));
-        this.p2pManager.on(LoaderEvents.ForceProcessing, this.processFileQueue.bind(this));
-        this.p2pManager.on(LoaderEvents.ChunkBytesLoaded, this.onChunkBytesLoaded.bind(this));
+        this.p2pManager.on(LoaderEvents.SegmentLoaded, this.onSegmentLoaded.bind(this));
+        this.p2pManager.on(LoaderEvents.SegmentError, this.onSegmentError.bind(this));
+        this.p2pManager.on(LoaderEvents.ForceProcessing, this.processSegmentsQueue.bind(this));
+        this.p2pManager.on(LoaderEvents.PieceBytesLoaded, this.onPieceBytesLoaded.bind(this));
         this.p2pManager.on(MediaPeerEvents.Connect, this.onPeerConnect.bind(this));
         this.p2pManager.on(MediaPeerEvents.Close, this.onPeerClose.bind(this));
 
         //setInterval(() => {
-            //this.processFileQueue();
+            //this.processSegmentsQueue();
         //}, 1000);
     }
 
-    load(files: LoaderFile[], swarmId: string, emitNowFileUrl?: string): void {
+    load(segments: Segment[], swarmId: string, emitNowSegmentUrl?: string): void {
         this.p2pManager.setSwarmId(swarmId);
-        this.debug("load files", files, this.fileQueue, emitNowFileUrl);
+        this.debug("load segments", segments, this.segmentsQueue, emitNowSegmentUrl);
 
-        // stop all http requests and p2p downloads for files that are not in the new load
-        this.fileQueue.forEach(file => {
-            if (files.findIndex(f => f.url === file.url) === -1) {
-                this.debug("remove file", file.url);
-                this.httpManager.abort(file);
-                this.p2pManager.abort(file);
-                this.emit(LoaderEvents.FileAbort, file.url);
+        // stop all http requests and p2p downloads for segments that are not in the new load
+        this.segmentsQueue.forEach(segment => {
+            if (segments.findIndex(f => f.url === segment.url) === -1) {
+                this.debug("remove segment", segment.url);
+                this.httpManager.abort(segment);
+                this.p2pManager.abort(segment);
+                this.emit(LoaderEvents.SegmentAbort, segment.url);
             }
         });
 
-        files.forEach(file => {
-            if (this.fileQueue.findIndex(f => f.url === file.url) === -1) {
-                this.debug("add file", file.url);
+        segments.forEach(segment => {
+            if (this.segmentsQueue.findIndex(f => f.url === segment.url) === -1) {
+                this.debug("add segment", segment.url);
             }
         });
 
-        // renew file queue
-        this.fileQueue = [];
-        files.forEach(file => {
-            this.fileQueue.push(new LoaderFile(file.url, file.priority));
+        // renew segment queue
+        this.segmentsQueue = [];
+        segments.forEach(segment => {
+            this.segmentsQueue.push(new Segment(segment.url, segment.priority));
         });
 
-        this.fileQueue = [...files];
+        this.segmentsQueue = [...segments];
 
-        // emit file loaded event if the file has already been downloaded
-        if (emitNowFileUrl) {
-            const downloadedFile = this.cacheManager.get(emitNowFileUrl);
-            if (downloadedFile) {
-                this.debug("emitNowFileUrl found in cache")
-                this.emitFileLoaded(downloadedFile);
+        // emit segment loaded event if the segment has already been downloaded
+        if (emitNowSegmentUrl) {
+            const downloadedSegment = this.cacheManager.get(emitNowSegmentUrl);
+            if (downloadedSegment) {
+                this.debug("emitNowSegmentUrl found in cache");
+                this.emitSegmentLoaded(downloadedSegment);
             } else {
-                this.debug("emitNowFileUrl not found in cache")
+                this.debug("emitNowSegmentUrl not found in cache");
             }
         }
 
         // run main processing algorithm
-        this.processFileQueue();
+        this.processSegmentsQueue();
 
         // collect garbage
         this.collectGarbage();
     }
 
-    private processFileQueue(): void {
-        const startingPriority = this.fileQueue.length > 0 ? this.fileQueue[0].priority : 0;
-        this.debug("processFileQueue - starting priority: " + startingPriority);
+    private processSegmentsQueue(): void {
+        const startingPriority = this.segmentsQueue.length > 0 ? this.segmentsQueue[0].priority : 0;
+        this.debug("processSegmentsQueue - starting priority: " + startingPriority);
 
-        for (let index = 0; index < this.fileQueue.length; index++) {
-            const file = this.fileQueue[index];
-            const filePriority = index + startingPriority;
-            if (!this.cacheManager.has(file.url)) {
-                if (filePriority < this.requiredFilesCount) {
-                    if (filePriority === 0 && !this.httpManager.isDownloading(file) && this.httpManager.getActiveDownloadsCount() > 0) {
-                        this.fileQueue.forEach(file => this.httpManager.abort(file));
+        for (let index = 0; index < this.segmentsQueue.length; index++) {
+            const segment = this.segmentsQueue[index];
+            const segmentPriority = index + startingPriority;
+            if (!this.cacheManager.has(segment.url)) {
+                if (segmentPriority < this.requiredSegmentsCount) {
+                    if (segmentPriority === 0 && !this.httpManager.isDownloading(segment) && this.httpManager.getActiveDownloadsCount() > 0) {
+                        this.segmentsQueue.forEach(s => this.httpManager.abort(s));
                     }
 
                     if (this.httpManager.getActiveDownloadsCount() === 0) {
-                        this.p2pManager.abort(file);
-                        this.httpManager.download(file);
+                        this.p2pManager.abort(segment);
+                        this.httpManager.download(segment);
                     }
-                } else if (!this.httpManager.isDownloading(file) && this.p2pManager.getActiveDownloadsCount() < 3) {
-                    this.p2pManager.download(file);
+                } else if (!this.httpManager.isDownloading(segment) && this.p2pManager.getActiveDownloadsCount() < 3) {
+                    this.p2pManager.download(segment);
                 }
             }
 
@@ -119,52 +119,52 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
 
         if (this.httpManager.getActiveDownloadsCount() === 0 && this.p2pManager.getActiveDownloadsCount() === 0) {
-            const pendingQueue = this.fileQueue.filter(file =>
-                !this.cacheManager.has(file.url) &&
-                !this.httpManager.isDownloading(file) &&
-                !this.p2pManager.isDownloading(file));
-            const downloadedFilesCount = this.fileQueue.length - pendingQueue.length;
+            const pendingQueue = this.segmentsQueue.filter(segment =>
+                !this.cacheManager.has(segment.url) &&
+                !this.httpManager.isDownloading(segment) &&
+                !this.p2pManager.isDownloading(segment));
+            const downloadedSegmentsCount = this.segmentsQueue.length - pendingQueue.length;
 
-            if (pendingQueue.length > 0 && downloadedFilesCount < this.bufferFilesCount) {
-                let fileForHttpDownload: LoaderFile | null = null;
+            if (pendingQueue.length > 0 && downloadedSegmentsCount < this.bufferSegmentsCount) {
+                let segmentForHttpDownload: Segment | null = null;
 
-                if (pendingQueue.length === 1 && pendingQueue[0].url === this.fileQueue[this.fileQueue.length - 1].url) {
-                    if (Math.random() <= this.lastFileProbability) {
-                        fileForHttpDownload = pendingQueue[0];
+                if (pendingQueue.length === 1 && pendingQueue[0].url === this.segmentsQueue[this.segmentsQueue.length - 1].url) {
+                    if (Math.random() <= this.lastSegmentProbability) {
+                        segmentForHttpDownload = pendingQueue[0];
                     }
                 } else {
-                    const random_index = Math.floor(Math.random() * Math.min(pendingQueue.length, this.bufferFilesCount));
-                    fileForHttpDownload = pendingQueue[random_index];
+                    const random_index = Math.floor(Math.random() * Math.min(pendingQueue.length, this.bufferSegmentsCount));
+                    segmentForHttpDownload = pendingQueue[random_index];
                 }
 
-                if (fileForHttpDownload) {
+                if (segmentForHttpDownload) {
                     this.debug("Random HTTP download:");
-                    this.httpManager.download(fileForHttpDownload);
+                    this.httpManager.download(segmentForHttpDownload);
                 }
             }
         }
 
     }
 
-    private onChunkBytesLoaded(data: any): void {
-        this.emit(LoaderEvents.ChunkBytesLoaded, data);
+    private onPieceBytesLoaded(data: any): void {
+        this.emit(LoaderEvents.PieceBytesLoaded, data);
     }
 
-    private onFileLoaded(file: LoaderFile): void {
-        this.cacheManager.set(file.url, file);
-        this.emitFileLoaded(file);
-        this.processFileQueue();
+    private onSegmentLoaded(segment: Segment): void {
+        this.cacheManager.set(segment.url, segment);
+        this.emitSegmentLoaded(segment);
+        this.processSegmentsQueue();
     }
 
-    private onFileError(url: string, event: any): void {
-        this.emit(LoaderEvents.FileError, url, event);
-        this.processFileQueue();
+    private onSegmentError(url: string, event: any): void {
+        this.emit(LoaderEvents.SegmentError, url, event);
+        this.processSegmentsQueue();
     }
 
-    private emitFileLoaded(file: LoaderFile): void {
-        this.cacheManager.updateLastAccessed(file.url);
-        this.emit(LoaderEvents.FileLoaded, {"url": file.url, "data": file.data.slice(0)});
-        this.debug("emitFileLoaded", file.url);
+    private emitSegmentLoaded(segment: Segment): void {
+        this.cacheManager.updateLastAccessed(segment.url);
+        this.emit(LoaderEvents.SegmentLoaded, {"url": segment.url, "data": segment.data.slice(0)});
+        this.debug("emitSegmentLoaded", segment.url);
     }
 
     private onPeerConnect(mediaPeer: MediaPeer): void {
@@ -178,7 +178,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private collectGarbage(): void {
         const now = new Date().getTime();
         this.cacheManager.forEach((value, key) => {
-            if (now - value.lastAccessed > this.loaderFileExpiration) {
+            if (now - value.lastAccessed > this.segmentExpiration) {
                 this.cacheManager.delete(key);
             }
         });

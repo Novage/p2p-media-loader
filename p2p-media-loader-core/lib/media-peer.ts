@@ -1,4 +1,4 @@
-import LoaderFile from "./loader-file";
+import Segment from "./segment";
 import {EventEmitter} from "events";
 import MediaPeerCommands from "./media-peer-commands";
 import Timer = NodeJS.Timer;
@@ -6,7 +6,7 @@ import MediaPeerEvents from "./media-peer-events";
 import LoaderEvents from "./loader-events";
 import * as Debug from "debug";
 
-class LoaderFileChunk {
+class SegmentPiece {
 
     constructor(readonly index: number, readonly data: Array<number>) {
     }
@@ -17,11 +17,11 @@ export default class MediaPeer extends EventEmitter {
 
     public id: string;
     private peer: any;
-    private tmpFileData: Map<string, Array<LoaderFileChunk>> = new Map();
-    private files: Set<string> = new Set();
-    private chunkSize = 4 * 1024;
-    private requestFileResponseTimeout = 3000;
-    private requestFileResponseTimers: Map<string, Timer> = new Map();
+    private segmentsPiecesData: Map<string, Array<SegmentPiece>> = new Map();
+    private segments: Set<string> = new Set();
+    private pieceSize = 4 * 1024;
+    private requestSegmentResponseTimeout = 3000;
+    private requestSegmentResponseTimers: Map<string, Timer> = new Map();
     private debug = Debug("p2pml:media-peer");
 
     // TODO: set according to MediaPeerCommands.Busy
@@ -64,51 +64,51 @@ export default class MediaPeer extends EventEmitter {
 
         switch (dataObject.command) {
 
-            case MediaPeerCommands.FilesMap:
-                this.files = new Set(dataObject.files);
-                this.emit(MediaPeerEvents.DataFilesMap);
+            case MediaPeerCommands.SegmentsMap:
+                this.segments = new Set(dataObject.segments);
+                this.emit(MediaPeerEvents.DataSegmentsMap);
                 break;
 
-            case MediaPeerCommands.FileRequest:
-                this.emit(MediaPeerEvents.DataFileRequest, this, dataObject.url);
+            case MediaPeerCommands.SegmentRequest:
+                this.emit(MediaPeerEvents.DataSegmentRequest, this, dataObject.url);
                 break;
 
-            case MediaPeerCommands.FileData:
+            case MediaPeerCommands.SegmentData:
                 this.setResponseTimer(dataObject.url);
-                const tmpFileData = this.tmpFileData.get(dataObject.url);
+                const segmentPieces = this.segmentsPiecesData.get(dataObject.url);
 
-                if (tmpFileData) {
-                    const chunk = new LoaderFileChunk(dataObject.chunkIndex,  dataObject.data);
-                    tmpFileData.push(chunk);
+                if (segmentPieces) {
+                    const piece = new SegmentPiece(dataObject.pieceIndex,  dataObject.data);
+                    segmentPieces.push(piece);
 
-                    if (dataObject.chunksCount === tmpFileData.length) {
+                    if (dataObject.piecesCount === segmentPieces.length) {
                         this.removeResponseTimer(dataObject.url);
-                        tmpFileData.sort((a, b) => a.index - b.index);
+                        segmentPieces.sort((a, b) => a.index - b.index);
 
                         const stringData = new Array<number>();
-                        tmpFileData.forEach((chunk) => {
-                            stringData.push(...chunk.data);
+                        segmentPieces.forEach((piece) => {
+                            stringData.push(...piece.data);
                         });
 
-                        const file = new LoaderFile(dataObject.url);
-                        file.data = Buffer.from(stringData).buffer;
+                        const segment = new Segment(dataObject.url);
+                        segment.data = Buffer.from(stringData).buffer;
 
-                        this.tmpFileData.delete(file.url);
-                        this.emit(MediaPeerEvents.DataFileLoaded, this, file);
+                        this.segmentsPiecesData.delete(segment.url);
+                        this.emit(MediaPeerEvents.DataSegmentLoaded, this, segment);
                     }
-                    this.emit(LoaderEvents.ChunkBytesLoaded, {"method": "p2p", "size": chunk.data.length, timestamp: Date.now()});
+                    this.emit(LoaderEvents.PieceBytesLoaded, {"method": "p2p", "size": piece.data.length, timestamp: Date.now()});
                 }
 
                 break;
 
-            case MediaPeerCommands.FileAbsent:
+            case MediaPeerCommands.SegmentAbsent:
                 this.removeResponseTimer(dataObject.url);
-                this.tmpFileData.delete(dataObject.url);
-                this.files.delete(dataObject.url);
-                this.emit(MediaPeerEvents.DataFileAbsent, this, dataObject.url);
+                this.segmentsPiecesData.delete(dataObject.url);
+                this.segments.delete(dataObject.url);
+                this.emit(MediaPeerEvents.DataSegmentAbsent, this, dataObject.url);
                 break;
 
-            case MediaPeerCommands.CancelFileRequest:
+            case MediaPeerCommands.CancelSegmentRequest:
                 // TODO: peer stop sending buffer
                 break;
 
@@ -117,30 +117,30 @@ export default class MediaPeer extends EventEmitter {
         }
     }
 
-    // TODO: move to LoaderFile
-    private getLoaderFileChunks(file: LoaderFile): Array<LoaderFileChunk> {
-        const jsonBufferData = new Buffer(file.data).toJSON().data;
-        const chunks = new Array<LoaderFileChunk>();
+    // TODO: move to Segment?
+    private getSegmentPieces(segment: Segment): Array<SegmentPiece> {
+        const jsonBufferData = new Buffer(segment.data).toJSON().data;
+        const pieces = new Array<SegmentPiece>();
 
-        if (jsonBufferData.length > this.chunkSize) {
-            const initialChunksCount = Math.floor(jsonBufferData.length / this.chunkSize);
-            const hasFinalChunk = jsonBufferData.length % this.chunkSize > 0;
+        if (jsonBufferData.length > this.pieceSize) {
+            const initialPiecesCount = Math.floor(jsonBufferData.length / this.pieceSize);
+            const hasFinalPiece = jsonBufferData.length % this.pieceSize > 0;
 
-            for (let i = 0; i < initialChunksCount; i++) {
-                const start = i * this.chunkSize;
-                const end = start + this.chunkSize;
-                chunks.push(new LoaderFileChunk(i, jsonBufferData.slice(start, end)));
+            for (let i = 0; i < initialPiecesCount; i++) {
+                const start = i * this.pieceSize;
+                const end = start + this.pieceSize;
+                pieces.push(new SegmentPiece(i, jsonBufferData.slice(start, end)));
             }
 
-            if (hasFinalChunk) {
-                chunks.push(new LoaderFileChunk(initialChunksCount, jsonBufferData.slice(initialChunksCount * this.chunkSize)));
+            if (hasFinalPiece) {
+                pieces.push(new SegmentPiece(initialPiecesCount, jsonBufferData.slice(initialPiecesCount * this.pieceSize)));
             }
 
         } else {
-            chunks.push(new LoaderFileChunk(0, jsonBufferData));
+            pieces.push(new SegmentPiece(0, jsonBufferData));
         }
 
-        return chunks;
+        return pieces;
     }
 
     private sendCommand(command: any): boolean {
@@ -162,66 +162,66 @@ export default class MediaPeer extends EventEmitter {
         }
     }
 
-    public hasFile(url: string): boolean {
-        return this.files.has(url);
+    public hasSegment(url: string): boolean {
+        return this.segments.has(url);
     }
 
-    public sendFilesMap(files: Array<string>) {
-        this.sendCommand({"command": MediaPeerCommands.FilesMap, "files": files});
+    public sendSegmentsMap(segments: Array<string>) {
+        this.sendCommand({"command": MediaPeerCommands.SegmentsMap, "segments": segments});
     }
 
-    public sendFileData(file: LoaderFile): void {
-        const fileChunks = this.getLoaderFileChunks(file);
+    public sendSegmentData(segment: Segment): void {
+        const segmentPieces = this.getSegmentPieces(segment);
 
-        for (let i = 0; i < fileChunks.length; i++) {
+        for (let i = 0; i < segmentPieces.length; i++) {
             this.sendCommand(
                 {
-                    "command": MediaPeerCommands.FileData,
-                    "url": file.url,
-                    "data": fileChunks[i].data,
-                    "chunkIndex": fileChunks[i].index,
-                    "chunksCount": fileChunks.length
+                    "command": MediaPeerCommands.SegmentData,
+                    "url": segment.url,
+                    "data": segmentPieces[i].data,
+                    "pieceIndex": segmentPieces[i].index,
+                    "piecesCount": segmentPieces.length
                 });
         }
     }
 
-    public sendFileAbsent(url: string): void {
-        this.sendCommand({"command": MediaPeerCommands.FileAbsent, "url": url});
+    public sendSegmentAbsent(url: string): void {
+        this.sendCommand({"command": MediaPeerCommands.SegmentAbsent, "url": url});
     }
 
-    public sendFileRequest(url: string): boolean {
-        if (this.sendCommand({"command": MediaPeerCommands.FileRequest, "url": url})) {
+    public sendSegmentRequest(url: string): boolean {
+        if (this.sendCommand({"command": MediaPeerCommands.SegmentRequest, "url": url})) {
             this.setResponseTimer(url);
-            this.tmpFileData.set(url, new Array<LoaderFileChunk>());
+            this.segmentsPiecesData.set(url, new Array<SegmentPiece>());
             return true;
         }
 
         return false;
     }
 
-    public sendCancelFileRequest(url: string): boolean {
-        return this.sendCommand({"command": MediaPeerCommands.CancelFileRequest, "url": url});
+    public sendCancelSegmentRequest(url: string): boolean {
+        return this.sendCommand({"command": MediaPeerCommands.CancelSegmentRequest, "url": url});
     }
 
     private setResponseTimer(url: string) {
 
-        let timer = this.requestFileResponseTimers.get(url);
+        let timer = this.requestSegmentResponseTimers.get(url);
         if (timer) {
             clearTimeout(timer);
         }
 
         timer = setTimeout(() => {
-                this.sendCancelFileRequest(url);
-                this.files.delete(url);
-                this.emit(MediaPeerEvents.DataFileAbsent, this, url);
+                this.sendCancelSegmentRequest(url);
+                this.segments.delete(url);
+                this.emit(MediaPeerEvents.DataSegmentAbsent, this, url);
             },
-            this.requestFileResponseTimeout);
+            this.requestSegmentResponseTimeout);
 
-        this.requestFileResponseTimers.set(url, timer);
+        this.requestSegmentResponseTimers.set(url, timer);
     }
 
     private removeResponseTimer(url: string) {
-        const timer = this.requestFileResponseTimers.get(url);
+        const timer = this.requestSegmentResponseTimers.get(url);
         if (timer) {
             clearTimeout(timer);
         }

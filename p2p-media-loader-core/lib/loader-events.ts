@@ -1,11 +1,11 @@
 enum LoaderEvents {
-    FileLoaded = "file_loaded",
-    FileError = "file_error",
-    FileAbort = "file_abort",
+    SegmentLoaded = "segment_loaded",
+    SegmentError = "segment_error",
+    SegmentAbort = "segment_abort",
     ForceProcessing = "force_processing",
     PeerConnect = "peer_connect",
     PeerClose = "peer_close",
-    ChunkBytesLoaded = "chunk_bytes_loaded"
+    PieceBytesLoaded = "piece_bytes_loaded"
 }
 
 export default LoaderEvents;

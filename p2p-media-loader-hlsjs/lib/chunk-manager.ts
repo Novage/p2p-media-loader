@@ -1,4 +1,4 @@
-import {LoaderEvents, LoaderFile, LoaderInterface} from "p2p-media-loader-core";
+import {LoaderEvents, Segment, LoaderInterface} from "p2p-media-loader-core";
 import Utils from "./utils";
 
 const m3u8Parser = require("m3u8-parser");
@@ -13,9 +13,9 @@ export default class ChunkManager {
 
     public constructor(loader: LoaderInterface) {
         this.loader = loader;
-        this.loader.on(LoaderEvents.FileLoaded, this.onFileLoaded.bind(this));
-        this.loader.on(LoaderEvents.FileError, this.onFileError.bind(this));
-        this.loader.on(LoaderEvents.FileAbort, this.onFileAbort.bind(this));
+        this.loader.on(LoaderEvents.SegmentLoaded, this.onSegmentLoaded.bind(this));
+        this.loader.on(LoaderEvents.SegmentError, this.onSegmentError.bind(this));
+        this.loader.on(LoaderEvents.SegmentAbort, this.onSegmentAbort.bind(this));
     }
 
     public processHlsPlaylist(url: string, content: string): void {
@@ -80,7 +80,7 @@ export default class ChunkManager {
         }
 
         this.chunk = new Chunk(url, onSuccess, onError);
-        this.loadFiles(loadingPlaylist, loadingChunkIndex, url);
+        this.loadSegments(loadingPlaylist, loadingChunkIndex, url);
         this.prevLoadUrl = url;
     }
 
@@ -100,7 +100,7 @@ export default class ChunkManager {
         if (this.prevLoadUrl) {
             const { playlist: loadingPlaylist, chunkIndex: loadingChunkIndex } = this.getChunkLocation(this.prevLoadUrl);
             if (loadingPlaylist) {
-                this.loadFiles(loadingPlaylist, loadingChunkIndex);
+                this.loadSegments(loadingPlaylist, loadingChunkIndex);
             }
         }
     }
@@ -111,17 +111,17 @@ export default class ChunkManager {
         }
     }
 
-    private onFileLoaded(file: LoaderFile): void {
-        if (this.chunk && this.chunk.url === file.url) {
-            this.playQueue.push(file.url);
+    private onSegmentLoaded(segment: Segment): void {
+        if (this.chunk && this.chunk.url === segment.url) {
+            this.playQueue.push(segment.url);
             if (this.chunk.onSuccess) {
-                this.chunk.onSuccess(file.data);
+                this.chunk.onSuccess(segment.data);
             }
             this.chunk = undefined;
         }
     }
 
-    private onFileError(url: string, error: any): void {
+    private onSegmentError(url: string, error: any): void {
         if (this.chunk && this.chunk.url === url) {
             if (this.chunk.onError) {
                 this.chunk.onError(error);
@@ -130,7 +130,7 @@ export default class ChunkManager {
         }
     }
 
-    private onFileAbort(url: string): void {
+    private onSegmentAbort(url: string): void {
         if (this.chunk && this.chunk.url === url) {
             if (this.chunk.onError) {
                 this.chunk.onError("Loading aborted");
@@ -152,18 +152,18 @@ export default class ChunkManager {
         return { playlist: undefined, chunkIndex: -1 };
     }
 
-    private loadFiles(playlist: Playlist, chunkIndex: number, loadUrl?: string): void {
-        const files: LoaderFile[] = [];
-        const segments: any[] = playlist.manifest.segments;
+    private loadSegments(playlist: Playlist, chunkIndex: number, loadUrl?: string): void {
+        const segments: Segment[] = [];
+        const manifestSegments: any[] = playlist.manifest.segments;
 
         let priority = Math.max(0, this.playQueue.length - 1);
-        for (let i = chunkIndex; i < segments.length; ++i) {
-            const fileUrl = playlist.getChunkAbsoluteUrl(i);
-            files.push(new LoaderFile(fileUrl, priority++));
+        for (let i = chunkIndex; i < manifestSegments.length; ++i) {
+            const segmentUrl = playlist.getChunkAbsoluteUrl(i);
+            segments.push(new Segment(segmentUrl, priority++));
         }
 
-        this.loader.load(files, this.getSwarmId(playlist), loadUrl);
-        //console.log("total files / play queue", files.length, this.playQueue.length);
+        this.loader.load(segments, this.getSwarmId(playlist), loadUrl);
+        //console.log("total segments / play queue", segments.length, this.playQueue.length);
     }
 
     private getSwarmId(playlist: Playlist): string {

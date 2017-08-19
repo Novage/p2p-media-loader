@@ -2,13 +2,11 @@ import * as sinon from "sinon";
 import { mock, instance, verify, deepEqual, when, anyFunction } from "ts-mockito";
 
 import ChunkManager from "../lib/chunk-manager";
-import LoaderFile from "../lib/loader-file";
-import LoaderInterface from "../lib/loader-interface";
-import LoaderEvents from "../lib/loader-events";
+import {LoaderEvents, Segment, LoaderInterface} from "p2p-media-loader-core";
 
 class LoaderInterfaceEmptyImpl implements LoaderInterface {
     on(eventName: string | symbol, listener: Function): this { return this; }
-    load(files: LoaderFile[], playlistUrl: string, emitNowFileUrl?: string): void { }
+    load(segments: Segment[], playlistUrl: string, emitNowSegmentUrl?: string): void { }
 }
 
 const testPlaylist = {
@@ -44,9 +42,9 @@ describe("ChunkManager", () => {
         manager.processHlsPlaylist(testPlaylist.url, testPlaylist.content);
         manager.loadChunk(testPlaylist.baseUrl + "chunk-1046.ts");
         verify(loader.load(deepEqual([
-            new LoaderFile(testPlaylist.baseUrl + "chunk-1046.ts"),
-            new LoaderFile(testPlaylist.baseUrl + "chunk-1047.ts"),
-            new LoaderFile(testPlaylist.baseUrl + "chunk-1048.ts")
+            new Segment(testPlaylist.baseUrl + "chunk-1046.ts"),
+            new Segment(testPlaylist.baseUrl + "chunk-1047.ts"),
+            new Segment(testPlaylist.baseUrl + "chunk-1048.ts")
         ]), testPlaylist.url, testPlaylist.baseUrl + "chunk-1046.ts")).once();
     });
 
@@ -60,8 +58,8 @@ describe("ChunkManager", () => {
         manager.loadChunk(testPlaylist.baseUrl + "chunk-1044.ts");
         manager.loadChunk(testPlaylist.baseUrl + "chunk-1047.ts");
         verify(loader.load(deepEqual([
-            new LoaderFile(testPlaylist.baseUrl + "chunk-1047.ts"),
-            new LoaderFile(testPlaylist.baseUrl + "chunk-1048.ts")
+            new Segment(testPlaylist.baseUrl + "chunk-1047.ts"),
+            new Segment(testPlaylist.baseUrl + "chunk-1048.ts")
         ]), testPlaylist.url, testPlaylist.baseUrl + "chunk-1047.ts")).once();
     });
 
@@ -69,29 +67,29 @@ describe("ChunkManager", () => {
         const loader = mock<LoaderInterface>(LoaderInterfaceEmptyImpl);
 
         const onSuccess = sinon.spy();
-        let fileLoadedListener: Function = () => { throw new Error("FileLoaded listener not set"); };
-        when(loader.on(LoaderEvents.FileLoaded, anyFunction())).thenCall((eventName_unused, listener) => {
-            fileLoadedListener = listener;
+        let segmentLoadedListener: Function = () => { throw new Error("SegmentLoaded listener not set"); };
+        when(loader.on(LoaderEvents.SegmentLoaded, anyFunction())).thenCall((eventName_unused, listener) => {
+            segmentLoadedListener = listener;
         });
 
-        const file = new LoaderFile(testPlaylist.baseUrl + "chunk-1045.ts");
-        file.data = new ArrayBuffer(0);
+        const segment = new Segment(testPlaylist.baseUrl + "chunk-1045.ts");
+        segment.data = new ArrayBuffer(0);
 
         const manager = new ChunkManager(instance(loader));
         manager.processHlsPlaylist(testPlaylist.url, testPlaylist.content);
-        manager.loadChunk(file.url, onSuccess);
-        fileLoadedListener(file);
+        manager.loadChunk(segment.url, onSuccess);
+        segmentLoadedListener(segment);
 
-        onSuccess.calledWith(file.data);
+        onSuccess.calledWith(segment.data);
     });
 
     it("should call onError after chunk loading failed", () => {
         const loader = mock<LoaderInterface>(LoaderInterfaceEmptyImpl);
 
         const onError = sinon.spy();
-        let fileErrorListener: Function = () => { throw new Error("FileError listener not set"); };
-        when(loader.on(LoaderEvents.FileError, anyFunction())).thenCall((eventName_unused, listener) => {
-            fileErrorListener = listener;
+        let segmentErrorListener: Function = () => { throw new Error("SegmentError listener not set"); };
+        when(loader.on(LoaderEvents.SegmentError, anyFunction())).thenCall((eventName_unused, listener) => {
+            segmentErrorListener = listener;
         });
 
         const url = testPlaylist.baseUrl + "chunk-1045.ts";
@@ -100,7 +98,7 @@ describe("ChunkManager", () => {
         const manager = new ChunkManager(instance(loader));
         manager.processHlsPlaylist(testPlaylist.url, testPlaylist.content);
         manager.loadChunk(url, undefined, onError);
-        fileErrorListener(url, error);
+        segmentErrorListener(url, error);
 
         onError.calledWith(error);
     });
@@ -109,25 +107,25 @@ describe("ChunkManager", () => {
         const loader = mock<LoaderInterface>(LoaderInterfaceEmptyImpl);
 
         const onSuccess = sinon.spy();
-        let fileLoadedListener: Function = () => { throw new Error("FileLoaded listener not set"); };
-        when(loader.on(LoaderEvents.FileLoaded, anyFunction())).thenCall((eventName_unused, listener) => {
-            fileLoadedListener = listener;
+        let segmentLoadedListener: Function = () => { throw new Error("SegmentLoaded listener not set"); };
+        when(loader.on(LoaderEvents.SegmentLoaded, anyFunction())).thenCall((eventName_unused, listener) => {
+            segmentLoadedListener = listener;
         });
 
         const onError = sinon.spy();
-        let fileErrorListener: Function = () => { throw new Error("FileError listener not set"); };
-        when(loader.on(LoaderEvents.FileError, anyFunction())).thenCall((eventName_unused, listener) => {
-            fileErrorListener = listener;
+        let segmentErrorListener: Function = () => { throw new Error("SegmentError listener not set"); };
+        when(loader.on(LoaderEvents.SegmentError, anyFunction())).thenCall((eventName_unused, listener) => {
+            segmentErrorListener = listener;
         });
 
-        const file = new LoaderFile(testPlaylist.baseUrl + "chunk-1045.ts");
-        file.data = new ArrayBuffer(0);
+        const segment = new Segment(testPlaylist.baseUrl + "chunk-1045.ts");
+        segment.data = new ArrayBuffer(0);
 
         const manager = new ChunkManager(instance(loader));
         manager.processHlsPlaylist(testPlaylist.url, testPlaylist.content);
-        manager.loadChunk(file.url, onSuccess, onError);
-        manager.abortChunk(file.url);
-        fileLoadedListener(file);
+        manager.loadChunk(segment.url, onSuccess, onError);
+        manager.abortChunk(segment.url);
+        segmentLoadedListener(segment);
 
         sinon.assert.notCalled(onSuccess);
         sinon.assert.notCalled(onError);

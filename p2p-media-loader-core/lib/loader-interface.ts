@@ -1,9 +1,9 @@
-import LoaderFile from "./loader-file";
+import Segment from "./segment";
 
 interface LoaderInterface {
 
     on(eventName: string | symbol, listener: Function): this;
-    load(files: LoaderFile[], swarmId: string, emitNowFileUrl?: string): void;
+    load(segments: Segment[], swarmId: string, emitNowSegmentUrl?: string): void;
 
 }
 

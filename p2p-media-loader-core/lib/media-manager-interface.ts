@@ -1,12 +1,12 @@
-import LoaderFile from "./loader-file";
+import Segment from "./segment";
 
 interface MediaManagerInterface {
 
     setSwarmId(id: string): void;
     on(eventName: string | symbol, listener: Function): this;
-    download(file: LoaderFile): void;
-    abort(file: LoaderFile): void;
-    isDownloading(file: LoaderFile): boolean;
+    download(segment: Segment): void;
+    abort(segment: Segment): void;
+    isDownloading(segment: Segment): boolean;
     getActiveDownloadsCount(): number;
 
 }

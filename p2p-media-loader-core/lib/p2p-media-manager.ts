@@ -1,8 +1,8 @@
 import MediaManagerInterface from "./media-manager-interface";
-import LoaderFile from "./loader-file";
+import Segment from "./segment";
 import {EventEmitter} from "events";
 import {createHash} from "crypto";
-import LoaderFileCacheManagerInterface from "./loader-file-cache-manger-interface";
+import SegmentCacheManagerInterface from "./segment-cache-manger-interface";
 import CacheEvents from "./cache-events";
 import LoaderEvents from "./loader-events";
 import MediaPeer from "./media-peer";
@@ -12,17 +12,17 @@ const Client = require("bittorrent-tracker");
 
 export default class P2PMediaManager extends EventEmitter implements MediaManagerInterface {
 
-    private cacheManager: LoaderFileCacheManagerInterface;
+    private cacheManager: SegmentCacheManagerInterface;
 
     private client: any;
     private readonly announce = [ "wss://tracker.btorrent.xyz/" ];
     private peers: Map<string, MediaPeer> = new Map();
-    private peerFileRequests: Map<string, string> = new Map();
+    private peerSegmentRequests: Map<string, string> = new Map();
     private swarmId: string;
     private peerId: string;
     private debug = Debug("p2pml:p2p-media-manager");
 
-    public constructor(cacheManager: LoaderFileCacheManagerInterface) {
+    public constructor(cacheManager: SegmentCacheManagerInterface) {
         super();
 
         this.cacheManager = cacheManager;
@@ -73,11 +73,11 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
             mediaPeer.on(MediaPeerEvents.Connect, this.onPeerConnect.bind(this));
             mediaPeer.on(MediaPeerEvents.Close, this.onPeerClose.bind(this));
             mediaPeer.on(MediaPeerEvents.Error, this.onPeerError.bind(this));
-            mediaPeer.on(MediaPeerEvents.DataFilesMap, this.onPeerDataFilesMap.bind(this));
-            mediaPeer.on(MediaPeerEvents.DataFileRequest, this.onPeerDataFileRequest.bind(this));
-            mediaPeer.on(MediaPeerEvents.DataFileLoaded, this.onPeerDataFileLoaded.bind(this));
-            mediaPeer.on(MediaPeerEvents.DataFileAbsent, this.onPeerDataFileAbsent.bind(this));
-            mediaPeer.on(LoaderEvents.ChunkBytesLoaded, this.onChunkBytesLoaded.bind(this));
+            mediaPeer.on(MediaPeerEvents.DataSegmentsMap, this.onPeerDataSegmentsMap.bind(this));
+            mediaPeer.on(MediaPeerEvents.DataSegmentRequest, this.onPeerDataSegmentRequest.bind(this));
+            mediaPeer.on(MediaPeerEvents.DataSegmentLoaded, this.onPeerDataSegmentLoaded.bind(this));
+            mediaPeer.on(MediaPeerEvents.DataSegmentAbsent, this.onPeerDataSegmentAbsent.bind(this));
+            mediaPeer.on(LoaderEvents.PieceBytesLoaded, this.onPieceBytesLoaded.bind(this));
 
             this.peers.set(peer.id, mediaPeer);
         } else {
@@ -85,61 +85,61 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
         }
     }
 
-    public download(file: LoaderFile): void {
-        if (this.isDownloading(file)) {
+    public download(segment: Segment): void {
+        if (this.isDownloading(segment)) {
             return;
         }
 
         const mediaPeer = Array.from(this.peers.values()).find((mediaPeer: MediaPeer) => {
-            return mediaPeer.hasFile(file.url) && mediaPeer.sendFileRequest(file.url);
+            return mediaPeer.hasSegment(segment.url) && mediaPeer.sendSegmentRequest(segment.url);
         });
 
         if (mediaPeer) {
-            this.debug("p2p file download", file.url);
-            this.peerFileRequests.set(file.url, mediaPeer.id);
+            this.debug("p2p segment download", segment.url);
+            this.peerSegmentRequests.set(segment.url, mediaPeer.id);
         } else {
-            //this.debug("p2p file not found", file.url);
+            //this.debug("p2p segment not found", segment.url);
         }
     }
 
-    public abort(file: LoaderFile): void {
-        const requestPeerId = this.peerFileRequests.get(file.url);
+    public abort(segment: Segment): void {
+        const requestPeerId = this.peerSegmentRequests.get(segment.url);
         if (requestPeerId) {
             const mediaPeer = this.peers.get(requestPeerId);
             if (mediaPeer) {
-                mediaPeer.sendCancelFileRequest(file.url);
+                mediaPeer.sendCancelSegmentRequest(segment.url);
             }
-            this.peerFileRequests.delete(file.url);
-            this.debug("p2p file abort", file.url);
+            this.peerSegmentRequests.delete(segment.url);
+            this.debug("p2p segment abort", segment.url);
         }
     }
 
-    public isDownloading(file: LoaderFile): boolean {
-        return this.peerFileRequests.has(file.url);
+    public isDownloading(segment: Segment): boolean {
+        return this.peerSegmentRequests.has(segment.url);
     }
 
     public getActiveDownloadsCount(): number {
-        return this.peerFileRequests.size;
+        return this.peerSegmentRequests.size;
     }
 
     private onCacheUpdated(): void {
-        this.peers.forEach((mediaPeer) => mediaPeer.sendFilesMap(this.cacheManager.keys()));
+        this.peers.forEach((mediaPeer) => mediaPeer.sendSegmentsMap(this.cacheManager.keys()));
     }
 
-    private onChunkBytesLoaded(data: any): void {
-        this.emit(LoaderEvents.ChunkBytesLoaded, data);
+    private onPieceBytesLoaded(data: any): void {
+        this.emit(LoaderEvents.PieceBytesLoaded, data);
     }
 
     private onPeerConnect(mediaPeer: MediaPeer): void {
-        mediaPeer.sendFilesMap(this.cacheManager.keys());
+        mediaPeer.sendSegmentsMap(this.cacheManager.keys());
         this.emit(MediaPeerEvents.Connect, mediaPeer);
     }
 
     private onPeerClose(mediaPeer: MediaPeer): void {
         let isUpdated = false;
-        this.peerFileRequests.forEach((value, key) => {
+        this.peerSegmentRequests.forEach((value, key) => {
             if (value === mediaPeer.id) {
-                this.peerFileRequests.delete(key);
+                this.peerSegmentRequests.delete(key);
                 isUpdated = true;
             }
         });
@@ -157,26 +157,26 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
         this.debug("onPeerError", mediaPeer, error);
     }
 
-    private onPeerDataFilesMap(): void {
+    private onPeerDataSegmentsMap(): void {
         this.emit(LoaderEvents.ForceProcessing);
     }
 
-    private onPeerDataFileRequest(mediaPeer: MediaPeer, url: string): void {
-        const file = this.cacheManager.get(url);
-        if (file) {
-            mediaPeer.sendFileData(file);
+    private onPeerDataSegmentRequest(mediaPeer: MediaPeer, url: string): void {
+        const segment = this.cacheManager.get(url);
+        if (segment) {
+            mediaPeer.sendSegmentData(segment);
         } else {
-            mediaPeer.sendFileAbsent(url);
+            mediaPeer.sendSegmentAbsent(url);
         }
     }
 
-    private onPeerDataFileLoaded(mediaPeer: MediaPeer, file: LoaderFile): void {
-        this.peerFileRequests.delete(file.url);
-        this.emit(LoaderEvents.FileLoaded, file);
+    private onPeerDataSegmentLoaded(mediaPeer: MediaPeer, segment: Segment): void {
+        this.peerSegmentRequests.delete(segment.url);
+        this.emit(LoaderEvents.SegmentLoaded, segment);
     }
 
-    private onPeerDataFileAbsent(mediaPeer: MediaPeer, url: string): void {
-        this.peerFileRequests.delete(url);
+    private onPeerDataSegmentAbsent(mediaPeer: MediaPeer, url: string): void {
+        this.peerSegmentRequests.delete(url);
         this.emit(LoaderEvents.ForceProcessing);
     }
 
