@@ -111,6 +111,19 @@ export default class SegmentManager {
         }
     }
 
+    public destroy(): void {
+        this.loader.destroy();
+
+        if (this.task && this.task.onError) {
+            this.task.onError("Loading aborted: object destroyed");
+        }
+        this.task = undefined;
+
+        this.prevLoadUrl = undefined;
+        this.playlists.clear();
+        this.playQueue = [];
+    }
+
     private onSegmentLoaded(segment: Segment): void {
         if (this.task && this.task.url === segment.url) {
             this.playQueue.push(segment.url);
@@ -133,7 +146,7 @@ export default class SegmentManager {
     private onSegmentAbort(url: string): void {
         if (this.task && this.task.url === url) {
             if (this.task.onError) {
-                this.task.onError("Loading aborted");
+                this.task.onError("Loading aborted: internal abort");
             }
             this.task = undefined;
         }

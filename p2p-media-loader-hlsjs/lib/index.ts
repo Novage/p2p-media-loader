@@ -5,19 +5,26 @@ const createHlsJsLoaderClass = require("./hlsjs-loader-class");
 
 const defaultLiveSyncDuration = 60;
 
+function initHlsJsEvents(player: any, segmentManager: SegmentManager): void {
+    player.on("hlsFragChanged", function (event: any, data: any) {
+        const url = data && data.frag ? data.frag.url : undefined;
+        segmentManager.setCurrentSegment(url);
+    });
+    player.on("hlsDestroying", function () {
+        segmentManager.destroy();
+    });
+}
+
 export function createLoaderClass(settings: any = {}): any {
     const manager: SegmentManager = settings.segmentManager || new SegmentManager(new HybridLoader(settings.loaderSettings));
     return createHlsJsLoaderClass(HlsJsLoader, manager);
 }
 
 export function initHlsJsPlayer(player: any, settings: any = {}): void {
-    player.config.loader = createLoaderClass(settings);
+    const loader = createLoaderClass(settings);
+    player.config.loader = loader;
     player.config.liveSyncDuration = defaultLiveSyncDuration;
-
-    player.on("hlsFragChanged", function (event: any, data: any) {
-        const url = data && data.frag ? data.frag.url : undefined;
-        player.config.loader.getSegmentManager().setCurrentSegment(url);
-    });
+    initHlsJsEvents(player, loader.getSegmentManager());
 }
 
 export function initClapprPlayer(player: any, settings: any = {}): void {
@@ -34,24 +41,21 @@ export function initClapprPlayer(player: any, settings: any = {}): void {
     });
 }
 
+export function initFlowplayerHlsJsPlayer(player: any, settings: any = {}): void {
+    if (player && player.engine && player.engine.hlsjs) {
+        initHlsJsPlayer(player.engine.hlsjs, settings);
+    }
+}
+
 export function initVideoJsContribHlsJsPlayer(player: any): void {
     player.ready(() => {
         const options = player.tech_.options_;
         if (options && options.hlsjsConfig && options.hlsjsConfig.loader && typeof options.hlsjsConfig.loader.getSegmentManager === "function") {
             const segmentManager: SegmentManager = options.hlsjsConfig.loader.getSegmentManager();
             options.hlsjsConfig.liveSyncDuration = defaultLiveSyncDuration;
-            player.tech_.on("hlsFragChanged", (event: any, data: any) => {
-                const url = data && data.frag ? data.frag.url : undefined;
-                segmentManager.setCurrentSegment(url);
-            });
+            initHlsJsEvents(player.tech_, segmentManager);
         }
     });
-}
-
-export function initFlowplayerHlsJsPlayer(player: any, settings: any = {}): void {
-    if (player && player.engine && player.engine.hlsjs) {
-        initHlsJsPlayer(player.engine.hlsjs, settings);
-    }
 }
 
 export function initMediaElementJsPlayer(mediaElement: any): void {
@@ -64,6 +68,13 @@ export function initMediaElementJsPlayer(mediaElement: any): void {
         if (hls && hls.config && hls.config.loader && typeof hls.config.loader.getSegmentManager === "function") {
             const segmentManager: SegmentManager = hls.config.loader.getSegmentManager();
             segmentManager.setCurrentSegment(url);
+        }
+    });
+    mediaElement.addEventListener("hlsDestroying", () => {
+        const hls = mediaElement.hlsPlayer;
+        if (hls && hls.config && hls.config.loader && typeof hls.config.loader.getSegmentManager === "function") {
+            const segmentManager: SegmentManager = hls.config.loader.getSegmentManager();
+            segmentManager.destroy();
         }
     });
 }
