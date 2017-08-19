@@ -165,7 +165,7 @@
             this.p2pmlLoader = new p2pml.HybridLoader();
             this.p2pmlLoader.on(p2pml.LoaderEvents.PieceBytesLoaded, this.onBytesLoaded.bind(this));
 
-            this.chunkManager = new p2pml.hlsjs.ChunkManager(this.p2pmlLoader);
+            this.segmentManager = new p2pml.hlsjs.SegmentManager(this.p2pmlLoader);
 
             switch (this.playerType) {
                 case 'hlsjs':
@@ -202,7 +202,7 @@
                 this.videoContainer.appendChild(level);
 
                 var hls = new Hls();
-                p2pml.hlsjs.initHlsJsPlayer(hls, { "chunkManager": this.chunkManager });
+                p2pml.hlsjs.initHlsJsPlayer(hls, { segmentManager: this.segmentManager });
                 hls.loadSource(this.videoUrl);
                 hls.attachMedia(video);
                 hls.on(Hls.Events.MANIFEST_PARSED, function () {
@@ -222,7 +222,7 @@
                 parentId: "#video",
                 source: this.videoUrl
             });
-            p2pml.hlsjs.initClapprPlayer(player, { "chunkManager": this.chunkManager });
+            p2pml.hlsjs.initClapprPlayer(player, { segmentManager: this.segmentManager });
             player.setVolume(0);
             player.play();
         };
@@ -236,7 +236,7 @@
                 stretching: "responsive",
                 startVolume: 0,
                 hls: {
-                    loader: p2pml.hlsjs.createLoaderClass(this.chunkManager)
+                    loader: p2pml.hlsjs.createLoaderClass(this.segmentManager)
                 },
                 success: function (mediaElement) {
                     p2pml.hlsjs.initMediaElementJsPlayer(mediaElement);
@@ -268,7 +268,7 @@
                 }
             });
 
-            p2pml.hlsjs.initFlowplayerHlsJsPlayer(player, { "chunkManager": this.chunkManager });
+            p2pml.hlsjs.initFlowplayerHlsJsPlayer(player, { segmentManager: this.segmentManager });
         };
 
         DemoApp.prototype.initVideoJsContribHlsJsPlayer = function () {
@@ -280,7 +280,7 @@
             this.videoContainer.appendChild(video);
 
             var player = videojs("video", { html5: { hlsjsConfig: {
-                loader: p2pml.hlsjs.createLoaderClass(this.chunkManager)
+                loader: p2pml.hlsjs.createLoaderClass(this.segmentManager)
             } } });
 
             p2pml.hlsjs.initVideoJsContribHlsJsPlayer(player);
