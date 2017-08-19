@@ -53,6 +53,10 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         this.collectGarbage();
     }
 
+    public destroy(): void {
+        // todo: add destroy logic here; after this call, the object should not use network or emit any events
+    }
+
     private processSegmentQueue(): void {
         this.segmentsQueue.forEach((segment) => {
             if (this.httpManager.getActiveDownloadsCount() < 1 &&

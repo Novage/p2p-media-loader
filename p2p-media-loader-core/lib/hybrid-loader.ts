@@ -90,6 +90,10 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.collectGarbage();
     }
 
+    public destroy(): void {
+        // todo: add destroy logic here; after this call, the object should not use network or emit any events
+    }
+
     private processSegmentsQueue(): void {
         const startingPriority = this.segmentsQueue.length > 0 ? this.segmentsQueue[0].priority : 0;
         this.debug("processSegmentsQueue - starting priority: " + startingPriority);
@@ -177,7 +181,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
     private collectGarbage(): void {
         const now = new Date().getTime();
-        let keys: string[] = [];
+        const keys: string[] = [];
 
         this.cacheManager.forEach((value, key) => {
             if (now - value.lastAccessed > this.segmentExpiration) {
