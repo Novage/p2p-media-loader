@@ -236,7 +236,7 @@
                 stretching: "responsive",
                 startVolume: 0,
                 hls: {
-                    loader: p2pml.hlsjs.createLoaderClass(this.segmentManager)
+                    loader: p2pml.hlsjs.createLoaderClass({ segmentManager: this.segmentManager })
                 },
                 success: function (mediaElement) {
                     p2pml.hlsjs.initMediaElementJsPlayer(mediaElement);
@@ -280,7 +280,7 @@
             this.videoContainer.appendChild(video);
 
             var player = videojs("video", { html5: { hlsjsConfig: {
-                loader: p2pml.hlsjs.createLoaderClass(this.segmentManager)
+                loader: p2pml.hlsjs.createLoaderClass({ segmentManager: this.segmentManager })
             } } });
 
             p2pml.hlsjs.initVideoJsContribHlsJsPlayer(player);
