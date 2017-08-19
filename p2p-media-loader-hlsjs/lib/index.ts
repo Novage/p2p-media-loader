@@ -1,12 +1,12 @@
 import {HybridLoader} from "p2p-media-loader-core";
-import ChunkManager from "./chunk-manager";
+import SegmentManager from "./segment-manager";
 import HlsJsLoader from "./hlsjs-loader";
 const createHlsJsLoaderClass = require("./hlsjs-loader-class");
 
 const defaultLiveSyncDuration = 60;
 
 export function createLoaderClass(settings: any = {}): any {
-    const manager: ChunkManager = settings.chunkManager || new ChunkManager(new HybridLoader(settings.loaderSettings));
+    const manager: SegmentManager = settings.segmentManager || new SegmentManager(new HybridLoader(settings.loaderSettings));
     return createHlsJsLoaderClass(HlsJsLoader, manager);
 }
 
@@ -16,7 +16,7 @@ export function initHlsJsPlayer(player: any, settings: any = {}): void {
 
     player.on("hlsFragChanged", function (event: any, data: any) {
         const url = data && data.frag ? data.frag.url : undefined;
-        player.config.loader.getChunkManager().setCurrentChunk(url);
+        player.config.loader.getSegmentManager().setCurrentSegment(url);
     });
 }
 
@@ -24,11 +24,11 @@ export function initClapprPlayer(player: any, settings: any = {}): void {
     player.on("play", () => {
         const playback = player.core.getCurrentPlayback();
         const hlsInstance = playback._hls;
-        if (hlsInstance && hlsInstance.config && hlsInstance.config.loader && typeof hlsInstance.config.loader.getChunkManager !== "function") {
+        if (hlsInstance && hlsInstance.config && hlsInstance.config.loader && typeof hlsInstance.config.loader.getSegmentManager !== "function") {
             initHlsJsPlayer(hlsInstance, settings);
             if (player.isPlaying()) {
-                const chunkManager: ChunkManager = hlsInstance.config.loader.getChunkManager();
-                chunkManager.loadHlsPlaylist(player.options.source, true);
+                const segmentManager: SegmentManager = hlsInstance.config.loader.getSegmentManager();
+                segmentManager.loadPlaylist(player.options.source, true);
             }
         }
     });
@@ -37,12 +37,12 @@ export function initClapprPlayer(player: any, settings: any = {}): void {
 export function initVideoJsContribHlsJsPlayer(player: any): void {
     player.ready(() => {
         const options = player.tech_.options_;
-        if (options && options.hlsjsConfig && options.hlsjsConfig.loader && typeof options.hlsjsConfig.loader.getChunkManager === "function") {
-            const chunkManager: ChunkManager = options.hlsjsConfig.loader.getChunkManager();
+        if (options && options.hlsjsConfig && options.hlsjsConfig.loader && typeof options.hlsjsConfig.loader.getSegmentManager === "function") {
+            const segmentManager: SegmentManager = options.hlsjsConfig.loader.getSegmentManager();
             options.hlsjsConfig.liveSyncDuration = defaultLiveSyncDuration;
             player.tech_.on("hlsFragChanged", (event: any, data: any) => {
                 const url = data && data.frag ? data.frag.url : undefined;
-                chunkManager.setCurrentChunk(url);
+                segmentManager.setCurrentSegment(url);
             });
         }
     });
@@ -61,11 +61,11 @@ export function initMediaElementJsPlayer(mediaElement: any): void {
     mediaElement.addEventListener("hlsFragChanged", (event: any) => {
         const url = event.data && event.data.length > 1 && event.data[ 1 ].frag ? event.data[ 1 ].frag.url : undefined;
         const hls = mediaElement.hlsPlayer;
-        if (hls && hls.config && hls.config.loader && typeof hls.config.loader.getChunkManager === "function") {
-            const chunkManager: ChunkManager = hls.config.loader.getChunkManager();
-            chunkManager.setCurrentChunk(url);
+        if (hls && hls.config && hls.config.loader && typeof hls.config.loader.getSegmentManager === "function") {
+            const segmentManager: SegmentManager = hls.config.loader.getSegmentManager();
+            segmentManager.setCurrentSegment(url);
         }
     });
 }
 
-export {default as ChunkManager} from "./chunk-manager";
+export {default as SegmentManager} from "./segment-manager";

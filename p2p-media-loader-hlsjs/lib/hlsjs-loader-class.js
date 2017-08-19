@@ -1,6 +1,6 @@
-function createHlsJsLoaderClass(HlsJsLoader, chunkManager) {
+function createHlsJsLoaderClass(HlsJsLoader, segmentManager) {
     function HlsJsLoaderClass(settings) {
-        this.impl = new HlsJsLoader(chunkManager, settings);
+        this.impl = new HlsJsLoader(segmentManager, settings);
         this.stats = this.impl.stats;
     }
 
@@ -16,8 +16,8 @@ function createHlsJsLoaderClass(HlsJsLoader, chunkManager) {
         return this.impl.destroy();
     };
 
-    HlsJsLoaderClass.getChunkManager = function () {
-        return chunkManager;
+    HlsJsLoaderClass.getSegmentManager = function () {
+        return segmentManager;
     };
 
     return HlsJsLoaderClass;

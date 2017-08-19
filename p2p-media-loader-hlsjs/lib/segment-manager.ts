@@ -3,11 +3,11 @@ import Utils from "./utils";
 
 const m3u8Parser = require("m3u8-parser");
 
-export default class ChunkManager {
+export default class SegmentManager {
 
     private loader: LoaderInterface;
     private playlists: Map<string, Playlist> = new Map();
-    private chunk?: Chunk = undefined;
+    private task?: Task = undefined;
     private prevLoadUrl?: string = undefined;
     private playQueue: string[] = [];
 
@@ -18,7 +18,7 @@ export default class ChunkManager {
         this.loader.on(LoaderEvents.SegmentAbort, this.onSegmentAbort.bind(this));
     }
 
-    public processHlsPlaylist(url: string, content: string): void {
+    public processPlaylist(url: string, content: string): void {
         const parser = new m3u8Parser.Parser();
         parser.push(content);
         parser.end();
@@ -26,12 +26,12 @@ export default class ChunkManager {
         this.playlists.set(url, playlist);
     }
 
-    public async loadHlsPlaylist(url: string, loadChildPlaylists: boolean = false): Promise<string> {
+    public async loadPlaylist(url: string, loadChildPlaylists: boolean = false): Promise<string> {
         let content = "";
 
         try {
             content = await Utils.fetchContent(url);
-            this.processHlsPlaylist(url, content);
+            this.processPlaylist(url, content);
         } catch (e) {
             this.playlists.delete(url);
             throw e;
@@ -42,7 +42,7 @@ export default class ChunkManager {
             if (playlist) {
                 for (const childUrl of playlist.getChildPlaylistAbsoluteUrls()) {
                     Utils.fetchContent(childUrl).then((childContent) => {
-                        this.processHlsPlaylist(childUrl, childContent);
+                        this.processPlaylist(childUrl, childContent);
                     });
                 }
             }
@@ -51,13 +51,13 @@ export default class ChunkManager {
         return content;
     }
 
-    public loadChunk(url: string, onSuccess?: Function, onError?: Function, playlistMissRetries: number = 1): void {
-        const { playlist: loadingPlaylist, chunkIndex: loadingChunkIndex } = this.getChunkLocation(url);
+    public loadSegment(url: string, onSuccess?: Function, onError?: Function, playlistMissRetries: number = 1): void {
+        const { playlist: loadingPlaylist, segmentIndex: loadingSegmentIndex } = this.getSegmentLocation(url);
         if (!loadingPlaylist) {
             if (playlistMissRetries > 0) {
-                setTimeout(() => { this.loadChunk(url, onSuccess, onError, playlistMissRetries - 1); }, 500);
+                setTimeout(() => { this.loadSegment(url, onSuccess, onError, playlistMissRetries - 1); }, 500);
             } else {
-                const message = "Requested chunk cannot be located in known playlists";
+                const message = "Requested segment cannot be located in known playlists";
                 console.error(message);
                 if (onError) {
                     setTimeout(() => { onError(message); }, 0);
@@ -67,9 +67,9 @@ export default class ChunkManager {
         }
 
         if (this.playQueue.length > 0) {
-            const prevChunkUrl = this.playQueue[ this.playQueue.length - 1 ];
-            const { playlist: prevLoadingPlaylist, chunkIndex: prevLoadingChunkIndex } = this.getChunkLocation(prevChunkUrl);
-            if (prevLoadingPlaylist && prevLoadingChunkIndex !== loadingChunkIndex - 1) {
+            const prevSegmentUrl = this.playQueue[ this.playQueue.length - 1 ];
+            const { playlist: prevLoadingPlaylist, segmentIndex: prevLoadingSegmentIndex } = this.getSegmentLocation(prevSegmentUrl);
+            if (prevLoadingPlaylist && prevLoadingSegmentIndex !== loadingSegmentIndex - 1) {
                 //console.log("#### load sequence BREAK");
                 this.playQueue = [];
             } else {
@@ -79,12 +79,12 @@ export default class ChunkManager {
             //console.log("#### load first");
         }
 
-        this.chunk = new Chunk(url, onSuccess, onError);
-        this.loadSegments(loadingPlaylist, loadingChunkIndex, url);
+        this.task = new Task(url, onSuccess, onError);
+        this.loadSegments(loadingPlaylist, loadingSegmentIndex, url);
         this.prevLoadUrl = url;
     }
 
-    public setCurrentChunk(url?: string): void {
+    public setCurrentSegment(url?: string): void {
         if (!url) {
             return;
         }
@@ -98,67 +98,67 @@ export default class ChunkManager {
         }
 
         if (this.prevLoadUrl) {
-            const { playlist: loadingPlaylist, chunkIndex: loadingChunkIndex } = this.getChunkLocation(this.prevLoadUrl);
+            const { playlist: loadingPlaylist, segmentIndex: loadingSegmentIndex } = this.getSegmentLocation(this.prevLoadUrl);
             if (loadingPlaylist) {
-                this.loadSegments(loadingPlaylist, loadingChunkIndex);
+                this.loadSegments(loadingPlaylist, loadingSegmentIndex);
             }
         }
     }
 
-    public abortChunk(url: string): void {
-        if (this.chunk && this.chunk.url === url) {
-            this.chunk = undefined;
+    public abortSegment(url: string): void {
+        if (this.task && this.task.url === url) {
+            this.task = undefined;
         }
     }
 
     private onSegmentLoaded(segment: Segment): void {
-        if (this.chunk && this.chunk.url === segment.url) {
+        if (this.task && this.task.url === segment.url) {
             this.playQueue.push(segment.url);
-            if (this.chunk.onSuccess) {
-                this.chunk.onSuccess(segment.data);
+            if (this.task.onSuccess) {
+                this.task.onSuccess(segment.data);
             }
-            this.chunk = undefined;
+            this.task = undefined;
         }
     }
 
     private onSegmentError(url: string, error: any): void {
-        if (this.chunk && this.chunk.url === url) {
-            if (this.chunk.onError) {
-                this.chunk.onError(error);
+        if (this.task && this.task.url === url) {
+            if (this.task.onError) {
+                this.task.onError(error);
             }
-            this.chunk = undefined;
+            this.task = undefined;
         }
     }
 
     private onSegmentAbort(url: string): void {
-        if (this.chunk && this.chunk.url === url) {
-            if (this.chunk.onError) {
-                this.chunk.onError("Loading aborted");
+        if (this.task && this.task.url === url) {
+            if (this.task.onError) {
+                this.task.onError("Loading aborted");
             }
-            this.chunk = undefined;
+            this.task = undefined;
         }
     }
 
-    private getChunkLocation(url?: string): { playlist?: Playlist, chunkIndex: number } {
+    private getSegmentLocation(url?: string): { playlist?: Playlist, segmentIndex: number } {
         if (url) {
             for (const playlist of Array.from(this.playlists.values())) {
-                const chunkIndex = playlist.getChunkIndex(url);
-                if (chunkIndex >= 0) {
-                    return { playlist: playlist, chunkIndex: chunkIndex };
+                const segmentIndex = playlist.getSegmentIndex(url);
+                if (segmentIndex >= 0) {
+                    return { playlist: playlist, segmentIndex: segmentIndex };
                 }
             }
         }
 
-        return { playlist: undefined, chunkIndex: -1 };
+        return { playlist: undefined, segmentIndex: -1 };
     }
 
-    private loadSegments(playlist: Playlist, chunkIndex: number, loadUrl?: string): void {
+    private loadSegments(playlist: Playlist, segmentIndex: number, loadUrl?: string): void {
         const segments: Segment[] = [];
-        const manifestSegments: any[] = playlist.manifest.segments;
+        const playlistSegments: any[] = playlist.manifest.segments;
 
         let priority = Math.max(0, this.playQueue.length - 1);
-        for (let i = chunkIndex; i < manifestSegments.length; ++i) {
-            const segmentUrl = playlist.getChunkAbsoluteUrl(i);
+        for (let i = segmentIndex; i < playlistSegments.length; ++i) {
+            const segmentUrl = playlist.getSegmentAbsoluteUrl(i);
             segments.push(new Segment(segmentUrl, priority++));
         }
 
@@ -208,9 +208,9 @@ class Playlist {
         this.baseUrl = url.substring(0, pos + 1);
     }
 
-    public getChunkIndex(url: string): number {
+    public getSegmentIndex(url: string): number {
         for (let i = 0; i < this.manifest.segments.length; ++i) {
-            if (url === this.getChunkAbsoluteUrl(i)) {
+            if (url === this.getSegmentAbsoluteUrl(i)) {
                 return i;
             }
         }
@@ -218,7 +218,7 @@ class Playlist {
         return -1;
     }
 
-    public getChunkAbsoluteUrl(index: number): string {
+    public getSegmentAbsoluteUrl(index: number): string {
         const uri = this.manifest.segments[ index ].uri;
         return Utils.isAbsoluteUrl(uri) ? uri : this.baseUrl + uri;
     }
@@ -240,7 +240,7 @@ class Playlist {
 
 }
 
-class Chunk {
+class Task {
 
     public url: string;
     public onSuccess?: Function;
