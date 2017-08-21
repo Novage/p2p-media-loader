@@ -510,7 +510,7 @@
                 hls.on(Hls.Events.LEVEL_SWITCHED, this._hlsLevelSwitch.bind(this));
 
                 this.select.addEventListener("change", function (event) {
-                    hls.currentLevel = event.target.selectedIndex - 1;
+                    hls.nextLevel = event.target.selectedIndex - 1;
                     this._hlsLevelSwitch();
                 }.bind(this));
             },
