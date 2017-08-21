@@ -7,8 +7,8 @@
     <script src="p2p-media-loader-core.js"></script>
     <script src="p2p-media-loader-hlsjs.js"></script>
 
-    <link rel="stylesheet" href="//releases.flowplayer.org/7.0.4/skin/skin.css">
-    <script src="//releases.flowplayer.org/7.0.4/flowplayer.min.js"></script>
+    <link rel="stylesheet" href="//releases.flowplayer.org/7.1.0/skin/skin.css">
+    <script src="//releases.flowplayer.org/7.1.0/flowplayer.min.js"></script>
     <script src="//releases.flowplayer.org/hlsjs/flowplayer.hlsjs.light.min.js"></script>
 
     <style>
@@ -28,7 +28,6 @@
     <script>
 
         var player = flowplayer("#video", {
-            autoplay: true,
             volume: 0.01,
             clip: {
                 sources: [{
@@ -40,6 +39,10 @@
         });
 
         p2pml.hlsjs.initFlowplayerHlsJsPlayer(player);
+
+        player.on("ready", function () {
+            player.play();
+        });
 
     </script>
 

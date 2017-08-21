@@ -22,8 +22,8 @@
     <script src="https://cdn.jsdelivr.net/clappr/latest/clappr.min.js"></script>
 
     <!-- Flowplayer -->
-    <link rel="stylesheet" href="//releases.flowplayer.org/7.0.4/skin/skin.css">
-    <script src="https://releases.flowplayer.org/7.0.4/flowplayer.min.js"></script>
+    <link rel="stylesheet" href="//releases.flowplayer.org/7.1.0/skin/skin.css">
+    <script src="https://releases.flowplayer.org/7.1.0/flowplayer.min.js"></script>
     <script src="https://releases.flowplayer.org/hlsjs/flowplayer.hlsjs.light.min.js"></script>
 
     <!-- MediaElement -->
@@ -282,7 +282,6 @@
             this.videoContainer.appendChild(video);
 
             var player = flowplayer("#video", {
-                autoplay: true,
                 volume: 0,
                 clip: {
                     sources: [{
@@ -294,6 +293,10 @@
             });
 
             p2pml.hlsjs.initFlowplayerHlsJsPlayer(player, { segmentManager: this.segmentManager });
+
+            player.on("ready", function () {
+                player.play();
+            });
         };
 
         DemoApp.prototype.initVideoJsContribHlsJsPlayer = function () {
