@@ -74,6 +74,10 @@
             left: 50px;
             z-index: 1;
         }
+        #main-view.hide,
+        #error-view.hide {
+            display: none;
+        }
     </style>
 
 </head>
@@ -81,7 +85,7 @@
 
 <h1>P2P Media Loader Demo</h1>
 
-<div class="row">
+<div id="main-view" class="row">
     <div class="col-md-8">
         <div id="video_container" class="text-center"></div>
         <div id="chart_container">
@@ -113,6 +117,15 @@
     </div>
 </div>
 
+<div id="error-view" class="row hide">
+    <div class="col-sm-12">
+        Sorry!<br>
+        Your browser doesn't support hls.js engine. :(<br>
+        <hr>
+        Read more at <a href="https://en.wikipedia.org/wiki/Media_Source_Extensions" target="_blank">Media Source Extensions</a>.
+    </div>
+</div>
+
 <script>
 
     var DemoApp = (function () {
@@ -120,6 +133,12 @@
         var P2PGraphClass = require("p2p-graph");
 
         function DemoApp() {
+            if (!Hls.isSupported()) {
+                document.querySelector("#main-view").classList.add("hide");
+                document.querySelector("#error-view").classList.remove("hide");
+                return;
+            }
+
             this.initForm();
 
             var videoUrlForm = document.getElementById("videoUrlForm");
