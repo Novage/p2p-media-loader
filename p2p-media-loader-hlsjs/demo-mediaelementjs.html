@@ -17,6 +17,9 @@
 
     <script>
 
+        // allow only one supported renderer
+        mejs.Renderers.order = [ "native_hls" ];
+
         var player = new MediaElementPlayer("video", {
             stretching: "responsive",
             startVolume: 0.01, // 1%
