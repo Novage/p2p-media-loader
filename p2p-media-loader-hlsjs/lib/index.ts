@@ -33,18 +33,21 @@ export function initClapprPlayer(player: any, settings: any = {}): void {
         const hlsInstance = playback._hls;
         if (hlsInstance && hlsInstance.config && hlsInstance.config.loader && typeof hlsInstance.config.loader.getSegmentManager !== "function") {
             initHlsJsPlayer(hlsInstance, settings);
-            if (player.isPlaying()) {
-                const segmentManager: SegmentManager = hlsInstance.config.loader.getSegmentManager();
-                segmentManager.loadPlaylist(player.options.source, true);
-            }
+            const segmentManager: SegmentManager = hlsInstance.config.loader.getSegmentManager();
+            segmentManager.loadPlaylist(player.options.source, true);
         }
     });
 }
 
 export function initFlowplayerHlsJsPlayer(player: any, settings: any = {}): void {
-    if (player && player.engine && player.engine.hlsjs) {
-        initHlsJsPlayer(player.engine.hlsjs, settings);
-    }
+    player.on("ready", () => {
+        const engine = player.engine;
+        if (engine && engine.hlsjs && engine.hlsjs.config && engine.hlsjs.config.loader && typeof engine.hlsjs.config.loader.getSegmentManager !== "function") {
+            initHlsJsPlayer(engine.hlsjs, settings);
+            const segmentManager: SegmentManager = engine.hlsjs.config.loader.getSegmentManager();
+            segmentManager.loadPlaylist(player.video.url, true);
+        }
+    });
 }
 
 export function initVideoJsContribHlsJsPlayer(player: any): void {
