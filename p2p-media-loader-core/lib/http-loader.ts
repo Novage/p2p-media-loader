@@ -58,8 +58,8 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
     }
 
     public destroy(): void {
+        this.segmentsQueue = [];
         this.httpManager.destroy();
-        this.segmentsQueue = []
     }
 
     private processSegmentQueue(): void {
