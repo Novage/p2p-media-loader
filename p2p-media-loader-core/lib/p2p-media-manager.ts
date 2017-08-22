@@ -50,9 +50,9 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
             if (this.client) {
                 this.client.stop();
                 this.client.destroy();
-                this.peers.forEach((mediaPeer) => mediaPeer.destroy());
-                this.peers.clear();
             }
+            this.peers.forEach((mediaPeer) => mediaPeer.destroy());
+            this.peers.clear();
             this.createClient(createHash("sha1").update(id).digest("hex"));
         }
     }
@@ -129,12 +129,22 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
         return this.peerSegmentRequests.size;
     }
 
+    public destroy(): void {
+        if (this.client) {
+            this.client.stop();
+            this.client.destroy();
+        }
+        this.peers.forEach((mediaPeer) => mediaPeer.destroy());
+        this.peers.clear();
+        this.peerSegmentRequests.clear();
+    }
+
     private onCacheUpdated(): void {
         this.peers.forEach((mediaPeer) => mediaPeer.sendSegmentsMap(this.cacheManager.keys()));
     }
 
-    private onPieceBytesLoaded(data: any): void {
-        this.emit(LoaderEvents.PieceBytesLoaded, data);
+    private onPieceBytesLoaded(method: string, size: number, timestamp: number): void {
+        this.emit(LoaderEvents.PieceBytesLoaded, method, size, timestamp);
     }
 
     private onPeerConnect(mediaPeer: MediaPeer): void {

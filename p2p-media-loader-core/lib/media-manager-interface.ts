@@ -8,6 +8,7 @@ interface MediaManagerInterface {
     abort(segment: SegmentInternal): void;
     isDownloading(segment: SegmentInternal): boolean;
     getActiveDownloadsCount(): number;
+    destroy(): void;
 
 }
 

@@ -89,7 +89,7 @@ export default class MediaPeer extends EventEmitter {
                         this.segmentsPiecesData.delete(dataObject.id);
                         this.emit(MediaPeerEvents.DataSegmentLoaded, this, dataObject.id, Buffer.from(stringData).buffer);
                     }
-                    this.emit(LoaderEvents.PieceBytesLoaded, {"method": "p2p", "size": piece.data.length, timestamp: Date.now()});
+                    this.emit(LoaderEvents.PieceBytesLoaded, "p2p", piece.data.length, Date.now());
                 }
 
                 break;

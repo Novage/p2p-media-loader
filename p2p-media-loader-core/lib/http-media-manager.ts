@@ -25,7 +25,7 @@ export default class HttpMediaManager extends EventEmitter implements MediaManag
         let prevBytesLoaded = 0;
         request.onprogress = (event: any) => {
             const bytesLoaded = event.loaded - prevBytesLoaded;
-            this.emit(LoaderEvents.PieceBytesLoaded, {"method": "http", "size": bytesLoaded, "timestamp": Date.now()});
+            this.emit(LoaderEvents.PieceBytesLoaded, "http", bytesLoaded, Date.now());
             prevBytesLoaded = event.loaded;
         };
 
@@ -64,6 +64,11 @@ export default class HttpMediaManager extends EventEmitter implements MediaManag
 
     public getActiveDownloadsCount(): number {
         return this.xhrRequests.size;
+    }
+
+    public destroy(): void {
+        this.xhrRequests.forEach(xhr => xhr.abort());
+        this.xhrRequests.clear();
     }
 
     setSwarmId(id: string): void {

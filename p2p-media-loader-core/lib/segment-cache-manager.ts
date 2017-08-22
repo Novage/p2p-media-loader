@@ -29,6 +29,10 @@ export default class SegmentCacheManager extends EventEmitter implements Segment
         this.emit(CacheEvents.CacheUpdated);
     }
 
+    public destroy(): void {
+        this.segments.clear();
+    }
+
     public forEach(callbackfn: (value: SegmentInternal, key: string, map: Map<string, SegmentInternal>) => void, thisArg?: any): void {
         this.segments.forEach(callbackfn, thisArg);
     }

@@ -58,7 +58,8 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
     }
 
     public destroy(): void {
-        // todo: add destroy logic here; after this call, the object should not use network or emit any events
+        this.httpManager.destroy();
+        this.segmentsQueue = []
     }
 
     private processSegmentQueue(): void {

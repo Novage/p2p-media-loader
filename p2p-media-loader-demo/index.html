@@ -450,8 +450,8 @@
             return {p2p: p2pSize / this.downloadSpeedTimespan, http: httpSize / this.downloadSpeedTimespan};
         };
 
-        DemoApp.prototype.onBytesLoaded = function (data) {
-            this.downloadStats.push(data);
+        DemoApp.prototype.onBytesLoaded = function (method, size, timestamp) {
+            this.downloadStats.push({"method": method, "size": size, "timestamp": timestamp});
         };
 
         DemoApp.prototype.refreshGraph = function (p2pLoader) {

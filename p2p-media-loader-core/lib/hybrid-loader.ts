@@ -98,7 +98,10 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     public destroy(): void {
-        // todo: add destroy logic here; after this call, the object should not use network or emit any events
+        this.segmentsQueue = [];
+        this.httpManager.destroy();
+        this.p2pManager.destroy();
+        this.cacheManager.destroy();
     }
 
     private processSegmentsQueue(): void {
@@ -157,8 +160,8 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
     }
 
-    private onPieceBytesLoaded(data: any): void {
-        this.emit(LoaderEvents.PieceBytesLoaded, data);
+    private onPieceBytesLoaded(method: string, size: number, timestamp: number): void {
+        this.emit(LoaderEvents.PieceBytesLoaded, method, size, timestamp);
     }
 
     private onSegmentLoaded(id: string, url: string, data: ArrayBuffer): void {
