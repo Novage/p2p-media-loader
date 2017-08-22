@@ -1,13 +1,13 @@
-import Segment from "./segment";
+import SegmentInternal from "./segment-internal";
 
 interface SegmentCacheManagerInterface  {
 
-    get(key: string): Segment | undefined;
+    get(key: string): SegmentInternal | undefined;
     has(key: string): boolean;
-    set(key: string, value: Segment): void;
+    set(key: string, value: SegmentInternal): void;
     keys(): Array<string>;
     delete(keys: string[]): void;
-    forEach(callbackfn: (value: Segment, key: string, map: Map<string, Segment>) => void, thisArg?: any): void;
+    forEach(callbackfn: (value: SegmentInternal, key: string, map: Map<string, SegmentInternal>) => void, thisArg?: any): void;
     updateLastAccessed(key: string): void;
     on(eventName: string | symbol, listener: Function): this;
 

@@ -1,5 +1,6 @@
 import LoaderInterface from "./loader-interface";
 import Segment from "./segment";
+import SegmentInternal from "./segment-internal";
 import LoaderEvents from "./loader-events";
 import MediaManagerInterface from "./media-manager-interface";
 import {EventEmitter} from "events";
@@ -13,7 +14,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
     private httpManager: MediaManagerInterface;
 
     private readonly segmentExpiration = 5 * 60 * 1000; // milliseconds
-    private segmentsQueue: Segment[] = [];
+    private segmentsQueue: SegmentInternal[] = [];
 
     public constructor() {
         super();
@@ -36,7 +37,10 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         });
 
         // renew segment queue
-        this.segmentsQueue = [...segments];
+        this.segmentsQueue = [];
+        segments.forEach(segment => {
+            this.segmentsQueue.push(new SegmentInternal(segment.url, segment.url, segment.priority));
+        });
 
         // emit segment loaded event if the segment has already been downloaded
         if (emitNowSegmentUrl) {
@@ -61,15 +65,18 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         this.segmentsQueue.forEach((segment) => {
             if (this.httpManager.getActiveDownloadsCount() < 1 &&
                 !this.httpManager.isDownloading(segment) &&
-                !this.cacheManager.has(segment.url)) {
+                !this.cacheManager.has(segment.id)) {
 
                 this.httpManager.download(segment);
             }
         });
     }
 
-    private onSegmentLoaded(segment: Segment): void {
-        this.cacheManager.set(segment.url, segment);
+    private onSegmentLoaded(url: string, data: ArrayBuffer): void {
+        const segment = new SegmentInternal(url, url);
+        segment.data = data;
+        this.cacheManager.set(segment.id, segment);
+
         this.emitSegmentLoaded(segment);
         this.processSegmentQueue();
     }
@@ -79,9 +86,12 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         this.processSegmentQueue();
     }
 
-    private emitSegmentLoaded(segment: Segment): void {
-        this.cacheManager.updateLastAccessed(segment.url);
-        this.emit(LoaderEvents.SegmentLoaded, {"url": segment.url, "data": segment.data.slice(0)});
+    private emitSegmentLoaded(segmentInternal: SegmentInternal): void {
+        this.cacheManager.updateLastAccessed(segmentInternal.id);
+
+        const segment = new Segment(segmentInternal.url);
+        segment.data = segment.data.slice(0);
+        this.emit(LoaderEvents.SegmentLoaded, segment);
     }
 
     private collectGarbage(): void {

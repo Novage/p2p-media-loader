@@ -1,10 +1,10 @@
-import Segment from "./segment";
 import {EventEmitter} from "events";
 import MediaPeerCommands from "./media-peer-commands";
 import Timer = NodeJS.Timer;
 import MediaPeerEvents from "./media-peer-events";
 import LoaderEvents from "./loader-events";
 import * as Debug from "debug";
+import SegmentInternal from "./segment-internal";
 
 class SegmentPiece {
 
@@ -23,10 +23,6 @@ export default class MediaPeer extends EventEmitter {
     private requestSegmentResponseTimeout = 3000;
     private requestSegmentResponseTimers: Map<string, Timer> = new Map();
     private debug = Debug("p2pml:media-peer");
-
-    // TODO: set according to MediaPeerCommands.Busy
-    // TODO: clear by timeout
-    private isBusy: boolean = false;
 
     constructor(peer: any) {
         super();
@@ -70,31 +66,28 @@ export default class MediaPeer extends EventEmitter {
                 break;
 
             case MediaPeerCommands.SegmentRequest:
-                this.emit(MediaPeerEvents.DataSegmentRequest, this, dataObject.url);
+                this.emit(MediaPeerEvents.DataSegmentRequest, this, dataObject.id);
                 break;
 
             case MediaPeerCommands.SegmentData:
-                this.setResponseTimer(dataObject.url);
-                const segmentPieces = this.segmentsPiecesData.get(dataObject.url);
+                this.setResponseTimer(dataObject.id);
+                const segmentPieces = this.segmentsPiecesData.get(dataObject.id);
 
                 if (segmentPieces) {
                     const piece = new SegmentPiece(dataObject.pieceIndex,  dataObject.data);
                     segmentPieces.push(piece);
 
                     if (dataObject.piecesCount === segmentPieces.length) {
-                        this.removeResponseTimer(dataObject.url);
+                        this.removeResponseTimer(dataObject.id);
                         segmentPieces.sort((a, b) => a.index - b.index);
 
-                        const stringData = new Array<number>();
+                        const stringData: number[] = [];
                         segmentPieces.forEach((piece) => {
                             stringData.push(...piece.data);
                         });
 
-                        const segment = new Segment(dataObject.url);
-                        segment.data = Buffer.from(stringData).buffer;
-
-                        this.segmentsPiecesData.delete(segment.url);
-                        this.emit(MediaPeerEvents.DataSegmentLoaded, this, segment);
+                        this.segmentsPiecesData.delete(dataObject.id);
+                        this.emit(MediaPeerEvents.DataSegmentLoaded, this, dataObject.id, Buffer.from(stringData).buffer);
                     }
                     this.emit(LoaderEvents.PieceBytesLoaded, {"method": "p2p", "size": piece.data.length, timestamp: Date.now()});
                 }
@@ -102,10 +95,10 @@ export default class MediaPeer extends EventEmitter {
                 break;
 
             case MediaPeerCommands.SegmentAbsent:
-                this.removeResponseTimer(dataObject.url);
-                this.segmentsPiecesData.delete(dataObject.url);
-                this.segments.delete(dataObject.url);
-                this.emit(MediaPeerEvents.DataSegmentAbsent, this, dataObject.url);
+                this.removeResponseTimer(dataObject.id);
+                this.segmentsPiecesData.delete(dataObject.id);
+                this.segments.delete(dataObject.id);
+                this.emit(MediaPeerEvents.DataSegmentAbsent, this, dataObject.id);
                 break;
 
             case MediaPeerCommands.CancelSegmentRequest:
@@ -118,9 +111,9 @@ export default class MediaPeer extends EventEmitter {
     }
 
     // TODO: move to Segment?
-    private getSegmentPieces(segment: Segment): Array<SegmentPiece> {
+    private getSegmentPieces(segment: SegmentInternal): Array<SegmentPiece> {
         const jsonBufferData = new Buffer(segment.data).toJSON().data;
-        const pieces = new Array<SegmentPiece>();
+        const pieces: SegmentPiece[] = [];
 
         if (jsonBufferData.length > this.pieceSize) {
             const initialPiecesCount = Math.floor(jsonBufferData.length / this.pieceSize);
@@ -162,63 +155,63 @@ export default class MediaPeer extends EventEmitter {
         }
     }
 
-    public hasSegment(url: string): boolean {
-        return this.segments.has(url);
+    public hasSegment(id: string): boolean {
+        return this.segments.has(id);
     }
 
     public sendSegmentsMap(segments: Array<string>) {
         this.sendCommand({"command": MediaPeerCommands.SegmentsMap, "segments": segments});
     }
 
-    public sendSegmentData(segment: Segment): void {
+    public sendSegmentData(segment: SegmentInternal): void {
         const segmentPieces = this.getSegmentPieces(segment);
 
         for (let i = 0; i < segmentPieces.length; i++) {
-            this.sendCommand(
-                {
-                    "command": MediaPeerCommands.SegmentData,
-                    "url": segment.url,
-                    "data": segmentPieces[i].data,
-                    "pieceIndex": segmentPieces[i].index,
-                    "piecesCount": segmentPieces.length
-                });
+            this.sendCommand({
+                "command": MediaPeerCommands.SegmentData,
+                "id": segment.id,
+                "data": segmentPieces[i].data,
+                "pieceIndex": segmentPieces[i].index,
+                "piecesCount": segmentPieces.length
+            });
         }
     }
 
-    public sendSegmentAbsent(url: string): void {
-        this.sendCommand({"command": MediaPeerCommands.SegmentAbsent, "url": url});
+    public sendSegmentAbsent(id: string): void {
+        this.sendCommand({"command": MediaPeerCommands.SegmentAbsent, "id": id});
     }
 
-    public sendSegmentRequest(url: string): boolean {
-        if (this.sendCommand({"command": MediaPeerCommands.SegmentRequest, "url": url})) {
-            this.setResponseTimer(url);
-            this.segmentsPiecesData.set(url, new Array<SegmentPiece>());
+    public sendSegmentRequest(id: string): boolean {
+        if (this.sendCommand({"command": MediaPeerCommands.SegmentRequest, "id": id})) {
+            this.setResponseTimer(id);
+            this.segmentsPiecesData.set(id, []);
             return true;
         }
 
         return false;
     }
 
-    public sendCancelSegmentRequest(url: string): boolean {
-        return this.sendCommand({"command": MediaPeerCommands.CancelSegmentRequest, "url": url});
+    public sendCancelSegmentRequest(id: string): boolean {
+        this.segmentsPiecesData.delete(id);
+        return this.sendCommand({"command": MediaPeerCommands.CancelSegmentRequest, "id": id});
     }
 
-    private setResponseTimer(url: string) {
+    private setResponseTimer(id: string) {
 
-        let timer = this.requestSegmentResponseTimers.get(url);
+        let timer = this.requestSegmentResponseTimers.get(id);
         if (timer) {
             clearTimeout(timer);
         }
 
         // TODO: check MediaPeerEvents.DataSegmentAbsent
         timer = setTimeout(() => {
-                this.sendCancelSegmentRequest(url);
-                this.segments.delete(url);
-                this.emit(MediaPeerEvents.DataSegmentAbsent, this, url);
+                this.sendCancelSegmentRequest(id);
+                this.segments.delete(id);
+                this.emit(MediaPeerEvents.DataSegmentAbsent, this, id);
             },
             this.requestSegmentResponseTimeout);
 
-        this.requestSegmentResponseTimers.set(url, timer);
+        this.requestSegmentResponseTimers.set(id, timer);
     }
 
     private removeResponseTimer(url: string) {

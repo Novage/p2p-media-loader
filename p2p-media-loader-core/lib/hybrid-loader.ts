@@ -10,6 +10,7 @@ import P2PMediaManager from "./p2p-media-manager";
 import MediaPeerEvents from "./media-peer-events";
 import MediaPeer from "./media-peer";
 import * as Debug from "debug";
+import SegmentInternal from "./segment-internal";
 
 export default class HybridLoader extends EventEmitter implements LoaderInterface {
 
@@ -20,7 +21,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private readonly requiredSegmentsCount = 2;
     private readonly lastSegmentProbability = 0.1;
     private readonly bufferSegmentsCount = 20;
-    private segmentsQueue: Segment[] = [];
+    private segmentsQueue: SegmentInternal[] = [];
     private debug = Debug("p2pml:hybrid-loader");
     private settings = {
         segmentIdGenerator: (url: string): string => url
@@ -74,14 +75,13 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         // renew segment queue
         this.segmentsQueue = [];
         segments.forEach(segment => {
-            this.segmentsQueue.push(new Segment(segment.url, segment.priority));
+            const segmentId = this.settings.segmentIdGenerator(segment.url);
+            this.segmentsQueue.push(new SegmentInternal(segmentId, segment.url, segment.priority));
         });
-
-        this.segmentsQueue = [...segments];
 
         // emit segment loaded event if the segment has already been downloaded
         if (emitNowSegmentUrl) {
-            const downloadedSegment = this.cacheManager.get(emitNowSegmentUrl);
+            const downloadedSegment = this.cacheManager.get(this.settings.segmentIdGenerator(emitNowSegmentUrl));
             if (downloadedSegment) {
                 this.debug("emitNowSegmentUrl found in cache");
                 this.emitSegmentLoaded(downloadedSegment);
@@ -108,7 +108,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         for (let index = 0; index < this.segmentsQueue.length; index++) {
             const segment = this.segmentsQueue[index];
             const segmentPriority = index + startingPriority;
-            if (!this.cacheManager.has(segment.url)) {
+            if (!this.cacheManager.has(segment.id)) {
                 if (segmentPriority < this.requiredSegmentsCount) {
                     if (segmentPriority === 0 && !this.httpManager.isDownloading(segment) && this.httpManager.getActiveDownloadsCount() > 0) {
                         this.segmentsQueue.forEach(s => this.httpManager.abort(s));
@@ -131,13 +131,13 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
         if (this.httpManager.getActiveDownloadsCount() === 0 && this.p2pManager.getActiveDownloadsCount() === 0) {
             const pendingQueue = this.segmentsQueue.filter(segment =>
-                !this.cacheManager.has(segment.url) &&
+                !this.cacheManager.has(segment.id) &&
                 !this.httpManager.isDownloading(segment) &&
                 !this.p2pManager.isDownloading(segment));
             const downloadedSegmentsCount = this.segmentsQueue.length - pendingQueue.length;
 
             if (pendingQueue.length > 0 && downloadedSegmentsCount < this.bufferSegmentsCount) {
-                let segmentForHttpDownload: Segment | null = null;
+                let segmentForHttpDownload: SegmentInternal | null = null;
 
                 if (pendingQueue.length === 1 && pendingQueue[0].url === this.segmentsQueue[this.segmentsQueue.length - 1].url) {
                     if (Math.random() <= this.lastSegmentProbability) {
@@ -161,8 +161,11 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.emit(LoaderEvents.PieceBytesLoaded, data);
     }
 
-    private onSegmentLoaded(segment: Segment): void {
-        this.cacheManager.set(segment.url, segment);
+    private onSegmentLoaded(id: string, url: string, data: ArrayBuffer): void {
+        const segment = new SegmentInternal(id, url);
+        segment.data = data;
+        this.cacheManager.set(id, segment);
+
         this.emitSegmentLoaded(segment);
         this.processSegmentsQueue();
     }
@@ -172,9 +175,13 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.processSegmentsQueue();
     }
 
-    private emitSegmentLoaded(segment: Segment): void {
-        this.cacheManager.updateLastAccessed(segment.url);
-        this.emit(LoaderEvents.SegmentLoaded, {"url": segment.url, "data": segment.data.slice(0)});
+    private emitSegmentLoaded(segmentInternal: SegmentInternal): void {
+        this.cacheManager.updateLastAccessed(segmentInternal.id);
+
+        const segment = new Segment(segmentInternal.url);
+        segment.data = segmentInternal.data.slice(0);
+
+        this.emit(LoaderEvents.SegmentLoaded, segment);
         this.debug("emitSegmentLoaded", segment.url);
     }
 

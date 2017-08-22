@@ -1,13 +1,13 @@
 import SegmentCacheManagerInterface from "./segment-cache-manger-interface";
-import Segment from "./segment";
 import {EventEmitter} from "events";
 import CacheEvents from "./cache-events";
+import SegmentInternal from "./segment-internal";
 
 export default class SegmentCacheManager extends EventEmitter implements SegmentCacheManagerInterface {
 
-    private segments: Map<string, Segment> = new Map();
+    private segments: Map<string, SegmentInternal> = new Map();
 
-    public get(key: string): Segment | undefined {
+    public get(key: string): SegmentInternal | undefined {
         return this.segments.get(key);
     }
 
@@ -15,7 +15,7 @@ export default class SegmentCacheManager extends EventEmitter implements Segment
         return this.segments.has(key);
     }
 
-    public set(key: string, value: Segment): void {
+    public set(key: string, value: SegmentInternal): void {
         this.segments.set(key, value);
         this.emit(CacheEvents.CacheUpdated);
     }
@@ -29,7 +29,7 @@ export default class SegmentCacheManager extends EventEmitter implements Segment
         this.emit(CacheEvents.CacheUpdated);
     }
 
-    public forEach(callbackfn: (value: Segment, key: string, map: Map<string, Segment>) => void, thisArg?: any): void {
+    public forEach(callbackfn: (value: SegmentInternal, key: string, map: Map<string, SegmentInternal>) => void, thisArg?: any): void {
         this.segments.forEach(callbackfn, thisArg);
     }
 

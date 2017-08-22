@@ -1,12 +1,12 @@
-import Segment from "./segment";
+import SegmentInternal from "./segment-internal";
 
 interface MediaManagerInterface {
 
     setSwarmId(id: string): void;
     on(eventName: string | symbol, listener: Function): this;
-    download(segment: Segment): void;
-    abort(segment: Segment): void;
-    isDownloading(segment: Segment): boolean;
+    download(segment: SegmentInternal): void;
+    abort(segment: SegmentInternal): void;
+    isDownloading(segment: SegmentInternal): boolean;
     getActiveDownloadsCount(): number;
 
 }
