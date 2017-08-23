@@ -24,6 +24,7 @@
     "@types/node": "^6.0.81",
     "@types/text-encoding": "0.0.31",
     "browserify": "^14.4.0",
+    "get-browser-rtc": "^1.0.2",
     "copyfiles": "^1.2.0",
     "rimraf": "^2.6.1",
     "ts-node": "^3.2.0",
