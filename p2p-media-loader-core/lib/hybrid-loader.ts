@@ -17,21 +17,22 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private httpManager: MediaManagerInterface;
     private p2pManager: MediaManagerInterface;
     private cacheManager: SegmentCacheManagerInterface;
-    private readonly segmentExpiration = 5 * 60 * 1000; // milliseconds
-    private readonly requiredSegmentsCount = 2;
-    private readonly lastSegmentProbability = 0.1;
-    private readonly bufferSegmentsCount = 20;
     private segmentsQueue: SegmentInternal[] = [];
     private debug = Debug("p2pml:hybrid-loader");
     private settings = {
-        segmentIdGenerator: (url: string): string => url
+        segmentIdGenerator: (url: string): string => url,
+        segmentExpiration: 5 * 60 * 1000, // milliseconds
+        requiredSegmentsCount: 2,
+        lastSegmentProbability: 0.1,
+        bufferSegmentsCount: 20,
+        trackerAnnounce: [ "wss://tracker.btorrent.xyz/" ]
     };
 
     public constructor(settings: any = {}) {
         super();
 
-        const {segmentIdGenerator} = settings;
-        Object.assign(this.settings, {segmentIdGenerator});
+        this.settings = Object.assign(this.settings, settings);
+        this.debug("loader settings", this.settings);
 
         this.cacheManager = new SegmentCacheManager();
         this.httpManager = new HttpMediaManager();
@@ -39,20 +40,16 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.httpManager.on(LoaderEvents.SegmentError, this.onSegmentError.bind(this));
         this.httpManager.on(LoaderEvents.PieceBytesLoaded, this.onPieceBytesLoaded.bind(this));
 
-        this.p2pManager = new P2PMediaManager(this.cacheManager);
+        this.p2pManager = new P2PMediaManager(this.cacheManager, this.settings.trackerAnnounce);
         this.p2pManager.on(LoaderEvents.SegmentLoaded, this.onSegmentLoaded.bind(this));
         this.p2pManager.on(LoaderEvents.SegmentError, this.onSegmentError.bind(this));
         this.p2pManager.on(LoaderEvents.ForceProcessing, this.processSegmentsQueue.bind(this));
         this.p2pManager.on(LoaderEvents.PieceBytesLoaded, this.onPieceBytesLoaded.bind(this));
         this.p2pManager.on(MediaPeerEvents.Connect, this.onPeerConnect.bind(this));
         this.p2pManager.on(MediaPeerEvents.Close, this.onPeerClose.bind(this));
-
-        //setInterval(() => {
-            //this.processSegmentsQueue();
-        //}, 1000);
     }
 
-    load(segments: Segment[], swarmId: string, emitNowSegmentUrl?: string): void {
+    public load(segments: Segment[], swarmId: string, emitNowSegmentUrl?: string): void {
         this.p2pManager.setSwarmId(swarmId);
         this.debug("load segments", segments, this.segmentsQueue, emitNowSegmentUrl);
 
@@ -97,6 +94,10 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.collectGarbage();
     }
 
+    public getSettings() {
+        return this.settings;
+    }
+
     public destroy(): void {
         this.segmentsQueue = [];
         this.httpManager.destroy();
@@ -112,7 +113,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             const segment = this.segmentsQueue[index];
             const segmentPriority = index + startingPriority;
             if (!this.cacheManager.has(segment.id)) {
-                if (segmentPriority < this.requiredSegmentsCount) {
+                if (segmentPriority < this.settings.requiredSegmentsCount) {
                     if (segmentPriority === 0 && !this.httpManager.isDownloading(segment) && this.httpManager.getActiveDownloadsCount() > 0) {
                         this.segmentsQueue.forEach(s => this.httpManager.abort(s));
                     }
@@ -139,15 +140,15 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
                 !this.p2pManager.isDownloading(segment));
             const downloadedSegmentsCount = this.segmentsQueue.length - pendingQueue.length;
 
-            if (pendingQueue.length > 0 && downloadedSegmentsCount < this.bufferSegmentsCount) {
+            if (pendingQueue.length > 0 && downloadedSegmentsCount < this.settings.bufferSegmentsCount) {
                 let segmentForHttpDownload: SegmentInternal | null = null;
 
                 if (pendingQueue.length === 1 && pendingQueue[0].url === this.segmentsQueue[this.segmentsQueue.length - 1].url) {
-                    if (Math.random() <= this.lastSegmentProbability) {
+                    if (Math.random() <= this.settings.lastSegmentProbability) {
                         segmentForHttpDownload = pendingQueue[0];
                     }
                 } else {
-                    const random_index = Math.floor(Math.random() * Math.min(pendingQueue.length, this.bufferSegmentsCount));
+                    const random_index = Math.floor(Math.random() * Math.min(pendingQueue.length, this.settings.bufferSegmentsCount));
                     segmentForHttpDownload = pendingQueue[random_index];
                 }
 
@@ -201,7 +202,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         const keys: string[] = [];
 
         this.cacheManager.forEach((value, key) => {
-            if (now - value.lastAccessed > this.segmentExpiration) {
+            if (now - value.lastAccessed > this.settings.segmentExpiration) {
                 keys.push(key);
             }
         });

@@ -12,12 +12,15 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
 
     private cacheManager: SegmentCacheManagerInterface;
     private httpManager: MediaManagerInterface;
-
-    private readonly segmentExpiration = 5 * 60 * 1000; // milliseconds
     private segmentsQueue: SegmentInternal[] = [];
+    private settings = {
+        segmentExpiration: 5 * 60 * 1000, // milliseconds
+    };
 
-    public constructor() {
+    public constructor(settings: any = {}) {
         super();
+
+        this.settings = Object.assign(this.settings, settings);
 
         this.httpManager = new HttpMediaManager();
         this.httpManager.on(LoaderEvents.SegmentLoaded, this.onSegmentLoaded.bind(this));
@@ -55,6 +58,10 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
 
         // collect garbage
         this.collectGarbage();
+    }
+
+    public getSettings() {
+        return this.settings;
     }
 
     public destroy(): void {
@@ -100,7 +107,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         const keys: string[] = [];
 
         this.cacheManager.forEach((value, key) => {
-            if (now - value.lastAccessed > this.segmentExpiration) {
+            if (now - value.lastAccessed > this.settings.segmentExpiration) {
                 keys.push(key);
             }
         });

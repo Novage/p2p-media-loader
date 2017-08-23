@@ -22,15 +22,17 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
     private cacheManager: SegmentCacheManagerInterface;
 
     private client: any;
-    private readonly announce = [ "wss://tracker.btorrent.xyz/" ];
+    private announce: string[];
     private peers: Map<string, MediaPeer> = new Map();
     private peerSegmentRequests: Map<string, PeerSegmentRequest> = new Map();
     private swarmId: string;
     private peerId: string;
     private debug = Debug("p2pml:p2p-media-manager");
 
-    public constructor(cacheManager: SegmentCacheManagerInterface) {
+    public constructor(cacheManager: SegmentCacheManagerInterface, announce: string[]) {
         super();
+
+        this.announce = announce;
 
         this.cacheManager = cacheManager;
         cacheManager.on(CacheEvents.CacheUpdated, this.onCacheUpdated.bind(this));
