@@ -92,6 +92,15 @@
 
 <h1>P2P Media Loader Demo</h1>
 
+<div id="info-view" class="row hide">
+    <div class="col-sm-12">
+        Sorry!<br>
+        WebRTC data channels API is not supported by your browser. :(<br>
+        <hr>
+        Read more at <a href="http://iswebrtcreadyyet.com/legacy.html" target="_blank">Is WebRTC ready yet?</a>
+    </div>
+</div>
+
 <div id="main-view" class="row">
     <div class="col-md-8">
         <div id="video_container" class="text-center"></div>
@@ -146,6 +155,12 @@
                 document.querySelector("#error-view").classList.remove("hide");
                 return;
             }
+
+            if (!p2pml.WEBRTC_SUPPORT) {
+                document.querySelector("#info-view").classList.remove("hide");
+            }
+
+            console.log("WEBRTC_SUPPORT", p2pml.WEBRTC_SUPPORT);
 
             this.initForm();
 
