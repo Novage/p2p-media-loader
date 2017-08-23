@@ -18,20 +18,20 @@ export default class SegmentManager {
         this.loader.on(LoaderEvents.SegmentAbort, this.onSegmentAbort.bind(this));
     }
 
-    public processPlaylist(url: string, content: string): void {
+    public processPlaylist(url: string, type: string, content: string): void {
         const parser = new m3u8Parser.Parser();
         parser.push(content);
         parser.end();
-        const playlist = new Playlist(url, parser.manifest);
+        const playlist = new Playlist(url, type, parser.manifest);
         this.playlists.set(url, playlist);
     }
 
-    public async loadPlaylist(url: string, loadChildPlaylists: boolean = false): Promise<string> {
+    public async loadPlaylist(url: string, type: string, loadChildPlaylists: boolean = false): Promise<string> {
         let content = "";
 
         try {
             content = await Utils.fetchContent(url);
-            this.processPlaylist(url, content);
+            this.processPlaylist(url, type, content);
         } catch (e) {
             this.playlists.delete(url);
             throw e;
@@ -42,7 +42,7 @@ export default class SegmentManager {
             if (playlist) {
                 for (const childUrl of playlist.getChildPlaylistAbsoluteUrls()) {
                     Utils.fetchContent(childUrl).then((childContent) => {
-                        this.processPlaylist(childUrl, childContent);
+                        this.processPlaylist(childUrl, "level", childContent);
                     });
                 }
             }
@@ -57,12 +57,13 @@ export default class SegmentManager {
             if (playlistMissRetries > 0) {
                 setTimeout(() => { this.loadSegment(url, onSuccess, onError, playlistMissRetries - 1); }, 500);
             } else {
-                const message = "Requested segment cannot be located in known playlists";
-                console.error(message);
-                if (onError) {
-                    setTimeout(() => { onError(message); }, 0);
-                }
+                this.fetchSegment(url, onSuccess, onError);
             }
+            return;
+        }
+
+        if (loadingPlaylist.type !== "level") {
+            this.fetchSegment(url, onSuccess, onError);
             return;
         }
 
@@ -70,13 +71,8 @@ export default class SegmentManager {
             const prevSegmentUrl = this.playQueue[ this.playQueue.length - 1 ];
             const { playlist: prevLoadingPlaylist, segmentIndex: prevLoadingSegmentIndex } = this.getSegmentLocation(prevSegmentUrl);
             if (prevLoadingPlaylist && prevLoadingSegmentIndex !== loadingSegmentIndex - 1) {
-                //console.log("#### load sequence BREAK");
                 this.playQueue = [];
-            } else {
-                //console.log("#### load sequential");
             }
-        } else {
-            //console.log("#### load first");
         }
 
         this.task = new Task(url, onSuccess, onError);
@@ -90,10 +86,7 @@ export default class SegmentManager {
         }
 
         const urlIndex = this.playQueue.indexOf(url);
-        if (urlIndex < 0) {
-            //console.log("#### play MISS");
-        } else {
-            //console.log("#### play hit");
+        if (urlIndex >= 0) {
             this.playQueue = this.playQueue.slice(urlIndex);
         }
 
@@ -201,16 +194,26 @@ export default class SegmentManager {
         }
     }
 
+    private fetchSegment(url: string, onSuccess?: Function, onError?: Function): void {
+        Utils.fetchContent(url, "arraybuffer").then((content: any) => {
+            if (onSuccess) { onSuccess(content); }
+        }).catch((error: any) => {
+            if (onError) { onError(error); }
+        });
+    }
+
 }
 
 class Playlist {
 
     public url: string;
+    public type: string;
     public baseUrl: string;
     public manifest: any;
 
-    public constructor(url: string, manifest: any) {
+    public constructor(url: string, type: string, manifest: any) {
         this.url = url;
+        this.type = type;
         this.manifest = manifest;
 
         const pos = url.lastIndexOf("/");

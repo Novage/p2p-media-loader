@@ -34,7 +34,7 @@ export function initClapprPlayer(player: any, settings: any = {}): void {
         if (hlsInstance && hlsInstance.config && hlsInstance.config.loader && typeof hlsInstance.config.loader.getSegmentManager !== "function") {
             initHlsJsPlayer(hlsInstance, settings);
             const segmentManager: SegmentManager = hlsInstance.config.loader.getSegmentManager();
-            segmentManager.loadPlaylist(player.options.source, true);
+            segmentManager.loadPlaylist(player.options.source, "manifest", true);
         }
     });
 }
@@ -45,7 +45,7 @@ export function initFlowplayerHlsJsPlayer(player: any, settings: any = {}): void
         if (engine && engine.hlsjs && engine.hlsjs.config && engine.hlsjs.config.loader && typeof engine.hlsjs.config.loader.getSegmentManager !== "function") {
             initHlsJsPlayer(engine.hlsjs, settings);
             const segmentManager: SegmentManager = engine.hlsjs.config.loader.getSegmentManager();
-            segmentManager.loadPlaylist(player.video.url, true);
+            segmentManager.loadPlaylist(player.video.url, "manifest", true);
         }
     });
 }
