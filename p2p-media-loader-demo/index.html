@@ -75,6 +75,12 @@
             left: 50px;
             z-index: 1;
         }
+        #legend-totals {
+            position: absolute;
+            bottom: 20px;
+            left: 50px;
+            z-index: 1;
+        }
         #main-view.hide,
         #error-view.hide {
             display: none;
@@ -91,6 +97,7 @@
         <div id="video_container" class="text-center"></div>
         <div id="chart_container">
             <div id="legend"></div>
+            <div id="legend-totals"></div>
             <div id="y_axis"></div>
             <div id="chart"></div>
         </div>
@@ -186,6 +193,7 @@
 
         DemoApp.prototype.restartDemo = function () {
             this.downloadStats = [];
+            this.downloadTotals = { http: 0, p2p: 0 };
 
             while (this.videoContainer.hasChildNodes()) {
                 this.videoContainer.removeChild(this.videoContainer.lastChild);
@@ -361,6 +369,11 @@
                 element: document.getElementById('legend')
             });
 
+            this.legendTotals = new Rickshaw.Graph.Legend({
+                graph: this.chart,
+                element: document.getElementById("legend-totals")
+            });
+
             this.chart.render();
             setInterval(this.updateChartData.bind(this), 500);
         };
@@ -407,17 +420,43 @@
                 data2.push({x: x, y: http});
                 this.chart.update();
 
-                this.formatChartLegendline(0, http);
-                this.formatChartLegendline(1, p2p);
-                this.formatChartLegendline(2, total);
+                this.formatChartLegendLine(0, http);
+                this.formatChartLegendLine(1, p2p);
+                this.formatChartLegendLine(2, total);
+
+                this.updateLegendTotals();
             }
         };
 
-        DemoApp.prototype.formatChartLegendline = function (index, speed) {
+        DemoApp.prototype.formatChartLegendLine = function (index, speed) {
             if (this.legend) {
                 var line = this.legend.lines[index];
-                line.element.childNodes[1].textContent = line.series.name + ' - '+ speed + ' Mbps';
+                line.element.childNodes[1].textContent = line.series.name + ' - '+ speed + ' Mbit/s';
             }
+        };
+
+        DemoApp.prototype.updateLegendTotals = function () {
+            if (!this.legendTotals) {
+                return;
+            }
+
+            var httpMb = ((this.downloadTotals.http * 10) >> 20) / 10;
+            var p2pMb = ((this.downloadTotals.p2p * 10) >> 20) / 10;
+            var totalMb = httpMb + p2pMb;
+
+            this.legendTotals.lines[ 0 ].element.childNodes[ 1 ].textContent
+                = "HTTP - "
+                + Number(httpMb).toFixed(1) + " MiB - "
+                + Number((httpMb * 100) / totalMb).toFixed(0) + "%";
+
+            this.legendTotals.lines[ 1 ].element.childNodes[ 1 ].textContent
+                = "P2P - "
+                + Number(p2pMb).toFixed(1) + " MiB - "
+                + Number((p2pMb * 100) / totalMb).toFixed(0) + "%";
+
+            this.legendTotals.lines[ 2 ].element.childNodes[ 1 ].textContent
+                = "Total - "
+                + Number(totalMb).toFixed(1) + " MiB";
         };
 
         DemoApp.prototype.getDownloadSpeed = function () {
@@ -446,6 +485,7 @@
 
         DemoApp.prototype.onBytesLoaded = function (method, size, timestamp) {
             this.downloadStats.push({"method": method, "size": size, "timestamp": timestamp});
+            this.downloadTotals[ method ] += size;
         };
 
         DemoApp.prototype.refreshGraph = function (p2pLoader) {
