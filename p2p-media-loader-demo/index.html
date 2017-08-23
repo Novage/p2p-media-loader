@@ -152,19 +152,13 @@
 
             this.downloadSpeedTimespan = 10; // seconds
 
-            var wowzaSegmentRe = /.+\/media_w(\d+)_b(\d+)_(\d+)\.ts/g;
+            var wowzaSegmentRegExp = /(.+)_w\d{6,}_(.+)/g;
+            var wowzaSegmentIdGenerator = function (url) {
+                return url.replace(wowzaSegmentRegExp, "$1$2");
+            };
+
             this.loaderSettings = {
-                segmentIdGenerator: function (url) {
-                    var info = wowzaSegmentRe.exec(url);
-                    if (info && info.length === 4) {
-                        // info[0] -- input url
-                        // info[1] -- the 'w' number (this number different for each client)
-                        // info[2] -- the 'b' number (bitrate/quality)
-                        // info[3] -- ts number
-                        return info[2] + info[3];
-                    }
-                    return url;
-                }
+                segmentIdGenerator: wowzaSegmentIdGenerator
             };
 
             this.initChart();
