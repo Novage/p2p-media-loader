@@ -154,6 +154,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
                 if (segmentForHttpDownload) {
                     this.debug("Random HTTP download:");
+                    console.log("http load", segmentForHttpDownload.url.replace("https://wowza.peer5.com/live/smil:ski.smil/media_w", ""));
                     this.httpManager.download(segmentForHttpDownload);
                 }
             }
