@@ -452,12 +452,12 @@
         };
 
         DemoApp.prototype.updateLegendTotals = function () {
-            if (!this.legendTotals) {
+            if (!this.legendTotals && totalMb > 0) {
                 return;
             }
 
-            var httpMb = ((this.downloadTotals.http * 10) >> 20) / 10;
-            var p2pMb = ((this.downloadTotals.p2p * 10) >> 20) / 10;
+            var httpMb = this.downloadTotals.http / 1048576;
+            var p2pMb = this.downloadTotals.p2p / 1048576;
             var totalMb = httpMb + p2pMb;
 
             this.legendTotals.lines[ 0 ].element.childNodes[ 1 ].textContent
@@ -502,6 +502,10 @@
         DemoApp.prototype.onBytesLoaded = function (method, size, timestamp) {
             this.downloadStats.push({"method": method, "size": size, "timestamp": timestamp});
             this.downloadTotals[ method ] += size;
+
+            if (size < 0) {
+                console.error("NEGTIVE", size);
+            }
         };
 
         DemoApp.prototype.refreshGraph = function (p2pLoader) {
@@ -606,7 +610,7 @@
         return DemoApp;
     }());
 
-    new DemoApp();
+    var demo = new DemoApp();
 
 </script>
 
