@@ -25,7 +25,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         requiredSegmentsCount: 2,
         lastSegmentProbability: 0.1,
         bufferSegmentsCount: 20,
-        trackerAnnounce: [ "wss://tracker.btorrent.xyz/" ]
+        trackerAnnounce: [ "wss://tracker.btorrent.xyz/", "wss://tracker.openwebtorrent.com/" ]
     };
 
     public constructor(settings: any = {}) {
