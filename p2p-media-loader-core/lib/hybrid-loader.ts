@@ -19,11 +19,13 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private cacheManager: SegmentCacheManagerInterface;
     private segmentsQueue: SegmentInternal[] = [];
     private debug = Debug("p2pml:hybrid-loader");
+    private lastSegmentProbabilityTimestamp = 0;
     private settings = {
         segmentIdGenerator: (url: string): string => url,
         segmentExpiration: 5 * 60 * 1000, // milliseconds
         requiredSegmentsCount: 2,
-        lastSegmentProbability: 0.1,
+        lastSegmentProbability: 0.05,
+        lastSegmentProbabilityInterval: 1000,
         bufferSegmentsCount: 20,
         trackerAnnounce: [ "wss://tracker.btorrent.xyz/", "wss://tracker.openwebtorrent.com/" ]
     };
@@ -144,6 +146,12 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
                 let segmentForHttpDownload: SegmentInternal | null = null;
 
                 if (pendingQueue.length === 1 && pendingQueue[0].url === this.segmentsQueue[this.segmentsQueue.length - 1].url) {
+                    const now = Date.now();
+                    if (now - this.lastSegmentProbabilityTimestamp < this.settings.lastSegmentProbabilityInterval) {
+                        return;
+                    }
+
+                    this.lastSegmentProbabilityTimestamp = now;
                     if (Math.random() <= this.settings.lastSegmentProbability) {
                         segmentForHttpDownload = pendingQueue[0];
                     }

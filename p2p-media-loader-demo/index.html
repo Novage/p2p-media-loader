@@ -452,7 +452,7 @@
         };
 
         DemoApp.prototype.updateLegendTotals = function () {
-            if (!this.legendTotals && totalMb > 0) {
+            if (!this.legendTotals) {
                 return;
             }
 
@@ -460,19 +460,21 @@
             var p2pMb = this.downloadTotals.p2p / 1048576;
             var totalMb = httpMb + p2pMb;
 
-            this.legendTotals.lines[ 0 ].element.childNodes[ 1 ].textContent
-                = "HTTP - "
-                + Number(httpMb).toFixed(1) + " MiB - "
-                + Number((httpMb * 100) / totalMb).toFixed(0) + "%";
+            if (totalMb > 0) {
+                this.legendTotals.lines[0].element.childNodes[1].textContent
+                    = "HTTP - "
+                    + Number(httpMb).toFixed(1) + " MiB - "
+                    + Number((httpMb * 100) / totalMb).toFixed(0) + "%";
 
-            this.legendTotals.lines[ 1 ].element.childNodes[ 1 ].textContent
-                = "P2P - "
-                + Number(p2pMb).toFixed(1) + " MiB - "
-                + Number((p2pMb * 100) / totalMb).toFixed(0) + "%";
+                this.legendTotals.lines[1].element.childNodes[1].textContent
+                    = "P2P - "
+                    + Number(p2pMb).toFixed(1) + " MiB - "
+                    + Number((p2pMb * 100) / totalMb).toFixed(0) + "%";
 
-            this.legendTotals.lines[ 2 ].element.childNodes[ 1 ].textContent
-                = "Total - "
-                + Number(totalMb).toFixed(1) + " MiB";
+                this.legendTotals.lines[2].element.childNodes[1].textContent
+                    = "Total - "
+                    + Number(totalMb).toFixed(1) + " MiB";
+            }
         };
 
         DemoApp.prototype.getDownloadSpeed = function () {
@@ -501,11 +503,7 @@
 
         DemoApp.prototype.onBytesLoaded = function (method, size, timestamp) {
             this.downloadStats.push({"method": method, "size": size, "timestamp": timestamp});
-            this.downloadTotals[ method ] += size;
-
-            if (size < 0) {
-                console.error("NEGTIVE", size);
-            }
+            this.downloadTotals[method] += size;
         };
 
         DemoApp.prototype.refreshGraph = function (p2pLoader) {
@@ -611,6 +609,11 @@
     }());
 
     var demo = new DemoApp();
+    /*setTimeout(function() {
+        demo.downloadTotals = { http: 0, p2p: 0 };
+        console.log("--------------------------------------------------------------------------------");
+    }, 60000);*/
+
 
 </script>
 
