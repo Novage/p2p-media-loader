@@ -60,18 +60,21 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
     }
 
     private createClient(infoHash: string): void {
-        const clientOptions = {
-            infoHash: infoHash,
-            peerId: this.peerId,
-            announce: this.announce,
-        };
+        if (this.announce && this.announce.length > 0) {
+            const clientOptions = {
+                infoHash: infoHash,
+                peerId: this.peerId,
+                announce: this.announce
+            };
 
-        this.client = new Client(clientOptions);
-        this.client.on("error", (error: any) => this.debug("client error", error));
-        this.client.on("warning", (error: any) => this.debug("client warning", error));
-        this.client.on("update", (data: any) => this.debug("client announce update", data));
-        this.client.on("peer", this.onClientPeer.bind(this));
-        this.client.start();
+            this.client = new Client(clientOptions);
+            this.client.on("error", (error: any) => this.debug("client error", error));
+            this.client.on("warning", (error: any) => this.debug("client warning", error));
+            this.client.on("update", (data: any) => this.debug("client announce update", data));
+            this.client.on("peer", this.onClientPeer.bind(this));
+
+            this.client.start();
+        }
     }
 
     private onClientPeer(peer: any) {

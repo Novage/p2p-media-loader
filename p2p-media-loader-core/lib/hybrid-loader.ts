@@ -24,6 +24,8 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         segmentIdGenerator: (url: string): string => url,
         segmentExpiration: 5 * 60 * 1000, // milliseconds
         requiredSegmentsCount: 2,
+        useP2P: true,
+        simultaneousP2PDownloads: 3,
         lastSegmentProbability: 0.05,
         lastSegmentProbabilityInterval: 1000,
         bufferSegmentsCount: 20,
@@ -42,7 +44,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.httpManager.on(LoaderEvents.SegmentError, this.onSegmentError.bind(this));
         this.httpManager.on(LoaderEvents.PieceBytesLoaded, this.onPieceBytesLoaded.bind(this));
 
-        this.p2pManager = new P2PMediaManager(this.cacheManager, this.settings.trackerAnnounce);
+        this.p2pManager = new P2PMediaManager(this.cacheManager, this.settings.useP2P ? this.settings.trackerAnnounce : []);
         this.p2pManager.on(LoaderEvents.SegmentLoaded, this.onSegmentLoaded.bind(this));
         this.p2pManager.on(LoaderEvents.SegmentError, this.onSegmentError.bind(this));
         this.p2pManager.on(LoaderEvents.ForceProcessing, this.processSegmentsQueue.bind(this));
@@ -124,12 +126,12 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
                         this.p2pManager.abort(segment);
                         this.httpManager.download(segment);
                     }
-                } else if (!this.httpManager.isDownloading(segment) && this.p2pManager.getActiveDownloadsCount() < 3) {
+                } else if (!this.httpManager.isDownloading(segment) && this.p2pManager.getActiveDownloadsCount() < this.settings.simultaneousP2PDownloads) {
                     this.p2pManager.download(segment);
                 }
             }
 
-            if (this.httpManager.getActiveDownloadsCount() === 1 && this.p2pManager.getActiveDownloadsCount() === 3) {
+            if (this.httpManager.getActiveDownloadsCount() === 1 && this.p2pManager.getActiveDownloadsCount() === this.settings.simultaneousP2PDownloads) {
                 return;
             }
         }
