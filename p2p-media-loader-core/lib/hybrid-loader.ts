@@ -22,7 +22,8 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private lastSegmentProbabilityTimestamp = 0;
     private settings = {
         segmentIdGenerator: (url: string): string => url,
-        segmentExpiration: 5 * 60 * 1000, // milliseconds
+        cacheSegmentExpiration: 5 * 60 * 1000, // milliseconds
+        maxCacheSegmentsCount: 5,
         requiredSegmentsCount: 2,
         useP2P: true,
         simultaneousP2PDownloads: 3,
@@ -209,15 +210,27 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
     private collectGarbage(): void {
         const now = new Date().getTime();
-        const keys: string[] = [];
+        const remainingValues: SegmentInternal[] = [];
+        const expiredKeys: string[] = [];
 
         this.cacheManager.forEach((value, key) => {
-            if (now - value.lastAccessed > this.settings.segmentExpiration) {
-                keys.push(key);
+            if (now - value.lastAccessed > this.settings.cacheSegmentExpiration) {
+                expiredKeys.push(key);
+            } else {
+                remainingValues.push(value);
             }
         });
 
-        this.cacheManager.delete(keys);
+        remainingValues.sort((a, b) => {
+            return a.lastAccessed - b.lastAccessed;
+        });
+
+        const countOverhead = remainingValues.length - this.settings.maxCacheSegmentsCount;
+        if (countOverhead > 0) {
+            remainingValues.slice(0, countOverhead).forEach(value => expiredKeys.push(value.id));
+        }
+
+        this.cacheManager.delete(expiredKeys);
     }
 
 }
