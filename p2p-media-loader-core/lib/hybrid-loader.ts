@@ -23,7 +23,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private settings = {
         segmentIdGenerator: (url: string): string => url,
         cacheSegmentExpiration: 5 * 60 * 1000, // milliseconds
-        maxCacheSegmentsCount: 5,
+        maxCacheSegmentsCount: 20,
         requiredSegmentsCount: 2,
         useP2P: true,
         simultaneousP2PDownloads: 3,
