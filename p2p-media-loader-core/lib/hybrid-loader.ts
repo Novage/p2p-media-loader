@@ -39,19 +39,32 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.settings = Object.assign(this.settings, settings);
         this.debug("loader settings", this.settings);
 
-        this.cacheManager = new SegmentCacheManager();
-        this.httpManager = new HttpMediaManager();
+        this.cacheManager = this.createCacheManager();
+
+        this.httpManager = this.createHttpManager();
         this.httpManager.on(LoaderEvents.SegmentLoaded, this.onSegmentLoaded.bind(this));
         this.httpManager.on(LoaderEvents.SegmentError, this.onSegmentError.bind(this));
         this.httpManager.on(LoaderEvents.PieceBytesLoaded, this.onPieceBytesLoaded.bind(this));
 
-        this.p2pManager = new P2PMediaManager(this.cacheManager, this.settings.useP2P ? this.settings.trackerAnnounce : []);
+        this.p2pManager = this.createP2PManager();
         this.p2pManager.on(LoaderEvents.SegmentLoaded, this.onSegmentLoaded.bind(this));
         this.p2pManager.on(LoaderEvents.SegmentError, this.onSegmentError.bind(this));
         this.p2pManager.on(LoaderEvents.ForceProcessing, this.processSegmentsQueue.bind(this));
         this.p2pManager.on(LoaderEvents.PieceBytesLoaded, this.onPieceBytesLoaded.bind(this));
         this.p2pManager.on(MediaPeerEvents.Connect, this.onPeerConnect.bind(this));
         this.p2pManager.on(MediaPeerEvents.Close, this.onPeerClose.bind(this));
+    }
+
+    private createCacheManager() {
+        return new SegmentCacheManager();
+    }
+
+    private createHttpManager() {
+        return new HttpMediaManager();
+    }
+
+    private createP2PManager() {
+        return new P2PMediaManager(this.cacheManager, this.settings.useP2P ? this.settings.trackerAnnounce : []);
     }
 
     public load(segments: Segment[], swarmId: string, emitNowSegmentUrl?: string): void {

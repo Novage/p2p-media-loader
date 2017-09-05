@@ -8,7 +8,8 @@
     "compile": "rimraf ./dist/ && tsc && copyfiles -f ./lib/*.js ./dist/",
     "lint": "tslint -c ./tslint.json -p ./tsconfig.json",
     "build": "npm run compile && browserify -r ./dist/index.js:p2p-media-loader-core ./dist/browser-init.js > p2p-media-loader-core.js",
-    "refresh-dependencies": "npm update"
+    "refresh-dependencies": "npm update",
+    "test": "mocha -r ts-node/register test/*.test.ts"
   },
   "license": "MIT",
   "repository": {
@@ -21,12 +22,15 @@
   },
   "devDependencies": {
     "@types/debug": "0.0.30",
+    "@types/mocha": "^2.2.41",
     "@types/node": "^6.0.81",
     "@types/text-encoding": "0.0.31",
     "browserify": "^14.4.0",
-    "get-browser-rtc": "^1.0.2",
     "copyfiles": "^1.2.0",
+    "get-browser-rtc": "^1.0.2",
     "rimraf": "^2.6.1",
+    "mocha": "^3.4.2",
+    "ts-mockito": "^2.0.2",
     "ts-node": "^3.2.0",
     "tslint": "^5.5.0",
     "typescript": "^2.4.1"
