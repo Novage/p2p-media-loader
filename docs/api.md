@@ -12,8 +12,7 @@ Implementation for [hls.js](https://github.com/video-dev/hls.js).
 ### `createLoaderClass(settings)`
 
 Returns a `function`, a class constructor, which can be used with your custom
-created hls.js instance. You can manually assign returned loader to your
-[config.loader](https://github.com/video-dev/hls.js/blob/master/doc/API.md#loader).
+created hls.js instance.
 
 #### `settings`
 
@@ -21,9 +20,9 @@ Every setting is optional until opposite explicitly stated.
 
 - `segmentManager`
     + a `SegmentManager` instance to use;
-      please note that `settings.loaderSettings` value is ignored in this case
+      please note that `loaderSettings` value is ignored in this case
     + if not set, a new one will be created with `HybridLoader` and provided
-      `settings.loaderSettings`
+      `loaderSettings`
 - `loaderSettings`, an `Object` with properties:
     + `bufferSegmentsCount`
         - a positive integer `Number`
@@ -35,7 +34,7 @@ Every setting is optional until opposite explicitly stated.
           dropped from the cache
         - default is `300000` (5 mins)
     + `lastSegmentProbability`
-        - a positive float `Number` in from 0.01 to 0.99
+        - a positive float `Number` from 0.01 to 0.99
         - ???
         - default is `0.05`
     + `lastSegmentProbabilityInterval`
@@ -112,7 +111,7 @@ The loading of some part of some segment has been completed.
 
 1. `method` used; can be `"p2p"` or `"http"` only
 2. `size` in bytes
-3. `timestamp` as a number from `Date.now()`
+3. `timestamp` from `Date.now()`
 
 ### `SegmentAbort`
 
