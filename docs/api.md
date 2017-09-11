@@ -12,7 +12,9 @@ Implementation for [hls.js](https://github.com/video-dev/hls.js).
 ### `createLoaderClass(settings)`
 
 Returns a `function`, a class constructor, which can be used with your custom
-created hls.js instance.
+created hls.js instance. Please note that you don't need to use this function
+in case you are using one of init-specific-player functions
+(e.g. `initHlsJsPlayer`).
 
 #### `settings`
 
@@ -62,6 +64,67 @@ Every setting is optional until opposite explicitly stated.
     + `trackerAnnounce`
         - an `Array` of trackers to use
         - default is `[ "wss://tracker.btorrent.xyz/", "wss://tracker.openwebtorrent.com/" ]`
+
+### `initClapprPlayer(player, settings)`
+
+[Clappr](https://github.com/clappr/clappr/) player support.
+
+- `player`
+    + valid Clappr player instance
+- `settings`
+    + optional; format same as for `settings` in `createLoaderClass`
+
+Example
+```javascript
+var player = new Clappr.Player({
+    parentId: "#video",
+    source: "https://example.com/path/to/your/playlist.m3u8"
+});
+
+p2pml.hlsjs.initClapprPlayer(player);
+
+player.play();
+```
+
+### `initFlowplayerHlsJsPlayer(player, settings)`
+
+[Flowplayer](https://github.com/flowplayer/flowplayer) support.
+
+- `player`
+    + valid Flowplayer instance
+- `settings`
+    + optional; format same as for `settings` in `createLoaderClass`
+
+Example
+```javascript
+var player = flowplayer("#video", {
+    clip: {
+        sources: [{
+            src: "https://example.com/path/to/your/playlist.m3u8",
+            type: "application/x-mpegurl",
+            live: true // set this accordingly to your playlist
+        }]
+    }
+});
+
+p2pml.hlsjs.initFlowplayerHlsJsPlayer(player);
+
+player.on("ready", function () {
+    player.play();
+});
+```
+
+### `initHlsJsPlayer(player, settings)`
+
+???
+
+### `initMediaElementJsPlayer(mediaElement)`
+
+???
+
+### `initVideoJsContribHlsJsPlayer(player)`
+
+???
 
 ---
 
