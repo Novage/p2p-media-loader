@@ -7,20 +7,24 @@ It is the only global identifier the library defines.
 
 ## `hlsjs`
 
-Contains implementation for [hls.js](https://github.com/video-dev/hls.js).
+Implementation for [hls.js](https://github.com/video-dev/hls.js).
 
 ### `createLoaderClass(settings)`
 
-Creates class, which can be used with your custom created hls.js instance.
+Returns a `function`, a class constructor, which can be used with your custom
+created hls.js instance. You can manually assign returned loader to your
+[config.loader](https://github.com/video-dev/hls.js/blob/master/doc/API.md#loader).
 
 #### `settings`
 
 Every setting is optional until opposite explicitly stated.
 
 - `segmentManager`
-    + a `SegmentManager` instance to use
-    + if not set, a default one will be created with new `HybridLoader`.
-- `loaderSettings`:
+    + a `SegmentManager` instance to use;
+      please note that `settings.loaderSettings` value is ignored in this case
+    + if not set, a new one will be created with `HybridLoader` and provided
+      `settings.loaderSettings`
+- `loaderSettings`, an `Object` with properties:
     + `bufferSegmentsCount`
         - a positive integer `Number`
         - ???
@@ -76,7 +80,58 @@ Every setting is optional until opposite explicitly stated.
 
 ## `LoaderEvents`
 
-???
+Events supported by loaders. You can subscribe to a specific event next way:
+```javascript
+var loader = new HybridLoader();
+loader.on(LoaderEvents.SegmentError, function (url, error) {
+    console.log("Loading failed", url, error);
+});
+```
+
+### `ForceProcessing`
+
+Force processing ???
+
+This event has no arguments.
+
+### `PeerClose`
+
+A peer has been disconnected.
+
+1. `mediaPeer` object ???
+
+### `PeerConnect`
+
+A new peer has been connected.
+
+1. `mediaPeer` object ???
+
+### `PieceBytesLoaded`
+
+The loading of some part of some segment has been completed.
+
+1. `method` used; can be `"p2p"` or `"http"` only
+2. `size` in bytes
+3. `timestamp` as a number from `Date.now()`
+
+### `SegmentAbort`
+
+Segment has been aborted internally.
+
+1. `url` of the segment this event related to
+
+### `SegmentError`
+    
+Segment failed to load.
+
+1. `url` of the segment this event related to
+2. `error` details
+    
+### `SegmentLoaded`
+
+Segment has been loaded.
+
+1. `segment` loaded with `data` ready to be used
 
 ---
 
@@ -86,18 +141,19 @@ Single smallest piece of data that can be requested to load.
 
 Instance contains:
 - `url`
-    - a `String`
+    + a `String`
 - `priority`
-    - a non-negative integer `Number`
-    - the lower value - the higher priority
-    - default is `0`
+    + a non-negative integer `Number`
+    + the lower value - the higher priority
+    + default is `0`
 - `data`
-    - an `ArrayBuffer`
-    - available only when segment is fully loaded; subscribe to `SegmentLoaded`
+    + an `ArrayBuffer`
+    + available only when segment is fully loaded; subscribe to `SegmentLoaded`
       event for this very moment
 
 ---
 
 ## `WEBRTC_SUPPORT`
 
-Contains `true` if WebRTC is supported by the browser.
+Contains `true` if WebRTC data channels API is supported by the browser.
+Read more [here](http://iswebrtcreadyyet.com/legacy.html).
