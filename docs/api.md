@@ -12,8 +12,8 @@ Implementation for [hls.js](https://github.com/video-dev/hls.js).
 ### `createLoaderClass(settings)`
 
 Returns a `function`, a class constructor, which can be used with your custom
-created hls.js instance. Please note that you don't need to use this function
-in case you are using one of init-specific-player functions
+created hls.js instance. Please note that in most cases you don't need to use
+this function when you are using one of init-specific-player functions
 (e.g. `initHlsJsPlayer`).
 
 #### `settings`
@@ -189,6 +189,88 @@ player.src({
     type: "application/x-mpegURL"
 });
 ```
+
+### `SegmentManager`
+
+Provides playlists and segments management.
+
+#### `constructor(loader)`
+
+Creates new instance. `loader` is required and must be instance of
+`LoaderInterface` implementation (e.g. `HttpLoader`, `HybridLoader`).
+
+#### `processPlaylist(url, type, content)`
+
+Processes playlist with given content.
+
+- `url`
+    + a `String` with playlist URL
+- `type`
+    + a `String` with type of the playlist in terms of hls.js
+      (e.g. `"manifest"`, `"level"`, etc.)
+- `content`
+    + a `String` with content of the playlist
+
+#### `loadPlaylist(url, type, loadChildPlaylists)`
+
+Asynchronously loads content of the playlist via HTTP. Automatically calls
+`processPlaylist`.
+
+- `url`
+    + a `String` with playlist URL
+- `type`
+    + a `String` with type of the playlist in terms of hls.js
+      (e.g. `"manifest"`, `"level"`, etc.)
+- `loadChildPlaylists`
+    + if `true` and this is `manifest` playlist, it will load all `level`
+      playlists it has via HTTP and automatically call `processPlaylist` for
+      each of them.
+    + default is `false`.
+
+Returns `Promise`.
+
+#### `loadSegment(url, onSuccess, onError, playlistMissRetries)`
+
+Asynchronously loads segment from one of previously loaded playlists. This
+method locates requested segment in known playlists. Please note, only segments
+from `level` type playlist will be loaded via the `loader` (provided in the
+`constructor`); others will be loaded via HTTP.
+
+- `url`
+    + a `String` with segment URL
+- `onSuccess`
+    + an optional `function`; called when segment finished loading
+- `onError`
+    + an optional `function`; called when segment failed to load
+- `playlistMissRetries`
+    + an optional positive integer `Number` defines amount of tries should
+      be made before considered an error occurred (and call `onError` if any)
+    + timeout between tries is 500 ms
+    + default is `1`
+
+#### `setCurrentSegment(url)`
+
+Sets current playing segment by the player.
+
+- `url`
+    + a `String` with segment URL
+
+#### `abortSegment(url)`
+
+Aborts segment loading (previously requested via `loadSegment`). Please note,
+there will be no `onSuccess` nor `onError` handlers called after calling to
+this method.
+
+- `url`
+    + a `String` with segment URL
+
+#### `destroy()`
+
+Destroys this `SegmentManager` instance. If there is pending segment, its
+`onError` handler will be called if available. You cannot use this instance
+any more once you have called `destroy`.
+
+Please note, this method also destroys `loader` object given via `constructor`.
 
 ---
 
