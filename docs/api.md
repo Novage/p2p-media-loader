@@ -202,62 +202,6 @@ Creates new instance.
     + instance of `LoaderInterface` implementation (e.g. `HttpLoader`,
       `HybridLoader`).
 
-#### `processPlaylist(url, type, content)`
-
-Processes playlist with given content.
-
-- `url`
-    + a `String` with playlist URL
-- `type`
-    + a `String` with type of the playlist in terms of hls.js
-      (e.g. `"manifest"`, `"level"`, etc.)
-- `content`
-    + a `String` with content of the playlist
-
-#### `loadPlaylist(url, type, loadChildPlaylists)`
-
-Asynchronously loads content of the playlist via HTTP. Automatically calls
-`processPlaylist`.
-
-- `url`
-    + a `String` with playlist URL
-- `type`
-    + a `String` with type of the playlist in terms of hls.js
-      (e.g. `"manifest"`, `"level"`, etc.)
-- `loadChildPlaylists`
-    + if `true` and this is `manifest` playlist, it will load all `level`
-      playlists it has via HTTP and automatically call `processPlaylist` for
-      each of them.
-    + default is `false`.
-
-Returns `Promise`.
-
-#### `loadSegment(url, onSuccess, onError, playlistMissRetries)`
-
-Asynchronously loads segment from one of previously loaded playlists. This
-method locates requested segment in known playlists. Please note, only segments
-from `level` type playlist will be loaded via the `loader` (provided in the
-`constructor`); others will be loaded via HTTP.
-
-- `url`
-    + a `String` with segment URL
-- `onSuccess`
-    + an optional `function`; called when segment finished loading
-- `onError`
-    + an optional `function`; called when segment failed to load
-- `playlistMissRetries`
-    + an optional positive integer `Number` defines amount of tries should
-      be made before considered an error occurred (and call `onError` if any)
-    + timeout between tries is 500 ms
-    + default is `1`
-
-#### `setCurrentSegment(url)`
-
-Sets current playing segment by the player.
-
-- `url`
-    + a `String` with segment URL
-
 #### `abortSegment(url)`
 
 Aborts segment loading (previously requested via `loadSegment`). Please note,
@@ -275,17 +219,110 @@ any more once you have called `destroy`.
 
 Please note, this method also destroys `loader` object given via `constructor`.
 
+#### `loadPlaylist(url, type, loadChildPlaylists)`
+
+Asynchronously loads content of the playlist via HTTP. Automatically calls
+`processPlaylist`.
+
+- `url`
+    + a `String` with playlist URL
+- `type`
+    + a `String` with type of the playlist in terms of hls.js
+      (e.g. `"manifest"`, `"level"`, etc.)
+- `loadChildPlaylists`
+    + if `true` and this is `"manifest"` playlist, it will load all `"level"`
+      playlists it has via HTTP and automatically call `processPlaylist` for
+      each of them.
+    + default is `false`.
+
+Returns `Promise`.
+
+#### `loadSegment(url, onSuccess, onError, playlistMissRetries)`
+
+Asynchronously loads segment from one of previously loaded playlists. This
+method locates requested segment in known playlists. Please note, only segments
+from `"level"` type playlist will be loaded via the `loader` (provided in the
+`constructor`); others will be loaded via HTTP.
+
+- `url`
+    + a `String` with segment URL
+- `onSuccess`
+    + an optional `function`; called when segment finished loading
+- `onError`
+    + an optional `function`; called when segment failed to load
+- `playlistMissRetries`
+    + an optional positive integer `Number` defines amount of tries should
+      be made before considered an error occurred (and call `onError` if any)
+    + timeout between tries is 500 ms
+    + default is `1`
+
+#### `processPlaylist(url, type, content)`
+
+Processes playlist with given content.
+
+- `url`
+    + a `String` with playlist URL
+- `type`
+    + a `String` with type of the playlist in terms of hls.js
+      (e.g. `"manifest"`, `"level"`, etc.)
+- `content`
+    + a `String` with content of the playlist
+
+#### `setCurrentSegment(url)`
+
+Sets current playing segment by the player.
+
+- `url`
+    + a `String` with segment URL
+
 ---
 
-## `HttpLoader`
+## `LoaderInterface`
 
-???
+Set of routines each loader has.
 
----
+Currently, this interface is implemented by following loaders:
+- `HttpLoader`
+    + HTTP is used for all segments
+- `HybridLoader`
+    + HTTP is used for high priority segments
+    + P2P is used for low priority segments
 
-## `HybridLoader`
+### `destroy()`
 
-???
+Destroys this loader instance. You cannot use this instance any more once you
+have called `destroy`.
+
+### `getSettings()`
+
+Returns current settings of the loader.
+
+### `load(segments, swarmId, emitNowSegmentUrl)`
+
+- `segments`
+    + an `Array`
+    + each item is a `Segment` (`url` and `priority` fields must be set)
+- `swarmId`
+    + a `String`
+    + unique identifier for this queue
+    + generally each video quality should have different `swarmId`, so
+      players playing same quality are connect to peers with same segments
+- `emitNowSegmentUrl`
+    + an optional `String`
+    + if set, segment with given URL will get emitted with `SegmentLoaded`,
+      `SegmentError` or `SegmentAbort` event when ready
+
+### `on(eventName, listener)`
+
+- `eventName`
+    + a `String`
+    + must be one of `LoaderEvents` value
+- `listener`
+    + a `function`
+    + handler to call when event occurres; please see `LoaderEvents` section
+      for each event argument list
+
+Returns `this`.
 
 ---
 
