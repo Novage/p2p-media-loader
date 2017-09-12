@@ -116,15 +116,79 @@ player.on("ready", function () {
 
 ### `initHlsJsPlayer(player, settings)`
 
-???
+[hls.js](https://github.com/video-dev/hls.js) player support.
+
+- `player`
+    + valid hls.js player instance
+- `settings`
+    + optional; format same as for `settings` in `createLoaderClass`
+
+Example
+```javascript
+var player = new Hls();
+p2pml.hlsjs.initHlsJsPlayer(player);
+
+player.loadSource("https://example.com/path/to/your/playlist.m3u8");
+
+var video = document.getElementById("video");
+player.attachMedia(video);
+player.on(Hls.Events.MANIFEST_PARSED, function () {
+    video.play();
+});
+```
 
 ### `initMediaElementJsPlayer(mediaElement)`
 
-???
+[MediaElement.js](https://github.com/mediaelement/mediaelement) player support.
+
+- `mediaElement`
+    + object, received with `success` handler (see example below)
+
+Example
+```javascript
+mejs.Renderers.order = [ "native_hls" ]; // allow only one supported renderer
+
+var player = new MediaElementPlayer("video", {
+    stretching: "responsive",
+    hls: {
+        loader: p2pml.hlsjs.createLoaderClass()
+    },
+    success: function (mediaElement) {
+        p2pml.hlsjs.initMediaElementJsPlayer(mediaElement);
+    }
+});
+
+player.setSrc("https://example.com/path/to/your/playlist.m3u8");
+player.options.forceLive = true; // set this accordingly to your playlist
+
+player.load();
+player.play();
+```
 
 ### `initVideoJsContribHlsJsPlayer(player)`
 
-???
+[video.js HLS Source Handler](https://github.com/videojs/videojs-contrib-hls) support.
+
+- `player`
+    + valid video.js player instance
+
+Example
+```javascript
+var player = videojs("video", {
+    html5: {
+        hlsjsConfig: {
+            loader: p2pml.hlsjs.createLoaderClass()
+        }
+    }
+});
+
+p2pml.hlsjs.initVideoJsContribHlsJsPlayer(player);
+
+player.src({
+    src: "https://example.com/path/to/your/playlist.m3u8",
+    type: "application/x-mpegURL"
+});
+```
 
 ---
 
