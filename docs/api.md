@@ -196,8 +196,11 @@ Provides playlists and segments management.
 
 #### `constructor(loader)`
 
-Creates new instance. `loader` is required and must be instance of
-`LoaderInterface` implementation (e.g. `HttpLoader`, `HybridLoader`).
+Creates new instance.
+
+- `loader`
+    + instance of `LoaderInterface` implementation (e.g. `HttpLoader`,
+      `HybridLoader`).
 
 #### `processPlaylist(url, type, content)`
 
