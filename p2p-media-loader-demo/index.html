@@ -21,6 +21,7 @@
 
     <!-- Clappr -->
     <script src="https://cdn.jsdelivr.net/clappr/latest/clappr.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/clappr.level-selector/latest/level-selector.min.js"></script>
 
     <!-- Flowplayer -->
     <link rel="stylesheet" href="//releases.flowplayer.org/7.1.0/skin/skin.css">
@@ -273,6 +274,9 @@
 
             var player = new Clappr.Player({
                 parentId: "#video",
+                plugins: {
+                    'core': [LevelSelector]
+                },
                 source: this.videoUrl
             });
             p2pml.hlsjs.initClapprPlayer(player, { segmentManager: this.segmentManager });
