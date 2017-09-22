@@ -93,14 +93,24 @@
 
 <h1>P2P Media Loader Demo</h1>
 
-<div id="info-view" class="row hide">
+<div id="error-webrtc-data-channels" class="row hide">
     <div class="col-sm-12">
         Sorry!<br>
         WebRTC data channels API is not supported by your browser. :(<br>
-        <hr>
         Read more at <a href="http://iswebrtcreadyyet.com/legacy.html" target="_blank">Is WebRTC ready yet?</a>
+        <hr>
     </div>
 </div>
+
+<div id="error-hls-js" class="row hide">
+    <div class="col-sm-12">
+        Sorry!<br>
+        Your browser doesn't support hls.js engine. :(<br>
+        Read more at <a href="https://en.wikipedia.org/wiki/Media_Source_Extensions" target="_blank">Media Source Extensions</a>.
+        <hr>
+    </div>
+</div>
+
 
 <div id="main-view" class="row">
     <div class="col-md-8">
@@ -137,14 +147,6 @@
     </div>
 </div>
 
-<div id="error-view" class="row hide">
-    <div class="col-sm-12">
-        Sorry!<br>
-        Your browser doesn't support hls.js engine. :(<br>
-        <hr>
-        Read more at <a href="https://en.wikipedia.org/wiki/Media_Source_Extensions" target="_blank">Media Source Extensions</a>.
-    </div>
-</div>
 
 <script>
 
@@ -154,13 +156,11 @@
 
         function DemoApp() {
             if (!Hls.isSupported()) {
-                document.querySelector("#main-view").classList.add("hide");
-                document.querySelector("#error-view").classList.remove("hide");
-                return;
+                document.querySelector("#error-hls-js").classList.remove("hide");
             }
 
             if (!p2pml.WEBRTC_SUPPORT) {
-                document.querySelector("#info-view").classList.remove("hide");
+                document.querySelector("#error-webrtc-data-channels").classList.remove("hide");
             }
 
             this.initForm();
@@ -613,11 +613,6 @@
     }());
 
     var demo = new DemoApp();
-    /*setTimeout(function() {
-        demo.downloadTotals = { http: 0, p2p: 0 };
-        console.log("--------------------------------------------------------------------------------");
-    }, 60000);*/
-
 
 </script>
 
