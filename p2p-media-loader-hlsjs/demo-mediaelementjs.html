@@ -24,6 +24,7 @@
             stretching: "responsive",
             startVolume: 0.01, // 1%
             hls: {
+                liveSyncDurationCount: 7, // To have at least 7 segments in queue
                 loader: p2pml.hlsjs.createLoaderClass()
             },
             success: function (mediaElement) {

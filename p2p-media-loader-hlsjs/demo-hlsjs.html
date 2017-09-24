@@ -25,7 +25,10 @@
     <script>
 
         if (Hls.isSupported()) {
-            var hls = new Hls();
+            var hls = new Hls({
+                liveSyncDurationCount: 7, // To have at least 7 segments in queue
+                loader: p2pml.hlsjs.createLoaderClass()
+            });
             p2pml.hlsjs.initHlsJsPlayer(hls);
 
             hls.loadSource("https://nasa-i.akamaihd.net/hls/live/253565/NASA-NTV1-Public/master.m3u8");

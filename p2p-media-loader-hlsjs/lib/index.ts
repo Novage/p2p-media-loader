@@ -3,8 +3,6 @@ import SegmentManager from "./segment-manager";
 import HlsJsLoader from "./hlsjs-loader";
 const createHlsJsLoaderClass = require("./hlsjs-loader-class");
 
-const defaultLiveSyncDuration = 60;
-
 function initHlsJsEvents(player: any, segmentManager: SegmentManager): void {
     player.on("hlsFragChanged", function (event: any, data: any) {
         const url = data && data.frag ? data.frag.url : undefined;
@@ -20,33 +18,21 @@ export function createLoaderClass(settings: any = {}): any {
     return createHlsJsLoaderClass(HlsJsLoader, manager);
 }
 
-export function initHlsJsPlayer(player: any, settings: any = {}): void {
-    const loader = createLoaderClass(settings);
-    player.config.loader = loader;
-    player.config.liveSyncDuration = defaultLiveSyncDuration;
-    initHlsJsEvents(player, loader.getSegmentManager());
+export function initHlsJsPlayer(player: any): void {
+    if (player && player.config && player.config.loader && typeof player.config.loader.getSegmentManager === "function") {
+        initHlsJsEvents(player, player.config.loader.getSegmentManager());
+    }
 }
 
-export function initClapprPlayer(player: any, settings: any = {}): void {
+export function initClapprPlayer(player: any): void {
     player.on("play", () => {
-        const playback = player.core.getCurrentPlayback();
-        const hlsInstance = playback._hls;
-        if (hlsInstance && hlsInstance.config && hlsInstance.config.loader && typeof hlsInstance.config.loader.getSegmentManager !== "function") {
-            initHlsJsPlayer(hlsInstance, settings);
-            const segmentManager: SegmentManager = hlsInstance.config.loader.getSegmentManager();
-            segmentManager.loadPlaylist(player.options.source, "manifest", true);
-        }
+        initHlsJsPlayer(player.core.getCurrentPlayback()._hls);
     });
 }
 
-export function initFlowplayerHlsJsPlayer(player: any, settings: any = {}): void {
+export function initFlowplayerHlsJsPlayer(player: any): void {
     player.on("ready", () => {
-        const engine = player.engine;
-        if (engine && engine.hlsjs && engine.hlsjs.config && engine.hlsjs.config.loader && typeof engine.hlsjs.config.loader.getSegmentManager !== "function") {
-            initHlsJsPlayer(engine.hlsjs, settings);
-            const segmentManager: SegmentManager = engine.hlsjs.config.loader.getSegmentManager();
-            segmentManager.loadPlaylist(player.video.url, "manifest", true);
-        }
+        initHlsJsPlayer(player.engine.hlsjs);
     });
 }
 
@@ -54,17 +40,12 @@ export function initVideoJsContribHlsJsPlayer(player: any): void {
     player.ready(() => {
         const options = player.tech_.options_;
         if (options && options.hlsjsConfig && options.hlsjsConfig.loader && typeof options.hlsjsConfig.loader.getSegmentManager === "function") {
-            const segmentManager: SegmentManager = options.hlsjsConfig.loader.getSegmentManager();
-            options.hlsjsConfig.liveSyncDuration = defaultLiveSyncDuration;
-            initHlsJsEvents(player.tech_, segmentManager);
+            initHlsJsEvents(player.tech_, options.hlsjsConfig.loader.getSegmentManager());
         }
     });
 }
 
 export function initMediaElementJsPlayer(mediaElement: any): void {
-    mediaElement.addEventListener("hlsManifestParsed", (event: any) => {
-        mediaElement.hlsPlayer.config.liveSyncDuration = defaultLiveSyncDuration;
-    });
     mediaElement.addEventListener("hlsFragChanged", (event: any) => {
         const url = event.data && event.data.length > 1 && event.data[ 1 ].frag ? event.data[ 1 ].frag.url : undefined;
         const hls = mediaElement.hlsPlayer;

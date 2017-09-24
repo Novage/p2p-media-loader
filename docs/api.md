@@ -11,10 +11,8 @@ Implementation for [hls.js](https://github.com/video-dev/hls.js).
 
 ### `createLoaderClass(settings)`
 
-Returns a `function`, a class constructor, which can be used with your custom
-created hls.js instance. Please note that in most cases you don't need to use
-this function when you are using one of init-specific-player functions
-(e.g. `initHlsJsPlayer`).
+Returns a `function`, a class constructor, which should be used to configure
+hls.js instance.
 
 #### `settings`
 
@@ -65,20 +63,22 @@ Every setting is optional until opposite explicitly stated.
         - an `Array` of trackers to use
         - default is `[ "wss://tracker.btorrent.xyz/", "wss://tracker.openwebtorrent.com/" ]`
 
-### `initClapprPlayer(player, settings)`
+### `initClapprPlayer(player)`
 
 [Clappr](https://github.com/clappr/clappr/) player support.
 
 - `player`
     + valid Clappr player instance
-- `settings`
-    + optional; format same as for `settings` in `createLoaderClass`
 
 Example
 ```javascript
 var player = new Clappr.Player({
     parentId: "#video",
     source: "https://example.com/path/to/your/playlist.m3u8"
+    hlsjsConfig: {
+        liveSyncDurationCount: 7, // To have at least 7 segments in queue
+        loader: p2pml.hlsjs.createLoaderClass()
+    }
 });
 
 p2pml.hlsjs.initClapprPlayer(player);
@@ -86,14 +86,12 @@ p2pml.hlsjs.initClapprPlayer(player);
 player.play();
 ```
 
-### `initFlowplayerHlsJsPlayer(player, settings)`
+### `initFlowplayerHlsJsPlayer(player)`
 
 [Flowplayer](https://github.com/flowplayer/flowplayer) support.
 
 - `player`
     + valid Flowplayer instance
-- `settings`
-    + optional; format same as for `settings` in `createLoaderClass`
 
 Example
 ```javascript
@@ -104,6 +102,10 @@ var player = flowplayer("#video", {
             type: "application/x-mpegurl",
             live: true // set this accordingly to your playlist
         }]
+    },
+    hlsjs: {
+        liveSyncDurationCount: 7, // To have at least 7 segments in queue
+        loader: p2pml.hlsjs.createLoaderClass()
     }
 });
 
@@ -114,18 +116,19 @@ player.on("ready", function () {
 });
 ```
 
-### `initHlsJsPlayer(player, settings)`
+### `initHlsJsPlayer(player)`
 
 [hls.js](https://github.com/video-dev/hls.js) player support.
 
 - `player`
     + valid hls.js player instance
-- `settings`
-    + optional; format same as for `settings` in `createLoaderClass`
 
 Example
 ```javascript
-var player = new Hls();
+var player = new Hls({
+    liveSyncDurationCount: 7, // To have at least 7 segments in queue
+    loader: p2pml.hlsjs.createLoaderClass()
+});
 p2pml.hlsjs.initHlsJsPlayer(player);
 
 player.loadSource("https://example.com/path/to/your/playlist.m3u8");
@@ -151,6 +154,7 @@ mejs.Renderers.order = [ "native_hls" ]; // allow only one supported renderer
 var player = new MediaElementPlayer("video", {
     stretching: "responsive",
     hls: {
+        liveSyncDurationCount: 7, // To have at least 7 segments in queue
         loader: p2pml.hlsjs.createLoaderClass()
     },
     success: function (mediaElement) {
@@ -177,6 +181,7 @@ Example
 var player = videojs("video", {
     html5: {
         hlsjsConfig: {
+            liveSyncDurationCount: 7, // To have at least 7 segments in queue
             loader: p2pml.hlsjs.createLoaderClass()
         }
     }

@@ -183,6 +183,8 @@
                 document.querySelector("#https-only").classList.remove("hide");
             }
 
+            this.liveSyncDurationCount = 7;
+
             this.initForm();
 
             var videoUrlForm = document.getElementById("videoUrlForm");
@@ -275,8 +277,11 @@
                 level.classList.add("form-control");
                 this.videoContainer.appendChild(level);
 
-                var hls = new Hls();
-                p2pml.hlsjs.initHlsJsPlayer(hls, { segmentManager: this.segmentManager });
+                var hls = new Hls({
+                    liveSyncDurationCount: this.liveSyncDurationCount,
+                    loader: p2pml.hlsjs.createLoaderClass({ segmentManager: this.segmentManager })
+                });
+                p2pml.hlsjs.initHlsJsPlayer(hls);
                 hls.loadSource(this.videoUrl);
                 hls.attachMedia(video);
                 hls.on(Hls.Events.MANIFEST_PARSED, function () {
@@ -297,9 +302,13 @@
                 plugins: {
                     'core': [LevelSelector]
                 },
+                hlsjsConfig: {
+                    liveSyncDurationCount: this.liveSyncDurationCount,
+                    loader: p2pml.hlsjs.createLoaderClass({ segmentManager: this.segmentManager })
+                },
                 source: this.videoUrl
             });
-            p2pml.hlsjs.initClapprPlayer(player, { segmentManager: this.segmentManager });
+            p2pml.hlsjs.initClapprPlayer(player);
             player.setVolume(0);
             player.play();
         };
@@ -316,6 +325,7 @@
                 stretching: "responsive",
                 startVolume: 0,
                 hls: {
+                    liveSyncDurationCount: this.liveSyncDurationCount,
                     loader: p2pml.hlsjs.createLoaderClass({ segmentManager: this.segmentManager })
                 },
                 success: function (mediaElement) {
@@ -344,10 +354,14 @@
                         //live: true,
                         src: this.videoUrl
                     }]
+                },
+                hlsjs: {
+                    liveSyncDurationCount: this.liveSyncDurationCount,
+                    loader: p2pml.hlsjs.createLoaderClass({ segmentManager: this.segmentManager })
                 }
             });
 
-            p2pml.hlsjs.initFlowplayerHlsJsPlayer(player, { segmentManager: this.segmentManager });
+            p2pml.hlsjs.initFlowplayerHlsJsPlayer(player);
 
             player.on("ready", function () {
                 player.play();
@@ -362,9 +376,14 @@
             video.className = "video-js vjs-default-skin";
             this.videoContainer.appendChild(video);
 
-            var player = videojs("video", { html5: { hlsjsConfig: {
-                loader: p2pml.hlsjs.createLoaderClass({ segmentManager: this.segmentManager })
-            } } });
+            var player = videojs("video", {
+                html5: {
+                    hlsjsConfig: {
+                        liveSyncDurationCount: this.liveSyncDurationCount,
+                        loader: p2pml.hlsjs.createLoaderClass({ segmentManager: this.segmentManager })
+                    }
+                }
+            });
 
             p2pml.hlsjs.initVideoJsContribHlsJsPlayer(player);
 

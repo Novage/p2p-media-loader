@@ -35,6 +35,10 @@
                     type: "application/x-mpegurl",
                     live: true
                 }]
+            },
+            hlsjs: {
+                liveSyncDurationCount: 7, // To have at least 7 segments in queue
+                loader: p2pml.hlsjs.createLoaderClass()
             }
         });
 

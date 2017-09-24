@@ -27,7 +27,14 @@
 
     <script>
 
-        var player = videojs("video", { html5: { hlsjsConfig: { loader: p2pml.hlsjs.createLoaderClass() } } });
+        var player = videojs("video", {
+            html5: {
+                hlsjsConfig: {
+                    liveSyncDurationCount: 7, // To have at least 7 segments in queue
+                    loader: p2pml.hlsjs.createLoaderClass()
+                }
+            }
+        });
 
         p2pml.hlsjs.initVideoJsContribHlsJsPlayer(player);
 
