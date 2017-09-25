@@ -32,6 +32,7 @@ export default class SegmentManager {
         try {
             content = await Utils.fetchContent(url);
             this.processPlaylist(url, type, content);
+            this.setCurrentSegment();
         } catch (e) {
             this.playlists.delete(url);
             throw e;
@@ -80,11 +81,7 @@ export default class SegmentManager {
         this.prevLoadUrl = url;
     }
 
-    public setCurrentSegment(url?: string): void {
-        if (!url) {
-            return;
-        }
-
+    public setCurrentSegment(url: string = ""): void {
         const urlIndex = this.playQueue.indexOf(url);
         if (urlIndex >= 0) {
             this.playQueue = this.playQueue.slice(urlIndex);
@@ -169,7 +166,6 @@ export default class SegmentManager {
         }
 
         this.loader.load(segments, this.getSwarmId(playlist), loadUrl);
-        //console.log("total segments / play queue", segments.length, this.playQueue.length);
     }
 
     private getSwarmId(playlist: Playlist): string {
