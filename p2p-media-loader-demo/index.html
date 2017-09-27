@@ -101,34 +101,22 @@
 </head>
 <body class="container">
 
-<h1>P2P Media Loader Demo</h1>
-
-<div>
-    <div class="col-sm-12">
+<div id="main-view" class="row">
+    <div class="col-md-12">
+        <h1 class="text-center">P2P Media Loader Demo</h1>
         Git: <a href="https://github.com/novage/p2p-media-loader">https://github.com/novage/p2p-media-loader</a>
         <hr>
     </div>
-</div>
-
-<div id="error-webrtc-data-channels" class="row hide">
-    <div class="col-sm-12">
-        Sorry!<br>
-        WebRTC data channels API is not supported by your browser. :(<br>
-        Read more at <a href="http://iswebrtcreadyyet.com/legacy.html" target="_blank">Is WebRTC ready yet?</a>
+    <div id="error-webrtc-data-channels" class="col-md-12 hide">
+        WebRTC data channels API is not supported by your browser. P2P disabled.<br>
+        Read more at <a href="http://iswebrtcreadyyet.com/legacy.html" target="_blank">Is WebRTC ready yet?</a>.
         <hr>
     </div>
-</div>
-
-<div id="error-hls-js" class="row hide">
-    <div class="col-sm-12">
-        Sorry!<br>
-        Your browser doesn't support hls.js engine. :(<br>
+    <div id="error-hls-js" class="col-md-12 hide">
+        Your browser doesn't support hls.js engine. P2P disabled.<br>
         Read more at <a href="https://en.wikipedia.org/wiki/Media_Source_Extensions" target="_blank">Media Source Extensions</a>.
         <hr>
     </div>
-</div>
-
-<div id="main-view" class="row">
     <div class="col-md-8">
         <div id="video_container" class="text-center"></div>
         <div id="chart_container">
@@ -293,24 +281,31 @@
         };
 
         DemoApp.prototype.initClapprPlayer = function () {
+            var outer = document.createElement("div");
+            outer.className = "embed-responsive embed-responsive-16by9";
             var video = document.createElement("div");
             video.id = "video";
-            this.videoContainer.appendChild(video);
+            video.className = "embed-responsive-item";
+            outer.appendChild(video);
+            this.videoContainer.appendChild(outer);
 
             var player = new Clappr.Player({
                 parentId: "#video",
                 plugins: {
-                    'core': [LevelSelector]
+                    "core": [LevelSelector]
                 },
                 hlsjsConfig: {
                     liveSyncDurationCount: this.liveSyncDurationCount,
                     loader: p2pml.hlsjs.createLoaderClass({ segmentManager: this.segmentManager })
                 },
-                source: this.videoUrl
+                source: this.videoUrl,
+                width: "100%",
+                height: "100%",
+                muted: true,
+                mute: true,
+                autoPlay: true
             });
             p2pml.hlsjs.initClapprPlayer(player);
-            player.setVolume(0);
-            player.play();
         };
 
         DemoApp.prototype.initMediaElementPlayer = function () {
@@ -369,12 +364,15 @@
         };
 
         DemoApp.prototype.initVideoJsContribHlsJsPlayer = function () {
+            var outer = document.createElement("div");
+            outer.className = "embed-responsive embed-responsive-16by9";
             var video = document.createElement("video");
             video.id = "video";
             video.controls = true;
             video.preload = "none";
-            video.className = "video-js vjs-default-skin";
-            this.videoContainer.appendChild(video);
+            video.className = "embed-responsive-item video-js vjs-default-skin";
+            outer.appendChild(video);
+            this.videoContainer.appendChild(outer);
 
             var player = videojs("video", {
                 html5: {
