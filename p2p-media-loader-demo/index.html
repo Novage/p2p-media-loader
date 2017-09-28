@@ -68,7 +68,7 @@
         #chart_container {
             position: relative;
             margin: 3em auto;
-            padding: 0 20px;
+            padding-left: 20px;
             max-width: 100%;
         }
         #y_axis {
@@ -396,7 +396,7 @@
         };
 
         DemoApp.prototype.initChart = function (event) {
-            this.chart = new Rickshaw.Graph({
+            var chartConf = {
                 element: document.querySelector("#chart"),
                 renderer: 'multi',
                 interpolation: "basis",
@@ -407,7 +407,9 @@
                     {name: "P2P", color: "#88b9ea", data: [], renderer: 'area'},
                     {name: "HTTP", color: "#eae288", data: [], renderer: 'area'}
                 ]
-            });
+            };
+
+            this.chart = new Rickshaw.Graph(chartConf);
 
             new Rickshaw.Graph.Axis.X({
                 graph: this.chart,
@@ -432,6 +434,15 @@
 
             this.chart.render();
             setInterval(this.updateChartData.bind(this), 500);
+
+            var chartResize = function () {
+                chartConf.width = this.chart.element.clientWidth;
+                this.chart.configure(chartConf);
+                this.chart.render();
+            }.bind(this);
+
+            chartResize();
+            window.addEventListener("resize", chartResize);
         };
 
         DemoApp.prototype.refreshChart = function () {
