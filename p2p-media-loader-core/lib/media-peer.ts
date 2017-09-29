@@ -16,6 +16,7 @@ class SegmentPiece {
 export default class MediaPeer extends EventEmitter {
 
     public id: string;
+    public remoteAddress: string;
     private peer: any;
     private segmentsPiecesData: Map<string, Array<SegmentPiece>> = new Map();
     private segments: Set<string> = new Set();
@@ -37,6 +38,7 @@ export default class MediaPeer extends EventEmitter {
     }
 
     private onPeerConnect(): void {
+        this.remoteAddress = this.peer.remoteAddress;
         this.emit(MediaPeerEvents.Connect, this);
     }
 

@@ -154,7 +154,7 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
 
     private onPeerConnect(mediaPeer: MediaPeer): void {
         mediaPeer.sendSegmentsMap(this.cacheManager.keys());
-        this.emit(MediaPeerEvents.Connect, mediaPeer);
+        this.emit(MediaPeerEvents.Connect, {id: mediaPeer.id, remoteAddress: mediaPeer.remoteAddress});
     }
 
     private onPeerClose(mediaPeer: MediaPeer): void {
@@ -172,7 +172,7 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
             this.emit(LoaderEvents.ForceProcessing);
         }
 
-        this.emit(MediaPeerEvents.Close, mediaPeer);
+        this.emit(MediaPeerEvents.Close, mediaPeer.id);
     }
 
     private onPeerError(mediaPeer: MediaPeer, error: any): void {

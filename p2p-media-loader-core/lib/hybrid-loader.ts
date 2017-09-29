@@ -220,12 +220,12 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.debug("emitSegmentLoaded", segment.url);
     }
 
-    private onPeerConnect(mediaPeer: MediaPeer): void {
-        this.emit(LoaderEvents.PeerConnect, mediaPeer);
+    private onPeerConnect(peer: any): void {
+        this.emit(LoaderEvents.PeerConnect, peer);
     }
 
-    private onPeerClose(mediaPeer: MediaPeer): void {
-        this.emit(LoaderEvents.PeerClose, mediaPeer);
+    private onPeerClose(peerId: string): void {
+        this.emit(LoaderEvents.PeerClose, peerId);
     }
 
     private collectGarbage(): void {

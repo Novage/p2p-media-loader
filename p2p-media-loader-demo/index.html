@@ -570,19 +570,17 @@
             this.p2pmlLoader.on(p2pml.LoaderEvents.PeerClose, this.onPeerClose.bind(this));
         };
 
-        DemoApp.prototype.onPeerConnect = function (mediaPeer) {
-            var peer = mediaPeer.peer;
+        DemoApp.prototype.onPeerConnect = function (peer) {
             if (!this.graph.hasPeer(peer.id)) {
                 this.graph.add({id: peer.id, name: peer.remoteAddress || 'Unknown'});
                 this.graph.connect("me", peer.id);
             }
         };
 
-        DemoApp.prototype.onPeerClose = function (mediaPeer) {
-            var peer = mediaPeer.peer;
-            if (this.graph.hasPeer(peer.id)) {
-                this.graph.disconnect("me", peer.id);
-                this.graph.remove(peer.id);
+        DemoApp.prototype.onPeerClose = function (id) {
+            if (this.graph.hasPeer(id)) {
+                this.graph.disconnect("me", id);
+                this.graph.remove(id);
             }
         };
 
