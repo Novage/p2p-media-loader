@@ -80,8 +80,8 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         });
     }
 
-    private onSegmentLoaded(url: string, data: ArrayBuffer): void {
-        const segment = new SegmentInternal(url, url);
+    private onSegmentLoaded(id: string, url: string, data: ArrayBuffer): void {
+        const segment = new SegmentInternal(id, url);
         segment.data = data;
         this.cacheManager.set(segment.id, segment);
 
@@ -98,7 +98,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         this.cacheManager.updateLastAccessed(segmentInternal.id);
 
         const segment = new Segment(segmentInternal.url);
-        segment.data = segment.data.slice(0);
+        segment.data = segmentInternal.data.slice(0);
         this.emit(LoaderEvents.SegmentLoaded, segment);
     }
 
