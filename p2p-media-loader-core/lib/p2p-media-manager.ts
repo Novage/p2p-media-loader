@@ -4,6 +4,7 @@ import {createHash} from "crypto";
 import SegmentCacheManagerInterface from "./segment-cache-manger-interface";
 import CacheEvents from "./cache-events";
 import LoaderEvents from "./loader-events";
+import {SegmentStatus} from "./media-peer";
 import MediaPeer from "./media-peer";
 import MediaPeerEvents from "./media-peer-events";
 import * as Debug from "debug";
@@ -145,7 +146,9 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
     }
 
     private onCacheUpdated(): void {
-        this.peers.forEach((mediaPeer) => mediaPeer.sendSegmentsMap(this.cacheManager.keys()));
+        this.peers.forEach((mediaPeer) => mediaPeer.sendSegmentsMap(
+            this.cacheManager.keys().reduce((a, k) => { a.push([k, SegmentStatus.Loaded]); return a; },
+            new Array<string[]>())));
     }
 
     private onPieceBytesLoaded(method: string, size: number, timestamp: number): void {
@@ -153,7 +156,8 @@ export default class P2PMediaManager extends EventEmitter implements MediaManage
     }
 
     private onPeerConnect(mediaPeer: MediaPeer): void {
-        mediaPeer.sendSegmentsMap(this.cacheManager.keys());
+        mediaPeer.sendSegmentsMap(this.cacheManager.keys().reduce((a, k) => { a.push([k, SegmentStatus.Loaded]); return a; },
+            new Array<string[]>()));
         this.emit(MediaPeerEvents.Connect, {id: mediaPeer.id, remoteAddress: mediaPeer.remoteAddress});
     }
 

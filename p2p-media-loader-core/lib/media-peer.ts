@@ -13,13 +13,25 @@ class SegmentPiece {
 
 }
 
+export enum SegmentStatus {
+    Loaded = "loaded",
+    LoadingByHttp = "loading_by_http"
+}
+
+class Segment {
+
+    constructor(readonly id: string, readonly status: SegmentStatus) {
+    }
+
+}
+
 export default class MediaPeer extends EventEmitter {
 
     public id: string;
     public remoteAddress: string;
     private peer: any;
     private segmentsPiecesData: Map<string, Array<SegmentPiece>> = new Map();
-    private segments: Set<string> = new Set();
+    private segments: Map<string, SegmentStatus> = new Map();
     private pieceSize = 4 * 1024;
     private requestSegmentResponseTimeout = 3000;
     private requestSegmentResponseTimers: Map<string, Timer> = new Map();
@@ -51,8 +63,10 @@ export default class MediaPeer extends EventEmitter {
     }
 
     private onPeerData(data: any): void {
+        // TODO: validate data from peers
+
         const dataString = new TextDecoder("utf-8").decode(data);
-        let dataObject;
+        let dataObject: any;
         try {
             dataObject = JSON.parse(dataString);
         } catch (err) {
@@ -63,7 +77,7 @@ export default class MediaPeer extends EventEmitter {
         switch (dataObject.command) {
 
             case MediaPeerCommands.SegmentsMap:
-                this.segments = new Set(dataObject.segments);
+                this.segments = new Map(dataObject.segments);
                 this.emit(MediaPeerEvents.DataSegmentsMap);
                 break;
 
@@ -158,10 +172,11 @@ export default class MediaPeer extends EventEmitter {
     }
 
     public hasSegment(id: string): boolean {
-        return this.segments.has(id);
+        const segmentStatus = this.segments.get(id);
+        return (segmentStatus != undefined) && (segmentStatus == SegmentStatus.Loaded);
     }
 
-    public sendSegmentsMap(segments: Array<string>) {
+    public sendSegmentsMap(segments: string[][]) {
         this.sendCommand({"command": MediaPeerCommands.SegmentsMap, "segments": segments});
     }
 
