@@ -36,9 +36,14 @@ If `settings` is specified, then the default settings (shown below) will be over
 | bufferSegmentsCount | Integer | 20 | Max number of the segments to be downloaded via HTTP or P2P methods
 | trackerAnnounce | String[] | [ "wss://tracker.btorrent.xyz/", "wss://tracker.openwebtorrent.com/" ] | Torrent trackers (announcers) to use
 
-### `loader.load(segments)`
+### `loader.load(segments, swarmId, emitNowSegmentUrl)`
 
-> TBD
+Creates new queue of segments to download. Aborts all http and peer connections for segments that are not in the new load and emits `LoaderEvents.SegmentAbort` event for each aborted event. It also emits `LoaderEvents.SegmentLoaded` event for segment with the url specified in the `emitNowSegmentUrl` param.
+
+Function args: 
+ - `segments` - array of `Segment` class instances with populated `url` and `priority` field;
+ - `swarmId` - used for gathering peers in pool;
+ - `emitNowSegmentUrl` - indicates which segment should be emitted immediately if it exists in the cache.
 
 ### `loader.on(LoaderEvents.SegmentLoaded,  function (segment) {})`
 
@@ -101,13 +106,45 @@ Implementation of the `LoaderInterface` that uses only HTTP loading mechanism.
 
 Creates a new `HttpLoader` instance.
 
-### `loader.load(segments)`
+### `loader.load(segments, swarmId, emitNowSegmentUrl)`
 
-> TBD
+Creates new queue of segments to download. Aborts all http requests for segments that are not in the new load and emits `LoaderEvents.SegmentAbort` event for each aborted event. It also emits `LoaderEvents.SegmentLoaded` event for segment with the url specified in the `emitNowSegmentUrl` param.
 
-### `loader.on(events,  function (segment) {})`
+Function args: 
+ - `segments` - array of `Segment` class instances with populated `url` field;
+ - `swarmId` - unused param by current implementation;
+ - `emitNowSegmentUrl` - indicates which segment should be emitted immediately if it exists in the cache.
 
-> TBD
+### `loader.on(LoaderEvents.SegmentLoaded,  function (segment) {})`
+
+Emitted when segment have been downloaded or on call of `load` method with specified `emitNowSegmentUrl` if it exists in the cache. 
+
+Listener args: 
+ - `segment` - instance of `Segment` class with populated `url` and `data` fields.
+
+### `loader.on(LoaderEvents.SegmentError,  function (url, event) {})`
+
+Emitted when an error occurred while loading the segment. 
+
+Listener args: 
+ - `url` - url of the segment;
+ - `event` - event associated with an error.
+
+### `loader.on(LoaderEvents.SegmentAbort,  function (url) {})`
+
+Emitted for each segment that does not hit into a new segments queue when the `load` method is called.
+
+Listener args: 
+ - `url` - url of the segment.
+
+### `loader.on(LoaderEvents.PieceBytesLoaded,  function (method, size, timestamp) {})`
+
+Emitted when a segment piece loaded.
+
+Listener args: 
+ - `method` - method that loaded piece, possible value: `http`;
+ - `size` - size of the loaded piece in bytes;
+ - `timestamp` - timestamp in millisecond when event was emitted.
 
 ### `loader.getSettings()`
 
@@ -135,14 +172,14 @@ Instance contains:
       
 ## `LoaderEvents`
 
-Events that are emitted by `HttpLoader` and `HybridLoader` by loaders, please see implementation of these loaders. 
+Events that are emitted by `HttpLoader` and `HybridLoader` loaders, please see implementation of these loaders. 
 
-- SegmentLoaded = "segment_loaded",
-- SegmentError = "segment_error",
-- SegmentAbort = "segment_abort",
-- PeerConnect = "peer_connect",
-- PeerClose = "peer_close",
-- PieceBytesLoaded = "piece_bytes_loaded"
+- SegmentLoaded
+- SegmentError
+- SegmentAbort
+- PeerConnect
+- PeerClose
+- PieceBytesLoaded
 
 Usage:
 
