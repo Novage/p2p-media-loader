@@ -226,7 +226,10 @@
 
             this.p2pmlLoader = new p2pml.HybridLoader(this.loaderSettings);
             this.p2pmlLoader.on(p2pml.LoaderEvents.PieceBytesLoaded, this.onBytesLoaded.bind(this));
-            document.getElementById('announce').innerHTML = this.p2pmlLoader.getSettings().trackerAnnounce.join("<br />");
+            var trackerAnnounce = this.p2pmlLoader.getSettings().trackerAnnounce;
+            if (Array.isArray(trackerAnnounce)) {
+                document.getElementById('announce').innerHTML = trackerAnnounce.join("<br />");
+            }
 
             this.segmentManager = new p2pml.hlsjs.SegmentManager(this.p2pmlLoader);
 
