@@ -25,6 +25,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         this.httpManager = new HttpMediaManager();
         this.httpManager.on(LoaderEvents.SegmentLoaded, this.onSegmentLoaded.bind(this));
         this.httpManager.on(LoaderEvents.SegmentError, this.onSegmentError.bind(this));
+        this.httpManager.on(LoaderEvents.PieceBytesLoaded, this.onPieceBytesLoaded.bind(this));
 
         this.cacheManager = new SegmentCacheManager();
     }
@@ -78,6 +79,10 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
                 this.httpManager.download(segment);
             }
         });
+    }
+
+    private onPieceBytesLoaded(method: string, size: number, timestamp: number): void {
+        this.emit(LoaderEvents.PieceBytesLoaded, method, size, timestamp);
     }
 
     private onSegmentLoaded(id: string, url: string, data: ArrayBuffer): void {
