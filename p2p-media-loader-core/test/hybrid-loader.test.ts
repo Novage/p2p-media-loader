@@ -6,7 +6,7 @@ import Segment from "../lib/segment";
 import {anyFunction, anyOfClass, anyString, instance, mock, verify, when} from "ts-mockito";
 import * as assert from "assert";
 import P2PMediaManager from "../lib/p2p-media-manager";
-import MediaPeerEvents from "../lib/media-peer-events";
+import {MediaPeerEvents} from "../lib/media-peer";
 
 describe("HybridLoader", () => {
 

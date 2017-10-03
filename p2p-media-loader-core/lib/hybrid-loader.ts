@@ -6,7 +6,7 @@ import SegmentCacheManager from "./segment-cache-manager";
 import {EventEmitter} from "events";
 import HttpMediaManager from "./http-media-manager";
 import P2PMediaManager from "./p2p-media-manager";
-import MediaPeerEvents from "./media-peer-events";
+import {MediaPeerEvents} from "./media-peer";
 import * as Debug from "debug";
 import SegmentInternal from "./segment-internal";
 

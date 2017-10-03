@@ -1,7 +1,6 @@
 import {EventEmitter} from "events";
 import MediaPeerCommands from "./media-peer-commands";
 import Timer = NodeJS.Timer;
-import MediaPeerEvents from "./media-peer-events";
 import LoaderEvents from "./loader-events";
 import * as Debug from "debug";
 import SegmentInternal from "./segment-internal";
@@ -13,12 +12,22 @@ class SegmentPiece {
 
 }
 
+export enum MediaPeerEvents {
+    Connect = "peer_connect",
+    Close = "peer_close",
+    Error = "peer_error",
+    DataSegmentsMap = "peer_data_segments_map",
+    DataSegmentRequest = "peer_data_segment_request",
+    DataSegmentLoaded = "peer_data_segment_loaded",
+    DataSegmentAbsent = "peer_data_segment_absent"
+}
+
 export enum SegmentStatus {
     Loaded = "loaded",
     LoadingByHttp = "loading_by_http"
 }
 
-export default class MediaPeer extends EventEmitter {
+export class MediaPeer extends EventEmitter {
 
     public id: string;
     public remoteAddress: string;
