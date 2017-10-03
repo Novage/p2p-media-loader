@@ -1,8 +1,7 @@
 import HttpMediaManager from "../lib/http-media-manager";
 import HybridLoader from "../lib/hybrid-loader";
 import SegmentInternal from "../lib/segment-internal";
-import {LoaderEvents} from "../lib/loader-interface";
-import Segment from "../lib/segment";
+import {LoaderEvents, Segment} from "../lib/loader-interface";
 import {anyFunction, anyOfClass, anyString, instance, mock, verify, when} from "ts-mockito";
 import * as assert from "assert";
 import {P2PMediaManager, P2PMediaManagerEvents} from "../lib/p2p-media-manager";

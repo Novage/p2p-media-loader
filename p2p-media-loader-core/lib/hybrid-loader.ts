@@ -1,5 +1,4 @@
-import {LoaderInterface, LoaderEvents} from "./loader-interface";
-import Segment from "./segment";
+import {LoaderInterface, LoaderEvents, Segment} from "./loader-interface";
 import SegmentCacheManager from "./segment-cache-manager";
 import {EventEmitter} from "events";
 import HttpMediaManager from "./http-media-manager";
