@@ -1,5 +1,4 @@
 import {EventEmitter} from "events";
-import MediaPeerCommands from "./media-peer-commands";
 import Timer = NodeJS.Timer;
 import LoaderEvents from "./loader-events";
 import * as Debug from "debug";
@@ -10,6 +9,14 @@ class SegmentPiece {
     constructor(readonly index: number, readonly data: number[]) {
     }
 
+}
+
+enum MediaPeerCommands {
+    SegmentData = "segment_data",
+    SegmentAbsent = "segment_absent",
+    SegmentsMap = "segments_map",
+    SegmentRequest = "segment_request",
+    CancelSegmentRequest = "cancel_segment_request",
 }
 
 export enum MediaPeerEvents {
