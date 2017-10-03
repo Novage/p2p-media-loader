@@ -8,7 +8,6 @@ import {EventEmitter} from "events";
 import HttpMediaManager from "./http-media-manager";
 import P2PMediaManager from "./p2p-media-manager";
 import MediaPeerEvents from "./media-peer-events";
-import MediaPeer from "./media-peer";
 import * as Debug from "debug";
 import SegmentInternal from "./segment-internal";
 
@@ -127,11 +126,11 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         const startingPriority = this.segmentsQueue.length > 0 ? this.segmentsQueue[0].priority : 0;
         this.debug("processSegmentsQueue - starting priority: " + startingPriority);
 
-        let pendingQueue = this.segmentsQueue.filter(segment =>
+        const pendingQueue = this.segmentsQueue.filter(segment =>
             !this.cacheManager.has(segment.id) &&
             !this.httpManager.isDownloading(segment) &&
             !this.p2pManager.isDownloading(segment));
-        let downloadedSegmentsCount = this.segmentsQueue.length - pendingQueue.length;
+        const downloadedSegmentsCount = this.segmentsQueue.length - pendingQueue.length;
 
         if (pendingQueue.length > 0) {
             for (let index = 0; index < this.segmentsQueue.length; index++) {
@@ -159,10 +158,10 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
             if (this.httpManager.getActiveDownloadsCount() === 0 && this.p2pManager.getActiveDownloadsCount() < this.settings.simultaneousP2PDownloads) {
 
-                let pendingQueue = this.segmentsQueue.filter(segment =>
+                const pendingQueue = this.segmentsQueue.filter(segment =>
                     !this.cacheManager.has(segment.id) &&
                     !this.p2pManager.isDownloading(segment));
-                let downloadedSegmentsCount = this.segmentsQueue.length - pendingQueue.length;
+                const downloadedSegmentsCount = this.segmentsQueue.length - pendingQueue.length;
 
                 if (pendingQueue.length > 0 && downloadedSegmentsCount < this.settings.bufferSegmentsCount) {
                     let segmentForHttpDownload: SegmentInternal | null = null;

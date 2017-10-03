@@ -18,13 +18,6 @@ export enum SegmentStatus {
     LoadingByHttp = "loading_by_http"
 }
 
-class Segment {
-
-    constructor(readonly id: string, readonly status: SegmentStatus) {
-    }
-
-}
-
 export default class MediaPeer extends EventEmitter {
 
     public id: string;
