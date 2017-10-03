@@ -2,7 +2,7 @@ import {EventEmitter} from "events";
 import {createHash} from "crypto";
 import SegmentCacheManager from "./segment-cache-manager";
 import CacheEvents from "./cache-events";
-import LoaderEvents from "./loader-events";
+import {LoaderEvents} from "./loader-interface";
 import {MediaPeer, MediaPeerEvents, SegmentStatus} from "./media-peer";
 import * as Debug from "debug";
 import SegmentInternal from "./segment-internal";
@@ -15,7 +15,11 @@ class PeerSegmentRequest {
 
 }
 
-export default class P2PMediaManager extends EventEmitter {
+export enum P2PMediaManagerEvents {
+    ForceProcessing = "force_processing"
+}
+
+export class P2PMediaManager extends EventEmitter {
 
     private cacheManager: SegmentCacheManager;
 
@@ -170,7 +174,7 @@ export default class P2PMediaManager extends EventEmitter {
         this.peers.delete(mediaPeer.id);
 
         if (isUpdated) {
-            this.emit(LoaderEvents.ForceProcessing);
+            this.emit(P2PMediaManagerEvents.ForceProcessing);
         }
 
         this.emit(MediaPeerEvents.Close, mediaPeer.id);
@@ -181,7 +185,7 @@ export default class P2PMediaManager extends EventEmitter {
     }
 
     private onPeerDataSegmentsMap(): void {
-        this.emit(LoaderEvents.ForceProcessing);
+        this.emit(P2PMediaManagerEvents.ForceProcessing);
     }
 
     private onPeerDataSegmentRequest(mediaPeer: MediaPeer, id: string): void {
@@ -204,7 +208,7 @@ export default class P2PMediaManager extends EventEmitter {
 
     private onPeerDataSegmentAbsent(mediaPeer: MediaPeer, id: string): void {
         this.peerSegmentRequests.delete(id);
-        this.emit(LoaderEvents.ForceProcessing);
+        this.emit(P2PMediaManagerEvents.ForceProcessing);
     }
 
 }

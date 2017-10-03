@@ -1,11 +1,11 @@
 import HttpMediaManager from "../lib/http-media-manager";
 import HybridLoader from "../lib/hybrid-loader";
 import SegmentInternal from "../lib/segment-internal";
-import LoaderEvents from "../lib/loader-events";
+import {LoaderEvents} from "../lib/loader-interface";
 import Segment from "../lib/segment";
 import {anyFunction, anyOfClass, anyString, instance, mock, verify, when} from "ts-mockito";
 import * as assert from "assert";
-import P2PMediaManager from "../lib/p2p-media-manager";
+import {P2PMediaManager, P2PMediaManagerEvents} from "../lib/p2p-media-manager";
 import {MediaPeerEvents} from "../lib/media-peer";
 
 describe("HybridLoader", () => {
@@ -77,7 +77,7 @@ describe("HybridLoader", () => {
         p2pSegmentErrorListener = listener;
     });
     let p2pForceProcessingListener: Function = () => {};
-    when(p2pMediaManager.on(LoaderEvents.ForceProcessing, anyFunction())).thenCall((event, listener) => {
+    when(p2pMediaManager.on(P2PMediaManagerEvents.ForceProcessing, anyFunction())).thenCall((event, listener) => {
         p2pForceProcessingListener = listener;
     });
     let p2pPieceBytesLoadedListener: Function = () => {};

@@ -1,10 +1,9 @@
-import LoaderInterface from "./loader-interface";
+import {LoaderInterface, LoaderEvents} from "./loader-interface";
 import Segment from "./segment";
-import LoaderEvents from "./loader-events";
 import SegmentCacheManager from "./segment-cache-manager";
 import {EventEmitter} from "events";
 import HttpMediaManager from "./http-media-manager";
-import P2PMediaManager from "./p2p-media-manager";
+import {P2PMediaManager, P2PMediaManagerEvents} from "./p2p-media-manager";
 import {MediaPeerEvents} from "./media-peer";
 import * as Debug from "debug";
 import SegmentInternal from "./segment-internal";
@@ -46,7 +45,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.p2pManager = this.createP2PManager();
         this.p2pManager.on(LoaderEvents.SegmentLoaded, this.onSegmentLoaded.bind(this));
         this.p2pManager.on(LoaderEvents.SegmentError, this.onSegmentError.bind(this));
-        this.p2pManager.on(LoaderEvents.ForceProcessing, this.processSegmentsQueue.bind(this));
+        this.p2pManager.on(P2PMediaManagerEvents.ForceProcessing, this.processSegmentsQueue.bind(this));
         this.p2pManager.on(LoaderEvents.PieceBytesLoaded, this.onPieceBytesLoaded.bind(this));
         this.p2pManager.on(MediaPeerEvents.Connect, this.onPeerConnect.bind(this));
         this.p2pManager.on(MediaPeerEvents.Close, this.onPeerClose.bind(this));

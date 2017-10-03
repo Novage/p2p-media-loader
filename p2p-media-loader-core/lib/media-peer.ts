@@ -1,6 +1,6 @@
 import {EventEmitter} from "events";
 import Timer = NodeJS.Timer;
-import LoaderEvents from "./loader-events";
+import {LoaderEvents} from "./loader-interface";
 import * as Debug from "debug";
 import SegmentInternal from "./segment-internal";
 

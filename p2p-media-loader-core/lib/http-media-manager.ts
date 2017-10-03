@@ -1,4 +1,4 @@
-import LoaderEvents from "./loader-events";
+import {LoaderEvents} from "./loader-interface";
 import {EventEmitter} from "events";
 import * as Debug from "debug";
 import SegmentInternal from "./segment-internal";

@@ -341,12 +341,6 @@ loader.on(LoaderEvents.SegmentError, function (url, error) {
 });
 ```
 
-### `ForceProcessing`
-
-Force processing ???
-
-This event has no arguments.
-
 ### `PeerClose`
 
 A peer has been disconnected.
