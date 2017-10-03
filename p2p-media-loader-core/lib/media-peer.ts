@@ -8,7 +8,7 @@ import SegmentInternal from "./segment-internal";
 
 class SegmentPiece {
 
-    constructor(readonly index: number, readonly data: Array<number>) {
+    constructor(readonly index: number, readonly data: number[]) {
     }
 
 }
@@ -30,7 +30,7 @@ export default class MediaPeer extends EventEmitter {
     public id: string;
     public remoteAddress: string;
     private peer: any;
-    private segmentsPiecesData: Map<string, Array<SegmentPiece>> = new Map();
+    private segmentsPiecesData: Map<string, SegmentPiece[]> = new Map();
     private segments: Map<string, SegmentStatus> = new Map();
     private pieceSize = 4 * 1024;
     private requestSegmentResponseTimeout = 3000;
@@ -127,7 +127,7 @@ export default class MediaPeer extends EventEmitter {
     }
 
     // TODO: move to Segment?
-    private getSegmentPieces(segment: SegmentInternal): Array<SegmentPiece> {
+    private getSegmentPieces(segment: SegmentInternal): SegmentPiece[] {
         const jsonBufferData = new Buffer(segment.data).toJSON().data;
         const pieces: SegmentPiece[] = [];
 
