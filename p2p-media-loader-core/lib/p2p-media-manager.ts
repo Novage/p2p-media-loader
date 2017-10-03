@@ -1,4 +1,3 @@
-import MediaManagerInterface from "./media-manager-interface";
 import {EventEmitter} from "events";
 import {createHash} from "crypto";
 import SegmentCacheManagerInterface from "./segment-cache-manger-interface";
@@ -18,7 +17,7 @@ class PeerSegmentRequest {
 
 }
 
-export default class P2PMediaManager extends EventEmitter implements MediaManagerInterface {
+export default class P2PMediaManager extends EventEmitter {
 
     private cacheManager: SegmentCacheManagerInterface;
 

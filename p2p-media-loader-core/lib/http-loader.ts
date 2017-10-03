@@ -2,7 +2,6 @@ import LoaderInterface from "./loader-interface";
 import Segment from "./segment";
 import SegmentInternal from "./segment-internal";
 import LoaderEvents from "./loader-events";
-import MediaManagerInterface from "./media-manager-interface";
 import {EventEmitter} from "events";
 import SegmentCacheManagerInterface from "./segment-cache-manger-interface";
 import SegmentCacheManager from "./segment-cache-manager";
@@ -11,7 +10,7 @@ import HttpMediaManager from "./http-media-manager";
 export default class HttpLoader extends EventEmitter implements LoaderInterface {
 
     private cacheManager: SegmentCacheManagerInterface;
-    private httpManager: MediaManagerInterface;
+    private httpManager: HttpMediaManager;
     private segmentsQueue: SegmentInternal[] = [];
     private settings = {
         segmentExpiration: 5 * 60 * 1000, // milliseconds

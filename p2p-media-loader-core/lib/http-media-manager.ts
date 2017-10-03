@@ -1,10 +1,9 @@
-import MediaManagerInterface from "./media-manager-interface";
 import LoaderEvents from "./loader-events";
 import {EventEmitter} from "events";
 import * as Debug from "debug";
 import SegmentInternal from "./segment-internal";
 
-export default class HttpMediaManager extends EventEmitter implements MediaManagerInterface {
+export default class HttpMediaManager extends EventEmitter {
 
     private xhrRequests: Map<string, XMLHttpRequest> = new Map();
     private debug = Debug("p2pml:http-media-manager");

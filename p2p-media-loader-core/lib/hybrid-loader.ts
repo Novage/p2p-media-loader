@@ -1,7 +1,6 @@
 import LoaderInterface from "./loader-interface";
 import Segment from "./segment";
 import LoaderEvents from "./loader-events";
-import MediaManagerInterface from "./media-manager-interface";
 import SegmentCacheManagerInterface from "./segment-cache-manger-interface";
 import SegmentCacheManager from "./segment-cache-manager";
 import {EventEmitter} from "events";
@@ -13,8 +12,8 @@ import SegmentInternal from "./segment-internal";
 
 export default class HybridLoader extends EventEmitter implements LoaderInterface {
 
-    private httpManager: MediaManagerInterface;
-    private p2pManager: MediaManagerInterface;
+    private httpManager: HttpMediaManager;
+    private p2pManager: P2PMediaManager;
     private cacheManager: SegmentCacheManagerInterface;
     private segmentsQueue: SegmentInternal[] = [];
     private debug = Debug("p2pml:hybrid-loader");
