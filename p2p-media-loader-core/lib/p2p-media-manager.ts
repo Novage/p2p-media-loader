@@ -1,6 +1,6 @@
 import {EventEmitter} from "events";
 import {createHash} from "crypto";
-import SegmentCacheManagerInterface from "./segment-cache-manger-interface";
+import SegmentCacheManager from "./segment-cache-manager";
 import CacheEvents from "./cache-events";
 import LoaderEvents from "./loader-events";
 import {MediaPeer, MediaPeerEvents, SegmentStatus} from "./media-peer";
@@ -17,7 +17,7 @@ class PeerSegmentRequest {
 
 export default class P2PMediaManager extends EventEmitter {
 
-    private cacheManager: SegmentCacheManagerInterface;
+    private cacheManager: SegmentCacheManager;
 
     private client: any;
     private announce: string[];
@@ -27,7 +27,7 @@ export default class P2PMediaManager extends EventEmitter {
     private peerId: string;
     private debug = Debug("p2pml:p2p-media-manager");
 
-    public constructor(cacheManager: SegmentCacheManagerInterface, announce: string[]) {
+    public constructor(cacheManager: SegmentCacheManager, announce: string[]) {
         super();
 
         this.announce = announce;

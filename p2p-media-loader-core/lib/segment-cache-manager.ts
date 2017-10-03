@@ -1,9 +1,8 @@
-import SegmentCacheManagerInterface from "./segment-cache-manger-interface";
 import {EventEmitter} from "events";
 import CacheEvents from "./cache-events";
 import SegmentInternal from "./segment-internal";
 
-export default class SegmentCacheManager extends EventEmitter implements SegmentCacheManagerInterface {
+export default class SegmentCacheManager extends EventEmitter {
 
     private segments: Map<string, SegmentInternal> = new Map();
 

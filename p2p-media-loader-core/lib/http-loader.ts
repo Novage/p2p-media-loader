@@ -3,13 +3,12 @@ import Segment from "./segment";
 import SegmentInternal from "./segment-internal";
 import LoaderEvents from "./loader-events";
 import {EventEmitter} from "events";
-import SegmentCacheManagerInterface from "./segment-cache-manger-interface";
 import SegmentCacheManager from "./segment-cache-manager";
 import HttpMediaManager from "./http-media-manager";
 
 export default class HttpLoader extends EventEmitter implements LoaderInterface {
 
-    private cacheManager: SegmentCacheManagerInterface;
+    private cacheManager: SegmentCacheManager;
     private httpManager: HttpMediaManager;
     private segmentsQueue: SegmentInternal[] = [];
     private settings = {
