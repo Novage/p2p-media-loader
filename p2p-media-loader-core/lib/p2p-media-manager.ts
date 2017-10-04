@@ -1,9 +1,8 @@
 import {EventEmitter} from "events";
 import {createHash} from "crypto";
-import SegmentCacheManager from "./segment-cache-manager";
-import CacheEvents from "./cache-events";
+import {SegmentCacheManager} from "./segment-cache-manager";
 import {LoaderEvents} from "./loader-interface";
-import {MediaPeer, MediaPeerEvents, SegmentStatus} from "./media-peer";
+import {MediaPeer, MediaPeerEvents} from "./media-peer";
 import * as Debug from "debug";
 import SegmentInternal from "./segment-internal";
 const Client = require("bittorrent-tracker");
@@ -37,7 +36,6 @@ export class P2PMediaManager extends EventEmitter {
         this.announce = announce;
 
         this.cacheManager = cacheManager;
-        cacheManager.on(CacheEvents.CacheUpdated, this.onCacheUpdated.bind(this));
 
         const date = (new Date()).valueOf().toString();
         const random = Math.random().toString();
@@ -146,19 +144,22 @@ export class P2PMediaManager extends EventEmitter {
         this.peerSegmentRequests.clear();
     }
 
-    private onCacheUpdated(): void {
-        this.peers.forEach((mediaPeer) => mediaPeer.sendSegmentsMap(
-            this.cacheManager.keys().reduce((a, k) => { a.push([k, SegmentStatus.Loaded]); return a; },
-            new Array<string[]>())));
-    }
-
     private onPieceBytesLoaded(method: string, size: number, timestamp: number): void {
         this.emit(LoaderEvents.PieceBytesLoaded, method, size, timestamp);
     }
 
+    public sendSegmentsMapToAll(segmentsMap: string[][]): void {
+        this.peers.forEach((peer) => peer.sendSegmentsMap(segmentsMap));
+    }
+
+    public sendSegmentsMap(peerId: string, segmentsMap: string[][]): void {
+        const peer = this.peers.get(peerId);
+        if (peer != undefined) {
+            peer.sendSegmentsMap(segmentsMap);
+        }
+    }
+
     private onPeerConnect(mediaPeer: MediaPeer): void {
-        mediaPeer.sendSegmentsMap(this.cacheManager.keys().reduce((a, k) => { a.push([k, SegmentStatus.Loaded]); return a; },
-            new Array<string[]>()));
         this.emit(MediaPeerEvents.Connect, {id: mediaPeer.id, remoteAddress: mediaPeer.remoteAddress});
     }
 

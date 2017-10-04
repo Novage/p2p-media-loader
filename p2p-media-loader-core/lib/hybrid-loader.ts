@@ -1,9 +1,9 @@
 import {LoaderInterface, LoaderEvents, Segment} from "./loader-interface";
-import SegmentCacheManager from "./segment-cache-manager";
+import {SegmentCacheManager, SegmentCacheManagerEvents} from "./segment-cache-manager";
 import {EventEmitter} from "events";
 import HttpMediaManager from "./http-media-manager";
 import {P2PMediaManager, P2PMediaManagerEvents} from "./p2p-media-manager";
-import {MediaPeerEvents} from "./media-peer";
+import {MediaPeerEvents, SegmentStatus} from "./media-peer";
 import * as Debug from "debug";
 import SegmentInternal from "./segment-internal";
 
@@ -35,6 +35,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.debug("loader settings", this.settings);
 
         this.cacheManager = this.createCacheManager();
+        this.cacheManager.on(SegmentCacheManagerEvents.CacheUpdated, this.onCacheUpdated.bind(this));
 
         this.httpManager = this.createHttpManager();
         this.httpManager.on(LoaderEvents.SegmentLoaded, this.onSegmentLoaded.bind(this));
@@ -184,7 +185,14 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
                 }
             }
         }
+    }
 
+    private onCacheUpdated(): void {
+        const segmentsMap: string[][] = this.cacheManager.keys().reduce(
+                (a, k) => { a.push([k, SegmentStatus.Loaded]); return a; },
+                new Array<string[]>());
+
+        this.p2pManager.sendSegmentsMapToAll(segmentsMap);
     }
 
     private onPieceBytesLoaded(method: string, size: number, timestamp: number): void {
@@ -216,6 +224,11 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private onPeerConnect(peer: any): void {
+        const segmentsMap: string[][] = this.cacheManager.keys().reduce(
+                (a, k) => { a.push([k, SegmentStatus.Loaded]); return a; },
+                new Array<string[]>());
+
+        this.p2pManager.sendSegmentsMap(peer.id, segmentsMap);
         this.emit(LoaderEvents.PeerConnect, peer);
     }
 

@@ -1,8 +1,11 @@
 import {EventEmitter} from "events";
-import CacheEvents from "./cache-events";
 import SegmentInternal from "./segment-internal";
 
-export default class SegmentCacheManager extends EventEmitter {
+export enum SegmentCacheManagerEvents {
+    CacheUpdated = "cache_updated"
+}
+
+export class SegmentCacheManager extends EventEmitter {
 
     private segments: Map<string, SegmentInternal> = new Map();
 
@@ -16,7 +19,7 @@ export default class SegmentCacheManager extends EventEmitter {
 
     public set(key: string, value: SegmentInternal): void {
         this.segments.set(key, value);
-        this.emit(CacheEvents.CacheUpdated);
+        this.emit(SegmentCacheManagerEvents.CacheUpdated);
     }
 
     public keys(): Array<string> {
@@ -25,7 +28,7 @@ export default class SegmentCacheManager extends EventEmitter {
 
     public delete(keys: string[]): void {
         keys.forEach(key => this.segments.delete(key));
-        this.emit(CacheEvents.CacheUpdated);
+        this.emit(SegmentCacheManagerEvents.CacheUpdated);
     }
 
     public destroy(): void {

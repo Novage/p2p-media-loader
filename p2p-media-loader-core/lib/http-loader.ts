@@ -1,7 +1,7 @@
 import {LoaderInterface, LoaderEvents, Segment} from "./loader-interface";
 import SegmentInternal from "./segment-internal";
 import {EventEmitter} from "events";
-import SegmentCacheManager from "./segment-cache-manager";
+import {SegmentCacheManager} from "./segment-cache-manager";
 import HttpMediaManager from "./http-media-manager";
 
 export default class HttpLoader extends EventEmitter implements LoaderInterface {
