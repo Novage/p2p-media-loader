@@ -223,7 +223,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.debug("emitSegmentLoaded", segment.url);
     }
 
-    private onPeerConnect(peer: any): void {
+    private onPeerConnect(peer: {id: string}): void {
         const segmentsMap: string[][] = this.cacheManager.keys().reduce(
                 (a, k) => { a.push([k, SegmentStatus.Loaded]); return a; },
                 new Array<string[]>());
