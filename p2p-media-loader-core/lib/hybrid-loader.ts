@@ -1,5 +1,5 @@
 import {LoaderInterface, LoaderEvents, Segment} from "./loader-interface";
-import {SegmentCacheManager, SegmentCacheManagerEvents} from "./segment-cache-manager";
+import SegmentCacheManager from "./segment-cache-manager";
 import {EventEmitter} from "events";
 import HttpMediaManager from "./http-media-manager";
 import {P2PMediaManager, P2PMediaManagerEvents} from "./p2p-media-manager";
@@ -35,7 +35,6 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.debug("loader settings", this.settings);
 
         this.cacheManager = this.createCacheManager();
-        this.cacheManager.on(SegmentCacheManagerEvents.CacheUpdated, this.onCacheUpdated.bind(this));
 
         this.httpManager = this.createHttpManager();
         this.httpManager.on(LoaderEvents.SegmentLoaded, this.onSegmentLoaded.bind(this));
@@ -187,7 +186,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         }
     }
 
-    private onCacheUpdated(): void {
+    private sendSegmentsMapUpdate(): void {
         const segmentsMap: string[][] = this.cacheManager.keys().reduce(
                 (a, k) => { a.push([k, SegmentStatus.Loaded]); return a; },
                 new Array<string[]>());
@@ -203,6 +202,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         const segment = new SegmentInternal(id, url);
         segment.data = data;
         this.cacheManager.set(id, segment);
+        this.sendSegmentsMapUpdate();
 
         this.emitSegmentLoaded(segment);
         this.processSegmentsQueue();
@@ -259,6 +259,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         }
 
         this.cacheManager.delete(expiredKeys);
+        this.sendSegmentsMapUpdate();
     }
 
 }

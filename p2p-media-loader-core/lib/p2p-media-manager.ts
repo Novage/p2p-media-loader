@@ -1,6 +1,6 @@
 import {EventEmitter} from "events";
 import {createHash} from "crypto";
-import {SegmentCacheManager} from "./segment-cache-manager";
+import SegmentCacheManager from "./segment-cache-manager";
 import {LoaderEvents} from "./loader-interface";
 import {MediaPeer, MediaPeerEvents} from "./media-peer";
 import * as Debug from "debug";
