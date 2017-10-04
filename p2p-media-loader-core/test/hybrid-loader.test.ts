@@ -76,7 +76,7 @@ describe("HybridLoader", () => {
         p2pSegmentErrorListener = listener;
     });
     let p2pForceProcessingListener: Function = () => {};
-    when(p2pMediaManager.on(P2PMediaManagerEvents.ForceProcessing, anyFunction())).thenCall((event, listener) => {
+    when(p2pMediaManager.on(P2PMediaManagerEvents.PeerDataUpdated, anyFunction())).thenCall((event, listener) => {
         p2pForceProcessingListener = listener;
     });
     let p2pPieceBytesLoadedListener: Function = () => {};
