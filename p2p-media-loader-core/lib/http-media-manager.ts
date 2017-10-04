@@ -70,8 +70,4 @@ export default class HttpMediaManager extends EventEmitter {
         this.xhrRequests.clear();
     }
 
-    setSwarmId(id: string): void {
-        throw new Error("Method not implemented.");
-    }
-
 }
