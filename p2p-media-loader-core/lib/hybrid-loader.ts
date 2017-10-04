@@ -45,7 +45,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.p2pManager = this.createP2PManager();
         this.p2pManager.on(LoaderEvents.SegmentLoaded, this.onSegmentLoaded.bind(this));
         this.p2pManager.on(LoaderEvents.SegmentError, this.onSegmentError.bind(this));
-        this.p2pManager.on(P2PMediaManagerEvents.ForceProcessing, this.processSegmentsQueue.bind(this));
+        this.p2pManager.on(P2PMediaManagerEvents.PeerDataUpdated, this.processSegmentsQueue.bind(this));
         this.p2pManager.on(LoaderEvents.PieceBytesLoaded, this.onPieceBytesLoaded.bind(this));
         this.p2pManager.on(MediaPeerEvents.Connect, this.onPeerConnect.bind(this));
         this.p2pManager.on(MediaPeerEvents.Close, this.onPeerClose.bind(this));

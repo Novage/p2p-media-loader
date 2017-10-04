@@ -15,7 +15,7 @@ class PeerSegmentRequest {
 }
 
 export enum P2PMediaManagerEvents {
-    ForceProcessing = "force_processing"
+    PeerDataUpdated = "peer_data_updated"
 }
 
 export class P2PMediaManager extends EventEmitter {
@@ -175,7 +175,7 @@ export class P2PMediaManager extends EventEmitter {
         this.peers.delete(mediaPeer.id);
 
         if (isUpdated) {
-            this.emit(P2PMediaManagerEvents.ForceProcessing);
+            this.emit(P2PMediaManagerEvents.PeerDataUpdated);
         }
 
         this.emit(MediaPeerEvents.Close, mediaPeer.id);
@@ -186,7 +186,7 @@ export class P2PMediaManager extends EventEmitter {
     }
 
     private onPeerDataSegmentsMap(): void {
-        this.emit(P2PMediaManagerEvents.ForceProcessing);
+        this.emit(P2PMediaManagerEvents.PeerDataUpdated);
     }
 
     private onPeerDataSegmentRequest(mediaPeer: MediaPeer, id: string): void {
@@ -209,7 +209,7 @@ export class P2PMediaManager extends EventEmitter {
 
     private onPeerDataSegmentAbsent(mediaPeer: MediaPeer, id: string): void {
         this.peerSegmentRequests.delete(id);
-        this.emit(P2PMediaManagerEvents.ForceProcessing);
+        this.emit(P2PMediaManagerEvents.PeerDataUpdated);
     }
 
 }
