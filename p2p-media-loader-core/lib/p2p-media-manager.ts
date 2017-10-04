@@ -1,6 +1,5 @@
 import {EventEmitter} from "events";
 import {createHash} from "crypto";
-import SegmentCacheManager from "./segment-cache-manager";
 import {LoaderEvents} from "./loader-interface";
 import {MediaPeer, MediaPeerEvents} from "./media-peer";
 import * as Debug from "debug";
@@ -20,7 +19,7 @@ export enum P2PMediaManagerEvents {
 
 export class P2PMediaManager extends EventEmitter {
 
-    private cacheManager: SegmentCacheManager;
+    private segments: Map<string, SegmentInternal>;
 
     private trackerClient: any;
     private announce: string[];
@@ -30,12 +29,12 @@ export class P2PMediaManager extends EventEmitter {
     private peerId: string;
     private debug = Debug("p2pml:p2p-media-manager");
 
-    public constructor(cacheManager: SegmentCacheManager, announce: string[]) {
+    public constructor(segments: Map<string, SegmentInternal>, announce: string[]) {
         super();
 
         this.announce = announce;
 
-        this.cacheManager = cacheManager;
+        this.segments = segments;
 
         const date = (new Date()).valueOf().toString();
         const random = Math.random().toString();
@@ -190,7 +189,7 @@ export class P2PMediaManager extends EventEmitter {
     }
 
     private onPeerDataSegmentRequest(peer: MediaPeer, id: string): void {
-        const segment = this.cacheManager.get(id);
+        const segment = this.segments.get(id);
         if (segment) {
             peer.sendSegmentData(segment);
         } else {

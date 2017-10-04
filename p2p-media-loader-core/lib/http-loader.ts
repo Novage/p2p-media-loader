@@ -1,12 +1,11 @@
 import {LoaderInterface, LoaderEvents, Segment} from "./loader-interface";
 import SegmentInternal from "./segment-internal";
 import {EventEmitter} from "events";
-import SegmentCacheManager from "./segment-cache-manager";
 import HttpMediaManager from "./http-media-manager";
 
 export default class HttpLoader extends EventEmitter implements LoaderInterface {
 
-    private cacheManager: SegmentCacheManager;
+    private segments: Map<string, SegmentInternal> = new Map();
     private httpManager: HttpMediaManager;
     private segmentsQueue: SegmentInternal[] = [];
     private settings = {
@@ -22,8 +21,6 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         this.httpManager.on(LoaderEvents.SegmentLoaded, this.onSegmentLoaded.bind(this));
         this.httpManager.on(LoaderEvents.SegmentError, this.onSegmentError.bind(this));
         this.httpManager.on(LoaderEvents.PieceBytesLoaded, this.onPieceBytesLoaded.bind(this));
-
-        this.cacheManager = new SegmentCacheManager();
     }
 
     public load(segments: Segment[], swarmId: string, emitNowSegmentUrl?: string): void {
@@ -44,7 +41,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
 
         // emit segment loaded event if the segment has already been downloaded
         if (emitNowSegmentUrl) {
-            const downloadedSegment = this.cacheManager.get(emitNowSegmentUrl);
+            const downloadedSegment = this.segments.get(emitNowSegmentUrl);
             if (downloadedSegment) {
                 this.emitSegmentLoaded(downloadedSegment);
             }
@@ -64,13 +61,14 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
     public destroy(): void {
         this.segmentsQueue = [];
         this.httpManager.destroy();
+        this.segments.clear();
     }
 
     private processSegmentQueue(): void {
         this.segmentsQueue.forEach((segment) => {
             if (this.httpManager.getActiveDownloadsCount() < 1 &&
                 !this.httpManager.isDownloading(segment) &&
-                !this.cacheManager.has(segment.id)) {
+                !this.segments.has(segment.id)) {
 
                 this.httpManager.download(segment);
             }
@@ -84,7 +82,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
     private onSegmentLoaded(id: string, url: string, data: ArrayBuffer): void {
         const segment = new SegmentInternal(id, url);
         segment.data = data;
-        this.cacheManager.set(segment.id, segment);
+        this.segments.set(segment.id, segment);
 
         this.emitSegmentLoaded(segment);
         this.processSegmentQueue();
@@ -96,7 +94,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
     }
 
     private emitSegmentLoaded(segmentInternal: SegmentInternal): void {
-        this.cacheManager.updateLastAccessed(segmentInternal.id);
+        segmentInternal.lastAccessed = new Date().getTime();
 
         const segment = new Segment(segmentInternal.url);
         segment.data = segmentInternal.data.slice(0);
@@ -105,15 +103,12 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
 
     private collectGarbage(): void {
         const now = new Date().getTime();
-        const keys: string[] = [];
 
-        this.cacheManager.forEach((value, key) => {
+        this.segments.forEach((value, key) => {
             if (now - value.lastAccessed > this.settings.segmentExpiration) {
-                keys.push(key);
+                this.segments.delete(key);
             }
         });
-
-        this.cacheManager.delete(keys);
     }
 
 
