@@ -181,8 +181,7 @@ export class MediaPeer extends EventEmitter {
     }
 
     public hasSegment(id: string): boolean {
-        const segmentStatus = this.segments.get(id);
-        return (segmentStatus != undefined) && (segmentStatus == SegmentStatus.Loaded);
+        return this.segments.get(id) === SegmentStatus.Loaded;
     }
 
     public sendSegmentsMap(segments: string[][]) {
