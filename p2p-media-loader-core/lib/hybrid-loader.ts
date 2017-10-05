@@ -63,7 +63,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
         // stop all http requests and p2p downloads for segments that are not in the new load
         this.segmentsQueue.forEach(segment => {
-            if (segments.findIndex(f => f.url === segment.url) === -1) {
+            if (segments.findIndex(f => f.url == segment.url) == -1) {
                 this.debug("remove segment", segment.url);
                 if (this.httpManager.isDownloading(segment)) {
                     updateSegmentsMap = true;
@@ -76,7 +76,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         });
 
         segments.forEach(segment => {
-            if (this.segmentsQueue.findIndex(f => f.url === segment.url) === -1) {
+            if (!this.segmentsQueue.find(f => f.url == segment.url)) {
                 this.debug("add segment", segment.url);
             }
         });
@@ -125,73 +125,81 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         const startingPriority = this.segmentsQueue.length > 0 ? this.segmentsQueue[0].priority : 0;
         this.debug("processSegmentsQueue - starting priority: " + startingPriority);
 
-        const pendingQueue = this.segmentsQueue.filter(segment =>
+        let pendingQueue = this.segmentsQueue.filter(segment =>
             !this.segments.has(segment.id) &&
             !this.httpManager.isDownloading(segment) &&
             !this.p2pManager.isDownloading(segment));
-        const downloadedSegmentsCount = this.segmentsQueue.length - pendingQueue.length;
+
+        if (pendingQueue.length == 0) {
+            return false;
+        }
+
+        let downloadedSegmentsCount = this.segmentsQueue.length - pendingQueue.length;
         let updateSegmentsMap = false;
 
-        if (pendingQueue.length > 0) {
-            for (let index = 0; index < this.segmentsQueue.length; index++) {
-                const segment = this.segmentsQueue[index];
-                const segmentPriority = index + startingPriority;
-                if (!this.segments.has(segment.id)) {
-                    if (segmentPriority < this.settings.requiredSegmentsCount) {
-                        if (segmentPriority === 0 && !this.httpManager.isDownloading(segment) && this.httpManager.getActiveDownloads().size > 0) {
-                            this.segmentsQueue.forEach(s => {
-                                    this.httpManager.abort(s);
-                                    updateSegmentsMap = true;
-                                });
-                        }
+        for (let index = 0; index < this.segmentsQueue.length; index++) {
+            const segment = this.segmentsQueue[index];
+            const segmentPriority = index + startingPriority;
 
-                        if (this.httpManager.getActiveDownloads().size === 0) {
-                            this.p2pManager.abort(segment);
-                            this.httpManager.download(segment);
-                            updateSegmentsMap = true;
-                        }
-                    } else if (!this.httpManager.isDownloading(segment) && this.p2pManager.getActiveDownloadsCount() < this.settings.simultaneousP2PDownloads && downloadedSegmentsCount < this.settings.bufferSegmentsCount) {
-                        this.p2pManager.download(segment);
+            if (!this.segments.has(segment.id)) {
+                if (segmentPriority < this.settings.requiredSegmentsCount) {
+                    if (segmentPriority == 0 && !this.httpManager.isDownloading(segment) && this.httpManager.getActiveDownloads().size > 0) {
+                        this.segmentsQueue.forEach(s => {
+                                this.httpManager.abort(s);
+                                updateSegmentsMap = true;
+                            });
+                    }
+
+                    if (this.httpManager.getActiveDownloads().size == 0) {
+                        this.p2pManager.abort(segment);
+                        this.httpManager.download(segment);
                         updateSegmentsMap = true;
                     }
-                }
-
-                if (this.httpManager.getActiveDownloads().size === 1 && this.p2pManager.getActiveDownloadsCount() === this.settings.simultaneousP2PDownloads) {
-                    return updateSegmentsMap;
+                } else if (!this.httpManager.isDownloading(segment) && this.p2pManager.getActiveDownloadsCount() < this.settings.simultaneousP2PDownloads && downloadedSegmentsCount < this.settings.bufferSegmentsCount) {
+                    this.p2pManager.download(segment);
+                    updateSegmentsMap = true;
                 }
             }
 
-            if (this.httpManager.getActiveDownloads().size === 0 && this.p2pManager.getActiveDownloadsCount() < this.settings.simultaneousP2PDownloads) {
-                const pendingQueue = this.segmentsQueue.filter(segment =>
-                    !this.segments.has(segment.id) &&
-                    !this.p2pManager.isDownloading(segment));
-                const downloadedSegmentsCount = this.segmentsQueue.length - pendingQueue.length;
-
-                if (pendingQueue.length > 0 && downloadedSegmentsCount < this.settings.bufferSegmentsCount) {
-                    let segmentForHttpDownload: SegmentInternal | null = null;
-
-                    if (pendingQueue.length === 1 && pendingQueue[0].url === this.segmentsQueue[this.segmentsQueue.length - 1].url) {
-                        const now = Date.now();
-                        if (now - this.lastSegmentProbabilityTimestamp < this.settings.lastSegmentProbabilityInterval) {
-                            return updateSegmentsMap;
-                        }
-
-                        this.lastSegmentProbabilityTimestamp = now;
-                        if (Math.random() <= this.settings.lastSegmentProbability) {
-                            segmentForHttpDownload = pendingQueue[0];
-                        }
-                    } else {
-                        const random_index = Math.floor(Math.random() * Math.min(pendingQueue.length, this.settings.bufferSegmentsCount));
-                        segmentForHttpDownload = pendingQueue[random_index];
-                    }
-
-                    if (segmentForHttpDownload) {
-                        this.debug("Random HTTP download:");
-                        this.httpManager.download(segmentForHttpDownload);
-                        updateSegmentsMap = true;
-                    }
-                }
+            if (this.httpManager.getActiveDownloads().size == 1 && this.p2pManager.getActiveDownloadsCount() == this.settings.simultaneousP2PDownloads) {
+                return updateSegmentsMap;
             }
+        }
+
+        if (this.httpManager.getActiveDownloads().size > 0 || this.p2pManager.getActiveDownloadsCount() >= this.settings.simultaneousP2PDownloads) {
+            return updateSegmentsMap;
+        }
+
+        pendingQueue = this.segmentsQueue.filter(segment =>
+            !this.segments.has(segment.id) &&
+            !this.p2pManager.isDownloading(segment));
+        downloadedSegmentsCount = this.segmentsQueue.length - pendingQueue.length;
+
+        if (pendingQueue.length == 0 || downloadedSegmentsCount >= this.settings.bufferSegmentsCount) {
+            return updateSegmentsMap;
+        }
+
+        let segmentForHttpDownload: SegmentInternal | null = null;
+
+        if (pendingQueue.length == 1 && pendingQueue[0].url == this.segmentsQueue[this.segmentsQueue.length - 1].url) {
+            const now = Date.now();
+            if (now - this.lastSegmentProbabilityTimestamp < this.settings.lastSegmentProbabilityInterval) {
+                return updateSegmentsMap;
+            }
+
+            this.lastSegmentProbabilityTimestamp = now;
+            if (Math.random() <= this.settings.lastSegmentProbability) {
+                segmentForHttpDownload = pendingQueue[0];
+            }
+        } else {
+            const random_index = Math.floor(Math.random() * Math.min(pendingQueue.length, this.settings.bufferSegmentsCount));
+            segmentForHttpDownload = pendingQueue[random_index];
+        }
+
+        if (segmentForHttpDownload) {
+            this.debug("Random HTTP download:");
+            this.httpManager.download(segmentForHttpDownload);
+            updateSegmentsMap = true;
         }
 
         return updateSegmentsMap;
