@@ -125,16 +125,18 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         const startingPriority = this.segmentsQueue.length > 0 ? this.segmentsQueue[0].priority : 0;
         this.debug("processSegmentsQueue - starting priority: " + startingPriority);
 
-        let pendingQueue = this.segmentsQueue.filter(segment =>
-            !this.segments.has(segment.id) &&
-            !this.httpManager.isDownloading(segment) &&
-            !this.p2pManager.isDownloading(segment));
+        let pendingCount = 0;
+        for (const segment of this.segmentsQueue) {
+            if (!this.segments.has(segment.id) && !this.httpManager.isDownloading(segment) && !this.p2pManager.isDownloading(segment)) {
+                pendingCount++;
+            }
+        }
 
-        if (pendingQueue.length == 0) {
+        if (pendingCount == 0) {
             return false;
         }
 
-        let downloadedSegmentsCount = this.segmentsQueue.length - pendingQueue.length;
+        let downloadedSegmentsCount = this.segmentsQueue.length - pendingCount;
         let updateSegmentsMap = false;
 
         for (let index = 0; index < this.segmentsQueue.length; index++) {
@@ -169,7 +171,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             return updateSegmentsMap;
         }
 
-        pendingQueue = this.segmentsQueue.filter(segment =>
+        const pendingQueue = this.segmentsQueue.filter(segment =>
             !this.segments.has(segment.id) &&
             !this.p2pManager.isDownloading(segment));
         downloadedSegmentsCount = this.segmentsQueue.length - pendingQueue.length;
