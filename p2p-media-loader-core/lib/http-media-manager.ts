@@ -29,7 +29,7 @@ export default class HttpMediaManager extends EventEmitter {
         };
 
         request.onload = (event: any) => {
-            this.xhrRequests.delete(segment.url);
+            this.xhrRequests.delete(segment.id);
 
             if (event.target.status === 200) {
                 this.emit(LoaderEvents.SegmentLoaded, segment.id, segment.url, event.target.response);
@@ -40,29 +40,29 @@ export default class HttpMediaManager extends EventEmitter {
 
         request.onerror = (event: any) => {
             // TODO: retry with timeout?
-            this.xhrRequests.delete(segment.url);
+            this.xhrRequests.delete(segment.id);
             this.emit(LoaderEvents.SegmentError, segment.url, event);
         };
 
-        this.xhrRequests.set(segment.url, request);
+        this.xhrRequests.set(segment.id, request);
         request.send();
     }
 
     public abort(segment: SegmentInternal): void {
-        const xhr = this.xhrRequests.get(segment.url);
+        const xhr = this.xhrRequests.get(segment.id);
         if (xhr) {
             xhr.abort();
-            this.xhrRequests.delete(segment.url);
+            this.xhrRequests.delete(segment.id);
             this.debug("http segment abort", segment.url);
         }
     }
 
     public isDownloading(segment: SegmentInternal): boolean {
-        return this.xhrRequests.has(segment.url);
+        return this.xhrRequests.has(segment.id);
     }
 
-    public getActiveDownloadsCount(): number {
-        return this.xhrRequests.size;
+    public getActiveDownloads() {
+        return this.xhrRequests;
     }
 
     public destroy(): void {

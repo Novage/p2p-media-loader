@@ -11,23 +11,18 @@ describe("HybridLoader", () => {
 
     // HttpMediaManager mock
     const httpMediaManger = mock(HttpMediaManager);
-    const httpDownloads: SegmentInternal[] = [];
+    const httpDownloads: Map<string, SegmentInternal> = new Map();
     when(httpMediaManger.download(anyOfClass(SegmentInternal))).thenCall((segment) => {
-        if (httpDownloads.indexOf(segment) === -1) {
-            httpDownloads.push(segment);
-        }
+        httpDownloads.set(segment.id, segment);
     });
     when(httpMediaManger.abort(anyOfClass(SegmentInternal))).thenCall((segment) => {
-        const index = httpDownloads.indexOf(segment);
-        if (index !== -1) {
-            httpDownloads.splice(index, 1);
-        }
+        httpDownloads.delete(segment.id);
     });
-    when(httpMediaManger.getActiveDownloadsCount()).thenCall(() => {
-        return httpDownloads.length;
+    when(httpMediaManger.getActiveDownloads()).thenCall(() => {
+        return httpDownloads;
     });
     when(httpMediaManger.isDownloading(anyOfClass(SegmentInternal))).thenCall((segment) => {
-        return httpDownloads.indexOf(segment) !== -1;
+        return httpDownloads.has(segment.id);
     });
     let httpSegmentLoadedListener: Function = () => {};
     when(httpMediaManger.on(LoaderEvents.SegmentLoaded, anyFunction())).thenCall((event, listener) => {
@@ -124,40 +119,44 @@ describe("HybridLoader", () => {
 
         // load
         hybridLoader.load(segments, swarmId, segments[0].url);
-        assert.equal(httpDownloads.length, 1);
-        verify(httpMediaManger.download(httpDownloads[0])).once();
-        assert.deepEqual(httpDownloads[0], {id: segments[0].url, url: segments[0].url, priority: segments[0].priority});
+        assert.equal(httpDownloads.size, 1);
+        let segment = httpDownloads.values().next().value;
+        verify(httpMediaManger.download(segment)).once();
+        assert.deepEqual(segment, {id: segments[0].url, url: segments[0].url, priority: segments[0].priority});
 
         // file loaded via http
-        httpDownloads.shift();
+        httpDownloads.clear();
         httpSegmentLoadedListener(segments[0].url, segments[0].url, new ArrayBuffer(1));
-        assert.equal(httpDownloads.length, 1);
-        verify(httpMediaManger.download(httpDownloads[0])).once();
-        assert.deepEqual(httpDownloads[0], {id: segments[1].url, url: segments[1].url, priority: segments[1].priority});
+        assert.equal(httpDownloads.size, 1);
+        segment = httpDownloads.values().next().value;
+        verify(httpMediaManger.download(segment)).once();
+        assert.deepEqual(segment, {id: segments[1].url, url: segments[1].url, priority: segments[1].priority});
 
         // load same files
         hybridLoader.load(segments, swarmId, segments[1].url);
-        assert.equal(httpDownloads.length, 1);
-        verify(httpMediaManger.download(httpDownloads[0])).once();
-        assert.deepEqual(httpDownloads[0], {id: segments[1].url, url: segments[1].url, priority: segments[1].priority});
+        assert.equal(httpDownloads.size, 1);
+        segment = httpDownloads.values().next().value;
+        verify(httpMediaManger.download(segment)).once();
+        assert.deepEqual(segment, {id: segments[1].url, url: segments[1].url, priority: segments[1].priority});
 
         // file loaded via http
-        httpDownloads.shift();
+        httpDownloads.clear();
         httpSegmentLoadedListener(segments[1].url, segments[1].url, new ArrayBuffer(2));
-        assert.equal(httpDownloads.length, 1);
-        verify(httpMediaManger.download(httpDownloads[0])).once();
-        assert.ok(httpDownloads[0].id === segments[2].url || httpDownloads[0].id === segments[3].url || httpDownloads[0].id === segments[4].url);
+        assert.equal(httpDownloads.size, 1);
+        segment = httpDownloads.values().next().value;
+        verify(httpMediaManger.download(segment)).once();
+        assert.ok([segments[2].url, segments[3].url, segments[4].url].find(id => id === segment.id) != undefined);
 
-        const i = httpDownloads[0].id === segments[2].url ? 3 : 2;
+        const i = segment.id === segments[2].url ? 3 : 2;
         p2pAvailableFiles.push(new SegmentInternal(segments[i].url, segments[i].url, segments[i].priority));
         p2pForceProcessingListener();
-        assert.equal(httpDownloads.length, 1);
-        verify(httpMediaManger.download(httpDownloads[0])).once();
-        assert.ok(httpDownloads[0].id === segments[2].url || httpDownloads[0].id === segments[3].url || httpDownloads[0].id === segments[4].url);
+        assert.equal(httpDownloads.size, 1);
+        segment = httpDownloads.values().next().value;
+        verify(httpMediaManger.download(segment)).once();
+        assert.ok([segments[2].url, segments[3].url, segments[4].url].find(id => id === segment.id) != undefined);
         assert.equal(p2pDownloads.length, 1);
         //verify(p2pMediaManager.download(p2pDownloads[0])).once();
         //assert.ok(httpDownloads[0].id === segments[2].url || httpDownloads[0].id === segments[3].url || httpDownloads[0].id === segments[4].url);
-
     });
 
 });

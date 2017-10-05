@@ -66,7 +66,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
 
     private processSegmentQueue(): void {
         this.segmentsQueue.forEach((segment) => {
-            if (this.httpManager.getActiveDownloadsCount() < 1 &&
+            if (this.httpManager.getActiveDownloads().size < 1 &&
                 !this.httpManager.isDownloading(segment) &&
                 !this.segments.has(segment.id)) {
 

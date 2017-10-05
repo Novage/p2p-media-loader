@@ -127,11 +127,11 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
                 const segmentPriority = index + startingPriority;
                 if (!this.segments.has(segment.id)) {
                     if (segmentPriority < this.settings.requiredSegmentsCount) {
-                        if (segmentPriority === 0 && !this.httpManager.isDownloading(segment) && this.httpManager.getActiveDownloadsCount() > 0) {
+                        if (segmentPriority === 0 && !this.httpManager.isDownloading(segment) && this.httpManager.getActiveDownloads().size > 0) {
                             this.segmentsQueue.forEach(s => this.httpManager.abort(s));
                         }
 
-                        if (this.httpManager.getActiveDownloadsCount() === 0) {
+                        if (this.httpManager.getActiveDownloads().size === 0) {
                             this.p2pManager.abort(segment);
                             this.httpManager.download(segment);
                         }
@@ -140,12 +140,12 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
                     }
                 }
 
-                if (this.httpManager.getActiveDownloadsCount() === 1 && this.p2pManager.getActiveDownloadsCount() === this.settings.simultaneousP2PDownloads) {
+                if (this.httpManager.getActiveDownloads().size === 1 && this.p2pManager.getActiveDownloadsCount() === this.settings.simultaneousP2PDownloads) {
                     return;
                 }
             }
 
-            if (this.httpManager.getActiveDownloadsCount() === 0 && this.p2pManager.getActiveDownloadsCount() < this.settings.simultaneousP2PDownloads) {
+            if (this.httpManager.getActiveDownloads().size === 0 && this.p2pManager.getActiveDownloadsCount() < this.settings.simultaneousP2PDownloads) {
 
                 const pendingQueue = this.segmentsQueue.filter(segment =>
                     !this.segments.has(segment.id) &&
@@ -180,9 +180,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private sendSegmentsMapUpdate(): void {
-        const segmentsMap = new Array<string[]>();
-        this.segments.forEach((value, key) => segmentsMap.push([key, SegmentStatus.Loaded]));
-        this.p2pManager.sendSegmentsMapToAll(segmentsMap);
+        this.p2pManager.sendSegmentsMapToAll(this.createSegmentsMap());
     }
 
     private onPieceBytesLoaded(method: string, size: number, timestamp: number): void {
@@ -214,11 +212,15 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.debug("emitSegmentLoaded", segment.url);
     }
 
-    private onPeerConnect(peer: {id: string}): void {
-        const segmentsMap = new Array<string[]>();
+    private createSegmentsMap() {
+        const segmentsMap: string[][] = [];
         this.segments.forEach((value, key) => segmentsMap.push([key, SegmentStatus.Loaded]));
-        this.p2pManager.sendSegmentsMap(peer.id, segmentsMap);
+        this.httpManager.getActiveDownloads().forEach((value, key) => segmentsMap.push([key, SegmentStatus.LoadingByHttp]));
+        return segmentsMap;
+    }
 
+    private onPeerConnect(peer: {id: string}): void {
+        this.p2pManager.sendSegmentsMap(peer.id, this.createSegmentsMap());
         this.emit(LoaderEvents.PeerConnect, peer);
     }
 
