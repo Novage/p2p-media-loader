@@ -59,12 +59,18 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.p2pManager.setSwarmId(swarmId);
         this.debug("load segments", segments, this.segmentsQueue, emitNowSegmentUrl);
 
+        let updateSegmentsMap = false;
+
         // stop all http requests and p2p downloads for segments that are not in the new load
         this.segmentsQueue.forEach(segment => {
             if (segments.findIndex(f => f.url === segment.url) === -1) {
                 this.debug("remove segment", segment.url);
-                this.httpManager.abort(segment);
-                this.p2pManager.abort(segment);
+                if (this.httpManager.isDownloading(segment)) {
+                    updateSegmentsMap = true;
+                    this.httpManager.abort(segment);
+                } else {
+                    this.p2pManager.abort(segment);
+                }
                 this.emit(LoaderEvents.SegmentAbort, segment.url);
             }
         });
@@ -94,10 +100,14 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         }
 
         // run main processing algorithm
-        this.processSegmentsQueue();
+        updateSegmentsMap = this.processSegmentsQueue() || updateSegmentsMap;
 
         // collect garbage
-        this.collectGarbage();
+        updateSegmentsMap = this.collectGarbage() || updateSegmentsMap;
+
+        if (updateSegmentsMap) {
+            this.p2pManager.sendSegmentsMapToAll(this.createSegmentsMap());
+        }
     }
 
     public getSettings() {
@@ -111,7 +121,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.segments.clear();
     }
 
-    private processSegmentsQueue(): void {
+    private processSegmentsQueue(): boolean {
         const startingPriority = this.segmentsQueue.length > 0 ? this.segmentsQueue[0].priority : 0;
         this.debug("processSegmentsQueue - starting priority: " + startingPriority);
 
@@ -120,6 +130,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             !this.httpManager.isDownloading(segment) &&
             !this.p2pManager.isDownloading(segment));
         const downloadedSegmentsCount = this.segmentsQueue.length - pendingQueue.length;
+        let updateSegmentsMap = false;
 
         if (pendingQueue.length > 0) {
             for (let index = 0; index < this.segmentsQueue.length; index++) {
@@ -128,25 +139,29 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
                 if (!this.segments.has(segment.id)) {
                     if (segmentPriority < this.settings.requiredSegmentsCount) {
                         if (segmentPriority === 0 && !this.httpManager.isDownloading(segment) && this.httpManager.getActiveDownloads().size > 0) {
-                            this.segmentsQueue.forEach(s => this.httpManager.abort(s));
+                            this.segmentsQueue.forEach(s => {
+                                    this.httpManager.abort(s);
+                                    updateSegmentsMap = true;
+                                });
                         }
 
                         if (this.httpManager.getActiveDownloads().size === 0) {
                             this.p2pManager.abort(segment);
                             this.httpManager.download(segment);
+                            updateSegmentsMap = true;
                         }
                     } else if (!this.httpManager.isDownloading(segment) && this.p2pManager.getActiveDownloadsCount() < this.settings.simultaneousP2PDownloads && downloadedSegmentsCount < this.settings.bufferSegmentsCount) {
                         this.p2pManager.download(segment);
+                        updateSegmentsMap = true;
                     }
                 }
 
                 if (this.httpManager.getActiveDownloads().size === 1 && this.p2pManager.getActiveDownloadsCount() === this.settings.simultaneousP2PDownloads) {
-                    return;
+                    return updateSegmentsMap;
                 }
             }
 
             if (this.httpManager.getActiveDownloads().size === 0 && this.p2pManager.getActiveDownloadsCount() < this.settings.simultaneousP2PDownloads) {
-
                 const pendingQueue = this.segmentsQueue.filter(segment =>
                     !this.segments.has(segment.id) &&
                     !this.p2pManager.isDownloading(segment));
@@ -158,7 +173,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
                     if (pendingQueue.length === 1 && pendingQueue[0].url === this.segmentsQueue[this.segmentsQueue.length - 1].url) {
                         const now = Date.now();
                         if (now - this.lastSegmentProbabilityTimestamp < this.settings.lastSegmentProbabilityInterval) {
-                            return;
+                            return updateSegmentsMap;
                         }
 
                         this.lastSegmentProbabilityTimestamp = now;
@@ -173,14 +188,13 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
                     if (segmentForHttpDownload) {
                         this.debug("Random HTTP download:");
                         this.httpManager.download(segmentForHttpDownload);
+                        updateSegmentsMap = true;
                     }
                 }
             }
         }
-    }
 
-    private sendSegmentsMapUpdate(): void {
-        this.p2pManager.sendSegmentsMapToAll(this.createSegmentsMap());
+        return updateSegmentsMap;
     }
 
     private onPieceBytesLoaded(method: string, size: number, timestamp: number): void {
@@ -191,10 +205,9 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         const segment = new SegmentInternal(id, url);
         segment.data = data;
         this.segments.set(id, segment);
-        this.sendSegmentsMapUpdate();
-
         this.emitSegmentLoaded(segment);
         this.processSegmentsQueue();
+        this.p2pManager.sendSegmentsMapToAll(this.createSegmentsMap());
     }
 
     private onSegmentError(url: string, event: any): void {
@@ -212,7 +225,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.debug("emitSegmentLoaded", segment.url);
     }
 
-    private createSegmentsMap() {
+    private createSegmentsMap(): string[][] {
         const segmentsMap: string[][] = [];
         this.segments.forEach((value, key) => segmentsMap.push([key, SegmentStatus.Loaded]));
         this.httpManager.getActiveDownloads().forEach((value, key) => segmentsMap.push([key, SegmentStatus.LoadingByHttp]));
@@ -228,7 +241,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.emit(LoaderEvents.PeerClose, peerId);
     }
 
-    private collectGarbage(): void {
+    private collectGarbage(): boolean {
         const now = new Date().getTime();
         const remainingValues: SegmentInternal[] = [];
         const expiredKeys: string[] = [];
@@ -241,9 +254,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             }
         });
 
-        remainingValues.sort((a, b) => {
-            return a.lastAccessed - b.lastAccessed;
-        });
+        remainingValues.sort((a, b) => a.lastAccessed - b.lastAccessed);
 
         const countOverhead = remainingValues.length - this.settings.maxCacheSegmentsCount;
         if (countOverhead > 0) {
@@ -251,7 +262,8 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         }
 
         expiredKeys.forEach(key => this.segments.delete(key));
-        this.sendSegmentsMapUpdate();
+
+        return expiredKeys.length > 0;
     }
 
 }
