@@ -24,20 +24,19 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
     }
 
     public load(segments: Segment[], swarmId: string, emitNowSegmentUrl?: string): void {
-
         // stop all xhr requests for segments that are not in the new load
-        this.segmentsQueue.forEach((segment) => {
-            if (segments.findIndex((f) => f.url === segment.url) === -1) {
+        for (const segment of this.segmentsQueue) {
+            if (!segments.find((f) => f.url === segment.url)) {
                 this.httpManager.abort(segment);
                 this.emit(LoaderEvents.SegmentAbort, segment.url);
             }
-        });
+        }
 
         // renew segment queue
         this.segmentsQueue = [];
-        segments.forEach(segment => {
+        for (const segment of segments) {
             this.segmentsQueue.push(new SegmentInternal(segment.url, segment.url, segment.priority));
-        });
+        }
 
         // emit segment loaded event if the segment has already been downloaded
         if (emitNowSegmentUrl) {
@@ -65,14 +64,14 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
     }
 
     private processSegmentQueue(): void {
-        this.segmentsQueue.forEach((segment) => {
+        for (const segment of this.segmentsQueue) {
             if (this.httpManager.getActiveDownloads().size < 1 &&
-                !this.httpManager.isDownloading(segment) &&
-                !this.segments.has(segment.id)) {
+                    !this.httpManager.isDownloading(segment) &&
+                    !this.segments.has(segment.id)) {
 
                 this.httpManager.download(segment);
             }
-        });
+        }
     }
 
     private onPieceBytesLoaded(method: string, size: number, timestamp: number): void {

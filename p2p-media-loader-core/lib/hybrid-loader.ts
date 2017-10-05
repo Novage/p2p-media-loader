@@ -62,8 +62,8 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         let updateSegmentsMap = false;
 
         // stop all http requests and p2p downloads for segments that are not in the new load
-        this.segmentsQueue.forEach(segment => {
-            if (segments.findIndex(f => f.url == segment.url) == -1) {
+        for (const segment of this.segmentsQueue) {
+            if (!segments.find(f => f.url == segment.url)) {
                 this.debug("remove segment", segment.url);
                 if (this.httpManager.isDownloading(segment)) {
                     updateSegmentsMap = true;
@@ -73,20 +73,20 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
                 }
                 this.emit(LoaderEvents.SegmentAbort, segment.url);
             }
-        });
+        }
 
-        segments.forEach(segment => {
+        for (const segment of segments) {
             if (!this.segmentsQueue.find(f => f.url == segment.url)) {
                 this.debug("add segment", segment.url);
             }
-        });
+        }
 
         // renew segment queue
         this.segmentsQueue = [];
-        segments.forEach(segment => {
+        for (const segment of segments) {
             const segmentId = this.settings.segmentIdGenerator(segment.url);
             this.segmentsQueue.push(new SegmentInternal(segmentId, segment.url, segment.priority));
-        });
+        }
 
         // emit segment loaded event if the segment has already been downloaded
         if (emitNowSegmentUrl) {
@@ -146,10 +146,10 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             if (!this.segments.has(segment.id)) {
                 if (segmentPriority < this.settings.requiredSegmentsCount) {
                     if (segmentPriority == 0 && !this.httpManager.isDownloading(segment) && this.httpManager.getActiveDownloads().size > 0) {
-                        this.segmentsQueue.forEach(s => {
-                                this.httpManager.abort(s);
-                                updateSegmentsMap = true;
-                            });
+                        for (const s of this.segmentsQueue) {
+                            this.httpManager.abort(s);
+                            updateSegmentsMap = true;
+                        }
                     }
 
                     if (this.httpManager.getActiveDownloads().size == 0) {

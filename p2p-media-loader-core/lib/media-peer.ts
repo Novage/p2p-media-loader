@@ -107,9 +107,9 @@ export class MediaPeer extends EventEmitter {
                         segmentPieces.sort((a, b) => a.index - b.index);
 
                         const stringData: number[] = [];
-                        segmentPieces.forEach((piece) => {
+                        for (const piece of segmentPieces) {
                             stringData.push(...piece.data);
-                        });
+                        }
 
                         this.segmentsPiecesData.delete(dataObject.id);
                         this.emit(MediaPeerEvents.DataSegmentLoaded, this, dataObject.id, Buffer.from(stringData).buffer);
@@ -191,12 +191,12 @@ export class MediaPeer extends EventEmitter {
     public sendSegmentData(segment: SegmentInternal): void {
         const segmentPieces = this.getSegmentPieces(segment);
 
-        for (let i = 0; i < segmentPieces.length; i++) {
+        for (const segmentPiece of segmentPieces) {
             this.sendCommand({
                 "command": MediaPeerCommands.SegmentData,
                 "id": segment.id,
-                "data": segmentPieces[i].data,
-                "pieceIndex": segmentPieces[i].index,
+                "data": segmentPiece.data,
+                "pieceIndex": segmentPiece.index,
                 "piecesCount": segmentPieces.length
             });
         }
