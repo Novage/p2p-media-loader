@@ -153,7 +153,7 @@ export class P2PMediaManager extends EventEmitter {
 
     public sendSegmentsMap(peerId: string, segmentsMap: string[][]): void {
         const peer = this.peers.get(peerId);
-        if (peer != undefined) {
+        if (peer) {
             peer.sendSegmentsMap(segmentsMap);
         }
     }
