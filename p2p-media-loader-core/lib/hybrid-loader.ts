@@ -157,7 +157,6 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
                     }
                 } else if (!this.httpManager.isDownloading(segment) && this.p2pManager.getActiveDownloadsCount() < this.settings.simultaneousP2PDownloads && downloadedSegmentsCount < this.settings.bufferSegmentsCount) {
                     this.p2pManager.download(segment);
-                    updateSegmentsMap = true;
                 }
             }
 
