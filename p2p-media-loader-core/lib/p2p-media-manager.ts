@@ -1,7 +1,7 @@
 import {EventEmitter} from "events";
 import {createHash} from "crypto";
 import {LoaderEvents} from "./loader-interface";
-import {MediaPeer, MediaPeerEvents} from "./media-peer";
+import {MediaPeer, MediaPeerEvents, MediaPeerSegmentStatus} from "./media-peer";
 import * as Debug from "debug";
 import SegmentInternal from "./segment-internal";
 const TrackerClient = require("bittorrent-tracker");
@@ -44,56 +44,60 @@ export class P2PMediaManager extends EventEmitter {
     }
 
     public setSwarmId(id: string): void {
-        if (this.swarmId !== id) {
-            this.swarmId = id;
-            this.debug("swarm", this.swarmId);
-
-            if (this.trackerClient) {
-                this.trackerClient.stop();
-                this.trackerClient.destroy();
-            }
-            this.peers.forEach((peer) => peer.destroy());
-            this.peers.clear();
-            this.createClient(createHash("sha1").update(id).digest("hex"));
+        if (this.swarmId == id) {
+            return;
         }
+
+        this.swarmId = id;
+        this.debug("swarm", this.swarmId);
+
+        if (this.trackerClient) {
+            this.trackerClient.stop();
+            this.trackerClient.destroy();
+        }
+        this.peers.forEach((peer) => peer.destroy());
+        this.peers.clear();
+        this.createClient(createHash("sha1").update(id).digest("hex"));
     }
 
     private createClient(infoHash: string): void {
-        if (this.announce && this.announce.length > 0) {
-            const clientOptions = {
-                infoHash: infoHash,
-                peerId: this.peerId,
-                announce: this.announce
-            };
-
-            this.trackerClient = new TrackerClient(clientOptions);
-            this.trackerClient.on("error", (error: any) => this.debug("client error", error));
-            this.trackerClient.on("warning", (error: any) => this.debug("client warning", error));
-            this.trackerClient.on("update", (data: any) => this.debug("client announce update", data));
-            this.trackerClient.on("peer", this.onClientPeer.bind(this));
-
-            this.trackerClient.start();
+        if (!this.announce || this.announce.length == 0) {
+            return;
         }
+
+        const clientOptions = {
+            infoHash: infoHash,
+            peerId: this.peerId,
+            announce: this.announce
+        };
+
+        this.trackerClient = new TrackerClient(clientOptions);
+        this.trackerClient.on("error", (error: any) => this.debug("client error", error));
+        this.trackerClient.on("warning", (error: any) => this.debug("client warning", error));
+        this.trackerClient.on("update", (data: any) => this.debug("client announce update", data));
+        this.trackerClient.on("peer", this.onClientPeer.bind(this));
+
+        this.trackerClient.start();
     }
 
-    private onClientPeer(trackerPeer: {id: string}) {
-        if (!this.peers.has(trackerPeer.id)) {
-
-            const peer = new MediaPeer(trackerPeer);
-
-            peer.on(MediaPeerEvents.Connect, this.onPeerConnect.bind(this));
-            peer.on(MediaPeerEvents.Close, this.onPeerClose.bind(this));
-            peer.on(MediaPeerEvents.Error, this.onPeerError.bind(this));
-            peer.on(MediaPeerEvents.DataSegmentsMap, this.onPeerDataSegmentsMap.bind(this));
-            peer.on(MediaPeerEvents.DataSegmentRequest, this.onPeerDataSegmentRequest.bind(this));
-            peer.on(MediaPeerEvents.DataSegmentLoaded, this.onPeerDataSegmentLoaded.bind(this));
-            peer.on(MediaPeerEvents.DataSegmentAbsent, this.onPeerDataSegmentAbsent.bind(this));
-            peer.on(LoaderEvents.PieceBytesLoaded, this.onPieceBytesLoaded.bind(this));
-
-            this.peers.set(trackerPeer.id, peer);
-        } else {
+    private onClientPeer(trackerPeer: {id: string}): void {
+        if (this.peers.has(trackerPeer.id)) {
             //this.debug("peer exists");
+            return;
         }
+
+        const peer = new MediaPeer(trackerPeer);
+
+        peer.on(MediaPeerEvents.Connect, this.onPeerConnect.bind(this));
+        peer.on(MediaPeerEvents.Close, this.onPeerClose.bind(this));
+        peer.on(MediaPeerEvents.Error, this.onPeerError.bind(this));
+        peer.on(MediaPeerEvents.DataSegmentsMap, this.onPeerDataSegmentsMap.bind(this));
+        peer.on(MediaPeerEvents.DataSegmentRequest, this.onPeerDataSegmentRequest.bind(this));
+        peer.on(MediaPeerEvents.DataSegmentLoaded, this.onPeerDataSegmentLoaded.bind(this));
+        peer.on(MediaPeerEvents.DataSegmentAbsent, this.onPeerDataSegmentAbsent.bind(this));
+        peer.on(LoaderEvents.PieceBytesLoaded, this.onPieceBytesLoaded.bind(this));
+
+        this.peers.set(trackerPeer.id, peer);
     }
 
     public download(segment: SegmentInternal): void {
@@ -102,7 +106,8 @@ export class P2PMediaManager extends EventEmitter {
         }
 
         const peer = Array.from(this.peers.values()).find((peer: MediaPeer) => {
-            return peer.hasSegment(segment.id) && peer.sendSegmentRequest(segment.id);
+            return (peer.getSegmentsMap().get(segment.id) === MediaPeerSegmentStatus.Loaded) &&
+                    peer.sendSegmentRequest(segment.id);
         });
 
         if (peer) {
@@ -143,10 +148,6 @@ export class P2PMediaManager extends EventEmitter {
         this.peerSegmentRequests.clear();
     }
 
-    private onPieceBytesLoaded(method: string, size: number, timestamp: number): void {
-        this.emit(LoaderEvents.PieceBytesLoaded, method, size, timestamp);
-    }
-
     public sendSegmentsMapToAll(segmentsMap: string[][]): void {
         this.peers.forEach((peer) => peer.sendSegmentsMap(segmentsMap));
     }
@@ -156,6 +157,23 @@ export class P2PMediaManager extends EventEmitter {
         if (peer) {
             peer.sendSegmentsMap(segmentsMap);
         }
+    }
+
+    public getOvrallSegmentsMap(): Map<string, MediaPeerSegmentStatus> {
+        const overallSegmentsMap: Map<string, MediaPeerSegmentStatus> = new Map();
+        this.peers.forEach(peer => peer.getSegmentsMap().forEach((segmentStatus, segmentId) => {
+            if (segmentStatus === MediaPeerSegmentStatus.Loaded) {
+                overallSegmentsMap.set(segmentId, MediaPeerSegmentStatus.Loaded);
+            } else if (!overallSegmentsMap.get(segmentId)) {
+                overallSegmentsMap.set(segmentId, MediaPeerSegmentStatus.LoadingByHttp);
+            }
+        }));
+
+        return overallSegmentsMap;
+    }
+
+    private onPieceBytesLoaded(method: string, size: number, timestamp: number): void {
+        this.emit(LoaderEvents.PieceBytesLoaded, method, size, timestamp);
     }
 
     private onPeerConnect(peer: MediaPeer): void {

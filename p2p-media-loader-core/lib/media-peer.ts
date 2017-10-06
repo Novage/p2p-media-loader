@@ -29,7 +29,7 @@ export enum MediaPeerEvents {
     DataSegmentAbsent = "peer_data_segment_absent"
 }
 
-export enum SegmentStatus {
+export enum MediaPeerSegmentStatus {
     Loaded = "loaded",
     LoadingByHttp = "loading_by_http"
 }
@@ -40,7 +40,7 @@ export class MediaPeer extends EventEmitter {
     public remoteAddress: string;
     private peer: any;
     private segmentsPiecesData: Map<string, SegmentPiece[]> = new Map();
-    private segments: Map<string, SegmentStatus> = new Map();
+    private segments: Map<string, MediaPeerSegmentStatus> = new Map();
     private pieceSize = 4 * 1024;
     private requestSegmentResponseTimeout = 3000;
     private requestSegmentResponseTimers: Map<string, Timer> = new Map();
@@ -180,11 +180,11 @@ export class MediaPeer extends EventEmitter {
         }
     }
 
-    public hasSegment(id: string): boolean {
-        return this.segments.get(id) === SegmentStatus.Loaded;
+    public getSegmentsMap(): Map<string, MediaPeerSegmentStatus> {
+        return this.segments;
     }
 
-    public sendSegmentsMap(segments: string[][]) {
+    public sendSegmentsMap(segments: string[][]): void {
         this.sendCommand({"command": MediaPeerCommands.SegmentsMap, "segments": segments});
     }
 
@@ -221,7 +221,7 @@ export class MediaPeer extends EventEmitter {
         return this.sendCommand({"command": MediaPeerCommands.CancelSegmentRequest, "id": id});
     }
 
-    private setResponseTimer(id: string) {
+    private setResponseTimer(id: string): void {
 
         let timer = this.requestSegmentResponseTimers.get(id);
         if (timer) {
@@ -239,7 +239,7 @@ export class MediaPeer extends EventEmitter {
         this.requestSegmentResponseTimers.set(id, timer);
     }
 
-    private removeResponseTimer(url: string) {
+    private removeResponseTimer(url: string): void {
         const timer = this.requestSegmentResponseTimers.get(url);
         if (timer) {
             clearTimeout(timer);

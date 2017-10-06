@@ -2,7 +2,7 @@ import {LoaderInterface, LoaderEvents, Segment} from "./loader-interface";
 import {EventEmitter} from "events";
 import HttpMediaManager from "./http-media-manager";
 import {P2PMediaManager, P2PMediaManagerEvents} from "./p2p-media-manager";
-import {MediaPeerEvents, SegmentStatus} from "./media-peer";
+import {MediaPeerEvents, MediaPeerSegmentStatus} from "./media-peer";
 import * as Debug from "debug";
 import SegmentInternal from "./segment-internal";
 
@@ -21,7 +21,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         requiredSegmentsCount: 2,
         useP2P: true,
         simultaneousP2PDownloads: 3,
-        lastSegmentProbability: 0.05,
+        lastSegmentProbability: 0.5,
         lastSegmentProbabilityInterval: 1000,
         bufferSegmentsCount: 20,
         trackerAnnounce: [ "wss://tracker.btorrent.xyz/", "wss://tracker.openwebtorrent.com/" ]
@@ -167,11 +167,11 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             }
         }
 
-        if (this.httpManager.getActiveDownloads().size > 0 || this.p2pManager.getActiveDownloadsCount() >= this.settings.simultaneousP2PDownloads) {
+        if (this.httpManager.getActiveDownloads().size > 0) {
             return updateSegmentsMap;
         }
 
-        const pendingQueue = this.segmentsQueue.filter(segment =>
+        let pendingQueue = this.segmentsQueue.filter(segment =>
             !this.segments.has(segment.id) &&
             !this.p2pManager.isDownloading(segment));
         downloadedSegmentsCount = this.segmentsQueue.length - pendingQueue.length;
@@ -180,26 +180,24 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             return updateSegmentsMap;
         }
 
-        let segmentForHttpDownload: SegmentInternal | null = null;
-
-        if (pendingQueue.length == 1 && pendingQueue[0].url == this.segmentsQueue[this.segmentsQueue.length - 1].url) {
-            const now = Date.now();
-            if (now - this.lastSegmentProbabilityTimestamp < this.settings.lastSegmentProbabilityInterval) {
-                return updateSegmentsMap;
-            }
-
-            this.lastSegmentProbabilityTimestamp = now;
-            if (Math.random() <= this.settings.lastSegmentProbability) {
-                segmentForHttpDownload = pendingQueue[0];
-            }
+        const now = Date.now();
+        if (now - this.lastSegmentProbabilityTimestamp < this.settings.lastSegmentProbabilityInterval) {
+            return updateSegmentsMap;
         } else {
-            const random_index = Math.floor(Math.random() * Math.min(pendingQueue.length, this.settings.bufferSegmentsCount));
-            segmentForHttpDownload = pendingQueue[random_index];
+            this.lastSegmentProbabilityTimestamp = now;
         }
 
-        if (segmentForHttpDownload) {
+        const segmentsMap = this.p2pManager.getOvrallSegmentsMap();
+        pendingQueue = pendingQueue.filter(segment => !segmentsMap.get(segment.id));
+
+        if (pendingQueue.length == 0) {
+            return updateSegmentsMap;
+        }
+
+        if (Math.random() <= this.settings.lastSegmentProbability) {
             this.debug("Random HTTP download:");
-            this.httpManager.download(segmentForHttpDownload);
+            const random_index = Math.floor(Math.random() * Math.min(pendingQueue.length, this.settings.bufferSegmentsCount));
+            this.httpManager.download(pendingQueue[random_index]);
             updateSegmentsMap = true;
         }
 
@@ -236,8 +234,8 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
     private createSegmentsMap(): string[][] {
         const segmentsMap: string[][] = [];
-        this.segments.forEach((value, key) => segmentsMap.push([key, SegmentStatus.Loaded]));
-        this.httpManager.getActiveDownloads().forEach((value, key) => segmentsMap.push([key, SegmentStatus.LoadingByHttp]));
+        this.segments.forEach((value, key) => segmentsMap.push([key, MediaPeerSegmentStatus.Loaded]));
+        this.httpManager.getActiveDownloads().forEach((value, key) => segmentsMap.push([key, MediaPeerSegmentStatus.LoadingByHttp]));
         return segmentsMap;
     }
 

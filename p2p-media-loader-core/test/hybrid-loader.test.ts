@@ -5,10 +5,9 @@ import {LoaderEvents, Segment} from "../lib/loader-interface";
 import {anyFunction, anyOfClass, anyString, instance, mock, verify, when} from "ts-mockito";
 import * as assert from "assert";
 import {P2PMediaManager, P2PMediaManagerEvents} from "../lib/p2p-media-manager";
-import {MediaPeerEvents} from "../lib/media-peer";
+import {MediaPeerEvents, MediaPeerSegmentStatus} from "../lib/media-peer";
 
 describe("HybridLoader", () => {
-
     // HttpMediaManager mock
     const httpMediaManger = mock(HttpMediaManager);
     const httpDownloads: Map<string, SegmentInternal> = new Map();
@@ -62,6 +61,9 @@ describe("HybridLoader", () => {
     when(p2pMediaManager.setSwarmId(anyString())).thenCall((id) => {
         swarmId = id;
     });
+    when(p2pMediaManager.getOvrallSegmentsMap()).thenCall(() => {
+        return new Map<string, MediaPeerSegmentStatus>();
+    });
     let p2pSegmentLoadedListener: Function = () => {};
     when(p2pMediaManager.on(LoaderEvents.SegmentLoaded, anyFunction())).thenCall((event, listener) => {
         p2pSegmentLoadedListener = listener;
@@ -107,7 +109,6 @@ describe("HybridLoader", () => {
         const hybridLoader = new HybridLoader(settings);
         verify(httpMediaManger.on(LoaderEvents.SegmentLoaded, anyFunction())).once();
 
-
         const segments: Segment[] = [
             new Segment("u1", 0),
             new Segment("u2", 1),
@@ -138,25 +139,6 @@ describe("HybridLoader", () => {
         segment = httpDownloads.values().next().value;
         verify(httpMediaManger.download(segment)).once();
         assert.deepEqual(segment, {id: segments[1].url, url: segments[1].url, priority: segments[1].priority});
-
-        // file loaded via http
-        httpDownloads.clear();
-        httpSegmentLoadedListener(segments[1].url, segments[1].url, new ArrayBuffer(2));
-        assert.equal(httpDownloads.size, 1);
-        segment = httpDownloads.values().next().value;
-        verify(httpMediaManger.download(segment)).once();
-        assert.ok([segments[2].url, segments[3].url, segments[4].url].find(id => id === segment.id) != undefined);
-
-        const i = segment.id === segments[2].url ? 3 : 2;
-        p2pAvailableFiles.push(new SegmentInternal(segments[i].url, segments[i].url, segments[i].priority));
-        p2pForceProcessingListener();
-        assert.equal(httpDownloads.size, 1);
-        segment = httpDownloads.values().next().value;
-        verify(httpMediaManger.download(segment)).once();
-        assert.ok([segments[2].url, segments[3].url, segments[4].url].find(id => id === segment.id) != undefined);
-        assert.equal(p2pDownloads.length, 1);
-        //verify(p2pMediaManager.download(p2pDownloads[0])).once();
-        //assert.ok(httpDownloads[0].id === segments[2].url || httpDownloads[0].id === segments[3].url || httpDownloads[0].id === segments[4].url);
     });
 
 });
