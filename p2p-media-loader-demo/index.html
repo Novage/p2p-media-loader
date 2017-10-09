@@ -179,9 +179,6 @@
             this.playerType = videoUrlForm.type.value;
             this.videoContainer = document.getElementById("video_container");
 
-            this.graph = new P2PGraphClass("#graph");
-            this.graph.add({ id: "me", name: "You", me: true });
-
             this.downloadSpeedTimespan = 10; // seconds
 
             var wowzaSegmentRegExp = /(.+)_w\d{6,}_(.+)/g;
@@ -193,6 +190,8 @@
                 segmentIdGenerator: wowzaSegmentIdGenerator
             };
 
+            this.graph = new P2PGraphClass("#graph");
+            this.graph.add({ id: "me", name: "You", me: true });
             this.initChart();
             this.restartDemo();
         }
@@ -449,6 +448,10 @@
         };
 
         DemoApp.prototype.refreshChart = function () {
+        	if (!this.chart) {
+        		return;
+        	}
+
             var data0 = this.chart.series[0].data;
             var data1 = this.chart.series[1].data;
             var data2 = this.chart.series[2].data;
@@ -471,31 +474,29 @@
         };
 
         DemoApp.prototype.updateChartData = function () {
-            if (this.chart) {
-                var speed = this.getDownloadSpeed();
-                var http = Number((speed.http * 8 / 1000000).toFixed(2));
-                var p2p = Number((speed.p2p * 8 / 1000000).toFixed(2));
-                var total = Number((http + p2p).toFixed(2));
+            var speed = this.getDownloadSpeed();
+            var http = Number((speed.http * 8 / 1000000).toFixed(2));
+            var p2p = Number((speed.p2p * 8 / 1000000).toFixed(2));
+            var total = Number((http + p2p).toFixed(2));
 
-                var data0 = this.chart.series[0].data;
-                var data1 = this.chart.series[1].data;
-                var data2 = this.chart.series[2].data;
-                var x = data0.length > 0 ? data0[data0.length - 1].x + 1 : 0;
+            var data0 = this.chart.series[0].data;
+            var data1 = this.chart.series[1].data;
+            var data2 = this.chart.series[2].data;
+            var x = data0.length > 0 ? data0[data0.length - 1].x + 1 : 0;
 
-                data0.shift();
-                data1.shift();
-                data2.shift();
-                data0.push({x: x, y: total});
-                data1.push({x: x, y: total});
-                data2.push({x: x, y: http});
-                this.chart.update();
+            data0.shift();
+            data1.shift();
+            data2.shift();
+            data0.push({x: x, y: total});
+            data1.push({x: x, y: total});
+            data2.push({x: x, y: http});
+            this.chart.update();
 
-                this.formatChartLegendLine(0, http);
-                this.formatChartLegendLine(1, p2p);
-                this.formatChartLegendLine(2, total);
+            this.formatChartLegendLine(0, http);
+            this.formatChartLegendLine(1, p2p);
+            this.formatChartLegendLine(2, total);
 
-                this.updateLegendTotals();
-            }
+            this.updateLegendTotals();
         };
 
         DemoApp.prototype.formatChartLegendLine = function (index, speed) {
@@ -561,6 +562,10 @@
         };
 
         DemoApp.prototype.refreshGraph = function (p2pLoader) {
+        	if (!this.graph) {
+        		return;
+        	}
+
             var nodes = this.graph.list();
             for (var i = 0; i < nodes.length; i++) {
                 if (nodes[i].id !== "me") {
