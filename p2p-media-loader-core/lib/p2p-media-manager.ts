@@ -91,10 +91,11 @@ export class P2PMediaManager extends EventEmitter {
         peer.on(MediaPeerEvents.Connect, this.onPeerConnect.bind(this));
         peer.on(MediaPeerEvents.Close, this.onPeerClose.bind(this));
         peer.on(MediaPeerEvents.Error, this.onPeerError.bind(this));
-        peer.on(MediaPeerEvents.DataSegmentsMap, this.onPeerDataSegmentsMap.bind(this));
-        peer.on(MediaPeerEvents.DataSegmentRequest, this.onPeerDataSegmentRequest.bind(this));
-        peer.on(MediaPeerEvents.DataSegmentLoaded, this.onPeerDataSegmentLoaded.bind(this));
-        peer.on(MediaPeerEvents.DataSegmentAbsent, this.onPeerDataSegmentAbsent.bind(this));
+        peer.on(MediaPeerEvents.SegmentsMap, this.onSegmentsMap.bind(this));
+        peer.on(MediaPeerEvents.SegmentRequest, this.onSegmentRequest.bind(this));
+        peer.on(MediaPeerEvents.SegmentLoaded, this.onSegmentLoaded.bind(this));
+        peer.on(MediaPeerEvents.SegmentAbsent, this.onSegmentAbsent.bind(this));
+        peer.on(MediaPeerEvents.SegmentError, this.onSegmentError.bind(this));
         peer.on(LoaderEvents.PieceBytesLoaded, this.onPieceBytesLoaded.bind(this));
 
         this.peers.set(trackerPeer.id, peer);
@@ -107,7 +108,7 @@ export class P2PMediaManager extends EventEmitter {
 
         const peer = Array.from(this.peers.values()).find((peer: MediaPeer) => {
             return (peer.getSegmentsMap().get(segment.id) === MediaPeerSegmentStatus.Loaded) &&
-                    peer.sendSegmentRequest(segment.id);
+                    peer.requestSegment(segment.id);
         });
 
         if (peer) {
@@ -123,7 +124,7 @@ export class P2PMediaManager extends EventEmitter {
         if (peerSegmentRequest) {
             const peer = this.peers.get(peerSegmentRequest.peerId);
             if (peer) {
-                peer.sendCancelSegmentRequest(segment.id);
+                peer.cancelSegmentRequest(segment.id);
             }
             this.peerSegmentRequests.delete(segment.id);
             this.debug("p2p segment abort", segment.id, segment.url);
@@ -202,31 +203,40 @@ export class P2PMediaManager extends EventEmitter {
         this.debug("onPeerError", peer, error);
     }
 
-    private onPeerDataSegmentsMap(): void {
+    private onSegmentsMap(): void {
         this.emit(P2PMediaManagerEvents.PeerDataUpdated);
     }
 
-    private onPeerDataSegmentRequest(peer: MediaPeer, id: string): void {
-        const segment = this.segments.get(id);
+    private onSegmentRequest(peer: MediaPeer, segmentId: string): void {
+        const segment = this.segments.get(segmentId);
         if (segment) {
             peer.sendSegmentData(segment);
         } else {
-            peer.sendSegmentAbsent(id);
+            peer.sendSegmentAbsent(segmentId);
         }
     }
 
-    private onPeerDataSegmentLoaded(peer: MediaPeer, id: string, data: ArrayBuffer): void {
-        const peerSegmentRequest = this.peerSegmentRequests.get(id);
+    private onSegmentLoaded(peer: MediaPeer, segmentId: string, data: ArrayBuffer): void {
+        const peerSegmentRequest = this.peerSegmentRequests.get(segmentId);
         if (peerSegmentRequest) {
-            this.peerSegmentRequests.delete(id);
-            this.emit(LoaderEvents.SegmentLoaded, id, peerSegmentRequest.segmentUrl, data);
+            this.peerSegmentRequests.delete(segmentId);
+            this.emit(LoaderEvents.SegmentLoaded, segmentId, peerSegmentRequest.segmentUrl, data);
             this.debug("p2p segment loaded", peerSegmentRequest.segmentUrl);
         }
     }
 
-    private onPeerDataSegmentAbsent(peer: MediaPeer, id: string): void {
-        this.peerSegmentRequests.delete(id);
+    private onSegmentAbsent(peer: MediaPeer, segmentId: string): void {
+        this.peerSegmentRequests.delete(segmentId);
         this.emit(P2PMediaManagerEvents.PeerDataUpdated);
+    }
+
+    private onSegmentError(peer: MediaPeer, segmentId: string, description: string): void {
+        const peerSegmentRequest = this.peerSegmentRequests.get(segmentId);
+        if (peerSegmentRequest) {
+            this.peerSegmentRequests.delete(segmentId);
+            this.emit(LoaderEvents.SegmentError, peerSegmentRequest.segmentUrl, description);
+            this.debug("p2p segment download failed", segmentId, description);
+        }
     }
 
 }
