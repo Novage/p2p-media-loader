@@ -188,7 +188,7 @@ export class MediaPeer extends EventEmitter {
         while (bytesLeft > 0) {
             const bytesToSend = (bytesLeft >= MAX_MESSAGE_SIZE ? MAX_MESSAGE_SIZE : bytesLeft);
             // Using Buffer.from because TypedArrays as input to this function cause memory copying
-            this.peer.write(new Buffer.from(segment.data, segment.data.byteLength - bytesLeft, bytesToSend));
+            this.peer.write(Buffer.from(segment.data, segment.data.byteLength - bytesLeft, bytesToSend));
             bytesLeft -= bytesToSend;
         }
     }
