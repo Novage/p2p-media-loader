@@ -123,7 +123,7 @@ describe("HybridLoader", () => {
         assert.equal(httpDownloads.size, 1);
         let segment = httpDownloads.values().next().value;
         verify(httpMediaManger.download(segment)).once();
-        assert.deepEqual(segment, {id: segments[0].url, url: segments[0].url, priority: segments[0].priority});
+        assert.deepEqual(segment, {id: segments[0].url, url: segments[0].url, priority: segments[0].priority, lastAccessed: 0, data: undefined});
 
         // file loaded via http
         httpDownloads.clear();
@@ -131,14 +131,14 @@ describe("HybridLoader", () => {
         assert.equal(httpDownloads.size, 1);
         segment = httpDownloads.values().next().value;
         verify(httpMediaManger.download(segment)).once();
-        assert.deepEqual(segment, {id: segments[1].url, url: segments[1].url, priority: segments[1].priority});
+        assert.deepEqual(segment, {id: segments[1].url, url: segments[1].url, priority: segments[1].priority, lastAccessed: 0, data: undefined});
 
         // load same files
         hybridLoader.load(segments, swarmId, segments[1].url);
         assert.equal(httpDownloads.size, 1);
         segment = httpDownloads.values().next().value;
         verify(httpMediaManger.download(segment)).once();
-        assert.deepEqual(segment, {id: segments[1].url, url: segments[1].url, priority: segments[1].priority});
+        assert.deepEqual(segment, {id: segments[1].url, url: segments[1].url, priority: segments[1].priority, lastAccessed: 0, data: undefined});
     });
 
 });
