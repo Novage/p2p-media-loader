@@ -101,22 +101,24 @@ export class P2PMediaManager extends EventEmitter {
         this.peers.set(trackerPeer.id, peer);
     }
 
-    public download(segment: SegmentInternal): void {
+    public download(segment: SegmentInternal): boolean {
         if (this.isDownloading(segment)) {
-            return;
+            return false;
         }
 
         const peer = Array.from(this.peers.values()).find((peer: MediaPeer) => {
-            return (peer.getSegmentsMap().get(segment.id) === MediaPeerSegmentStatus.Loaded) &&
-                    peer.requestSegment(segment.id);
+            return (peer.getDownloadingSegmentId() == null) &&
+                (peer.getSegmentsMap().get(segment.id) === MediaPeerSegmentStatus.Loaded) &&
+                peer.requestSegment(segment.id);
         });
 
         if (peer) {
-            this.debug("p2p segment download", segment.id, segment.url);
             this.peerSegmentRequests.set(segment.id, new PeerSegmentRequest(peer.id, segment.url));
-        } else {
-            //this.debug("p2p segment not found", segment.id);
+            this.debug("p2p segment download", segment.id, segment.url);
+            return true;
         }
+
+        return false;
     }
 
     public abort(segment: SegmentInternal): void {
@@ -124,7 +126,7 @@ export class P2PMediaManager extends EventEmitter {
         if (peerSegmentRequest) {
             const peer = this.peers.get(peerSegmentRequest.peerId);
             if (peer) {
-                peer.cancelSegmentRequest(segment.id);
+                peer.cancelSegmentRequest();
             }
             this.peerSegmentRequests.delete(segment.id);
             this.debug("p2p segment abort", segment.id, segment.url);
@@ -182,20 +184,14 @@ export class P2PMediaManager extends EventEmitter {
     }
 
     private onPeerClose(peer: MediaPeer): void {
-        let isUpdated = false;
         this.peerSegmentRequests.forEach((value, key) => {
             if (value.peerId === peer.id) {
                 this.peerSegmentRequests.delete(key);
-                isUpdated = true;
             }
         });
 
         this.peers.delete(peer.id);
-
-        if (isUpdated) {
-            this.emit(P2PMediaManagerEvents.PeerDataUpdated);
-        }
-
+        this.emit(P2PMediaManagerEvents.PeerDataUpdated);
         this.emit(MediaPeerEvents.Close, peer.id);
     }
 

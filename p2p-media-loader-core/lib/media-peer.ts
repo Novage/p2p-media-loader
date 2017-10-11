@@ -40,8 +40,8 @@ export class MediaPeer extends EventEmitter {
     public id: string;
     public remoteAddress: string;
     private peer: any;
+    private downloadingSegmentId: string | null = null;
     private downloadingSegment: DownloadingSegment | null = null;
-    private segmentsForDownload: Set<string> = new Set();
     private segmentsMap: Map<string, MediaPeerSegmentStatus> = new Map();
     private debug = Debug("p2pml:media-peer");
 
@@ -63,6 +63,8 @@ export class MediaPeer extends EventEmitter {
     }
 
     private onPeerClose(): void {
+        this.downloadingSegmentId = null;
+        this.downloadingSegment = null;
         this.emit(MediaPeerEvents.Close, this);
     }
 
@@ -92,6 +94,8 @@ export class MediaPeer extends EventEmitter {
             this.downloadingSegment.pieces.push(data);
             this.emit(LoaderEvents.PieceBytesLoaded, "p2p", data.byteLength, Date.now());
 
+            const segmentId = this.downloadingSegment.id;
+
             if (this.downloadingSegment.bytesDownloaded == this.downloadingSegment.size) {
                 const segmentData = new Uint8Array(this.downloadingSegment.size);
                 let offset = 0;
@@ -100,19 +104,23 @@ export class MediaPeer extends EventEmitter {
                     offset += piece.byteLength;
                 }
 
-                this.emit(MediaPeerEvents.SegmentLoaded, this, this.downloadingSegment.id, segmentData.buffer);
                 this.downloadingSegment = null;
+                this.downloadingSegmentId = null;
+                this.emit(MediaPeerEvents.SegmentLoaded, this, segmentId, segmentData.buffer);
             } else if (this.downloadingSegment.bytesDownloaded > this.downloadingSegment.size) {
-                this.emit(MediaPeerEvents.SegmentError, this, this.downloadingSegment.id, "Too many bytes received for segment");
                 this.downloadingSegment = null;
+                this.downloadingSegmentId = null;
+                this.emit(MediaPeerEvents.SegmentError, this, segmentId, "Too many bytes received for segment");
             }
 
             return;
         }
 
         if (this.downloadingSegment) {
-            this.emit(MediaPeerEvents.SegmentError, this, this.downloadingSegment.id, "Segment download interrupted by a command");
+            const segmentId = this.downloadingSegment.id;
             this.downloadingSegment = null;
+            this.downloadingSegmentId = null;
+            this.emit(MediaPeerEvents.SegmentError, this, segmentId, "Segment download interrupted by a command");
             return;
         }
 
@@ -128,16 +136,17 @@ export class MediaPeer extends EventEmitter {
                 break;
 
             case MediaPeerCommands.SegmentData:
-                if (this.segmentsForDownload.has(command.segment_id)) {
+                if (this.downloadingSegmentId === command.segment_id) {
                     this.downloadingSegment = new DownloadingSegment(command.segment_id, command.segment_size);
-                    this.segmentsForDownload.delete(command.segment_id);
                 }
                 break;
 
             case MediaPeerCommands.SegmentAbsent:
-                this.segmentsForDownload.delete(command.segment_id);
-                this.segmentsMap.delete(command.segment_id);
-                this.emit(MediaPeerEvents.SegmentAbsent, this, command.segment_id);
+                if (this.downloadingSegmentId === command.segment_id) {
+                    this.downloadingSegmentId = null;
+                    this.segmentsMap.delete(command.segment_id);
+                    this.emit(MediaPeerEvents.SegmentAbsent, this, command.segment_id);
+                }
                 break;
 
             case MediaPeerCommands.CancelSegmentRequest:
@@ -163,9 +172,15 @@ export class MediaPeer extends EventEmitter {
     }
 
     public destroy(): void {
+        this.downloadingSegmentId = null;
+        this.downloadingSegment = null;
         if (this.peer.connected) {
             this.peer.destroy();
         }
+    }
+
+    public getDownloadingSegmentId(): string | null {
+        return this.downloadingSegmentId;
     }
 
     public getSegmentsMap(): Map<string, MediaPeerSegmentStatus> {
@@ -197,20 +212,24 @@ export class MediaPeer extends EventEmitter {
     }
 
     public requestSegment(segmentId: string): boolean {
+        if (this.downloadingSegmentId) {
+            throw new Error("A segment is already downloading: " + this.downloadingSegmentId);
+        }
+
         if (this.sendCommand({"command": MediaPeerCommands.SegmentRequest, "segment_id": segmentId})) {
-            this.segmentsForDownload.add(segmentId);
+            this.downloadingSegmentId = segmentId;
             return true;
         }
 
         return false;
     }
 
-    public cancelSegmentRequest(segmentId: string): boolean {
-        this.segmentsForDownload.delete(segmentId);
-        if (this.downloadingSegment && this.downloadingSegment.id == segmentId) {
+    public cancelSegmentRequest(): void {
+        if (this.downloadingSegmentId) {
+            this.downloadingSegmentId = null;
             this.downloadingSegment = null;
+            this.sendCommand({"command": MediaPeerCommands.CancelSegmentRequest, "segment_id": this.downloadingSegmentId});
         }
-        return this.sendCommand({"command": MediaPeerCommands.CancelSegmentRequest, "segment_id": segmentId});
     }
 
 }
