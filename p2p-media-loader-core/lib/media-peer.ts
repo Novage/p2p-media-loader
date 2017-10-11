@@ -2,7 +2,7 @@ import {EventEmitter} from "events";
 import {LoaderEvents} from "./loader-interface";
 import * as Debug from "debug";
 import SegmentInternal from "./segment-internal";
-let Buffer = require('buffer').Buffer;
+const Buffer = require("buffer").Buffer;
 
 enum MediaPeerCommands {
     SegmentData = "segment_data",
