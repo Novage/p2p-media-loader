@@ -155,10 +155,13 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
                     if (this.httpManager.getActiveDownloads().size == 0) {
                         this.p2pManager.abort(segment);
                         this.httpManager.download(segment);
+                        this.debug("HTTP download (priority)", segment.priority, segment.url);
                         updateSegmentsMap = true;
                     }
                 } else if (!this.httpManager.isDownloading(segment) && this.p2pManager.getActiveDownloadsCount() < this.settings.simultaneousP2PDownloads && downloadedSegmentsCount < this.settings.bufferSegmentsCount) {
-                    this.p2pManager.download(segment);
+                    if (this.p2pManager.download(segment)) {
+                        this.debug("P2P download", segment.priority, segment.url);
+                    }
                 }
             }
 
@@ -195,9 +198,10 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         }
 
         if (Math.random() <= this.settings.httpDownloadProbability) {
-            this.debug("Random HTTP download:");
             const random_index = Math.floor(Math.random() * Math.min(pendingQueue.length, this.settings.bufferSegmentsCount));
-            this.httpManager.download(pendingQueue[random_index]);
+            const segment = pendingQueue[random_index];
+            this.debug("HTTP download (random)", segment.priority, segment.url);
+            this.httpManager.download(segment);
             updateSegmentsMap = true;
         }
 
