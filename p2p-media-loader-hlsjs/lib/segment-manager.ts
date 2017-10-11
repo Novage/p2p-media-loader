@@ -118,7 +118,7 @@ export default class SegmentManager {
         if (this.task && this.task.url === segment.url) {
             this.playQueue.push(segment.url);
             if (this.task.onSuccess) {
-                this.task.onSuccess(segment.data);
+                this.task.onSuccess(segment.data!.slice(0));
             }
             this.task = undefined;
         }
