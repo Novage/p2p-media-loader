@@ -1,12 +1,13 @@
 export class Segment {
 
     public url: string;
-    public data: ArrayBuffer;
     public priority: number;
+    public data: ArrayBuffer | undefined;
 
-    public constructor(url: string, priority: number = 0) {
+    public constructor(url: string, priority: number = 0, data: ArrayBuffer | undefined = undefined) {
         this.url = url;
         this.priority = priority;
+        this.data = data;
     }
 
 }

@@ -1,7 +1,6 @@
 import {EventEmitter} from "events";
 import {LoaderEvents} from "./loader-interface";
 import * as Debug from "debug";
-import SegmentInternal from "./segment-internal";
 const Buffer = require("buffer").Buffer;
 
 enum MediaPeerCommands {
@@ -177,18 +176,18 @@ export class MediaPeer extends EventEmitter {
         this.sendCommand({"command": MediaPeerCommands.SegmentsMap, "segments": segments});
     }
 
-    public sendSegmentData(segment: SegmentInternal): void {
+    public sendSegmentData(segmentId: string, data: ArrayBuffer): void {
         this.sendCommand({
             "command": MediaPeerCommands.SegmentData,
-            "segment_id": segment.id,
-            "segment_size": segment.data.byteLength
+            "segment_id": segmentId,
+            "segment_size": data.byteLength
         });
 
-        let bytesLeft = segment.data.byteLength;
+        let bytesLeft = data.byteLength;
         while (bytesLeft > 0) {
             const bytesToSend = (bytesLeft >= MAX_MESSAGE_SIZE ? MAX_MESSAGE_SIZE : bytesLeft);
             // Using Buffer.from because TypedArrays as input to this function cause memory copying
-            this.peer.write(Buffer.from(segment.data, segment.data.byteLength - bytesLeft, bytesToSend));
+            this.peer.write(Buffer.from(data, data.byteLength - bytesLeft, bytesToSend));
             bytesLeft -= bytesToSend;
         }
     }

@@ -210,7 +210,7 @@ export class P2PMediaManager extends EventEmitter {
     private onSegmentRequest(peer: MediaPeer, segmentId: string): void {
         const segment = this.segments.get(segmentId);
         if (segment) {
-            peer.sendSegmentData(segment);
+            peer.sendSegmentData(segmentId, segment.data!);
         } else {
             peer.sendSegmentAbsent(segmentId);
         }
