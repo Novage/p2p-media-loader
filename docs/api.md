@@ -33,14 +33,14 @@ Every setting is optional until opposite explicitly stated.
         - when this value exceeds for any particular segment, it will be
           dropped from the cache
         - default is `300000` (5 mins)
-    + `lastSegmentProbability`
+    + `httpDownloadProbability`
         - a positive float `Number` from 0.01 to 0.99
-        - ???
-        - default is `0.05`
-    + `lastSegmentProbabilityInterval`
+        - probalility to download segment by HTTP
+        - default is `0.25`
+    + `httpDownloadProbabilityInterval`
         - a positive integer `Number` in milliseconds
-        - ???
-        - default is `1000`
+        - interval to probe HTTP segment download
+        - default is `500`
     + `maxCacheSegmentsCount`
         - a positive integer `Number`
         - when this value exceeds, oldest segment will be dropped from

@@ -13,7 +13,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private segments: Map<string, SegmentInternal> = new Map();
     private segmentsQueue: SegmentInternal[] = [];
     private debug = Debug("p2pml:hybrid-loader");
-    private lastSegmentProbabilityTimestamp = 0;
+    private httpDownloadProbabilityTimestamp = 0;
     private settings = {
         segmentIdGenerator: (url: string): string => url,
         cacheSegmentExpiration: 5 * 60 * 1000, // milliseconds
@@ -21,8 +21,8 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         requiredSegmentsCount: 2,
         useP2P: true,
         simultaneousP2PDownloads: 3,
-        lastSegmentProbability: 0.5,
-        lastSegmentProbabilityInterval: 1000,
+        httpDownloadProbability: 0.25,
+        httpDownloadProbabilityInterval: 500,
         bufferSegmentsCount: 20,
         trackerAnnounce: [ "wss://tracker.btorrent.xyz/", "wss://tracker.openwebtorrent.com/" ]
     };
@@ -171,6 +171,13 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             return updateSegmentsMap;
         }
 
+        const now = Date.now();
+        if (now - this.httpDownloadProbabilityTimestamp < this.settings.httpDownloadProbabilityInterval) {
+            return updateSegmentsMap;
+        } else {
+            this.httpDownloadProbabilityTimestamp = now;
+        }
+
         let pendingQueue = this.segmentsQueue.filter(segment =>
             !this.segments.has(segment.id) &&
             !this.p2pManager.isDownloading(segment));
@@ -180,13 +187,6 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             return updateSegmentsMap;
         }
 
-        const now = Date.now();
-        if (now - this.lastSegmentProbabilityTimestamp < this.settings.lastSegmentProbabilityInterval) {
-            return updateSegmentsMap;
-        } else {
-            this.lastSegmentProbabilityTimestamp = now;
-        }
-
         const segmentsMap = this.p2pManager.getOvrallSegmentsMap();
         pendingQueue = pendingQueue.filter(segment => !segmentsMap.get(segment.id));
 
@@ -194,7 +194,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             return updateSegmentsMap;
         }
 
-        if (Math.random() <= this.settings.lastSegmentProbability) {
+        if (Math.random() <= this.settings.httpDownloadProbability) {
             this.debug("Random HTTP download:");
             const random_index = Math.floor(Math.random() * Math.min(pendingQueue.length, this.settings.bufferSegmentsCount));
             this.httpManager.download(pendingQueue[random_index]);
