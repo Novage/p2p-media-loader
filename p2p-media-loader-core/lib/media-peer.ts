@@ -72,47 +72,55 @@ export class MediaPeer extends EventEmitter {
         this.emit(MediaPeerEvents.Error, this, error);
     }
 
-    private onPeerData(data: ArrayBuffer): void {
-        const bytes = new Uint8Array(data);
-        let command: any = null;
+    private receiveSegmentPiece(data: ArrayBuffer): void {
+        if (!this.downloadingSegment) {
+            // The segment was not requested or canceled
+            return;
+        }
 
-        // JSON string check by first, second and last characters: '{" .... }'
+        this.downloadingSegment.bytesDownloaded += data.byteLength;
+        this.downloadingSegment.pieces.push(data);
+        this.emit(LoaderEvents.PieceBytesLoaded, "p2p", data.byteLength, Date.now());
+
+        const segmentId = this.downloadingSegment.id;
+
+        if (this.downloadingSegment.bytesDownloaded == this.downloadingSegment.size) {
+            const segmentData = new Uint8Array(this.downloadingSegment.size);
+            let offset = 0;
+            for (const piece of this.downloadingSegment.pieces) {
+                segmentData.set(new Uint8Array(piece), offset);
+                offset += piece.byteLength;
+            }
+
+            this.downloadingSegment = null;
+            this.downloadingSegmentId = null;
+            this.emit(MediaPeerEvents.SegmentLoaded, this, segmentId, segmentData.buffer);
+        } else if (this.downloadingSegment.bytesDownloaded > this.downloadingSegment.size) {
+            this.downloadingSegment = null;
+            this.downloadingSegmentId = null;
+            this.emit(MediaPeerEvents.SegmentError, this, segmentId, "Too many bytes received for segment");
+        }
+    }
+
+    private getJsonCommand(data: ArrayBuffer): any {
+        const bytes = new Uint8Array(data);
+
+        // Serialized JSON string check by first, second and last characters: '{" .... }'
         if (bytes[0] == 123 && bytes[1] == 34 && bytes[data.byteLength - 1] == 125) {
             try {
-                command = JSON.parse(new TextDecoder("utf-8").decode(data));
+                return JSON.parse(new TextDecoder("utf-8").decode(data));
             } catch {
             }
         }
 
+        return null;
+    }
+
+    private onPeerData(data: ArrayBuffer): void {
+        let command = this.getJsonCommand(data);
+
         if (command == null) {
-            if (!this.downloadingSegment) {
-                // The segment was not requested or canceled
-                return;
-            }
-
-            this.downloadingSegment.bytesDownloaded += data.byteLength;
-            this.downloadingSegment.pieces.push(data);
-            this.emit(LoaderEvents.PieceBytesLoaded, "p2p", data.byteLength, Date.now());
-
-            const segmentId = this.downloadingSegment.id;
-
-            if (this.downloadingSegment.bytesDownloaded == this.downloadingSegment.size) {
-                const segmentData = new Uint8Array(this.downloadingSegment.size);
-                let offset = 0;
-                for (const piece of this.downloadingSegment.pieces) {
-                    segmentData.set(new Uint8Array(piece), offset);
-                    offset += piece.byteLength;
-                }
-
-                this.downloadingSegment = null;
-                this.downloadingSegmentId = null;
-                this.emit(MediaPeerEvents.SegmentLoaded, this, segmentId, segmentData.buffer);
-            } else if (this.downloadingSegment.bytesDownloaded > this.downloadingSegment.size) {
-                this.downloadingSegment = null;
-                this.downloadingSegmentId = null;
-                this.emit(MediaPeerEvents.SegmentError, this, segmentId, "Too many bytes received for segment");
-            }
-
+            this.receiveSegmentPiece(data);
             return;
         }
 
@@ -120,7 +128,7 @@ export class MediaPeer extends EventEmitter {
             const segmentId = this.downloadingSegment.id;
             this.downloadingSegment = null;
             this.downloadingSegmentId = null;
-            this.emit(MediaPeerEvents.SegmentError, this, segmentId, "Segment download interrupted by a command");
+            this.emit(MediaPeerEvents.SegmentError, this, segmentId, "Segment download is interrupted by a command");
             return;
         }
 
