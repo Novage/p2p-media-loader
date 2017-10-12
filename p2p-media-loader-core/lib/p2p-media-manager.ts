@@ -96,6 +96,7 @@ export class P2PMediaManager extends EventEmitter {
         peer.on(MediaPeerEvents.SegmentLoaded, this.onSegmentLoaded.bind(this));
         peer.on(MediaPeerEvents.SegmentAbsent, this.onSegmentAbsent.bind(this));
         peer.on(MediaPeerEvents.SegmentError, this.onSegmentError.bind(this));
+        peer.on(MediaPeerEvents.SegmentTimeout, this.onSegmentTimeout.bind(this));
         peer.on(LoaderEvents.PieceBytesLoaded, this.onPieceBytesLoaded.bind(this));
 
         this.peers.set(trackerPeer.id, peer);
@@ -232,6 +233,18 @@ export class P2PMediaManager extends EventEmitter {
             this.peerSegmentRequests.delete(segmentId);
             this.emit(LoaderEvents.SegmentError, peerSegmentRequest.segmentUrl, description);
             this.debug("p2p segment download failed", segmentId, description);
+        }
+    }
+
+    private onSegmentTimeout(peer: MediaPeer, segmentId: string): void {
+        const peerSegmentRequest = this.peerSegmentRequests.get(segmentId);
+        if (peerSegmentRequest) {
+            this.peerSegmentRequests.delete(segmentId);
+            peer.destroy();
+            if (this.peers.delete(peerSegmentRequest.peerId)) {
+                this.emit(P2PMediaManagerEvents.PeerDataUpdated);
+            }
+            this.debug("p2p segment download timeout", segmentId);
         }
     }
 
