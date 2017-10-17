@@ -1,3 +1,5 @@
+/// <reference path="../node_modules/@types/mocha/index.d.ts" />
+
 import HttpMediaManager from "../lib/http-media-manager";
 import HybridLoader from "../lib/hybrid-loader";
 import SegmentInternal from "../lib/segment-internal";

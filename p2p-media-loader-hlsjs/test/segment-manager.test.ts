@@ -1,3 +1,5 @@
+/// <reference path="../node_modules/@types/mocha/index.d.ts" />
+
 import * as sinon from "sinon";
 import { mock, instance, verify, deepEqual, when, anyFunction } from "ts-mockito";
 
