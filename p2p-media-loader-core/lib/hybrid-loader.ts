@@ -174,7 +174,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             return updateSegmentsMap;
         }
 
-        const now = performance.now();
+        const now = this.now();
         if (now - this.httpDownloadProbabilityTimestamp < this.settings.httpDownloadProbabilityInterval) {
             return updateSegmentsMap;
         } else {
@@ -226,7 +226,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private emitSegmentLoaded(segmentInternal: SegmentInternal): void {
-        segmentInternal.lastAccessed = performance.now();
+        segmentInternal.lastAccessed = this.now();
 
         const segment = new Segment(segmentInternal.url, 0, segmentInternal.data!);
 
@@ -251,7 +251,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private collectGarbage(): boolean {
-        const now = performance.now();
+        const now = this.now();
         const remainingValues: SegmentInternal[] = [];
         const expiredKeys: string[] = [];
 
@@ -275,4 +275,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         return expiredKeys.length > 0;
     }
 
+    private now() {
+        return performance.now();
+    }
 }

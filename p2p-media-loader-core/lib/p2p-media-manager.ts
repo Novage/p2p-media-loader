@@ -4,7 +4,7 @@ import {LoaderEvents} from "./loader-interface";
 import {MediaPeer, MediaPeerEvents, MediaPeerSegmentStatus} from "./media-peer";
 import * as Debug from "debug";
 import SegmentInternal from "./segment-internal";
-const TrackerClient = require("bittorrent-tracker");
+import {Client} from "bittorrent-tracker";
 
 class PeerSegmentRequest {
 
@@ -67,7 +67,7 @@ export class P2PMediaManager extends EventEmitter {
             announce: this.announce
         };
 
-        this.trackerClient = new TrackerClient(clientOptions);
+        this.trackerClient = new Client(clientOptions);
         this.trackerClient.on("error", (error: any) => this.debug("client error", error));
         this.trackerClient.on("warning", (error: any) => this.debug("client warning", error));
         this.trackerClient.on("update", (data: any) => this.debug("client announce update", data));

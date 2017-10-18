@@ -1,7 +1,7 @@
 import {EventEmitter} from "events";
 import {LoaderEvents} from "./loader-interface";
 import * as Debug from "debug";
-const Buffer = require("buffer").Buffer;
+import {Buffer} from "buffer";
 
 enum MediaPeerCommands {
     SegmentData = "segment_data",
@@ -46,7 +46,7 @@ export class MediaPeer extends EventEmitter {
     private downloadingSegment: DownloadingSegment | null = null;
     private segmentsMap: Map<string, MediaPeerSegmentStatus> = new Map();
     private debug = Debug("p2pml:media-peer");
-    private timer: NodeJS.Timer | null = null;
+    private timer: number | null = null;
 
     constructor(peer: any) {
         super();
@@ -241,7 +241,7 @@ export class MediaPeer extends EventEmitter {
     }
 
     private runResponseTimeoutTimer(): void {
-        this.timer = setTimeout(() => {
+        this.timer = window.setTimeout(() => {
             this.timer = null;
             if (!this.downloadingSegmentId) {
                 return;
