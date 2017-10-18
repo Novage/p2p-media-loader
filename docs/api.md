@@ -359,7 +359,6 @@ The loading of some part of some segment has been completed.
 
 1. `method` used; can be `"p2p"` or `"http"` only
 2. `size` in bytes
-3. `timestamp` from `Date.now()`
 
 ### `SegmentAbort`
 

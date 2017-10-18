@@ -33,12 +33,8 @@ export class P2PMediaManager extends EventEmitter {
         super();
 
         this.announce = announce;
-
         this.segments = segments;
-
-        const date = (new Date()).valueOf().toString();
-        const random = Math.random().toString();
-        this.peerId = createHash("sha1").update(date + random).digest("hex");
+        this.peerId = createHash("sha1").update((Date.now() + Math.random()).toFixed(12)).digest("hex");
 
         this.debug("peerId", this.peerId);
     }
@@ -176,8 +172,8 @@ export class P2PMediaManager extends EventEmitter {
         return overallSegmentsMap;
     }
 
-    private onPieceBytesLoaded(method: string, size: number, timestamp: number): void {
-        this.emit(LoaderEvents.PieceBytesLoaded, method, size, timestamp);
+    private onPieceBytesLoaded(method: string, size: number): void {
+        this.emit(LoaderEvents.PieceBytesLoaded, method, size);
     }
 
     private onPeerConnect(peer: MediaPeer): void {

@@ -533,7 +533,7 @@
         };
 
         DemoApp.prototype.getDownloadSpeed = function () {
-            var startingPoint = Date.now() - (this.downloadSpeedTimespan * 1000);
+            var startingPoint = performance.now() - (this.downloadSpeedTimespan * 1000);
             var httpSize = 0;
             var p2pSize = 0;
 
@@ -556,8 +556,8 @@
             return {p2p: p2pSize / this.downloadSpeedTimespan, http: httpSize / this.downloadSpeedTimespan};
         };
 
-        DemoApp.prototype.onBytesLoaded = function (method, size, timestamp) {
-            this.downloadStats.push({"method": method, "size": size, "timestamp": timestamp});
+        DemoApp.prototype.onBytesLoaded = function (method, size) {
+            this.downloadStats.push({method: method, size: size, timestamp: performance.now()});
             this.downloadTotals[method] += size;
         };
 

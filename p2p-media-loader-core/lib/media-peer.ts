@@ -82,7 +82,7 @@ export class MediaPeer extends EventEmitter {
 
         this.downloadingSegment.bytesDownloaded += data.byteLength;
         this.downloadingSegment.pieces.push(data);
-        this.emit(LoaderEvents.PieceBytesLoaded, "p2p", data.byteLength, Date.now());
+        this.emit(LoaderEvents.PieceBytesLoaded, "p2p", data.byteLength);
 
         const segmentId = this.downloadingSegment.id;
 

@@ -74,8 +74,8 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         }
     }
 
-    private onPieceBytesLoaded(method: string, size: number, timestamp: number): void {
-        this.emit(LoaderEvents.PieceBytesLoaded, method, size, timestamp);
+    private onPieceBytesLoaded(method: string, size: number): void {
+        this.emit(LoaderEvents.PieceBytesLoaded, method, size);
     }
 
     private onSegmentLoaded(id: string, url: string, data: ArrayBuffer): void {
@@ -92,7 +92,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
     }
 
     private emitSegmentLoaded(segmentInternal: SegmentInternal): void {
-        segmentInternal.lastAccessed = new Date().getTime();
+        segmentInternal.lastAccessed = performance.now();
 
         const segment = new Segment(segmentInternal.url, 0, segmentInternal.data!);
 
@@ -100,7 +100,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
     }
 
     private collectGarbage(): void {
-        const now = new Date().getTime();
+        const now = performance.now();
 
         this.segments.forEach((value, key) => {
             if (now - value.lastAccessed > this.settings.segmentExpiration) {

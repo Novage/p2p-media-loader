@@ -13,7 +13,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private segments: Map<string, SegmentInternal> = new Map();
     private segmentsQueue: SegmentInternal[] = [];
     private debug = Debug("p2pml:hybrid-loader");
-    private httpDownloadProbabilityTimestamp = 0;
+    private httpDownloadProbabilityTimestamp = -999999;
     private settings = {
         segmentIdGenerator: (url: string): string => url,
         cacheSegmentExpiration: 5 * 60 * 1000, // milliseconds
@@ -174,7 +174,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             return updateSegmentsMap;
         }
 
-        const now = Date.now();
+        const now = performance.now();
         if (now - this.httpDownloadProbabilityTimestamp < this.settings.httpDownloadProbabilityInterval) {
             return updateSegmentsMap;
         } else {
@@ -208,8 +208,8 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         return updateSegmentsMap;
     }
 
-    private onPieceBytesLoaded(method: string, size: number, timestamp: number): void {
-        this.emit(LoaderEvents.PieceBytesLoaded, method, size, timestamp);
+    private onPieceBytesLoaded(method: string, size: number): void {
+        this.emit(LoaderEvents.PieceBytesLoaded, method, size);
     }
 
     private onSegmentLoaded(id: string, url: string, data: ArrayBuffer): void {
@@ -226,7 +226,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private emitSegmentLoaded(segmentInternal: SegmentInternal): void {
-        segmentInternal.lastAccessed = new Date().getTime();
+        segmentInternal.lastAccessed = performance.now();
 
         const segment = new Segment(segmentInternal.url, 0, segmentInternal.data!);
 
@@ -251,7 +251,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private collectGarbage(): boolean {
-        const now = new Date().getTime();
+        const now = performance.now();
         const remainingValues: SegmentInternal[] = [];
         const expiredKeys: string[] = [];
 
