@@ -1,7 +1,6 @@
 import {LoaderEvents, Segment, LoaderInterface} from "p2p-media-loader-core";
 import Utils from "./utils";
-
-const m3u8Parser = require("m3u8-parser");
+import {Parser} from "m3u8-parser";
 
 export default class SegmentManager {
 
@@ -19,7 +18,7 @@ export default class SegmentManager {
     }
 
     public processPlaylist(url: string, type: string, content: string): void {
-        const parser = new m3u8Parser.Parser();
+        const parser = new Parser();
         parser.push(content);
         parser.end();
         const playlist = new Playlist(url, type, parser.manifest);

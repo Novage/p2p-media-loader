@@ -23,4 +23,4 @@ function createHlsJsLoaderClass(HlsJsLoader, segmentManager) {
     return HlsJsLoaderClass;
 }
 
-module.exports = createHlsJsLoaderClass;
+module.exports.createHlsJsLoaderClass = createHlsJsLoaderClass;

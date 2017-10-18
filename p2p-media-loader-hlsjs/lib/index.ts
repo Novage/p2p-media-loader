@@ -1,7 +1,7 @@
 import {HybridLoader} from "p2p-media-loader-core";
 import SegmentManager from "./segment-manager";
 import HlsJsLoader from "./hlsjs-loader";
-const createHlsJsLoaderClass = require("./hlsjs-loader-class");
+import {createHlsJsLoaderClass} from "./hlsjs-loader-class";
 
 function initHlsJsEvents(player: any, segmentManager: SegmentManager): void {
     player.on("hlsFragChanged", function (event: any, data: any) {
