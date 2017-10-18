@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "compile": "rimraf ./dist/ && tsc && copyfiles -f ./lib/*.js ./dist/",
-    "lint": "tslint -c ./tslint.json -p ./tsconfig.json",
+    "lint": "tslint -c ./tslint.json -p ./tsconfig.test.json",
     "build": "npm run compile && browserify -r ./dist/index.js:p2p-media-loader-core ./dist/browser-init.js > p2p-media-loader-core.js",
     "refresh-dependencies": "npm update",
     "test": "mocha -r ts-node/register test/*.test.ts"

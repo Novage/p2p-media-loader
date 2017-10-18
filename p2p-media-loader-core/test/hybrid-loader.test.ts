@@ -1,4 +1,7 @@
 /// <reference path="../node_modules/@types/mocha/index.d.ts" />
+/// <reference path="../node_modules/@types/node/index.d.ts" />
+/// <reference path="../node_modules/typescript/lib/lib.es2015.d.ts" />
+/// <reference path="../node_modules/typescript/lib/lib.dom.d.ts" />
 
 import HttpMediaManager from "../lib/http-media-manager";
 import HybridLoader from "../lib/hybrid-loader";
@@ -93,6 +96,7 @@ describe("HybridLoader", () => {
 
     HybridLoader.prototype["createHttpManager"] = () => instance(httpMediaManger);
     HybridLoader.prototype["createP2PManager"] = () => instance(p2pMediaManager);
+    HybridLoader.prototype["now"] = () => Date.now();
 
     it("load", () => {
 
