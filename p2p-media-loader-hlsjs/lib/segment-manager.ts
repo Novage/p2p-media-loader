@@ -187,6 +187,8 @@ export default class SegmentManager {
                 return playlist;
             }
         }
+
+        return undefined;
     }
 
     private fetchSegment(url: string, onSuccess?: Function, onError?: Function): void {
