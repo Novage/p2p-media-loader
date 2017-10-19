@@ -6,8 +6,17 @@
     "strict": true,
     "moduleResolution": "node",
     "declaration": true,
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "noUnusedLocals": true,
+    "noUnusedParameters": false,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noImplicitAny": true
   },
+  "compileOnSave": true,
   "include": [
     "lib/**/*"
   ]
