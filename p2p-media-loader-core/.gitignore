@@ -3,4 +3,3 @@ node_modules/
 p2p-media-loader-core.js
 dist
 .directory
-test/dist

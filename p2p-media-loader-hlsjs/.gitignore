@@ -4,4 +4,3 @@ p2p-media-loader-core.js
 p2p-media-loader-hlsjs.js
 dist
 .directory
-test/dist

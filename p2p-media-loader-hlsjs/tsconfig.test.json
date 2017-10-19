@@ -6,7 +6,7 @@
     "strict": true,
     "moduleResolution": "node",
     "declaration": true,
-    "outDir": "./test/dist"
+    "noEmit": true
   },
   "include": [
     "lib/**/*",
