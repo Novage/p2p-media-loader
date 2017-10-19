@@ -3,14 +3,12 @@ import SegmentManager from "./segment-manager";
 export default class HlsJsLoader {
 
     private segmentManager: SegmentManager;
-    private stats: any;
     private context: any;
     private callbacks: any;
     private url: string;
 
-    public constructor(segmentManager: SegmentManager, settings_unused: any) {
+    public constructor(segmentManager: SegmentManager, settings: any) {
         this.segmentManager = segmentManager;
-        this.stats = {};
     }
 
     public load(context: any, config_unused: any, callbacks: any): void {
@@ -23,7 +21,7 @@ export default class HlsJsLoader {
                 .catch((error: any) => { this.error(error); });
         } else if (context.frag) {
             this.segmentManager.loadSegment(this.url,
-                (content: any) => { setTimeout(() => { this.success(content); }, 0); },
+                (content: ArrayBuffer) => { setTimeout(() => { this.success(content); }, 0); },
                 (error: any) => { setTimeout(() => { this.error(error); }, 0); }
             );
         } else {
@@ -39,19 +37,19 @@ export default class HlsJsLoader {
         this.abort();
     }
 
-    private success(content: any): void {
+    private success(content: string | ArrayBuffer): void {
         // todo: report correct loading stats when they will be reported by the manager
-        this.stats.trequest = performance.now();
-        this.stats.tfirst = this.stats.trequest + 500;
-        this.stats.tload = this.stats.trequest + 500;
-        this.stats.loaded = content instanceof ArrayBuffer
-            ? content.byteLength
-            : content.length;
+        const now = performance.now();
 
         this.callbacks.onSuccess({
             url: this.url,
             data: content
-        }, this.stats, this.context);
+        }, {
+            trequest: now,
+            tfirst: now + 500,
+            tload: now + 500,
+            loaded: content instanceof ArrayBuffer ? content.byteLength : content.length
+        }, this.context);
     }
 
     private error(error: any): void {
