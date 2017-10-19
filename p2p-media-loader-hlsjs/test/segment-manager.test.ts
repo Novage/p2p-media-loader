@@ -1,7 +1,7 @@
 /// <reference path="../node_modules/@types/mocha/index.d.ts" />
 
 import * as sinon from "sinon";
-import { mock, instance, verify, deepEqual, when, anyFunction } from "ts-mockito";
+import { mock, instance, when, anyFunction } from "ts-mockito";
 
 import SegmentManager from "../lib/segment-manager";
 import {LoaderEvents, Segment, LoaderInterface} from "p2p-media-loader-core";
