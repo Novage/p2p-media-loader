@@ -3,11 +3,13 @@ export class Segment {
     public url: string;
     public priority: number;
     public data: ArrayBuffer | undefined;
+    public downloadSpeed: number; // in bytes/ms
 
-    public constructor(url: string, priority: number = 0, data: ArrayBuffer | undefined = undefined) {
+    public constructor(url: string, priority: number = 0, data: ArrayBuffer | undefined = undefined, downloadSpeed: number = 0) {
         this.url = url;
         this.priority = priority;
         this.data = data;
+        this.downloadSpeed = downloadSpeed;
     }
 
 }

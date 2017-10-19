@@ -5,6 +5,7 @@ import {P2PMediaManager, P2PMediaManagerEvents} from "./p2p-media-manager";
 import {MediaPeerEvents, MediaPeerSegmentStatus} from "./media-peer";
 import * as Debug from "debug";
 import SegmentInternal from "./segment-internal";
+import {SpeedApproximator} from "./speed-approximator";
 
 export default class HybridLoader extends EventEmitter implements LoaderInterface {
 
@@ -14,6 +15,8 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private segmentsQueue: SegmentInternal[] = [];
     private debug = Debug("p2pml:hybrid-loader");
     private httpDownloadProbabilityTimestamp = -999999;
+    private speedApproximator = new SpeedApproximator();
+
     private settings = {
         segmentIdGenerator: (url: string): string => url,
         cacheSegmentExpiration: 5 * 60 * 1000, // milliseconds
@@ -209,6 +212,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private onPieceBytesLoaded(method: string, size: number): void {
+        this.speedApproximator.addBytes(size, this.now());
         this.emit(LoaderEvents.PieceBytesLoaded, method, size);
     }
 
@@ -228,7 +232,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private emitSegmentLoaded(segmentInternal: SegmentInternal): void {
         segmentInternal.lastAccessed = this.now();
 
-        const segment = new Segment(segmentInternal.url, 0, segmentInternal.data!);
+        const segment = new Segment(segmentInternal.url, 0, segmentInternal.data!, this.speedApproximator.getSpeed(this.now()));
 
         this.emit(LoaderEvents.SegmentLoaded, segment);
         this.debug("emitSegmentLoaded", segment.url);
