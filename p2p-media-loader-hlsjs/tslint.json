@@ -50,7 +50,6 @@
     ],
     "no-internal-module": true,
     "no-trailing-whitespace": true,
-    "no-non-null-assertion": true,
     "prefer-const": true,
     "jsdoc-format": true,
     "eofline": true
