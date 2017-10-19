@@ -51,18 +51,9 @@ export default class SegmentManager {
         return content;
     }
 
-    public loadSegment(url: string, onSuccess?: (content: ArrayBuffer) => void, onError?: (error: any) => void, playlistMissRetries: number = 1): void {
+    public loadSegment(url: string, onSuccess?: (content: ArrayBuffer, downloadSpeed: number) => void, onError?: (error: any) => void): void {
         const { playlist: loadingPlaylist, segmentIndex: loadingSegmentIndex } = this.getSegmentLocation(url);
-        if (!loadingPlaylist) {
-            if (playlistMissRetries > 0) {
-                setTimeout(() => { this.loadSegment(url, onSuccess, onError, playlistMissRetries - 1); }, 500);
-            } else {
-                this.fetchSegment(url, onSuccess, onError);
-            }
-            return;
-        }
-
-        if (loadingPlaylist.type !== "level") {
+        if (!loadingPlaylist || loadingPlaylist.type !== "level") {
             this.fetchSegment(url, onSuccess, onError);
             return;
         }
@@ -117,7 +108,7 @@ export default class SegmentManager {
         if (this.task && this.task.url === segment.url) {
             this.playQueue.push(segment.url);
             if (this.task.onSuccess) {
-                this.task.onSuccess(segment.data!.slice(0));
+                this.task.onSuccess(segment.data!.slice(0), segment.downloadSpeed);
             }
             this.task = undefined;
         }
@@ -191,10 +182,10 @@ export default class SegmentManager {
         return undefined;
     }
 
-    private fetchSegment(url: string, onSuccess?: (content: ArrayBuffer) => void, onError?: (error: any) => void): void {
+    private fetchSegment(url: string, onSuccess?: (content: ArrayBuffer, downloadSpeed: number) => void, onError?: (error: any) => void): void {
         Utils.fetchContentAsArrayBuffer(url).then((content: ArrayBuffer) => {
             if (onSuccess) {
-                onSuccess(content);
+                onSuccess(content, 0);
             }
         }).catch((error: any) => {
             if (onError) {
@@ -260,10 +251,10 @@ class Playlist {
 class Task {
 
     public url: string;
-    public onSuccess?: (content: ArrayBuffer) => void;
+    public onSuccess?: (content: ArrayBuffer, downloadSpeed: number) => void;
     public onError?: (error: any) => void;
 
-    public constructor(url: string, onSuccess?: (content: ArrayBuffer) => void, onError?: (error: any) => void) {
+    public constructor(url: string, onSuccess?: (content: ArrayBuffer, downloadSpeed: number) => void, onError?: (error: any) => void) {
         this.url = url;
         this.onSuccess = onSuccess;
         this.onError = onError;

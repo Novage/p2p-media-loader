@@ -242,7 +242,7 @@ Asynchronously loads content of the playlist via HTTP. Automatically calls
 
 Returns `Promise`.
 
-#### `loadSegment(url, onSuccess, onError, playlistMissRetries)`
+#### `loadSegment(url, onSuccess, onError)`
 
 Asynchronously loads segment from one of previously loaded playlists. This
 method locates requested segment in known playlists. Please note, only segments
@@ -255,11 +255,6 @@ from `"level"` type playlist will be loaded via the `loader` (provided in the
     + an optional `function`; called when segment finished loading
 - `onError`
     + an optional `function`; called when segment failed to load
-- `playlistMissRetries`
-    + an optional positive integer `Number` defines amount of tries should
-      be made before considered an error occurred (and call `onError` if any)
-    + timeout between tries is 500 ms
-    + default is `1`
 
 #### `processPlaylist(url, type, content)`
 
