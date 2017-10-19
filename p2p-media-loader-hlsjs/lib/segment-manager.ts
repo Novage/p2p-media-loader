@@ -26,10 +26,10 @@ export default class SegmentManager {
     }
 
     public async loadPlaylist(url: string, type: string, loadChildPlaylists: boolean = false): Promise<string> {
-        let content = "";
+        let content: string;
 
         try {
-            content = await Utils.fetchContent(url);
+            content = await Utils.fetchContentAsText(url);
             this.processPlaylist(url, type, content);
             this.setCurrentSegment();
         } catch (e) {
@@ -41,7 +41,7 @@ export default class SegmentManager {
             const playlist = this.playlists.get(url);
             if (playlist) {
                 for (const childUrl of playlist.getChildPlaylistAbsoluteUrls()) {
-                    Utils.fetchContent(childUrl).then((childContent) => {
+                    Utils.fetchContentAsText(childUrl).then((childContent: string) => {
                         this.processPlaylist(childUrl, "level", childContent);
                     });
                 }
@@ -51,7 +51,7 @@ export default class SegmentManager {
         return content;
     }
 
-    public loadSegment(url: string, onSuccess?: Function, onError?: Function, playlistMissRetries: number = 1): void {
+    public loadSegment(url: string, onSuccess?: (content: ArrayBuffer) => void, onError?: (error: any) => void, playlistMissRetries: number = 1): void {
         const { playlist: loadingPlaylist, segmentIndex: loadingSegmentIndex } = this.getSegmentLocation(url);
         if (!loadingPlaylist) {
             if (playlistMissRetries > 0) {
@@ -191,11 +191,15 @@ export default class SegmentManager {
         return undefined;
     }
 
-    private fetchSegment(url: string, onSuccess?: Function, onError?: Function): void {
-        Utils.fetchContent(url, "arraybuffer").then((content: any) => {
-            if (onSuccess) { onSuccess(content); }
+    private fetchSegment(url: string, onSuccess?: (content: ArrayBuffer) => void, onError?: (error: any) => void): void {
+        Utils.fetchContentAsArrayBuffer(url).then((content: ArrayBuffer) => {
+            if (onSuccess) {
+                onSuccess(content);
+            }
         }).catch((error: any) => {
-            if (onError) { onError(error); }
+            if (onError) {
+                onError(error);
+            }
         });
     }
 
@@ -256,10 +260,10 @@ class Playlist {
 class Task {
 
     public url: string;
-    public onSuccess?: Function;
-    public onError?: Function;
+    public onSuccess?: (content: ArrayBuffer) => void;
+    public onError?: (error: any) => void;
 
-    public constructor(url: string, onSuccess?: Function, onError?: Function) {
+    public constructor(url: string, onSuccess?: (content: ArrayBuffer) => void, onError?: (error: any) => void) {
         this.url = url;
         this.onSuccess = onSuccess;
         this.onError = onError;

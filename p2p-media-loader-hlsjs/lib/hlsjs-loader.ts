@@ -19,7 +19,7 @@ export default class HlsJsLoader {
         this.url = context.url;
         if (context.type) {
             this.segmentManager.loadPlaylist(this.url, context.type)
-                .then((content: any) => { this.success(content); })
+                .then((content: string) => { this.success(content); })
                 .catch((error: any) => { this.error(error); });
         } else if (context.frag) {
             this.segmentManager.loadSegment(this.url,
