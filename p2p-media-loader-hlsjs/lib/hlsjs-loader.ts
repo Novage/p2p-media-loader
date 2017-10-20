@@ -43,6 +43,11 @@ export default class HlsJsLoader {
     }
 
     private successPlaylist(content: string): void {
+        this.stats.trequest = 0;
+        this.stats.tfirst = 1;
+        this.stats.tload = 2;
+        this.stats.loaded = content.length;
+
         this.callbacks.onSuccess({
             url: this.url,
             data: content
