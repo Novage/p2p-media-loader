@@ -1,8 +1,7 @@
 import SegmentManager from "./segment-manager";
 
-const DEFAULT_DOWNLOAD_LATENCY = 20;
-const DEFAULT_DOWNLOAD_TIME = 1000;
-const DEFAULT_PLAYLIST_DOWNLOAD_TIME = 500;
+const DEFAULT_DOWNLOAD_LATENCY = 1;
+const DEFAULT_DOWNLOAD_SPEED = 12500; // bytes per millisecond
 
 export default class HlsJsLoader {
 
@@ -44,13 +43,6 @@ export default class HlsJsLoader {
     }
 
     private successPlaylist(content: string): void {
-        const now = performance.now();
-
-        this.stats.trequest = now - DEFAULT_DOWNLOAD_LATENCY - DEFAULT_PLAYLIST_DOWNLOAD_TIME;
-        this.stats.tfirst = now - DEFAULT_PLAYLIST_DOWNLOAD_TIME;
-        this.stats.tload = now;
-        this.stats.loaded = content.length;
-
         this.callbacks.onSuccess({
             url: this.url,
             data: content
@@ -59,7 +51,7 @@ export default class HlsJsLoader {
 
     private successSegment(content: ArrayBuffer, downloadSpeed: number): void {
         const now = performance.now();
-        const downloadTime = (downloadSpeed <= 0) ? DEFAULT_DOWNLOAD_TIME : (content.byteLength / downloadSpeed);
+        const downloadTime = content.byteLength / ((downloadSpeed <= 0) ? DEFAULT_DOWNLOAD_SPEED : downloadSpeed);
 
         this.stats.trequest = now - DEFAULT_DOWNLOAD_LATENCY - downloadTime;
         this.stats.tfirst = now - downloadTime;

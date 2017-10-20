@@ -1,8 +1,8 @@
-const SMOOTH_INTERVAL = 5 * 1000;
+const SMOOTH_INTERVAL = 4 * 1000;
 const MEASURE_INTERVAL = 60 * 1000;
 
 class NumberWithTime {
-    constructor (readonly value: number, readonly timePoint: number) {}
+    constructor (readonly value: number, readonly timeStamp: number) {}
 }
 
 export class SpeedApproximator {
@@ -14,16 +14,16 @@ export class SpeedApproximator {
         this.lastBytes.push(new NumberWithTime(bytes, timeStamp));
         this.currentBytesSum += bytes;
 
-        while (timeStamp - this.lastBytes[0].timePoint > SMOOTH_INTERVAL) {
+        while (timeStamp - this.lastBytes[0].timeStamp > SMOOTH_INTERVAL) {
             this.currentBytesSum -= this.lastBytes.shift()!.value;
         }
 
         this.lastSpeed.push(new NumberWithTime(this.currentBytesSum / SMOOTH_INTERVAL, timeStamp));
     }
 
-    // in bytes/ms
+    // in bytes per millisecond
     public getSpeed(timeStamp: number): number {
-        while (this.lastSpeed.length != 0 && timeStamp - this.lastSpeed[0].timePoint > MEASURE_INTERVAL) {
+        while (this.lastSpeed.length != 0 && timeStamp - this.lastSpeed[0].timeStamp > MEASURE_INTERVAL) {
             this.lastSpeed.shift();
         }
 
