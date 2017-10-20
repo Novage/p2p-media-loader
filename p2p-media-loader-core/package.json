@@ -21,6 +21,7 @@
     "events": "^1.1.1",
     "buffer": "^5.0.8",
     "crypto-browserify": "^3.11.1",
+    "get-browser-rtc": "^1.0.2",
     "debug": "^3.0.0"
   },
   "devDependencies": {

@@ -23,6 +23,10 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         this.httpManager.on(LoaderEvents.PieceBytesLoaded, this.onPieceBytesLoaded.bind(this));
     }
 
+    public isSupported(): boolean {
+        return true;
+    }
+
     public load(segments: Segment[], swarmId: string, emitNowSegmentUrl?: string): void {
         // stop all xhr requests for segments that are not in the new load
         for (const segment of this.segmentsQueue) {

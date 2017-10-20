@@ -17,6 +17,10 @@ export default class SegmentManager {
         this.loader.on(LoaderEvents.SegmentAbort, this.onSegmentAbort.bind(this));
     }
 
+    public isSupported(): boolean {
+        return this.loader.isSupported();
+    }
+
     public processPlaylist(url: string, type: string, content: string): void {
         const parser = new Parser();
         parser.push(content);

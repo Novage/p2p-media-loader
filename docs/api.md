@@ -12,7 +12,8 @@ Implementation for [hls.js](https://github.com/video-dev/hls.js).
 ### `createLoaderClass(settings)`
 
 Returns a `function`, a class constructor, which should be used to configure
-hls.js instance.
+hls.js instance. Returns default hls.js loader if
+functionality is not supported.
 
 #### `settings`
 
@@ -207,6 +208,10 @@ Creates new instance.
     + instance of `LoaderInterface` implementation (e.g. `HttpLoader`,
       `HybridLoader`).
 
+#### `isSupported()`
+
+Returns `true` if the segment manager is supported by the browser.
+
 #### `abortSegment(url)`
 
 Aborts segment loading (previously requested via `loadSegment`). Please note,
@@ -296,6 +301,10 @@ have called `destroy`.
 ### `getSettings()`
 
 Returns current settings of the loader.
+
+### `isSupported()`
+
+Returns `true` if the loader is supported by the browser.
 
 ### `load(segments, swarmId, emitNowSegmentUrl)`
 
@@ -397,7 +406,7 @@ Instance contains:
 
 ---
 
-## `WEBRTC_SUPPORT`
+## `HybridLoader.isSupported()`
 
-Contains `true` if WebRTC data channels API is supported by the browser.
+Returns `true` if WebRTC data channels API is supported by the browser.
 Read more [here](http://iswebrtcreadyyet.com/legacy.html).

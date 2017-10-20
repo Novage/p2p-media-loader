@@ -29,5 +29,6 @@ export interface LoaderInterface {
     load(segments: Segment[], swarmId: string, emitNowSegmentUrl?: string): void;
     getSettings(): any;
     destroy(): void;
+    isSupported(): boolean;
 
 }

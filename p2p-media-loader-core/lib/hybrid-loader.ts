@@ -7,6 +7,8 @@ import * as Debug from "debug";
 import SegmentInternal from "./segment-internal";
 import {SpeedApproximator} from "./speed-approximator";
 
+const getBrowserRtc = require("get-browser-rtc");
+
 export default class HybridLoader extends EventEmitter implements LoaderInterface {
 
     private httpManager: HttpMediaManager;
@@ -29,6 +31,15 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         bufferSegmentsCount: 20,
         trackerAnnounce: [ "wss://tracker.btorrent.xyz/", "wss://tracker.openwebtorrent.com/" ]
     };
+
+    public static isSupported(): boolean {
+        const browserRtc = getBrowserRtc();
+        return ((!!browserRtc) && (browserRtc.RTCPeerConnection.prototype.createDataChannel !== undefined));
+    }
+
+    public isSupported(): boolean {
+        return HybridLoader.isSupported();
+    }
 
     public constructor(settings: any = {}) {
         super();

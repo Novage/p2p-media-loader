@@ -1,4 +1,8 @@
 function createHlsJsLoaderClass(HlsJsLoader, segmentManager) {
+	if (!segmentManager.isSupported()) {
+		return Hls.DefaultConfig.loader;
+	}
+
     function HlsJsLoaderClass(settings) {
         this.impl = new HlsJsLoader(segmentManager, settings);
         this.stats = this.impl.stats;

@@ -107,7 +107,7 @@
         <hr>
     </div>
     <div id="error-webrtc-data-channels" class="col-md-12 hide">
-        WebRTC data channels API is not supported by your browser. P2P disabled.<br>
+        WebRTC Data Channels API is not supported by your browser. P2P disabled.<br>
         Read more at <a href="http://iswebrtcreadyyet.com/legacy.html" target="_blank">Is WebRTC ready yet?</a>.
         <hr>
     </div>
@@ -162,7 +162,7 @@
                 document.querySelector("#error-hls-js").classList.remove("hide");
             }
 
-            if (!p2pml.WEBRTC_SUPPORT) {
+            if (!p2pml.HybridLoader.isSupported()) {
                 document.querySelector("#error-webrtc-data-channels").classList.remove("hide");
             }
 
