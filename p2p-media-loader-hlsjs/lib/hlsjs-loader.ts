@@ -11,6 +11,8 @@ export default class HlsJsLoader {
     private callbacks: any;
     private url: string;
 
+    private readonly stats: any = {}; // required for older versions of hls.js
+
     public constructor(segmentManager: SegmentManager, settings: any) {
         this.segmentManager = segmentManager;
     }
@@ -42,33 +44,32 @@ export default class HlsJsLoader {
     }
 
     private successPlaylist(content: string): void {
-        // todo: report correct loading stats when they will be reported by the manager
         const now = performance.now();
+
+        this.stats.trequest = now - DEFAULT_DOWNLOAD_LATENCY - DEFAULT_PLAYLIST_DOWNLOAD_TIME;
+        this.stats.tfirst = now - DEFAULT_PLAYLIST_DOWNLOAD_TIME;
+        this.stats.tload = now;
+        this.stats.loaded = content.length;
 
         this.callbacks.onSuccess({
             url: this.url,
             data: content
-        }, {
-            trequest: now - DEFAULT_DOWNLOAD_LATENCY - DEFAULT_PLAYLIST_DOWNLOAD_TIME,
-            tfirst: now - DEFAULT_PLAYLIST_DOWNLOAD_TIME,
-            tload: now,
-            loaded: content.length
-        }, this.context);
+        }, this.stats, this.context);
     }
 
     private successSegment(content: ArrayBuffer, downloadSpeed: number): void {
         const now = performance.now();
         const downloadTime = (downloadSpeed <= 0) ? DEFAULT_DOWNLOAD_TIME : (content.byteLength / downloadSpeed);
 
+        this.stats.trequest = now - DEFAULT_DOWNLOAD_LATENCY - downloadTime;
+        this.stats.tfirst = now - downloadTime;
+        this.stats.tload = now;
+        this.stats.loaded = content.byteLength;
+
         this.callbacks.onSuccess({
             url: this.url,
             data: content
-        }, {
-            trequest: now - DEFAULT_DOWNLOAD_LATENCY - downloadTime,
-            tfirst: now - downloadTime,
-            tload: now,
-            loaded: content.byteLength
-        }, this.context);
+        }, this.stats, this.context);
     }
 
     private error(error: any): void {
