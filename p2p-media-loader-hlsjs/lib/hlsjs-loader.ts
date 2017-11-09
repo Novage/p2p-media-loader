@@ -22,12 +22,12 @@ export default class HlsJsLoader {
         this.url = context.url;
         if (context.type) {
             this.segmentManager.loadPlaylist(this.url, context.type)
-                .then((content: string) => { this.successPlaylist(content); })
-                .catch((error: any) => { this.error(error); });
+                .then((content: string) => this.successPlaylist(content))
+                .catch((error: any) => this.error(error));
         } else if (context.frag) {
             this.segmentManager.loadSegment(this.url,
-                (content: ArrayBuffer, downloadSpeed: number) => { setTimeout(() => { this.successSegment(content, downloadSpeed); }, 0); },
-                (error: any) => { setTimeout(() => { this.error(error); }, 0); }
+                (content: ArrayBuffer, downloadSpeed: number) => setTimeout(() => this.successSegment(content, downloadSpeed), 0),
+                (error: any) => setTimeout(() => this.error(error), 0)
             );
         } else {
             console.warn("Unknown load request", context);
@@ -44,7 +44,7 @@ export default class HlsJsLoader {
 
     private successPlaylist(content: string): void {
         const now = performance.now();
-        
+
         this.stats.trequest = now - 300;
         this.stats.tfirst = now - 200;
         this.stats.tload = now;

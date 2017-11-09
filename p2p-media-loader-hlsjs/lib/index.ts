@@ -25,15 +25,11 @@ export function initHlsJsPlayer(player: any): void {
 }
 
 export function initClapprPlayer(player: any): void {
-    player.on("play", () => {
-        initHlsJsPlayer(player.core.getCurrentPlayback()._hls);
-    });
+    player.on("play", () => initHlsJsPlayer(player.core.getCurrentPlayback()._hls));
 }
 
 export function initFlowplayerHlsJsPlayer(player: any): void {
-    player.on("ready", () => {
-        initHlsJsPlayer(player.engine.hlsjs);
-    });
+    player.on("ready", () => initHlsJsPlayer(player.engine.hlsjs));
 }
 
 export function initVideoJsContribHlsJsPlayer(player: any): void {

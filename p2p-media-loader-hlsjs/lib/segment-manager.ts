@@ -45,9 +45,8 @@ export default class SegmentManager {
             const playlist = this.playlists.get(url);
             if (playlist) {
                 for (const childUrl of playlist.getChildPlaylistAbsoluteUrls()) {
-                    Utils.fetchContentAsText(childUrl).then((childContent: string) => {
-                        this.processPlaylist(childUrl, "level", childContent);
-                    });
+                    Utils.fetchContentAsText(childUrl)
+                    .then((childContent: string) => this.processPlaylist(childUrl, "level", childContent));
                 }
             }
         }
