@@ -43,9 +43,11 @@ export default class HlsJsLoader {
     }
 
     private successPlaylist(content: string): void {
-        this.stats.trequest = 0;
-        this.stats.tfirst = 1;
-        this.stats.tload = 2;
+        const now = performance.now();
+        
+        this.stats.trequest = now - 300;
+        this.stats.tfirst = now - 200;
+        this.stats.tload = now;
         this.stats.loaded = content.length;
 
         this.callbacks.onSuccess({
