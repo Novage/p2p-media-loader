@@ -7,10 +7,10 @@ import HttpMediaManager from "../lib/http-media-manager";
 import HybridLoader from "../lib/hybrid-loader";
 import SegmentInternal from "../lib/segment-internal";
 import {LoaderEvents, Segment} from "../lib/loader-interface";
-import {anyFunction, anyOfClass, anyString, instance, mock, verify, when} from "ts-mockito";
+import {anyFunction, anyOfClass, instance, mock, verify, when} from "ts-mockito";
 import * as assert from "assert";
-import {P2PMediaManager, P2PMediaManagerEvents} from "../lib/p2p-media-manager";
-import {MediaPeerEvents, MediaPeerSegmentStatus} from "../lib/media-peer";
+import {P2PMediaManager} from "../lib/p2p-media-manager";
+import {MediaPeerSegmentStatus} from "../lib/media-peer";
 
 describe("HybridLoader", () => {
     // HttpMediaManager mock
@@ -32,20 +32,12 @@ describe("HybridLoader", () => {
     when(httpMediaManger.on(LoaderEvents.SegmentLoaded, anyFunction())).thenCall((event, listener) => {
         httpSegmentLoadedListener = listener;
     });
-    let httpSegmentErrorListener: Function = () => {};
-    when(httpMediaManger.on(LoaderEvents.SegmentError, anyFunction())).thenCall((event, listener) => {
-        httpSegmentErrorListener = listener;
-    });
-    let httpPieceBytesLoadedListener: Function = () => {};
-    when(httpMediaManger.on(LoaderEvents.PieceBytesLoaded, anyFunction())).thenCall((event, listener) => {
-        httpPieceBytesLoadedListener = listener;
-    });
 
     // P2PMediaManager mock
     const p2pMediaManager = mock(P2PMediaManager);
     const p2pAvailableFiles: SegmentInternal[] = [];
     const p2pDownloads: SegmentInternal[] = [];
-    let swarmId: String;
+
     when(p2pMediaManager.download(anyOfClass(SegmentInternal))).thenCall((segment) => {
         if (p2pDownloads.indexOf(segment) === -1 && p2pAvailableFiles.filter((p) => p.id == segment.id).length === 1) {
             p2pDownloads.push(segment);
@@ -63,35 +55,8 @@ describe("HybridLoader", () => {
     when(p2pMediaManager.isDownloading(anyOfClass(SegmentInternal))).thenCall((segment) => {
         return p2pDownloads.indexOf(segment) !== -1;
     });
-    when(p2pMediaManager.setSwarmId(anyString())).thenCall((id) => {
-        swarmId = id;
-    });
     when(p2pMediaManager.getOvrallSegmentsMap()).thenCall(() => {
         return new Map<string, MediaPeerSegmentStatus>();
-    });
-    let p2pSegmentLoadedListener: Function = () => {};
-    when(p2pMediaManager.on(LoaderEvents.SegmentLoaded, anyFunction())).thenCall((event, listener) => {
-        p2pSegmentLoadedListener = listener;
-    });
-    let p2pSegmentErrorListener: Function = () => {};
-    when(p2pMediaManager.on(LoaderEvents.SegmentError, anyFunction())).thenCall((event, listener) => {
-        p2pSegmentErrorListener = listener;
-    });
-    let p2pForceProcessingListener: Function = () => {};
-    when(p2pMediaManager.on(P2PMediaManagerEvents.PeerDataUpdated, anyFunction())).thenCall((event, listener) => {
-        p2pForceProcessingListener = listener;
-    });
-    let p2pPieceBytesLoadedListener: Function = () => {};
-    when(p2pMediaManager.on(LoaderEvents.PieceBytesLoaded, anyFunction())).thenCall((event, listener) => {
-        p2pPieceBytesLoadedListener = listener;
-    });
-    let p2pPeerConnectListener: Function = () => {};
-    when(p2pMediaManager.on(MediaPeerEvents.Connect, anyFunction())).thenCall((event, listener) => {
-        p2pPeerConnectListener = listener;
-    });
-    let p2pPeerCloseListener: Function = () => {};
-    when(p2pMediaManager.on(MediaPeerEvents.Close, anyFunction())).thenCall((event, listener) => {
-        p2pPeerCloseListener = listener;
     });
 
     HybridLoader.prototype["createHttpManager"] = () => instance(httpMediaManger);
