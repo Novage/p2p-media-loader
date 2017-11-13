@@ -26,7 +26,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         requiredSegmentsCount: 2,
         useP2P: true,
         simultaneousP2PDownloads: 3,
-        httpDownloadProbability: 0.25,
+        httpDownloadProbability: 0.06,
         httpDownloadProbabilityInterval: 500,
         bufferSegmentsCount: 20,
         trackerAnnounce: [ "wss://tracker.btorrent.xyz/", "wss://tracker.openwebtorrent.com/" ]
@@ -211,12 +211,13 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             return updateSegmentsMap;
         }
 
-        if (Math.random() <= this.settings.httpDownloadProbability) {
-            const random_index = Math.floor(Math.random() * Math.min(pendingQueue.length, this.settings.bufferSegmentsCount));
-            const segment = pendingQueue[random_index];
-            this.debug("HTTP download (random)", segment.priority, segment.url);
-            this.httpManager.download(segment);
-            updateSegmentsMap = true;
+        for (const segment of pendingQueue) {
+            if (Math.random() <= this.settings.httpDownloadProbability) {
+                this.debug("HTTP download (random)", segment.priority, segment.url);
+                this.httpManager.download(segment);
+                updateSegmentsMap = true;
+                break;
+            }
         }
 
         return updateSegmentsMap;

@@ -31,8 +31,8 @@ If `settings` is specified, then the default settings (shown below) will be over
 | requiredSegmentsCount | Integer | 2 | The number of the segments to be downloaded as quickly as possible via HTTP method
 | useP2P | Boolean | true | Enable/Disable peers interaction
 | simultaneousP2PDownloads | Integer | 3 | Max number of simultaneous downloads from peers
-| lastSegmentProbability | Float | 0.05 | Probability of downloading the last one in the row and the only remaining not downloaded file in the segments queue via HTTP
-| lastSegmentProbabilityInterval | Integer | 1000 | Interval of the lastSegmentProbability check (in milliseconds)
+| httpDownloadProbability | Float | 0.06 | Probability of downloading remaining not downloaded segment in the segments queue via HTTP
+| httpDownloadProbabilityInterval | Integer | 500 | Interval of the httpDownloadProbability check (in milliseconds)
 | bufferSegmentsCount | Integer | 20 | Max number of the segments to be downloaded via HTTP or P2P methods
 | trackerAnnounce | String[] | [ "wss://tracker.btorrent.xyz/", "wss://tracker.openwebtorrent.com/" ] | Torrent trackers (announcers) to use
 
