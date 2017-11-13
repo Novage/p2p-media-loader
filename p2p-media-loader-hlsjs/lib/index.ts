@@ -25,7 +25,13 @@ export function initHlsJsPlayer(player: any): void {
 }
 
 export function initClapprPlayer(player: any): void {
-    player.on("play", () => initHlsJsPlayer(player.core.getCurrentPlayback()._hls));
+    player.on("play", () => {
+        const playback = player.core.getCurrentPlayback();
+        if (playback._hls && !playback._hls._p2pm_linitialized) {
+            playback._hls._p2pm_linitialized = true;
+            initHlsJsPlayer(player.core.getCurrentPlayback()._hls);
+        }
+    });
 }
 
 export function initFlowplayerHlsJsPlayer(player: any): void {
