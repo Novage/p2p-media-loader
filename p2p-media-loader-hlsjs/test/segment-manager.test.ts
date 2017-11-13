@@ -11,6 +11,7 @@ class LoaderInterfaceEmptyImpl implements LoaderInterface {
     load(segments: Segment[], playlistUrl: string, emitNowSegmentUrl?: string): void { }
     getSettings(): any { }
     destroy(): void { }
+    isSupported(): boolean { return true; }
 }
 
 const testPlaylist = {
@@ -90,10 +91,6 @@ describe("SegmentManager", () => {
         });
 
         const onError = sinon.spy();
-        let segmentErrorListener: Function = () => { throw new Error("SegmentError listener not set"); };
-        when(loader.on(LoaderEvents.SegmentError, anyFunction())).thenCall((eventName_unused, listener) => {
-            segmentErrorListener = listener;
-        });
 
         const segment = new Segment(testPlaylist.baseUrl + "segment-1045.ts");
         segment.data = new ArrayBuffer(0);
