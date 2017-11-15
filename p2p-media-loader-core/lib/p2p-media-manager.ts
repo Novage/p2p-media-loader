@@ -21,9 +21,10 @@ export class P2PMediaManager extends EventEmitter {
 
     private segments: Map<string, SegmentInternal>;
 
-    private trackerClient: any;
+    private trackerClient: any = null;
     private announce: string[];
     private peers: Map<string, MediaPeer> = new Map();
+    private peerCandidates: Map<string, MediaPeer[]> = new Map();
     private peerSegmentRequests: Map<string, PeerSegmentRequest> = new Map();
     private swarmId: string;
     private peerId: string;
@@ -44,15 +45,10 @@ export class P2PMediaManager extends EventEmitter {
             return;
         }
 
+        this.destroy();
+
         this.swarmId = id;
         this.debug("swarm", this.swarmId);
-
-        if (this.trackerClient) {
-            this.trackerClient.stop();
-            this.trackerClient.destroy();
-        }
-        this.peers.forEach((peer) => peer.destroy());
-        this.peers.clear();
         this.createClient(createHash("sha1").update(id).digest("hex"));
     }
 
@@ -76,9 +72,9 @@ export class P2PMediaManager extends EventEmitter {
         this.trackerClient.start();
     }
 
-    private onClientPeer(trackerPeer: {id: string}): void {
+    private onClientPeer(trackerPeer: any): void {
         if (this.peers.has(trackerPeer.id)) {
-            //this.debug("peer exists");
+            trackerPeer.destroy();
             return;
         }
 
@@ -95,7 +91,14 @@ export class P2PMediaManager extends EventEmitter {
         peer.on(MediaPeerEvents.SegmentTimeout, this.onSegmentTimeout.bind(this));
         peer.on(LoaderEvents.PieceBytesLoaded, this.onPieceBytesLoaded.bind(this));
 
-        this.peers.set(trackerPeer.id, peer);
+        let peerCandidatesById = this.peerCandidates.get(peer.id);
+
+        if (!peerCandidatesById) {
+            peerCandidatesById = [];
+            this.peerCandidates.set(peer.id, peerCandidatesById);
+        }
+
+        peerCandidatesById.push(peer);
     }
 
     public download(segment: SegmentInternal): boolean {
@@ -142,10 +145,20 @@ export class P2PMediaManager extends EventEmitter {
         if (this.trackerClient) {
             this.trackerClient.stop();
             this.trackerClient.destroy();
+            this.trackerClient = null;
         }
+
         this.peers.forEach((peer) => peer.destroy());
         this.peers.clear();
+
         this.peerSegmentRequests.clear();
+
+        this.peerCandidates.forEach((peerCandidateById) => {
+            for (const peerCandidate of peerCandidateById) {
+                peerCandidate.destroy();
+            }
+        });
+        this.peerCandidates.clear();
     }
 
     public sendSegmentsMapToAll(segmentsMap: string[][]): void {
@@ -177,12 +190,51 @@ export class P2PMediaManager extends EventEmitter {
     }
 
     private onPeerConnect(peer: MediaPeer): void {
-        this.emit(MediaPeerEvents.Connect, {id: peer.id, remoteAddress: peer.remoteAddress});
+        const connectedPeer = this.peers.get(peer.id);
+
+        // First peer with the ID connected
+        if (!connectedPeer) {
+            this.peers.set(peer.id, peer);
+
+            // Destroy all other peer candidates
+            const peerCandidatesById = this.peerCandidates.get(peer.id);
+            if (peerCandidatesById) {
+                for (const peerCandidate of peerCandidatesById) {
+                    if (peerCandidate != peer) {
+                        peerCandidate.destroy();
+                    }
+                }
+
+                this.peerCandidates.delete(peer.id);
+            }
+
+            this.emit(MediaPeerEvents.Connect, {id: peer.id, remoteAddress: peer.remoteAddress});
+        }
     }
 
     private onPeerClose(peer: MediaPeer): void {
+        if (this.peers.get(peer.id) != peer) {
+            // Try to delete the peer candidate
+
+            const peerCandidatesById = this.peerCandidates.get(peer.id);
+            if (!peerCandidatesById) {
+                return;
+            }
+
+            const index = peerCandidatesById.indexOf(peer);
+            if (index != -1) {
+                peerCandidatesById.splice(index, 1);
+            }
+
+            if (peerCandidatesById.length == 0) {
+                this.peerCandidates.delete(peer.id);
+            }
+
+            return;
+        }
+
         this.peerSegmentRequests.forEach((value, key) => {
-            if (value.peerId === peer.id) {
+            if (value.peerId == peer.id) {
                 this.peerSegmentRequests.delete(key);
             }
         });

@@ -181,9 +181,7 @@ export class MediaPeer extends EventEmitter {
 
     public destroy(): void {
         this.terminateSegmentRequest();
-        if (this.peer.connected) {
-            this.peer.destroy();
-        }
+        this.peer.destroy();
     }
 
     public getDownloadingSegmentId(): string | null {
