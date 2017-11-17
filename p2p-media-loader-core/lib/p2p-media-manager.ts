@@ -19,10 +19,7 @@ export enum P2PMediaManagerEvents {
 
 export class P2PMediaManager extends EventEmitter {
 
-    private segments: Map<string, SegmentInternal>;
-
     private trackerClient: any = null;
-    private announce: string[];
     private peers: Map<string, MediaPeer> = new Map();
     private peerCandidates: Map<string, MediaPeer[]> = new Map();
     private peerSegmentRequests: Map<string, PeerSegmentRequest> = new Map();
@@ -30,10 +27,15 @@ export class P2PMediaManager extends EventEmitter {
     private peerId: string;
     private debug = Debug("p2pml:p2p-media-manager");
 
-    public constructor(segments: Map<string, SegmentInternal>, announce: string[]) {
+    public constructor(readonly segments: Map<string, SegmentInternal>,
+            readonly settings: {
+                useP2P: boolean,
+                trackerAnnounce: string[],
+                p2pSegmentDownloadTimeout: number,
+                webRtcMaxMessageSize: number
+            }) {
         super();
 
-        this.announce = announce;
         this.segments = segments;
         this.peerId = createHash("sha1").update((Date.now() + Math.random()).toFixed(12)).digest("hex");
 
@@ -53,14 +55,14 @@ export class P2PMediaManager extends EventEmitter {
     }
 
     private createClient(infoHash: string): void {
-        if (!this.announce || this.announce.length == 0) {
+        if (!this.settings.useP2P) {
             return;
         }
 
         const clientOptions = {
             infoHash: infoHash,
             peerId: this.peerId,
-            announce: this.announce
+            announce: this.settings.trackerAnnounce
         };
 
         this.trackerClient = new Client(clientOptions);
@@ -78,7 +80,7 @@ export class P2PMediaManager extends EventEmitter {
             return;
         }
 
-        const peer = new MediaPeer(trackerPeer);
+        const peer = new MediaPeer(trackerPeer, this.settings);
 
         peer.on(MediaPeerEvents.Connect, this.onPeerConnect.bind(this));
         peer.on(MediaPeerEvents.Close, this.onPeerClose.bind(this));

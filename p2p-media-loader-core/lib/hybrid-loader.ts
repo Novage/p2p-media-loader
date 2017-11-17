@@ -21,14 +21,19 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
     private settings = {
         segmentIdGenerator: (url: string): string => url,
-        cacheSegmentExpiration: 5 * 60 * 1000, // milliseconds
-        maxCacheSegmentsCount: 20,
-        requiredSegmentsCount: 2,
+        cachedSegmentExpiration: 5 * 60 * 1000, // milliseconds
+        cachedSegmentsCount: 20,
+
         useP2P: true,
+        requiredSegmentsCount: 2,
         simultaneousP2PDownloads: 3,
         httpDownloadProbability: 0.06,
         httpDownloadProbabilityInterval: 500,
-        bufferSegmentsCount: 20,
+        bufferedSegmentsCount: 20,
+
+        webRtcMaxMessageSize: 16 * 1024,
+        p2pSegmentDownloadTimeout: 60000,
+
         trackerAnnounce: [ "wss://tracker.btorrent.xyz/", "wss://tracker.openwebtorrent.com/" ]
     };
 
@@ -66,7 +71,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private createP2PManager() {
-        return new P2PMediaManager(this.segments, this.settings.useP2P ? this.settings.trackerAnnounce : []);
+        return new P2PMediaManager(this.segments, this.settings);
     }
 
     public load(segments: Segment[], swarmId: string, emitNowSegmentUrl?: string): void {
@@ -172,7 +177,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
                         this.debug("HTTP download (priority)", segment.priority, segment.url);
                         updateSegmentsMap = true;
                     }
-                } else if (!this.httpManager.isDownloading(segment) && this.p2pManager.getActiveDownloadsCount() < this.settings.simultaneousP2PDownloads && downloadedSegmentsCount < this.settings.bufferSegmentsCount) {
+                } else if (!this.httpManager.isDownloading(segment) && this.p2pManager.getActiveDownloadsCount() < this.settings.simultaneousP2PDownloads && downloadedSegmentsCount < this.settings.bufferedSegmentsCount) {
                     if (this.p2pManager.download(segment)) {
                         this.debug("P2P download", segment.priority, segment.url);
                     }
@@ -200,7 +205,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             !this.p2pManager.isDownloading(segment));
         downloadedSegmentsCount = this.segmentsQueue.length - pendingQueue.length;
 
-        if (pendingQueue.length == 0 || downloadedSegmentsCount >= this.settings.bufferSegmentsCount) {
+        if (pendingQueue.length == 0 || downloadedSegmentsCount >= this.settings.bufferedSegmentsCount) {
             return updateSegmentsMap;
         }
 
@@ -272,7 +277,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         const expiredKeys: string[] = [];
 
         this.segments.forEach((value, key) => {
-            if (now - value.lastAccessed > this.settings.cacheSegmentExpiration) {
+            if (now - value.lastAccessed > this.settings.cachedSegmentExpiration) {
                 expiredKeys.push(key);
             } else {
                 remainingValues.push(value);
@@ -281,7 +286,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
         remainingValues.sort((a, b) => a.lastAccessed - b.lastAccessed);
 
-        const countOverhead = remainingValues.length - this.settings.maxCacheSegmentsCount;
+        const countOverhead = remainingValues.length - this.settings.cachedSegmentsCount;
         if (countOverhead > 0) {
             remainingValues.slice(0, countOverhead).forEach(value => expiredKeys.push(value.id));
         }

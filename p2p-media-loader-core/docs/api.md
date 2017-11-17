@@ -26,15 +26,17 @@ If `settings` is specified, then the default settings (shown below) will be over
 | Name | Type | Default Value | Description |
 | --- | ---- | ------ | ------ |
 | segmentIdGenerator | String | (url: string): string => url | Function that generates segment identifier based on the input url argument
-| cacheSegmentExpiration | Integer | 300000 | Segment lifetime in cache. The segment is deleted from the cache if the last access time is greater than this value (in milliseconds)
-| maxCacheSegmentsCount | Integer | 20 | Max number of segments that can be stored in the cache
+| cachedSegmentExpiration | Integer | 300000 | Segment lifetime in cache. The segment is deleted from the cache if the last access time is greater than this value (in milliseconds)
+| cachedSegmentsCount | Integer | 20 | Max number of segments that can be stored in the cache
 | requiredSegmentsCount | Integer | 2 | The number of the segments to be downloaded as quickly as possible via HTTP method
 | useP2P | Boolean | true | Enable/Disable peers interaction
 | simultaneousP2PDownloads | Integer | 3 | Max number of simultaneous downloads from peers
 | httpDownloadProbability | Float | 0.06 | Probability of downloading remaining not downloaded segment in the segments queue via HTTP
 | httpDownloadProbabilityInterval | Integer | 500 | Interval of the httpDownloadProbability check (in milliseconds)
-| bufferSegmentsCount | Integer | 20 | Max number of the segments to be downloaded via HTTP or P2P methods
+| bufferedSegmentsCount | Integer | 20 | Max number of the segments to be downloaded via HTTP or P2P methods
 | trackerAnnounce | String[] | [ "wss://tracker.btorrent.xyz/", "wss://tracker.openwebtorrent.com/" ] | Torrent trackers (announcers) to use
+| webRtcMaxMessageSize | number | 16 * 1024 | Max WebRTC message size. 16KiB is minimal that works with all the browsers. 64KiB - 1B should work for most of recent browsers. 
+| p2pSegmentDownloadTimeout | number | 60000 | Timeout to download a segment from a peer. If exceeded the peer is dropped. 
 
 ### `loader.load(segments, swarmId, emitNowSegmentUrl)`
 

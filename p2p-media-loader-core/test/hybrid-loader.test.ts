@@ -67,14 +67,14 @@ describe("HybridLoader", () => {
 
         const settings = {
             segmentIdGenerator: (url: string): string => url,
-            cacheSegmentExpiration: 5 * 60 * 1000,
-            maxCacheSegmentsCount: 20,
+            cachedSegmentExpiration: 5 * 60 * 1000,
+            cachedSegmentsCount: 20,
             requiredSegmentsCount: 2,
             useP2P: false,
             simultaneousP2PDownloads: 3,
             lastSegmentProbability: 0.05,
             lastSegmentProbabilityInterval: 1000,
-            bufferSegmentsCount: 20,
+            bufferedSegmentsCount: 20,
             trackerAnnounce: [ "wss://tracker.btorrent.xyz/", "wss://tracker.openwebtorrent.com/" ]
         };
         const hybridLoader = new HybridLoader(settings);

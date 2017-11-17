@@ -34,24 +34,23 @@ class DownloadingSegment {
     constructor(readonly id: string, readonly size: number) {}
 }
 
-const MAX_MESSAGE_SIZE = 16 * 1024;
-const RESPONSE_TIMEOUT = 3000;
-
 export class MediaPeer extends EventEmitter {
 
     public id: string;
     public remoteAddress: string;
-    private peer: any;
     private downloadingSegmentId: string | null = null;
     private downloadingSegment: DownloadingSegment | null = null;
     private segmentsMap: Map<string, MediaPeerSegmentStatus> = new Map();
     private debug = Debug("p2pml:media-peer");
     private timer: number | null = null;
 
-    constructor(peer: any) {
+    constructor(readonly peer: any,
+            readonly settings: {
+                p2pSegmentDownloadTimeout: number,
+                webRtcMaxMessageSize: number
+            }) {
         super();
 
-        this.peer = peer;
         this.peer.on("connect", () => this.onPeerConnect());
         this.peer.on("close", () => this.onPeerClose());
         this.peer.on("error", (error: any) => this.onPeerError(error));
@@ -205,7 +204,7 @@ export class MediaPeer extends EventEmitter {
 
         let bytesLeft = data.byteLength;
         while (bytesLeft > 0) {
-            const bytesToSend = (bytesLeft >= MAX_MESSAGE_SIZE ? MAX_MESSAGE_SIZE : bytesLeft);
+            const bytesToSend = (bytesLeft >= this.settings.webRtcMaxMessageSize ? this.settings.webRtcMaxMessageSize : bytesLeft);
             // Using Buffer.from because TypedArrays as input to this function cause memory copying
             this.peer.write(Buffer.from(data, data.byteLength - bytesLeft, bytesToSend));
             bytesLeft -= bytesToSend;
@@ -247,7 +246,7 @@ export class MediaPeer extends EventEmitter {
             const segmentId = this.downloadingSegmentId;
             this.cancelSegmentRequest();
             this.emit(MediaPeerEvents.SegmentTimeout, this, segmentId); // TODO: send peer not responding event
-        }, RESPONSE_TIMEOUT);
+        }, this.settings.p2pSegmentDownloadTimeout);
     }
 
     private cancelResponseTimeoutTimer(): void {

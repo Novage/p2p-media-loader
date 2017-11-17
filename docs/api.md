@@ -24,45 +24,7 @@ Every setting is optional until opposite explicitly stated.
       please note that `loaderSettings` value is ignored in this case
     + if not set, a new one will be created with `HybridLoader` and provided
       `loaderSettings`
-- `loaderSettings`, an `Object` with properties:
-    + `bufferSegmentsCount`
-        - a positive integer `Number`
-        - ???
-        - default is `20`
-    + `cacheSegmentExpiration`
-        - a positive integer `Number` in milliseconds
-        - when this value exceeds for any particular segment, it will be
-          dropped from the cache
-        - default is `300000` (5 mins)
-    + `httpDownloadProbability`
-        - a positive float `Number` from 0.01 to 0.99
-        - probalility to download segment by HTTP
-        - default is `0.25`
-    + `httpDownloadProbabilityInterval`
-        - a positive integer `Number` in milliseconds
-        - interval to probe HTTP segment download
-        - default is `500`
-    + `maxCacheSegmentsCount`
-        - a positive integer `Number`
-        - when this value exceeds, oldest segment will be dropped from
-          the cache
-        - default is `20`
-    + `useP2P`
-        - a `Boolean`
-        - default is `true`
-    + `requiredSegmentsCount`
-        - a positive integer `Number`
-        - default is `2`
-    + `segmentIdGenerator`
-        - a `function` takes URL as `String` and returns ID as `String`
-        - default is: segment URL is equivalent to segment ID 
-    + `simultaneousP2PDownloads`
-        - a positive integer `Number`
-        - used only when `useP2P` is `true`
-        - default is `3`
-    + `trackerAnnounce`
-        - an `Array` of trackers to use
-        - default is `[ "wss://tracker.btorrent.xyz/", "wss://tracker.openwebtorrent.com/" ]`
+- `loaderSettings`, setting passed to `HybridLoader`
 
 ### `initClapprPlayer(player)`
 
