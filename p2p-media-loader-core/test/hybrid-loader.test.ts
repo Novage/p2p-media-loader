@@ -69,7 +69,7 @@ describe("HybridLoader", () => {
             segmentIdGenerator: (url: string): string => url,
             cachedSegmentExpiration: 5 * 60 * 1000,
             cachedSegmentsCount: 20,
-            requiredSegmentsCount: 2,
+            requiredSegmentsPriority: 1,
             useP2P: false,
             simultaneousP2PDownloads: 3,
             lastSegmentProbability: 0.05,

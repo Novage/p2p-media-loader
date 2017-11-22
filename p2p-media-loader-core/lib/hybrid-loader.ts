@@ -25,7 +25,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         cachedSegmentsCount: 20,
 
         useP2P: true,
-        requiredSegmentsCount: 2,
+        requiredSegmentsPriority: 1,
         simultaneousP2PDownloads: 3,
         httpDownloadProbability: 0.06,
         httpDownloadProbabilityInterval: 500,
@@ -163,7 +163,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             const segmentPriority = index + startingPriority;
 
             if (!this.segments.has(segment.id)) {
-                if (segmentPriority < this.settings.requiredSegmentsCount) {
+                if (segmentPriority <= this.settings.requiredSegmentsPriority) {
                     if (segmentPriority == 0 && !this.httpManager.isDownloading(segment) && this.httpManager.getActiveDownloads().size > 0) {
                         for (const s of this.segmentsQueue) {
                             this.httpManager.abort(s);
