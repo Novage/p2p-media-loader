@@ -39,7 +39,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
     public static isSupported(): boolean {
         const browserRtc = getBrowserRtc();
-        return ((!!browserRtc) && (browserRtc.RTCPeerConnection.prototype.createDataChannel !== undefined));
+        return (browserRtc && (browserRtc.RTCPeerConnection.prototype.createDataChannel !== undefined));
     }
 
     public isSupported(): boolean {

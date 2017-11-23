@@ -174,7 +174,7 @@ export default class SegmentManager {
 
     private getMasterPlaylist(): Playlist | undefined {
         for (const playlist of Array.from(this.playlists.values())) {
-            if (!!playlist.manifest.playlists) {
+            if (playlist.manifest.playlists) {
                 return playlist;
             }
         }
