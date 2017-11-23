@@ -25,11 +25,18 @@ export default class SegmentManager {
         const parser = new Parser();
         parser.push(content);
         parser.end();
-        const playlist = new Playlist(url, type, parser.manifest);
+
+        if (type === "level" && parser.manifest.playlists !== undefined) {
+            throw new Error("Level playlist contains playlists");
+        } else if (type === "manifest" && parser.manifest.playlists === undefined) {
+            throw new Error("Manifest playlist has no playlists");
+        }
+
+        const playlist = new Playlist(url, parser.manifest);
         this.playlists.set(url, playlist);
     }
 
-    public async loadPlaylist(url: string, type: string, loadChildPlaylists: boolean = false): Promise<string> {
+    public async loadPlaylist(url: string, type: string): Promise<string> {
         let content: string;
 
         try {
@@ -41,22 +48,12 @@ export default class SegmentManager {
             throw e;
         }
 
-        if (loadChildPlaylists) {
-            const playlist = this.playlists.get(url);
-            if (playlist) {
-                for (const childUrl of playlist.getChildPlaylistAbsoluteUrls()) {
-                    Utils.fetchContentAsText(childUrl)
-                    .then((childContent: string) => this.processPlaylist(childUrl, "level", childContent));
-                }
-            }
-        }
-
         return content;
     }
 
     public loadSegment(url: string, onSuccess?: (content: ArrayBuffer, downloadSpeed: number) => void, onError?: (error: any) => void): void {
         const { playlist: loadingPlaylist, segmentIndex: loadingSegmentIndex } = this.getSegmentLocation(url);
-        if (!loadingPlaylist || loadingPlaylist.type !== "level") {
+        if (!loadingPlaylist) {
             this.fetchSegment(url, onSuccess, onError);
             return;
         }
@@ -201,19 +198,12 @@ export default class SegmentManager {
 
 class Playlist {
 
-    public url: string;
-    public type: string;
     public baseUrl: string;
-    public manifest: any;
 
-    public constructor(url: string, type: string, manifest: any) {
-        this.url = url;
-        this.type = type;
-        this.manifest = manifest;
-
+    public constructor(readonly url: string, readonly manifest: any) {
         const pos = url.lastIndexOf("/");
         if (pos === -1) {
-            throw "Unexpected playlist URL format";
+            throw new Error("Unexpected playlist URL format");
         }
 
         this.baseUrl = url.substring(0, pos + 1);
