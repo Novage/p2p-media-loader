@@ -21,27 +21,21 @@ export default class SegmentManager {
         return this.loader.isSupported();
     }
 
-    public processPlaylist(url: string, type: string, content: string): void {
+    public processPlaylist(url: string, content: string): void {
         const parser = new Parser();
         parser.push(content);
         parser.end();
-
-        if (type === "level" && parser.manifest.playlists !== undefined) {
-            throw new Error("Level playlist contains playlists");
-        } else if (type === "manifest" && parser.manifest.playlists === undefined) {
-            throw new Error("Manifest playlist has no playlists");
-        }
 
         const playlist = new Playlist(url, parser.manifest);
         this.playlists.set(url, playlist);
     }
 
-    public async loadPlaylist(url: string, type: string): Promise<string> {
+    public async loadPlaylist(url: string): Promise<string> {
         let content: string;
 
         try {
             content = await Utils.fetchContentAsText(url);
-            this.processPlaylist(url, type, content);
+            this.processPlaylist(url, content);
             this.setCurrentSegment();
         } catch (e) {
             this.playlists.delete(url);
