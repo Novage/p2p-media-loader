@@ -8,6 +8,7 @@
     "compile": "rimraf ./dist/ && tsc && copyfiles -f ./lib/*.js ./dist/",
     "lint": "tslint -c ./tslint.json -p ./tsconfig.test.json",
     "build": "npm run compile && browserify -r ./dist/index.js:p2p-media-loader-hlsjs ./dist/browser-init.js --exclude p2p-media-loader-core > p2p-media-loader-hlsjs.js",
+    "minify": "uglifyjs p2p-media-loader-hlsjs.js > p2p-media-loader-hlsjs.min.js",
     "refresh-dependencies": "rimraf ./node_modules/p2p-media-loader-core/ && npm install && npm update && copyfiles -f ./node_modules/p2p-media-loader-core/p2p-media-loader-core.js ./",
     "test": "mocha -r ts-node/register test/*.test.ts"
   },
@@ -32,6 +33,7 @@
     "ts-mockito": "^2.0.2",
     "ts-node": "^3.2.0",
     "tslint": "^5.5.0",
-    "typescript": "^2.4.1"
+    "typescript": "^2.4.1",
+    "uglify-js": "^3.1.10"
   }
 }
