@@ -292,7 +292,6 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
             for (const segment of remainingSegments) {
                 if (!this.segmentsQueue.find(queueSegment => queueSegment.id == segment.id)) {
-                    console.log("NOT IN QUEUE", segment.url);
                     segmentsToDelete.push(segment.id);
                     countOverhead--;
                     if (countOverhead == 0) {
