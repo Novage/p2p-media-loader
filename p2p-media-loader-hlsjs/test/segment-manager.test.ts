@@ -54,7 +54,7 @@ describe("SegmentManager", () => {
         segment.data = new ArrayBuffer(0);
 
         const manager = new SegmentManager(instance(loader));
-        manager.processPlaylist(testPlaylist.url, "manifest", testPlaylist.content);
+        manager.processPlaylist(testPlaylist.url, testPlaylist.content);
         manager.loadSegment(segment.url, onSuccess);
         segmentLoadedListener(segment);
 
@@ -74,7 +74,7 @@ describe("SegmentManager", () => {
         const error = "Test error message content";
 
         const manager = new SegmentManager(instance(loader));
-        manager.processPlaylist(testPlaylist.url, "manifest", testPlaylist.content);
+        manager.processPlaylist(testPlaylist.url, testPlaylist.content);
         manager.loadSegment(url, undefined, onError);
         segmentErrorListener(url, error);
 
@@ -96,7 +96,7 @@ describe("SegmentManager", () => {
         segment.data = new ArrayBuffer(0);
 
         const manager = new SegmentManager(instance(loader));
-        manager.processPlaylist(testPlaylist.url, "manifest", testPlaylist.content);
+        manager.processPlaylist(testPlaylist.url, testPlaylist.content);
         manager.loadSegment(segment.url, onSuccess, onError);
         manager.abortSegment(segment.url);
         segmentLoadedListener(segment);
