@@ -27,7 +27,7 @@ If `settings` is specified, then the default settings (shown below) will be over
 | --- | ---- | ------ | ------ |
 | segmentIdGenerator | String | (url: string): string => url | Function that generates segment identifier based on the input url argument
 | cachedSegmentExpiration | Integer | 300000 | Segment lifetime in cache. The segment is deleted from the cache if the last access time is greater than this value (in milliseconds)
-| cachedSegmentsCount | Integer | 20 | Max number of segments that can be stored in the cache
+| cachedSegmentsCount | Integer | 30 | Max number of segments that can be stored in the cache
 | requiredSegmentsPriority | Integer | 1 | The maximum priority of the segments to be downloaded (if not available) as quickly as possible (i.e. via HTTP method)
 | useP2P | Boolean | true | Enable/Disable peers interaction
 | simultaneousP2PDownloads | Integer | 3 | Max number of simultaneous downloads from peers

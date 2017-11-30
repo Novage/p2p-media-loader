@@ -22,7 +22,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private settings = {
         segmentIdGenerator: (url: string): string => url,
         cachedSegmentExpiration: 5 * 60 * 1000, // milliseconds
-        cachedSegmentsCount: 20,
+        cachedSegmentsCount: 30,
 
         useP2P: true,
         requiredSegmentsPriority: 1,
@@ -272,28 +272,38 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private collectGarbage(): boolean {
-        const now = this.now();
-        const remainingValues: SegmentInternal[] = [];
-        const expiredKeys: string[] = [];
+        const segmentsToDelete: string[] = [];
+        const remainingSegments: SegmentInternal[] = [];
 
-        this.segments.forEach((value, key) => {
-            if (now - value.lastAccessed > this.settings.cachedSegmentExpiration) {
-                expiredKeys.push(key);
+        // Delete old segments
+        const now = this.now();
+        this.segments.forEach(segment => {
+            if (now - segment.lastAccessed > this.settings.cachedSegmentExpiration) {
+                segmentsToDelete.push(segment.id);
             } else {
-                remainingValues.push(value);
+                remainingSegments.push(segment);
             }
         });
 
-        remainingValues.sort((a, b) => a.lastAccessed - b.lastAccessed);
-
-        const countOverhead = remainingValues.length - this.settings.cachedSegmentsCount;
+        // Delete segments over cached count
+        let countOverhead = remainingSegments.length - this.settings.cachedSegmentsCount;
         if (countOverhead > 0) {
-            remainingValues.slice(0, countOverhead).forEach(value => expiredKeys.push(value.id));
+            remainingSegments.sort((a, b) => a.lastAccessed - b.lastAccessed);
+
+            for (const segment of remainingSegments) {
+                if (!this.segmentsQueue.find(queueSegment => queueSegment.id == segment.id)) {
+                    console.log("NOT IN QUEUE", segment.url);
+                    segmentsToDelete.push(segment.id);
+                    countOverhead--;
+                    if (countOverhead == 0) {
+                        break;
+                    }
+                }
+            }
         }
 
-        expiredKeys.forEach(key => this.segments.delete(key));
-
-        return expiredKeys.length > 0;
+        segmentsToDelete.forEach(id => this.segments.delete(id));
+        return segmentsToDelete.length > 0;
     }
 
     private now() {
