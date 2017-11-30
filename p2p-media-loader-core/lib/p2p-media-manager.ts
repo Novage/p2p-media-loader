@@ -108,16 +108,16 @@ export class P2PMediaManager extends EventEmitter {
             return false;
         }
 
-        const peer = Array.from(this.peers.values()).find((peer: MediaPeer) => {
-            return (peer.getDownloadingSegmentId() == null) &&
-                (peer.getSegmentsMap().get(segment.id) === MediaPeerSegmentStatus.Loaded) &&
-                peer.requestSegment(segment.id);
-        });
-
-        if (peer) {
-            this.peerSegmentRequests.set(segment.id, new PeerSegmentRequest(peer.id, segment.url));
-            this.debug("p2p segment download", segment.id, segment.url);
-            return true;
+        const entries = this.peers.values();
+        for (let entry = entries.next(); !entry.done; entry = entries.next()) {
+            const peer = entry.value;
+            if ((peer.getDownloadingSegmentId() == null) &&
+                    (peer.getSegmentsMap().get(segment.id) === MediaPeerSegmentStatus.Loaded) &&
+                    peer.requestSegment(segment.id)) {
+                this.peerSegmentRequests.set(segment.id, new PeerSegmentRequest(peer.id, segment.url));
+                this.debug("p2p segment download", segment.id, segment.url);
+                return true;
+            }
         }
 
         return false;

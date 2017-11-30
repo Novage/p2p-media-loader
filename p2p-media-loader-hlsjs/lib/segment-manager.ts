@@ -128,7 +128,9 @@ export default class SegmentManager {
 
     private getSegmentLocation(url?: string): { playlist?: Playlist, segmentIndex: number } {
         if (url) {
-            for (const playlist of Array.from(this.playlists.values())) {
+            const entries = this.playlists.values();
+            for (let entry = entries.next(); !entry.done; entry = entries.next()) {
+                const playlist = entry.value;
                 const segmentIndex = playlist.getSegmentIndex(url);
                 if (segmentIndex >= 0) {
                     return { playlist: playlist, segmentIndex: segmentIndex };
@@ -167,7 +169,10 @@ export default class SegmentManager {
     }
 
     private getMasterPlaylist(): Playlist | undefined {
-        for (const playlist of Array.from(this.playlists.values())) {
+        const entries = this.playlists.values();
+        for (let entry = entries.next(); !entry.done; entry = entries.next()) {
+            const playlist = entry.value;
+
             if (playlist.manifest.playlists) {
                 return playlist;
             }
