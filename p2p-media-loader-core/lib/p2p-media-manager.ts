@@ -1,6 +1,6 @@
 import {EventEmitter} from "events";
 import {createHash} from "crypto";
-import {LoaderEvents} from "./loader-interface";
+import {LoaderEvents, Segment} from "./loader-interface";
 import {MediaPeer, MediaPeerEvents, MediaPeerSegmentStatus} from "./media-peer";
 import * as Debug from "debug";
 import SegmentInternal from "./segment-internal";
@@ -27,7 +27,8 @@ export class P2PMediaManager extends EventEmitter {
     private peerId: string;
     private debug = Debug("p2pml:p2p-media-manager");
 
-    public constructor(readonly segments: Map<string, SegmentInternal>,
+    public constructor(
+            readonly cachedSegments: Map<string, SegmentInternal>,
             readonly settings: {
                 useP2P: boolean,
                 trackerAnnounce: string[],
@@ -36,7 +37,6 @@ export class P2PMediaManager extends EventEmitter {
             }) {
         super();
 
-        this.segments = segments;
         this.peerId = createHash("sha1").update((Date.now() + Math.random()).toFixed(12)).digest("hex");
 
         this.debug("peerId", this.peerId);
@@ -104,7 +104,7 @@ export class P2PMediaManager extends EventEmitter {
         peerCandidatesById.push(peer);
     }
 
-    public download(segment: SegmentInternal): boolean {
+    public download(segment: Segment): boolean {
         if (this.isDownloading(segment)) {
             return false;
         }
@@ -124,7 +124,7 @@ export class P2PMediaManager extends EventEmitter {
         return false;
     }
 
-    public abort(segment: SegmentInternal): void {
+    public abort(segment: Segment): void {
         const peerSegmentRequest = this.peerSegmentRequests.get(segment.id);
         if (peerSegmentRequest) {
             const peer = this.peers.get(peerSegmentRequest.peerId);
@@ -136,7 +136,7 @@ export class P2PMediaManager extends EventEmitter {
         }
     }
 
-    public isDownloading(segment: SegmentInternal): boolean {
+    public isDownloading(segment: Segment): boolean {
         return this.peerSegmentRequests.has(segment.id);
     }
 
@@ -260,7 +260,7 @@ export class P2PMediaManager extends EventEmitter {
     }
 
     private onSegmentRequest(peer: MediaPeer, segmentId: string): void {
-        const segment = this.segments.get(segmentId);
+        const segment = this.cachedSegments.get(segmentId);
         if (segment) {
             peer.sendSegmentData(segmentId, segment.data!);
         } else {

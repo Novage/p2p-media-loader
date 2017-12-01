@@ -1,7 +1,6 @@
-import {LoaderEvents} from "./loader-interface";
+import {LoaderEvents, Segment} from "./loader-interface";
 import {EventEmitter} from "events";
 import * as Debug from "debug";
-import SegmentInternal from "./segment-internal";
 
 export default class HttpMediaManager extends EventEmitter {
 
@@ -12,7 +11,7 @@ export default class HttpMediaManager extends EventEmitter {
         super();
     }
 
-    public download(segment: SegmentInternal): void {
+    public download(segment: Segment): void {
         if (this.isDownloading(segment)) {
             return;
         }
@@ -48,16 +47,16 @@ export default class HttpMediaManager extends EventEmitter {
         request.send();
     }
 
-    public abort(segment: SegmentInternal): void {
+    public abort(segment: Segment): void {
         const xhr = this.xhrRequests.get(segment.id);
         if (xhr) {
             xhr.abort();
             this.xhrRequests.delete(segment.id);
-            this.debug("http segment abort", segment.url);
+            this.debug("http segment abort", segment.id);
         }
     }
 
-    public isDownloading(segment: SegmentInternal): boolean {
+    public isDownloading(segment: Segment): boolean {
         return this.xhrRequests.has(segment.id);
     }
 

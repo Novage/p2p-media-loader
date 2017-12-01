@@ -14,7 +14,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private httpManager: HttpMediaManager;
     private p2pManager: P2PMediaManager;
     private segments: Map<string, SegmentInternal> = new Map();
-    private segmentsQueue: SegmentInternal[] = [];
+    private segmentsQueue: Segment[] = [];
     private debug = Debug("p2pml:hybrid-loader");
     private httpDownloadProbabilityTimestamp = -999999;
     private speedApproximator = new SpeedApproximator();
@@ -101,7 +101,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         }
 
         // renew segment queue
-        this.segmentsQueue = Array.from(segments, s => new SegmentInternal(s.id, s.url, s.priority));
+        this.segmentsQueue = segments;
 
         // run main processing algorithm
         updateSegmentsMap = this.processSegmentsQueue() || updateSegmentsMap;

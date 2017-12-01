@@ -5,7 +5,6 @@
 
 import HttpMediaManager from "../lib/http-media-manager";
 import HybridLoader from "../lib/hybrid-loader";
-import SegmentInternal from "../lib/segment-internal";
 import {LoaderEvents, Segment} from "../lib/loader-interface";
 import {anyFunction, anyOfClass, instance, mock, verify, when} from "ts-mockito";
 import * as assert from "assert";
@@ -15,17 +14,17 @@ import {MediaPeerSegmentStatus} from "../lib/media-peer";
 describe("HybridLoader", () => {
     // HttpMediaManager mock
     const httpMediaManger = mock(HttpMediaManager);
-    const httpDownloads: Map<string, SegmentInternal> = new Map();
-    when(httpMediaManger.download(anyOfClass(SegmentInternal))).thenCall((segment) => {
+    const httpDownloads: Map<string, Segment> = new Map();
+    when(httpMediaManger.download(anyOfClass(Segment))).thenCall((segment) => {
         httpDownloads.set(segment.id, segment);
     });
-    when(httpMediaManger.abort(anyOfClass(SegmentInternal))).thenCall((segment) => {
+    when(httpMediaManger.abort(anyOfClass(Segment))).thenCall((segment) => {
         httpDownloads.delete(segment.id);
     });
     when(httpMediaManger.getActiveDownloads()).thenCall(() => {
         return httpDownloads;
     });
-    when(httpMediaManger.isDownloading(anyOfClass(SegmentInternal))).thenCall((segment) => {
+    when(httpMediaManger.isDownloading(anyOfClass(Segment))).thenCall((segment) => {
         return httpDownloads.has(segment.id);
     });
     let httpSegmentLoadedListener: Function = () => {};
@@ -35,15 +34,15 @@ describe("HybridLoader", () => {
 
     // P2PMediaManager mock
     const p2pMediaManager = mock(P2PMediaManager);
-    const p2pAvailableFiles: SegmentInternal[] = [];
-    const p2pDownloads: SegmentInternal[] = [];
+    const p2pAvailableFiles: Segment[] = [];
+    const p2pDownloads: Segment[] = [];
 
-    when(p2pMediaManager.download(anyOfClass(SegmentInternal))).thenCall((segment) => {
+    when(p2pMediaManager.download(anyOfClass(Segment))).thenCall((segment) => {
         if (p2pDownloads.indexOf(segment) === -1 && p2pAvailableFiles.filter((p) => p.id == segment.id).length === 1) {
             p2pDownloads.push(segment);
         }
     });
-    when(p2pMediaManager.abort(anyOfClass(SegmentInternal))).thenCall((segment) => {
+    when(p2pMediaManager.abort(anyOfClass(Segment))).thenCall((segment) => {
         const index = p2pDownloads.indexOf(segment);
         if (index !== -1) {
             p2pDownloads.splice(index, 1);
@@ -52,7 +51,7 @@ describe("HybridLoader", () => {
     when(p2pMediaManager.getActiveDownloadsCount()).thenCall(() => {
         return p2pDownloads.length;
     });
-    when(p2pMediaManager.isDownloading(anyOfClass(SegmentInternal))).thenCall((segment) => {
+    when(p2pMediaManager.isDownloading(anyOfClass(Segment))).thenCall((segment) => {
         return p2pDownloads.indexOf(segment) !== -1;
     });
     when(p2pMediaManager.getOvrallSegmentsMap()).thenCall(() => {
@@ -94,7 +93,7 @@ describe("HybridLoader", () => {
         assert.equal(httpDownloads.size, 1);
         let segment = httpDownloads.values().next().value;
         verify(httpMediaManger.download(segment)).once();
-        assert.deepEqual(segment, {id: segments[0].id, url: segments[0].url, priority: segments[0].priority, lastAccessed: 0, data: undefined, downloadSpeed: 0});
+        assert.deepEqual(segment, {id: segments[0].id, url: segments[0].url, priority: segments[0].priority, data: undefined, downloadSpeed: 0});
 
         // file loaded via http
         httpDownloads.clear();
@@ -102,14 +101,14 @@ describe("HybridLoader", () => {
         assert.equal(httpDownloads.size, 1);
         segment = httpDownloads.values().next().value;
         verify(httpMediaManger.download(segment)).once();
-        assert.deepEqual(segment, {id: segments[1].id, url: segments[1].url, priority: segments[1].priority, lastAccessed: 0, data: undefined, downloadSpeed: 0});
+        assert.deepEqual(segment, {id: segments[1].id, url: segments[1].url, priority: segments[1].priority, data: undefined, downloadSpeed: 0});
 
         // load same files
         hybridLoader.load(segments, swarmId);
         assert.equal(httpDownloads.size, 1);
         segment = httpDownloads.values().next().value;
         verify(httpMediaManger.download(segment)).once();
-        assert.deepEqual(segment, {id: segments[1].id, url: segments[1].url, priority: segments[1].priority, lastAccessed: 0, data: undefined, downloadSpeed: 0});
+        assert.deepEqual(segment, {id: segments[1].id, url: segments[1].url, priority: segments[1].priority, data: undefined, downloadSpeed: 0});
     });
 
 });
