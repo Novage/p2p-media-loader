@@ -349,11 +349,16 @@ Segment has been loaded.
 
 ## `Segment`
 
-Single smallest piece of data that can be requested to load.
+Media stream segment.
 
 Instance contains:
+- `id`
+    + a `String`
+    + unique identifier of the segment across peers
+    + can be equal to URL if it is the same for all peers
 - `url`
     + a `String`
+    + URL of the segment
 - `priority`
     + a non-negative integer `Number`
     + the lower value - the higher priority

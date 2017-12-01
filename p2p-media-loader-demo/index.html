@@ -181,15 +181,6 @@
 
             this.loadSpeedTimespan = 10; // seconds
 
-            var wowzaSegmentRegExp = /(.+)_w\d{6,}_(.+)/g;
-            var wowzaSegmentIdGenerator = function (url) {
-                return url.replace(wowzaSegmentRegExp, "$1$2");
-            };
-
-            this.loaderSettings = {
-                segmentIdGenerator: wowzaSegmentIdGenerator
-            };
-
             this.graph = new P2PGraphClass("#graph");
             this.graph.add({ id: "me", name: "You", me: true });
             this.initChart();
@@ -225,7 +216,7 @@
                 this.videoContainer.removeChild(this.videoContainer.lastChild);
             }
 
-            this.p2pmlLoader = new p2pml.HybridLoader(this.loaderSettings);
+            this.p2pmlLoader = new p2pml.HybridLoader();
             this.p2pmlLoader.on(p2pml.LoaderEvents.PieceBytesDownloaded, this.onBytesDownloaded.bind(this));
             this.p2pmlLoader.on(p2pml.LoaderEvents.PieceBytesUploaded, this.onBytesUploaded.bind(this));
             var trackerAnnounce = this.p2pmlLoader.getSettings().trackerAnnounce;

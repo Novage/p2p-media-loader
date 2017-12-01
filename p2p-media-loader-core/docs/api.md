@@ -25,7 +25,6 @@ If `settings` is specified, then the default settings (shown below) will be over
 
 | Name | Type | Default Value | Description |
 | --- | ---- | ------ | ------ |
-| segmentIdGenerator | String | (url: string): string => url | Function that generates segment identifier based on the input url argument
 | cachedSegmentExpiration | Integer | 300000 | Segment lifetime in cache. The segment is deleted from the cache if the last access time is greater than this value (in milliseconds)
 | cachedSegmentsCount | Integer | 30 | Max number of segments that can be stored in the cache
 | requiredSegmentsPriority | Integer | 1 | The maximum priority of the segments to be downloaded (if not available) as quickly as possible (i.e. via HTTP method)
@@ -158,11 +157,16 @@ Destroys loader: abort all http connections, clear cached segments.
 
 ## `Segment`
 
-Single smallest piece of data that can be requested to load.
+Media stream segment.
 
 Instance contains:
+- `id`
+    + a `String`
+    + unique identifier of the segment across peers
+    + can be equal to URL if it is the same for all peers
 - `url`
     + a `String`
+    + URL of the segment
 - `priority`
     + a non-negative integer `Number`
     + the lower value - the higher priority
@@ -171,7 +175,10 @@ Instance contains:
     + an `ArrayBuffer`
     + available only when segment is fully loaded; subscribe to `SegmentLoaded`
       event for this very moment
-      
+- `downloadSpeed`
+    + a non-negative integer `Number`
+    + download speed in bytes per millisecond or 0
+
 ## `LoaderEvents`
 
 Events that are emitted by `HttpLoader` and `HybridLoader` loaders, please see implementation of these loaders. 

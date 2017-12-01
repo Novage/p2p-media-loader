@@ -20,7 +20,6 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private speedApproximator = new SpeedApproximator();
 
     private settings = {
-        segmentIdGenerator: (url: string): string => url,
         cachedSegmentExpiration: 5 * 60 * 1000, // milliseconds
         cachedSegmentsCount: 30,
 
@@ -102,20 +101,19 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         }
 
         // renew segment queue
-        this.segmentsQueue = [];
-        for (const segment of segments) {
-            const segmentId = this.settings.segmentIdGenerator(segment.url);
-            this.segmentsQueue.push(new SegmentInternal(segmentId, segment.url, segment.priority));
-        }
+        this.segmentsQueue = Array.from(segments, s => new SegmentInternal(s.id, s.url, s.priority));
 
         // emit segment loaded event if the segment has already been downloaded
         if (emitNowSegmentUrl) {
-            const downloadedSegment = this.segments.get(this.settings.segmentIdGenerator(emitNowSegmentUrl));
-            if (downloadedSegment) {
-                this.debug("emitNowSegmentUrl found in cache");
-                this.emitSegmentLoaded(downloadedSegment);
-            } else {
-                this.debug("emitNowSegmentUrl not found in cache");
+            const segment = segments.find(s => s.url == emitNowSegmentUrl);
+            if (segment) {
+                const downloadedSegment = this.segments.get(segment.id);
+                if (downloadedSegment) {
+                    this.debug("emitNowSegmentUrl found in cache");
+                    this.emitSegmentLoaded(downloadedSegment);
+                } else {
+                    this.debug("emitNowSegmentUrl not found in cache");
+                }
             }
         }
 
@@ -255,7 +253,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private emitSegmentLoaded(segmentInternal: SegmentInternal): void {
         segmentInternal.lastAccessed = this.now();
 
-        const segment = new Segment(segmentInternal.url, 0, segmentInternal.data!, this.speedApproximator.getSpeed(this.now()));
+        const segment = new Segment(segmentInternal.id, segmentInternal.url, 0, segmentInternal.data, this.speedApproximator.getSpeed(this.now()));
 
         this.emit(LoaderEvents.SegmentLoaded, segment);
         this.debug("emitSegmentLoaded", segment.url);

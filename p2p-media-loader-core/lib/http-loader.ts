@@ -98,7 +98,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
     private emitSegmentLoaded(segmentInternal: SegmentInternal): void {
         segmentInternal.lastAccessed = performance.now();
 
-        const segment = new Segment(segmentInternal.url, 0, segmentInternal.data!);
+        const segment = new Segment(segmentInternal.id, segmentInternal.url, 0, segmentInternal.data);
 
         this.emit(LoaderEvents.SegmentLoaded, segment);
     }

@@ -144,14 +144,17 @@ export default class SegmentManager {
     private loadSegments(playlist: Playlist, segmentIndex: number, loadUrl?: string): void {
         const segments: Segment[] = [];
         const playlistSegments: any[] = playlist.manifest.segments;
+        const sequence: number | undefined = playlist.manifest.mediaSequence;
+        const swarmId = this.getSwarmId(playlist);
 
         let priority = Math.max(0, this.playQueue.length - 1);
         for (let i = segmentIndex; i < playlistSegments.length; ++i) {
-            const segmentUrl = playlist.getSegmentAbsoluteUrl(i);
-            segments.push(new Segment(segmentUrl, priority++));
+            const url = playlist.getSegmentAbsoluteUrl(i);
+            const id: string = (sequence ? (sequence + i).toString() : url) + swarmId;
+            segments.push(new Segment(id, url, priority++));
         }
 
-        this.loader.load(segments, this.getSwarmId(playlist), loadUrl);
+        this.loader.load(segments, swarmId, loadUrl);
     }
 
     private getSwarmId(playlist: Playlist): string {
