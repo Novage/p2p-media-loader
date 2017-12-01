@@ -80,14 +80,21 @@ Emitted when a peer is disconnected.
 Listener args: 
  - `id` - peer id.
 
-### `loader.on(LoaderEvents.PieceBytesLoaded,  function (method, size, timestamp) {})`
+### `loader.on(LoaderEvents.PieceBytesDownloaded,  function (method, size) {})`
 
-Emitted when a segment piece loaded.
+Emitted when a segment piece downloaded.
 
 Listener args: 
- - `method` - method that loaded piece, possible values: `http`, `p2p`;
- - `size` - size of the loaded piece in bytes;
- - `timestamp` - timestamp in millisecond when event was emitted.
+ - `method` - method that downloaded piece, possible values: `http`, `p2p`;
+ - `size` - size of the downloaded piece in bytes;
+ 
+ ### `loader.on(LoaderEvents.PieceBytesUploaded,  function (method, size) {})`
+
+Emitted when a segment piece uploaded.
+
+Listener args: 
+ - `method` - method that uploaded piece, possible values: `p2p`;
+ - `size` - size of the uploaded piece in bytes;
 
 ### `loader.getSettings()`
 
@@ -137,6 +144,13 @@ Listener args:
  - `size` - size of the loaded piece in bytes;
  - `timestamp` - timestamp in millisecond when event was emitted.
 
+### `loader.getSegment(id)`
+
+Returns a segment from loader or undefined if the segment is not available.
+
+Function args: 
+ - `id` - the segment id.
+
 ### `loader.getSettings()`
 
 Returns loader instance settings.
@@ -178,7 +192,8 @@ Events that are emitted by loaders, please see implementation of these loaders.
 - SegmentAbort
 - PeerConnect
 - PeerClose
-- PieceBytesLoaded
+- PieceBytesDownloaded
+- PieceBytesUploaded
 
 Usage:
 
