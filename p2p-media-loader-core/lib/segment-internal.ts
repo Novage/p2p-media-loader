@@ -1,17 +1,10 @@
 export default class SegmentInternal {
+    public lastAccessed = 0;
 
-    public id: string;
-    public url: string;
-    public priority: number;
-    public data: ArrayBuffer | undefined;
-    public lastAccessed: number;
-
-    public constructor(id: string, url: string, priority: number = 0, data: ArrayBuffer | undefined = undefined) {
-        this.id = id;
-        this.url = url;
-        this.priority = priority;
-        this.data = data;
-        this.lastAccessed = 0;
+    public constructor(
+            readonly id: string,
+            readonly url: string,
+            readonly priority = 0,
+            readonly data: ArrayBuffer | undefined = undefined) {
     }
-
 }

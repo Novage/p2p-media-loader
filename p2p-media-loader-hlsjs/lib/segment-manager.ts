@@ -241,15 +241,9 @@ class Playlist {
 }
 
 class Task {
-
-    public url: string;
-    public onSuccess?: (content: ArrayBuffer, downloadSpeed: number) => void;
-    public onError?: (error: any) => void;
-
-    public constructor(url: string, onSuccess?: (content: ArrayBuffer, downloadSpeed: number) => void, onError?: (error: any) => void) {
-        this.url = url;
-        this.onSuccess = onSuccess;
-        this.onError = onError;
+    public constructor(
+            readonly url: string,
+            readonly onSuccess?: (content: ArrayBuffer, downloadSpeed: number) => void,
+            readonly onError?: (error: any) => void) {
     }
-
 }
