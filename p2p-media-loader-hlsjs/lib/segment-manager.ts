@@ -6,8 +6,8 @@ export default class SegmentManager {
 
     private loader: LoaderInterface;
     private playlists: Map<string, Playlist> = new Map();
-    private task?: Task = undefined;
-    private currentSegmentUrl?: string = undefined;
+    private task: Task | null = null;
+    private currentSegmentUrl: string | null = null;
     private playQueue: string[] = [];
 
     public constructor(loader: LoaderInterface) {
@@ -46,23 +46,23 @@ export default class SegmentManager {
     }
 
     public loadSegment(url: string, onSuccess?: (content: ArrayBuffer, downloadSpeed: number) => void, onError?: (error: any) => void): void {
-        const { playlist: loadingPlaylist, segmentIndex: loadingSegmentIndex } = this.getSegmentLocation(url);
-        if (!loadingPlaylist) {
+        const segmentLocation = this.getSegmentLocation(url);
+        if (!segmentLocation) {
             this.fetchSegment(url, onSuccess, onError);
             return;
         }
 
         if (this.playQueue.length > 0) {
             const prevSegmentUrl = this.playQueue[ this.playQueue.length - 1 ];
-            const { playlist: prevLoadingPlaylist, segmentIndex: prevLoadingSegmentIndex } = this.getSegmentLocation(prevSegmentUrl);
-            if (prevLoadingPlaylist && prevLoadingSegmentIndex !== loadingSegmentIndex - 1) {
+            const prevSegmentLocation = this.getSegmentLocation(prevSegmentUrl);
+            if (prevSegmentLocation && prevSegmentLocation.segmentIndex !== segmentLocation.segmentIndex - 1) {
                 this.playQueue = [];
             }
         }
 
         this.task = new Task(url, onSuccess, onError);
         this.currentSegmentUrl = url;
-        this.loadSegments(loadingPlaylist, loadingSegmentIndex, url);
+        this.loadSegments(segmentLocation.playlist, segmentLocation.segmentIndex, url);
     }
 
     public setCurrentSegment(url: string = ""): void {
@@ -72,16 +72,16 @@ export default class SegmentManager {
         }
 
         if (this.currentSegmentUrl) {
-            const { playlist: loadingPlaylist, segmentIndex: loadingSegmentIndex } = this.getSegmentLocation(this.currentSegmentUrl);
-            if (loadingPlaylist) {
-                this.loadSegments(loadingPlaylist, loadingSegmentIndex);
+            const segmentLocation = this.getSegmentLocation(this.currentSegmentUrl);
+            if (segmentLocation) {
+                this.loadSegments(segmentLocation.playlist, segmentLocation.segmentIndex);
             }
         }
     }
 
     public abortSegment(url: string): void {
         if (this.task && this.task.url === url) {
-            this.task = undefined;
+            this.task = null;
         }
     }
 
@@ -91,9 +91,9 @@ export default class SegmentManager {
         if (this.task && this.task.onError) {
             this.task.onError("Loading aborted: object destroyed");
         }
-        this.task = undefined;
+        this.task = null;
 
-        this.currentSegmentUrl = undefined;
+        this.currentSegmentUrl = null;
         this.playlists.clear();
         this.playQueue = [];
     }
@@ -104,7 +104,7 @@ export default class SegmentManager {
             if (this.task.onSuccess) {
                 this.task.onSuccess(segment.data!.slice(0), segment.downloadSpeed);
             }
-            this.task = undefined;
+            this.task = null;
         }
     }
 
@@ -113,7 +113,7 @@ export default class SegmentManager {
             if (this.task.onError) {
                 this.task.onError(error);
             }
-            this.task = undefined;
+            this.task = null;
         }
     }
 
@@ -122,11 +122,11 @@ export default class SegmentManager {
             if (this.task.onError) {
                 this.task.onError("Loading aborted: internal abort");
             }
-            this.task = undefined;
+            this.task = null;
         }
     }
 
-    private getSegmentLocation(url?: string): { playlist?: Playlist, segmentIndex: number } {
+    private getSegmentLocation(url?: string): { playlist: Playlist, segmentIndex: number } | undefined {
         if (url) {
             const entries = this.playlists.values();
             for (let entry = entries.next(); !entry.done; entry = entries.next()) {
@@ -138,7 +138,7 @@ export default class SegmentManager {
             }
         }
 
-        return { playlist: undefined, segmentIndex: -1 };
+        return undefined;
     }
 
     private loadSegments(playlist: Playlist, segmentIndex: number, loadUrl?: string): void {
