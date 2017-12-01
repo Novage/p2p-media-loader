@@ -3,11 +3,11 @@ import Utils from "./utils";
 import {Parser} from "m3u8-parser";
 
 export default class SegmentManager {
-
     private loader: LoaderInterface;
-    private playlists: Map<string, Playlist> = new Map();
+    private masterPlaylist: Playlist | null = null;
+    private variantPlaylists: Map<string, Playlist> = new Map();
     private task: Task | null = null;
-    private currentSegmentUrl: string | null = null;
+    private loadingSegmentUrl: string | null = null;
     private playQueue: string[] = [];
 
     public constructor(loader: LoaderInterface) {
@@ -27,13 +27,18 @@ export default class SegmentManager {
         parser.end();
 
         const playlist = new Playlist(url, parser.manifest);
-        this.playlists.set(url, playlist);
+
+        if (playlist.manifest.playlists) {
+            this.masterPlaylist = playlist;
+        } else {
+            this.variantPlaylists.set(url, playlist);
+        }
     }
 
     public async loadPlaylist(url: string): Promise<string> {
-        let content = await Utils.fetchContentAsText(url);
+        const content = await Utils.fetchContentAsText(url);
         this.processPlaylist(url, content);
-        this.setCurrentSegment();
+        this.setPlayingSegment();
         return content;
     }
 
@@ -45,7 +50,7 @@ export default class SegmentManager {
         }
 
         if (this.playQueue.length > 0) {
-            const prevSegmentUrl = this.playQueue[ this.playQueue.length - 1 ];
+            const prevSegmentUrl = this.playQueue[this.playQueue.length - 1];
             const prevSegmentLocation = this.getSegmentLocation(prevSegmentUrl);
             if (prevSegmentLocation && prevSegmentLocation.segmentIndex !== segmentLocation.segmentIndex - 1) {
                 this.playQueue = [];
@@ -53,18 +58,20 @@ export default class SegmentManager {
         }
 
         this.task = new Task(url, onSuccess, onError);
-        this.currentSegmentUrl = url;
+        this.loadingSegmentUrl = url;
         this.loadSegments(segmentLocation.playlist, segmentLocation.segmentIndex, url);
     }
 
-    public setCurrentSegment(url: string = ""): void {
-        const urlIndex = this.playQueue.indexOf(url);
-        if (urlIndex >= 0) {
-            this.playQueue = this.playQueue.slice(urlIndex);
+    public setPlayingSegment(url?: string): void {
+        if (url) {
+            const urlIndex = this.playQueue.indexOf(url);
+            if (urlIndex >= 0) {
+                this.playQueue = this.playQueue.slice(urlIndex);
+            }
         }
 
-        if (this.currentSegmentUrl) {
-            const segmentLocation = this.getSegmentLocation(this.currentSegmentUrl);
+        if (this.loadingSegmentUrl) {
+            const segmentLocation = this.getSegmentLocation(this.loadingSegmentUrl);
             if (segmentLocation) {
                 this.loadSegments(segmentLocation.playlist, segmentLocation.segmentIndex);
             }
@@ -85,8 +92,9 @@ export default class SegmentManager {
         }
         this.task = null;
 
-        this.currentSegmentUrl = null;
-        this.playlists.clear();
+        this.loadingSegmentUrl = null;
+        this.masterPlaylist = null;
+        this.variantPlaylists.clear();
         this.playQueue = [];
     }
 
@@ -120,7 +128,7 @@ export default class SegmentManager {
 
     private getSegmentLocation(url?: string): { playlist: Playlist, segmentIndex: number } | undefined {
         if (url) {
-            const entries = this.playlists.values();
+            const entries = this.variantPlaylists.values();
             for (let entry = entries.next(); !entry.done; entry = entries.next()) {
                 const playlist = entry.value;
                 const segmentIndex = playlist.getSegmentIndex(url);
@@ -143,10 +151,10 @@ export default class SegmentManager {
         let priority = Math.max(0, this.playQueue.length - 1);
         for (let i = segmentIndex; i < playlistSegments.length; ++i) {
             const url = playlist.getSegmentAbsoluteUrl(i);
-            const id: string = (sequence ? (sequence + i).toString() : url) + swarmId;
+            const id: string = (sequence ? (sequence + i).toString() : url) + "+" + swarmId;
             segments.push(new Segment(id, url, priority++));
 
-            if (loadUrl === url) {
+            if (loadUrl && !loadSegmentId) {
                 loadSegmentId = id;
             }
         }
@@ -155,39 +163,24 @@ export default class SegmentManager {
 
         if (loadSegmentId) {
             const segment = this.loader.getSegment(loadSegmentId);
-            if (segment) {
+            if (segment) { // Segment already loaded by loader
                 this.onSegmentLoaded(segment);
             }
-        } else if (loadUrl) {
-            throw new Error("No URL within segments list");
         }
     }
 
     private getSwarmId(playlist: Playlist): string {
-        const master = this.getMasterPlaylist();
-        if (master && master.url !== playlist.url) {
-            const urls = master.getChildPlaylistAbsoluteUrls();
-            for (let i = 0; i < urls.length; ++i) {
-                if (urls[ i ] === playlist.url) {
-                    return master.url + "+" + i;
+        if (this.masterPlaylist) {
+            for (let i = 0; i < this.masterPlaylist.manifest.playlists.length; ++i) {
+                let url = this.masterPlaylist.manifest.playlists[i].uri;
+                url = Utils.isAbsoluteUrl(url) ? url : this.masterPlaylist.baseUrl + url;
+                if (url === playlist.url) {
+                    return i + "+" + this.masterPlaylist.url;
                 }
             }
         }
 
         return playlist.url;
-    }
-
-    private getMasterPlaylist(): Playlist | undefined {
-        const entries = this.playlists.values();
-        for (let entry = entries.next(); !entry.done; entry = entries.next()) {
-            const playlist = entry.value;
-
-            if (playlist.manifest.playlists) {
-                return playlist;
-            }
-        }
-
-        return undefined;
     }
 
     private fetchSegment(url: string, onSuccess?: (content: ArrayBuffer, downloadSpeed: number) => void, onError?: (error: any) => void): void {
@@ -228,25 +221,9 @@ class Playlist {
     }
 
     public getSegmentAbsoluteUrl(index: number): string {
-        const uri = this.manifest.segments[ index ].uri;
+        const uri = this.manifest.segments[index].uri;
         return Utils.isAbsoluteUrl(uri) ? uri : this.baseUrl + uri;
     }
-
-    public getChildPlaylistAbsoluteUrls(): string[] {
-        const urls: string[] = [];
-
-        if (!this.manifest.playlists) {
-            return urls;
-        }
-
-        for (const playlist of this.manifest.playlists) {
-            const url = playlist.uri;
-            urls.push(Utils.isAbsoluteUrl(url) ? url : this.baseUrl + url);
-        }
-
-        return urls;
-    }
-
 }
 
 class Task {

@@ -234,9 +234,9 @@ Processes playlist with given content.
 - `content`
     + a `String` with content of the playlist
 
-#### `setCurrentSegment(url)`
+#### `setPlayingSegment(url)`
 
-Sets current playing segment by the player.
+Sets current playing by the player segment URL.
 
 - `url`
     + a `String` with segment URL

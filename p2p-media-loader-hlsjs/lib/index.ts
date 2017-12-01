@@ -6,7 +6,7 @@ import {createHlsJsLoaderClass} from "./hlsjs-loader-class";
 function initHlsJsEvents(player: any, segmentManager: SegmentManager): void {
     player.on("hlsFragChanged", function (event: any, data: any) {
         const url = data && data.frag ? data.frag.url : undefined;
-        segmentManager.setCurrentSegment(url);
+        segmentManager.setPlayingSegment(url);
     });
     player.on("hlsDestroying", function () {
         segmentManager.destroy();
@@ -53,7 +53,7 @@ export function initMediaElementJsPlayer(mediaElement: any): void {
         const hls = mediaElement.hlsPlayer;
         if (hls && hls.config && hls.config.loader && typeof hls.config.loader.getSegmentManager === "function") {
             const segmentManager: SegmentManager = hls.config.loader.getSegmentManager();
-            segmentManager.setCurrentSegment(url);
+            segmentManager.setPlayingSegment(url);
         }
     });
     mediaElement.addEventListener("hlsDestroying", () => {
