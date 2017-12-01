@@ -7,7 +7,7 @@ export default class SegmentManager {
     private loader: LoaderInterface;
     private playlists: Map<string, Playlist> = new Map();
     private task?: Task = undefined;
-    private prevLoadUrl?: string = undefined;
+    private currentSegmentUrl?: string = undefined;
     private playQueue: string[] = [];
 
     public constructor(loader: LoaderInterface) {
@@ -61,8 +61,8 @@ export default class SegmentManager {
         }
 
         this.task = new Task(url, onSuccess, onError);
+        this.currentSegmentUrl = url;
         this.loadSegments(loadingPlaylist, loadingSegmentIndex, url);
-        this.prevLoadUrl = url;
     }
 
     public setCurrentSegment(url: string = ""): void {
@@ -71,8 +71,8 @@ export default class SegmentManager {
             this.playQueue = this.playQueue.slice(urlIndex);
         }
 
-        if (this.prevLoadUrl) {
-            const { playlist: loadingPlaylist, segmentIndex: loadingSegmentIndex } = this.getSegmentLocation(this.prevLoadUrl);
+        if (this.currentSegmentUrl) {
+            const { playlist: loadingPlaylist, segmentIndex: loadingSegmentIndex } = this.getSegmentLocation(this.currentSegmentUrl);
             if (loadingPlaylist) {
                 this.loadSegments(loadingPlaylist, loadingSegmentIndex);
             }
@@ -93,7 +93,7 @@ export default class SegmentManager {
         }
         this.task = undefined;
 
-        this.prevLoadUrl = undefined;
+        this.currentSegmentUrl = undefined;
         this.playlists.clear();
         this.playQueue = [];
     }
@@ -146,15 +146,29 @@ export default class SegmentManager {
         const playlistSegments: any[] = playlist.manifest.segments;
         const sequence: number | undefined = playlist.manifest.mediaSequence;
         const swarmId = this.getSwarmId(playlist);
+        let loadSegmentId: string | null = null;
 
         let priority = Math.max(0, this.playQueue.length - 1);
         for (let i = segmentIndex; i < playlistSegments.length; ++i) {
             const url = playlist.getSegmentAbsoluteUrl(i);
             const id: string = (sequence ? (sequence + i).toString() : url) + swarmId;
             segments.push(new Segment(id, url, priority++));
+
+            if (loadUrl === url) {
+                loadSegmentId = id;
+            }
         }
 
-        this.loader.load(segments, swarmId, loadUrl);
+        this.loader.load(segments, swarmId);
+
+        if (loadSegmentId) {
+            const segment = this.loader.getSegment(loadSegmentId);
+            if (segment) {
+                this.onSegmentLoaded(segment);
+            }
+        } else if (loadUrl) {
+            throw new Error("No URL within segments list");
+        }
     }
 
     private getSwarmId(playlist: Playlist): string {

@@ -5,6 +5,7 @@ export default class SegmentInternal {
             readonly id: string,
             readonly url: string,
             readonly priority = 0,
-            readonly data: ArrayBuffer | undefined = undefined) {
+            readonly data: ArrayBuffer | undefined = undefined,
+            readonly downloadSpeed = 0) {
     }
 }

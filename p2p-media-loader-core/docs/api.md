@@ -7,8 +7,6 @@ Core P2P functionality.
 Set of routines each loader has.
 
 Currently, this interface is implemented by following loaders:
-- `HttpLoader`
-    + HTTP is used for all segments
 - `HybridLoader`
     + HTTP is used for high priority segments
     + P2P is used for low priority segments
@@ -99,14 +97,6 @@ Returns loader instance settings.
 
 Destroys loader: abort all connections (http, tsp, peer), clear cached segments.
 
-## `HttpLoader`
-
-Implementation of the `LoaderInterface` that uses only HTTP loading mechanism.
-
-### `loader = new HttpLoader()`
-
-Creates a new `HttpLoader` instance.
-
 ### `loader.load(segments, swarmId, emitNowSegmentUrl)`
 
 Creates new queue of segments to download. Aborts all http requests for segments that are not in the new load and emits `LoaderEvents.SegmentAbort` event for each aborted event. It also emits `LoaderEvents.SegmentLoaded` event for segment with the url specified in the `emitNowSegmentUrl` param.
@@ -181,7 +171,7 @@ Instance contains:
 
 ## `LoaderEvents`
 
-Events that are emitted by `HttpLoader` and `HybridLoader` loaders, please see implementation of these loaders. 
+Events that are emitted by loaders, please see implementation of these loaders. 
 
 - SegmentLoaded
 - SegmentError

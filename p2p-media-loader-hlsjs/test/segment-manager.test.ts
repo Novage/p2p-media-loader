@@ -9,6 +9,7 @@ import {LoaderEvents, Segment, LoaderInterface} from "p2p-media-loader-core";
 class LoaderInterfaceEmptyImpl implements LoaderInterface {
     on(eventName: string | symbol, listener: Function): this { return this; }
     load(segments: Segment[], playlistUrl: string, emitNowSegmentUrl?: string): void { }
+    getSegment(id: string): Segment | undefined { return undefined; }
     getSettings(): any { }
     destroy(): void { }
     isSupported(): boolean { return true; }

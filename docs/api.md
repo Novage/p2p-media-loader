@@ -167,8 +167,7 @@ Provides playlists and segments management.
 Creates new instance.
 
 - `loader`
-    + instance of `LoaderInterface` implementation (e.g. `HttpLoader`,
-      `HybridLoader`).
+    + instance of `LoaderInterface` implementation (e.g. `HybridLoader`).
 
 #### `isSupported()`
 
@@ -249,8 +248,6 @@ Sets current playing segment by the player.
 Set of routines each loader has.
 
 Currently, this interface is implemented by following loaders:
-- `HttpLoader`
-    + HTTP is used for all segments
 - `HybridLoader`
     + HTTP is used for high priority segments
     + P2P is used for low priority segments

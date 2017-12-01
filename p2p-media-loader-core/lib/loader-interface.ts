@@ -19,11 +19,10 @@ export enum LoaderEvents {
 }
 
 export interface LoaderInterface {
-
     on(eventName: string | symbol, listener: Function): this;
-    load(segments: Segment[], swarmId: string, emitNowSegmentUrl?: string): void;
+    load(segments: Segment[], swarmId: string): void;
+    getSegment(id: string): Segment | undefined;
     getSettings(): any;
     destroy(): void;
     isSupported(): boolean;
-
 }

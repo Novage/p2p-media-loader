@@ -74,9 +74,9 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         return new P2PMediaManager(this.segments, this.settings);
     }
 
-    public load(segments: Segment[], swarmId: string, emitNowSegmentUrl?: string): void {
+    public load(segments: Segment[], swarmId: string): void {
         this.p2pManager.setSwarmId(swarmId);
-        this.debug("load segments", segments, this.segmentsQueue, emitNowSegmentUrl);
+        this.debug("load segments", segments, this.segmentsQueue);
 
         let updateSegmentsMap = false;
 
@@ -103,20 +103,6 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         // renew segment queue
         this.segmentsQueue = Array.from(segments, s => new SegmentInternal(s.id, s.url, s.priority));
 
-        // emit segment loaded event if the segment has already been downloaded
-        if (emitNowSegmentUrl) {
-            const segment = segments.find(s => s.url == emitNowSegmentUrl);
-            if (segment) {
-                const downloadedSegment = this.segments.get(segment.id);
-                if (downloadedSegment) {
-                    this.debug("emitNowSegmentUrl found in cache");
-                    this.emitSegmentLoaded(downloadedSegment);
-                } else {
-                    this.debug("emitNowSegmentUrl not found in cache");
-                }
-            }
-        }
-
         // run main processing algorithm
         updateSegmentsMap = this.processSegmentsQueue() || updateSegmentsMap;
 
@@ -126,6 +112,11 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         if (updateSegmentsMap) {
             this.p2pManager.sendSegmentsMapToAll(this.createSegmentsMap());
         }
+    }
+
+    public getSegment(id: string): Segment | undefined {
+        const segment = this.segments.get(id);
+        return segment ? (segment.data ? new Segment(segment.id, segment.url, segment.priority, segment.data, segment.downloadSpeed) : undefined) : undefined;
     }
 
     public getSettings() {
@@ -238,7 +229,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private onSegmentLoaded(id: string, url: string, data: ArrayBuffer): void {
-        const segment = new SegmentInternal(id, url, 0, data);
+        const segment = new SegmentInternal(id, url, 0, data, this.speedApproximator.getSpeed(this.now()));
         this.segments.set(id, segment);
         this.emitSegmentLoaded(segment);
         this.processSegmentsQueue();
@@ -253,7 +244,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private emitSegmentLoaded(segmentInternal: SegmentInternal): void {
         segmentInternal.lastAccessed = this.now();
 
-        const segment = new Segment(segmentInternal.id, segmentInternal.url, 0, segmentInternal.data, this.speedApproximator.getSpeed(this.now()));
+        const segment = new Segment(segmentInternal.id, segmentInternal.url, 0, segmentInternal.data, segmentInternal.downloadSpeed);
 
         this.emit(LoaderEvents.SegmentLoaded, segment);
         this.debug("emitSegmentLoaded", segment.url);

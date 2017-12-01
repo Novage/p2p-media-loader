@@ -90,11 +90,11 @@ describe("HybridLoader", () => {
         const swarmId = "swarmId";
 
         // load
-        hybridLoader.load(segments, swarmId, segments[0].url);
+        hybridLoader.load(segments, swarmId);
         assert.equal(httpDownloads.size, 1);
         let segment = httpDownloads.values().next().value;
         verify(httpMediaManger.download(segment)).once();
-        assert.deepEqual(segment, {id: segments[0].id, url: segments[0].url, priority: segments[0].priority, lastAccessed: 0, data: undefined});
+        assert.deepEqual(segment, {id: segments[0].id, url: segments[0].url, priority: segments[0].priority, lastAccessed: 0, data: undefined, downloadSpeed: 0});
 
         // file loaded via http
         httpDownloads.clear();
@@ -102,14 +102,14 @@ describe("HybridLoader", () => {
         assert.equal(httpDownloads.size, 1);
         segment = httpDownloads.values().next().value;
         verify(httpMediaManger.download(segment)).once();
-        assert.deepEqual(segment, {id: segments[1].id, url: segments[1].url, priority: segments[1].priority, lastAccessed: 0, data: undefined});
+        assert.deepEqual(segment, {id: segments[1].id, url: segments[1].url, priority: segments[1].priority, lastAccessed: 0, data: undefined, downloadSpeed: 0});
 
         // load same files
-        hybridLoader.load(segments, swarmId, segments[1].url);
+        hybridLoader.load(segments, swarmId);
         assert.equal(httpDownloads.size, 1);
         segment = httpDownloads.values().next().value;
         verify(httpMediaManger.download(segment)).once();
-        assert.deepEqual(segment, {id: segments[1].id, url: segments[1].url, priority: segments[1].priority, lastAccessed: 0, data: undefined});
+        assert.deepEqual(segment, {id: segments[1].id, url: segments[1].url, priority: segments[1].priority, lastAccessed: 0, data: undefined, downloadSpeed: 0});
     });
 
 });
