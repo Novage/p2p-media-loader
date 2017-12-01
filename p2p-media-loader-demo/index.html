@@ -179,7 +179,7 @@
             this.playerType = videoUrlForm.type.value;
             this.videoContainer = document.getElementById("video_container");
 
-            this.downloadSpeedTimespan = 10; // seconds
+            this.loadSpeedTimespan = 10; // seconds
 
             var wowzaSegmentRegExp = /(.+)_w\d{6,}_(.+)/g;
             var wowzaSegmentIdGenerator = function (url) {
@@ -218,13 +218,16 @@
         DemoApp.prototype.restartDemo = function () {
             this.downloadStats = [];
             this.downloadTotals = { http: 0, p2p: 0 };
+            this.uploadStats = [];
+            this.uploadTotal = 0;
 
             while (this.videoContainer.hasChildNodes()) {
                 this.videoContainer.removeChild(this.videoContainer.lastChild);
             }
 
             this.p2pmlLoader = new p2pml.HybridLoader(this.loaderSettings);
-            this.p2pmlLoader.on(p2pml.LoaderEvents.PieceBytesLoaded, this.onBytesLoaded.bind(this));
+            this.p2pmlLoader.on(p2pml.LoaderEvents.PieceBytesDownloaded, this.onBytesDownloaded.bind(this));
+            this.p2pmlLoader.on(p2pml.LoaderEvents.PieceBytesUploaded, this.onBytesUploaded.bind(this));
             var trackerAnnounce = this.p2pmlLoader.getSettings().trackerAnnounce;
             if (Array.isArray(trackerAnnounce)) {
                 document.getElementById('announce').innerHTML = trackerAnnounce.join("<br />");
@@ -403,11 +406,13 @@
                 renderer: 'multi',
                 interpolation: "basis",
                 stack: false,
-                strokeWidth: 5,
+                min: 'auto',
+                strokeWidth: 1,
                 series: [
-                    {name: "Total", color: "#f64", data: [], renderer: 'line'},
-                    {name: "P2P", color: "#88b9ea", data: [], renderer: 'area'},
-                    {name: "HTTP", color: "#eae288", data: [], renderer: 'area'}
+                	{name: " - P2P", color: "#88b9ea", data: [], renderer: 'area'},
+                	{name: " - HTTP", color: "#eae288", data: [], renderer: 'area'},
+                	{name: "Download", color: "#f64", data: [], renderer: 'line'},
+                	{name: "Upload P2P", color: "#88eab9", data: [], renderer: 'area'}
                 ]
             };
 
@@ -455,6 +460,7 @@
             var data0 = this.chart.series[0].data;
             var data1 = this.chart.series[1].data;
             var data2 = this.chart.series[2].data;
+            var data3 = this.chart.series[3].data;
             var lastX = data0.length > 0 ? data0[data0.length - 1].x : -1;
 
             var seriesDataMapper = function(currentValue, index) {
@@ -464,37 +470,44 @@
             data0.length = 0;
             data1.length = 0;
             data2.length = 0;
+            data3.length = 0;
 
             var stubData = Array.apply(null, Array(200)).map(seriesDataMapper);
             data0.push.apply(data0, stubData.slice(0));
             data1.push.apply(data1, stubData.slice(0));
             data2.push.apply(data2, stubData.slice(0));
+            data3.push.apply(data3, stubData.slice(0));
 
             this.chart.update();
         };
 
         DemoApp.prototype.updateChartData = function () {
-            var speed = this.getDownloadSpeed();
-            var http = Number((speed.http * 8 / 1000000).toFixed(2));
-            var p2p = Number((speed.p2p * 8 / 1000000).toFixed(2));
+            var downloadSpeed = this.getDownloadSpeed();
+            var http = Number((downloadSpeed.http * 8 / 1000000).toFixed(2));
+            var p2p = Number((downloadSpeed.p2p * 8 / 1000000).toFixed(2));
             var total = Number((http + p2p).toFixed(2));
+            var upload = Number(this.getUploadSpeed() * 8 / 1000000).toFixed(2);
 
             var data0 = this.chart.series[0].data;
             var data1 = this.chart.series[1].data;
             var data2 = this.chart.series[2].data;
+            var data3 = this.chart.series[3].data;
             var x = data0.length > 0 ? data0[data0.length - 1].x + 1 : 0;
 
             data0.shift();
             data1.shift();
             data2.shift();
+            data3.shift();
             data0.push({x: x, y: total});
-            data1.push({x: x, y: total});
-            data2.push({x: x, y: http});
+            data1.push({x: x, y: http});
+            data2.push({x: x, y: total});
+            data3.push({x: x, y: -upload});
             this.chart.update();
 
-            this.formatChartLegendLine(0, http);
-            this.formatChartLegendLine(1, p2p);
-            this.formatChartLegendLine(2, total);
+            this.formatChartLegendLine(0, upload);
+            this.formatChartLegendLine(1, total);
+            this.formatChartLegendLine(2, http);
+            this.formatChartLegendLine(3, p2p);
 
             this.updateLegendTotals();
         };
@@ -514,26 +527,31 @@
             var httpMb = this.downloadTotals.http / 1048576;
             var p2pMb = this.downloadTotals.p2p / 1048576;
             var totalMb = httpMb + p2pMb;
+            var uploadMb = this.uploadTotal / 1048576;
 
-            if (totalMb > 0) {
-                this.legendTotals.lines[0].element.childNodes[1].textContent
-                    = "HTTP - "
-                    + Number(httpMb).toFixed(1) + " MiB - "
-                    + Number((httpMb * 100) / totalMb).toFixed(0) + "%";
+            if (totalMb != 0) {
+				this.legendTotals.lines[0].element.childNodes[1].textContent
+					= "Upload P2P - "
+					+ Number(uploadMb).toFixed(1) + " MiB";
 
-                this.legendTotals.lines[1].element.childNodes[1].textContent
-                    = "P2P - "
-                    + Number(p2pMb).toFixed(1) + " MiB - "
-                    + Number((p2pMb * 100) / totalMb).toFixed(0) + "%";
+				this.legendTotals.lines[1].element.childNodes[1].textContent
+				    = "Download - "
+				    + Number(totalMb).toFixed(1) + " MiB";
 
-                this.legendTotals.lines[2].element.childNodes[1].textContent
-                    = "Total - "
-                    + Number(totalMb).toFixed(1) + " MiB";
+				this.legendTotals.lines[2].element.childNodes[1].textContent
+				    = " - HTTP - "
+				    + Number(httpMb).toFixed(1) + " MiB - "
+				    + Number((httpMb * 100) / totalMb).toFixed(0) + "%";
+
+				this.legendTotals.lines[3].element.childNodes[1].textContent
+			    	= " - P2P - "
+			    	+ Number(p2pMb).toFixed(1) + " MiB - "
+			    	+ Number((p2pMb * 100) / totalMb).toFixed(0) + "%";
             }
         };
 
         DemoApp.prototype.getDownloadSpeed = function () {
-            var startingPoint = performance.now() - (this.downloadSpeedTimespan * 1000);
+            var startingPoint = performance.now() - (this.loadSpeedTimespan * 1000);
             var httpSize = 0;
             var p2pSize = 0;
 
@@ -553,12 +571,36 @@
 
             this.downloadStats.splice(0, i + 1);
 
-            return {p2p: p2pSize / this.downloadSpeedTimespan, http: httpSize / this.downloadSpeedTimespan};
+            return {p2p: p2pSize / this.loadSpeedTimespan, http: httpSize / this.loadSpeedTimespan};
         };
 
-        DemoApp.prototype.onBytesLoaded = function (method, size) {
+        DemoApp.prototype.getUploadSpeed = function () {
+            var startingPoint = performance.now() - (this.loadSpeedTimespan * 1000);
+            var size = 0;
+
+            var i = this.uploadStats.length;
+            while (i--) {
+                var stat = this.uploadStats[i];
+                if (stat.timestamp < startingPoint) {
+                    break;
+                }
+
+                size += stat.size;
+            }
+
+            this.uploadStats.splice(0, i + 1);
+
+            return size / this.loadSpeedTimespan;
+        };
+
+        DemoApp.prototype.onBytesDownloaded = function (method, size) {
             this.downloadStats.push({method: method, size: size, timestamp: performance.now()});
             this.downloadTotals[method] += size;
+        };
+        
+        DemoApp.prototype.onBytesUploaded = function (method, size) {
+            this.uploadStats.push({size: size, timestamp: performance.now()});
+            this.uploadTotal += size;
         };
 
         DemoApp.prototype.refreshGraph = function (p2pLoader) {

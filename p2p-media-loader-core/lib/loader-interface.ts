@@ -20,7 +20,8 @@ export enum LoaderEvents {
     SegmentAbort = "segment_abort",
     PeerConnect = "peer_connect",
     PeerClose = "peer_close",
-    PieceBytesLoaded = "piece_bytes_loaded"
+    PieceBytesDownloaded = "piece_bytes_downloaded",
+    PieceBytesUploaded = "piece_bytes_uploaded"
 }
 
 export interface LoaderInterface {

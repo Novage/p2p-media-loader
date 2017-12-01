@@ -91,7 +91,8 @@ export class P2PMediaManager extends EventEmitter {
         peer.on(MediaPeerEvents.SegmentAbsent, this.onSegmentAbsent.bind(this));
         peer.on(MediaPeerEvents.SegmentError, this.onSegmentError.bind(this));
         peer.on(MediaPeerEvents.SegmentTimeout, this.onSegmentTimeout.bind(this));
-        peer.on(LoaderEvents.PieceBytesLoaded, this.onPieceBytesLoaded.bind(this));
+        peer.on(LoaderEvents.PieceBytesDownloaded, this.onPieceBytesDownloaded.bind(this));
+        peer.on(LoaderEvents.PieceBytesUploaded, this.onPieceBytesUploaded.bind(this));
 
         let peerCandidatesById = this.peerCandidates.get(peer.id);
 
@@ -187,8 +188,12 @@ export class P2PMediaManager extends EventEmitter {
         return overallSegmentsMap;
     }
 
-    private onPieceBytesLoaded(method: string, size: number): void {
-        this.emit(LoaderEvents.PieceBytesLoaded, method, size);
+    private onPieceBytesDownloaded(method: string, size: number): void {
+        this.emit(LoaderEvents.PieceBytesDownloaded, method, size);
+    }
+
+    private onPieceBytesUploaded(method: string, size: number): void {
+        this.emit(LoaderEvents.PieceBytesUploaded, method, size);
     }
 
     private onPeerConnect(peer: MediaPeer): void {

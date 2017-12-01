@@ -20,7 +20,7 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         this.httpManager = new HttpMediaManager();
         this.httpManager.on(LoaderEvents.SegmentLoaded, this.onSegmentLoaded.bind(this));
         this.httpManager.on(LoaderEvents.SegmentError, this.onSegmentError.bind(this));
-        this.httpManager.on(LoaderEvents.PieceBytesLoaded, this.onPieceBytesLoaded.bind(this));
+        this.httpManager.on(LoaderEvents.PieceBytesDownloaded, this.onPieceBytesDownloaded.bind(this));
     }
 
     public isSupported(): boolean {
@@ -78,8 +78,8 @@ export default class HttpLoader extends EventEmitter implements LoaderInterface 
         }
     }
 
-    private onPieceBytesLoaded(method: string, size: number): void {
-        this.emit(LoaderEvents.PieceBytesLoaded, method, size);
+    private onPieceBytesDownloaded(method: string, size: number): void {
+        this.emit(LoaderEvents.PieceBytesDownloaded, method, size);
     }
 
     private onSegmentLoaded(id: string, url: string, data: ArrayBuffer): void {

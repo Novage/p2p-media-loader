@@ -24,7 +24,7 @@ export default class HttpMediaManager extends EventEmitter {
         let prevBytesLoaded = 0;
         request.onprogress = (event: any) => {
             const bytesLoaded = event.loaded - prevBytesLoaded;
-            this.emit(LoaderEvents.PieceBytesLoaded, "http", bytesLoaded);
+            this.emit(LoaderEvents.PieceBytesDownloaded, "http", bytesLoaded);
             prevBytesLoaded = event.loaded;
         };
 

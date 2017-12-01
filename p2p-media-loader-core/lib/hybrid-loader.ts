@@ -55,13 +55,14 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.httpManager = this.createHttpManager();
         this.httpManager.on(LoaderEvents.SegmentLoaded, this.onSegmentLoaded.bind(this));
         this.httpManager.on(LoaderEvents.SegmentError, this.onSegmentError.bind(this));
-        this.httpManager.on(LoaderEvents.PieceBytesLoaded, this.onPieceBytesLoaded.bind(this));
+        this.httpManager.on(LoaderEvents.PieceBytesDownloaded, this.onPieceBytesDownloaded.bind(this));
 
         this.p2pManager = this.createP2PManager();
         this.p2pManager.on(LoaderEvents.SegmentLoaded, this.onSegmentLoaded.bind(this));
         this.p2pManager.on(LoaderEvents.SegmentError, this.onSegmentError.bind(this));
         this.p2pManager.on(P2PMediaManagerEvents.PeerDataUpdated, this.processSegmentsQueue.bind(this));
-        this.p2pManager.on(LoaderEvents.PieceBytesLoaded, this.onPieceBytesLoaded.bind(this));
+        this.p2pManager.on(LoaderEvents.PieceBytesDownloaded, this.onPieceBytesDownloaded.bind(this));
+        this.p2pManager.on(LoaderEvents.PieceBytesUploaded, this.onPieceBytesUploaded.bind(this));
         this.p2pManager.on(MediaPeerEvents.Connect, this.onPeerConnect.bind(this));
         this.p2pManager.on(MediaPeerEvents.Close, this.onPeerClose.bind(this));
     }
@@ -228,9 +229,14 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         return updateSegmentsMap;
     }
 
-    private onPieceBytesLoaded(method: string, size: number): void {
+    private onPieceBytesDownloaded(method: string, size: number): void {
         this.speedApproximator.addBytes(size, this.now());
-        this.emit(LoaderEvents.PieceBytesLoaded, method, size);
+        this.emit(LoaderEvents.PieceBytesDownloaded, method, size);
+    }
+
+    private onPieceBytesUploaded(method: string, size: number): void {
+        this.speedApproximator.addBytes(size, this.now());
+        this.emit(LoaderEvents.PieceBytesUploaded, method, size);
     }
 
     private onSegmentLoaded(id: string, url: string, data: ArrayBuffer): void {

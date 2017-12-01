@@ -81,7 +81,7 @@ export class MediaPeer extends EventEmitter {
 
         this.downloadingSegment.bytesDownloaded += data.byteLength;
         this.downloadingSegment.pieces.push(data);
-        this.emit(LoaderEvents.PieceBytesLoaded, "p2p", data.byteLength);
+        this.emit(LoaderEvents.PieceBytesDownloaded, "p2p", data.byteLength);
 
         const segmentId = this.downloadingSegment.id;
 
@@ -209,6 +209,8 @@ export class MediaPeer extends EventEmitter {
             this.peer.write(Buffer.from(data, data.byteLength - bytesLeft, bytesToSend));
             bytesLeft -= bytesToSend;
         }
+
+        this.emit(LoaderEvents.PieceBytesUploaded, "p2p", data.byteLength);
     }
 
     public sendSegmentAbsent(segmentId: string): void {
