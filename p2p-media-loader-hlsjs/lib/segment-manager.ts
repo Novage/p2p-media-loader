@@ -31,17 +31,9 @@ export default class SegmentManager {
     }
 
     public async loadPlaylist(url: string): Promise<string> {
-        let content: string;
-
-        try {
-            content = await Utils.fetchContentAsText(url);
-            this.processPlaylist(url, content);
-            this.setCurrentSegment();
-        } catch (e) {
-            this.playlists.delete(url);
-            throw e;
-        }
-
+        let content = await Utils.fetchContentAsText(url);
+        this.processPlaylist(url, content);
+        this.setCurrentSegment();
         return content;
     }
 
