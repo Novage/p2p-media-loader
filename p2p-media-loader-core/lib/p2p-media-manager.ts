@@ -6,11 +6,11 @@ import * as Debug from "debug";
 import SegmentInternal from "./segment-internal";
 import {Client} from "bittorrent-tracker";
 
-class PeerSegmentRequest {
+const PEER_PROTOCOL_VERSION = 1;
 
+class PeerSegmentRequest {
     constructor(readonly peerId: string, readonly segmentUrl: string) {
     }
-
 }
 
 export enum P2PMediaManagerEvents {
@@ -18,7 +18,6 @@ export enum P2PMediaManagerEvents {
 }
 
 export class P2PMediaManager extends EventEmitter {
-
     private trackerClient: any = null;
     private peers: Map<string, MediaPeer> = new Map();
     private peerCandidates: Map<string, MediaPeer[]> = new Map();
@@ -42,16 +41,16 @@ export class P2PMediaManager extends EventEmitter {
         this.debug("peerId", this.peerId);
     }
 
-    public setSwarmId(id: string): void {
-        if (this.swarmId == id) {
+    public setSwarmId(swarmId: string): void {
+        if (this.swarmId == swarmId) {
             return;
         }
 
         this.destroy();
 
-        this.swarmId = id;
+        this.swarmId = swarmId;
         this.debug("swarm", this.swarmId);
-        this.createClient(createHash("sha1").update(id).digest("hex"));
+        this.createClient(createHash("sha1").update(PEER_PROTOCOL_VERSION + this.swarmId).digest("hex"));
     }
 
     private createClient(infoHash: string): void {
@@ -302,5 +301,4 @@ export class P2PMediaManager extends EventEmitter {
             this.debug("p2p segment download timeout", segmentId);
         }
     }
-
 }
