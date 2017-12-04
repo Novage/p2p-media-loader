@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build-p2p-graph": "browserify -r p2p-graph | uglifyjs > p2p-graph.js",
-    "refresh-dependencies": "rimraf ./node_modules/p2p-media-loader-core/ && rimraf ./node_modules/p2p-media-loader-hlsjs/ && npm install && npm update && copyfiles -f ./node_modules/p2p-media-loader-core/p2p-media-loader-core.js ./ && copyfiles -f ./node_modules/p2p-media-loader-hlsjs/p2p-media-loader-hlsjs.js ./"
+    "refresh-dependencies": "rimraf ./node_modules/p2p-media-loader-core/ && rimraf ./node_modules/p2p-media-loader-hlsjs/ && npm install && npm update && copyfiles -f ./node_modules/p2p-media-loader-core/p2p-media-loader-core.min.js ./ && copyfiles -f ./node_modules/p2p-media-loader-hlsjs/p2p-media-loader-hlsjs.min.js ./"
   },
   "license": "MIT",
   "repository": {
