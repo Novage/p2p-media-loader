@@ -30,7 +30,9 @@ export default class SegmentManager {
 
         if (playlist.manifest.playlists) {
             this.masterPlaylist = playlist;
+            this.variantPlaylists.forEach(playlist => playlist.swarmId = this.getSwarmId(playlist.url));
         } else {
+            playlist.swarmId = this.getSwarmId(url);
             this.variantPlaylists.set(url, playlist);
         }
     }
@@ -145,13 +147,12 @@ export default class SegmentManager {
         const segments: Segment[] = [];
         const playlistSegments: any[] = playlist.manifest.segments;
         const sequence: number | undefined = playlist.manifest.mediaSequence;
-        const swarmId = this.getSwarmId(playlist);
         let loadSegmentId: string | null = null;
 
         let priority = Math.max(0, this.playQueue.length - 1);
         for (let i = segmentIndex; i < playlistSegments.length; ++i) {
             const url = playlist.getSegmentAbsoluteUrl(i);
-            const id: string = (sequence ? (sequence + i).toString() : url) + "+" + swarmId;
+            const id: string = (sequence ? (sequence + i).toString() : url) + "+" + playlist.swarmId;
             segments.push(new Segment(id, url, priority++));
 
             if (loadUrl && !loadSegmentId) {
@@ -159,7 +160,7 @@ export default class SegmentManager {
             }
         }
 
-        this.loader.load(segments, swarmId);
+        this.loader.load(segments, playlist.swarmId);
 
         if (loadSegmentId) {
             const segment = this.loader.getSegment(loadSegmentId);
@@ -169,18 +170,18 @@ export default class SegmentManager {
         }
     }
 
-    private getSwarmId(playlist: Playlist): string {
+    private getSwarmId(playlistUrl: string): string {
         if (this.masterPlaylist) {
             for (let i = 0; i < this.masterPlaylist.manifest.playlists.length; ++i) {
                 let url = this.masterPlaylist.manifest.playlists[i].uri;
                 url = Utils.isAbsoluteUrl(url) ? url : this.masterPlaylist.baseUrl + url;
-                if (url === playlist.url) {
+                if (url === playlistUrl) {
                     return i + "+" + this.masterPlaylist.url;
                 }
             }
         }
 
-        return playlist.url;
+        return playlistUrl;
     }
 
     private fetchSegment(url: string, onSuccess?: (content: ArrayBuffer, downloadSpeed: number) => void, onError?: (error: any) => void): void {
@@ -194,12 +195,11 @@ export default class SegmentManager {
             }
         });
     }
-
 }
 
 class Playlist {
-
     public baseUrl: string;
+    public swarmId: string;
 
     public constructor(readonly url: string, readonly manifest: any) {
         const pos = url.lastIndexOf("/");
