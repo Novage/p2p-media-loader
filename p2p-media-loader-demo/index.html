@@ -400,10 +400,10 @@
                 min: 'auto',
                 strokeWidth: 1,
                 series: [
-                	{name: " - P2P", color: "#88b9ea", data: [], renderer: 'area'},
-                	{name: " - HTTP", color: "#eae288", data: [], renderer: 'area'},
-                	{name: "Download", color: "#f64", data: [], renderer: 'line'},
-                	{name: "Upload P2P", color: "#88eab9", data: [], renderer: 'area'}
+                    {name: "Upload P2P", color: "#88eab9", data: [], renderer: 'area'},
+                    {name: " - P2P", color: "#88b9ea", data: [], renderer: 'area'},
+                    {name: " - HTTP", color: "#eae288", data: [], renderer: 'area'},
+                    {name: "Download", color: "#f64", data: [], renderer: 'line'}
                 ]
             };
 
@@ -489,16 +489,16 @@
             data1.shift();
             data2.shift();
             data3.shift();
-            data0.push({x: x, y: total});
-            data1.push({x: x, y: http});
-            data2.push({x: x, y: total});
-            data3.push({x: x, y: -upload});
+            data0.push({x: x, y: -upload});
+            data1.push({x: x, y: total});
+            data2.push({x: x, y: http});
+            data3.push({x: x, y: total});
             this.chart.update();
 
-            this.formatChartLegendLine(0, upload);
-            this.formatChartLegendLine(1, total);
-            this.formatChartLegendLine(2, http);
-            this.formatChartLegendLine(3, p2p);
+            this.formatChartLegendLine(0, total);
+            this.formatChartLegendLine(1, http);
+            this.formatChartLegendLine(2, p2p);
+            this.formatChartLegendLine(3, upload);
 
             this.updateLegendTotals();
         };
@@ -506,7 +506,7 @@
         DemoApp.prototype.formatChartLegendLine = function (index, speed) {
             if (this.legend) {
                 var line = this.legend.lines[index];
-                line.element.childNodes[1].textContent = line.series.name + ' - '+ speed + ' Mbit/s';
+                line.element.childNodes[1].textContent = line.series.name + ' - ' + speed + ' Mbit/s';
             }
         };
 
@@ -521,23 +521,23 @@
             var uploadMb = this.uploadTotal / 1048576;
 
             if (totalMb != 0) {
-				this.legendTotals.lines[0].element.childNodes[1].textContent
-					= "Upload P2P - "
-					+ Number(uploadMb).toFixed(1) + " MiB";
+                this.legendTotals.lines[0].element.childNodes[1].textContent
+                    = "Download - "
+                    + Number(totalMb).toFixed(1) + " MiB";
 
-				this.legendTotals.lines[1].element.childNodes[1].textContent
-				    = "Download - "
-				    + Number(totalMb).toFixed(1) + " MiB";
+                this.legendTotals.lines[1].element.childNodes[1].textContent
+                    = " - HTTP - "
+                    + Number(httpMb).toFixed(1) + " MiB - "
+                    + Number((httpMb * 100) / totalMb).toFixed(0) + "%";
 
-				this.legendTotals.lines[2].element.childNodes[1].textContent
-				    = " - HTTP - "
-				    + Number(httpMb).toFixed(1) + " MiB - "
-				    + Number((httpMb * 100) / totalMb).toFixed(0) + "%";
+                this.legendTotals.lines[2].element.childNodes[1].textContent
+                    = " - P2P - "
+                    + Number(p2pMb).toFixed(1) + " MiB - "
+                    + Number((p2pMb * 100) / totalMb).toFixed(0) + "%";
 
-				this.legendTotals.lines[3].element.childNodes[1].textContent
-			    	= " - P2P - "
-			    	+ Number(p2pMb).toFixed(1) + " MiB - "
-			    	+ Number((p2pMb * 100) / totalMb).toFixed(0) + "%";
+                this.legendTotals.lines[3].element.childNodes[1].textContent
+                    = "Upload P2P - "
+                    + Number(uploadMb).toFixed(1) + " MiB";
             }
         };
 
@@ -588,7 +588,7 @@
             this.downloadStats.push({method: method, size: size, timestamp: performance.now()});
             this.downloadTotals[method] += size;
         };
-        
+
         DemoApp.prototype.onBytesUploaded = function (method, size) {
             this.uploadStats.push({size: size, timestamp: performance.now()});
             this.uploadTotal += size;
