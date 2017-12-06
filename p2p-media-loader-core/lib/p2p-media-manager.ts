@@ -32,7 +32,8 @@ export class P2PMediaManager extends EventEmitter {
                 useP2P: boolean,
                 trackerAnnounce: string[],
                 p2pSegmentDownloadTimeout: number,
-                webRtcMaxMessageSize: number
+                webRtcMaxMessageSize: number,
+                rtcConfig?: RTCConfiguration
             }) {
         super();
 
@@ -61,7 +62,8 @@ export class P2PMediaManager extends EventEmitter {
         const clientOptions = {
             infoHash: infoHash,
             peerId: this.peerId,
-            announce: this.settings.trackerAnnounce
+            announce: this.settings.trackerAnnounce,
+            rtcConfig: this.settings.rtcConfig
         };
 
         this.trackerClient = new Client(clientOptions);
