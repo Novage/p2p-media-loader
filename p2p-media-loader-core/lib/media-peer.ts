@@ -35,14 +35,14 @@ class DownloadingSegment {
 }
 
 export class MediaPeer extends EventEmitter {
-
     public id: string;
     public remoteAddress: string;
     private downloadingSegmentId: string | null = null;
     private downloadingSegment: DownloadingSegment | null = null;
-    private segmentsMap: Map<string, MediaPeerSegmentStatus> = new Map();
+    private segmentsMap = new Map<string, MediaPeerSegmentStatus>();
     private debug = Debug("p2pml:media-peer");
     private timer: number | null = null;
+    private isSafari11_0: boolean;
 
     constructor(readonly peer: any,
             readonly settings: {
@@ -57,6 +57,21 @@ export class MediaPeer extends EventEmitter {
         this.peer.on("data", (data: any) => this.onPeerData(data));
 
         this.id = peer.id;
+
+        this.detectSafari11_0();
+    }
+
+    private detectSafari11_0() {
+        const userAgent: string = typeof navigator !== "undefined" ? navigator.userAgent || "" : "";
+        const isSafari = userAgent.indexOf("Safari") != -1 && userAgent.indexOf("Chrome") == -1;
+        if (isSafari) {
+            const match = userAgent.match(/version\/(\d+(\.\d+)?)/i);
+            const version = (match && match.length > 1 && match[1]) || "";
+            this.isSafari11_0 = (version === "11.0");
+            return;
+        }
+
+        this.isSafari11_0 = false;
     }
 
     private onPeerConnect(): void {
@@ -205,8 +220,11 @@ export class MediaPeer extends EventEmitter {
         let bytesLeft = data.byteLength;
         while (bytesLeft > 0) {
             const bytesToSend = (bytesLeft >= this.settings.webRtcMaxMessageSize ? this.settings.webRtcMaxMessageSize : bytesLeft);
-            // Using Buffer.from because TypedArrays as input to this function cause memory copying
-            this.peer.write(Buffer.from(data, data.byteLength - bytesLeft, bytesToSend));
+            const buffer = this.isSafari11_0 ?
+                Buffer.from(data.slice(data.byteLength - bytesLeft, data.byteLength - bytesLeft + bytesToSend)) : // workaround for Safari 11.0 bug: https://bugs.webkit.org/show_bug.cgi?id=173052
+                Buffer.from(data, data.byteLength - bytesLeft, bytesToSend); // avoid memory copying
+
+            this.peer.write(buffer);
             bytesLeft -= bytesToSend;
         }
 
@@ -263,5 +281,4 @@ export class MediaPeer extends EventEmitter {
         this.downloadingSegment = null;
         this.cancelResponseTimeoutTimer();
     }
-
 }
