@@ -229,6 +229,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private onSegmentLoaded(id: string, url: string, data: ArrayBuffer): void {
+        this.debug("segment loaded", id, url);
         const segment = new SegmentInternal(id, url, 0, data, this.speedApproximator.getSpeed(this.now()));
         this.segments.set(id, segment);
         this.emitSegmentLoaded(segment);
@@ -247,7 +248,6 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         const segment = new Segment(segmentInternal.id, segmentInternal.url, 0, segmentInternal.data, segmentInternal.downloadSpeed);
 
         this.emit(LoaderEvents.SegmentLoaded, segment);
-        this.debug("emitSegmentLoaded", segment.url);
     }
 
     private createSegmentsMap(): string[][] {
