@@ -14,7 +14,6 @@ enum MediaPeerCommands {
 export enum MediaPeerEvents {
     Connect = "peer_connect",
     Close = "peer_close",
-    Error = "peer_error",
     SegmentsMap = "peer_segments_map",
     SegmentRequest = "peer_segment_request",
     SegmentLoaded = "peer_segment_loaded",
@@ -53,7 +52,7 @@ export class MediaPeer extends EventEmitter {
 
         this.peer.on("connect", () => this.onPeerConnect());
         this.peer.on("close", () => this.onPeerClose());
-        this.peer.on("error", (error: any) => this.onPeerError(error));
+        this.peer.on("error", (error: any) => this.debug("peer error", this.id, error, this));
         this.peer.on("data", (data: any) => this.onPeerData(data));
 
         this.id = peer.id;
@@ -67,30 +66,32 @@ export class MediaPeer extends EventEmitter {
         if (isSafari) {
             const match = userAgent.match(/version\/(\d+(\.\d+)?)/i);
             const version = (match && match.length > 1 && match[1]) || "";
-            this.isSafari11_0 = (version === "11.0");
-            return;
+            if (version === "11.0") {
+                this.isSafari11_0 = true;
+                this.debug("enable workaround for Safari 11.0");
+                return;
+            }
         }
 
         this.isSafari11_0 = false;
     }
 
     private onPeerConnect(): void {
+        this.debug("peer connect", this.id, this);
         this.remoteAddress = this.peer.remoteAddress;
         this.emit(MediaPeerEvents.Connect, this);
     }
 
     private onPeerClose(): void {
+        this.debug("peer close", this.id, this);
         this.terminateSegmentRequest();
         this.emit(MediaPeerEvents.Close, this);
-    }
-
-    private onPeerError(error: any): void {
-        this.emit(MediaPeerEvents.Error, this, error);
     }
 
     private receiveSegmentPiece(data: ArrayBuffer): void {
         if (!this.downloadingSegment) {
             // The segment was not requested or canceled
+            this.debug("peer segment not requested", this.id, this);
             return;
         }
 
@@ -108,9 +109,11 @@ export class MediaPeer extends EventEmitter {
                 offset += piece.byteLength;
             }
 
+            this.debug("peer segment download done", this.id, segmentId, this);
             this.terminateSegmentRequest();
             this.emit(MediaPeerEvents.SegmentLoaded, this, segmentId, segmentData.buffer);
         } else if (this.downloadingSegment.bytesDownloaded > this.downloadingSegment.size) {
+            this.debug("peer segment download bytes mismatch", this.id, segmentId, this);
             this.terminateSegmentRequest();
             this.emit(MediaPeerEvents.SegmentError, this, segmentId, "Too many bytes received for segment");
         }
@@ -139,14 +142,17 @@ export class MediaPeer extends EventEmitter {
         }
 
         if (this.downloadingSegment) {
+            this.debug("peer segment download is interrupted by a command", this.id, this);
+
             const segmentId = this.downloadingSegment.id;
             this.terminateSegmentRequest();
             this.emit(MediaPeerEvents.SegmentError, this, segmentId, "Segment download is interrupted by a command");
             return;
         }
 
-        switch (command.command) {
+        this.debug("peer receive command", this.id, command, this);
 
+        switch (command.command) {
             case MediaPeerCommands.SegmentsMap:
                 this.segmentsMap = new Map(command.segments);
                 this.emit(MediaPeerEvents.SegmentsMap);
@@ -180,20 +186,13 @@ export class MediaPeer extends EventEmitter {
         }
     }
 
-    private sendCommand(command: any): boolean {
-        try {
-            if (this.peer.connected) {
-                this.peer.write(JSON.stringify(command));
-                return true;
-            }
-        } catch (err) {
-            this.debug("sendCommand failed", err, command);
-        }
-
-        return false;
+    private sendCommand(command: any): void {
+        this.debug("peer send command", this.id, command, this);
+        this.peer.write(JSON.stringify(command));
     }
 
     public destroy(): void {
+        this.debug("peer destroy", this.id, this);
         this.terminateSegmentRequest();
         this.peer.destroy();
     }
@@ -235,18 +234,14 @@ export class MediaPeer extends EventEmitter {
         this.sendCommand({"command": MediaPeerCommands.SegmentAbsent, "segment_id": segmentId});
     }
 
-    public requestSegment(segmentId: string): boolean {
+    public requestSegment(segmentId: string): void {
         if (this.downloadingSegmentId) {
             throw new Error("A segment is already downloading: " + this.downloadingSegmentId);
         }
 
-        if (this.sendCommand({"command": MediaPeerCommands.SegmentRequest, "segment_id": segmentId})) {
-            this.downloadingSegmentId = segmentId;
-            this.runResponseTimeoutTimer();
-            return true;
-        }
-
-        return false;
+        this.sendCommand({"command": MediaPeerCommands.SegmentRequest, "segment_id": segmentId});
+        this.downloadingSegmentId = segmentId;
+        this.runResponseTimeoutTimer();
     }
 
     public cancelSegmentRequest(): void {

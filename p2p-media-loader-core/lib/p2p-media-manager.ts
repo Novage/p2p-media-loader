@@ -38,7 +38,7 @@ export class P2PMediaManager extends EventEmitter {
 
         this.peerId = createHash("sha1").update((Date.now() + Math.random()).toFixed(12)).digest("hex");
 
-        this.debug("peerId", this.peerId);
+        this.debug("peer ID", this.peerId);
     }
 
     public setSwarmId(swarmId: string): void {
@@ -49,7 +49,7 @@ export class P2PMediaManager extends EventEmitter {
         this.destroy();
 
         this.swarmId = swarmId;
-        this.debug("swarm", this.swarmId);
+        this.debug("swarm ID", this.swarmId);
         this.createClient(createHash("sha1").update(PEER_PROTOCOL_VERSION + this.swarmId).digest("hex"));
     }
 
@@ -65,16 +65,19 @@ export class P2PMediaManager extends EventEmitter {
         };
 
         this.trackerClient = new Client(clientOptions);
-        this.trackerClient.on("error", (error: any) => this.debug("client error", error));
-        this.trackerClient.on("warning", (error: any) => this.debug("client warning", error));
-        this.trackerClient.on("update", (data: any) => this.debug("client announce update", data));
-        this.trackerClient.on("peer", this.onClientPeer.bind(this));
+        this.trackerClient.on("error", (error: any) => this.debug("tracker error", error));
+        this.trackerClient.on("warning", (error: any) => this.debug("tracker warning", error));
+        this.trackerClient.on("update", (data: any) => this.debug("tracker update", data));
+        this.trackerClient.on("peer", this.onTrackerPeer.bind(this));
 
         this.trackerClient.start();
     }
 
-    private onClientPeer(trackerPeer: any): void {
+    private onTrackerPeer(trackerPeer: any): void {
+        this.debug("tracker peer", trackerPeer.id, trackerPeer);
+
         if (this.peers.has(trackerPeer.id)) {
+            this.debug("tracker peer already connected", trackerPeer.id, trackerPeer);
             trackerPeer.destroy();
             return;
         }
@@ -83,7 +86,6 @@ export class P2PMediaManager extends EventEmitter {
 
         peer.on(MediaPeerEvents.Connect, this.onPeerConnect.bind(this));
         peer.on(MediaPeerEvents.Close, this.onPeerClose.bind(this));
-        peer.on(MediaPeerEvents.Error, this.onPeerError.bind(this));
         peer.on(MediaPeerEvents.SegmentsMap, this.onSegmentsMap.bind(this));
         peer.on(MediaPeerEvents.SegmentRequest, this.onSegmentRequest.bind(this));
         peer.on(MediaPeerEvents.SegmentLoaded, this.onSegmentLoaded.bind(this));
@@ -112,10 +114,9 @@ export class P2PMediaManager extends EventEmitter {
         for (let entry = entries.next(); !entry.done; entry = entries.next()) {
             const peer = entry.value;
             if ((peer.getDownloadingSegmentId() == null) &&
-                    (peer.getSegmentsMap().get(segment.id) === MediaPeerSegmentStatus.Loaded) &&
-                    peer.requestSegment(segment.id)) {
+                    (peer.getSegmentsMap().get(segment.id) === MediaPeerSegmentStatus.Loaded)) {
+                peer.requestSegment(segment.id);
                 this.peerSegmentRequests.set(segment.id, new PeerSegmentRequest(peer.id, segment.url));
-                this.debug("p2p segment download", segment.id, segment.url);
                 return true;
             }
         }
@@ -131,7 +132,6 @@ export class P2PMediaManager extends EventEmitter {
                 peer.cancelSegmentRequest();
             }
             this.peerSegmentRequests.delete(segment.id);
-            this.debug("p2p segment abort", segment.id, segment.url);
         }
     }
 
@@ -198,24 +198,28 @@ export class P2PMediaManager extends EventEmitter {
     private onPeerConnect(peer: MediaPeer): void {
         const connectedPeer = this.peers.get(peer.id);
 
+        if (connectedPeer) {
+            this.debug("tracker peer already connected (in peer connect)", peer.id, peer);
+            peer.destroy();
+            return;
+        }
+
         // First peer with the ID connected
-        if (!connectedPeer) {
-            this.peers.set(peer.id, peer);
+        this.peers.set(peer.id, peer);
 
-            // Destroy all other peer candidates
-            const peerCandidatesById = this.peerCandidates.get(peer.id);
-            if (peerCandidatesById) {
-                for (const peerCandidate of peerCandidatesById) {
-                    if (peerCandidate != peer) {
-                        peerCandidate.destroy();
-                    }
+        // Destroy all other peer candidates
+        const peerCandidatesById = this.peerCandidates.get(peer.id);
+        if (peerCandidatesById) {
+            for (const peerCandidate of peerCandidatesById) {
+                if (peerCandidate != peer) {
+                    peerCandidate.destroy();
                 }
-
-                this.peerCandidates.delete(peer.id);
             }
 
-            this.emit(MediaPeerEvents.Connect, {id: peer.id, remoteAddress: peer.remoteAddress});
+            this.peerCandidates.delete(peer.id);
         }
+
+        this.emit(MediaPeerEvents.Connect, {id: peer.id, remoteAddress: peer.remoteAddress});
     }
 
     private onPeerClose(peer: MediaPeer): void {
@@ -250,10 +254,6 @@ export class P2PMediaManager extends EventEmitter {
         this.emit(MediaPeerEvents.Close, peer.id);
     }
 
-    private onPeerError(peer: MediaPeer, error: any): void {
-        this.debug("onPeerError", peer, error);
-    }
-
     private onSegmentsMap(): void {
         this.emit(P2PMediaManagerEvents.PeerDataUpdated);
     }
@@ -272,7 +272,6 @@ export class P2PMediaManager extends EventEmitter {
         if (peerSegmentRequest) {
             this.peerSegmentRequests.delete(segmentId);
             this.emit(LoaderEvents.SegmentLoaded, segmentId, peerSegmentRequest.segmentUrl, data);
-            this.debug("p2p segment loaded", peerSegmentRequest.segmentUrl);
         }
     }
 
@@ -286,7 +285,6 @@ export class P2PMediaManager extends EventEmitter {
         if (peerSegmentRequest) {
             this.peerSegmentRequests.delete(segmentId);
             this.emit(LoaderEvents.SegmentError, peerSegmentRequest.segmentUrl, description);
-            this.debug("p2p segment download failed", segmentId, description);
         }
     }
 
@@ -298,7 +296,6 @@ export class P2PMediaManager extends EventEmitter {
             if (this.peers.delete(peerSegmentRequest.peerId)) {
                 this.emit(P2PMediaManagerEvents.PeerDataUpdated);
             }
-            this.debug("p2p segment download timeout", segmentId);
         }
     }
 }
