@@ -10,7 +10,6 @@ import {SpeedApproximator} from "./speed-approximator";
 const getBrowserRtc = require("get-browser-rtc");
 
 export default class HybridLoader extends EventEmitter implements LoaderInterface {
-
     private httpManager: HttpMediaManager;
     private p2pManager: P2PMediaManager;
     private segments: Map<string, SegmentInternal> = new Map();
@@ -30,10 +29,10 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         httpDownloadProbabilityInterval: 500,
         bufferedSegmentsCount: 20,
 
-        webRtcMaxMessageSize: 16 * 1024,
+        webRtcMaxMessageSize: 64 * 1024 - 1,
         p2pSegmentDownloadTimeout: 60000,
-
-        trackerAnnounce: [ "wss://tracker.btorrent.xyz/", "wss://tracker.openwebtorrent.com/" ]
+        trackerAnnounce: ["wss://tracker.btorrent.xyz/", "wss://tracker.openwebtorrent.com/"],
+        rtcConfig: require("simple-peer").config
     };
 
     public static isSupported(): boolean {

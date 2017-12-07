@@ -32,9 +32,9 @@ If `settings` is specified, then the default settings (shown below) will be over
 | httpDownloadProbabilityInterval | Integer | 500 | Interval of the httpDownloadProbability check (in milliseconds)
 | bufferedSegmentsCount | Integer | 20 | Max number of the segments to be downloaded via HTTP or P2P methods
 | trackerAnnounce | String[] | [ "wss://tracker.btorrent.xyz/", "wss://tracker.openwebtorrent.com/" ] | Torrent trackers (announcers) to use
-| webRtcMaxMessageSize | number | 16 * 1024 | Max WebRTC message size. 16KiB is minimal that works with all the browsers. 64KiB - 1B should work for most of recent browsers. 
+| webRtcMaxMessageSize | number | 64 * 1024 - 1 | Max WebRTC message size. 64KiB - 1B should work with most of recent browsers. Set it to 16KiB for older browsers support. 
 | p2pSegmentDownloadTimeout | number | 60000 | Timeout to download a segment from a peer. If exceeded the peer is dropped. 
-| rtcConfig | RTCConfiguration | undefined | An RTCConfiguration dictionary providing options to configure WebRTC connections.
+| rtcConfig | RTCConfiguration | Object | An RTCConfiguration dictionary providing options to configure WebRTC connections.
 
 ### `loader.load(segments, swarmId, emitNowSegmentUrl)`
 
