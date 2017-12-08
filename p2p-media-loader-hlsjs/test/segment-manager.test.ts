@@ -55,7 +55,7 @@ describe("SegmentManager", () => {
 
         const manager = new SegmentManager(instance(loader));
         manager.processPlaylist(testPlaylist.url, testPlaylist.content);
-        manager.loadSegment(segment.url, onSuccess);
+        manager.loadSegment(segment.url, onSuccess, () => {});
         segmentLoadedListener(segment);
 
         onSuccess.calledWith(segment.data);
@@ -75,7 +75,7 @@ describe("SegmentManager", () => {
 
         const manager = new SegmentManager(instance(loader));
         manager.processPlaylist(testPlaylist.url, testPlaylist.content);
-        manager.loadSegment(url, undefined, onError);
+        manager.loadSegment(url, () => {}, onError);
         segmentErrorListener(url, error);
 
         onError.calledWith(error);
