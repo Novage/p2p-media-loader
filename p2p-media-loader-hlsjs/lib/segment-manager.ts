@@ -6,8 +6,7 @@ export default class SegmentManager {
     private loader: LoaderInterface;
     private masterPlaylist: Playlist | null = null;
     private variantPlaylists: Map<string, Playlist> = new Map();
-    private task: Task | null = null;
-    private loadingSegmentUrl: string | null = null;
+    private segmentRequest: SegmentRequest | null = null;
     private playQueue: string[] = [];
 
     public constructor(loader: LoaderInterface) {
@@ -31,20 +30,21 @@ export default class SegmentManager {
         if (playlist.manifest.playlists) {
             this.masterPlaylist = playlist;
             this.variantPlaylists.forEach(playlist => playlist.swarmId = this.getSwarmId(playlist.url));
+            // TODO: validate that playlist was not changed
         } else {
             playlist.swarmId = this.getSwarmId(url);
             this.variantPlaylists.set(url, playlist);
+            this.setPlayingSegment();
         }
     }
 
     public async loadPlaylist(url: string): Promise<string> {
         const content = await Utils.fetchContentAsText(url);
         this.processPlaylist(url, content);
-        this.setPlayingSegment();
         return content;
     }
 
-    public loadSegment(url: string, onSuccess?: (content: ArrayBuffer, downloadSpeed: number) => void, onError?: (error: any) => void): void {
+    public loadSegment(url: string, onSuccess: (content: ArrayBuffer, downloadSpeed: number) => void, onError: (error: any) => void): void {
         const segmentLocation = this.getSegmentLocation(url);
         if (!segmentLocation) {
             this.fetchSegment(url, onSuccess, onError);
@@ -59,8 +59,7 @@ export default class SegmentManager {
             }
         }
 
-        this.task = new Task(url, onSuccess, onError);
-        this.loadingSegmentUrl = url;
+        this.segmentRequest = new SegmentRequest(url, onSuccess, onError);
         this.loadSegments(segmentLocation.playlist, segmentLocation.segmentIndex, url);
     }
 
@@ -72,8 +71,8 @@ export default class SegmentManager {
             }
         }
 
-        if (this.loadingSegmentUrl) {
-            const segmentLocation = this.getSegmentLocation(this.loadingSegmentUrl);
+        if (this.segmentRequest) {
+            const segmentLocation = this.getSegmentLocation(this.segmentRequest.url);
             if (segmentLocation) {
                 this.loadSegments(segmentLocation.playlist, segmentLocation.segmentIndex);
             }
@@ -81,50 +80,43 @@ export default class SegmentManager {
     }
 
     public abortSegment(url: string): void {
-        if (this.task && this.task.url === url) {
-            this.task = null;
+        if (this.segmentRequest && this.segmentRequest.url === url) {
+            this.segmentRequest = null;
         }
     }
 
     public destroy(): void {
         this.loader.destroy();
 
-        if (this.task && this.task.onError) {
-            this.task.onError("Loading aborted: object destroyed");
+        if (this.segmentRequest) {
+            this.segmentRequest.onError("Loading aborted: object destroyed");
+            this.segmentRequest = null;
         }
-        this.task = null;
 
-        this.loadingSegmentUrl = null;
         this.masterPlaylist = null;
         this.variantPlaylists.clear();
         this.playQueue = [];
     }
 
     private onSegmentLoaded(segment: Segment): void {
-        if (this.task && this.task.url === segment.url) {
+        if (this.segmentRequest && this.segmentRequest.url === segment.url) {
             this.playQueue.push(segment.url);
-            if (this.task.onSuccess) {
-                this.task.onSuccess(segment.data!.slice(0), segment.downloadSpeed);
-            }
-            this.task = null;
+            this.segmentRequest.onSuccess(segment.data!.slice(0), segment.downloadSpeed);
+            this.segmentRequest = null;
         }
     }
 
     private onSegmentError(url: string, error: any): void {
-        if (this.task && this.task.url === url) {
-            if (this.task.onError) {
-                this.task.onError(error);
-            }
-            this.task = null;
+        if (this.segmentRequest && this.segmentRequest.url === url) {
+            this.segmentRequest.onError(error);
+            this.segmentRequest = null;
         }
     }
 
     private onSegmentAbort(url: string): void {
-        if (this.task && this.task.url === url) {
-            if (this.task.onError) {
-                this.task.onError("Loading aborted: internal abort");
-            }
-            this.task = null;
+        if (this.segmentRequest && this.segmentRequest.url === url) {
+            this.segmentRequest.onError("Loading aborted: internal abort");
+            this.segmentRequest = null;
         }
     }
 
@@ -226,10 +218,10 @@ class Playlist {
     }
 }
 
-class Task {
+class SegmentRequest {
     public constructor(
             readonly url: string,
-            readonly onSuccess?: (content: ArrayBuffer, downloadSpeed: number) => void,
-            readonly onError?: (error: any) => void) {
+            readonly onSuccess: (content: ArrayBuffer, downloadSpeed: number) => void,
+            readonly onError: (error: any) => void) {
     }
 }
