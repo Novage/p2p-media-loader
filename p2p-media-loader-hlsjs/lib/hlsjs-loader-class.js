@@ -9,15 +9,18 @@ function createHlsJsLoaderClass(HlsJsLoader, segmentManager) {
     }
 
     HlsJsLoaderClass.prototype.load = function (context, config, callbacks) {
-        return this.impl.load(context, config, callbacks);
+        this.context = context;
+        this.impl.load(context, config, callbacks);
     };
 
     HlsJsLoaderClass.prototype.abort = function () {
-        return this.impl.abort();
+        this.impl.abort(this.context);
     };
 
     HlsJsLoaderClass.prototype.destroy = function () {
-        return this.impl.destroy();
+        if (this.context) {
+            this.impl.abort(this.context);
+        }
     };
 
     HlsJsLoaderClass.getSegmentManager = function () {
