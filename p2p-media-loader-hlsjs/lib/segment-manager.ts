@@ -60,6 +60,10 @@ export default class SegmentManager {
                 this.playQueue = [];
             }
         }
+        
+        if (this.segmentRequest) {
+            this.segmentRequest.onError("Cancel segment request: simultaneous segment requests no supported");    
+        }
 
         this.segmentRequest = new SegmentRequest(url, onSuccess, onError);
         this.loadSegments(segmentLocation.playlist, segmentLocation.segmentIndex, url);
