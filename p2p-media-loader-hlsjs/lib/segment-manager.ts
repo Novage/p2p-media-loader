@@ -7,7 +7,7 @@ export default class SegmentManager {
     private masterPlaylist: Playlist | null = null;
     private variantPlaylists: Map<string, Playlist> = new Map();
     private segmentRequest: SegmentRequest | null = null;
-    private playQueue: string[] = [];
+    private playQueue: {segmentSequence: number, segmentUrl: string}[] = [];
 
     public constructor(loader: LoaderInterface) {
         this.loader = loader;
@@ -34,7 +34,7 @@ export default class SegmentManager {
         } else {
             playlist.swarmId = this.getSwarmId(url);
             this.variantPlaylists.set(url, playlist);
-            this.setPlayingSegment();
+            this.updateSegments();
         }
     }
 
@@ -53,10 +53,13 @@ export default class SegmentManager {
             return;
         }
 
+        const segmentSequence = (segmentLocation.playlist.manifest.mediaSequence ? segmentLocation.playlist.manifest.mediaSequence : 0)
+            + segmentLocation.segmentIndex;
+
         if (this.playQueue.length > 0) {
-            const prevSegmentUrl = this.playQueue[this.playQueue.length - 1];
-            const prevSegmentLocation = this.getSegmentLocation(prevSegmentUrl);
-            if (prevSegmentLocation && prevSegmentLocation.segmentIndex !== segmentLocation.segmentIndex - 1) {
+            const previousSegment = this.playQueue[this.playQueue.length - 1];
+            if (previousSegment.segmentSequence !== segmentSequence - 1) {
+                // Reset play queue in case of segment loading out of sequence
                 this.playQueue = [];
             }
         }
@@ -65,28 +68,21 @@ export default class SegmentManager {
             this.segmentRequest.onError("Cancel segment request: simultaneous segment requests are not supported");
         }
 
-        this.segmentRequest = new SegmentRequest(url, onSuccess, onError);
-        this.loadSegments(segmentLocation.playlist, segmentLocation.segmentIndex, url);
+        this.segmentRequest = new SegmentRequest(url, segmentSequence, segmentLocation.playlist.url, onSuccess, onError);
+        this.playQueue.push({segmentUrl: url, segmentSequence: segmentSequence});
+        this.loadSegments(segmentLocation.playlist, segmentLocation.segmentIndex, true);
     }
 
-    public setPlayingSegment(url?: string): void {
-        if (url) {
-            const urlIndex = this.playQueue.indexOf(url);
-            if (urlIndex >= 0) {
-                this.playQueue = this.playQueue.slice(urlIndex);
-            }
-        }
-
-        if (this.segmentRequest) {
-            const segmentLocation = this.getSegmentLocation(this.segmentRequest.url);
-            if (segmentLocation) {
-                this.loadSegments(segmentLocation.playlist, segmentLocation.segmentIndex);
-            }
+    public setPlayingSegment(url: string): void {
+        const urlIndex = this.playQueue.findIndex(segment => segment.segmentUrl == url);
+        if (urlIndex >= 0) {
+            this.playQueue = this.playQueue.slice(urlIndex);
+            this.updateSegments();
         }
     }
 
     public abortSegment(url: string): void {
-        if (this.segmentRequest && this.segmentRequest.url === url) {
+        if (this.segmentRequest && this.segmentRequest.segmentUrl === url) {
             this.segmentRequest = null;
         }
     }
@@ -104,23 +100,40 @@ export default class SegmentManager {
         this.playQueue = [];
     }
 
+    private updateSegments(): void {
+        if (!this.segmentRequest) {
+            return;
+        }
+
+        const segmentLocation = this.getSegmentLocation(this.segmentRequest.segmentUrl);
+        if (segmentLocation) {
+            this.loadSegments(segmentLocation.playlist, segmentLocation.segmentIndex, false);
+        } else { // the segment not found in current playlist
+            const playlist = this.variantPlaylists.get(this.segmentRequest.playlistUrl);
+            if (playlist) {
+                this.loadSegments(playlist, 0, false, {
+                    url: this.segmentRequest.segmentUrl,
+                    sequence: this.segmentRequest.segmentSequence});
+            }
+        }
+    }
+
     private onSegmentLoaded(segment: Segment): void {
-        if (this.segmentRequest && this.segmentRequest.url === segment.url) {
-            this.playQueue.push(segment.url);
+        if (this.segmentRequest && this.segmentRequest.segmentUrl === segment.url) {
             this.segmentRequest.onSuccess(segment.data!.slice(0), segment.downloadSpeed);
             this.segmentRequest = null;
         }
     }
 
     private onSegmentError(url: string, error: any): void {
-        if (this.segmentRequest && this.segmentRequest.url === url) {
+        if (this.segmentRequest && this.segmentRequest.segmentUrl === url) {
             this.segmentRequest.onError(error);
             this.segmentRequest = null;
         }
     }
 
     private onSegmentAbort(url: string): void {
-        if (this.segmentRequest && this.segmentRequest.url === url) {
+        if (this.segmentRequest && this.segmentRequest.segmentUrl === url) {
             this.segmentRequest.onError("Loading aborted: internal abort");
             this.segmentRequest = null;
         }
@@ -139,19 +152,34 @@ export default class SegmentManager {
         return undefined;
     }
 
-    private loadSegments(playlist: Playlist, segmentIndex: number, loadUrl?: string): void {
+    private getSegmentId(segmentSequence: number, segmentPlaylist: Playlist): string {
+        return segmentSequence + "+" + segmentPlaylist.swarmId;
+    }
+
+    private loadSegments(playlist: Playlist, segmentIndex: number, requestFirstSegment: boolean, notInPlaylistSegment?: {url: string, sequence: number}): void {
         const segments: Segment[] = [];
         const playlistSegments: any[] = playlist.manifest.segments;
-        const sequence: number = playlist.manifest.mediaSequence ? playlist.manifest.mediaSequence : 0;
+        const initialSequence: number = playlist.manifest.mediaSequence ? playlist.manifest.mediaSequence : 0;
         let loadSegmentId: string | null = null;
 
         let priority = Math.max(0, this.playQueue.length - 1);
-        for (let i = segmentIndex; i < playlistSegments.length; ++i) {
-            const url = playlist.getSegmentAbsoluteUrl(i);
-            const id: string = (sequence + i) + "+" + playlist.swarmId;
+
+        if (notInPlaylistSegment) {
+            const url = playlist.getSegmentAbsoluteUrl(notInPlaylistSegment.url);
+            const id = this.getSegmentId(notInPlaylistSegment.sequence, playlist);
             segments.push(new Segment(id, url, priority++));
 
-            if (loadUrl && !loadSegmentId) {
+            if (requestFirstSegment) {
+                loadSegmentId = id;
+            }
+        }
+
+        for (let i = segmentIndex; i < playlistSegments.length; ++i) {
+            const url = playlist.getSegmentAbsoluteUrlByIndex(i);
+            const id = this.getSegmentId(initialSequence + i, playlist);
+            segments.push(new Segment(id, url, priority++));
+
+            if (requestFirstSegment && !loadSegmentId) {
                 loadSegmentId = id;
             }
         }
@@ -196,7 +224,7 @@ class Playlist {
 
     public getSegmentIndex(url: string): number {
         for (let i = 0; i < this.manifest.segments.length; ++i) {
-            if (url === this.getSegmentAbsoluteUrl(i)) {
+            if (url === this.getSegmentAbsoluteUrlByIndex(i)) {
                 return i;
             }
         }
@@ -204,15 +232,20 @@ class Playlist {
         return -1;
     }
 
-    public getSegmentAbsoluteUrl(index: number): string {
-        const uri = this.manifest.segments[index].uri;
-        return Utils.isAbsoluteUrl(uri) ? uri : this.baseUrl + uri;
+    public getSegmentAbsoluteUrlByIndex(index: number): string {
+        return this.getSegmentAbsoluteUrl(this.manifest.segments[index].uri);
+    }
+
+    public getSegmentAbsoluteUrl(segmentUrl: string): string {
+        return Utils.isAbsoluteUrl(segmentUrl) ? segmentUrl : this.baseUrl + segmentUrl;
     }
 }
 
 class SegmentRequest {
     public constructor(
-            readonly url: string,
+            readonly segmentUrl: string,
+            readonly segmentSequence: number,
+            readonly playlistUrl: string,
             readonly onSuccess: (content: ArrayBuffer, downloadSpeed: number) => void,
             readonly onError: (error: any) => void) {
     }
