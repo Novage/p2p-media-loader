@@ -47,7 +47,9 @@ export default class SegmentManager {
     public loadSegment(url: string, onSuccess: (content: ArrayBuffer, downloadSpeed: number) => void, onError: (error: any) => void): void {
         const segmentLocation = this.getSegmentLocation(url);
         if (!segmentLocation) {
-            this.fetchSegment(url, onSuccess, onError);
+            Utils.fetchContentAsArrayBuffer(url)
+                .then((content: ArrayBuffer) => onSuccess(content, 0))
+                .catch((error: any) => onError(error));
             return;
         }
 
@@ -174,18 +176,6 @@ export default class SegmentManager {
         }
 
         return playlistUrl;
-    }
-
-    private fetchSegment(url: string, onSuccess?: (content: ArrayBuffer, downloadSpeed: number) => void, onError?: (error: any) => void): void {
-        Utils.fetchContentAsArrayBuffer(url).then((content: ArrayBuffer) => {
-            if (onSuccess) {
-                onSuccess(content, 0);
-            }
-        }).catch((error: any) => {
-            if (onError) {
-                onError(error);
-            }
-        });
     }
 }
 
