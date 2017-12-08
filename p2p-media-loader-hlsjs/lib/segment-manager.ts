@@ -126,15 +126,13 @@ export default class SegmentManager {
         }
     }
 
-    private getSegmentLocation(url?: string): { playlist: Playlist, segmentIndex: number } | undefined {
-        if (url) {
-            const entries = this.variantPlaylists.values();
-            for (let entry = entries.next(); !entry.done; entry = entries.next()) {
-                const playlist = entry.value;
-                const segmentIndex = playlist.getSegmentIndex(url);
-                if (segmentIndex >= 0) {
-                    return { playlist: playlist, segmentIndex: segmentIndex };
-                }
+    private getSegmentLocation(url: string): { playlist: Playlist, segmentIndex: number } | undefined {
+        const entries = this.variantPlaylists.values();
+        for (let entry = entries.next(); !entry.done; entry = entries.next()) {
+            const playlist = entry.value;
+            const segmentIndex = playlist.getSegmentIndex(url);
+            if (segmentIndex >= 0) {
+                return { playlist: playlist, segmentIndex: segmentIndex };
             }
         }
 
