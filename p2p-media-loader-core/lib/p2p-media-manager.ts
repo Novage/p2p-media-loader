@@ -43,7 +43,7 @@ export class P2PMediaManager extends EventEmitter {
     }
 
     public setSwarmId(swarmId: string): void {
-        if (this.swarmId == swarmId) {
+        if (this.swarmId === swarmId) {
             return;
         }
 
@@ -146,6 +146,8 @@ export class P2PMediaManager extends EventEmitter {
     }
 
     public destroy(): void {
+        this.swarmId = null;
+
         if (this.trackerClient) {
             this.trackerClient.stop();
             this.trackerClient.destroy();
