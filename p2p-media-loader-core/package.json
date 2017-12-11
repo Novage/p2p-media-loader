@@ -9,7 +9,7 @@
     "lint": "tslint -c ./tslint.json -p ./tsconfig.test.json",
     "build": "npm run compile && npm run browserify && npm run minify",
     "browserify": "browserify -r ./dist/index.js:p2p-media-loader-core ./dist/browser-init.js > p2p-media-loader-core.js",
-    "minify": "uglifyjs p2p-media-loader-core.js > p2p-media-loader-core.min.js",
+    "minify": "uglifyjs p2p-media-loader-core.js -m -c > p2p-media-loader-core.min.js",
     "refresh-dependencies": "npm update",
     "test": "mocha -r ts-node/register test/*.test.ts"
   },
