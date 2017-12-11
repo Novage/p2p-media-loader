@@ -22,7 +22,7 @@ export class P2PMediaManager extends EventEmitter {
     private peers: Map<string, MediaPeer> = new Map();
     private peerCandidates: Map<string, MediaPeer[]> = new Map();
     private peerSegmentRequests: Map<string, PeerSegmentRequest> = new Map();
-    private swarmId: string;
+    private swarmId: string | null = null;
     private peerId: string;
     private debug = Debug("p2pml:p2p-media-manager");
 
