@@ -6,6 +6,7 @@
 
     <script src="p2p-media-loader-core.js"></script>
     <script src="p2p-media-loader-shaka.js"></script>
+    <script src="https://github.com/videojs/mux.js/releases/download/v4.3.2/mux.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/2.3.0/shaka-player.compiled.js"></script>
 
 </head>
@@ -21,9 +22,12 @@
    	  if (shaka.Player.isBrowserSupported()) {
    		var video = document.getElementById('video');
        	var player = new shaka.Player(video);
-       	player.load("https://storage.googleapis.com/shaka-demo-assets/angel-one/dash.mpd").then(function() {
-       	  console.log('The video has now been loaded!');
-       	}).catch(onError);
+       	var onError = function(error) { console.error('Error code', error.code, 'object', error); }
+       	player.addEventListener('error', function(event) { onError(event.detail); });
+       	player.load(
+       	  //"https://storage.googleapis.com/shaka-demo-assets/angel-one/dash.mpd"
+          "https://nasa-i.akamaihd.net/hls/live/253565/NASA-NTV1-Public/master.m3u8"
+        ).catch(onError);
    	  } else {
    	    console.error('Browser not supported!');
    	  }
