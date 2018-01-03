@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "es5",
+    "module": "commonjs",
+    "lib": ["dom", "es6"],
+    "strict": true,
+    "moduleResolution": "node",
+    "declaration": true,
+    "outDir": "./dist",
+    "noUnusedLocals": true,
+    "noUnusedParameters": false,
+    "noImplicitThis": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true
+  },
+  "compileOnSave": true,
+  "include": [
+    "lib/**/*"
+  ]
+}

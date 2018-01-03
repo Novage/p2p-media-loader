@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+
+    <script src="p2p-media-loader-core.js"></script>
+    <script src="p2p-media-loader-shaka.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/2.3.0/shaka-player.compiled.js"></script>
+
+</head>
+<body>
+
+    <video id="video"
+           width="640"
+           poster="//shaka-player-demo.appspot.com/assets/poster.jpg"
+           controls autoplay></video>
+
+    <script>
+   	  shaka.polyfill.installAll();
+   	  if (shaka.Player.isBrowserSupported()) {
+   		var video = document.getElementById('video');
+       	var player = new shaka.Player(video);
+       	player.load("https://storage.googleapis.com/shaka-demo-assets/angel-one/dash.mpd").then(function() {
+       	  console.log('The video has now been loaded!');
+       	}).catch(onError);
+   	  } else {
+   	    console.error('Browser not supported!');
+   	  }
+    </script>
+
+</body>
+</html>
