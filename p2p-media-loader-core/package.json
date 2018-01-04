@@ -33,7 +33,6 @@
     "@types/text-encoding": "^0.0.31",
     "browserify": "^14.4.0",
     "copyfiles": "^1.2.0",
-    "get-browser-rtc": "^1.0.2",
     "rimraf": "^2.6.1",
     "mocha": "^3.4.2",
     "ts-mockito": "^2.0.2",
