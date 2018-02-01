@@ -11,7 +11,7 @@
 
     <video id="video"
            width="640"
-           poster="//shaka-player-demo.appspot.com/assets/poster.jpg"
+           poster="https://shaka-player-demo.appspot.com/assets/poster.jpg"
            controls autoplay></video>
 
     <script>
@@ -21,10 +21,13 @@
        	var player = new shaka.Player(video);
        	var onError = function(error) { console.error('Error code', error.code, 'object', error); }
        	player.addEventListener('error', function(event) { onError(event.detail); });
+
+       	p2pml.shaka.initShakaPlayer(player);
+
        	player.load(
-       	  //"https://storage.googleapis.com/shaka-demo-assets/angel-one/dash.mpd"
-       	  "https://wowza.peer5.com/live/smil:bbb_abr.smil/playlist.m3u8"
-        ).catch(onError);
+       	  "https://storage.googleapis.com/shaka-demo-assets/angel-one/dash.mpd",
+       	  //"https://wowza.peer5.com/live/smil:bbb_abr.smil/playlist.m3u8",
+       	  0, p2pml.shaka.ShakaDashManifestParserProxy).catch(onError);
    	  } else {
    	    console.error('Browser not supported!');
    	  }
