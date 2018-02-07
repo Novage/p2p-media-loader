@@ -13,8 +13,8 @@
     "url": "https://git.witua.com/novage/p2p-media-loader.git"
   },
   "dependencies": {
-    "p2p-media-loader-core": "../p2p-media-loader-core",
-    "p2p-media-loader-hlsjs": "../p2p-media-loader-hlsjs",
+    "p2p-media-loader-core": "^0.0.1",
+    "p2p-media-loader-hlsjs": "^0.0.1",
     "p2p-graph": "^1.2.1"
   },
   "devDependencies": {

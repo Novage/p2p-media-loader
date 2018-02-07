@@ -19,7 +19,7 @@
     "url": "https://git.witua.com/novage/p2p-media-loader.git"
   },
   "dependencies": {
-    "p2p-media-loader-core": "../p2p-media-loader-core"
+    "p2p-media-loader-core": "^0.0.1"
   },
   "devDependencies": {
     "@types/mocha": "^2.2.41",
