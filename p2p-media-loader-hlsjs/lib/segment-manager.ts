@@ -211,7 +211,7 @@ export default class SegmentManager {
 
 class Playlist {
     public baseUrl: string;
-    public swarmId: string;
+    public swarmId: string = "";
 
     public constructor(readonly url: string, readonly manifest: any) {
         const pos = url.lastIndexOf("/");

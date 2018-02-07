@@ -35,13 +35,13 @@ class DownloadingSegment {
 
 export class MediaPeer extends EventEmitter {
     public id: string;
-    public remoteAddress: string;
+    public remoteAddress: string = "";
     private downloadingSegmentId: string | null = null;
     private downloadingSegment: DownloadingSegment | null = null;
     private segmentsMap = new Map<string, MediaPeerSegmentStatus>();
     private debug = Debug("p2pml:media-peer");
     private timer: number | null = null;
-    private isSafari11_0: boolean;
+    private isSafari11_0: boolean = false;
 
     constructor(readonly peer: any,
             readonly settings: {
@@ -72,8 +72,6 @@ export class MediaPeer extends EventEmitter {
                 return;
             }
         }
-
-        this.isSafari11_0 = false;
     }
 
     private onPeerConnect(): void {
