@@ -18,26 +18,26 @@
     "url": "https://git.witua.com/novage/p2p-media-loader.git"
   },
   "dependencies": {
-    "bittorrent-tracker": "^9.2.3",
-    "events": "^1.1.1",
+    "bittorrent-tracker": "^9.3.0",
     "buffer": "^5.0.8",
     "crypto-browserify": "^3.11.1",
-    "get-browser-rtc": "^1.0.2",
-    "debug": "^3.0.0"
+    "debug": "^3.0.0",
+    "events": "^1.1.1",
+    "get-browser-rtc": "^1.0.2"
   },
   "devDependencies": {
     "@types/debug": "^0.0.30",
-    "@types/mocha": "^2.2.41",
-    "@types/node": "^6.0.81",
+    "@types/mocha": "^2.2.48",
+    "@types/node": "^6.0.98",
     "@types/text-encoding": "^0.0.31",
     "browserify": "^14.4.0",
     "copyfiles": "^1.2.0",
-    "rimraf": "^2.6.1",
     "mocha": "^3.4.2",
-    "ts-mockito": "^2.0.2",
+    "rimraf": "^2.6.1",
+    "ts-mockito": "^2.2.9",
     "ts-node": "^3.2.0",
     "tslint": "^5.5.0",
-    "typescript": "^2.4.1",
-    "uglify-js": "^3.1.10"
+    "typescript": "^2.7.1",
+    "uglify-js": "^3.3.9"
   }
 }
