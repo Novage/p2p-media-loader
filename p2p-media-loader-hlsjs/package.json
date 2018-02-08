@@ -19,7 +19,7 @@
     "url": "https://git.witua.com/novage/p2p-media-loader.git"
   },
   "dependencies": {
-    "m3u8-parser": "3.0.0",
+    "m3u8-parser": "^3.0.0",
     "p2p-media-loader-core": "^0.0.1"
   },
   "devDependencies": {
