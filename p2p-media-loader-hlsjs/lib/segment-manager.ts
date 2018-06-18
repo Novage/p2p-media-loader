@@ -32,9 +32,12 @@ export default class SegmentManager {
             this.variantPlaylists.forEach(playlist => playlist.swarmId = this.getSwarmId(playlist.url));
             // TODO: validate that playlist was not changed
         } else {
-            playlist.swarmId = this.getSwarmId(url);
-            this.variantPlaylists.set(url, playlist);
-            this.updateSegments();
+            const swarmId = this.getSwarmId(url);
+            if (swarmId !== url || !this.masterPlaylist) {
+                playlist.swarmId = swarmId;
+                this.variantPlaylists.set(url, playlist);
+                this.updateSegments();
+            }
         }
     }
 
