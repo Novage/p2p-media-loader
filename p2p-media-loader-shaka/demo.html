@@ -5,32 +5,33 @@
     <script src="p2p-media-loader-core.js"></script>
     <script src="p2p-media-loader-shaka.js"></script>
     <script src="https://github.com/videojs/mux.js/releases/download/v4.4.0/mux.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/2.3.1/shaka-player.compiled.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/2.4.1/shaka-player.compiled.js"></script>
 </head>
 <body>
 
-    <video id="video"
-           width="640"
-           poster="https://shaka-player-demo.appspot.com/assets/poster.jpg"
-           controls autoplay></video>
+    <video id="video" width="640" poster="https://shaka-player-demo.appspot.com/assets/poster.jpg" controls autoplay></video>
 
     <script>
-   	  shaka.polyfill.installAll();
-   	  if (shaka.Player.isBrowserSupported()) {
-   		var video = document.getElementById('video');
-       	var player = new shaka.Player(video);
-       	var onError = function(error) { console.error('Error code', error.code, 'object', error); }
-       	player.addEventListener('error', function(event) { onError(event.detail); });
+        shaka.polyfill.installAll();
+        if (shaka.Player.isBrowserSupported()) {
+            var video = document.getElementById('video');
+            var player = new shaka.Player(video);
+            var onError = function(error) { console.error('Error code', error.code, 'object', error); }
+            player.addEventListener('error', function(event) { onError(event.detail); });
 
-       	p2pml.shaka.initShakaPlayer(player);
+            p2pml.shaka.initShakaPlayer(player);
 
-       	player.load(
-       	  "https://storage.googleapis.com/shaka-demo-assets/angel-one/dash.mpd",
-       	  //"https://wowza.peer5.com/live/smil:bbb_abr.smil/playlist.m3u8",
-       	  0, p2pml.shaka.ShakaDashManifestParserProxy).catch(onError);
-   	  } else {
-   	    console.error('Browser not supported!');
-   	  }
+            player.load(
+                'https://storage.googleapis.com/shaka-demo-assets/angel-one/dash.mpd'
+                //'https://storage.googleapis.com/shaka-demo-assets/angel-one-hls/hls.m3u8'
+                //'https://dash.akamaized.net/dash264/TestCases/1c/qualcomm/2/MultiRate.mpd'
+                //'https://wowzaec2demo.streamlock.net/live/bigbuckbunny/manifest_mpm4sav_mvtime.mpd'
+                //'https://vm2.dashif.org/livesim/utc_head/testpic_6s/Manifest.mpd'
+                //'https://wowza.peer5.com/live/smil:bbb_abr.smil/playlist.m3u8'
+            ).catch(onError);
+        } else {
+            console.error('Browser not supported!');
+        }
     </script>
 
 </body>

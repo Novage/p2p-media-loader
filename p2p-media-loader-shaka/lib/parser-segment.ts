@@ -1,0 +1,88 @@
+export class ParserSegment {
+
+    public static create (stream: any, position: number) : ParserSegment | undefined {
+        const ref = stream.getSegmentReferenceOriginal(position);
+        if (!ref) {
+            return undefined;
+        }
+
+        const uris = ref.createUris();
+        if (!uris || uris.length === 0) {
+            return undefined;
+        }
+
+        const startByte = ref.getStartByte();
+        const endByte = ref.getEndByte();
+        const range = startByte || endByte ? `bytes=${startByte || ''}-${endByte || ''}` : undefined;
+
+        return new ParserSegment(
+            stream.id,
+            stream.type,
+            position,
+            ref.getStartTime(),
+            ref.getEndTime(),
+            uris[ 0 ],
+            range,
+            () => ParserSegment.create(stream, position + 1)
+        );
+    }
+
+    private constructor (
+        readonly sid: number,
+        readonly type: string,
+        readonly position: number,
+        readonly start: number,
+        readonly end: number,
+        readonly uri: string,
+        readonly range: string | undefined,
+        readonly next: any
+    ) {}
+
+} // end of ParserSegment
+
+export class ParserSegmentCache {
+
+    readonly segments: ParserSegment[] = [];
+    readonly maxSegments: number;
+
+    public constructor(maxSegments: number) {
+        this.maxSegments = maxSegments;
+    }
+
+    public find (uri: string, range?: string) {
+        return this.segments.find(i => i.uri === uri && i.range === range);
+    }
+
+    public add (stream: any, position: number) {
+        const segment = ParserSegment.create(stream, position);
+        if (segment && !this.find(segment.uri, segment.range)) {
+            this.segments.push(segment);
+            if (this.segments.length > this.maxSegments) {
+                this.segments.splice(this.maxSegments * 0.85);
+            }
+        }
+    }
+
+    public clear () {
+        this.segments.splice(this.segments.length);
+    }
+
+    public getForwardSequence (uri: string, range: string, duration: number) : ParserSegment[] {
+        let segment = this.find(uri, range);
+        if (!segment) {
+            return [];
+        }
+
+        const sequence = [];
+        let seqDuration = 0;
+
+        do {
+            sequence.push(segment);
+            seqDuration += segment.end - segment.start;
+            segment = segment.next();
+        } while (segment && seqDuration < duration);
+
+        return sequence;
+    }
+
+} // end of ParserSegmentCache
