@@ -20,6 +20,10 @@ export default class HttpMediaManager extends EventEmitter {
         request.open("GET", segment.url, true);
         request.responseType = "arraybuffer";
 
+        if (segment.range) {
+            request.setRequestHeader('Range', segment.range);
+        }
+
         let prevBytesLoaded = 0;
         request.onprogress = (event: any) => {
             const bytesLoaded = event.loaded - prevBytesLoaded;
@@ -30,17 +34,17 @@ export default class HttpMediaManager extends EventEmitter {
         request.onload = (event: any) => {
             this.xhrRequests.delete(segment.id);
 
-            if (event.target.status === 200) {
-                this.emit(LoaderEvents.SegmentLoaded, segment.id, segment.url, event.target.response);
+            if (event.target.status >= 200 && 300 > event.target.status) {
+                this.emit(LoaderEvents.SegmentLoaded, segment, event.target.response);
             } else {
-                this.emit(LoaderEvents.SegmentError, segment.url, event);
+                this.emit(LoaderEvents.SegmentError, segment, event);
             }
         };
 
         request.onerror = (event: any) => {
             // TODO: retry with timeout?
             this.xhrRequests.delete(segment.id);
-            this.emit(LoaderEvents.SegmentError, segment.url, event);
+            this.emit(LoaderEvents.SegmentError, segment, event);
         };
 
         this.xhrRequests.set(segment.id, request);

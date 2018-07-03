@@ -128,15 +128,15 @@ export default class SegmentManager {
         }
     }
 
-    private onSegmentError(url: string, error: any): void {
-        if (this.segmentRequest && this.segmentRequest.segmentUrl === url) {
+    private onSegmentError(segment: Segment, error: any): void {
+        if (this.segmentRequest && this.segmentRequest.segmentUrl === segment.url) {
             this.segmentRequest.onError(error);
             this.segmentRequest = null;
         }
     }
 
-    private onSegmentAbort(url: string): void {
-        if (this.segmentRequest && this.segmentRequest.segmentUrl === url) {
+    private onSegmentAbort(segment: Segment): void {
+        if (this.segmentRequest && this.segmentRequest.segmentUrl === segment.url) {
             this.segmentRequest.onError("Loading aborted: internal abort");
             this.segmentRequest = null;
         }
@@ -170,7 +170,7 @@ export default class SegmentManager {
         if (notInPlaylistSegment) {
             const url = playlist.getSegmentAbsoluteUrl(notInPlaylistSegment.url);
             const id = this.getSegmentId(notInPlaylistSegment.sequence, playlist);
-            segments.push(new Segment(id, url, priority++));
+            segments.push(new Segment(id, url, undefined, priority++));
 
             if (requestFirstSegment) {
                 loadSegmentId = id;
@@ -180,7 +180,7 @@ export default class SegmentManager {
         for (let i = segmentIndex; i < playlistSegments.length; ++i) {
             const url = playlist.getSegmentAbsoluteUrlByIndex(i);
             const id = this.getSegmentId(initialSequence + i, playlist);
-            segments.push(new Segment(id, url, priority++));
+            segments.push(new Segment(id, url, undefined, priority++));
 
             if (requestFirstSegment && !loadSegmentId) {
                 loadSegmentId = id;

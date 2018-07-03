@@ -9,7 +9,7 @@ import {Client} from "bittorrent-tracker";
 const PEER_PROTOCOL_VERSION = 1;
 
 class PeerSegmentRequest {
-    constructor(readonly peerId: string, readonly segmentUrl: string) {
+    constructor(readonly peerId: string, readonly segment: Segment) {
     }
 }
 
@@ -118,7 +118,7 @@ export class P2PMediaManager extends EventEmitter {
             if ((peer.getDownloadingSegmentId() == null) &&
                     (peer.getSegmentsMap().get(segment.id) === MediaPeerSegmentStatus.Loaded)) {
                 peer.requestSegment(segment.id);
-                this.peerSegmentRequests.set(segment.id, new PeerSegmentRequest(peer.id, segment.url));
+                this.peerSegmentRequests.set(segment.id, new PeerSegmentRequest(peer.id, segment));
                 return true;
             }
         }
@@ -275,7 +275,7 @@ export class P2PMediaManager extends EventEmitter {
         const peerSegmentRequest = this.peerSegmentRequests.get(segmentId);
         if (peerSegmentRequest) {
             this.peerSegmentRequests.delete(segmentId);
-            this.emit(LoaderEvents.SegmentLoaded, segmentId, peerSegmentRequest.segmentUrl, data);
+            this.emit(LoaderEvents.SegmentLoaded, peerSegmentRequest.segment, data);
         }
     }
 
@@ -288,7 +288,7 @@ export class P2PMediaManager extends EventEmitter {
         const peerSegmentRequest = this.peerSegmentRequests.get(segmentId);
         if (peerSegmentRequest) {
             this.peerSegmentRequests.delete(segmentId);
-            this.emit(LoaderEvents.SegmentError, peerSegmentRequest.segmentUrl, description);
+            this.emit(LoaderEvents.SegmentError, peerSegmentRequest.segment, description);
         }
     }
 

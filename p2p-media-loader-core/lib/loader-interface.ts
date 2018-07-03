@@ -1,11 +1,12 @@
 export class Segment {
     public constructor(
-            readonly id: string,
-            readonly url: string,
-            readonly priority = 0,
-            readonly data: ArrayBuffer | undefined = undefined,
-            readonly downloadSpeed = 0) {
-    }
+        readonly id: string,
+        readonly url: string,
+        readonly range: string | undefined,
+        readonly priority = 0,
+        readonly data: ArrayBuffer | undefined = undefined,
+        readonly downloadSpeed = 0
+    ) {}
 }
 
 export enum LoaderEvents {
