@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "(browserify -r p2p-graph | uglifyjs -m -c > p2p-graph.js) && npm run refresh-dependencies",
-    "refresh-dependencies": "copyfiles -f ./node_modules/p2p-media-loader-core/p2p-media-loader-core.min.js ./ && copyfiles -f ./node_modules/p2p-media-loader-hlsjs/p2p-media-loader-hlsjs.min.js ./"
+    "refresh-dependencies": "copyfiles -f ./node_modules/p2p-media-loader-core/p2p-media-loader-core.min.js ./ && copyfiles -f ./node_modules/p2p-media-loader-hlsjs/p2p-media-loader-hlsjs.min.js ./ && copyfiles -f ./node_modules/p2p-media-loader-shaka/p2p-media-loader-shaka.min.js ./"
   },
   "license": "MIT",
   "repository": {
@@ -15,6 +15,7 @@
   "dependencies": {
     "p2p-media-loader-core": "^0.0.1",
     "p2p-media-loader-hlsjs": "^0.0.1",
+    "p2p-media-loader-shaka": "^0.0.1",
     "p2p-graph": "^1.2.1"
   },
   "devDependencies": {
