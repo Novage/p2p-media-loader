@@ -113,3 +113,5 @@ function getPlayheadTime (player: any) {
     const timeAsDate = player.getPlayheadTimeAsDate();
     return timeAsDate ? timeAsDate.valueOf() / 1000 : 0;
 }
+
+export {default as SegmentManager} from "./segment-manager";
