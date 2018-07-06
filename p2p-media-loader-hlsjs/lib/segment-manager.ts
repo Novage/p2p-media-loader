@@ -155,10 +155,6 @@ export default class SegmentManager {
         return undefined;
     }
 
-    private getSegmentId(segmentSequence: number, segmentPlaylist: Playlist): string {
-        return segmentSequence + "+" + segmentPlaylist.swarmId;
-    }
-
     private loadSegments(playlist: Playlist, segmentIndex: number, requestFirstSegment: boolean, notInPlaylistSegment?: {url: string, sequence: number}): void {
         const segments: Segment[] = [];
         const playlistSegments: any[] = playlist.manifest.segments;
@@ -169,7 +165,7 @@ export default class SegmentManager {
 
         if (notInPlaylistSegment) {
             const url = playlist.getSegmentAbsoluteUrl(notInPlaylistSegment.url);
-            const id = this.getSegmentId(notInPlaylistSegment.sequence, playlist);
+            const id = this.getSegmentId(playlist, notInPlaylistSegment.sequence);
             segments.push(new Segment(id, url, undefined, priority++));
 
             if (requestFirstSegment) {
@@ -179,7 +175,7 @@ export default class SegmentManager {
 
         for (let i = segmentIndex; i < playlistSegments.length; ++i) {
             const url = playlist.getSegmentAbsoluteUrlByIndex(i);
-            const id = this.getSegmentId(initialSequence + i, playlist);
+            const id = this.getSegmentId(playlist, initialSequence + i);
             segments.push(new Segment(id, url, undefined, priority++));
 
             if (requestFirstSegment && !loadSegmentId) {
@@ -197,13 +193,17 @@ export default class SegmentManager {
         }
     }
 
+    private getSegmentId(playlist: Playlist, segmentSequence: number): string {
+        return `${playlist.swarmId}+${segmentSequence}`;
+    }
+
     private getSwarmId(playlistUrl: string): string {
         if (this.masterPlaylist) {
             for (let i = 0; i < this.masterPlaylist.manifest.playlists.length; ++i) {
                 let url = this.masterPlaylist.manifest.playlists[i].uri;
                 url = Utils.isAbsoluteUrl(url) ? url : this.masterPlaylist.baseUrl + url;
                 if (url === playlistUrl) {
-                    return i + "+" + this.masterPlaylist.url;
+                    return `${this.masterPlaylist.url}+${i}`;
                 }
             }
         }
