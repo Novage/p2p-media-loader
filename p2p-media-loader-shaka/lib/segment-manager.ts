@@ -64,7 +64,7 @@ export default class {
     private refreshLoad () : LoaderSegment {
         const loaderSegments: LoaderSegment[] = this.parserSegments.map((s, i) => {
             return new LoaderSegment(
-                s.uri + (s.range ? '+' + s.range : ''),
+                `${this.manifestUri}+${s.sid}+${Number(s.start).toFixed(3)}` + (s.range ? `+${s.range}` : ''),
                 s.uri,
                 s.range,
                 i // TODO: implement "seconds prioroty", maybe use s.start and this.playheadTime
