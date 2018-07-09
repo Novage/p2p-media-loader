@@ -18,6 +18,7 @@ export class ParserSegment {
         return new ParserSegment(
             stream.id,
             stream.type,
+            stream.getPosition(),
             position,
             ref.getStartTime(),
             ref.getEndTime(),
@@ -28,8 +29,9 @@ export class ParserSegment {
     }
 
     private constructor (
-        readonly sid: number,
-        readonly type: string,
+        readonly streamId: number,
+        readonly streamType: string,
+        readonly streamPosition: number,
         readonly position: number,
         readonly start: number,
         readonly end: number,
@@ -45,7 +47,7 @@ export class ParserSegmentCache {
     readonly segments: ParserSegment[] = [];
     readonly maxSegments: number;
 
-    public constructor(maxSegments: number) {
+    public constructor (maxSegments: number) {
         this.maxSegments = maxSegments;
     }
 

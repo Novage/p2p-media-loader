@@ -6,21 +6,19 @@ export class ShakaManifestParserProxy {
 
     readonly cache: ParserSegmentCache = new ParserSegmentCache(200);
     readonly originalManifestParser: any;
+    private manifest: any;
 
     public constructor (originalManifestParser: any) {
         this.originalManifestParser = originalManifestParser;
     }
 
-    private hookGetSegmentReference (stream: any): void {
-        stream.getSegmentReferenceOriginal = stream.getSegmentReference;
-        stream.getSegmentReference = (number: any) => {
-            this.cache.add(stream, number);
-            return stream.getSegmentReferenceOriginal(number);
-        };
-    }
+    public isHls () { return this.originalManifestParser instanceof shaka.hls.HlsParser; }
+    public isDash () { return this.originalManifestParser instanceof shaka.dash.DashParser; }
 
     public start (uri: string, playerInterface: any) {
         return this.originalManifestParser.start(uri, playerInterface).then((manifest: any) => {
+            this.manifest = manifest;
+
             for (const period of manifest.periods) {
                 const processedStreams = [];
 
@@ -60,11 +58,34 @@ export class ShakaManifestParserProxy {
 
     public getForwardSequence (uri: string, range: string, duration: number) : ParserSegment[] {
         const sequence = this.cache.getForwardSequence(uri, range, duration);
-        return sequence.length > 0 && sequence[ 0 ].type === 'video' ? sequence : [];
+        return sequence.length > 0 && sequence[ 0 ].streamType === 'video' ? sequence : [];
     }
 
     public reset () {
         this.cache.clear();
+    }
+
+    private hookGetSegmentReference (stream: any): void {
+        stream.getSegmentReferenceOriginal = stream.getSegmentReference;
+
+        stream.getSegmentReference = (number: any) => {
+            this.cache.add(stream, number);
+            return stream.getSegmentReferenceOriginal(number);
+        };
+
+        stream.getPosition = () => {
+            if (this.isHls()) {
+                if (stream.type === 'video') {
+                    return this.manifest.periods[0].variants.reduce((a: any, i: any) => {
+                        if (i.video && i.video.id && !a.includes(i.video.id)) {
+                            a.push(i.video.id);
+                        }
+                        return a;
+                    }, []).indexOf(stream.id);
+                }
+            }
+            return -1;
+        };
     }
 
 } // end of ShakaManifestParserProxy

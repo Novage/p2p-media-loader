@@ -16,7 +16,6 @@ export default class {
     private loader: LoaderInterface;
     private requests: Map<string, Request> = new Map();
     private manifestUri: string = '';
-    // private playheadTime: number = 0;
     private parserSegments: ParserSegment[] = [];
     private settings: any = undefined;
 
@@ -33,14 +32,8 @@ export default class {
         return this.loader.isSupported();
     }
 
-    public setPlayheadTime (time: number) {
-        // this.playheadTime = time;
-        this.refreshLoad();
-    }
-
-    public async load (parserSegments: ParserSegment[], playheadTime: number, manifestUri: string) : Promise<any> {
+    public async load (parserSegments: ParserSegment[], manifestUri: string) : Promise<any> {
         this.parserSegments = parserSegments;
-        // this.playheadTime = playheadTime;
         this.manifestUri = manifestUri;
         let firstLoaderSegment = this.refreshLoad();
 
@@ -62,16 +55,20 @@ export default class {
     }
 
     private refreshLoad () : LoaderSegment {
+        const streamPosition = this.parserSegments[ 0 ].streamPosition >= 0
+            ? this.parserSegments[ 0 ].streamPosition
+            : this.parserSegments[ 0 ].streamId;
+
         const loaderSegments: LoaderSegment[] = this.parserSegments.map((s, i) => {
             return new LoaderSegment(
-                `${this.manifestUri}+${s.sid}+${Number(s.start).toFixed(3)}` + (s.range ? `+${s.range}` : ''),
+                `${this.manifestUri}+${streamPosition}+${s.position}`,
                 s.uri,
                 s.range,
-                i // TODO: implement "seconds prioroty", maybe use s.start and this.playheadTime
+                i
             );
         });
 
-        this.loader.load(loaderSegments, this.manifestUri);
+        this.loader.load(loaderSegments, `${this.manifestUri}+${streamPosition}`);
         return loaderSegments[ 0 ];
     }
 

@@ -3,8 +3,6 @@ import SegmentManager from "./segment-manager";
 import {ShakaManifestParserProxy, ShakaDashManifestParserProxy, ShakaHlsManifestParserProxy} from "./manifest-parser-proxy";
 
 declare const shaka: any;
-declare const setInterval: any;
-declare const clearInterval: any;
 
 const defaultSettings = {
     // The duration in seconds; used by parser to build up predicted forward segments sequence; used to predownload and share via P2P
@@ -28,31 +26,13 @@ export function initShakaPlayer(player: any, settings: any = {}): void {
         ? settings.segmentManager
         : new SegmentManager(new HybridLoader());
 
-    let intervalId: number = 0;
-    let lastPlayheadTime: number = 0;
-
-    player.addEventListener('loading', (event: any) => {
-        if (intervalId > 0) {
-            clearInterval(intervalId);
-            intervalId = 0;
-        }
-
-        lastPlayheadTime = 0;
-
+    player.addEventListener('loading', (event_unused: any) => {
         const manifest = player.getManifest();
         if (manifest && manifest.p2pml) {
             manifest.p2pml.parser.reset();
         }
 
         segmentManager.destroy();
-
-        intervalId = setInterval(() => {
-            const playheadTime = getPlayheadTime(player);
-            if (playheadTime !== lastPlayheadTime) {
-               segmentManager.setPlayheadTime(playheadTime);
-               lastPlayheadTime = playheadTime;
-            }
-        }, 500);
     });
 
     player.getNetworkingEngine().registerRequestFilter((requestType: number, request: any) => {
@@ -96,7 +76,7 @@ function processNetworkRequest (uri: string, request: any, requestType: number) 
     const promise = new Promise((resolve, reject) => {
         rejectCallback = reject;
         segmentManager
-            .load(sequence, getPlayheadTime(player), player.getManifestUri())
+            .load(sequence, player.getManifestUri())
             .then((data: any) => resolve({ data }));
     });
 
@@ -107,11 +87,6 @@ function processNetworkRequest (uri: string, request: any, requestType: number) 
     ));
 
     return new shaka.util.AbortableOperation(promise, abort);
-}
-
-function getPlayheadTime (player: any) {
-    const timeAsDate = player.getPlayheadTimeAsDate();
-    return timeAsDate ? timeAsDate.valueOf() / 1000 : 0;
 }
 
 export {default as SegmentManager} from "./segment-manager";
