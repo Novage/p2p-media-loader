@@ -11,17 +11,36 @@ export class ParserSegment {
             return undefined;
         }
 
+        const start = ref.getStartTime();
+        const end = ref.getEndTime();
+
         const startByte = ref.getStartByte();
         const endByte = ref.getEndByte();
-        const range = startByte || endByte ? `bytes=${startByte || ''}-${endByte || ''}` : undefined;
+        const range = startByte || endByte
+            ? `bytes=${startByte || ''}-${endByte || ''}`
+            : undefined;
+
+        const streamTypeCode = stream.type.substring(0, 1).toUpperCase();
+        const streamPosition = stream.getPosition();
+        const streamIsHls = streamPosition >= 0;
+
+        const streamIdentity = streamIsHls
+            ? `${streamTypeCode}${streamPosition}`
+            : `${streamTypeCode}${stream.id}`;
+
+        const identity = streamIsHls
+            ? `${streamIdentity}+${position}`
+            : `${streamIdentity}+${Number(start).toFixed(3)}`;
 
         return new ParserSegment(
             stream.id,
             stream.type,
-            stream.getPosition(),
+            streamPosition,
+            streamIdentity,
+            identity,
             position,
-            ref.getStartTime(),
-            ref.getEndTime(),
+            start,
+            end,
             uris[ 0 ],
             range,
             () => ParserSegment.create(stream, position + 1)
@@ -32,6 +51,8 @@ export class ParserSegment {
         readonly streamId: number,
         readonly streamType: string,
         readonly streamPosition: number,
+        readonly streamIdentity: string,
+        readonly identity: string,
         readonly position: number,
         readonly start: number,
         readonly end: number,

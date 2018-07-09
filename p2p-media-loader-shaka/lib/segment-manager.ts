@@ -55,20 +55,16 @@ export default class {
     }
 
     private refreshLoad () : LoaderSegment {
-        const streamPosition = this.parserSegments[ 0 ].streamPosition >= 0
-            ? this.parserSegments[ 0 ].streamPosition
-            : this.parserSegments[ 0 ].streamId;
-
         const loaderSegments: LoaderSegment[] = this.parserSegments.map((s, i) => {
             return new LoaderSegment(
-                `${this.manifestUri}+${streamPosition}+${s.position}`,
+                `${this.manifestUri}+${s.identity}`,
                 s.uri,
                 s.range,
                 i
             );
         });
 
-        this.loader.load(loaderSegments, `${this.manifestUri}+${streamPosition}`);
+        this.loader.load(loaderSegments, `${this.manifestUri}+${this.parserSegments[ 0 ].streamIdentity}`);
         return loaderSegments[ 0 ];
     }
 

@@ -203,7 +203,7 @@ export default class SegmentManager {
                 let url = this.masterPlaylist.manifest.playlists[i].uri;
                 url = Utils.isAbsoluteUrl(url) ? url : this.masterPlaylist.baseUrl + url;
                 if (url === playlistUrl) {
-                    return `${this.masterPlaylist.url}+${i}`;
+                    return `${this.masterPlaylist.url}+V${i}`;
                 }
             }
         }
