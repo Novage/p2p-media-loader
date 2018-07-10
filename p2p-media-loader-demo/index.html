@@ -277,6 +277,7 @@
             if (Hls.isSupported()) {
                 var video = document.createElement("video");
                 video.id = "video";
+                video.volume = 0;
                 video.controls = true;
                 this.videoContainer.appendChild(video);
 
@@ -294,8 +295,6 @@
                 hls.attachMedia(video);
                 hls.on(Hls.Events.MANIFEST_PARSED, function () {
                     this.hlsLevelSwitcher.init(hls, level);
-                    video.play();
-                    video.volume = 0;
                 }.bind(this));
             }
         };
