@@ -419,18 +419,20 @@
         DemoApp.prototype.initShakaPlayer = function () {
             shaka.polyfill.installAll();
             if (shaka.Player.isBrowserSupported()) {
-                var outer = document.createElement("div");
-                outer.className = "embed-responsive embed-responsive-16by9";
                 var video = document.createElement("video");
                 video.id = "video";
                 video.volume = 0;
                 video.controls = true;
-                video.className = "embed-responsive-item video-js vjs-default-skin";
-                outer.appendChild(video);
-                this.videoContainer.appendChild(outer);
+                this.videoContainer.appendChild(video);
+
+                var level = document.createElement("select");
+                level.id = "level";
+                level.classList.add("form-control");
+                this.videoContainer.appendChild(level);
 
                 var player = new shaka.Player(video);
                 p2pml.shaka.initShakaPlayer(player, { segmentManager: this.segmentManager });
+                this.shakaLevelSwitcher.init(player, level);
                 player.load(this.videoUrl);
             } else {
                 document.querySelector("#error-shakaplayer").classList.remove("hide");
@@ -739,7 +741,83 @@
                 this.select.add(option);
             }
 
-        };
+        }; // end of hlsLevelSwitcher
+
+        DemoApp.prototype.shakaLevelSwitcher = {
+
+            auto: "Auto",
+            player: undefined,
+            select: undefined,
+
+            init: function (player, select) {
+                this.player = player;
+                this.select = select;
+
+                player.addEventListener("trackschanged", () => {
+                    this._clearOptions();
+                    this._addOption(this.auto);
+                    this.player.getVariantTracks().forEach((e, i) => {
+                        var name = [];
+
+                        if (e.height) {
+                            name.push(e.height + "p");
+                        }
+
+                        if (e.bandwidth) {
+                            name.push(Math.round(e.bandwidth / 1000) + "k");
+                        }
+
+                        if (e.label) {
+                            name.push(e.label);
+                        } else if (e.language) {
+                            name.push(e.language);
+                        }
+
+                        if (name.length === 0) {
+                            name.push("Variant #" + i);
+                        }
+
+                        this._addOption(name.join(" / "), e.id);
+                    });
+                });
+
+                player.addEventListener("adaptation", () => {
+                    var variantId = this.player.getVariantTracks().find(i => i.active === true).id;
+                    var curr = this.select.querySelector("option[data-variant-id='" + variantId + "']");
+                    var auto = this.select.querySelector("option:not([data-variant-id])");
+                    auto.text = curr ? curr.text + " (" + this.auto + ")" : this.auto;
+                });
+
+                select.addEventListener("change", () => {
+                    var variantId = this.select.selectedOptions[ 0 ].dataset.variantId;
+                    if (variantId) {
+                        var variant = this.player.getVariantTracks().find(i => i.id == variantId);
+                        this.player.configure({ abr: { enabled: false } });
+                        this.player.selectVariantTrack(variant);
+                        var auto = this.select.querySelector("option:not([data-variant-id])");
+                        auto.text = this.auto;
+                    } else {
+                        this.player.configure({ abr: { enabled: true } });
+                    }
+                });
+            },
+
+            _clearOptions: function () {
+                while (this.select.options.length) {
+                    this.select.remove(0);
+                }
+            },
+
+            _addOption: function (text, variantId) {
+                var option = document.createElement("option");
+                option.text = text;
+                if (variantId) {
+                    option.dataset.variantId = variantId;
+                }
+                this.select.add(option);
+            }
+
+        }; // end of shakaLevelSwitcher
 
         return DemoApp;
     }());
