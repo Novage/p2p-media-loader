@@ -13,7 +13,7 @@ const defaultSettings = {
 
 export function initShakaPlayer(player: any, settings: any = {}): void {
     if (!shaka) {
-        console.error('p2pml', 'window.shaka is not defined. Did you forget to include Shaka Player?');
+        console.error("p2pml", "window.shaka is not defined. Did you forget to include Shaka Player?");
         return;
     }
 
@@ -26,7 +26,7 @@ export function initShakaPlayer(player: any, settings: any = {}): void {
         ? settings.segmentManager
         : new SegmentManager(new HybridLoader());
 
-    player.addEventListener('loading', (event_unused: any) => {
+    player.addEventListener("loading", (event_unused: any) => {
         const manifest = player.getManifest();
         if (manifest && manifest.p2pml) {
             manifest.p2pml.parser.reset();
@@ -41,16 +41,16 @@ export function initShakaPlayer(player: any, settings: any = {}): void {
 }
 
 function registerParserProxies() {
-    shaka.media.ManifestParser.registerParserByExtension('mpd', ShakaDashManifestParserProxy);
-    shaka.media.ManifestParser.registerParserByMime('application/dash+xml', ShakaDashManifestParserProxy);
-    shaka.media.ManifestParser.registerParserByExtension('m3u8', ShakaHlsManifestParserProxy);
-    shaka.media.ManifestParser.registerParserByMime('application/x-mpegurl', ShakaHlsManifestParserProxy);
-    shaka.media.ManifestParser.registerParserByMime('application/vnd.apple.mpegurl', ShakaHlsManifestParserProxy);
+    shaka.media.ManifestParser.registerParserByExtension("mpd", ShakaDashManifestParserProxy);
+    shaka.media.ManifestParser.registerParserByMime("application/dash+xml", ShakaDashManifestParserProxy);
+    shaka.media.ManifestParser.registerParserByExtension("m3u8", ShakaHlsManifestParserProxy);
+    shaka.media.ManifestParser.registerParserByMime("application/x-mpegurl", ShakaHlsManifestParserProxy);
+    shaka.media.ManifestParser.registerParserByMime("application/vnd.apple.mpegurl", ShakaHlsManifestParserProxy);
 }
 
 function initializeNetworkingEngine() {
-    shaka.net.NetworkingEngine.registerScheme('http', processNetworkRequest);
-    shaka.net.NetworkingEngine.registerScheme('https', processNetworkRequest);
+    shaka.net.NetworkingEngine.registerScheme("http", processNetworkRequest);
+    shaka.net.NetworkingEngine.registerScheme("https", processNetworkRequest);
 }
 
 function processNetworkRequest (uri: string, request: any, requestType: number) {

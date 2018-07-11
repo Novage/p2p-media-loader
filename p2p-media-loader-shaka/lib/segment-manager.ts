@@ -15,7 +15,7 @@ export default class {
     private debug = Debug("p2pml:shaka:sm");
     private loader: LoaderInterface;
     private requests: Map<string, Request> = new Map();
-    private manifestUri: string = '';
+    private manifestUri: string = "";
     private parserSegments: ParserSegment[] = [];
     private settings: any = undefined;
 
@@ -32,10 +32,10 @@ export default class {
         return this.loader.isSupported();
     }
 
-    public async load (parserSegments: ParserSegment[], manifestUri: string) : Promise<any> {
+    public async load (parserSegments: ParserSegment[], manifestUri: string): Promise<any> {
         this.parserSegments = parserSegments;
         this.manifestUri = manifestUri;
-        let firstLoaderSegment = this.refreshLoad();
+        const firstLoaderSegment = this.refreshLoad();
 
         const alreadyLoadedSegment = this.loader.getSegment(firstLoaderSegment.id);
 
@@ -44,7 +44,7 @@ export default class {
             if (alreadyLoadedSegment) {
                 this.reportSuccess(request, alreadyLoadedSegment);
             } else {
-                this.debug('request add', request.id);
+                this.debug("request add", request.id);
                 this.requests.set(request.id, request);
             }
         });
@@ -54,7 +54,7 @@ export default class {
         this.loader.destroy();
     }
 
-    private refreshLoad () : LoaderSegment {
+    private refreshLoad (): LoaderSegment {
         const loaderSegments: LoaderSegment[] = this.parserSegments.map((s, i) => {
             return new LoaderSegment(
                 `${this.manifestUri}+${s.identity}`,
@@ -76,7 +76,7 @@ export default class {
                 timeDelation = Date.now() - request.timeCreated + downloadTime;
             }
             setTimeout(() => {
-                this.debug('report success', request.id);
+                this.debug("report success", request.id);
                 request.resolve(loaderSegment.data);
             }, timeDelation);
         }
@@ -84,7 +84,7 @@ export default class {
 
     private reportError (request: Request, error: any) {
         if (request.reject) {
-            this.debug('report error', request.id);
+            this.debug("report error", request.id);
             request.reject(error);
         }
     }
@@ -92,7 +92,7 @@ export default class {
     private onSegmentLoaded = (segment: LoaderSegment) => {
         if (this.requests.has(segment.id)) {
             this.reportSuccess(this.requests.get(segment.id)!, segment);
-            this.debug('request delete', segment.id);
+            this.debug("request delete", segment.id);
             this.requests.delete(segment.id);
         }
     }
@@ -100,15 +100,15 @@ export default class {
     private onSegmentError = (segment: LoaderSegment, error: any) => {
         if (this.requests.has(segment.id)) {
             this.reportError(this.requests.get(segment.id)!, error);
-            this.debug('request delete from error', segment.id);
+            this.debug("request delete from error", segment.id);
             this.requests.delete(segment.id);
         }
     }
 
     private onSegmentAbort = (segment: LoaderSegment) => {
         if (this.requests.has(segment.id)) {
-            this.reportError(this.requests.get(segment.id)!, 'Internal abort');
-            this.debug('request delete from abort', segment.id);
+            this.reportError(this.requests.get(segment.id)!, "Internal abort");
+            this.debug("request delete from abort", segment.id);
             this.requests.delete(segment.id);
         }
     }

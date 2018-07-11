@@ -1,6 +1,6 @@
 export class ParserSegment {
 
-    public static create (stream: any, position: number) : ParserSegment | undefined {
+    public static create (stream: any, position: number): ParserSegment | undefined {
         const ref = stream.getSegmentReferenceOriginal(position);
         if (!ref) {
             return undefined;
@@ -17,7 +17,7 @@ export class ParserSegment {
         const startByte = ref.getStartByte();
         const endByte = ref.getEndByte();
         const range = startByte || endByte
-            ? `bytes=${startByte || ''}-${endByte || ''}`
+            ? `bytes=${startByte || ""}-${endByte || ""}`
             : undefined;
 
         const streamTypeCode = stream.type.substring(0, 1).toUpperCase();
@@ -90,7 +90,7 @@ export class ParserSegmentCache {
         this.segments.splice(this.segments.length);
     }
 
-    public getForwardSequence (uri: string, range: string, duration: number) : ParserSegment[] {
+    public getForwardSequence (uri: string, range: string, duration: number): ParserSegment[] {
         let segment = this.find(uri, range);
         if (!segment) {
             return [];

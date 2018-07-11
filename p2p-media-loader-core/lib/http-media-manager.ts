@@ -21,7 +21,7 @@ export default class HttpMediaManager extends EventEmitter {
         request.responseType = "arraybuffer";
 
         if (segment.range) {
-            request.setRequestHeader('Range', segment.range);
+            request.setRequestHeader("Range", segment.range);
         }
 
         let prevBytesLoaded = 0;

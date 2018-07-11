@@ -56,9 +56,9 @@ export class ShakaManifestParserProxy {
         return this.originalManifestParser.onExpirationUpdated();
     }
 
-    public getForwardSequence (uri: string, range: string, duration: number) : ParserSegment[] {
+    public getForwardSequence (uri: string, range: string, duration: number): ParserSegment[] {
         const sequence = this.cache.getForwardSequence(uri, range, duration);
-        return sequence.length > 0 && sequence[ 0 ].streamType === 'video' ? sequence : [];
+        return sequence.length > 0 && sequence[ 0 ].streamType === "video" ? sequence : [];
     }
 
     public reset () {
@@ -75,7 +75,7 @@ export class ShakaManifestParserProxy {
 
         stream.getPosition = () => {
             if (this.isHls()) {
-                if (stream.type === 'video') {
+                if (stream.type === "video") {
                     return this.manifest.periods[0].variants.reduce((a: any, i: any) => {
                         if (i.video && i.video.id && !a.includes(i.video.id)) {
                             a.push(i.video.id);
