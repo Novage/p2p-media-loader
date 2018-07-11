@@ -55,16 +55,20 @@ export default class {
     }
 
     private refreshLoad (): LoaderSegment {
+        const manifestUri = this.manifestUri;
+        const index = manifestUri.indexOf("?");
+        const manifestUriNoQuery = (index === -1) ? manifestUri : manifestUri.substring(0, index);
+
         const loaderSegments: LoaderSegment[] = this.parserSegments.map((s, i) => {
             return new LoaderSegment(
-                `${this.manifestUri}+${s.identity}`,
+                `${manifestUriNoQuery}+${s.identity}`,
                 s.uri,
                 s.range,
                 i
             );
         });
 
-        this.loader.load(loaderSegments, `${this.manifestUri}+${this.parserSegments[ 0 ].streamIdentity}`);
+        this.loader.load(loaderSegments, `${manifestUriNoQuery}+${this.parserSegments[ 0 ].streamIdentity}`);
         return loaderSegments[ 0 ];
     }
 
