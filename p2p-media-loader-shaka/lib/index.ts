@@ -3,11 +3,11 @@ import SegmentManager from "./segment-manager";
 import {ShakaManifestParserProxy, ShakaDashManifestParserProxy, ShakaHlsManifestParserProxy} from "./manifest-parser-proxy";
 
 declare const shaka: any;
+declare const setInterval: any;
+declare const clearInterval: any;
 
 const defaultSettings = {
-    // The duration in seconds; used by parser to build up predicted forward segments sequence; used to predownload and share via P2P
-    parserForwardDuration: 60,
-    // Custom segment manager; if not set, default p2pml.shaka.SegmentManager initialized with default p2pml.core.HybridLoader will be used
+    // Custom segment manager; if not set, default p2pml.shaka.SegmentManager initialized with p2pml.core.HybridLoader will be used
     segmentManager: undefined
 };
 
@@ -26,17 +26,35 @@ export function initShakaPlayer(player: any, settings: any = {}): void {
         ? settings.segmentManager
         : new SegmentManager(new HybridLoader());
 
-    player.addEventListener("loading", (event_unused: any) => {
+    let intervalId: number = 0;
+    let lastPlayheadTimeReported: number = 0;
+
+    player.addEventListener("loading", () => {
+        if (intervalId > 0) {
+            clearInterval(intervalId);
+            intervalId = 0;
+        }
+
+        lastPlayheadTimeReported = 0;
+
         const manifest = player.getManifest();
         if (manifest && manifest.p2pml) {
             manifest.p2pml.parser.reset();
         }
 
         segmentManager.destroy();
+
+        intervalId = setInterval(() => {
+            const playheadTime = getPlayheadTime(player);
+            if (playheadTime !== lastPlayheadTimeReported) {
+               segmentManager.setPlayheadTime(playheadTime);
+               lastPlayheadTimeReported = playheadTime;
+            }
+        }, 1000);
     });
 
     player.getNetworkingEngine().registerRequestFilter((requestType: number, request: any) => {
-        request.p2pml = {player, settings, segmentManager};
+        request.p2pml = {player, segmentManager};
     });
 }
 
@@ -58,7 +76,7 @@ function processNetworkRequest (uri: string, request: any, requestType: number) 
         return shaka.net.HttpXHRPlugin(uri, request, requestType);
     }
 
-    const {player, settings, segmentManager} = request.p2pml;
+    const {player, segmentManager} = request.p2pml;
 
     const manifest = player.getManifest();
     if (!manifest || !manifest.p2pml) {
@@ -66,8 +84,8 @@ function processNetworkRequest (uri: string, request: any, requestType: number) 
     }
 
     const parser: ShakaManifestParserProxy = manifest.p2pml.parser;
-    const sequence = parser.getForwardSequence(uri, request.headers.Range, settings.parserForwardDuration);
-    if (sequence.length === 0) {
+    const segment = parser.find(uri, request.headers.Range);
+    if (!segment || segment.streamType !== "video") {
         return shaka.net.HttpXHRPlugin(uri, request, requestType);
     }
 
@@ -76,7 +94,7 @@ function processNetworkRequest (uri: string, request: any, requestType: number) 
     const promise = new Promise((resolve, reject) => {
         rejectCallback = reject;
         segmentManager
-            .load(sequence, player.getManifestUri())
+            .load(segment, player.getManifestUri(), getPlayheadTime(player))
             .then((data: any) => resolve({ data }));
     });
 
@@ -87,6 +105,16 @@ function processNetworkRequest (uri: string, request: any, requestType: number) 
     ));
 
     return new shaka.util.AbortableOperation(promise, abort);
+}
+
+function getPlayheadTime (player: any): number {
+    let time = player.getPlayheadTimeAsDate().valueOf();
+
+    if (player.isLive()) {
+        time -= player.getPresentationStartTimeAsDate().valueOf();
+    }
+
+    return time / 1000;
 }
 
 export {default as SegmentManager} from "./segment-manager";

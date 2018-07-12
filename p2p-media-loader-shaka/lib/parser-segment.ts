@@ -43,6 +43,7 @@ export class ParserSegment {
             end,
             uris[ 0 ],
             range,
+            () => ParserSegment.create(stream, position - 1),
             () => ParserSegment.create(stream, position + 1)
         );
     }
@@ -58,7 +59,8 @@ export class ParserSegment {
         readonly end: number,
         readonly uri: string,
         readonly range: string | undefined,
-        readonly next: any
+        readonly prev: () => ParserSegment | undefined,
+        readonly next: () => ParserSegment | undefined
     ) {}
 
 } // end of ParserSegment
@@ -81,31 +83,13 @@ export class ParserSegmentCache {
         if (segment && !this.find(segment.uri, segment.range)) {
             this.segments.push(segment);
             if (this.segments.length > this.maxSegments) {
-                this.segments.splice(this.maxSegments * 0.85);
+                this.segments.splice(0, this.maxSegments * 0.2);
             }
         }
     }
 
     public clear () {
-        this.segments.splice(this.segments.length);
-    }
-
-    public getForwardSequence (uri: string, range: string, duration: number): ParserSegment[] {
-        let segment = this.find(uri, range);
-        if (!segment) {
-            return [];
-        }
-
-        const sequence = [];
-        let seqDuration = 0;
-
-        do {
-            sequence.push(segment);
-            seqDuration += segment.end - segment.start;
-            segment = segment.next();
-        } while (segment && seqDuration < duration);
-
-        return sequence;
+        this.segments.splice(0);
     }
 
 } // end of ParserSegmentCache

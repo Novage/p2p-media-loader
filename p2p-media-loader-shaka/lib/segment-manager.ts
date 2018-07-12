@@ -3,6 +3,10 @@ import {LoaderEvents, Segment as LoaderSegment, LoaderInterface} from "p2p-media
 import {ParserSegment} from "./parser-segment";
 
 const defaultSettings = {
+    // The duration in seconds; used by manager to build up predicted forward segments sequence; used to predownload and share via P2P
+    forwardSequenceDuration: 60,
+    // Maximum amount of segments manager should hold from the load() calls; used to build up sequence with correct priorities for P2P sharing
+    maxHistorySegments: 100,
     // Shaka player measures time spent on loading data when its request gets resolved;
     // Shaka player does assumtions about network speed and might decide to change playback quality (if its set to 'auto');
     // If simulateTimeDelation is true, we're trying to simulate this behaivior (meaning if some data was preloaded by us
@@ -12,12 +16,13 @@ const defaultSettings = {
 
 export default class {
 
-    private debug = Debug("p2pml:shaka:sm");
-    private loader: LoaderInterface;
-    private requests: Map<string, Request> = new Map();
+    private readonly debug = Debug("p2pml:shaka:sm");
+    private readonly loader: LoaderInterface;
+    private readonly requests: Map<string, Request> = new Map();
     private manifestUri: string = "";
-    private parserSegments: ParserSegment[] = [];
-    private settings: any = undefined;
+    private playheadTime: number = 0;
+    private readonly segmentHistory: ParserSegment[] = [];
+    private readonly settings: any = undefined;
 
     public constructor(loader: LoaderInterface, settings: any = {}) {
         this.settings = Object.assign(defaultSettings, settings);
@@ -32,15 +37,25 @@ export default class {
         return this.loader.isSupported();
     }
 
-    public async load (parserSegments: ParserSegment[], manifestUri: string): Promise<any> {
-        this.parserSegments = parserSegments;
-        this.manifestUri = manifestUri;
-        const firstLoaderSegment = this.refreshLoad();
+    public setPlayheadTime (time: number) {
+        this.playheadTime = time;
 
-        const alreadyLoadedSegment = this.loader.getSegment(firstLoaderSegment.id);
+        if (this.segmentHistory.length > 0) {
+            this.refreshLoad();
+        }
+    }
+
+    public async load (parserSegment: ParserSegment, manifestUri: string, playheadTime: number): Promise<any> {
+        this.manifestUri = manifestUri;
+        this.playheadTime = playheadTime;
+
+        this.pushSegmentHistory(parserSegment);
+
+        const lastRequestedSegment = this.refreshLoad();
+        const alreadyLoadedSegment = this.loader.getSegment(lastRequestedSegment.id);
 
         return new Promise<any>((resolve, reject) => {
-            const request = new Request(firstLoaderSegment.id, resolve, reject);
+            const request = new Request(lastRequestedSegment.id, resolve, reject);
             if (alreadyLoadedSegment) {
                 this.reportSuccess(request, alreadyLoadedSegment);
             } else {
@@ -50,16 +65,36 @@ export default class {
         });
     }
 
-    public destroy () {
-        this.loader.destroy();
-    }
-
     private refreshLoad (): LoaderSegment {
-        const manifestUri = this.manifestUri;
-        const index = manifestUri.indexOf("?");
-        const manifestUriNoQuery = (index === -1) ? manifestUri : manifestUri.substring(0, index);
+        const lastRequestedSegment = this.segmentHistory[ this.segmentHistory.length - 1 ];
+        const safePlayheadTime = this.playheadTime > 0.1 ? this.playheadTime : lastRequestedSegment.start;
+        const sequence: ParserSegment[] = this.segmentHistory.reduce((a: ParserSegment[], i) => {
+            if (i.start >= safePlayheadTime) {
+                a.push(i);
+            }
+            return a;
+        }, []);
 
-        const loaderSegments: LoaderSegment[] = this.parserSegments.map((s, i) => {
+        if (sequence.length === 0) {
+            sequence.push(lastRequestedSegment);
+        }
+
+        const lastRequestedSegmentIndex = sequence.length - 1;
+        let duration = sequence.reduce((a, i) => a + i.end - i.start, 0);
+
+        do {
+            const next = sequence[ sequence.length - 1 ].next();
+            if (next) {
+                sequence.push(next);
+                duration += next.end - next.start;
+            } else {
+                break;
+            }
+        } while (duration < this.settings.forwardSequenceDuration);
+
+        const manifestUriNoQuery = this.manifestUri.split("?")[ 0 ];
+
+        const loaderSegments: LoaderSegment[] = sequence.map((s, i) => {
             return new LoaderSegment(
                 `${manifestUriNoQuery}+${s.identity}`,
                 s.uri,
@@ -68,8 +103,33 @@ export default class {
             );
         });
 
-        this.loader.load(loaderSegments, `${manifestUriNoQuery}+${this.parserSegments[ 0 ].streamIdentity}`);
-        return loaderSegments[ 0 ];
+        this.loader.load(loaderSegments, `${manifestUriNoQuery}+${lastRequestedSegment.streamIdentity}`);
+        return loaderSegments[ lastRequestedSegmentIndex ];
+    }
+
+    public destroy () {
+        if (this.requests.size !== 0) {
+            console.error("Destroying segment manager with active request(s)!");
+            this.requests.clear();
+        }
+
+        this.playheadTime = 0;
+        this.segmentHistory.splice(0);
+        this.loader.destroy();
+    }
+
+    private pushSegmentHistory (segment: ParserSegment) {
+        if (this.segmentHistory.length >= this.settings.maxHistorySegments) {
+            this.debug("segment history auto shrink");
+            this.segmentHistory.splice(0, this.settings.maxHistorySegments * 0.2);
+        }
+
+        if (this.segmentHistory.length > 0 && this.segmentHistory[ this.segmentHistory.length - 1 ].start > segment.start) {
+            this.debug("segment history reset due to playhead seek back");
+            this.segmentHistory.splice(0);
+        }
+
+        this.segmentHistory.push(segment);
     }
 
     private reportSuccess (request: Request, loaderSegment: LoaderSegment) {

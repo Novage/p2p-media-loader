@@ -56,9 +56,8 @@ export class ShakaManifestParserProxy {
         return this.originalManifestParser.onExpirationUpdated();
     }
 
-    public getForwardSequence (uri: string, range: string, duration: number): ParserSegment[] {
-        const sequence = this.cache.getForwardSequence(uri, range, duration);
-        return sequence.length > 0 && sequence[ 0 ].streamType === "video" ? sequence : [];
+    public find (uri: string, range?: string): ParserSegment | undefined {
+        return this.cache.find(uri, range);
     }
 
     public reset () {
