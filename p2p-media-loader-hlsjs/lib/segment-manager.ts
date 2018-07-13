@@ -199,9 +199,7 @@ export default class SegmentManager {
 
     private getSwarmId(playlistUrl: string): string {
         if (this.masterPlaylist) {
-            const masterUrl = this.masterPlaylist.url;
-            const index = masterUrl.indexOf("?");
-            const masterUrlNoQuery = (index === -1) ? masterUrl : masterUrl.substring(0, index);
+            const masterUrlNoQuery = this.masterPlaylist.url.split("?")[0];
 
             for (let i = 0; i < this.masterPlaylist.manifest.playlists.length; ++i) {
                 let url = this.masterPlaylist.manifest.playlists[i].uri;
