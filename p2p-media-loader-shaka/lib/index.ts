@@ -1,6 +1,7 @@
 import {HybridLoader} from "p2p-media-loader-core";
 import SegmentManager from "./segment-manager";
 import {ShakaManifestParserProxy, ShakaDashManifestParserProxy, ShakaHlsManifestParserProxy} from "./manifest-parser-proxy";
+import {getSchemedUri} from "./utils";
 
 declare const shaka: any;
 declare const setInterval: any;
@@ -94,7 +95,7 @@ function processNetworkRequest (uri: string, request: any, requestType: number) 
     const promise = new Promise((resolve, reject) => {
         rejectCallback = reject;
         segmentManager
-            .load(segment, player.getManifestUri(), getPlayheadTime(player))
+            .load(segment, getSchemedUri(player.getManifestUri()), getPlayheadTime(player))
             .then((data: any) => resolve({ data }));
     });
 

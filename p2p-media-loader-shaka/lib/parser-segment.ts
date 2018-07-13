@@ -1,3 +1,5 @@
+import {getSchemedUri} from "./utils";
+
 export class ParserSegment {
 
     public static create (stream: any, position: number): ParserSegment | undefined {
@@ -41,7 +43,7 @@ export class ParserSegment {
             position,
             start,
             end,
-            uris[ 0 ],
+            getSchemedUri(uris[ 0 ]),
             range,
             () => ParserSegment.create(stream, position - 1),
             () => ParserSegment.create(stream, position + 1)
