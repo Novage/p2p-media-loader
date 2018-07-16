@@ -4,8 +4,10 @@
   "version": "0.0.1",
   "main": "index.js",
   "scripts": {
-    "build": "(browserify -r p2p-graph | uglifyjs -m -c > p2p-graph.js) && npm run refresh-dependencies",
-    "refresh-dependencies": "copyfiles -f ./node_modules/p2p-media-loader-core/p2p-media-loader-core.min.js ./ && copyfiles -f ./node_modules/p2p-media-loader-hlsjs/p2p-media-loader-hlsjs.min.js ./ && copyfiles -f ./node_modules/p2p-media-loader-shaka/p2p-media-loader-shaka.min.js ./"
+    "build": "npm run build-p2p-graph && npm run build-hola-jwplayer-hlsjs && npm run refresh-dependencies",
+    "refresh-dependencies": "copyfiles -f ./node_modules/p2p-media-loader-core/p2p-media-loader-core.min.js ./ && copyfiles -f ./node_modules/p2p-media-loader-hlsjs/p2p-media-loader-hlsjs.min.js ./ && copyfiles -f ./node_modules/p2p-media-loader-shaka/p2p-media-loader-shaka.min.js ./",
+    "build-p2p-graph": "browserify -r p2p-graph | uglifyjs -m -c > p2p-graph.js",
+    "build-hola-jwplayer-hlsjs": "browserify -r @hola.org/jwplayer-hlsjs | uglifyjs -m -c > hola-jwplayer-hlsjs.min.js"
   },
   "license": "MIT",
   "repository": {
@@ -19,7 +21,9 @@
     "p2p-graph": "^1.2.1"
   },
   "devDependencies": {
+    "@hola.org/jwplayer-hlsjs": "^0.0.79",
     "browserify": "^14.4.0",
+    "browserify-versionify": "^1.0.6",
     "copyfiles": "^1.2.0",
     "rimraf": "^2.6.1",
     "uglify-js": "^3.3.12"

@@ -52,6 +52,11 @@
     <script src="https://github.com/videojs/mux.js/releases/download/v4.4.0/mux.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/2.4.2/shaka-player.compiled.js"></script>
 
+    <!-- JWPlayer -->
+    <script src="https://content.jwplatform.com/libraries/aG3IMhIy.js"></script>
+    <!--script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script--> <!-- required but already included above -->
+    <script src="hola-jwplayer-hlsjs.min.js"></script>
+
     <style>
         body {
             margin-top: 1em;
@@ -145,12 +150,17 @@
             <div class="form-group">
                 <label for="type">Player:</label>
                 <select class="form-control" id="type" name="type">
-                    <option value="clappr" selected>Clappr</option>
-                    <option value="hlsjs">Hls.js</option>
-                    <option value="flowplayer">Flowplayer</option>
-                    <option value="mediaelement">MediaElement</option>
-                    <option value="videojs-contrib-hlsjs">VideoJs-Contrib-HlsJs</option>
-                    <option value="shakaplayer">ShakaPlayer</option>
+                    <optgroup label="Hls.js P2P Engine">
+                        <option value="clappr" selected>Clappr</option>
+                        <option value="hlsjs">Hls.js</option>
+                        <option value="flowplayer">Flowplayer</option>
+                        <option value="mediaelement">MediaElement</option>
+                        <option value="videojs-contrib-hlsjs">VideoJs-Contrib-HlsJs</option>
+                        <option value="jwplayer">JWPlayer</option>
+                    </optgroup>
+                    <optgroup label="Shaka P2P Engine">
+                        <option value="shakaplayer">ShakaPlayer</option>
+                    </optgroup>
                 </select>
             </div>
             <button type="submit" class="btn btn-primary">Apply</button>
@@ -241,6 +251,7 @@
                 case 'flowplayer':
                 case 'mediaelement':
                 case 'videojs-contrib-hlsjs':
+                case 'jwplayer':
                     this.segmentManager = new p2pml.hlsjs.SegmentManager(this.p2pmlLoader);
                     break;
                 case 'shakaplayer':
@@ -263,6 +274,9 @@
                     break;
                 case 'videojs-contrib-hlsjs':
                     this.initVideoJsContribHlsJsPlayer();
+                    break;
+                case 'jwplayer':
+                    this.initJwPlayer();
                     break;
                 case 'shakaplayer':
                     this.initShakaPlayer();
@@ -412,6 +426,25 @@
             player.ready(function() {
                 player.volume(0);
                 player.play();
+            });
+        };
+
+        DemoApp.prototype.initJwPlayer = function () {
+            var video = document.createElement("div");
+            video.id = "video";
+            //video.className = "fp-slim";
+            this.videoContainer.appendChild(video);
+
+            var player = jwplayer("video");
+            player.setup({ file: this.videoUrl });
+            player.setVolume(0);
+
+            var provider = require("@hola.org/jwplayer-hlsjs");
+            provider.attach();
+
+            p2pml.hlsjs.initJwPlayer(player, {
+                liveSyncDurationCount: this.liveSyncDurationCount,
+                loader: p2pml.hlsjs.createLoaderClass({ segmentManager: this.segmentManager })
             });
         };
 
