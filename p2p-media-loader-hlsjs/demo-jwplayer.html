@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+
+    <script src="p2p-media-loader-core.js"></script>
+    <script src="p2p-media-loader-hlsjs.js"></script>
+
+    <script src="https://content.jwplatform.com/libraries/aG3IMhIy.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="hola-jwplayer-hlsjs.min.js"></script>
+
+</head>
+<body>
+
+    <div id="player"></div>
+
+    <script>
+
+        var player = jwplayer("player");
+
+        player.setup({
+            file: "https://wowza.peer5.com/live/smil:bbb_abr.smil/playlist.m3u8"
+            //file: "https://storage.googleapis.com/shaka-live-assets/player-source.m3u8"
+        });
+
+        var provider = require("@hola.org/jwplayer-hlsjs");
+        provider.attach();
+
+        p2pml.hlsjs.initJwPlayer(player, {
+            liveSyncDurationCount: 7
+        });
+
+    </script>
+
+</body>
+</html>

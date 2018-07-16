@@ -7,11 +7,12 @@
   "scripts": {
     "compile": "rimraf ./dist/ && tsc && copyfiles -f ./lib/*.js ./dist/",
     "lint": "tslint -c ./tslint.json -p ./tsconfig.test.json",
-    "build": "npm run refresh-dependencies && npm run compile && npm run browserify && npm run minify",
+    "build": "npm run refresh-dependencies && npm run compile && npm run browserify && npm run minify && npm run build-hola-jwplayer-hlsjs",
     "browserify": "browserify -r ./dist/index.js:p2p-media-loader-hlsjs ./dist/browser-init.js --exclude p2p-media-loader-core > p2p-media-loader-hlsjs.js",
     "minify": "uglifyjs p2p-media-loader-hlsjs.js -m -c > p2p-media-loader-hlsjs.min.js",
     "refresh-dependencies": "copyfiles -f ./node_modules/p2p-media-loader-core/p2p-media-loader-core.js ./",
-    "test": "mocha -r ts-node/register test/*.test.ts"
+    "test": "mocha -r ts-node/register test/*.test.ts",
+    "build-hola-jwplayer-hlsjs": "browserify -r @hola.org/jwplayer-hlsjs | uglifyjs -m -c > hola-jwplayer-hlsjs.min.js"
   },
   "license": "MIT",
   "repository": {
@@ -23,10 +24,12 @@
     "p2p-media-loader-core": "^0.0.1"
   },
   "devDependencies": {
+    "@hola.org/jwplayer-hlsjs": "^0.0.79",
     "@types/mocha": "^2.2.48",
     "@types/node": "^6.0.101",
     "@types/sinon": "^2.3.3",
     "browserify": "^14.4.0",
+    "browserify-versionify": "^1.0.6",
     "copyfiles": "^1.2.0",
     "mocha": "^3.4.2",
     "rimraf": "^2.6.1",

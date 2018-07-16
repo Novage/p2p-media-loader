@@ -65,4 +65,19 @@ export function initMediaElementJsPlayer(mediaElement: any): void {
     });
 }
 
+export function initJwPlayer(player: any, hlsjsConfig: any): void {
+    const iid = setInterval(() => {
+        if (player.hls && player.hls.config) {
+            clearInterval(iid);
+
+            player.hls.config = Object.assign(player.hls.config, hlsjsConfig);
+            if (!hlsjsConfig.loader) {
+                player.hls.config.loader = createLoaderClass();
+            }
+
+            initHlsJsPlayer(player.hls);
+        }
+    }, 200);
+}
+
 export {default as SegmentManager} from "./segment-manager";
