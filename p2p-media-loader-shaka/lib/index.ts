@@ -121,13 +121,18 @@ function processNetworkRequest (uri: string, request: any, requestType: number) 
 }
 
 function getPlayheadTime (player: any): number {
-    let time = player.getPlayheadTimeAsDate().valueOf();
+    let time = 0;
 
-    if (player.isLive()) {
-        time -= player.getPresentationStartTimeAsDate().valueOf();
+    const date = player.getPlayheadTimeAsDate();
+    if (date) {
+        time = date.valueOf();
+        if (player.isLive()) {
+            time -= player.getPresentationStartTimeAsDate().valueOf();
+        }
+        time /= 1000;
     }
 
-    return time / 1000;
+    return time;
 }
 
 export {default as SegmentManager} from "./segment-manager";
