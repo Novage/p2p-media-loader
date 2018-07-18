@@ -52,11 +52,11 @@ export function initShakaPlayer(player: any, settings: any = {}) {
 
         intervalId = setInterval(() => {
             const playheadTime = getPlayheadTime(player);
-            if (playheadTime !== lastPlayheadTimeReported) {
+            if (playheadTime !== lastPlayheadTimeReported || player.isBuffering()) {
                segmentManager.setPlayheadTime(playheadTime);
                lastPlayheadTimeReported = playheadTime;
             }
-        }, 1000);
+        }, 500);
     });
 
     debug("register request filter");

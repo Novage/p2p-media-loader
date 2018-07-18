@@ -4,9 +4,9 @@ import {ParserSegment} from "./parser-segment";
 
 const defaultSettings = {
     // The duration in seconds; used by manager to build up predicted forward segments sequence; used to predownload and share via P2P
-    forwardSequenceDuration: 60,
+    forwardSequenceDuration: 30,
     // Maximum amount of segments manager should hold from the load() calls; used to build up sequence with correct priorities for P2P sharing
-    maxHistorySegments: 100,
+    maxHistorySegments: 50,
     // Shaka player measures time spent on loading data when its request gets resolved;
     // Shaka player does assumtions about network speed and might decide to change playback quality (if its set to 'auto');
     // If simulateTimeDelation is true, we're trying to simulate this behaivior (meaning if some data was preloaded by us
