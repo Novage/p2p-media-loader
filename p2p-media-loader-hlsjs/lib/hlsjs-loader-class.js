@@ -1,10 +1,6 @@
-function createHlsJsLoaderClass(HlsJsLoader, segmentManager, settings) {
-	if (!segmentManager.isSupported()) {
-		return Hls.DefaultConfig.loader;
-	}
-
+function createHlsJsLoaderClass(HlsJsLoader, engine) {
     function HlsJsLoaderClass() {
-        this.impl = new HlsJsLoader(segmentManager, settings);
+        this.impl = new HlsJsLoader(engine.segmentManager);
         this.stats = this.impl.stats;
     }
 
@@ -23,8 +19,8 @@ function createHlsJsLoaderClass(HlsJsLoader, segmentManager, settings) {
         }
     };
 
-    HlsJsLoaderClass.getSegmentManager = function () {
-        return segmentManager;
+    HlsJsLoaderClass.getEngine = function () {
+        return engine;
     };
 
     return HlsJsLoaderClass;

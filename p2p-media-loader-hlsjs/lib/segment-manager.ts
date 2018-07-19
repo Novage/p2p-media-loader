@@ -2,22 +2,30 @@ import {LoaderEvents, Segment, LoaderInterface} from "p2p-media-loader-core";
 import Utils from "./utils";
 import {Parser} from "m3u8-parser";
 
-export default class SegmentManager {
+const defaultSettings = {
+    // Number of segments for building up predicted forward segments sequence; used to predownload and share via P2P
+    forwardSegmentCount: 20
+};
+
+export class SegmentManager {
     private loader: LoaderInterface;
     private masterPlaylist: Playlist | null = null;
     private variantPlaylists: Map<string, Playlist> = new Map();
     private segmentRequest: SegmentRequest | null = null;
     private playQueue: {segmentSequence: number, segmentUrl: string}[] = [];
+    private readonly settings: any;
 
-    public constructor(loader: LoaderInterface) {
+    public constructor(loader: LoaderInterface, settings: any = {}) {
+        this.settings = Object.assign(defaultSettings, settings);
+
         this.loader = loader;
         this.loader.on(LoaderEvents.SegmentLoaded, this.onSegmentLoaded.bind(this));
         this.loader.on(LoaderEvents.SegmentError, this.onSegmentError.bind(this));
         this.loader.on(LoaderEvents.SegmentAbort, this.onSegmentAbort.bind(this));
     }
 
-    public isSupported(): boolean {
-        return this.loader.isSupported();
+    public getSettings() {
+        return this.settings;
     }
 
     public processPlaylist(url: string, content: string): void {
@@ -173,7 +181,7 @@ export default class SegmentManager {
             }
         }
 
-        for (let i = segmentIndex; i < playlistSegments.length; ++i) {
+        for (let i = segmentIndex; i < playlistSegments.length && segments.length < this.settings.forwardSegmentCount; ++i) {
             const url = playlist.getSegmentAbsoluteUrlByIndex(i);
             const id = this.getSegmentId(playlist, initialSequence + i);
             segments.push(new Segment(id, url, undefined, priority++));
@@ -248,10 +256,10 @@ class Playlist {
 
 class SegmentRequest {
     public constructor(
-            readonly segmentUrl: string,
-            readonly segmentSequence: number,
-            readonly playlistUrl: string,
-            readonly onSuccess: (content: ArrayBuffer, downloadSpeed: number) => void,
-            readonly onError: (error: any) => void) {
-    }
+        readonly segmentUrl: string,
+        readonly segmentSequence: number,
+        readonly playlistUrl: string,
+        readonly onSuccess: (content: ArrayBuffer, downloadSpeed: number) => void,
+        readonly onError: (error: any) => void
+    ) {}
 }

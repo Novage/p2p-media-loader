@@ -1,26 +1,8 @@
-import {HybridLoader} from "p2p-media-loader-core";
-import SegmentManager from "./segment-manager";
-import HlsJsLoader from "./hlsjs-loader";
-import {createHlsJsLoaderClass} from "./hlsjs-loader-class";
-
-function initHlsJsEvents(player: any, segmentManager: SegmentManager): void {
-    player.on("hlsFragChanged", function (event: any, data: any) {
-        const url = data && data.frag ? data.frag.url : undefined;
-        segmentManager.setPlayingSegment(url);
-    });
-    player.on("hlsDestroying", function () {
-        segmentManager.destroy();
-    });
-}
-
-export function createLoaderClass(settings: any = {}): any {
-    const manager: SegmentManager = settings.segmentManager || new SegmentManager(new HybridLoader(settings.loaderSettings));
-    return createHlsJsLoaderClass(HlsJsLoader, manager);
-}
+import {Engine} from "./engine";
 
 export function initHlsJsPlayer(player: any): void {
-    if (player && player.config && player.config.loader && typeof player.config.loader.getSegmentManager === "function") {
-        initHlsJsEvents(player, player.config.loader.getSegmentManager());
+    if (player && player.config && player.config.loader && typeof player.config.loader.getEngine === "function") {
+        initHlsJsEvents(player, player.config.loader.getEngine());
     }
 }
 
@@ -41,8 +23,8 @@ export function initFlowplayerHlsJsPlayer(player: any): void {
 export function initVideoJsContribHlsJsPlayer(player: any): void {
     player.ready(() => {
         const options = player.tech_.options_;
-        if (options && options.hlsjsConfig && options.hlsjsConfig.loader && typeof options.hlsjsConfig.loader.getSegmentManager === "function") {
-            initHlsJsEvents(player.tech_, options.hlsjsConfig.loader.getSegmentManager());
+        if (options && options.hlsjsConfig && options.hlsjsConfig.loader && typeof options.hlsjsConfig.loader.getEngine === "function") {
+            initHlsJsEvents(player.tech_, options.hlsjsConfig.loader.getEngine());
         }
     });
 }
@@ -51,16 +33,16 @@ export function initMediaElementJsPlayer(mediaElement: any): void {
     mediaElement.addEventListener("hlsFragChanged", (event: any) => {
         const url = event.data && event.data.length > 1 && event.data[ 1 ].frag ? event.data[ 1 ].frag.url : undefined;
         const hls = mediaElement.hlsPlayer;
-        if (hls && hls.config && hls.config.loader && typeof hls.config.loader.getSegmentManager === "function") {
-            const segmentManager: SegmentManager = hls.config.loader.getSegmentManager();
-            segmentManager.setPlayingSegment(url);
+        if (hls && hls.config && hls.config.loader && typeof hls.config.loader.getEngine === "function") {
+            const engine: Engine = hls.config.loader.getEngine();
+            engine.setPlayingSegment(url);
         }
     });
     mediaElement.addEventListener("hlsDestroying", () => {
         const hls = mediaElement.hlsPlayer;
-        if (hls && hls.config && hls.config.loader && typeof hls.config.loader.getSegmentManager === "function") {
-            const segmentManager: SegmentManager = hls.config.loader.getSegmentManager();
-            segmentManager.destroy();
+        if (hls && hls.config && hls.config.loader && typeof hls.config.loader.getEngine === "function") {
+            const engine: Engine = hls.config.loader.getEngine();
+            engine.destroy();
         }
     });
 }
@@ -69,16 +51,21 @@ export function initJwPlayer(player: any, hlsjsConfig: any): void {
     const iid = setInterval(() => {
         if (player.hls && player.hls.config) {
             clearInterval(iid);
-
             player.hls.config = Object.assign(player.hls.config, hlsjsConfig);
-            if (!hlsjsConfig.loader) {
-                player.hls.config.loader = createLoaderClass();
-            }
-
             initHlsJsPlayer(player.hls);
         }
     }, 200);
 }
 
-export {default as SegmentManager} from "./segment-manager";
+export { Engine };
 export const version = "__VERSION__";
+
+function initHlsJsEvents(player: any, engine: Engine): void {
+    player.on("hlsFragChanged", function (event_unused: any, data: any) {
+        const url = data && data.frag ? data.frag.url : undefined;
+        engine.setPlayingSegment(url);
+    });
+    player.on("hlsDestroying", function () {
+        engine.destroy();
+    });
+}

@@ -3,7 +3,7 @@
 import * as sinon from "sinon";
 import { mock, instance, when, anyFunction } from "ts-mockito";
 
-import SegmentManager from "../lib/segment-manager";
+import {SegmentManager} from "../lib/segment-manager";
 import {LoaderEvents, Segment, LoaderInterface} from "p2p-media-loader-core";
 
 class LoaderInterfaceEmptyImpl implements LoaderInterface {
@@ -12,7 +12,6 @@ class LoaderInterfaceEmptyImpl implements LoaderInterface {
     getSegment(id: string): Segment | undefined { return undefined; }
     getSettings(): any { }
     destroy(): void { }
-    isSupported(): boolean { return true; }
 }
 
 const testPlaylist = {

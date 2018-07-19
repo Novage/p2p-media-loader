@@ -1,4 +1,4 @@
-import HlsJsLoader from "./hlsjs-loader";
-import SegmentManager from "./segment-manager";
+import {HlsJsLoader} from "./hlsjs-loader";
+import {Engine} from "./engine";
 
-export function createHlsJsLoaderClass(type: typeof HlsJsLoader, segmentManager: SegmentManager): any;
+export function createHlsJsLoaderClass(type: typeof HlsJsLoader, engine: Engine): any;

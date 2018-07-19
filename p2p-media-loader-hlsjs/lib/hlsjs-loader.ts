@@ -1,13 +1,13 @@
-import SegmentManager from "./segment-manager";
+import {SegmentManager} from "./segment-manager";
 
 const DEFAULT_DOWNLOAD_LATENCY = 1;
 const DEFAULT_DOWNLOAD_SPEED = 12500; // bytes per millisecond
 
-export default class HlsJsLoader {
+export class HlsJsLoader {
     private segmentManager: SegmentManager;
     private readonly stats: any = {}; // required for older versions of hls.js
 
-    public constructor(segmentManager: SegmentManager, settings: any) {
+    public constructor(segmentManager: SegmentManager) {
         this.segmentManager = segmentManager;
     }
 
