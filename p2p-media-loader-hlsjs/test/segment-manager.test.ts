@@ -8,7 +8,7 @@ import {LoaderEvents, Segment, LoaderInterface} from "p2p-media-loader-core";
 
 class LoaderInterfaceEmptyImpl implements LoaderInterface {
     on(eventName: string | symbol, listener: Function): this { return this; }
-    load(segments: Segment[], playlistUrl: string, emitNowSegmentUrl?: string): void { }
+    load(segments: Segment[], swarmId: string): void { }
     getSegment(id: string): Segment | undefined { return undefined; }
     getSettings(): any { }
     destroy(): void { }
@@ -50,7 +50,7 @@ describe("SegmentManager", () => {
             segmentLoadedListener = listener;
         });
 
-        const segment = new Segment("id", testPlaylist.baseUrl + "segment-1045.ts", 0, new ArrayBuffer(0));
+        const segment = new Segment("id", testPlaylist.baseUrl + "segment-1045.ts", undefined, 0, new ArrayBuffer(0));
 
         const manager = new SegmentManager(instance(loader));
         manager.processPlaylist(testPlaylist.url, testPlaylist.content);
@@ -91,7 +91,7 @@ describe("SegmentManager", () => {
 
         const onError = sinon.spy();
 
-        const segment = new Segment("id", testPlaylist.baseUrl + "segment-1045.ts", 0, new ArrayBuffer(0));
+        const segment = new Segment("id", testPlaylist.baseUrl + "segment-1045.ts", undefined, 0, new ArrayBuffer(0));
 
         const manager = new SegmentManager(instance(loader));
         manager.processPlaylist(testPlaylist.url, testPlaylist.content);
