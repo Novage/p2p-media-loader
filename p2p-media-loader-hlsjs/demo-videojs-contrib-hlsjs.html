@@ -27,25 +27,32 @@
 
     <script>
 
-        var player = videojs("video", {
-            html5: {
-                hlsjsConfig: {
-                    liveSyncDurationCount: 7, // To have at least 7 segments in queue
-                    loader: p2pml.hlsjs.createLoaderClass()
+        if (p2pml.hlsjs.Engine.isSupported()) {
+            var engine = new p2pml.hlsjs.Engine();
+
+            var player = videojs("video", {
+                html5: {
+                    hlsjsConfig: {
+                        liveSyncDurationCount: 7, // To have at least 7 segments in queue
+                        loader: engine.createLoaderClass()
+                    }
                 }
-            }
-        });
+            });
 
-        p2pml.hlsjs.initVideoJsContribHlsJsPlayer(player);
+            p2pml.hlsjs.initVideoJsContribHlsJsPlayer(player);
 
-        player.src({
-            src: "https://nasa-i.akamaihd.net/hls/live/253565/NASA-NTV1-Public/master.m3u8",
-            type: "application/x-mpegURL"
-        });
+            player.src({
+                src: "https://wowza.peer5.com/live/smil:bbb_abr.smil/playlist.m3u8",
+                //src: "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8",
+                type: "application/x-mpegURL"
+            });
 
-        player.ready(function() {
-            player.volume(0.01); // 1%
-        });
+            player.ready(function() {
+                player.volume(0.01); // 1%
+            });
+        } else {
+            document.write("Not supported :(");
+        }
 
     </script>
 

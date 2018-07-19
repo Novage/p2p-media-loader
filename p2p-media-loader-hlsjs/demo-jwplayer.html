@@ -19,19 +19,26 @@
 
     <script>
 
-        var player = jwplayer("player");
+        if (Hls.isSupported() && p2pml.hlsjs.Engine.isSupported()) {
+            var engine = new p2pml.hlsjs.Engine();
 
-        player.setup({
-            file: "https://wowza.peer5.com/live/smil:bbb_abr.smil/playlist.m3u8"
-            //file: "https://storage.googleapis.com/shaka-live-assets/player-source.m3u8"
-        });
+            var player = jwplayer("player");
 
-        var provider = require("@hola.org/jwplayer-hlsjs");
-        provider.attach();
+            player.setup({
+                file: "https://wowza.peer5.com/live/smil:bbb_abr.smil/playlist.m3u8"
+                //file: "https://storage.googleapis.com/shaka-live-assets/player-source.m3u8"
+            });
 
-        p2pml.hlsjs.initJwPlayer(player, {
-            liveSyncDurationCount: 7
-        });
+            var provider = require("@hola.org/jwplayer-hlsjs");
+            provider.attach();
+
+            p2pml.hlsjs.initJwPlayer(player, {
+                liveSyncDurationCount: 7, // To have at least 7 segments in queue
+                loader: engine.createLoaderClass()
+            });
+        } else {
+            document.write("Not supported :(");
+        }
 
     </script>
 

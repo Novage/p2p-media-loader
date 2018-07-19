@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+
+    <script src="p2p-media-loader-core.js"></script>
+    <script src="p2p-media-loader-hlsjs.js"></script>
+
+    <link rel="stylesheet" href="https://releases.flowplayer.org/7.1.0/skin/skin.css">
+    <script src="https://releases.flowplayer.org/7.1.0/flowplayer.min.js"></script>
+    <script src="https://releases.flowplayer.org/hlsjs/flowplayer.hlsjs.min.js"></script>
+
+    <style>
+        #video {
+            width: 720px;
+            margin-left: auto;
+            margin-right: auto;
+            display: block;
+        }
+    </style>
+
+</head>
+<body>
+
+    <div id="video" class="fp-slim"></div>
+
+    <script>
+
+        if (p2pml.hlsjs.Engine.isSupported()) {
+            var engine = new p2pml.hlsjs.Engine();
+
+            var player = flowplayer("#video", {
+                volume: 0.01,
+                clip: {
+                    sources: [{
+                        src: "https://wowza.peer5.com/live/smil:bbb_abr.smil/playlist.m3u8",
+                        type: "application/x-mpegurl",
+                        live: true
+                    }]
+                    // sources: [{
+                    //     src: "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8",
+                    //     type: "application/x-mpegurl"
+                    // }]
+                },
+                hlsjs: {
+                    liveSyncDurationCount: 7, // To have at least 7 segments in queue
+                    loader: engine.createLoaderClass()
+                }
+            });
+
+            p2pml.hlsjs.initFlowplayerHlsJsPlayer(player);
+
+            player.on("ready", function () {
+                player.play();
+            });
+        } else {
+            document.write("Not supported :(");
+        }
+
+    </script>
+
+</body>
+</html>
