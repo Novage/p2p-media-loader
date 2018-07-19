@@ -25,5 +25,4 @@ export interface LoaderInterface {
     getSegment(id: string): Segment | undefined;
     getSettings(): any;
     destroy(): void;
-    isSupported(): boolean;
 }

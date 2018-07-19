@@ -40,10 +40,6 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         return (browserRtc && (browserRtc.RTCPeerConnection.prototype.createDataChannel !== undefined));
     }
 
-    public isSupported(): boolean {
-        return HybridLoader.isSupported();
-    }
-
     public constructor(settings: any = {}) {
         super();
 
