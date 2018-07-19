@@ -27,6 +27,7 @@
     "@types/node": "^6.0.98",
     "@types/sinon": "^2.3.3",
     "browserify": "^14.4.0",
+    "browserify-versionify": "^1.0.6",
     "copyfiles": "^1.2.0",
     "mocha": "^3.4.2",
     "rimraf": "^2.6.1",
@@ -36,5 +37,10 @@
     "tslint": "^5.5.0",
     "typescript": "^2.7.1",
     "uglify-js": "^3.3.9"
+  },
+  "browserify": {
+    "transform": [
+      "browserify-versionify"
+    ]
   }
 }

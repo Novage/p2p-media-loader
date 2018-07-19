@@ -136,3 +136,4 @@ function getPlayheadTime (player: any): number {
 }
 
 export {default as SegmentManager} from "./segment-manager";
+export const version = "__VERSION__";

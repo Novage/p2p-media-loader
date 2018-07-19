@@ -183,7 +183,7 @@
                 document.querySelector("#error-hls-js").classList.remove("hide");
             }
 
-            if (!p2pml.HybridLoader.isSupported()) {
+            if (!p2pml.core.HybridLoader.isSupported()) {
                 document.querySelector("#error-webrtc-data-channels").classList.remove("hide");
             }
 
@@ -237,9 +237,9 @@
                 this.videoContainer.removeChild(this.videoContainer.lastChild);
             }
 
-            this.p2pmlLoader = new p2pml.HybridLoader();
-            this.p2pmlLoader.on(p2pml.LoaderEvents.PieceBytesDownloaded, this.onBytesDownloaded.bind(this));
-            this.p2pmlLoader.on(p2pml.LoaderEvents.PieceBytesUploaded, this.onBytesUploaded.bind(this));
+            this.p2pmlLoader = new p2pml.core.HybridLoader();
+            this.p2pmlLoader.on(p2pml.core.LoaderEvents.PieceBytesDownloaded, this.onBytesDownloaded.bind(this));
+            this.p2pmlLoader.on(p2pml.core.LoaderEvents.PieceBytesUploaded, this.onBytesUploaded.bind(this));
             var trackerAnnounce = this.p2pmlLoader.getSettings().trackerAnnounce;
             if (Array.isArray(trackerAnnounce)) {
                 document.getElementById('announce').innerHTML = trackerAnnounce.join("<br />");
@@ -687,8 +687,8 @@
                 }
             }
 
-            this.p2pmlLoader.on(p2pml.LoaderEvents.PeerConnect, this.onPeerConnect.bind(this));
-            this.p2pmlLoader.on(p2pml.LoaderEvents.PeerClose, this.onPeerClose.bind(this));
+            this.p2pmlLoader.on(p2pml.core.LoaderEvents.PeerConnect, this.onPeerConnect.bind(this));
+            this.p2pmlLoader.on(p2pml.core.LoaderEvents.PeerClose, this.onPeerClose.bind(this));
         };
 
         DemoApp.prototype.onPeerConnect = function (peer) {

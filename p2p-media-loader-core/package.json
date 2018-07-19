@@ -30,6 +30,7 @@
     "@types/mocha": "^2.2.48",
     "@types/node": "^6.0.101",
     "browserify": "^14.4.0",
+    "browserify-versionify": "^1.0.6",
     "copyfiles": "^1.2.0",
     "mocha": "^3.4.2",
     "rimraf": "^2.6.1",
@@ -38,5 +39,10 @@
     "tslint": "^5.5.0",
     "typescript": "^2.7.2",
     "uglify-js": "^3.3.12"
+  },
+  "browserify": {
+    "transform": [
+      "browserify-versionify"
+    ]
   }
 }

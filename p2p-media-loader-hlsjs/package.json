@@ -39,5 +39,10 @@
     "tslint": "^5.5.0",
     "typescript": "^2.7.2",
     "uglify-js": "^3.3.12"
+  },
+  "browserify": {
+    "transform": [
+      "browserify-versionify"
+    ]
   }
 }

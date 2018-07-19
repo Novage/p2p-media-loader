@@ -81,3 +81,4 @@ export function initJwPlayer(player: any, hlsjsConfig: any): void {
 }
 
 export {default as SegmentManager} from "./segment-manager";
+export const version = "__VERSION__";
