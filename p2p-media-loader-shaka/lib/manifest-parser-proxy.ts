@@ -8,14 +8,14 @@ export class ShakaManifestParserProxy {
     readonly originalManifestParser: any;
     private manifest: any;
 
-    public constructor (originalManifestParser: any) {
+    public constructor(originalManifestParser: any) {
         this.originalManifestParser = originalManifestParser;
     }
 
-    public isHls () { return this.originalManifestParser instanceof shaka.hls.HlsParser; }
-    public isDash () { return this.originalManifestParser instanceof shaka.dash.DashParser; }
+    public isHls() { return this.originalManifestParser instanceof shaka.hls.HlsParser; }
+    public isDash() { return this.originalManifestParser instanceof shaka.dash.DashParser; }
 
-    public start (uri: string, playerInterface: any) {
+    public start(uri: string, playerInterface: any) {
         return this.originalManifestParser.start(uri, playerInterface).then((manifest: any) => {
             this.manifest = manifest;
 
@@ -40,31 +40,31 @@ export class ShakaManifestParserProxy {
         });
     }
 
-    public configure (config: any) {
+    public configure(config: any) {
         return this.originalManifestParser.configure(config);
     }
 
-    public stop () {
+    public stop() {
         return this.originalManifestParser.stop();
     }
 
-    public update () {
+    public update() {
         return this.originalManifestParser.update();
     }
 
-    public onExpirationUpdated () {
+    public onExpirationUpdated() {
         return this.originalManifestParser.onExpirationUpdated();
     }
 
-    public find (uri: string, range?: string): ParserSegment | undefined {
+    public find(uri: string, range?: string): ParserSegment | undefined {
         return this.cache.find(uri, range);
     }
 
-    public reset () {
+    public reset() {
         this.cache.clear();
     }
 
-    private hookGetSegmentReference (stream: any): void {
+    private hookGetSegmentReference(stream: any): void {
         stream.getSegmentReferenceOriginal = stream.getSegmentReference;
 
         stream.getSegmentReference = (number: any) => {
@@ -90,13 +90,13 @@ export class ShakaManifestParserProxy {
 } // end of ShakaManifestParserProxy
 
 export class ShakaDashManifestParserProxy extends ShakaManifestParserProxy {
-    public constructor () {
+    public constructor() {
         super(new shaka.dash.DashParser());
     }
 }
 
 export class ShakaHlsManifestParserProxy extends ShakaManifestParserProxy {
-    public constructor () {
+    public constructor() {
         super(new shaka.hls.HlsParser());
     }
 }

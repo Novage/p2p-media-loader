@@ -6,15 +6,10 @@ const defaultSettings = {
     // The duration in seconds; used by manager to build up predicted forward segments sequence; used to predownload and share via P2P
     forwardSequenceDuration: 30,
     // Maximum amount of segments manager should hold from the load() calls; used to build up sequence with correct priorities for P2P sharing
-    maxHistorySegments: 50,
-    // Shaka player measures time spent on loading data when its request gets resolved;
-    // Shaka player does assumtions about network speed and might decide to change playback quality (if its set to 'auto');
-    // If simulateTimeDelation is true, we're trying to simulate this behaivior (meaning if some data was preloaded by us
-    // and player asked for it, we do not resolve request immediatelly, we delay resolving for amount of time spent on loading that data);
-    simulateTimeDelation: true
+    maxHistorySegments: 50
 };
 
-export default class {
+export class SegmentManager {
 
     private readonly debug = Debug("p2pml:shaka:sm");
     private readonly loader: LoaderInterface;
@@ -33,19 +28,22 @@ export default class {
         this.loader.on(LoaderEvents.SegmentAbort, this.onSegmentAbort);
     }
 
-    public isSupported (): boolean {
-        return this.loader.isSupported();
-    }
-
-    public setPlayheadTime (time: number) {
-        this.playheadTime = time;
-
-        if (this.segmentHistory.length > 0) {
-            this.refreshLoad();
+    public destroy() {
+        if (this.requests.size !== 0) {
+            console.error("Destroying segment manager with active request(s)!");
+            this.requests.clear();
         }
+
+        this.playheadTime = 0;
+        this.segmentHistory.splice(0);
+        this.loader.destroy();
     }
 
-    public async load (parserSegment: ParserSegment, manifestUri: string, playheadTime: number): Promise<any> {
+    public getSettings() {
+        return this.settings;
+    }
+
+    public async load(parserSegment: ParserSegment, manifestUri: string, playheadTime: number): Promise<any> {
         this.manifestUri = manifestUri;
         this.playheadTime = playheadTime;
 
@@ -65,7 +63,15 @@ export default class {
         });
     }
 
-    private refreshLoad (): LoaderSegment {
+    public setPlayheadTime(time: number) {
+        this.playheadTime = time;
+
+        if (this.segmentHistory.length > 0) {
+            this.refreshLoad();
+        }
+    }
+
+    private refreshLoad(): LoaderSegment {
         const lastRequestedSegment = this.segmentHistory[ this.segmentHistory.length - 1 ];
         const safePlayheadTime = this.playheadTime > 0.1 ? this.playheadTime : lastRequestedSegment.start;
         const sequence: ParserSegment[] = this.segmentHistory.reduce((a: ParserSegment[], i) => {
@@ -107,18 +113,7 @@ export default class {
         return loaderSegments[ lastRequestedSegmentIndex ];
     }
 
-    public destroy () {
-        if (this.requests.size !== 0) {
-            console.error("Destroying segment manager with active request(s)!");
-            this.requests.clear();
-        }
-
-        this.playheadTime = 0;
-        this.segmentHistory.splice(0);
-        this.loader.destroy();
-    }
-
-    private pushSegmentHistory (segment: ParserSegment) {
+    private pushSegmentHistory(segment: ParserSegment) {
         if (this.segmentHistory.length >= this.settings.maxHistorySegments) {
             this.debug("segment history auto shrink");
             this.segmentHistory.splice(0, this.settings.maxHistorySegments * 0.2);
@@ -132,10 +127,10 @@ export default class {
         this.segmentHistory.push(segment);
     }
 
-    private reportSuccess (request: Request, loaderSegment: LoaderSegment) {
+    private reportSuccess(request: Request, loaderSegment: LoaderSegment) {
         if (request.resolve) {
             let timeDelation = 0;
-            if (this.settings.simulateTimeDelation && loaderSegment.downloadSpeed > 0 && loaderSegment.data && loaderSegment.data.byteLength > 0) {
+            if (loaderSegment.downloadSpeed > 0 && loaderSegment.data && loaderSegment.data.byteLength > 0) {
                 const downloadTime = Math.trunc(loaderSegment.data.byteLength / loaderSegment.downloadSpeed);
                 timeDelation = Date.now() - request.timeCreated + downloadTime;
             }
@@ -146,7 +141,7 @@ export default class {
         }
     }
 
-    private reportError (request: Request, error: any) {
+    private reportError(request: Request, error: any) {
         if (request.reject) {
             this.debug("report error", request.id);
             request.reject(error);
@@ -181,7 +176,7 @@ export default class {
 
 class Request {
     readonly timeCreated: number = Date.now();
-    public constructor (
+    public constructor(
         readonly id: string,
         readonly resolve: any,
         readonly reject: any

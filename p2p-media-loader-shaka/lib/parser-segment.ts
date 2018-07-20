@@ -2,7 +2,7 @@ import {getSchemedUri} from "./utils";
 
 export class ParserSegment {
 
-    public static create (stream: any, position: number): ParserSegment | undefined {
+    public static create(stream: any, position: number): ParserSegment | undefined {
         const ref = stream.getSegmentReferenceOriginal(position);
         if (!ref) {
             return undefined;
@@ -50,7 +50,7 @@ export class ParserSegment {
         );
     }
 
-    private constructor (
+    private constructor(
         readonly streamId: number,
         readonly streamType: string,
         readonly streamPosition: number,
@@ -72,15 +72,15 @@ export class ParserSegmentCache {
     readonly segments: ParserSegment[] = [];
     readonly maxSegments: number;
 
-    public constructor (maxSegments: number) {
+    public constructor(maxSegments: number) {
         this.maxSegments = maxSegments;
     }
 
-    public find (uri: string, range?: string) {
+    public find(uri: string, range?: string) {
         return this.segments.find(i => i.uri === uri && i.range === range);
     }
 
-    public add (stream: any, position: number) {
+    public add(stream: any, position: number) {
         const segment = ParserSegment.create(stream, position);
         if (segment && !this.find(segment.uri, segment.range)) {
             this.segments.push(segment);
@@ -90,7 +90,7 @@ export class ParserSegmentCache {
         }
     }
 
-    public clear () {
+    public clear() {
         this.segments.splice(0);
     }
 
