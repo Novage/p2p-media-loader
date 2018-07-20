@@ -19,9 +19,9 @@ export class SegmentManager {
         this.settings = Object.assign(defaultSettings, settings);
 
         this.loader = loader;
-        this.loader.on(LoaderEvents.SegmentLoaded, this.onSegmentLoaded.bind(this));
-        this.loader.on(LoaderEvents.SegmentError, this.onSegmentError.bind(this));
-        this.loader.on(LoaderEvents.SegmentAbort, this.onSegmentAbort.bind(this));
+        this.loader.on(LoaderEvents.SegmentLoaded, this.onSegmentLoaded);
+        this.loader.on(LoaderEvents.SegmentError, this.onSegmentError);
+        this.loader.on(LoaderEvents.SegmentAbort, this.onSegmentAbort);
     }
 
     public getSettings() {
@@ -129,21 +129,21 @@ export class SegmentManager {
         }
     }
 
-    private onSegmentLoaded(segment: Segment): void {
+    private onSegmentLoaded = (segment: Segment) => {
         if (this.segmentRequest && this.segmentRequest.segmentUrl === segment.url) {
             this.segmentRequest.onSuccess(segment.data!.slice(0), segment.downloadSpeed);
             this.segmentRequest = null;
         }
     }
 
-    private onSegmentError(segment: Segment, error: any): void {
+    private onSegmentError = (segment: Segment, error: any) => {
         if (this.segmentRequest && this.segmentRequest.segmentUrl === segment.url) {
             this.segmentRequest.onError(error);
             this.segmentRequest = null;
         }
     }
 
-    private onSegmentAbort(segment: Segment): void {
+    private onSegmentAbort = (segment: Segment) => {
         if (this.segmentRequest && this.segmentRequest.segmentUrl === segment.url) {
             this.segmentRequest.onError("Loading aborted: internal abort");
             this.segmentRequest = null;
