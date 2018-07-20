@@ -9,7 +9,25 @@ import {SpeedApproximator} from "./speed-approximator";
 
 const getBrowserRtc = require("get-browser-rtc");
 
+const defaultSettings: Settings = {
+    cachedSegmentExpiration: 5 * 60 * 1000,
+    cachedSegmentsCount: 30,
+
+    useP2P: true,
+    requiredSegmentsPriority: 1,
+    simultaneousP2PDownloads: 3,
+    httpDownloadProbability: 0.06,
+    httpDownloadProbabilityInterval: 500,
+    bufferedSegmentsCount: 20,
+
+    webRtcMaxMessageSize: 64 * 1024 - 1,
+    p2pSegmentDownloadTimeout: 60000,
+    trackerAnnounce: ["wss://tracker.btorrent.xyz/", "wss://tracker.openwebtorrent.com/"],
+    rtcConfig: require("simple-peer").config
+};
+
 export default class HybridLoader extends EventEmitter implements LoaderInterface {
+
     private httpManager: HttpMediaManager;
     private p2pManager: P2PMediaManager;
     private segments: Map<string, SegmentInternal> = new Map();
@@ -17,23 +35,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private debug = Debug("p2pml:hybrid-loader");
     private httpDownloadProbabilityTimestamp = -999999;
     private speedApproximator = new SpeedApproximator();
-
-    private settings = {
-        cachedSegmentExpiration: 5 * 60 * 1000, // milliseconds
-        cachedSegmentsCount: 30,
-
-        useP2P: true,
-        requiredSegmentsPriority: 1,
-        simultaneousP2PDownloads: 3,
-        httpDownloadProbability: 0.06,
-        httpDownloadProbabilityInterval: 500,
-        bufferedSegmentsCount: 20,
-
-        webRtcMaxMessageSize: 64 * 1024 - 1,
-        p2pSegmentDownloadTimeout: 60000,
-        trackerAnnounce: ["wss://tracker.btorrent.xyz/", "wss://tracker.openwebtorrent.com/"],
-        rtcConfig: require("simple-peer").config
-    };
+    private readonly settings: Settings;
 
     public static isSupported(): boolean {
         const browserRtc = getBrowserRtc();
@@ -43,7 +45,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     public constructor(settings: any = {}) {
         super();
 
-        this.settings = Object.assign(this.settings, settings);
+        this.settings = Object.assign(defaultSettings, settings);
         this.debug("loader settings", this.settings);
 
         this.httpManager = this.createHttpManager();
@@ -318,4 +320,67 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private now() {
         return performance.now();
     }
+
+} // end of HybridLoader
+
+interface Settings {
+    /**
+     * Segment lifetime in cache. The segment is deleted from the cache if the last access time is greater than this value (in milliseconds).
+     */
+    cachedSegmentExpiration: number;
+
+    /**
+     * Max number of segments that can be stored in the cache.
+     */
+    cachedSegmentsCount: number;
+
+    /**
+     * Enable/Disable peers interaction.
+     */
+    useP2P: boolean;
+
+    /**
+     * The maximum priority of the segments to be downloaded (if not available) as quickly as possible (i.e. via HTTP method).
+     */
+    requiredSegmentsPriority: number;
+
+    /**
+     * Max number of simultaneous downloads from peers.
+     */
+    simultaneousP2PDownloads: number;
+
+    /**
+     * Probability of downloading remaining not downloaded segment in the segments queue via HTTP.
+     */
+    httpDownloadProbability: number;
+
+    /**
+     * Interval of the httpDownloadProbability check (in milliseconds).
+     */
+    httpDownloadProbabilityInterval: number;
+
+    /**
+     * Max number of the segments to be downloaded via HTTP or P2P methods.
+     */
+    bufferedSegmentsCount: number;
+
+    /**
+     * Max WebRTC message size. 64KiB - 1B should work with most of recent browsers. Set it to 16KiB for older browsers support.
+     */
+    webRtcMaxMessageSize: number;
+
+    /**
+     * Timeout to download a segment from a peer. If exceeded the peer is dropped.
+     */
+    p2pSegmentDownloadTimeout: number;
+
+    /**
+     * Torrent trackers (announcers) to use.
+     */
+    trackerAnnounce: string[];
+
+    /**
+     * An RTCConfiguration dictionary providing options to configure WebRTC connections.
+     */
+    rtcConfig: any;
 }

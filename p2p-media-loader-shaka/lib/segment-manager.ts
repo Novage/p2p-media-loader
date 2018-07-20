@@ -2,10 +2,8 @@ import * as Debug from "debug";
 import {LoaderEvents, Segment as LoaderSegment, LoaderInterface} from "p2p-media-loader-core";
 import {ParserSegment} from "./parser-segment";
 
-const defaultSettings = {
-    // Number of segments for building up predicted forward segments sequence; used to predownload and share via P2P
+const defaultSettings: Settings = {
     forwardSegmentCount: 20,
-    // Maximum amount of segments manager should hold from the load() calls; used to build up sequence with correct priorities for P2P sharing
     maxHistorySegments: 50
 };
 
@@ -17,7 +15,7 @@ export class SegmentManager {
     private manifestUri: string = "";
     private playheadTime: number = 0;
     private readonly segmentHistory: ParserSegment[] = [];
-    private readonly settings: any = undefined;
+    private readonly settings: Settings;
 
     public constructor(loader: LoaderInterface, settings: any = {}) {
         this.settings = Object.assign(defaultSettings, settings);
@@ -170,7 +168,7 @@ export class SegmentManager {
         }
     }
 
-} // end of default class
+} // end of SegmentManager
 
 class Request {
     readonly timeCreated: number = Date.now();
@@ -179,4 +177,16 @@ class Request {
         readonly resolve: any,
         readonly reject: any
     ) {}
+}
+
+interface Settings {
+    /**
+     * Number of segments for building up predicted forward segments sequence; used to predownload and share via P2P
+     */
+    forwardSegmentCount: number;
+
+    /**
+     * Maximum amount of requested segments manager should remember; used to build up sequence with correct priorities for P2P sharing
+     */
+    maxHistorySegments: number;
 }

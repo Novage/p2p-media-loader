@@ -2,18 +2,18 @@ import {LoaderEvents, Segment, LoaderInterface} from "p2p-media-loader-core";
 import Utils from "./utils";
 import {Parser} from "m3u8-parser";
 
-const defaultSettings = {
-    // Number of segments for building up predicted forward segments sequence; used to predownload and share via P2P
+const defaultSettings: Settings = {
     forwardSegmentCount: 20
 };
 
 export class SegmentManager {
+
     private loader: LoaderInterface;
     private masterPlaylist: Playlist | null = null;
     private variantPlaylists: Map<string, Playlist> = new Map();
     private segmentRequest: SegmentRequest | null = null;
     private playQueue: {segmentSequence: number, segmentUrl: string}[] = [];
-    private readonly settings: any;
+    private readonly settings: Settings;
 
     public constructor(loader: LoaderInterface, settings: any = {}) {
         this.settings = Object.assign(defaultSettings, settings);
@@ -220,7 +220,8 @@ export class SegmentManager {
 
         return playlistUrl;
     }
-}
+
+} // end of SegmentManager
 
 class Playlist {
     public baseUrl: string;
@@ -262,4 +263,11 @@ class SegmentRequest {
         readonly onSuccess: (content: ArrayBuffer, downloadSpeed: number) => void,
         readonly onError: (error: any) => void
     ) {}
+}
+
+interface Settings {
+    /**
+     * Number of segments for building up predicted forward segments sequence; used to predownload and share via P2P
+     */
+    forwardSegmentCount: number;
 }
