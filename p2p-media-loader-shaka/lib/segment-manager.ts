@@ -3,8 +3,8 @@ import {LoaderEvents, Segment as LoaderSegment, LoaderInterface} from "p2p-media
 import {ParserSegment} from "./parser-segment";
 
 const defaultSettings = {
-    // The duration in seconds; used by manager to build up predicted forward segments sequence; used to predownload and share via P2P
-    forwardSequenceDuration: 30,
+    // Number of segments for building up predicted forward segments sequence; used to predownload and share via P2P
+    forwardSegmentCount: 20,
     // Maximum amount of segments manager should hold from the load() calls; used to build up sequence with correct priorities for P2P sharing
     maxHistorySegments: 50
 };
@@ -86,17 +86,15 @@ export class SegmentManager {
         }
 
         const lastRequestedSegmentIndex = sequence.length - 1;
-        let duration = sequence.reduce((a, i) => a + i.end - i.start, 0);
 
         do {
             const next = sequence[ sequence.length - 1 ].next();
             if (next) {
                 sequence.push(next);
-                duration += next.end - next.start;
             } else {
                 break;
             }
-        } while (duration < this.settings.forwardSequenceDuration);
+        } while (sequence.length < this.settings.forwardSegmentCount);
 
         const manifestUriNoQuery = this.manifestUri.split("?")[ 0 ];
 
