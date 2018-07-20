@@ -1,7 +1,7 @@
 import {EventEmitter} from "events";
 import {LoaderEvents, LoaderInterface, HybridLoader} from "p2p-media-loader-core";
 import {SegmentManager} from "./segment-manager";
-import {ParserSegment} from "./parser-segment";
+import * as integration from "./integration";
 
 export class Engine extends EventEmitter {
 
@@ -35,12 +35,8 @@ export class Engine extends EventEmitter {
         };
     }
 
-    public async load(parserSegment: ParserSegment, manifestUri: string, playheadTime: number): Promise<any> {
-        return this.segmentManager.load(parserSegment, manifestUri, playheadTime);
-    }
-
-    public setPlayheadTime(time: number) {
-        this.segmentManager.setPlayheadTime(time);
+    public initShakaPlayer(player: any) {
+        integration.initShakaPlayer(player, this.segmentManager);
     }
 
 }

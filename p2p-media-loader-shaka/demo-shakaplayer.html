@@ -27,7 +27,7 @@
             var onError = function(error) { console.error("Error code", error.code, "object", error); }
             player.addEventListener("error", function(event) { onError(event.detail); });
 
-            p2pml.shaka.initShakaPlayer(player, engine);
+            engine.initShakaPlayer(player);
 
             player.load(
                 //"https://irtdashreference-i.akamaihd.net/dash/live/901161/bfs/manifestARD.mpd"
