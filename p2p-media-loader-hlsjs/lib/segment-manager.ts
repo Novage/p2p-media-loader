@@ -1,4 +1,4 @@
-import {LoaderEvents, Segment, LoaderInterface} from "p2p-media-loader-core";
+import {Events, Segment, LoaderInterface} from "p2p-media-loader-core";
 import Utils from "./utils";
 import {Parser} from "m3u8-parser";
 
@@ -19,9 +19,9 @@ export class SegmentManager {
         this.settings = Object.assign(defaultSettings, settings);
 
         this.loader = loader;
-        this.loader.on(LoaderEvents.SegmentLoaded, this.onSegmentLoaded);
-        this.loader.on(LoaderEvents.SegmentError, this.onSegmentError);
-        this.loader.on(LoaderEvents.SegmentAbort, this.onSegmentAbort);
+        this.loader.on(Events.SegmentLoaded, this.onSegmentLoaded);
+        this.loader.on(Events.SegmentError, this.onSegmentError);
+        this.loader.on(Events.SegmentAbort, this.onSegmentAbort);
     }
 
     public getSettings() {

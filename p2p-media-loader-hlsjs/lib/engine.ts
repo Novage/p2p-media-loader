@@ -1,5 +1,5 @@
 import {EventEmitter} from "events";
-import {LoaderEvents, LoaderInterface, HybridLoader} from "p2p-media-loader-core";
+import {Events, LoaderInterface, HybridLoader} from "p2p-media-loader-core";
 import {SegmentManager} from "./segment-manager";
 import {HlsJsLoader} from "./hlsjs-loader";
 import {createHlsJsLoaderClass} from "./hlsjs-loader-class";
@@ -19,8 +19,8 @@ export class Engine extends EventEmitter {
         this.loader = new HybridLoader(settings.loader);
         this.segmentManager = new SegmentManager(this.loader, settings.segments);
 
-        Object.keys(LoaderEvents)
-            .map(eventKey => LoaderEvents[eventKey as any])
+        Object.keys(Events)
+            .map(eventKey => Events[eventKey as any])
             .forEach(event => this.loader.on(event, (...args: any[]) => this.emit(event, ...args)));
     }
 

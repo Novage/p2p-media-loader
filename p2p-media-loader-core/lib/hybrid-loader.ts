@@ -1,4 +1,4 @@
-import {LoaderInterface, LoaderEvents, Segment} from "./loader-interface";
+import {LoaderInterface, Events, Segment} from "./loader-interface";
 import {EventEmitter} from "events";
 import {HttpMediaManager} from "./http-media-manager";
 import {P2PMediaManager} from "./p2p-media-manager";
@@ -87,7 +87,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
                 } else {
                     this.p2pManager.abort(segment);
                 }
-                this.emit(LoaderEvents.SegmentAbort, segment);
+                this.emit(Events.SegmentAbort, segment);
             }
         }
 
@@ -221,12 +221,12 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
     private onPieceBytesDownloaded = (method: "http" | "p2p", bytes: number) => {
         this.speedApproximator.addBytes(bytes, this.now());
-        this.emit(LoaderEvents.PieceBytesDownloaded, method, bytes);
+        this.emit(Events.PieceBytesDownloaded, method, bytes);
     }
 
-    private onPieceBytesUploaded = (method: "http" | "p2p", size: number) => {
-        this.speedApproximator.addBytes(size, this.now());
-        this.emit(LoaderEvents.PieceBytesUploaded, method, size);
+    private onPieceBytesUploaded = (method: "p2p", bytes: number) => {
+        this.speedApproximator.addBytes(bytes, this.now());
+        this.emit(Events.PieceBytesUploaded, method, bytes);
     }
 
     private onSegmentLoaded = (segment: Segment, data: ArrayBuffer) => {
@@ -248,7 +248,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private onSegmentError = (segment: Segment, event: any) => {
-        this.emit(LoaderEvents.SegmentError, segment, event);
+        this.emit(Events.SegmentError, segment, event);
         this.processSegmentsQueue();
     }
 
@@ -264,7 +264,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             segmentInternal.downloadSpeed
         );
 
-        this.emit(LoaderEvents.SegmentLoaded, segment);
+        this.emit(Events.SegmentLoaded, segment);
     }
 
     private createSegmentsMap(): string[][] {
@@ -276,11 +276,11 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
     private onPeerConnect = (peer: {id: string}) => {
         this.p2pManager.sendSegmentsMap(peer.id, this.createSegmentsMap());
-        this.emit(LoaderEvents.PeerConnect, peer);
+        this.emit(Events.PeerConnect, peer);
     }
 
     private onPeerClose = (peerId: string) => {
-        this.emit(LoaderEvents.PeerClose, peerId);
+        this.emit(Events.PeerClose, peerId);
     }
 
     private collectGarbage(): boolean {

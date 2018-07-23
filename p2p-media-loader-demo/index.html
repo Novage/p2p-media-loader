@@ -278,8 +278,8 @@
                     return;
             }
 
-            this.engine.on(p2pml.core.LoaderEvents.PieceBytesDownloaded, this.onBytesDownloaded.bind(this));
-            this.engine.on(p2pml.core.LoaderEvents.PieceBytesUploaded, this.onBytesUploaded.bind(this));
+            this.engine.on(p2pml.core.Events.PieceBytesDownloaded, this.onBytesDownloaded.bind(this));
+            this.engine.on(p2pml.core.Events.PieceBytesUploaded, this.onBytesUploaded.bind(this));
 
             var trackerAnnounce = this.engine.getSettings().loader.trackerAnnounce;
             if (Array.isArray(trackerAnnounce)) {
@@ -692,8 +692,8 @@
                 }
             }
 
-            this.engine.on(p2pml.core.LoaderEvents.PeerConnect, this.onPeerConnect.bind(this));
-            this.engine.on(p2pml.core.LoaderEvents.PeerClose, this.onPeerClose.bind(this));
+            this.engine.on(p2pml.core.Events.PeerConnect, this.onPeerConnect.bind(this));
+            this.engine.on(p2pml.core.Events.PeerClose, this.onPeerClose.bind(this));
         };
 
         DemoApp.prototype.onPeerConnect = function (peer) {
