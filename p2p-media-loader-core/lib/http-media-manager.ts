@@ -1,8 +1,10 @@
-import {LoaderEvents, Segment} from "./loader-interface";
-import {EventEmitter} from "events";
 import * as Debug from "debug";
+import STEEmitter from "./stringly-typed-event-emitter";
+import {Segment} from "./loader-interface";
 
-export default class HttpMediaManager extends EventEmitter {
+export class HttpMediaManager extends STEEmitter<
+    "segment-loaded" | "segment-error" | "bytes-downloaded"
+> {
 
     private xhrRequests: Map<string, XMLHttpRequest> = new Map();
     private debug = Debug("p2pml:http-media-manager");
@@ -27,7 +29,7 @@ export default class HttpMediaManager extends EventEmitter {
         let prevBytesLoaded = 0;
         request.onprogress = (event: any) => {
             const bytesLoaded = event.loaded - prevBytesLoaded;
-            this.emit(LoaderEvents.PieceBytesDownloaded, "http", bytesLoaded);
+            this.emit("bytes-downloaded", bytesLoaded);
             prevBytesLoaded = event.loaded;
         };
 
@@ -35,16 +37,16 @@ export default class HttpMediaManager extends EventEmitter {
             this.xhrRequests.delete(segment.id);
 
             if (event.target.status >= 200 && 300 > event.target.status) {
-                this.emit(LoaderEvents.SegmentLoaded, segment, event.target.response);
+                this.emit("segment-loaded", segment, event.target.response);
             } else {
-                this.emit(LoaderEvents.SegmentError, segment, event);
+                this.emit("segment-error", segment, event);
             }
         };
 
         request.onerror = (event: any) => {
             // TODO: retry with timeout?
             this.xhrRequests.delete(segment.id);
-            this.emit(LoaderEvents.SegmentError, segment, event);
+            this.emit("segment-error", segment, event);
         };
 
         this.xhrRequests.set(segment.id, request);
@@ -73,4 +75,4 @@ export default class HttpMediaManager extends EventEmitter {
         this.xhrRequests.clear();
     }
 
-}
+} // end of HttpMediaManager

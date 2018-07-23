@@ -1,7 +1,6 @@
-import {EventEmitter} from "events";
-import {LoaderEvents} from "./loader-interface";
 import * as Debug from "debug";
 import {Buffer} from "buffer";
+import STEEmitter from "./stringly-typed-event-emitter";
 
 enum MediaPeerCommands {
     SegmentData = "segment_data",
@@ -9,17 +8,6 @@ enum MediaPeerCommands {
     SegmentsMap = "segments_map",
     SegmentRequest = "segment_request",
     CancelSegmentRequest = "cancel_segment_request",
-}
-
-export enum MediaPeerEvents {
-    Connect = "peer_connect",
-    Close = "peer_close",
-    SegmentsMap = "peer_segments_map",
-    SegmentRequest = "peer_segment_request",
-    SegmentLoaded = "peer_segment_loaded",
-    SegmentAbsent = "peer_segment_absent",
-    SegmentError = "peer_segment_error",
-    SegmentTimeout = "peer_segment_timeout"
 }
 
 export enum MediaPeerSegmentStatus {
@@ -33,7 +21,11 @@ class DownloadingSegment {
     constructor(readonly id: string, readonly size: number) {}
 }
 
-export class MediaPeer extends EventEmitter {
+export class MediaPeer extends STEEmitter<
+    "connect" | "close" | "data-updated" |
+    "segment-request" | "segment-absent" | "segment-loaded" | "segment-error" | "segment-timeout" |
+    "bytes-downloaded" | "bytes-uploaded"
+> {
     public id: string;
     public remoteAddress: string = "";
     private downloadingSegmentId: string | null = null;
@@ -77,13 +69,13 @@ export class MediaPeer extends EventEmitter {
     private onPeerConnect(): void {
         this.debug("peer connect", this.id, this);
         this.remoteAddress = this.peer.remoteAddress;
-        this.emit(MediaPeerEvents.Connect, this);
+        this.emit("connect", this);
     }
 
     private onPeerClose(): void {
         this.debug("peer close", this.id, this);
         this.terminateSegmentRequest();
-        this.emit(MediaPeerEvents.Close, this);
+        this.emit("close", this);
     }
 
     private receiveSegmentPiece(data: ArrayBuffer): void {
@@ -95,7 +87,7 @@ export class MediaPeer extends EventEmitter {
 
         this.downloadingSegment.bytesDownloaded += data.byteLength;
         this.downloadingSegment.pieces.push(data);
-        this.emit(LoaderEvents.PieceBytesDownloaded, "p2p", data.byteLength);
+        this.emit("bytes-downloaded", data.byteLength);
 
         const segmentId = this.downloadingSegment.id;
 
@@ -109,11 +101,11 @@ export class MediaPeer extends EventEmitter {
 
             this.debug("peer segment download done", this.id, segmentId, this);
             this.terminateSegmentRequest();
-            this.emit(MediaPeerEvents.SegmentLoaded, this, segmentId, segmentData.buffer);
+            this.emit("segment-loaded", this, segmentId, segmentData.buffer);
         } else if (this.downloadingSegment.bytesDownloaded > this.downloadingSegment.size) {
             this.debug("peer segment download bytes mismatch", this.id, segmentId, this);
             this.terminateSegmentRequest();
-            this.emit(MediaPeerEvents.SegmentError, this, segmentId, "Too many bytes received for segment");
+            this.emit("segment-error", this, segmentId, "Too many bytes received for segment");
         }
     }
 
@@ -144,7 +136,7 @@ export class MediaPeer extends EventEmitter {
 
             const segmentId = this.downloadingSegment.id;
             this.terminateSegmentRequest();
-            this.emit(MediaPeerEvents.SegmentError, this, segmentId, "Segment download is interrupted by a command");
+            this.emit("segment-error", this, segmentId, "Segment download is interrupted by a command");
             return;
         }
 
@@ -153,11 +145,11 @@ export class MediaPeer extends EventEmitter {
         switch (command.command) {
             case MediaPeerCommands.SegmentsMap:
                 this.segmentsMap = new Map(command.segments);
-                this.emit(MediaPeerEvents.SegmentsMap);
+                this.emit("data-updated");
                 break;
 
             case MediaPeerCommands.SegmentRequest:
-                this.emit(MediaPeerEvents.SegmentRequest, this, command.segment_id);
+                this.emit("segment-request", this, command.segment_id);
                 break;
 
             case MediaPeerCommands.SegmentData:
@@ -171,7 +163,7 @@ export class MediaPeer extends EventEmitter {
                 if (this.downloadingSegmentId === command.segment_id) {
                     this.terminateSegmentRequest();
                     this.segmentsMap.delete(command.segment_id);
-                    this.emit(MediaPeerEvents.SegmentAbsent, this, command.segment_id);
+                    this.emit("segment-absent", this, command.segment_id);
                 }
                 break;
 
@@ -225,7 +217,7 @@ export class MediaPeer extends EventEmitter {
             bytesLeft -= bytesToSend;
         }
 
-        this.emit(LoaderEvents.PieceBytesUploaded, "p2p", data.byteLength);
+        this.emit("bytes-uploaded", data.byteLength);
     }
 
     public sendSegmentAbsent(segmentId: string): void {
@@ -258,7 +250,7 @@ export class MediaPeer extends EventEmitter {
             }
             const segmentId = this.downloadingSegmentId;
             this.cancelSegmentRequest();
-            this.emit(MediaPeerEvents.SegmentTimeout, this, segmentId); // TODO: send peer not responding event
+            this.emit("segment-timeout", this, segmentId); // TODO: send peer not responding event
         }, this.settings.p2pSegmentDownloadTimeout);
     }
 
