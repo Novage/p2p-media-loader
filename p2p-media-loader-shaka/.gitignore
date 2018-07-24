@@ -1,7 +1,3 @@
-.idea/
-node_modules/
-p2p-media-loader-core.js
-p2p-media-loader-shaka.js
-dist
-.directory
-p2p-media-loader-shaka.min.js
+/node_modules
+/dist
+/p2p-media-loader-*.js

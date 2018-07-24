@@ -1,10 +1,4 @@
-.idea/
-node_modules/
-p2p-graph.js
-p2p-media-loader-core.js
-p2p-media-loader-hlsjs.js
-p2p-media-loader-core.min.js
-p2p-media-loader-hlsjs.min.js
-p2p-media-loader-shaka.min.js
-.directory
-hola-jwplayer-hlsjs.min.js
+/node_modules
+/p2p-media-loader-*.js
+/p2p-graph.js
+/hola-jwplayer-hlsjs.min.js

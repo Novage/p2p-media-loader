@@ -1,8 +1,4 @@
-.idea/
-node_modules/
-p2p-media-loader-core.js
-p2p-media-loader-hlsjs.js
-dist
-.directory
-/p2p-media-loader-hlsjs.min.js
+/node_modules
+/dist
+/p2p-media-loader-*.js
 /hola-jwplayer-hlsjs.min.js
