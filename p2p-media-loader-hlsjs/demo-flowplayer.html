@@ -34,14 +34,10 @@
                 volume: 0.01,
                 clip: {
                     sources: [{
-                        src: "https://wowza.peer5.com/live/smil:bbb_abr.smil/playlist.m3u8",
+                        src: "https://storage.googleapis.com/shaka-live-assets/player-source.m3u8",
                         type: "application/x-mpegurl",
                         live: true
                     }]
-                    // sources: [{
-                    //     src: "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8",
-                    //     type: "application/x-mpegurl"
-                    // }]
                 },
                 hlsjs: {
                     liveSyncDurationCount: 7, // To have at least 7 segments in queue

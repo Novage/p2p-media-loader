@@ -34,8 +34,7 @@
 
             p2pml.hlsjs.initHlsJsPlayer(hls);
 
-            hls.loadSource("https://wowza.peer5.com/live/smil:bbb_abr.smil/playlist.m3u8");
-            //hls.loadSource("https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8");
+            hls.loadSource("https://storage.googleapis.com/shaka-live-assets/player-source.m3u8");
 
             var video = document.getElementById("video");
             hls.attachMedia(video);

@@ -29,8 +29,7 @@
 
             var player = new Clappr.Player({
                 parentId: "#video",
-                source: "https://wowza.peer5.com/live/smil:bbb_abr.smil/playlist.m3u8",
-                //source: "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8",
+                source: "https://storage.googleapis.com/shaka-live-assets/player-source.m3u8",
                 hlsjsConfig: {
                     liveSyncDurationCount: 7, // To have at least 7 segments in queue
                     loader: engine.createLoaderClass()
