@@ -159,7 +159,7 @@ Instance contains:
 
 ---
 
-# Usage Example
+## Usage Example
 
 ```javascript
 var loader = new p2pml.core.HybridLoader();
