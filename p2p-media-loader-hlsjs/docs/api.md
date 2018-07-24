@@ -1,6 +1,6 @@
 # P2P Media Loader hls.js API
 
-[hls.js](https://github.com/video-dev/hls.js) integration
+[hls.js](https://github.com/video-dev/hls.js) integration.
 
 The library uses `window.p2pml.hlsjs` as a root namespace for:
 - `Engine` - hls.js support engine
@@ -32,6 +32,10 @@ Creates a new `Engine` instance.
 - `loader`
     + settings for `HybridLoader` (see _P2P Media Loader Core API_ for details);
 
+### `engine.getSettings()`
+
+Returns engine instance settings.
+
 ### `engine.createLoaderClass()`
 
 Creates hls.js loader class bound to this engine.
@@ -41,10 +45,6 @@ Creates hls.js loader class bound to this engine.
 Notifies engine about current playing segment url.
 
 Needed for own integrations with other players. If you write one, you should update engine with current playing segment url from your player.
-
-### `engine.getSettings()`
-
-Returns engine instance settings.
 
 ### `engine.destroy()`
 
