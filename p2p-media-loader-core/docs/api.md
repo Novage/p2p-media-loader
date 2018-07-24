@@ -2,20 +2,17 @@
 
 Core P2P functionality.
 
-## `LoaderInterface`
-
-Set of routines each loader has.
-
-Currently, this interface is implemented by following loaders:
-- `HybridLoader`
-    + HTTP is used for high priority segments
-    + P2P is used for low priority segments
+The library uses `window.p2pml.core` as a root namespace for:
+- `HybridLoader` - HTTP and P2P loader
+- `Events` - Events emitted by `HybridLoader`
+- `Segment` - Media stream segment
+- `version` - API version
 
 ---
 
 ## `HybridLoader`
 
-Implementation of the `LoaderInterface` that uses HTTP and P2P loading mechanism.
+HTTP and P2P loader.
 
 ### `HybridLoader.isSupported()`
 
@@ -29,18 +26,18 @@ If `settings` is specified, then the default settings (shown below) will be over
 
 | Name | Type | Default Value | Description |
 | --- | ---- | ------ | ------ |
-| cachedSegmentExpiration | Integer | 300000 | Segment lifetime in cache. The segment is deleted from the cache if the last access time is greater than this value (in milliseconds)
-| cachedSegmentsCount | Integer | 30 | Max number of segments that can be stored in the cache
-| requiredSegmentsPriority | Integer | 1 | The maximum priority of the segments to be downloaded (if not available) as quickly as possible (i.e. via HTTP method)
-| useP2P | Boolean | true | Enable/Disable peers interaction
-| simultaneousP2PDownloads | Integer | 3 | Max number of simultaneous downloads from peers
-| httpDownloadProbability | Float | 0.06 | Probability of downloading remaining not downloaded segment in the segments queue via HTTP
-| httpDownloadProbabilityInterval | Integer | 500 | Interval of the httpDownloadProbability check (in milliseconds)
-| bufferedSegmentsCount | Integer | 20 | Max number of the segments to be downloaded via HTTP or P2P methods
-| trackerAnnounce | String[] | [ "wss://tracker.btorrent.xyz/", "wss://tracker.openwebtorrent.com/" ] | Torrent trackers (announcers) to use
-| webRtcMaxMessageSize | number | 64 * 1024 - 1 | Max WebRTC message size. 64KiB - 1B should work with most of recent browsers. Set it to 16KiB for older browsers support. 
-| p2pSegmentDownloadTimeout | number | 60000 | Timeout to download a segment from a peer. If exceeded the peer is dropped. 
-| rtcConfig | RTCConfiguration | Object | An RTCConfiguration dictionary providing options to configure WebRTC connections.
+| `cachedSegmentExpiration` | Integer | 300000 | Segment lifetime in cache. The segment is deleted from the cache if the last access time is greater than this value (in milliseconds)
+| `cachedSegmentsCount` | Integer | 30 | Max number of segments that can be stored in the cache
+| `requiredSegmentsPriority` | Integer | 1 | The maximum priority of the segments to be downloaded (if not available) as quickly as possible (i.e. via HTTP method)
+| `useP2P` | Boolean | true | Enable/Disable peers interaction
+| `simultaneousP2PDownloads` | Integer | 3 | Max number of simultaneous downloads from peers
+| `httpDownloadProbability` | Float | 0.06 | Probability of downloading remaining not downloaded segment in the segments queue via HTTP
+| `httpDownloadProbabilityInterval` | Integer | 500 | Interval of the httpDownloadProbability check (in milliseconds)
+| `bufferedSegmentsCount` | Integer | 20 | Max number of the segments to be downloaded via HTTP or P2P methods
+| `trackerAnnounce` | String[] | [ "wss://tracker.btorrent.xyz/", "wss://tracker.openwebtorrent.com/" ] | Torrent trackers (announcers) to use
+| `webRtcMaxMessageSize` | number | 64 * 1024 - 1 | Max WebRTC message size. 64KiB - 1B should work with most of recent browsers. Set it to 16KiB for older browsers support. 
+| `p2pSegmentDownloadTimeout` | number | 60000 | Timeout to download a segment from a peer. If exceeded the peer is dropped. 
+| `rtcConfig` | RTCConfiguration | Object | An RTCConfiguration dictionary providing options to configure WebRTC connections.
 
 ### `loader.load(segments, swarmId)`
 
@@ -106,16 +103,30 @@ Listener args:
 
 Returns loader instance settings.
 
-### `loader.destroy()`
-
-Destroys loader: abort all connections (http, tcp, peer), clears cached segments.
-
 ### `loader.getSegment(id)`
 
 Returns a segment from loader cache or undefined if the segment is not available.
 
 Function args:
 - `id` - Id of the segment;
+
+### `loader.destroy()`
+
+Destroys loader: abort all connections (http, tcp, peer), clears cached segments.
+
+---
+
+## `Events`
+
+Events that are emitted by `HybridLoader`.
+
+- SegmentLoaded
+- SegmentError
+- SegmentAbort
+- PeerConnect
+- PeerClose
+- PieceBytesDownloaded
+- PieceBytesUploaded
 
 ---
 
@@ -146,23 +157,24 @@ Instance contains:
     + a non-negative integer `Number`
     + download speed in bytes per millisecond or 0
 
-## `Events`
+---
 
-Events that are emitted by `HybridLoader`.
-
-- SegmentLoaded
-- SegmentError
-- SegmentAbort
-- PeerConnect
-- PeerClose
-- PieceBytesDownloaded
-- PieceBytesUploaded
-
-Usage:
+# Usage Example
 
 ```javascript
-var loader = new HybridLoader();
-loader.on(Events.SegmentError, function (segment, error) {
+var loader = new p2pml.core.HybridLoader();
+
+loader.on(p2pml.core.Events.SegmentLoaded, function (segment) {
+    console.log("Loading finished, bytes:", segment.data.byteLength);
+});
+
+loader.on(p2pml.core.Events.SegmentError, function (segment, error) {
     console.log("Loading failed", segment, error);
 });
+
+loader.load([
+    new p2pml.core.Segment("segment-1", "//url/to/segment/1", undefined, 0),
+    new p2pml.core.Segment("segment-2", "//url/to/segment/2", undefined, 1),
+    new p2pml.core.Segment("segment-3", "//url/to/segment/3", undefined, 2)
+], "swarm-1");
 ```
