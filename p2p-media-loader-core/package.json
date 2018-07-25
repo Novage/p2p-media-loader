@@ -5,11 +5,11 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "compile": "rimraf ./dist/ && tsc && copyfiles -f ./lib/*.js ./dist/",
-    "lint": "tslint -c ./tslint.json -p ./tsconfig.test.json",
+    "compile": "rimraf ./dist && tsc && copyfiles -f ./lib/*.js ./dist && rimraf ./build && mkdirp ./build",
+    "browserify": "browserify -r ./dist/index.js:p2p-media-loader-core ./dist/browser-init.js > ./build/p2p-media-loader-core.js",
+    "minify": "uglifyjs ./build/p2p-media-loader-core.js -m -c > ./build/p2p-media-loader-core.min.js",
     "build": "npm run compile && npm run browserify && npm run minify",
-    "browserify": "browserify -r ./dist/index.js:p2p-media-loader-core ./dist/browser-init.js > p2p-media-loader-core.js",
-    "minify": "uglifyjs p2p-media-loader-core.js -m -c > p2p-media-loader-core.min.js",
+    "lint": "tslint -c ./tslint.json -p ./tsconfig.test.json",
     "test": "mocha -r ts-node/register test/*.test.ts"
   },
   "license": "MIT",
@@ -32,6 +32,7 @@
     "browserify": "^14.4.0",
     "browserify-versionify": "^1.0.6",
     "copyfiles": "^1.2.0",
+    "mkdirp": "^0.5.1",
     "mocha": "^3.4.2",
     "rimraf": "^2.6.1",
     "ts-mockito": "^2.3.0",
