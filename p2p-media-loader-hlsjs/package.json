@@ -10,7 +10,7 @@
     "minify": "uglifyjs ./build/p2p-media-loader-hlsjs.js -m -c > ./build/p2p-media-loader-hlsjs.min.js",
     "refresh-dependencies": "copyfiles -f ./node_modules/p2p-media-loader-core/build/p2p-media-loader-core*.js ./build",
     "build-hola-jwplayer-hlsjs": "browserify -r @hola.org/jwplayer-hlsjs | uglifyjs -m -c > ./build/hola-jwplayer-hlsjs.min.js",
-    "build": "npm run refresh-dependencies && npm run compile && npm run browserify && npm run minify && npm run build-hola-jwplayer-hlsjs",
+    "build": "npm run compile && npm run browserify && npm run minify && npm run refresh-dependencies && npm run build-hola-jwplayer-hlsjs",
     "lint": "tslint -c ./tslint.json -p ./tsconfig.test.json",
     "test": "mocha -r ts-node/register test/*.test.ts"
   },
