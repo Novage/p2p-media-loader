@@ -2,6 +2,9 @@
   "name": "p2p-media-loader-demo",
   "description": "P2P Media Loader demo",
   "version": "0.0.1",
+  "license": "Apache-2.0",
+  "author": "Novage",
+  "homepage": "https://github.com/Novage/p2p-media-loader",
   "main": "index.js",
   "scripts": {
     "build-p2p-graph": "browserify -r p2p-graph | uglifyjs -m -c > p2p-graph.js",
@@ -9,10 +12,9 @@
     "refresh-dependencies": "copyfiles -f ./node_modules/p2p-media-loader-core/build/p2p-media-loader-core.min.js ./ && copyfiles -f ./node_modules/p2p-media-loader-hlsjs/build/p2p-media-loader-hlsjs.min.js ./ && copyfiles -f ./node_modules/p2p-media-loader-shaka/build/p2p-media-loader-shaka.min.js ./",
     "build": "npm run build-p2p-graph && npm run build-hola-jwplayer-hlsjs && npm run refresh-dependencies"
   },
-  "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://git.witua.com/novage/p2p-media-loader.git"
+    "url": "https://github.com/Novage/p2p-media-loader.git"
   },
   "dependencies": {
     "p2p-media-loader-core": "^0.0.1",
