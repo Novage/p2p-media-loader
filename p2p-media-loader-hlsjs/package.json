@@ -2,22 +2,24 @@
   "name": "p2p-media-loader-hlsjs",
   "description": "P2P Media Loader hlsjs integration",
   "version": "0.0.1",
+  "license": "Apache-2.0",
+  "author": "Novage",
+  "homepage": "https://github.com/Novage/p2p-media-loader",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "compile": "rimraf ./dist && tsc && copyfiles -f ./lib/*.js ./dist && rimraf ./build && mkdirp ./build",
     "browserify": "browserify -r ./dist/index.js:p2p-media-loader-hlsjs ./dist/browser-init.js --exclude p2p-media-loader-core > ./build/p2p-media-loader-hlsjs.js",
-    "minify": "uglifyjs ./build/p2p-media-loader-hlsjs.js -m -c > ./build/p2p-media-loader-hlsjs.min.js",
+    "minify": "uglifyjs ./build/p2p-media-loader-hlsjs.js -m -c --comments > ./build/p2p-media-loader-hlsjs.min.js",
     "refresh-dependencies": "copyfiles -f ./node_modules/p2p-media-loader-core/build/p2p-media-loader-core*.js ./build",
     "build-hola-jwplayer-hlsjs": "browserify -r @hola.org/jwplayer-hlsjs | uglifyjs -m -c > ./build/hola-jwplayer-hlsjs.min.js",
     "build": "npm run compile && npm run browserify && npm run minify && npm run refresh-dependencies && npm run build-hola-jwplayer-hlsjs",
     "lint": "tslint -c ./tslint.json -p ./tsconfig.test.json",
     "test": "mocha -r ts-node/register test/*.test.ts"
   },
-  "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://git.witua.com/novage/p2p-media-loader.git"
+    "url": "https://github.com/Novage/p2p-media-loader.git"
   },
   "dependencies": {
     "m3u8-parser": "^3.0.0",
