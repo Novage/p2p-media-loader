@@ -2,21 +2,23 @@
   "name": "p2p-media-loader-shaka",
   "description": "P2P Media Loader Shaka Player integration",
   "version": "0.0.1",
+  "license": "Apache-2.0",
+  "author": "Novage",
+  "homepage": "https://github.com/Novage/p2p-media-loader",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "compile": "rimraf ./dist && tsc && copyfiles -f ./lib/*.js ./dist && rimraf ./build && mkdirp ./build",
     "browserify": "browserify -r ./dist/index.js:p2p-media-loader-shaka ./dist/browser-init.js --exclude p2p-media-loader-core > ./build/p2p-media-loader-shaka.js",
-    "minify": "uglifyjs ./build/p2p-media-loader-shaka.js -m -c > ./build/p2p-media-loader-shaka.min.js",
+    "minify": "uglifyjs ./build/p2p-media-loader-shaka.js -m -c --comments > ./build/p2p-media-loader-shaka.min.js",
     "refresh-dependencies": "copyfiles -f ./node_modules/p2p-media-loader-core/build/p2p-media-loader-core*.js ./build",
     "build": "npm run compile && npm run browserify && npm run minify && npm run refresh-dependencies",
     "lint": "tslint -c ./tslint.json -p ./tsconfig.test.json",
     "test": "mocha -r ts-node/register test/*.test.ts"
   },
-  "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://git.witua.com/novage/p2p-media-loader.git"
+    "url": "https://github.com/Novage/p2p-media-loader.git"
   },
   "dependencies": {
     "p2p-media-loader-core": "^0.0.1"
