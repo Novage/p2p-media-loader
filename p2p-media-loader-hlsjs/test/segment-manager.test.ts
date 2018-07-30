@@ -1,4 +1,5 @@
 /// <reference path="../node_modules/@types/mocha/index.d.ts" />
+/// <reference path="../lib/declarations.d.ts" />
 
 import * as sinon from "sinon";
 import { mock, instance, when, anyFunction } from "ts-mockito";
