@@ -22,23 +22,23 @@
     "url": "https://github.com/Novage/p2p-media-loader.git"
   },
   "dependencies": {
-    "m3u8-parser": "^3.0.0",
+    "m3u8-parser": "^4.2.0",
     "p2p-media-loader-core": "^0.0.1"
   },
   "devDependencies": {
     "@hola.org/jwplayer-hlsjs": "^0.0.79",
-    "@types/mocha": "^2.2.48",
-    "@types/node": "^6.0.101",
-    "@types/sinon": "^2.3.3",
-    "browserify": "^14.4.0",
+    "@types/mocha": "^5.2.5",
+    "@types/node": "^10.5.4",
+    "@types/sinon": "^5.0.1",
+    "browserify": "^16.2.2",
     "browserify-versionify": "^1.0.6",
-    "copyfiles": "^1.2.0",
+    "copyfiles": "^2.0.0",
     "mkdirp": "^0.5.1",
-    "mocha": "^3.4.2",
+    "mocha": "^5.2.0",
     "rimraf": "^2.6.1",
-    "sinon": "^2.4.0",
+    "sinon": "^6.1.4",
     "ts-mockito": "^2.3.0",
-    "ts-node": "^3.2.0",
+    "ts-node": "^7.0.0",
     "tslint": "^5.5.0",
     "typescript": "^2.7.2",
     "uglify-js": "^3.3.12"

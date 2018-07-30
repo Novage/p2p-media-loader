@@ -24,9 +24,9 @@
   },
   "devDependencies": {
     "@hola.org/jwplayer-hlsjs": "^0.0.79",
-    "browserify": "^14.4.0",
+    "browserify": "^16.2.2",
     "browserify-versionify": "^1.0.6",
-    "copyfiles": "^1.2.0",
+    "copyfiles": "^2.0.0",
     "uglify-js": "^3.3.12"
   }
 }

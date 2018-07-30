@@ -15,7 +15,6 @@
  */
 
 import * as Debug from "debug";
-import {Buffer} from "buffer";
 import STEEmitter from "./stringly-typed-event-emitter";
 
 enum MediaPeerCommands {

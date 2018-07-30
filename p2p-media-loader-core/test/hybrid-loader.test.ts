@@ -2,6 +2,7 @@
 /// <reference path="../node_modules/@types/node/index.d.ts" />
 /// <reference path="../node_modules/typescript/lib/lib.es2015.d.ts" />
 /// <reference path="../node_modules/typescript/lib/lib.dom.d.ts" />
+/// <reference path="../lib/declarations.d.ts" />
 
 import {HttpMediaManager} from "../lib/http-media-manager";
 import HybridLoader from "../lib/hybrid-loader";
