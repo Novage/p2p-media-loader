@@ -6,6 +6,21 @@
   "author": "Novage",
   "homepage": "https://github.com/Novage/p2p-media-loader",
   "main": "index.js",
+  "keywords": [
+    "p2p",
+    "peer-to-peer",
+    "hls",
+    "dash",
+    "webrtc",
+    "video",
+    "mse",
+    "player",
+    "torrent",
+    "bittorrent",
+    "webtorrent",
+    "hlsjs",
+    "shaka player"
+  ],
   "scripts": {
     "build-p2p-graph": "browserify -r p2p-graph | uglifyjs -m -c > p2p-graph.js",
     "build-hola-jwplayer-hlsjs": "browserify -r @hola.org/jwplayer-hlsjs | uglifyjs -m -c > hola-jwplayer-hlsjs.min.js",

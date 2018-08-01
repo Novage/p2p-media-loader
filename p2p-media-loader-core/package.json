@@ -1,12 +1,27 @@
 {
   "name": "p2p-media-loader-core",
-  "description": "P2P Media Loader core function",
+  "description": "P2P Media Loader core functionality",
   "version": "0.0.1",
   "license": "Apache-2.0",
   "author": "Novage",
   "homepage": "https://github.com/Novage/p2p-media-loader",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "keywords": [
+    "p2p",
+    "peer-to-peer",
+    "hls",
+    "dash",
+    "webrtc",
+    "video",
+    "mse",
+    "player",
+    "torrent",
+    "bittorrent",
+    "webtorrent",
+    "hlsjs",
+    "shaka player"
+  ],
   "scripts": {
     "compile": "rimraf ./dist && tsc && copyfiles -f ./lib/*.js ./dist && rimraf ./build && mkdirp ./build",
     "browserify": "browserify -r ./dist/index.js:p2p-media-loader-core ./dist/browser-init.js > ./build/p2p-media-loader-core.js",

@@ -7,6 +7,19 @@
   "homepage": "https://github.com/Novage/p2p-media-loader",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "keywords": [
+    "p2p",
+    "peer-to-peer",
+    "hls",
+    "webrtc",
+    "video",
+    "mse",
+    "player",
+    "torrent",
+    "bittorrent",
+    "webtorrent",
+    "hlsjs"
+  ],
   "scripts": {
     "compile": "rimraf ./dist && tsc && copyfiles -f ./lib/*.js ./dist && rimraf ./build && mkdirp ./build",
     "browserify": "browserify -r ./dist/index.js:p2p-media-loader-hlsjs ./dist/browser-init.js --exclude p2p-media-loader-core > ./build/p2p-media-loader-hlsjs.js",
