@@ -1,8 +1,16 @@
-# P2P Media Loader Core API
+# P2P Media Loader Core
 
-Core P2P functionality.
+Core functionality for P2P sharing of segmented media streams (i.e. HLS, DASH) using WebRTC.
 
-The library uses `window.p2pml.core` as a root namespace for:
+Useful links:
+- [Demo](http://google.com/)
+- [Builds on cdnjs](http://google.com/)
+- [Overview](http://google.com/)
+- [Technical Overview](http://google.com/)
+
+# API
+
+The library uses `window.p2pml.core` as a root namespace in Web browser for:
 - `HybridLoader` - HTTP and P2P loader
 - `Events` - Events emitted by `HybridLoader`
 - `Segment` - Media stream segment

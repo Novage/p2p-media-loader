@@ -1,8 +1,16 @@
-# P2P Media Loader hls.js API
+# P2P Media Loader hls.js
 
-[hls.js](https://github.com/video-dev/hls.js) integration.
+[hls.js](https://github.com/video-dev/hls.js) integration for P2P sharing of segmented media streams (HLS) using WebRTC.
 
-The library uses `window.p2pml.hlsjs` as a root namespace for:
+Useful links:
+- [Demo](http://google.com/)
+- [Builds on cdnjs](http://google.com/)
+- [Overview](http://google.com/)
+- [Technical Overview](http://google.com/)
+
+# API
+
+The library uses `window.p2pml.hlsjs` as a root namespace in Web browser for:
 - `Engine` - hls.js support engine
 - `initHlsJsPlayer` - [hls.js](https://github.com/video-dev/hls.js) player integration
 - `initClapprPlayer` - [Clappr](https://github.com/clappr/clappr) player integration

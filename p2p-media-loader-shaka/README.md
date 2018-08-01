@@ -1,8 +1,16 @@
-# P2P Media Loader Shaka Player API
+# P2P Media Loader Shaka Player
 
-[Shaka Player](https://github.com/google/shaka-player) integration.
+[Shaka Player](https://github.com/google/shaka-player) integration for P2P sharing of segmented media streams (i.e. HLS, DASH) using WebRTC.
 
-The library uses `window.p2pml.shaka` as a root namespace for:
+Useful links:
+- [Demo](http://google.com/)
+- [Builds on cdnjs](http://google.com/)
+- [Overview](http://google.com/)
+- [Technical Overview](http://google.com/)
+
+# API
+
+The library uses `window.p2pml.shaka` as a root namespace in Web browser for:
 - `Engine` - Shaka Player support engine
 - `version` - API version
 
