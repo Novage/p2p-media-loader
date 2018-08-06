@@ -1,13 +1,13 @@
 # P2P Media Loader
 
-
 **P2P Media Loader** is open source JavaScript library that uses features of modern browsers (i.e. WebRTC) to deliver media over P2P. It doesn’t require any browser plugins or addons to function.
 
 It allows to create Peer-to-Peer network (also called P2P CDN or P2PTV) for traffic sharing between users (peers) that are watching the same media stream live or VOD over HLS or DASH protocols.
 
 It significantly reduces traditional CDN traffic and cost while delivering media streams to more users.
 
-## Useful links:
+## Useful links
+
 - [Demo](http://novage.com.ua/p2p-media-loader/demo.html)
 - [Overview](http://novage.com.ua/p2p-media-loader/overview.html)
 - [Technical overview](http://novage.com.ua/p2p-media-loader/technical-overview.html)
