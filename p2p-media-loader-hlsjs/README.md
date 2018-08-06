@@ -11,6 +11,53 @@ Useful links:
   - [Hls.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/build/)
   - [Shaka integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@latest/build/)
 
+## Basic usage
+
+General steps are:
+
+1. Include P2P Medial Loader scripts.
+2. Create P2P Medial Loader engine instance.
+3. Create a player instance.
+4. Call init function for the player.
+
+**P2P Media Loader** supports many players that use Hls.js as media engine. Lets pick [Clappr](https://github.com/clappr/clappr) just for this example:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Clappr/Hls.js with P2P Media Loader</title>
+    <meta charset="utf-8">
+    <script src="p2p-media-loader-core.min.js"></script>
+    <script src="p2p-media-loader-hlsjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/clappr@latest/dist/clappr.min.js"></script>
+</head>
+<body>
+    <div id="player"></div>
+    <script>
+        if (p2pml.hlsjs.Engine.isSupported()) {
+            var engine = new p2pml.hlsjs.Engine();
+
+            var player = new Clappr.Player({
+                parentId: "#player",
+                source: "https://wowza.peer5.com/live/smil:bbb_abr.smil/playlist.m3u8",
+                mute: true,
+                autoPlay: true,
+                hlsjsConfig: {
+                    liveSyncDurationCount: 7,
+                    loader: engine.createLoaderClass()
+                }
+            });
+
+            p2pml.hlsjs.initClapprPlayer(player);
+        } else {
+            document.write("Not supported :(");
+        }
+    </script>
+</body>
+</html>
+```
+
 # API
 
 The library uses `window.p2pml.hlsjs` as a root namespace in Web browser for:
