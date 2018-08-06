@@ -1,6 +1,6 @@
-# P2P Media Loader Shaka Player
+# P2P Media Loader - Shaka Player integration
 
-[Shaka Player](https://github.com/google/shaka-player) integration for P2P sharing of segmented media streams (i.e. HLS, DASH) using WebRTC.
+P2P sharing of segmented media streams (i.e. HLS, DASH) using WebRTC for [Shaka Player](https://github.com/google/shaka-player)
 
 Useful links:
 - [Demo](http://google.com/)
