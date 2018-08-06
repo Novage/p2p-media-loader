@@ -1,6 +1,6 @@
-# P2P Media Loader hls.js
+# P2P Media Loader - hls.js integration
 
-[hls.js](https://github.com/video-dev/hls.js) integration for P2P sharing of segmented media streams (HLS) using WebRTC.
+P2P sharing of segmented media streams (i.e. HLS) using WebRTC for [hls.js](https://github.com/video-dev/hls.js)
 
 Useful links:
 - [Demo](http://google.com/)
