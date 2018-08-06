@@ -10,6 +10,49 @@ Useful links:
   - [Core](https://cdn.jsdelivr.net/npm/p2p-media-loader-core@latest/build/)
   - [Shaka integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@latest/build/)
   - [Hls.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/build/)
+ 
+## Basic usage
+
+General steps are:
+
+1. Include P2P Medial Loader scripts.
+2. Create P2P Medial Loader engine instance.
+3. Create a player instance.
+4. Call init function for the player.
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Shaka Player with P2P Media Loader</title>
+    <meta charset="utf-8">
+    <script src="p2p-media-loader-core.min.js"></script>
+    <script src="p2p-media-loader-shaka.min.js"></script>
+    <script src="https://github.com/videojs/mux.js/releases/download/v4.4.0/mux.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/2.4.2/shaka-player.compiled.js"></script>
+</head>
+<body>
+    <video id="video" width="640" controls autoplay muted></video>
+    <script>
+        shaka.polyfill.installAll();
+        if (shaka.Player.isBrowserSupported() && p2pml.shaka.Engine.isSupported()) {
+            function onError(error) { console.error("Error code", error.code, "object", error); }
+
+            var engine = new p2pml.shaka.Engine();
+
+            var player = new shaka.Player(document.getElementById("video"));
+            player.addEventListener("error", function(event) { onError(event.detail); });
+
+            engine.initShakaPlayer(player);
+
+            player.load("https://wowza.peer5.com/live/smil:bbb_abr.smil/playlist.m3u8").catch(onError);
+        } else {
+            document.write("Not supported :(");
+        }
+    </script>
+</body>
+</html>
+```
 
 # API
 
