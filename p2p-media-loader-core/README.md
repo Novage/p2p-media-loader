@@ -3,10 +3,13 @@
 Core functionality for P2P sharing of segmented media streams (i.e. HLS, DASH) using WebRTC.
 
 Useful links:
-- [Demo](http://google.com/)
-- [Builds on cdnjs](http://google.com/)
-- [Overview](http://google.com/)
-- [Technical Overview](http://google.com/)
+- [Demo](http://novage.com.ua/p2p-media-loader/demo.html)
+- [Overview](http://novage.com.ua/p2p-media-loader/overview.html)
+- [Technical overview](http://novage.com.ua/p2p-media-loader/technical-overview.html)
+- JS CDN
+  - [Core](https://cdn.jsdelivr.net/npm/p2p-media-loader-core@latest/build/)
+  - [Hls.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/build/)
+  - [Shaka integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@latest/build/)
 
 # API
 
