@@ -25,7 +25,7 @@
     "compile": "rimraf ./dist && tsc && copyfiles -f ./lib/*.js ./dist && rimraf ./build && mkdirp ./build",
     "browserify": "browserify -r ./dist/index.js:p2p-media-loader-shaka ./dist/browser-init.js --exclude p2p-media-loader-core > ./build/p2p-media-loader-shaka.js",
     "minify": "uglifyjs ./build/p2p-media-loader-shaka.js -m -c --comments > ./build/p2p-media-loader-shaka.min.js",
-    "refresh-dependencies": "copyfiles -f ./node_modules/p2p-media-loader-core/build/p2p-media-loader-core*.js ./build",
+    "refresh-dependencies": "copyfiles -f ./node_modules/p2p-media-loader-core/build/p2p-media-loader-core*.js ./demo",
     "build": "npm run compile && npm run browserify && npm run minify && npm run refresh-dependencies",
     "lint": "tslint -c ./tslint.json -p ./tsconfig.test.json",
     "test": "mocha -r ts-node/register test/*.test.ts"

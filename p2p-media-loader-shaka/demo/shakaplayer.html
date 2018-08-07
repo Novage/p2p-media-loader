@@ -19,7 +19,7 @@
 
     <meta charset="UTF-8">
 
-    <script src="../build/p2p-media-loader-core.js"></script>
+    <script src="p2p-media-loader-core.js"></script>
     <script src="../build/p2p-media-loader-shaka.js"></script>
 
     <script src="https://github.com/videojs/mux.js/releases/download/v4.4.0/mux.js"></script>
@@ -46,7 +46,8 @@
 
             player.load(
                 //"https://wowzaec2demo.streamlock.net/live/bigbuckbunny/playlist.m3u8"
-                "https://storage.googleapis.com/shaka-live-assets/player-source.mpd"
+                //"https://storage.googleapis.com/shaka-live-assets/player-source.mpd"
+		"https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.mpd"
             ).catch(onError);
         } else {
             document.write("Not supported :(");
