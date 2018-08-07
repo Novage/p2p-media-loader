@@ -310,7 +310,10 @@
                 var video = document.createElement("video");
                 video.id = "video";
                 video.volume = 0;
-                video.controls = true;
+                video.setAttribute("playsinline", "");
+                video.setAttribute("muted", "");
+                video.setAttribute("autoplay", "");
+                video.setAttribute("controls", "");
                 this.videoContainer.appendChild(video);
 
                 var level = document.createElement("select");
@@ -368,6 +371,10 @@
 
             var video = document.createElement("video");
             video.id = "video";
+            video.volume = 0;
+            video.setAttribute("playsinline", "");
+            video.setAttribute("muted", "");
+            video.setAttribute("autoplay", "");
             this.videoContainer.appendChild(video);
 
             var player = new MediaElementPlayer("video", {
@@ -393,6 +400,10 @@
             var video = document.createElement("div");
             video.id = "video";
             video.className = "fp-slim";
+            video.volume = 0;
+            video.setAttribute("playsinline", "");
+            video.setAttribute("muted", "");
+            video.setAttribute("autoplay", "");
             this.videoContainer.appendChild(video);
 
             var player = flowplayer("#video", {
@@ -422,9 +433,13 @@
             outer.className = "embed-responsive embed-responsive-16by9";
             var video = document.createElement("video");
             video.id = "video";
-            video.controls = true;
             video.preload = "none";
             video.className = "embed-responsive-item video-js vjs-default-skin";
+            video.volume = 0;
+            video.setAttribute("playsinline", "");
+            video.setAttribute("muted", "");
+            video.setAttribute("autoplay", "");
+            video.setAttribute("controls", "");
             outer.appendChild(video);
             this.videoContainer.appendChild(outer);
 
@@ -453,11 +468,14 @@
         DemoApp.prototype.initJwPlayer = function () {
             var video = document.createElement("div");
             video.id = "video";
+            video.volume = 0;
+            video.setAttribute("playsinline", "");
+            video.setAttribute("muted", "");
+            video.setAttribute("autoplay", "");
             this.videoContainer.appendChild(video);
 
             var player = jwplayer("video");
-            player.setup({ file: this.videoUrl });
-            player.setVolume(0);
+            player.setup({ file: this.videoUrl, autostart: true, mute: true });
 
             var provider = require("@hola.org/jwplayer-hlsjs");
             provider.attach();
@@ -466,6 +484,7 @@
                 liveSyncDurationCount: this.liveSyncDurationCount,
                 loader: this.engine.createLoaderClass()
             });
+            video.play();
         };
 
         DemoApp.prototype.initShakaPlayer = function () {
@@ -474,7 +493,10 @@
                 var video = document.createElement("video");
                 video.id = "video";
                 video.volume = 0;
-                video.controls = true;
+                video.setAttribute("playsinline", "");
+                video.setAttribute("muted", "");
+                video.setAttribute("autoplay", "");
+                video.setAttribute("controls", "");
                 this.videoContainer.appendChild(video);
 
                 var level = document.createElement("select");
@@ -486,6 +508,7 @@
                 this.engine.initShakaPlayer(player);
                 this.shakaLevelSwitcher.init(player, level);
                 player.load(this.videoUrl);
+                video.play();
             } else {
                 document.querySelector("#error-shakaplayer").classList.remove("hide");
             }
