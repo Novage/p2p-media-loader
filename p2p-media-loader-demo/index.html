@@ -477,7 +477,6 @@
                 liveSyncDurationCount: this.liveSyncDurationCount,
                 loader: this.engine.createLoaderClass()
             });
-            video.play();
         };
 
         DemoApp.prototype.initShakaPlayer = function () {
@@ -501,7 +500,6 @@
                 this.engine.initShakaPlayer(player);
                 this.shakaLevelSwitcher.init(player, level);
                 player.load(this.videoUrl);
-                video.play();
             } else {
                 document.querySelector("#error-shakaplayer").classList.remove("hide");
             }
