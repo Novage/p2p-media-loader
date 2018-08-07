@@ -1,4 +1,6 @@
-p2p-media-loader-core.js
 tsconfig.json
+tsconfig.test.json
 tslint.json
 lib
+test
+demo

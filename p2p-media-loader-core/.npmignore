@@ -1,3 +1,5 @@
 tsconfig.json
+tsconfig.test.json
 tslint.json
 lib
+test
