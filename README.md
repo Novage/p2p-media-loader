@@ -35,7 +35,7 @@ It significantly reduces traditional CDN traffic and cost while delivering media
 
 All the components of the P2P network are free and open source.
 
-![P2P Media Loader network](https://novage.github.io/p2p-media-loader/images/p2p-media-loader-network.png "P2P Media Loader network")
+![P2P Media Loader network](https://raw.githubusercontent.com/Novage/p2p-media-loader/gh-pages/images/p2p-media-loader-network.png)
 
 **P2P Media Loader** browser requirements are:<br>
 - **WebRTC Data Channels** support to exchange data between peers
