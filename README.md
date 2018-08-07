@@ -12,9 +12,9 @@ It significantly reduces traditional CDN traffic and cost while delivering media
 - [Overview](http://novage.com.ua/p2p-media-loader/overview.html)
 - [Technical overview](http://novage.com.ua/p2p-media-loader/technical-overview.html)
 - API documentation
-  - [Hls.js integration](https://github.com/novage/p2p-media-loader/p2p-media-loader-hlsjs)
-  - [Shaka Player integration](https://github.com/novage/p2p-media-loader/p2p-media-loader-shaka)
-  - [Core](https://github.com/novage/p2p-media-loader/p2p-media-loader-core)
+  - [Hls.js integration](https://github.com/Novage/p2p-media-loader/tree/master/p2p-media-loader-hlsjs#p2p-media-loader---hlsjs-integration)
+  - [Shaka Player integration](https://github.com/Novage/p2p-media-loader/tree/master/p2p-media-loader-shaka#p2p-media-loader---shaka-player-integration)
+  - [Core](https://github.com/Novage/p2p-media-loader/tree/master/p2p-media-loader-core#p2p-media-loader-core)
 - JS CDN
   - [Core](https://cdn.jsdelivr.net/npm/p2p-media-loader-core@latest/build/)
   - [Hls.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/build/)
@@ -28,8 +28,8 @@ It significantly reduces traditional CDN traffic and cost while delivering media
  Players: JWPlayer, Clappr, Flowplayer, MediaElement, VideoJS  
 - Supports adaptive bitrate streaming of HLS and DASH protocols.
 - No need in server side software. By default P2P Media Loader uses publicly available servers:  
- - STUN servers - [Public STUN server list](https://gist.github.com/mondain/b0ec1cf5f60ae726202e)
- - WebTorrent trackers - [https://openwebtorrent.com/](https://openwebtorrent.com/)
+  - STUN servers - [Public STUN server list](https://gist.github.com/mondain/b0ec1cf5f60ae726202e)
+  - WebTorrent trackers - [https://openwebtorrent.com/](https://openwebtorrent.com/)
 
 ## Key components of the P2P network
 
