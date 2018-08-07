@@ -28,8 +28,8 @@ General steps are:
 <head>
     <title>Clappr/Hls.js with P2P Media Loader</title>
     <meta charset="utf-8">
-    <script src="https://cdn.jsdelivr.net/npm/p2p-media-loader-core@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/p2p-media-loader-core@latest/build/p2p-media-loader-core.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/build/p2p-media-loader-hlsjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/clappr@latest"></script>
 </head>
 <body>
