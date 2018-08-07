@@ -45,7 +45,7 @@ General steps are:
 
             engine.initShakaPlayer(player);
 
-            player.load("https://wowza.peer5.com/live/smil:bbb_abr.smil/playlist.m3u8").catch(onError);
+            player.load("https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.mpd").catch(onError);
         } else {
             document.write("Not supported :(");
         }

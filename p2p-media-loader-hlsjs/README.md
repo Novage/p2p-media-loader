@@ -30,7 +30,7 @@ General steps are:
     <meta charset="utf-8">
     <script src="p2p-media-loader-core.min.js"></script>
     <script src="p2p-media-loader-hlsjs.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/clappr@latest/dist/clappr.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/clappr@latest"></script>
 </head>
 <body>
     <div id="player"></div>
@@ -40,7 +40,7 @@ General steps are:
 
             var player = new Clappr.Player({
                 parentId: "#player",
-                source: "https://wowza.peer5.com/live/smil:bbb_abr.smil/playlist.m3u8",
+                source: "https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.m3u8",
                 mute: true,
                 autoPlay: true,
                 hlsjsConfig: {
