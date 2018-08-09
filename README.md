@@ -23,9 +23,9 @@ It significantly reduces traditional CDN traffic and cost while delivering media
 ## Key features
 
 - Supports live and VOD streams over HLS or DASH protocols.
-- Supports multiple player and engines
- Engines: Hls.js, ShakaPlayer
- Players: JWPlayer, Clappr, Flowplayer, MediaElement, VideoJS
+- Supports multiple players and engines  
+  Engines: Hls.js, ShakaPlayer  
+  Players: JWPlayer, Clappr, Flowplayer, MediaElement, VideoJS
 - Supports adaptive bitrate streaming of HLS and DASH protocols.
 - No need in server side software. By default P2P Media Loader uses publicly available servers:
   - STUN servers - [Public STUN server list](https://gist.github.com/mondain/b0ec1cf5f60ae726202e)
