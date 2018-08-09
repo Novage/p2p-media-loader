@@ -1,6 +1,6 @@
 # P2P Media Loader demo
 
-**P2P Media Loader** is open source JavaScript library that uses features of modern browsers (i.e. WebRTC) to deliver media over P2P. It doesn’t require any browser plugins or addons to function.
+**P2P Media Loader** is an open-source JavaScript library that uses features of modern browsers (i.e. WebRTC) to deliver media over P2P. It doesn’t require any browser plugins or addons to function.
 
 ## Useful links
 
