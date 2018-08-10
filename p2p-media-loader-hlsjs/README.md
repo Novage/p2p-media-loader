@@ -90,7 +90,7 @@ Creates a new `Engine` instance.
 - `segments`
     + `forwardSegmentCount` - Number of segments for building up predicted forward segments sequence; used to predownload and share via P2P. Default is 20;
 - `loader`
-    + settings for `HybridLoader` (see _P2P Media Loader Core API_ for details);
+    + settings for `HybridLoader` (see [P2P Media Loader Core API](../p2p-media-loader-core/README.md#loader--new-hybridloadersettings) for details);
 
 ### `engine.getSettings()`
 
