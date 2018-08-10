@@ -1,5 +1,7 @@
 # P2P Media Loader - Hls.js integration
 
+[![npm version](https://badge.fury.io/js/p2p-media-loader-hlsjs.svg)](https://npmjs.com/package/p2p-media-loader-hlsjs)
+
 P2P sharing of segmented media streams (i.e. HLS) using WebRTC for [Hls.js](https://github.com/video-dev/hls.js)
 
 Useful links:

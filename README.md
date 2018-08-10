@@ -19,6 +19,10 @@ It significantly reduces traditional CDN traffic and cost while delivering media
   - [Core](https://cdn.jsdelivr.net/npm/p2p-media-loader-core@latest/build/)
   - [Hls.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/build/)
   - [Shaka integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@latest/build/)
+- npm packages
+  - [Core](https://npmjs.com/package/p2p-media-loader-core)
+  - [Hls.js integration](https://npmjs.com/package/p2p-media-loader-hlsjs)
+  - [Shaka integration](https://npmjs.com/package/p2p-media-loader-shaka)
 
 ## Key features
 
