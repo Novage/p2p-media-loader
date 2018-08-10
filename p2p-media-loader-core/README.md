@@ -50,7 +50,7 @@ If `settings` is specified, then the default settings (shown below) will be over
 | `trackerAnnounce` | String[] | [ "wss://tracker.btorrent.xyz/", "wss://tracker.openwebtorrent.com/" ] | Torrent trackers (announcers) to use
 | `webRtcMaxMessageSize` | number | 64 * 1024 - 1 | Max WebRTC message size. 64KiB - 1B should work with most of recent browsers. Set it to 16KiB for older browsers support. 
 | `p2pSegmentDownloadTimeout` | number | 60000 | Timeout to download a segment from a peer. If exceeded the peer is dropped. 
-| `rtcConfig` | RTCConfiguration | Object | An RTCConfiguration dictionary providing options to configure WebRTC connections.
+| `rtcConfig` | [RTCConfiguration](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/RTCPeerConnection#RTCConfiguration_dictionary) | Object | An [RTCConfiguration](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/RTCPeerConnection#RTCConfiguration_dictionary) dictionary providing options to configure WebRTC connections.
 
 ### `loader.load(segments, swarmId)`
 
