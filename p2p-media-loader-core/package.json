@@ -27,6 +27,8 @@
     "browserify": "browserify -r ./dist/index.js:p2p-media-loader-core ./dist/browser-init.js > ./build/p2p-media-loader-core.js",
     "minify": "uglifyjs ./build/p2p-media-loader-core.js -m -c --comments > ./build/p2p-media-loader-core.min.js",
     "build": "npm run compile && npm run browserify && npm run minify",
+    "webpack:build": "webpack --progress",
+    "webpack:devserver": "webpack-dev-server --progress --port 8080",
     "lint": "tslint -c ./tslint.json -p ./tsconfig.test.json",
     "test": "mocha -r ts-node/register test/*.test.ts"
   },
@@ -51,11 +53,15 @@
     "mkdirp": "^0.5.1",
     "mocha": "^5.2.0",
     "rimraf": "^2.6.1",
+    "ts-loader": "^4.4.2",
     "ts-mockito": "^2.3.0",
-    "ts-node": "^7.0.0",
+    "ts-node": "^7.0.1",
     "tslint": "^5.5.0",
-    "typescript": "^2.7.2",
-    "uglify-js": "^3.3.12"
+    "typescript": "^2.9.1",
+    "uglify-js": "^3.3.12",
+    "webpack": "^4.11.1",
+    "webpack-cli": "^3.0.2",
+    "webpack-dev-server": "^3.1.4"
   },
   "browserify": {
     "transform": [
