@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
+import * as Debug from "debug";
+
 import {LoaderInterface, Events, Segment} from "./loader-interface";
 import {EventEmitter} from "events";
 import {HttpMediaManager} from "./http-media-manager";
 import {P2PMediaManager} from "./p2p-media-manager";
 import {MediaPeerSegmentStatus} from "./media-peer";
-import * as Debug from "debug";
-import SegmentInternal from "./segment-internal";
+import {SegmentInternal} from "./segment-internal";
 import {SpeedApproximator} from "./speed-approximator";
 
 const getBrowserRtc = require("get-browser-rtc");
