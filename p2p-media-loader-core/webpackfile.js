@@ -11,21 +11,17 @@ function makeConfig({libName, entry, mode}) {
           extensions: [".ts", ".js"]
         },
         module: {
-          strictExportPresence: true,
           rules: [
             // all files with a `.ts` extension will be handled by `ts-loader`
-            { test: /\.ts?$/, loader: "ts-loader" },
+            { test: /\.ts?$/, exclude: [/node_modules/], loader: "ts-loader" },
           ]
         },
         output: {
             filename: libName + '.umd.js',
-            chunkFilename: '[name].js',
             path: path.resolve(__dirname, OUTPUT_PATH),
             publicPath: '/' + OUTPUT_PATH + '/',
             library: libName,
             libraryTarget: 'umd',
-            libraryExport: 'default',
-            globalObject: 'this'
         },
         plugins: []
     }
