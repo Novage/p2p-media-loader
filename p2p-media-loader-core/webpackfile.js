@@ -1,4 +1,5 @@
 const path = require('path');
+const webpack = require('webpack');
 
 const OUTPUT_PATH = 'build/webpack'
 
@@ -23,7 +24,11 @@ function makeConfig({libName, entry, mode}) {
             library: libName,
             libraryTarget: 'umd',
         },
-        plugins: []
+        plugins: [
+            new webpack.DefinePlugin({
+                __VERSION__: JSON.stringify(require('./package.json').version)
+            })
+        ]
     }
 };
 
