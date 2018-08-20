@@ -1,0 +1,47 @@
+body {
+    margin-top: 1em;
+    margin-bottom: 3em;
+}
+#video {
+    width: 100%;
+}
+#level {
+    width: auto;
+    float: right;
+}
+#graph {
+    max-width: 100%;
+    overflow: hidden;
+    margin: 3em auto;
+    border: 1px solid #eee;
+}
+#chart_container {
+    position: relative;
+    margin: 3em auto;
+    padding-left: 20px;
+    max-width: 100%;
+}
+#y_axis {
+    position: absolute;
+    top: 0;
+    width: 40px;
+    left: -20px;
+}
+#y_axis > svg {
+    overflow: visible;
+}
+#legend {
+    position: absolute;
+    top: 20px;
+    left: 40px;
+    z-index: 1;
+}
+#legend-totals {
+    position: absolute;
+    bottom: 20px;
+    left: 40px;
+    z-index: 1;
+}
+#main-view.hide {
+    display: none;
+}
