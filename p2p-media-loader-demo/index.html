@@ -38,8 +38,15 @@
     <!-- HlsJs -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
+    <!-- ShakaPlayer -->
+    <script src="https://github.com/videojs/mux.js/releases/download/v4.4.0/mux.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/2.4.4/shaka-player.compiled.js"></script>
+
     <!-- Clappr -->
     <script src="https://cdn.jsdelivr.net/npm/clappr@latest"></script>
+    <!--script src="https://github.com/videojs/mux.js/releases/download/v4.4.0/mux.js"></script--> <!-- required but already included above -->
+    <!--script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/2.4.4/shaka-player.compiled.js"></script--> <!-- required but already included above -->
+    <script src="https://cdn.jsdelivr.net/gh/clappr/dash-shaka-playback@latest/dist/dash-shaka-playback.external.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/clappr/clappr-level-selector-plugin@latest/dist/level-selector.min.js"></script>
 
     <!-- Flowplayer -->
@@ -55,10 +62,6 @@
     <link href="https://vjs.zencdn.net/7.2.0/video-js.css" rel="stylesheet">
     <script src="https://vjs.zencdn.net/7.2.0/video.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/videojs-contrib-hls.js@latest"></script>
-
-    <!-- ShakaPlayer -->
-    <script src="https://github.com/videojs/mux.js/releases/download/v4.4.0/mux.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/2.4.4/shaka-player.compiled.js"></script>
 
     <!-- JWPlayer -->
     <script src="https://content.jwplatform.com/libraries/aG3IMhIy.js"></script>
@@ -168,6 +171,7 @@
                     </optgroup>
                     <optgroup label="Shaka P2P Engine (HLS and DASH)">
                         <option value="shakaplayer">ShakaPlayer</option>
+                        <option value="clappr-shaka" selected>Clappr (DASH only)</option>
                     </optgroup>
                 </select>
             </div>
@@ -282,6 +286,11 @@
                     this.initShakaPlayer();
                     break;
 
+                case "clappr-shaka":
+                    this.engine = new p2pml.shaka.Engine();
+                    this.initClapprPlayer(true);
+                    break;
+
                 default:
                     console.error('Unexpected player type: ', this.playerType);
                     return;
@@ -330,7 +339,7 @@
             }
         };
 
-        DemoApp.prototype.initClapprPlayer = function () {
+        DemoApp.prototype.initClapprPlayer = function (isShaka) {
             var outer = document.createElement("div");
             outer.className = "embed-responsive embed-responsive-16by9";
             var video = document.createElement("div");
@@ -339,24 +348,34 @@
             outer.appendChild(video);
             this.videoContainer.appendChild(outer);
 
-            var player = new Clappr.Player({
+            var setup = {
                 parentId: "#video",
-                plugins: {
-                    "core": [LevelSelector]
-                },
-                hlsjsConfig: {
-                    liveSyncDurationCount: this.liveSyncDurationCount,
-                    loader: this.engine.createLoaderClass()
-                },
+                plugins: [LevelSelector],
                 source: this.videoUrl,
                 width: "100%",
                 height: "100%",
                 muted: true,
                 mute: true,
                 autoPlay: true
-            });
+            };
 
-            p2pml.hlsjs.initClapprPlayer(player);
+            if (isShaka) {
+                setup.plugins.push(DashShakaPlayback);
+                setup.shakaOnBeforeLoad = (shakaPlayerInstance) => {
+                    this.engine.initShakaPlayer(shakaPlayerInstance);
+                };
+            } else {
+                setup.hlsjsConfig = {
+                    liveSyncDurationCount: this.liveSyncDurationCount,
+                    loader: this.engine.createLoaderClass()
+                };
+            }
+
+            var player = new Clappr.Player(setup);
+
+            if (!isShaka) {
+                p2pml.hlsjs.initClapprPlayer(player);
+            }
         };
 
         DemoApp.prototype.initMediaElementPlayer = function () {
