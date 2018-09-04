@@ -41,20 +41,20 @@
   "devDependencies": {
     "@hola.org/jwplayer-hlsjs": "^0.0.79",
     "@types/mocha": "^5.2.5",
-    "@types/node": "^10.5.4",
-    "@types/sinon": "^5.0.1",
+    "@types/node": "^10.9.4",
+    "@types/sinon": "^5.0.2",
     "browserify": "^16.2.2",
     "browserify-versionify": "^1.0.6",
-    "copyfiles": "^2.0.0",
+    "copyfiles": "^2.1.0",
     "mkdirp": "^0.5.1",
     "mocha": "^5.2.0",
-    "rimraf": "^2.6.1",
-    "sinon": "^6.1.4",
-    "ts-mockito": "^2.3.0",
-    "ts-node": "^7.0.0",
-    "tslint": "^5.5.0",
-    "typescript": "^2.7.2",
-    "uglify-js": "^3.3.12"
+    "rimraf": "^2.6.2",
+    "sinon": "^6.1.5",
+    "ts-mockito": "^2.3.1",
+    "ts-node": "^7.0.1",
+    "tslint": "^5.11.0",
+    "typescript": "^3.0.3",
+    "uglify-js": "^3.4.9"
   },
   "browserify": {
     "transform": [

@@ -35,13 +35,13 @@
     "p2p-media-loader-core": "^0.1.0",
     "p2p-media-loader-hlsjs": "^0.1.0",
     "p2p-media-loader-shaka": "^0.1.0",
-    "p2p-graph": "^1.2.1"
+    "p2p-graph": "^1.2.2"
   },
   "devDependencies": {
     "@hola.org/jwplayer-hlsjs": "^0.0.79",
     "browserify": "^16.2.2",
     "browserify-versionify": "^1.0.6",
-    "copyfiles": "^2.0.0",
-    "uglify-js": "^3.3.12"
+    "copyfiles": "^2.1.0",
+    "uglify-js": "^3.4.9"
   }
 }
