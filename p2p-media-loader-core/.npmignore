@@ -3,3 +3,4 @@ tsconfig.test.json
 tslint.json
 lib
 test
+.editorconfig
