@@ -5,3 +5,4 @@ lib
 test
 .editorconfig
 build/dist
+webpackfile.js
