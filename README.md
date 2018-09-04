@@ -12,9 +12,9 @@ It significantly reduces traditional CDN traffic and cost while delivering media
 - [Overview](http://novage.com.ua/p2p-media-loader/overview.html)
 - [Technical overview](http://novage.com.ua/p2p-media-loader/technical-overview.html)
 - API documentation
-  - [Hls.js integration](https://github.com/Novage/p2p-media-loader/tree/master/p2p-media-loader-hlsjs#p2p-media-loader---hlsjs-integration)
-  - [Shaka Player integration](https://github.com/Novage/p2p-media-loader/tree/master/p2p-media-loader-shaka#p2p-media-loader---shaka-player-integration)
-  - [Core](https://github.com/Novage/p2p-media-loader/tree/master/p2p-media-loader-core#p2p-media-loader-core)
+  - [Hls.js integration](p2p-media-loader-hlsjs#p2p-media-loader---hlsjs-integration)
+  - [Shaka Player integration](p2p-media-loader-shaka#p2p-media-loader---shaka-player-integration)
+  - [Core](p2p-media-loader-core#p2p-media-loader-core)
 - JS CDN
   - [Core](https://cdn.jsdelivr.net/npm/p2p-media-loader-core@latest/build/)
   - [Hls.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/build/)
