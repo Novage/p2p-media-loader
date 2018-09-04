@@ -22,11 +22,12 @@
     "shaka player"
   ],
   "scripts": {
-    "compile": "rimraf ./dist && tsc && copyfiles -f ./lib/*.js ./dist && rimraf ./build && mkdirp ./build",
-    "browserify": "browserify -r ./dist/index.js:p2p-media-loader-shaka ./dist/browser-init.js --exclude p2p-media-loader-core > ./build/p2p-media-loader-shaka.js",
+    "compile": "tsc && copyfiles -f ./lib/*.js ./dist",
+    "browserify": "mkdirp ./build && browserify -r ./dist/index.js:p2p-media-loader-shaka ./dist/browser-init.js --exclude p2p-media-loader-core > ./build/p2p-media-loader-shaka.js",
     "minify": "uglifyjs ./build/p2p-media-loader-shaka.js -m -c --comments > ./build/p2p-media-loader-shaka.min.js",
-    "refresh-dependencies": "copyfiles -f ./node_modules/p2p-media-loader-core/build/p2p-media-loader-core*.js ./demo",
-    "build": "npm run compile && npm run browserify && npm run minify && npm run refresh-dependencies",
+    "build": "npm run compile && npm run browserify && npm run minify",
+    "webpack:build": "webpack --progress",
+    "webpack:watch": "webpack --watch --progress",
     "lint": "tslint -c ./tslint.json -p ./tsconfig.test.json",
     "test": "mocha -r ts-node/register test/*.test.ts"
   },
@@ -47,13 +48,15 @@
     "copyfiles": "^2.1.0",
     "mkdirp": "^0.5.1",
     "mocha": "^5.2.0",
-    "rimraf": "^2.6.2",
     "sinon": "^6.1.5",
+    "ts-loader": "^5.0.0",
     "ts-mockito": "^2.3.1",
     "ts-node": "^7.0.1",
     "tslint": "^5.11.0",
     "typescript": "^3.0.3",
-    "uglify-js": "^3.4.9"
+    "uglify-js": "^3.4.9",
+    "webpack": "^4.17.2",
+    "webpack-cli": "^3.1.0"
   },
   "browserify": {
     "transform": [
