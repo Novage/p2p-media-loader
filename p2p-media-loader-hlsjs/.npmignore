@@ -4,3 +4,4 @@ tslint.json
 lib
 test
 demo
+webpackfile.js

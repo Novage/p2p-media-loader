@@ -1,5 +1,4 @@
 /node_modules
 /dist
 /build
-/demo/p2p-media-loader*.js
 /demo/hola-jwplayer-hlsjs.min.js
