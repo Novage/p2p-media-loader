@@ -23,8 +23,8 @@
     "shaka player"
   ],
   "scripts": {
-    "compile": "rimraf ./dist && tsc && copyfiles -f ./lib/*.js ./dist && rimraf ./build && mkdirp ./build",
-    "browserify": "browserify -r ./dist/index.js:p2p-media-loader-core ./dist/browser-init.js > ./build/p2p-media-loader-core.js",
+    "compile": "tsc && copyfiles -f ./lib/*.js ./dist",
+    "browserify": "mkdirp ./build && browserify -r ./dist/index.js:p2p-media-loader-core ./dist/browser-init.js > ./build/p2p-media-loader-core.js",
     "minify": "uglifyjs ./build/p2p-media-loader-core.js -m -c --comments > ./build/p2p-media-loader-core.min.js",
     "build": "npm run compile && npm run browserify && npm run minify",
     "webpack:build": "webpack --progress",
@@ -52,7 +52,6 @@
     "copyfiles": "^2.1.0",
     "mkdirp": "^0.5.1",
     "mocha": "^5.2.0",
-    "rimraf": "^2.6.2",
     "ts-loader": "^5.0.0",
     "ts-mockito": "^2.3.1",
     "ts-node": "^7.0.1",
