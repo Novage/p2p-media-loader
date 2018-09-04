@@ -1,6 +1,6 @@
 const path = require('path');
 
-const OUTPUT_PATH = 'build/webpack'
+const OUTPUT_PATH = 'build'
 
 function makeConfig({libName, entry, mode}) {
     return {
@@ -17,16 +17,14 @@ function makeConfig({libName, entry, mode}) {
           ]
         },
         output: {
-            filename: libName + '.umd.js',
-            path: path.resolve(__dirname, OUTPUT_PATH),
-            publicPath: '/' + OUTPUT_PATH + '/',
-            library: libName,
-            libraryTarget: 'umd',
+            filename: libName + '.js',
+            path: path.resolve(__dirname, OUTPUT_PATH)
         },
         plugins: []
     }
 };
 
 module.exports = [
-    makeConfig({libName: 'P2pMediaLoaderCore', entry: './lib/index', mode: 'development'})
+    makeConfig({entry: './lib/browser-init-webpack.js', mode: 'development', libName: 'p2p-media-loader-core', }),
+    makeConfig({entry: './lib/browser-init-webpack.js', mode: 'production', libName: 'p2p-media-loader-core.min'})
 ];

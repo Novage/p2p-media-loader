@@ -4,3 +4,4 @@ tslint.json
 lib
 test
 .editorconfig
+build/dist
