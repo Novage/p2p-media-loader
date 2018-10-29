@@ -1,6 +1,6 @@
 # P2P Media Loader
 
-**P2P Media Loader** is an open-source JavaScript library that uses features of modern browsers (i.e. WebRTC) to deliver media over P2P. It doesn’t require any browser plugins or addons to function.
+**P2P Media Loader** is an open-source JavaScript library that uses features of modern browsers (i.e. HTML5 and WebRTC) to deliver media over P2P. It doesn’t require any browser plugins or addons to function.
 
 It allows to create Peer-to-Peer network (also called P2P CDN or P2PTV) for traffic sharing between users (peers) that are watching the same media stream live or VOD over HLS or DASH protocols.
 
@@ -26,12 +26,12 @@ It significantly reduces traditional CDN traffic and cost while delivering media
 
 ## Key features
 
-- Supports live and VOD streams over HLS or DASH protocols.
+- Supports live and VOD streams over HLS or DASH protocols
 - Supports multiple players and engines  
   Engines: Hls.js, ShakaPlayer  
   Players: JWPlayer, Clappr, Flowplayer, MediaElement, VideoJS
-- Supports adaptive bitrate streaming of HLS and DASH protocols.
-- No need in server side software. By default P2P Media Loader uses publicly available servers:
+- Supports adaptive bitrate streaming of HLS and DASH protocols
+- No need in server side software. By default **P2P Media Loader** uses publicly available servers:
   - STUN servers - [Public STUN server list](https://gist.github.com/mondain/b0ec1cf5f60ae726202e)
   - WebTorrent trackers - [https://openwebtorrent.com/](https://openwebtorrent.com/)
 
@@ -67,3 +67,7 @@ and obtains from them list of other peers that are downloading the same media st
 **P2P Media Loader** connects and starts to download media segments from the obtained peers as well as sharing already downloaded segments to them.
 
 From time to time random peers from P2P swarm download new segments over HTTP(S) and share them to others over P2P.
+
+## Limitations
+
+Only one media track is delivered over P2P. If video and audio tracks in HLS or DASH go separately, just video is going to be shared over P2P network.
