@@ -48,8 +48,8 @@ If `settings` is specified, then the default settings (shown below) will be over
 | `httpDownloadProbabilityInterval` | Integer | 500 | Interval of the httpDownloadProbability check (in milliseconds)
 | `bufferedSegmentsCount` | Integer | 20 | Max number of the segments to be downloaded via HTTP or P2P methods
 | `trackerAnnounce` | String[] | [ "wss://tracker.btorrent.xyz/", "wss://tracker.openwebtorrent.com/" ] | Torrent trackers (announcers) to use
-| `webRtcMaxMessageSize` | number | 64 * 1024 - 1 | Max WebRTC message size. 64KiB - 1B should work with most of recent browsers. Set it to 16KiB for older browsers support. 
-| `p2pSegmentDownloadTimeout` | number | 60000 | Timeout to download a segment from a peer. If exceeded the peer is dropped. 
+| `webRtcMaxMessageSize` | Integer | 64 * 1024 - 1 | Max WebRTC message size. 64KiB - 1B should work with most of recent browsers. Set it to 16KiB for older browsers support.
+| `p2pSegmentDownloadTimeout` | Integer | 60000 | Timeout to download a segment from a peer. If exceeded the peer is dropped.
 | `rtcConfig` | [RTCConfiguration](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/RTCPeerConnection#RTCConfiguration_dictionary) | Object | An [RTCConfiguration](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/RTCPeerConnection#RTCConfiguration_dictionary) dictionary providing options to configure WebRTC connections.
 
 ### `loader.load(segments, swarmId)`
@@ -100,7 +100,7 @@ Listener args:
 
 Emitted when a segment piece downloaded.
 
-Listener args: 
+Listener args:
 - `method` - downloading method, possible values: `http`, `p2p`;
 - `bytes` - amount of bytes downloaded;
 
