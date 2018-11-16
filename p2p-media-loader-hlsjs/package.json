@@ -1,7 +1,7 @@
 {
   "name": "p2p-media-loader-hlsjs",
   "description": "P2P Media Loader hls.js integration",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "Apache-2.0",
   "author": "Novage",
   "homepage": "https://github.com/Novage/p2p-media-loader",
@@ -37,12 +37,12 @@
   },
   "dependencies": {
     "m3u8-parser": "^4.2.0",
-    "p2p-media-loader-core": "^0.1.0"
+    "p2p-media-loader-core": "^0.2.0"
   },
   "devDependencies": {
     "@hola.org/jwplayer-hlsjs": "^0.0.79",
     "@types/mocha": "^5.2.5",
-    "@types/node": "^10.12.8",
+    "@types/node": "^10.12.9",
     "@types/sinon": "^5.0.5",
     "browserify": "^16.2.3",
     "browserify-versionify": "^1.0.6",
