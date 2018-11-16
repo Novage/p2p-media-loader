@@ -20,7 +20,8 @@ import {ParserSegment} from "./parser-segment";
 
 const defaultSettings: Settings = {
     forwardSegmentCount: 20,
-    maxHistorySegments: 50
+    maxHistorySegments: 50,
+    swarmId: undefined,
 };
 
 export class SegmentManager {
@@ -110,18 +111,19 @@ export class SegmentManager {
             }
         } while (sequence.length < this.settings.forwardSegmentCount);
 
-        const manifestUriNoQuery = this.manifestUri.split("?")[ 0 ];
+        const masterSwarmId = (this.settings.swarmId && (this.settings.swarmId.length !== 0)) ?
+                this.settings.swarmId : this.manifestUri.split("?")[0];
 
         const loaderSegments: LoaderSegment[] = sequence.map((s, i) => {
             return new LoaderSegment(
-                `${manifestUriNoQuery}+${s.identity}`,
+                `${masterSwarmId}+${s.identity}`,
                 s.uri,
                 s.range,
                 i
             );
         });
 
-        this.loader.load(loaderSegments, `${manifestUriNoQuery}+${lastRequestedSegment.streamIdentity}`);
+        this.loader.load(loaderSegments, `${masterSwarmId}+${lastRequestedSegment.streamIdentity}`);
         return loaderSegments[ lastRequestedSegmentIndex ];
     }
 
@@ -205,4 +207,10 @@ interface Settings {
      * Maximum amount of requested segments manager should remember; used to build up sequence with correct priorities for P2P sharing
      */
     maxHistorySegments: number;
+
+    /**
+     * Override default swarm ID that is used to identify unique media stream with trackers (manifest URL without
+     * query parameters is used as the swarm ID if the parameter is not specified)
+     */
+    swarmId: string | undefined;
 }

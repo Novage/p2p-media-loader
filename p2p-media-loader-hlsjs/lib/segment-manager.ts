@@ -19,7 +19,8 @@ import Utils from "./utils";
 import {Parser} from "m3u8-parser";
 
 const defaultSettings: Settings = {
-    forwardSegmentCount: 20
+    forwardSegmentCount: 20,
+    swarmId: undefined,
 };
 
 export class SegmentManager {
@@ -223,13 +224,14 @@ export class SegmentManager {
 
     private getSwarmId(playlistUrl: string): string {
         if (this.masterPlaylist) {
-            const masterUrlNoQuery = this.masterPlaylist.url.split("?")[0];
+            const masterSwarmId = (this.settings.swarmId && (this.settings.swarmId.length !== 0)) ?
+                    this.settings.swarmId : this.masterPlaylist.url.split("?")[0];
 
             for (let i = 0; i < this.masterPlaylist.manifest.playlists.length; ++i) {
                 let url = this.masterPlaylist.manifest.playlists[i].uri;
                 url = Utils.isAbsoluteUrl(url) ? url : this.masterPlaylist.baseUrl + url;
                 if (url === playlistUrl) {
-                    return `${masterUrlNoQuery}+V${i}`;
+                    return `${masterSwarmId}+V${i}`;
                 }
             }
         }
@@ -286,4 +288,10 @@ interface Settings {
      * Number of segments for building up predicted forward segments sequence; used to predownload and share via P2P
      */
     forwardSegmentCount: number;
+
+    /**
+     * Override default swarm ID that is used to identify unique media stream with trackers (manifest URL without
+     * query parameters is used as the swarm ID if the parameter is not specified)
+     */
+    swarmId: string | undefined;
 }

@@ -220,7 +220,7 @@
 
         DemoApp.prototype.initForm = function () {
             var form = document.getElementById("videoUrlForm");
-            window.location.search.substr(1).split("&").forEach(function (e) {
+            window.location.search.substr(1).split("&").forEach((e) => {
                 var p = e.split("=");
                 if (p.length === 2) {
                     var name = p[0];
@@ -231,6 +231,9 @@
                             break;
                         case "type":
                             form.type.value = value;
+                            break;
+                        case "swarm":
+                            this.swarmId = value;
                             break;
                     }
                 }
@@ -247,44 +250,50 @@
                 this.videoContainer.removeChild(this.videoContainer.lastChild);
             }
 
+            const config = {
+                segments: {
+                    swarmId: this.swarmId
+                }
+            };
+
             switch (this.playerType) {
                 case "hlsjs":
-                    this.engine = new p2pml.hlsjs.Engine();
+                    this.engine = new p2pml.hlsjs.Engine(config);
                     this.initHlsJsPlayer();
                     break;
 
                 case "clappr":
-                    this.engine = new p2pml.hlsjs.Engine();
+                    this.engine = new p2pml.hlsjs.Engine(config);
                     this.initClapprPlayer();
                     break;
 
                 case "flowplayer":
-                    this.engine = new p2pml.hlsjs.Engine();
+                    this.engine = new p2pml.hlsjs.Engine(config);
                     this.initFlowplayerPlayer();
                     break;
 
                 case "mediaelement":
-                    this.engine = new p2pml.hlsjs.Engine();
+                    this.engine = new p2pml.hlsjs.Engine(config);
                     this.initMediaElementPlayer();
                     break;
 
                 case "videojs-contrib-hlsjs":
-                    this.engine = new p2pml.hlsjs.Engine();
+                    this.engine = new p2pml.hlsjs.Engine(config);
                     this.initVideoJsContribHlsJsPlayer();
                     break;
 
                 case "jwplayer":
-                    this.engine = new p2pml.hlsjs.Engine();
+                    this.engine = new p2pml.hlsjs.Engine(config);
                     this.initJwPlayer();
                     break;
 
                 case "shakaplayer":
-                    this.engine = new p2pml.shaka.Engine();
+                    this.engine = new p2pml.shaka.Engine(config);
                     this.initShakaPlayer();
                     break;
 
                 case "clappr-shaka":
-                    this.engine = new p2pml.shaka.Engine();
+                    this.engine = new p2pml.shaka.Engine(config);
                     this.initClapprPlayer(true);
                     break;
 

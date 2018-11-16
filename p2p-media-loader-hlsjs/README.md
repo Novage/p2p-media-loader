@@ -89,6 +89,7 @@ Creates a new `Engine` instance.
 `settings` structure:
 - `segments`
     + `forwardSegmentCount` - Number of segments for building up predicted forward segments sequence; used to predownload and share via P2P. Default is 20;
+    + `swarmId` - Override default swarm ID that is used to identify unique media stream with trackers (manifest URL without query parameters is used as the swarm ID if the parameter is not specified);
 - `loader`
     + settings for `HybridLoader` (see [P2P Media Loader Core API](../p2p-media-loader-core/README.md#loader--new-hybridloadersettings) for details);
 

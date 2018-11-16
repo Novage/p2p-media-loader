@@ -12,7 +12,7 @@ Useful links:
   - [Core](https://cdn.jsdelivr.net/npm/p2p-media-loader-core@latest/build/)
   - [Shaka integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@latest/build/)
   - [Hls.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/build/)
- 
+
 ## Basic usage
 
 General steps are:
@@ -80,6 +80,7 @@ Creates a new `Engine` instance.
 - `segments`
     + `forwardSegmentCount` - Number of segments for building up predicted forward segments sequence; used to predownload and share via P2P. Default is 20;
     + `maxHistorySegments` - Maximum amount of requested segments manager should remember; used to build up sequence with correct priorities for P2P sharing. Default is 50;
+    + `swarmId` - Override default swarm ID that is used to identify unique media stream with trackers (manifest URL without query parameters is used as the swarm ID if the parameter is not specified);
 - `loader`
     + settings for `HybridLoader` (see [P2P Media Loader Core API](../p2p-media-loader-core/README.md#loader--new-hybridloadersettings) for details);
 
