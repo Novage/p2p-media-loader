@@ -3,5 +3,7 @@ tsconfig.test.json
 tslint.json
 lib
 test
+.editorconfig
 demo
 webpackfile.js
+*.tgz
