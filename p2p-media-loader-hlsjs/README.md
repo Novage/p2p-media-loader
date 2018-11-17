@@ -2,7 +2,7 @@
 
 [![npm version](https://badge.fury.io/js/p2p-media-loader-hlsjs.svg)](https://npmjs.com/package/p2p-media-loader-hlsjs)
 
-P2P sharing of segmented media streams (i.e. HLS) using WebRTC for [Hls.js](https://github.com/video-dev/hls.js)
+P2P sharing of HLS media streams using WebRTC for [Hls.js](https://github.com/video-dev/hls.js)
 
 Useful links:
 - [Demo](http://novage.com.ua/p2p-media-loader/demo.html)

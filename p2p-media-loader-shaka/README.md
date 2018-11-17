@@ -2,7 +2,7 @@
 
 [![npm version](https://badge.fury.io/js/p2p-media-loader-shaka.svg)](https://npmjs.com/package/p2p-media-loader-shaka)
 
-P2P sharing of segmented media streams (i.e. HLS, DASH) using WebRTC for [Shaka Player](https://github.com/google/shaka-player)
+P2P sharing of segmented media streams (i.e. HLS, MPEG-DASH) using WebRTC for [Shaka Player](https://github.com/google/shaka-player)
 
 Useful links:
 - [Demo](http://novage.com.ua/p2p-media-loader/demo.html)
