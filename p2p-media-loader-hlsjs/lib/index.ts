@@ -33,7 +33,7 @@ export function initClapprPlayer(player: any): void {
 }
 
 export function initFlowplayerHlsJsPlayer(player: any): void {
-    player.on("ready", () => initHlsJsPlayer(player.engine.hlsjs));
+    player.on("ready", () => initHlsJsPlayer(player.engine.hlsjs ? player.engine.hlsjs : player.engine.hls));
 }
 
 export function initVideoJsContribHlsJsPlayer(player: any): void {
