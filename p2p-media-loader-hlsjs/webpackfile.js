@@ -1,7 +1,7 @@
-const path = require('path');
-const webpack = require('webpack');
+const path = require("path");
+const webpack = require("webpack");
 
-const OUTPUT_PATH = 'build';
+const OUTPUT_PATH = "build";
 
 function makeConfig({libName, entry, mode}) {
     return {
@@ -18,21 +18,21 @@ function makeConfig({libName, entry, mode}) {
           ]
         },
         output: {
-            filename: libName + '.js',
+            filename: libName + ".js",
             path: path.resolve(__dirname, OUTPUT_PATH)
         },
         externals: {
-            'p2p-media-loader-core': 'window.p2pml.core'
+            "p2p-media-loader-core": "window.p2pml.core"
         },
         plugins: [
             new webpack.DefinePlugin({
-                __P2PML_VERSION__: JSON.stringify(require('./package.json').version)
+                __P2PML_VERSION__: JSON.stringify(require("./package.json").version)
             })
         ]
     }
 };
 
 module.exports = [
-    makeConfig({entry: './lib/browser-init-webpack.js', mode: 'development', libName: 'p2p-media-loader-hlsjs', }),
-    makeConfig({entry: './lib/browser-init-webpack.js', mode: 'production', libName: 'p2p-media-loader-hlsjs.min'})
+    makeConfig({entry: "./lib/browser-init-webpack.js", mode: "development", libName: "p2p-media-loader-hlsjs", }),
+    makeConfig({entry: "./lib/browser-init-webpack.js", mode: "production", libName: "p2p-media-loader-hlsjs.min"})
 ];
