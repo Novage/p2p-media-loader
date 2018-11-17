@@ -16,4 +16,4 @@
 
 export {LoaderInterface, Events, Segment} from "./loader-interface";
 export {default as HybridLoader} from "./hybrid-loader";
-export const version = "__VERSION__";
+export const version = typeof(__P2PML_VERSION__) === "undefined" ? "__VERSION__" : __P2PML_VERSION__;

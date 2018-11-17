@@ -1,6 +1,7 @@
 const path = require('path');
+const webpack = require('webpack');
 
-const OUTPUT_PATH = 'build'
+const OUTPUT_PATH = 'build';
 
 function makeConfig({libName, entry, mode}) {
     return {
@@ -23,7 +24,11 @@ function makeConfig({libName, entry, mode}) {
         externals: {
             'p2p-media-loader-core': 'window.p2pml.core'
         },
-        plugins: []
+        plugins: [
+            new webpack.DefinePlugin({
+                __P2PML_VERSION__: JSON.stringify(require('./package.json').version)
+            })
+        ]
     }
 };
 

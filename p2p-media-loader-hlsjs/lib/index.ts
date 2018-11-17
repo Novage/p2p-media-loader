@@ -74,7 +74,7 @@ export function initJwPlayer(player: any, hlsjsConfig: any): void {
 }
 
 export { Engine };
-export const version = "__VERSION__";
+export const version = typeof(__P2PML_VERSION__) === "undefined" ? "__VERSION__" : __P2PML_VERSION__;
 
 function initHlsJsEvents(player: any, engine: Engine): void {
     player.on("hlsFragChanged", function (event_unused: any, data: any) {

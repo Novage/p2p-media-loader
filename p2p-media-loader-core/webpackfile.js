@@ -1,6 +1,7 @@
 const path = require('path');
+const webpack = require('webpack');
 
-const OUTPUT_PATH = 'build'
+const OUTPUT_PATH = 'build';
 
 function makeConfig({libName, entry, mode}) {
     return {
@@ -20,7 +21,11 @@ function makeConfig({libName, entry, mode}) {
             filename: libName + '.js',
             path: path.resolve(__dirname, OUTPUT_PATH)
         },
-        plugins: []
+        plugins: [
+            new webpack.DefinePlugin({
+                __P2PML_VERSION__: JSON.stringify(require('./package.json').version)
+            })
+        ]
     }
 };
 

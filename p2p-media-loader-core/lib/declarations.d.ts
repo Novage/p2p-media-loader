@@ -19,3 +19,5 @@ declare module "bittorrent-tracker" {
     export const Server: any;
     export default Client;
 }
+
+declare const __P2PML_VERSION__: string;
