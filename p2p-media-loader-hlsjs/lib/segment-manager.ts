@@ -228,8 +228,7 @@ export class SegmentManager {
                     this.settings.swarmId : this.masterPlaylist.url.split("?")[0];
 
             for (let i = 0; i < this.masterPlaylist.manifest.playlists.length; ++i) {
-                let url = this.masterPlaylist.manifest.playlists[i].uri;
-                url = Utils.isAbsoluteUrl(url) ? url : this.masterPlaylist.baseUrl + url;
+                const url = new URL(this.masterPlaylist.manifest.playlists[i].uri, this.masterPlaylist.url).toString();
                 if (url === playlistUrl) {
                     return `${masterSwarmId}+V${i}`;
                 }
@@ -242,7 +241,6 @@ export class SegmentManager {
 } // end of SegmentManager
 
 class Playlist {
-    public baseUrl: string;
     public swarmId: string = "";
 
     public constructor(readonly url: string, readonly manifest: any) {
@@ -250,8 +248,6 @@ class Playlist {
         if (pos === -1) {
             throw new Error("Unexpected playlist URL format");
         }
-
-        this.baseUrl = url.substring(0, pos + 1);
     }
 
     public getSegmentIndex(url: string): number {
@@ -269,7 +265,7 @@ class Playlist {
     }
 
     public getSegmentAbsoluteUrl(segmentUrl: string): string {
-        return Utils.isAbsoluteUrl(segmentUrl) ? segmentUrl : this.baseUrl + segmentUrl;
+        return new URL(segmentUrl, this.url).toString();
     }
 }
 

@@ -43,8 +43,4 @@ export default class Utils {
         return Utils.fetchContentAsAny(url, "arraybuffer");
     }
 
-    public static isAbsoluteUrl(url: string): boolean {
-        return url.startsWith("http://") || url.startsWith("https://");
-    }
-
 }
