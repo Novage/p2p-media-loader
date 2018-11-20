@@ -370,9 +370,11 @@
                     this.engine.initShakaPlayer(shakaPlayerInstance);
                 };
             } else {
-                setup.hlsjsConfig = {
-                    liveSyncDurationCount: this.liveSyncDurationCount,
-                    loader: this.engine.createLoaderClass()
+                setup.playback = {
+                    hlsjsConfig: {
+                        liveSyncDurationCount: this.liveSyncDurationCount,
+                        loader: this.engine.createLoaderClass()
+                    }
                 };
             }
 

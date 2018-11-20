@@ -45,9 +45,11 @@ General steps are:
                 source: "https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.m3u8",
                 mute: true,
                 autoPlay: true,
-                hlsjsConfig: {
-                    liveSyncDurationCount: 7,
-                    loader: engine.createLoaderClass()
+                playback: {
+                    hlsjsConfig: {
+                        liveSyncDurationCount: 7,
+                        loader: engine.createLoaderClass()
+                    }
                 }
             });
 
@@ -162,9 +164,11 @@ var engine = new p2pml.hlsjs.Engine();
 var player = new Clappr.Player({
     parentId: "#video",
     source: "https://example.com/path/to/your/playlist.m3u8",
-    hlsjsConfig: {
-        liveSyncDurationCount: 7,
-        loader: engine.createLoaderClass()
+    playback: {
+        hlsjsConfig: {
+            liveSyncDurationCount: 7,
+            loader: engine.createLoaderClass()
+        }
     }
 });
 
