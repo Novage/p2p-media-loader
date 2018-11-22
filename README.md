@@ -41,16 +41,16 @@ All the components of the P2P network are free and open-source.
 
 ![P2P Media Loader network](https://raw.githubusercontent.com/Novage/p2p-media-loader/gh-pages/images/p2p-media-loader-network.png)
 
-**P2P Media Loader** browser requirements are:<br>
+**P2P Media Loader** browser [requirements](#browsers-support) are:<br>
 - **WebRTC Data Channels** support to exchange data between peers
 - **Media Source Extensions** are required by Hls.js and ShakaPlayer engines for media playback
 
 [**STUN**](https://en.wikipedia.org/wiki/STUN) server is used by [WebRTC](https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API) to gather [ICE](https://en.wikipedia.org/wiki/Interactive_Connectivity_Establishment) candidates.
-There are many running public servers available on [Public STUN server list](https://gist.github.com/mondain/b0ec1cf5f60ae726202e)
+There are many running public servers available on [Public STUN server list](https://gist.github.com/mondain/b0ec1cf5f60ae726202e).
 
 [**WebTorrent**](https://webtorrent.io/) tracker is used for WebRTC signaling and to create swarms of peers that download the same media stream.
 Few running public trackers are available: [https://openwebtorrent.com/](https://openwebtorrent.com/).
-It is possible to run personal WebTorrent tracker using open-source implementations: [bittorrent-tracker](https://github.com/webtorrent/bittorrent-tracker), [uWebTorrentTracker](https://github.com/DiegoRBaquero/uWebTorrentTracker)
+It is possible to run personal WebTorrent tracker using open-source implementations: [bittorrent-tracker](https://github.com/webtorrent/bittorrent-tracker), [uWebTorrentTracker](https://github.com/DiegoRBaquero/uWebTorrentTracker).
 
 **P2P Media Loader** is configured to use public **STUN** and **WebTorrent** servers by default. It means that it is not required to run any server side software for the P2P network to function.
 
