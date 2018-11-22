@@ -27,8 +27,8 @@ It significantly reduces traditional CDN traffic and cost while delivering media
 ## Key features
 
 - Supports live and VOD streams over HLS or MPEG-DASH protocols
-- Supports multiple players and engines  
-  Engines: Hls.js, ShakaPlayer  
+- Supports multiple players and engines
+  Engines: Hls.js, ShakaPlayer
   Players: JWPlayer, Clappr, Flowplayer, MediaElement, VideoJS
 - Supports adaptive bitrate streaming of HLS and MPEG-DASH protocols
 - No need in server side software. By default **P2P Media Loader** uses publicly available servers:
@@ -71,3 +71,11 @@ From time to time random peers from P2P swarm download new segments over HTTP(S)
 ## Limitations
 
 Only one media track is delivered over P2P. If video and audio tracks in HLS or MPEG-DASH go separately, just video is going to be shared over P2P network.
+
+## Browsers support
+
+|                         | Chrome | Firefox | macOS Safari | iOS Safari | IE    | Edge  |
+|-------------------------|--------|---------|--------------|------------|-------|-------|
+| WebRTC Data Channels    | +      | +       | +            | +          | -     | -     |
+| Media Source Extensions | +      | +       | +            | -          | +     | +     |
+| **P2P Media Loader**    | **+**  | **+**   | **+**        | **-**      | **-** | **-** |
