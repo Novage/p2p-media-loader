@@ -48,7 +48,6 @@ export class MediaPeer extends STEEmitter<
     private segmentsMap = new Map<string, MediaPeerSegmentStatus>();
     private debug = Debug("p2pml:media-peer");
     private timer: number | null = null;
-    private isSafari11_0: boolean = false;
 
     constructor(readonly peer: any,
             readonly settings: {
@@ -63,22 +62,6 @@ export class MediaPeer extends STEEmitter<
         this.peer.on("data", (data: any) => this.onPeerData(data));
 
         this.id = peer.id;
-
-        this.detectSafari11_0();
-    }
-
-    private detectSafari11_0() {
-        const userAgent: string = typeof navigator !== "undefined" ? navigator.userAgent || "" : "";
-        const isSafari = userAgent.indexOf("Safari") != -1 && userAgent.indexOf("Chrome") == -1;
-        if (isSafari) {
-            const match = userAgent.match(/version\/(\d+(\.\d+)?)/i);
-            const version = (match && match.length > 1 && match[1]) || "";
-            if (version === "11.0") {
-                this.isSafari11_0 = true;
-                this.debug("enable workaround for Safari 11.0");
-                return;
-            }
-        }
     }
 
     private onPeerConnect(): void {
@@ -224,9 +207,7 @@ export class MediaPeer extends STEEmitter<
         let bytesLeft = data.byteLength;
         while (bytesLeft > 0) {
             const bytesToSend = (bytesLeft >= this.settings.webRtcMaxMessageSize ? this.settings.webRtcMaxMessageSize : bytesLeft);
-            const buffer = this.isSafari11_0 ?
-                Buffer.from(data.slice(data.byteLength - bytesLeft, data.byteLength - bytesLeft + bytesToSend)) : // workaround for Safari 11.0 bug: https://bugs.webkit.org/show_bug.cgi?id=173052
-                Buffer.from(data, data.byteLength - bytesLeft, bytesToSend); // avoid memory copying
+            const buffer = Buffer.from(data, data.byteLength - bytesLeft, bytesToSend);
 
             this.peer.write(buffer);
             bytesLeft -= bytesToSend;
