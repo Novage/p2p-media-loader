@@ -39,7 +39,7 @@ const defaultSettings: Settings = {
 
     webRtcMaxMessageSize: 64 * 1024 - 1,
     p2pSegmentDownloadTimeout: 60000,
-    trackerAnnounce: ["wss://tracker.btorrent.xyz/", "wss://tracker.openwebtorrent.com/"],
+    trackerAnnounce: ["wss://tracker.btorrent.xyz", "wss://tracker.openwebtorrent.com", "wss://tracker.fastcast.nz"],
     rtcConfig: require("simple-peer").config
 };
 
