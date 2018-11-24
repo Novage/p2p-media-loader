@@ -17,7 +17,6 @@
 import * as Debug from "debug";
 
 import {Client} from "bittorrent-tracker";
-import {createHash} from "crypto";
 import STEEmitter from "./stringly-typed-event-emitter";
 import {Segment} from "./loader-interface";
 import {MediaPeer, MediaPeerSegmentStatus} from "./media-peer";
@@ -42,8 +41,11 @@ export class P2PMediaManager extends STEEmitter<
     private peerCandidates: Map<string, MediaPeer[]> = new Map();
     private peerSegmentRequests: Map<string, PeerSegmentRequest> = new Map();
     private swarmId: string | null = null;
-    private peerId: string;
+    private peerId: ArrayBuffer;
     private debug = Debug("p2pml:p2p-media-manager");
+    private pendingTrackerClient: {
+        isDestroyed: boolean
+    } | null = null;
 
     public constructor(
             readonly cachedSegments: Map<string, SegmentInternal>,
@@ -56,12 +58,14 @@ export class P2PMediaManager extends STEEmitter<
             }) {
         super();
 
-        this.peerId = createHash("sha1").update((Date.now() + Math.random()).toFixed(12)).digest("hex");
+        this.peerId = crypto.getRandomValues(new Uint8Array(20)).buffer;
 
-        this.debug("peer ID", this.peerId);
+        if (this.debug.enabled) {
+            this.debug("peer ID", Buffer.from(this.peerId).toString("hex"));
+        }
     }
 
-    public setSwarmId(swarmId: string): void {
+    public async setSwarmId(swarmId: string) {
         if (this.swarmId === swarmId) {
             return;
         }
@@ -70,17 +74,31 @@ export class P2PMediaManager extends STEEmitter<
 
         this.swarmId = swarmId;
         this.debug("swarm ID", this.swarmId);
-        this.createClient(createHash("sha1").update(PEER_PROTOCOL_VERSION + this.swarmId).digest("hex"));
+
+        this.pendingTrackerClient = {
+            isDestroyed: false
+        };
+
+        const pendingTrackerClient = this.pendingTrackerClient;
+
+        // TODO: Edge doesn't support SHA-1. Change to SHA-256 once Edge support is required.
+        const infoHash = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(PEER_PROTOCOL_VERSION + this.swarmId));
+
+        // destroy may be called while waiting for the hash to be calculated
+        if (!pendingTrackerClient.isDestroyed) {
+            this.pendingTrackerClient = null;
+            this.createClient(infoHash);
+        }
     }
 
-    private createClient(infoHash: string): void {
+    private createClient(infoHash: ArrayBuffer): void {
         if (!this.settings.useP2P) {
             return;
         }
 
         const clientOptions = {
-            infoHash: infoHash,
-            peerId: this.peerId,
+            infoHash: Buffer.from(infoHash, 0, 20),
+            peerId: Buffer.from(this.peerId, 0, 20),
             announce: this.settings.trackerAnnounce,
             rtcConfig: this.settings.rtcConfig
         };
@@ -171,6 +189,11 @@ export class P2PMediaManager extends STEEmitter<
             this.trackerClient.stop();
             this.trackerClient.destroy();
             this.trackerClient = null;
+        }
+
+        if (this.pendingTrackerClient) {
+            this.pendingTrackerClient.isDestroyed = true;
+            this.pendingTrackerClient = null;
         }
 
         this.peers.forEach((peer) => peer.destroy());

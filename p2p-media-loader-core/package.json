@@ -38,7 +38,6 @@
   },
   "dependencies": {
     "bittorrent-tracker": "^9.10.1",
-    "crypto-browserify": "^3.12.0",
     "debug": "^3.2.6",
     "events": "^3.0.0",
     "get-browser-rtc": "^1.0.2"
