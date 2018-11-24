@@ -70,7 +70,7 @@ export enum Events {
 }
 
 export interface LoaderInterface {
-    on(eventName: string | symbol, listener: Function): this;
+    on(eventName: string, listener: Function): this;
     load(segments: Segment[], swarmId: string): void;
     getSegment(id: string): Segment | undefined;
     getSettings(): any;

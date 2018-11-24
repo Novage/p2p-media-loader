@@ -21,6 +21,7 @@ import STEEmitter from "./stringly-typed-event-emitter";
 import {Segment} from "./loader-interface";
 import {MediaPeer, MediaPeerSegmentStatus} from "./media-peer";
 import {SegmentInternal} from "./segment-internal";
+import {Buffer} from "buffer";
 
 const PEER_PROTOCOL_VERSION = 1;
 
