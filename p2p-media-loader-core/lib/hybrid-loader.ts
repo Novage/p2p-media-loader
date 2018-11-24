@@ -24,7 +24,8 @@ import {MediaPeerSegmentStatus} from "./media-peer";
 import {SegmentInternal} from "./segment-internal";
 import {SpeedApproximator} from "./speed-approximator";
 
-const getBrowserRtc = require("get-browser-rtc");
+import * as getBrowserRTC from "get-browser-rtc";
+import * as Peer from "simple-peer";
 
 const defaultSettings: Settings = {
     cachedSegmentExpiration: 5 * 60 * 1000,
@@ -40,7 +41,7 @@ const defaultSettings: Settings = {
     webRtcMaxMessageSize: 64 * 1024 - 1,
     p2pSegmentDownloadTimeout: 60000,
     trackerAnnounce: ["wss://tracker.btorrent.xyz", "wss://tracker.openwebtorrent.com", "wss://tracker.fastcast.nz"],
-    rtcConfig: require("simple-peer").config
+    rtcConfig: (Peer as any).config
 };
 
 export default class HybridLoader extends EventEmitter implements LoaderInterface {
@@ -55,7 +56,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private readonly settings: Settings;
 
     public static isSupported(): boolean {
-        const browserRtc = getBrowserRtc();
+        const browserRtc = (getBrowserRTC as Function)();
         return (browserRtc && (browserRtc.RTCPeerConnection.prototype.createDataChannel !== undefined));
     }
 

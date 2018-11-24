@@ -7,7 +7,7 @@
     "moduleResolution": "node",
     "declaration": true,
     "noEmit": true,
-	"noUnusedLocals": true,
+	  "noUnusedLocals": true,
     "noUnusedParameters": false,
     "strictNullChecks": true,
     "forceConsistentCasingInFileNames": true,
