@@ -40,8 +40,8 @@
   },
   "devDependencies": {
     "@types/debug": "^0.0.31",
+    "@types/events": "^1.2.0",
     "@types/mocha": "^5.2.5",
-    "@types/node": "^10.12.9",
     "@types/sinon": "^5.0.5",
     "browserify": "^16.2.3",
     "browserify-versionify": "^1.0.6",
