@@ -48,7 +48,7 @@ export class MediaPeer extends STEEmitter<
     private downloadingSegment: DownloadingSegment | null = null;
     private segmentsMap = new Map<string, MediaPeerSegmentStatus>();
     private debug = Debug("p2pml:media-peer");
-    private timer: number | null = null;
+    private timer: ReturnType<typeof setTimeout> | null = null;
 
     constructor(readonly peer: any,
             readonly settings: {
@@ -240,7 +240,7 @@ export class MediaPeer extends STEEmitter<
     }
 
     private runResponseTimeoutTimer(): void {
-        this.timer = window.setTimeout(() => {
+        this.timer = setTimeout(() => {
             this.timer = null;
             if (!this.downloadingSegmentId) {
                 return;
