@@ -36,12 +36,12 @@
     "url": "https://github.com/Novage/p2p-media-loader.git"
   },
   "dependencies": {
-    "@types/events": "^1.2.0",
     "m3u8-parser": "^4.2.0",
     "p2p-media-loader-core": "^0.2.1"
   },
   "devDependencies": {
     "@hola.org/jwplayer-hlsjs": "^0.0.79",
+    "@types/events": "^1.2.0",
     "@types/mocha": "^5.2.5",
     "@types/sinon": "^5.0.5",
     "browserify": "^16.2.3",
