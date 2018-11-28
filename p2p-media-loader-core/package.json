@@ -30,7 +30,7 @@
     "webpack:build": "webpack --progress",
     "webpack:watch": "webpack --watch --progress",
     "lint": "tslint -c ./tslint.json -p ./tsconfig.tslint.json",
-    "test": "TS_NODE_PROJECT=tsconfig.test.json mocha -r ts-node/register test/*.test.ts"
+    "test": "TS_NODE_PROJECT=tsconfig.test.json TS_NODE_CACHE=false mocha -r ts-node/register test/*.test.ts"
   },
   "repository": {
     "type": "git",

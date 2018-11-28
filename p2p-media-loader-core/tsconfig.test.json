@@ -16,7 +16,7 @@
     "noImplicitAny": true,
     "types": ["mocha", "node", "browser-stubs"],
     "typeRoots" : ["./node_modules/@types", "./test/types"],
-    "baseUrl": ".",
+    "baseUrl": "."
   },
   "compileOnSave": true
 }

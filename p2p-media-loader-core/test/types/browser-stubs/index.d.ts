@@ -18,15 +18,15 @@ declare class RTCConfiguration {
 }
 
 declare class XMLHttpRequest {
-    [key: string]: any
+    [key: string]: any;
 }
 
 declare class TextEncoder {
-    [key: string]: any
+    [key: string]: any;
 }
 
 declare class TextDecoder {
-    [key: string]: any
+    [key: string]: any;
 }
 
 declare const performance: any;

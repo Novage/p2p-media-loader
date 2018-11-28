@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+/// <reference path="../lib/declarations.d.ts" />
 /// <reference types="mocha" />
 
 import {SpeedApproximator} from "../lib/speed-approximator";

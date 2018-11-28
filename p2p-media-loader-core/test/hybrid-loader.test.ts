@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+/// <reference path="../lib/declarations.d.ts" />
 /// <reference types="mocha" />
 
 import {HttpMediaManager} from "../lib/http-media-manager";
