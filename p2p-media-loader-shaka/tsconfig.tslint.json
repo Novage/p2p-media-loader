@@ -14,7 +14,8 @@
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,
     "noImplicitThis": true,
-    "noImplicitAny": true
+    "noImplicitAny": true,
+    "types": []
   },
   "include": [
     "lib/**/*",

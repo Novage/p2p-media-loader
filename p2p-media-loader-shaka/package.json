@@ -28,30 +28,24 @@
     "build": "npm run compile && npm run browserify && npm run minify",
     "webpack:build": "webpack --progress",
     "webpack:watch": "webpack --watch --progress",
-    "lint": "tslint -c ./tslint.json -p ./tsconfig.test.json",
-    "test": "mocha -r ts-node/register test/*.test.ts"
+    "lint": "tslint -c ./tslint.json -p ./tsconfig.tslint.json"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/Novage/p2p-media-loader.git"
   },
   "dependencies": {
+    "debug": "^3.2.6",
     "p2p-media-loader-core": "^0.2.1"
   },
   "devDependencies": {
     "@types/debug": "^0.0.31",
     "@types/events": "^1.2.0",
-    "@types/mocha": "^5.2.5",
-    "@types/sinon": "^5.0.5",
     "browserify": "^16.2.3",
     "browserify-versionify": "^1.0.6",
     "copyfiles": "^2.1.0",
     "mkdirp": "^0.5.1",
-    "mocha": "^5.2.0",
-    "sinon": "^7.1.1",
     "ts-loader": "^5.3.0",
-    "ts-mockito": "^2.3.1",
-    "ts-node": "^7.0.1",
     "tslint": "^5.11.0",
     "typescript": "^3.1.6",
     "uglify-js": "^3.4.9",
