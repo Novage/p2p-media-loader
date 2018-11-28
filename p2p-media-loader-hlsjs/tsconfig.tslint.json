@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
+    "target": "es5",
     "module": "commonjs",
-    "lib": ["es6"],
+    "lib": ["dom", "es6"],
     "strict": true,
     "moduleResolution": "node",
     "declaration": true,
@@ -14,9 +15,10 @@
     "noImplicitReturns": true,
     "noImplicitThis": true,
     "noImplicitAny": true,
-    "types": ["mocha", "node", "node-globals", "browser-stubs"],
-    "typeRoots" : ["./node_modules/@types", "./test/types"],
-    "baseUrl": "."
+    "types": []
   },
-  "compileOnSave": true
+  "include": [
+    "lib/**/*",
+    "test/**/*"
+  ]
 }
