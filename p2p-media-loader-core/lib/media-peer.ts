@@ -114,7 +114,7 @@ export class MediaPeer extends STEEmitter<
         // Serialized JSON string check by first, second and last characters: '{" .... }'
         if (bytes[0] == 123 && bytes[1] == 34 && bytes[data.byteLength - 1] == 125) {
             try {
-                return JSON.parse(new TextDecoder("utf-8").decode(data));
+                return JSON.parse(new TextDecoder().decode(data));
             } catch {
             }
         }

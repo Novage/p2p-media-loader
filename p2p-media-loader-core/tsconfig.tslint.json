@@ -6,7 +6,7 @@
     "strict": true,
     "moduleResolution": "node",
     "declaration": true,
-    "outDir": "./dist",
+    "noEmit": true,
     "noUnusedLocals": true,
     "noUnusedParameters": false,
     "strictNullChecks": true,
@@ -17,8 +17,8 @@
     "noImplicitAny": true,
     "types": []
   },
-  "compileOnSave": true,
   "include": [
-    "lib/**/*"
+    "lib/**/*",
+    "test/**/*"
   ]
 }
