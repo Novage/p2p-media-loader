@@ -36,6 +36,7 @@
     "url": "https://github.com/Novage/p2p-media-loader.git"
   },
   "dependencies": {
+    "events": "^3.0.0",
     "m3u8-parser": "^4.2.0",
     "p2p-media-loader-core": "^0.2.1"
   },

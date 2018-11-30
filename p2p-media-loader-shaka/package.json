@@ -36,6 +36,7 @@
   },
   "dependencies": {
     "debug": "^3.2.6",
+    "events": "^3.0.0",
     "p2p-media-loader-core": "^0.2.1"
   },
   "devDependencies": {
