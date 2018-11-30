@@ -24,7 +24,7 @@
   ],
   "scripts": {
     "compile": "tsc && copyfiles -f ./lib/*.js ./dist",
-    "browserify": "mkdirp ./build && browserify -r ./dist/index.js:p2p-media-loader-core ./dist/browser-init.js > ./build/p2p-media-loader-core.js",
+    "browserify": "mkdirp ./build && browserify -r ./dist/index.js:p2p-media-loader-core -r debug -r events ./dist/browser-init.js > ./build/p2p-media-loader-core.js",
     "minify": "uglifyjs ./build/p2p-media-loader-core.js -m -c --comments > ./build/p2p-media-loader-core.min.js",
     "build": "npm run compile && npm run browserify && npm run minify",
     "webpack:build": "webpack --progress",

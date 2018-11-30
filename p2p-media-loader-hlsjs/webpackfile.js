@@ -22,7 +22,9 @@ function makeConfig({libName, entry, mode}) {
             path: path.resolve(__dirname, OUTPUT_PATH)
         },
         externals: {
-            "p2p-media-loader-core": "window.p2pml.core"
+            "p2p-media-loader-core": "window.p2pml.core",
+            "debug": "window.p2pml._shared.debug",
+            "events": "window.p2pml._shared.events",
         },
         plugins: [
             new webpack.DefinePlugin({

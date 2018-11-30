@@ -23,7 +23,7 @@
   ],
   "scripts": {
     "compile": "tsc && copyfiles -f ./lib/*.js ./dist",
-    "browserify": "mkdirp ./build && browserify -r ./dist/index.js:p2p-media-loader-shaka ./dist/browser-init.js --exclude p2p-media-loader-core > ./build/p2p-media-loader-shaka.js",
+    "browserify": "mkdirp ./build && browserify -r ./dist/index.js:p2p-media-loader-shaka ./dist/browser-init.js -x p2p-media-loader-core -x debug -x events > ./build/p2p-media-loader-shaka.js",
     "minify": "uglifyjs ./build/p2p-media-loader-shaka.js -m -c --comments > ./build/p2p-media-loader-shaka.min.js",
     "build": "npm run compile && npm run browserify && npm run minify",
     "webpack:build": "webpack --progress",
