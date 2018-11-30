@@ -1,6 +1,6 @@
 # P2P Media Loader
 
-**P2P Media Loader** is an open-source JavaScript library that uses features of modern browsers (i.e. HTML5 and WebRTC) to deliver media over P2P. It doesn’t require any browser plugins or addons to function.
+**P2P Media Loader** is an open-source JavaScript library that uses features of modern web browsers (i.e. HTML5 video and WebRTC) to deliver media over P2P and do playback via integrations with many popular HTML5 video players. It doesn’t require any web browser plugins or add-ons to function.
 
 It allows creating Peer-to-Peer network (also called P2P CDN or P2PTV) for traffic sharing between users (peers) that are watching the same media stream live or VOD over HLS or MPEG-DASH protocols.
 
@@ -27,9 +27,9 @@ It significantly reduces traditional CDN traffic and cost while delivering media
 ## Key features
 
 - Supports live and VOD streams over HLS or MPEG-DASH protocols
-- Supports multiple players and engines:
+- Supports multiple HTML5 video players and engines:
   - Engines: Hls.js, ShakaPlayer
-  - Players: JWPlayer, Clappr, Flowplayer, MediaElement, VideoJS
+  - Video players: JWPlayer, Clappr, Flowplayer, MediaElement, VideoJS
 - Supports adaptive bitrate streaming of HLS and MPEG-DASH protocols
 - No need in server-side software. By default **P2P Media Loader** uses publicly available servers:
   - STUN servers - [Public STUN server list](https://gist.github.com/mondain/b0ec1cf5f60ae726202e)
@@ -41,7 +41,7 @@ All the components of the P2P network are free and open-source.
 
 ![P2P Media Loader network](https://raw.githubusercontent.com/Novage/p2p-media-loader/gh-pages/images/p2p-media-loader-network.png)
 
-**P2P Media Loader** browser [requirements](#browsers-support) are:<br>
+**P2P Media Loader** web browser [requirements](#web-browsers-support) are:<br>
 - **WebRTC Data Channels** support to exchange data between peers
 - **Media Source Extensions** are required by Hls.js and ShakaPlayer engines for media playback
 
@@ -56,7 +56,7 @@ It is possible to run personal WebTorrent tracker using open-source implementati
 
 ## How it works
 
-A browser runs a player integrated with **P2P Media Loader** library. An instance of **P2P Media Loader** is called **peer**. Many peers form the P2P network.
+A web browser runs a video player integrated with **P2P Media Loader** library. An instance of **P2P Media Loader** is called **peer**. Many peers form the P2P network.
 
 **P2P Media Loader** starts to download initial media segments over HTTP(S) from source server or CDN. This allows beginning media playback faster.
 Also, in case of no peers, it will continue to download segments over HTTP(S) that will not differ from traditional media stream download over HTTP.
@@ -72,7 +72,7 @@ From time to time random peers from the P2P swarm download new segments over HTT
 
 Only one media track is delivered over P2P. If video and audio tracks in HLS or MPEG-DASH go separately, just video is going to be shared over the P2P network.
 
-## Browsers support
+## Web browsers support
 
 |                         | Chrome | Firefox | macOS Safari | iOS Safari | IE    | Edge  |
 |-------------------------|--------|---------|--------------|------------|-------|-------|
