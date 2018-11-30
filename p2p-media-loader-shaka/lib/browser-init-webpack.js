@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import * as p2pMediaLoaderShaka from './index';
+import * as p2pMediaLoaderShaka from "./index";
 
 if (!window.p2pml) {
     window.p2pml = {};
