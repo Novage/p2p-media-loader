@@ -150,9 +150,7 @@ export class P2PMediaManager extends STEEmitter<
             return false;
         }
 
-        const entries = this.peers.values();
-        for (let entry = entries.next(); !entry.done; entry = entries.next()) {
-            const peer = entry.value;
+        for (const peer of this.peers.values()) {
             if ((peer.getDownloadingSegmentId() == null) &&
                     (peer.getSegmentsMap().get(segment.id) === MediaPeerSegmentStatus.Loaded)) {
                 peer.requestSegment(segment.id);
@@ -197,21 +195,21 @@ export class P2PMediaManager extends STEEmitter<
             this.pendingTrackerClient = null;
         }
 
-        this.peers.forEach((peer) => peer.destroy());
+        this.peers.forEach(peer => peer.destroy());
         this.peers.clear();
 
         this.peerSegmentRequests.clear();
 
-        this.peerCandidates.forEach((peerCandidateById) => {
+        for (const peerCandidateById of this.peerCandidates.values()) {
             for (const peerCandidate of peerCandidateById) {
                 peerCandidate.destroy();
             }
-        });
+        }
         this.peerCandidates.clear();
     }
 
     public sendSegmentsMapToAll(segmentsMap: string[][]): void {
-        this.peers.forEach((peer) => peer.sendSegmentsMap(segmentsMap));
+        this.peers.forEach(peer => peer.sendSegmentsMap(segmentsMap));
     }
 
     public sendSegmentsMap(peerId: string, segmentsMap: string[][]): void {
@@ -223,13 +221,16 @@ export class P2PMediaManager extends STEEmitter<
 
     public getOvrallSegmentsMap(): Map<string, MediaPeerSegmentStatus> {
         const overallSegmentsMap: Map<string, MediaPeerSegmentStatus> = new Map();
-        this.peers.forEach(peer => peer.getSegmentsMap().forEach((segmentStatus, segmentId) => {
-            if (segmentStatus === MediaPeerSegmentStatus.Loaded) {
-                overallSegmentsMap.set(segmentId, MediaPeerSegmentStatus.Loaded);
-            } else if (!overallSegmentsMap.get(segmentId)) {
-                overallSegmentsMap.set(segmentId, MediaPeerSegmentStatus.LoadingByHttp);
+
+        for (const peer of this.peers.values()) {
+            for (const [segmentId, segmentStatus] of peer.getSegmentsMap()) {
+                if (segmentStatus === MediaPeerSegmentStatus.Loaded) {
+                    overallSegmentsMap.set(segmentId, MediaPeerSegmentStatus.Loaded);
+                } else if (!overallSegmentsMap.get(segmentId)) {
+                    overallSegmentsMap.set(segmentId, MediaPeerSegmentStatus.LoadingByHttp);
+                }
             }
-        }));
+        }
 
         return overallSegmentsMap;
     }
@@ -290,11 +291,11 @@ export class P2PMediaManager extends STEEmitter<
             return;
         }
 
-        this.peerSegmentRequests.forEach((value, key) => {
+        for (const [key, value] of this.peerSegmentRequests) {
             if (value.peerId == peer.id) {
                 this.peerSegmentRequests.delete(key);
             }
-        });
+        }
 
         this.peers.delete(peer.id);
         this.emit("peer-data-updated");

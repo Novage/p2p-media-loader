@@ -168,9 +168,7 @@ export class SegmentManager {
     }
 
     private getSegmentLocation(url: string): { playlist: Playlist, segmentIndex: number } | undefined {
-        const entries = this.variantPlaylists.values();
-        for (let entry = entries.next(); !entry.done; entry = entries.next()) {
-            const playlist = entry.value;
+        for (const playlist of this.variantPlaylists.values()) {
             const segmentIndex = playlist.getSegmentIndex(url);
             if (segmentIndex >= 0) {
                 return { playlist: playlist, segmentIndex: segmentIndex };

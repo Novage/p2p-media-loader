@@ -307,13 +307,14 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
         // Delete old segments
         const now = this.now();
-        this.segments.forEach(segment => {
+
+        for (const segment of this.segments.values()) {
             if (now - segment.lastAccessed > this.settings.cachedSegmentExpiration) {
                 segmentsToDelete.push(segment.id);
             } else {
                 remainingSegments.push(segment);
             }
-        });
+        }
 
         // Delete segments over cached count
         let countOverhead = remainingSegments.length - this.settings.cachedSegmentsCount;
