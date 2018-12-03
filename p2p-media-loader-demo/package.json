@@ -22,8 +22,8 @@
     "shaka player"
   ],
   "scripts": {
-    "build-p2p-graph": "browserify -r p2p-graph | uglifyjs -m -c > p2p-graph.js",
-    "build-hola-jwplayer-hlsjs": "browserify -r @hola.org/jwplayer-hlsjs | uglifyjs -m -c > hola-jwplayer-hlsjs.min.js",
+    "build-p2p-graph": "browserify -r p2p-graph | terser -m -c > p2p-graph.js",
+    "build-hola-jwplayer-hlsjs": "browserify -r @hola.org/jwplayer-hlsjs | terser -m -c > hola-jwplayer-hlsjs.min.js",
     "build": "npm run build-p2p-graph && npm run build-hola-jwplayer-hlsjs"
   },
   "repository": {
@@ -41,6 +41,6 @@
     "browserify": "^16.2.3",
     "browserify-versionify": "^1.0.6",
     "copyfiles": "^2.1.0",
-    "uglify-js": "^3.4.9"
+    "terser": "^3.11.0"
   }
 }
