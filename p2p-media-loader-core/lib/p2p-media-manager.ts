@@ -22,6 +22,7 @@ import {Segment} from "./loader-interface";
 import {MediaPeer, MediaPeerSegmentStatus} from "./media-peer";
 import {SegmentInternal} from "./segment-internal";
 import {Buffer} from "buffer";
+import * as sha1 from "sha.js/sha1";
 
 const PEER_PROTOCOL_VERSION = 1;
 
@@ -82,8 +83,11 @@ export class P2PMediaManager extends STEEmitter<
 
         const pendingTrackerClient = this.pendingTrackerClient;
 
+        // TODO: native browser 'crypto.subtle' implementation doesn't work in Chrome in insecure pages
         // TODO: Edge doesn't support SHA-1. Change to SHA-256 once Edge support is required.
-        const infoHash = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(PEER_PROTOCOL_VERSION + this.swarmId));
+        // const infoHash = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(PEER_PROTOCOL_VERSION + this.swarmId));
+
+        const infoHash = new sha1().update(PEER_PROTOCOL_VERSION + this.swarmId).digest();
 
         // destroy may be called while waiting for the hash to be calculated
         if (!pendingTrackerClient.isDestroyed) {

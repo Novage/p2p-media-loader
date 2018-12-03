@@ -40,7 +40,8 @@
     "bittorrent-tracker": "^9.10.1",
     "debug": "^3.2.6",
     "events": "^3.0.0",
-    "get-browser-rtc": "^1.0.2"
+    "get-browser-rtc": "^1.0.2",
+    "sha.js": "^2.4.11"
   },
   "devDependencies": {
     "@types/assert": "^1.4.0",
