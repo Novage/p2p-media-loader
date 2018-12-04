@@ -154,7 +154,7 @@
 <script>
 
     function waitForGlobalObject(objectName, objectNextName) {
-        return new Promise(function(resolve) {
+        return new Promise((resolve) => {
             function check() {
                 if ((window[objectName] !== undefined)
                         && ((objectNextName === undefined) || window[objectName][objectNextName] !== undefined)) {
@@ -169,7 +169,7 @@
     }
 
     function waitForModule(moduleName) {
-        return new Promise(function(resolve) {
+        return new Promise((resolve) => {
             function check() {
                 try {
                     resolve(require(moduleName));
@@ -186,10 +186,10 @@
         return new Promise((resolve, reject) => {
             const script= document.createElement('script');
             script.type= 'text/javascript';
-            script.onload = function () {
+            script.onload = () => {
                 resolve();
             };
-            script.onerror = function () {
+            script.onerror = () => {
                 console.log("Failed to load script", src);
                 reject();
             };
@@ -203,10 +203,10 @@
             const link= document.createElement('link');
             link.rel = 'stylesheet';
             link.type= 'text/css';
-            link.onload = function () {
+            link.onload = () => {
                 resolve();
             };
-            link.onerror = function () {
+            link.onerror = () => {
                 console.log("Failed to load CSS", src);
                 reject();
             };
@@ -215,10 +215,8 @@
         });
     }
 
-    var DemoApp = (function () {
-        function DemoApp() {};
-
-        DemoApp.prototype.init = async function() {
+    class DemoApp {
+        async init() {
             await waitForGlobalObject("p2pml", "core");
 
             if (!p2pml.core.HybridLoader.isSupported()) {
@@ -250,7 +248,7 @@
             this.restartDemo();
         }
 
-        DemoApp.prototype.initForm = function () {
+        initForm() {
             var form = document.getElementById("videoUrlForm");
             window.location.search.substr(1).split("&").forEach((e) => {
                 var p = e.split("=");
@@ -270,9 +268,9 @@
                     }
                 }
             });
-        };
+        }
 
-        DemoApp.prototype.restartDemo = async function () {
+        async restartDemo() {
             this.downloadStats = [];
             this.downloadTotals = { http: 0, p2p: 0 };
             this.uploadStats = [];
@@ -368,9 +366,9 @@
 
             this.refreshChart();
             this.refreshGraph();
-        };
+        }
 
-        DemoApp.prototype.initHlsJsPlayer = async function () {
+        async initHlsJsPlayer() {
             if (!Hls.isSupported()) {
                 return;
             }
@@ -397,12 +395,12 @@
 
             hls.loadSource(this.videoUrl);
             hls.attachMedia(video);
-            hls.on(Hls.Events.MANIFEST_PARSED, function () {
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
                 this.hlsLevelSwitcher.init(hls, level);
-            }.bind(this));
-        };
+            });
+        }
 
-        DemoApp.prototype.initClapprPlayer = async function (isShaka) {
+        async initClapprPlayer(isShaka) {
             await loadScript("https://cdn.jsdelivr.net/npm/clappr@latest");
             await loadScript("https://cdn.jsdelivr.net/gh/clappr/clappr-level-selector-plugin@latest/dist/level-selector.min.js");
 
@@ -446,9 +444,9 @@
             if (!isShaka) {
                 p2pml.hlsjs.initClapprPlayer(player);
             }
-        };
+        }
 
-        DemoApp.prototype.initMediaElementPlayer = async function() {
+        async initMediaElementPlayer() {
             await Promise.all([
                 loadStyle("https://cdnjs.cloudflare.com/ajax/libs/mediaelement/4.2.9/mediaelementplayer.min.css"),
                 loadScript("https://cdnjs.cloudflare.com/ajax/libs/mediaelement/4.2.9/mediaelement-and-player.min.js")
@@ -472,9 +470,7 @@
                     liveSyncDurationCount: this.liveSyncDurationCount,
                     loader: this.engine.createLoaderClass()
                 },
-                success: function (mediaElement) {
-                    p2pml.hlsjs.initMediaElementJsPlayer(mediaElement);
-                }
+                success: (mediaElement) => p2pml.hlsjs.initMediaElementJsPlayer(mediaElement)
             });
 
             player.setSrc(this.videoUrl);
@@ -482,9 +478,9 @@
 
             player.load();
             player.play();
-        };
+        }
 
-        DemoApp.prototype.initFlowplayerPlayer = async function() {
+        async initFlowplayerPlayer() {
             await Promise.all([
                 loadStyle("https://releases.flowplayer.org/7.2.7/skin/skin.css"),
                 loadScript("https://releases.flowplayer.org/7.2.7/flowplayer.min.js")
@@ -516,12 +512,12 @@
 
             p2pml.hlsjs.initFlowplayerHlsJsPlayer(player);
 
-            player.on("ready", function () {
+            player.on("ready", () => {
                 player.play();
             });
-        };
+        }
 
-        DemoApp.prototype.initVideoJsContribHlsJsPlayer = async function() {
+        async initVideoJsContribHlsJsPlayer() {
             await Promise.all([
                 loadStyle("https://vjs.zencdn.net/7.2.0/video-js.css"),
                 loadScript("https://vjs.zencdn.net/7.2.0/video.js")
@@ -559,13 +555,13 @@
                 src: this.videoUrl
             });
 
-            player.ready(function() {
+            player.ready(() => {
                 player.volume(0);
                 player.play();
             });
-        };
+        }
 
-        DemoApp.prototype.initJwPlayer = async function() {
+        async initJwPlayer() {
             await loadScript("https://content.jwplatform.com/libraries/aG3IMhIy.js");
             await loadScript("hola-jwplayer-hlsjs.min.js");
 
@@ -587,9 +583,9 @@
                 liveSyncDurationCount: this.liveSyncDurationCount,
                 loader: this.engine.createLoaderClass()
             });
-        };
+        }
 
-        DemoApp.prototype.initShakaPlayer = function () {
+        initShakaPlayer() {
             if (!shaka.Player.isBrowserSupported()) {
                 return;
             }
@@ -612,9 +608,9 @@
             this.engine.initShakaPlayer(player);
             this.shakaLevelSwitcher.init(player, level);
             player.load(this.videoUrl);
-        };
+        }
 
-        DemoApp.prototype.initChart = function () {
+        initChart() {
             var chartConf = {
                 element: document.querySelector("#chart"),
                 renderer: 'multi',
@@ -634,7 +630,7 @@
 
             new Rickshaw.Graph.Axis.X({
                 graph: this.chart,
-                tickFormat: function() { return ''; }
+                tickFormat: () => ''
             });
 
             new Rickshaw.Graph.Axis.Y({
@@ -656,17 +652,17 @@
             this.chart.render();
             setInterval(this.updateChartData.bind(this), 500);
 
-            var chartResize = function () {
+            var chartResize = () => {
                 chartConf.width = this.chart.element.clientWidth;
                 this.chart.configure(chartConf);
                 this.chart.render();
-            }.bind(this);
+            };
 
             chartResize();
             window.addEventListener("resize", chartResize);
-        };
+        }
 
-        DemoApp.prototype.refreshChart = function () {
+        refreshChart() {
             if (!this.chart) {
                 return;
             }
@@ -677,9 +673,7 @@
             var data3 = this.chart.series[3].data;
             var lastX = data0.length > 0 ? data0[data0.length - 1].x : -1;
 
-            var seriesDataMapper = function(currentValue, index) {
-                return {x: index + lastX + 1, y: 0};
-            };
+            var seriesDataMapper = (currentValue, index) => ({x: index + lastX + 1, y: 0});
 
             data0.length = 0;
             data1.length = 0;
@@ -693,9 +687,9 @@
             data3.push.apply(data3, stubData.slice(0));
 
             this.chart.update();
-        };
+        }
 
-        DemoApp.prototype.updateChartData = function () {
+        updateChartData() {
             var downloadSpeed = this.getDownloadSpeed();
             var http = Number((downloadSpeed.http * 8 / 1000000).toFixed(2));
             var p2p = Number((downloadSpeed.p2p * 8 / 1000000).toFixed(2));
@@ -724,16 +718,16 @@
             this.formatChartLegendLine(3, upload);
 
             this.updateLegendTotals();
-        };
+        }
 
-        DemoApp.prototype.formatChartLegendLine = function (index, speed) {
+        formatChartLegendLine(index, speed) {
             if (this.legend) {
                 var line = this.legend.lines[index];
                 line.element.childNodes[1].textContent = line.series.name + ' - ' + speed + ' Mbit/s';
             }
-        };
+        }
 
-        DemoApp.prototype.updateLegendTotals = function () {
+        updateLegendTotals() {
             if (!this.legendTotals) {
                 return;
             }
@@ -762,9 +756,9 @@
                     = "Upload P2P - "
                     + Number(uploadMb).toFixed(1) + " MiB";
             }
-        };
+        }
 
-        DemoApp.prototype.getDownloadSpeed = function () {
+        getDownloadSpeed() {
             var startingPoint = performance.now() - (this.loadSpeedTimespan * 1000);
             var httpSize = 0;
             var p2pSize = 0;
@@ -786,9 +780,9 @@
             this.downloadStats.splice(0, i + 1);
 
             return {p2p: p2pSize / this.loadSpeedTimespan, http: httpSize / this.loadSpeedTimespan};
-        };
+        }
 
-        DemoApp.prototype.getUploadSpeed = function () {
+        getUploadSpeed() {
             var startingPoint = performance.now() - (this.loadSpeedTimespan * 1000);
             var size = 0;
 
@@ -805,19 +799,19 @@
             this.uploadStats.splice(0, i + 1);
 
             return size / this.loadSpeedTimespan;
-        };
+        }
 
-        DemoApp.prototype.onBytesDownloaded = function (method, size) {
+        onBytesDownloaded(method, size) {
             this.downloadStats.push({method: method, size: size, timestamp: performance.now()});
             this.downloadTotals[method] += size;
-        };
+        }
 
-        DemoApp.prototype.onBytesUploaded = function (method, size) {
+        onBytesUploaded(method, size) {
             this.uploadStats.push({size: size, timestamp: performance.now()});
             this.uploadTotal += size;
-        };
+        }
 
-        DemoApp.prototype.refreshGraph = function (p2pLoader) {
+        refreshGraph(p2pLoader) {
             if (!this.graph) {
                 return;
             }
@@ -832,170 +826,166 @@
 
             this.engine.on(p2pml.core.Events.PeerConnect, this.onPeerConnect.bind(this));
             this.engine.on(p2pml.core.Events.PeerClose, this.onPeerClose.bind(this));
-        };
+        }
 
-        DemoApp.prototype.onPeerConnect = function (peer) {
+        onPeerConnect(peer) {
             if (!this.graph.hasPeer(peer.id)) {
                 this.graph.add({id: peer.id, name: peer.remoteAddress || 'Unknown'});
                 this.graph.connect("me", peer.id);
             }
-        };
+        }
 
-        DemoApp.prototype.onPeerClose = function (id) {
+        onPeerClose(id) {
             if (this.graph.hasPeer(id)) {
                 this.graph.disconnect("me", id);
                 this.graph.remove(id);
             }
-        };
+        }
 
-        DemoApp.prototype.hlsLevelSwitcher = {
+        constructor() {
+            this.hlsLevelSwitcher = {
+                auto: "Auto",
+                hls: undefined,
+                select: undefined,
 
-            auto: "Auto",
-            hls: undefined,
-            select: undefined,
-
-            init: function (hls, select) {
-                if (hls.levelController.levels.length < 2) {
-                    select.style.display = "none";
-                    return;
-                } else {
-                    select.style.display = "block";
-                }
-
-                this.hls = hls;
-                this.select = select;
-
-                this._clearOptions();
-                this._addOption(this.auto);
-                hls.levelController.levels.forEach(function (e, i) {
-                    var name = [];
-                    if (e.height) {
-                        name.push(e.height + "p");
+                init: function (hls, select) {
+                    if (hls.levelController.levels.length < 2) {
+                        select.style.display = "none";
+                        return;
+                    } else {
+                        select.style.display = "block";
                     }
-                    if (e.bitrate) {
-                        name.push(Math.round(e.bitrate / 1000) + "k");
-                    }
-                    if (name.length === 0) {
-                        name.push("Quality #" + i);
-                    }
-                    this._addOption(name.join(" / "), i);
-                }.bind(this));
 
-                hls.on(Hls.Events.LEVEL_SWITCHED, this._hlsLevelSwitch.bind(this));
+                    this.hls = hls;
+                    this.select = select;
 
-                this.select.addEventListener("change", function (event) {
-                    hls.nextLevel = event.target.selectedIndex - 1;
-                    this._hlsLevelSwitch();
-                }.bind(this));
-            },
-
-            _hlsLevelSwitch: function () {
-                var auto = this.select.querySelector("option:not([data-index])");
-                var curr = this.select.querySelector("option[data-index='" + this.hls.currentLevel + "']");
-                if (this.hls.autoLevelEnabled || this.hls.currentLevel === -1) {
-                    auto.selected = true;
-                    auto.text = curr ? curr.text + " (" + this.auto + ")" : this.auto;
-                } else {
-                    curr.selected = true;
-                    auto.text = this.auto;
-                }
-            },
-
-            _clearOptions: function () {
-                while (this.select.options.length) {
-                    this.select.remove(0);
-                }
-            },
-
-            _addOption: function (text, index) {
-                var option = document.createElement("option");
-                option.text = text;
-                if (index !== undefined) {
-                    option.dataset.index = index;
-                }
-                this.select.add(option);
-            }
-
-        }; // end of hlsLevelSwitcher
-
-        DemoApp.prototype.shakaLevelSwitcher = {
-
-            auto: "Auto",
-            player: undefined,
-            select: undefined,
-
-            init: function (player, select) {
-                this.player = player;
-                this.select = select;
-
-                player.addEventListener("trackschanged", () => {
                     this._clearOptions();
                     this._addOption(this.auto);
-                    this.player.getVariantTracks().forEach((e, i) => {
+                    hls.levelController.levels.forEach((e, i) => {
                         var name = [];
-
                         if (e.height) {
                             name.push(e.height + "p");
                         }
-
-                        if (e.bandwidth) {
-                            name.push(Math.round(e.bandwidth / 1000) + "k");
+                        if (e.bitrate) {
+                            name.push(Math.round(e.bitrate / 1000) + "k");
                         }
-
-                        if (e.label) {
-                            name.push(e.label);
-                        } else if (e.language) {
-                            name.push(e.language);
-                        }
-
                         if (name.length === 0) {
-                            name.push("Variant #" + i);
+                            name.push("Quality #" + i);
                         }
-
-                        this._addOption(name.join(" / "), e.id);
+                        this._addOption(name.join(" / "), i);
                     });
-                });
 
-                player.addEventListener("adaptation", () => {
-                    var variantId = this.player.getVariantTracks().find(i => i.active === true).id;
-                    var curr = this.select.querySelector("option[data-variant-id='" + variantId + "']");
-                    var auto = this.select.querySelector("option:not([data-variant-id])");
-                    auto.text = curr ? curr.text + " (" + this.auto + ")" : this.auto;
-                });
+                    hls.on(Hls.Events.LEVEL_SWITCHED, this._hlsLevelSwitch.bind(this));
 
-                select.addEventListener("change", () => {
-                    var variantId = this.select.selectedOptions[ 0 ].dataset.variantId;
-                    if (variantId) {
-                        var variant = this.player.getVariantTracks().find(i => i.id == variantId);
-                        this.player.configure({ abr: { enabled: false } });
-                        this.player.selectVariantTrack(variant);
-                        var auto = this.select.querySelector("option:not([data-variant-id])");
-                        auto.text = this.auto;
+                    this.select.addEventListener("change", (event) => {
+                        hls.nextLevel = event.target.selectedIndex - 1;
+                        this._hlsLevelSwitch();
+                    });
+                },
+
+                _hlsLevelSwitch: function () {
+                    var auto = this.select.querySelector("option:not([data-index])");
+                    var curr = this.select.querySelector("option[data-index='" + this.hls.currentLevel + "']");
+                    if (this.hls.autoLevelEnabled || this.hls.currentLevel === -1) {
+                        auto.selected = true;
+                        auto.text = curr ? curr.text + " (" + this.auto + ")" : this.auto;
                     } else {
-                        this.player.configure({ abr: { enabled: true } });
+                        curr.selected = true;
+                        auto.text = this.auto;
                     }
-                });
-            },
+                },
 
-            _clearOptions: function () {
-                while (this.select.options.length) {
-                    this.select.remove(0);
+                _clearOptions: function () {
+                    while (this.select.options.length) {
+                        this.select.remove(0);
+                    }
+                },
+
+                _addOption: function (text, index) {
+                    var option = document.createElement("option");
+                    option.text = text;
+                    if (index !== undefined) {
+                        option.dataset.index = index;
+                    }
+                    this.select.add(option);
                 }
-            },
+            };
 
-            _addOption: function (text, variantId) {
-                var option = document.createElement("option");
-                option.text = text;
-                if (variantId) {
-                    option.dataset.variantId = variantId;
+            this.shakaLevelSwitcher = {
+                auto: "Auto",
+                player: undefined,
+                select: undefined,
+
+                init: function (player, select) {
+                    this.player = player;
+                    this.select = select;
+
+                    player.addEventListener("trackschanged", () => {
+                        this._clearOptions();
+                        this._addOption(this.auto);
+                        this.player.getVariantTracks().forEach((e, i) => {
+                            var name = [];
+
+                            if (e.height) {
+                                name.push(e.height + "p");
+                            }
+
+                            if (e.bandwidth) {
+                                name.push(Math.round(e.bandwidth / 1000) + "k");
+                            }
+
+                            if (e.label) {
+                                name.push(e.label);
+                            } else if (e.language) {
+                                name.push(e.language);
+                            }
+
+                            if (name.length === 0) {
+                                name.push("Variant #" + i);
+                            }
+
+                            this._addOption(name.join(" / "), e.id);
+                        });
+                    });
+
+                    player.addEventListener("adaptation", () => {
+                        var variantId = this.player.getVariantTracks().find(i => i.active === true).id;
+                        var curr = this.select.querySelector("option[data-variant-id='" + variantId + "']");
+                        var auto = this.select.querySelector("option:not([data-variant-id])");
+                        auto.text = curr ? curr.text + " (" + this.auto + ")" : this.auto;
+                    });
+
+                    select.addEventListener("change", () => {
+                        var variantId = this.select.selectedOptions[ 0 ].dataset.variantId;
+                        if (variantId) {
+                            var variant = this.player.getVariantTracks().find(i => i.id == variantId);
+                            this.player.configure({ abr: { enabled: false } });
+                            this.player.selectVariantTrack(variant);
+                            var auto = this.select.querySelector("option:not([data-variant-id])");
+                            auto.text = this.auto;
+                        } else {
+                            this.player.configure({ abr: { enabled: true } });
+                        }
+                    });
+                },
+
+                _clearOptions: function () {
+                    while (this.select.options.length) {
+                        this.select.remove(0);
+                    }
+                },
+
+                _addOption: function (text, variantId) {
+                    var option = document.createElement("option");
+                    option.text = text;
+                    if (variantId) {
+                        option.dataset.variantId = variantId;
+                    }
+                    this.select.add(option);
                 }
-                this.select.add(option);
-            }
-
-        }; // end of shakaLevelSwitcher
-
-        return DemoApp;
-    }());
+            };
+        }
+    }
 
     new DemoApp().init();
 
