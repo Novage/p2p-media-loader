@@ -25,45 +25,14 @@
     <title>P2P Media Loader</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <script async src="node_modules/p2p-media-loader-core/build/p2p-media-loader-core.min.js"></script>
+    <script async src="p2p-graph.js"></script>
 
-    <script src="p2p-graph.js"></script>
-    <script src="node_modules/p2p-media-loader-core/build/p2p-media-loader-core.min.js"></script>
-    <script src="node_modules/p2p-media-loader-hlsjs/build/p2p-media-loader-hlsjs.min.js"></script>
-    <script src="node_modules/p2p-media-loader-shaka/build/p2p-media-loader-shaka.min.js"></script>
-
-    <link type="text/css" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/rickshaw/1.6.3/rickshaw.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.17/d3.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/rickshaw/1.6.3/rickshaw.min.js"></script>
+    <script async src="https://cdnjs.cloudflare.com/ajax/libs/rickshaw/1.6.3/rickshaw.min.js"></script>
 
-    <!-- HlsJs -->
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-
-    <!-- ShakaPlayer -->
-    <script src="https://github.com/videojs/mux.js/releases/download/v4.4.0/mux.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/2.4.4/shaka-player.compiled.js"></script>
-
-    <!-- Clappr -->
-    <script src="https://cdn.jsdelivr.net/npm/clappr@latest"></script>
-    <script src="https://cdn.jsdelivr.net/gh/clappr/dash-shaka-playback@latest/dist/dash-shaka-playback.external.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/clappr/clappr-level-selector-plugin@latest/dist/level-selector.min.js"></script>
-
-    <!-- Flowplayer -->
-    <link rel="stylesheet" href="https://releases.flowplayer.org/7.2.7/skin/skin.css">
-    <script src="https://releases.flowplayer.org/7.2.7/flowplayer.min.js"></script>
-
-    <!-- MediaElement -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mediaelement/4.2.9/mediaelementplayer.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mediaelement/4.2.9/mediaelement-and-player.min.js"></script>
-
-    <!-- VideoJs-Contrib-HlsJs -->
-    <link href="https://vjs.zencdn.net/7.2.0/video-js.css" rel="stylesheet">
-    <script src="https://vjs.zencdn.net/7.2.0/video.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/videojs-contrib-hls.js@latest"></script>
-
-    <!-- JWPlayer -->
-    <script src="https://content.jwplatform.com/libraries/aG3IMhIy.js"></script>
-    <script src="hola-jwplayer-hlsjs.min.js"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <link type="text/css" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/rickshaw/1.6.3/rickshaw.min.css">
 
     <style>
         body {
@@ -135,8 +104,8 @@
         <hr>
     </div>
     <div id="error-shakaplayer" class="col-md-12 hide">
-        Your browser doesn't support Shaka Player.<br>
-        Read more at <a href="https://shaka-player-demo.appspot.com/docs/api/shaka.Player.html#.isBrowserSupported" target="_blank">shaka.Player.isBrowserSupported</a>.
+        Your browser doesn't support Shaka Player engine. P2P disabled.<br>
+        Read more at <a href="https://en.wikipedia.org/wiki/Media_Source_Extensions" target="_blank">Media Source Extensions</a>.
         <hr>
     </div>
     <div class="col-md-8">
@@ -184,14 +153,73 @@
 
 <script>
 
-    var DemoApp = (function () {
-
-        var P2PGraphClass = require("p2p-graph");
-
-        function DemoApp() {
-            if (!Hls.isSupported()) {
-                document.querySelector("#error-hls-js").classList.remove("hide");
+    function waitForGlobalObject(objectName, objectNextName) {
+        return new Promise(function(resolve) {
+            function check() {
+                if ((window[objectName] !== undefined)
+                        && ((objectNextName === undefined) || window[objectName][objectNextName] !== undefined)) {
+                    resolve();
+                } else {
+                    setTimeout(check, 200);
+                }
             }
+
+            check();
+        });
+    }
+
+    function waitForModule(moduleName) {
+        return new Promise(function(resolve) {
+            function check() {
+                try {
+                    resolve(require(moduleName));
+                } catch {
+                    setTimeout(check, 200);
+                }
+            }
+
+            check();
+        });
+    }
+
+    function loadScript(src) {
+        return new Promise((resolve, reject) => {
+            const script= document.createElement('script');
+            script.type= 'text/javascript';
+            script.onload = function () {
+                resolve();
+            };
+            script.onerror = function () {
+                console.log("Failed to load script", src);
+                reject();
+            };
+            script.src = src;
+            document.head.appendChild(script);
+        });
+    }
+
+    function loadStyle(src) {
+        return new Promise((resolve, reject) => {
+            const link= document.createElement('link');
+            link.rel = 'stylesheet';
+            link.type= 'text/css';
+            link.onload = function () {
+                resolve();
+            };
+            link.onerror = function () {
+                console.log("Failed to load CSS", src);
+                reject();
+            };
+            link.href = src;
+            document.head.appendChild(link);
+        });
+    }
+
+    var DemoApp = (function () {
+        function DemoApp() {};
+
+        DemoApp.prototype.init = async function() {
+            await waitForGlobalObject("p2pml", "core");
 
             if (!p2pml.core.HybridLoader.isSupported()) {
                 document.querySelector("#error-webrtc-data-channels").classList.remove("hide");
@@ -212,9 +240,13 @@
 
             this.loadSpeedTimespan = 10; // seconds
 
+            const P2PGraphClass = await waitForModule("p2p-graph");
             this.graph = new P2PGraphClass("#graph");
             this.graph.add({ id: "me", name: "You", me: true });
+
+            await waitForGlobalObject("Rickshaw");
             this.initChart();
+
             this.restartDemo();
         }
 
@@ -240,7 +272,7 @@
             });
         };
 
-        DemoApp.prototype.restartDemo = function () {
+        DemoApp.prototype.restartDemo = async function () {
             this.downloadStats = [];
             this.downloadTotals = { http: 0, p2p: 0 };
             this.uploadStats = [];
@@ -258,48 +290,72 @@
 
             switch (this.playerType) {
                 case "hlsjs":
-                    this.engine = new p2pml.hlsjs.Engine(config);
-                    this.initHlsJsPlayer();
-                    break;
-
                 case "clappr":
-                    this.engine = new p2pml.hlsjs.Engine(config);
-                    this.initClapprPlayer();
-                    break;
-
                 case "flowplayer":
-                    this.engine = new p2pml.hlsjs.Engine(config);
-                    this.initFlowplayerPlayer();
-                    break;
-
                 case "mediaelement":
-                    this.engine = new p2pml.hlsjs.Engine(config);
-                    this.initMediaElementPlayer();
-                    break;
-
                 case "videojs-contrib-hlsjs":
-                    this.engine = new p2pml.hlsjs.Engine(config);
-                    this.initVideoJsContribHlsJsPlayer();
-                    break;
-
                 case "jwplayer":
+                    await loadScript("https://cdn.jsdelivr.net/npm/hls.js@latest");
+
+                    if (!Hls.isSupported()) {
+                        document.querySelector("#error-hls-js").classList.remove("hide");
+                    }
+
+                    await loadScript("node_modules/p2p-media-loader-hlsjs/build/p2p-media-loader-hlsjs.min.js");
                     this.engine = new p2pml.hlsjs.Engine(config);
-                    this.initJwPlayer();
                     break;
 
                 case "shakaplayer":
-                    this.engine = new p2pml.shaka.Engine(config);
-                    this.initShakaPlayer();
-                    break;
-
                 case "clappr-shaka":
+                    await loadScript("https://github.com/videojs/mux.js/releases/download/v4.4.0/mux.js");
+                    await loadScript("https://cdnjs.cloudflare.com/ajax/libs/shaka-player/2.4.4/shaka-player.compiled.js");
+
+                    shaka.polyfill.installAll();
+                    if (!shaka.Player.isBrowserSupported()) {
+                        document.querySelector("#error-shakaplayer").classList.remove("hide");
+                    }
+
+                    await loadScript("node_modules/p2p-media-loader-shaka/build/p2p-media-loader-shaka.min.js");
                     this.engine = new p2pml.shaka.Engine(config);
-                    this.initClapprPlayer(true);
                     break;
 
                 default:
                     console.error('Unexpected player type: ', this.playerType);
                     return;
+            }
+
+            switch (this.playerType) {
+                case "hlsjs":
+                    this.initHlsJsPlayer();
+                    break;
+
+                case "clappr":
+                    this.initClapprPlayer();
+                    break;
+
+                case "flowplayer":
+                    this.initFlowplayerPlayer();
+                    break;
+
+                case "mediaelement":
+                    this.initMediaElementPlayer();
+                    break;
+
+                case "videojs-contrib-hlsjs":
+                    this.initVideoJsContribHlsJsPlayer();
+                    break;
+
+                case "jwplayer":
+                    this.initJwPlayer();
+                    break;
+
+                case "shakaplayer":
+                    this.initShakaPlayer();
+                    break;
+
+                case "clappr-shaka":
+                    this.initClapprPlayer(true);
+                    break;
             }
 
             this.engine.on(p2pml.core.Events.PieceBytesDownloaded, this.onBytesDownloaded.bind(this));
@@ -314,38 +370,42 @@
             this.refreshGraph();
         };
 
-        DemoApp.prototype.initHlsJsPlayer = function () {
-            if (Hls.isSupported()) {
-                var video = document.createElement("video");
-                video.id = "video";
-                video.volume = 0;
-                video.setAttribute("playsinline", "");
-                video.setAttribute("muted", "");
-                video.setAttribute("autoplay", "");
-                video.setAttribute("controls", "");
-                this.videoContainer.appendChild(video);
-
-                var level = document.createElement("select");
-                level.id = "level";
-                level.classList.add("form-control");
-                this.videoContainer.appendChild(level);
-
-                var hls = new Hls({
-                    liveSyncDurationCount: this.liveSyncDurationCount,
-                    loader: this.engine.createLoaderClass()
-                });
-
-                p2pml.hlsjs.initHlsJsPlayer(hls);
-
-                hls.loadSource(this.videoUrl);
-                hls.attachMedia(video);
-                hls.on(Hls.Events.MANIFEST_PARSED, function () {
-                    this.hlsLevelSwitcher.init(hls, level);
-                }.bind(this));
+        DemoApp.prototype.initHlsJsPlayer = async function () {
+            if (!Hls.isSupported()) {
+                return;
             }
+            var video = document.createElement("video");
+            video.id = "video";
+            video.volume = 0;
+            video.setAttribute("playsinline", "");
+            video.setAttribute("muted", "");
+            video.setAttribute("autoplay", "");
+            video.setAttribute("controls", "");
+            this.videoContainer.appendChild(video);
+
+            var level = document.createElement("select");
+            level.id = "level";
+            level.classList.add("form-control");
+            this.videoContainer.appendChild(level);
+
+            var hls = new Hls({
+                liveSyncDurationCount: this.liveSyncDurationCount,
+                loader: this.engine.createLoaderClass()
+            });
+
+            p2pml.hlsjs.initHlsJsPlayer(hls);
+
+            hls.loadSource(this.videoUrl);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, function () {
+                this.hlsLevelSwitcher.init(hls, level);
+            }.bind(this));
         };
 
-        DemoApp.prototype.initClapprPlayer = function (isShaka) {
+        DemoApp.prototype.initClapprPlayer = async function (isShaka) {
+            await loadScript("https://cdn.jsdelivr.net/npm/clappr@latest");
+            await loadScript("https://cdn.jsdelivr.net/gh/clappr/clappr-level-selector-plugin@latest/dist/level-selector.min.js");
+
             var outer = document.createElement("div");
             outer.className = "embed-responsive embed-responsive-16by9";
             var video = document.createElement("div");
@@ -362,20 +422,22 @@
                 height: "100%",
                 muted: true,
                 mute: true,
-                autoPlay: true
+                autoPlay: true,
+                playback: {
+                    playInline: true
+                }
             };
 
             if (isShaka) {
+                await loadScript("https://cdn.jsdelivr.net/gh/clappr/dash-shaka-playback@latest/dist/dash-shaka-playback.external.js");
                 setup.plugins.push(DashShakaPlayback);
                 setup.shakaOnBeforeLoad = (shakaPlayerInstance) => {
                     this.engine.initShakaPlayer(shakaPlayerInstance);
                 };
             } else {
-                setup.playback = {
-                    hlsjsConfig: {
-                        liveSyncDurationCount: this.liveSyncDurationCount,
-                        loader: this.engine.createLoaderClass()
-                    }
+                setup.playback.hlsjsConfig = {
+                    liveSyncDurationCount: this.liveSyncDurationCount,
+                    loader: this.engine.createLoaderClass()
                 };
             }
 
@@ -386,7 +448,12 @@
             }
         };
 
-        DemoApp.prototype.initMediaElementPlayer = function () {
+        DemoApp.prototype.initMediaElementPlayer = async function() {
+            await Promise.all([
+                loadStyle("https://cdnjs.cloudflare.com/ajax/libs/mediaelement/4.2.9/mediaelementplayer.min.css"),
+                loadScript("https://cdnjs.cloudflare.com/ajax/libs/mediaelement/4.2.9/mediaelement-and-player.min.js")
+            ]);
+
             // allow only one supported renderer
             mejs.Renderers.order = [ "native_hls" ];
 
@@ -417,7 +484,12 @@
             player.play();
         };
 
-        DemoApp.prototype.initFlowplayerPlayer = function () {
+        DemoApp.prototype.initFlowplayerPlayer = async function() {
+            await Promise.all([
+                loadStyle("https://releases.flowplayer.org/7.2.7/skin/skin.css"),
+                loadScript("https://releases.flowplayer.org/7.2.7/flowplayer.min.js")
+            ]);
+
             var video = document.createElement("div");
             video.id = "video";
             video.className = "fp-slim";
@@ -449,7 +521,14 @@
             });
         };
 
-        DemoApp.prototype.initVideoJsContribHlsJsPlayer = function () {
+        DemoApp.prototype.initVideoJsContribHlsJsPlayer = async function() {
+            await Promise.all([
+                loadStyle("https://vjs.zencdn.net/7.2.0/video-js.css"),
+                loadScript("https://vjs.zencdn.net/7.2.0/video.js")
+            ]);
+
+            await loadScript("https://cdn.jsdelivr.net/npm/videojs-contrib-hls.js@latest");
+
             var outer = document.createElement("div");
             outer.className = "embed-responsive embed-responsive-16by9";
             var video = document.createElement("video");
@@ -486,7 +565,10 @@
             });
         };
 
-        DemoApp.prototype.initJwPlayer = function () {
+        DemoApp.prototype.initJwPlayer = async function() {
+            await loadScript("https://content.jwplatform.com/libraries/aG3IMhIy.js");
+            await loadScript("hola-jwplayer-hlsjs.min.js");
+
             var video = document.createElement("div");
             video.id = "video";
             video.volume = 0;
@@ -508,32 +590,31 @@
         };
 
         DemoApp.prototype.initShakaPlayer = function () {
-            shaka.polyfill.installAll();
-            if (shaka.Player.isBrowserSupported()) {
-                var video = document.createElement("video");
-                video.id = "video";
-                video.volume = 0;
-                video.setAttribute("playsinline", "");
-                video.setAttribute("muted", "");
-                video.setAttribute("autoplay", "");
-                video.setAttribute("controls", "");
-                this.videoContainer.appendChild(video);
-
-                var level = document.createElement("select");
-                level.id = "level";
-                level.classList.add("form-control");
-                this.videoContainer.appendChild(level);
-
-                var player = new shaka.Player(video);
-                this.engine.initShakaPlayer(player);
-                this.shakaLevelSwitcher.init(player, level);
-                player.load(this.videoUrl);
-            } else {
-                document.querySelector("#error-shakaplayer").classList.remove("hide");
+            if (!shaka.Player.isBrowserSupported()) {
+                return;
             }
+
+            var video = document.createElement("video");
+            video.id = "video";
+            video.volume = 0;
+            video.setAttribute("playsinline", "");
+            video.setAttribute("muted", "");
+            video.setAttribute("autoplay", "");
+            video.setAttribute("controls", "");
+            this.videoContainer.appendChild(video);
+
+            var level = document.createElement("select");
+            level.id = "level";
+            level.classList.add("form-control");
+            this.videoContainer.appendChild(level);
+
+            var player = new shaka.Player(video);
+            this.engine.initShakaPlayer(player);
+            this.shakaLevelSwitcher.init(player, level);
+            player.load(this.videoUrl);
         };
 
-        DemoApp.prototype.initChart = function (event) {
+        DemoApp.prototype.initChart = function () {
             var chartConf = {
                 element: document.querySelector("#chart"),
                 renderer: 'multi',
@@ -916,7 +997,7 @@
         return DemoApp;
     }());
 
-    var demo = new DemoApp();
+    new DemoApp().init();
 
 </script>
 
