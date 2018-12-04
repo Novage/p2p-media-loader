@@ -51,7 +51,7 @@ export function initShakaPlayer(player: any, segmentManager: SegmentManager) {
             const time = getPlayheadTime(player);
             if (time !== lastPlayheadTimeReported || player.isBuffering()) {
                 segmentManager.setPlayheadTime(time);
-               lastPlayheadTimeReported = time;
+                lastPlayheadTimeReported = time;
             }
         }, 500);
     });
