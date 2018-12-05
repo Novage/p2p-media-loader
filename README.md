@@ -18,17 +18,17 @@ It significantly reduces traditional CDN traffic and cost while delivering media
 - JS CDN
   - [Core](https://cdn.jsdelivr.net/npm/p2p-media-loader-core@latest/build/)
   - [Hls.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/build/)
-  - [Shaka integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@latest/build/)
+  - [Shaka Player integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@latest/build/)
 - npm packages
   - [Core](https://npmjs.com/package/p2p-media-loader-core)
   - [Hls.js integration](https://npmjs.com/package/p2p-media-loader-hlsjs)
-  - [Shaka integration](https://npmjs.com/package/p2p-media-loader-shaka)
+  - [Shaka Player integration](https://npmjs.com/package/p2p-media-loader-shaka)
 
 ## Key features
 
 - Supports live and VOD streams over HLS or MPEG-DASH protocols
 - Supports multiple HTML5 video players and engines:
-  - Engines: Hls.js, ShakaPlayer
+  - Engines: Hls.js, Shaka Player
   - Video players: JWPlayer, Clappr, Flowplayer, MediaElement, VideoJS
 - Supports adaptive bitrate streaming of HLS and MPEG-DASH protocols
 - No need in server-side software. By default **P2P Media Loader** uses publicly available servers:
@@ -43,7 +43,7 @@ All the components of the P2P network are free and open-source.
 
 **P2P Media Loader** web browser [requirements](#web-browsers-support) are:<br>
 - **WebRTC Data Channels** support to exchange data between peers
-- **Media Source Extensions** are required by Hls.js and ShakaPlayer engines for media playback
+- **Media Source Extensions** are required by Hls.js and Shaka Player engines for media playback
 
 [**STUN**](https://en.wikipedia.org/wiki/STUN) server is used by [WebRTC](https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API) to gather [ICE](https://en.wikipedia.org/wiki/Interactive_Connectivity_Establishment) candidates.
 There are many running public servers available on [Public STUN server list](https://gist.github.com/mondain/b0ec1cf5f60ae726202e).

@@ -10,7 +10,7 @@ Useful links:
 - [Technical overview](http://novage.com.ua/p2p-media-loader/technical-overview.html)
 - JS CDN
   - [Core](https://cdn.jsdelivr.net/npm/p2p-media-loader-core@latest/build/)
-  - [Shaka integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@latest/build/)
+  - [Shaka Player integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@latest/build/)
   - [Hls.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/build/)
 
 ## Basic usage
