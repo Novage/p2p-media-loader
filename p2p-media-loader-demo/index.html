@@ -489,32 +489,26 @@
             var video = document.createElement("div");
             video.id = "video";
             video.className = "fp-slim";
-            video.volume = 0;
-            video.setAttribute("playsinline", "");
-            video.setAttribute("muted", "");
-            video.setAttribute("autoplay", "");
             this.videoContainer.appendChild(video);
 
             var player = flowplayer("#video", {
-                volume: 0,
+                autoplay: true,
+                muted: true,
+                live: true,
                 clip: {
                     sources: [{
                         type: "application/x-mpegurl",
-                        //live: true,
                         src: this.videoUrl
                     }]
                 },
                 hlsjs: {
                     liveSyncDurationCount: this.liveSyncDurationCount,
-                    loader: this.engine.createLoaderClass()
+                    loader: this.engine.createLoaderClass(),
+                    safari: true
                 }
             });
 
             p2pml.hlsjs.initFlowplayerHlsJsPlayer(player);
-
-            player.on("ready", () => {
-                player.play();
-            });
         }
 
         async initVideoJsContribHlsJsPlayer() {

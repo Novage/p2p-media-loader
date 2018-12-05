@@ -194,7 +194,8 @@ var player = flowplayer("#video", {
     },
     hlsjs: {
         liveSyncDurationCount: 7,
-        loader: engine.createLoaderClass()
+        loader: engine.createLoaderClass(),
+        safari: true
     }
 });
 
