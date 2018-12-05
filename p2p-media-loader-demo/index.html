@@ -25,13 +25,14 @@
     <title>P2P Media Loader</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+
     <script async src="node_modules/p2p-media-loader-core/build/p2p-media-loader-core.min.js"></script>
     <script async src="p2p-graph.js"></script>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.17/d3.min.js"></script>
     <script async src="https://cdnjs.cloudflare.com/ajax/libs/rickshaw/1.6.3/rickshaw.min.js"></script>
 
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
     <link type="text/css" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/rickshaw/1.6.3/rickshaw.min.css">
 
     <style>
@@ -80,6 +81,10 @@
             z-index: 1;
         }
         #main-view.hide {
+            display: none;
+        }
+
+        .hide {
             display: none;
         }
     </style>
@@ -149,7 +154,6 @@
         <div id="announce"></div>
     </div>
 </div>
-
 
 <script>
 
