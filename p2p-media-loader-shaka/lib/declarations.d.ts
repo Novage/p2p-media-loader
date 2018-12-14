@@ -14,4 +14,6 @@
  * limitations under the License.
  */
 
+declare const shaka: any;
+
 declare const __P2PML_VERSION__: string;
