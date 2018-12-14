@@ -19,10 +19,6 @@ import {SegmentManager} from "./segment-manager";
 import {ShakaManifestParserProxy, ShakaDashManifestParserProxy, ShakaHlsManifestParserProxy} from "./manifest-parser-proxy";
 import {getSchemedUri} from "./utils";
 
-declare const shaka: any;
-declare const setInterval: any;
-declare const clearInterval: any;
-
 const debug = Debug("p2pml:shaka:index");
 
 export function initShakaPlayer(player: any, segmentManager: SegmentManager) {

@@ -16,8 +16,6 @@
 
 import {ParserSegment, ParserSegmentCache} from "./parser-segment";
 
-declare const shaka: any;
-
 export class ShakaManifestParserProxy {
 
     readonly cache: ParserSegmentCache = new ParserSegmentCache(200);
