@@ -58,7 +58,7 @@ export class SegmentManager {
         return this.settings;
     }
 
-    public async load(parserSegment: ParserSegment, manifestUri: string, playheadTime: number): Promise<any> {
+    public async load(parserSegment: ParserSegment, manifestUri: string, playheadTime: number): Promise<{ data: ArrayBuffer, timeMs: number | undefined }> {
         this.manifestUri = manifestUri;
         this.playheadTime = playheadTime;
 
@@ -67,7 +67,7 @@ export class SegmentManager {
         const lastRequestedSegment = this.refreshLoad();
         const alreadyLoadedSegment = this.loader.getSegment(lastRequestedSegment.id);
 
-        return new Promise<any>((resolve, reject) => {
+        return new Promise<{ data: ArrayBuffer, timeMs: number | undefined }>((resolve, reject) => {
             const request = new Request(lastRequestedSegment.id, resolve, reject);
             if (alreadyLoadedSegment) {
                 this.reportSuccess(request, alreadyLoadedSegment);
@@ -142,17 +142,14 @@ export class SegmentManager {
     }
 
     private reportSuccess(request: Request, loaderSegment: LoaderSegment) {
-        if (request.resolve) {
-            let timeDelation = 0;
-            if (loaderSegment.downloadSpeed > 0 && loaderSegment.data && loaderSegment.data.byteLength > 0) {
-                const downloadTime = Math.trunc(loaderSegment.data.byteLength / loaderSegment.downloadSpeed);
-                timeDelation = Date.now() - request.timeCreated + downloadTime;
-            }
-            setTimeout(() => {
-                this.debug("report success", request.id);
-                request.resolve(loaderSegment.data);
-            }, timeDelation);
+        let timeMs: number | undefined = undefined;
+
+        if (loaderSegment.downloadSpeed > 0 && loaderSegment.data && loaderSegment.data.byteLength > 0) {
+            timeMs = Math.trunc(loaderSegment.data.byteLength / loaderSegment.downloadSpeed);
         }
+
+        this.debug("report success", request.id);
+        request.resolve({ data: loaderSegment.data!, timeMs } );
     }
 
     private reportError(request: Request, error: any) {
@@ -189,11 +186,10 @@ export class SegmentManager {
 } // end of SegmentManager
 
 class Request {
-    readonly timeCreated: number = Date.now();
     public constructor(
         readonly id: string,
-        readonly resolve: any,
-        readonly reject: any
+        readonly resolve: (value: { data: ArrayBuffer, timeMs: number | undefined }) => void,
+        readonly reject: (reason?: any) => void
     ) {}
 }
 
