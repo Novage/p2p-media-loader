@@ -137,7 +137,7 @@
                         <option value="hlsjs">Hls.js</option>
                         <option value="flowplayer">Flowplayer</option>
                         <option value="mediaelement">MediaElement</option>
-                        <option value="videojs-contrib-hlsjs">VideoJs-Contrib-HlsJs</option>
+                        <option value="videojs-hls">VideoJs (HLS)</option>
                         <option value="jwplayer">JWPlayer</option>
                     </optgroup>
                     <optgroup label="Shaka P2P Engine (HLS and DASH)">
@@ -295,7 +295,7 @@
                 case "clappr":
                 case "flowplayer":
                 case "mediaelement":
-                case "videojs-contrib-hlsjs":
+                case "videojs-hls":
                 case "jwplayer":
                     await loadScript("https://cdn.jsdelivr.net/npm/hls.js@latest");
 
@@ -343,7 +343,7 @@
                     this.initMediaElementPlayer();
                     break;
 
-                case "videojs-contrib-hlsjs":
+                case "videojs-hls":
                     this.initVideoJsContribHlsJsPlayer();
                     break;
 
@@ -520,8 +520,6 @@
                 loadStyle("https://vjs.zencdn.net/7.2.0/video-js.css"),
                 loadScript("https://vjs.zencdn.net/7.2.0/video.js")
             ]);
-
-            await loadScript("https://cdn.jsdelivr.net/npm/videojs-contrib-hls.js@latest");
 
             var outer = document.createElement("div");
             outer.className = "embed-responsive embed-responsive-16by9";
