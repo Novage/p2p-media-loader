@@ -110,7 +110,8 @@ Notifies engine about current playing segment.
 Needed for own integrations with other players. If you write one, you should update engine with current playing segment from your player.
 
 `url` segment URL.
-`byterange` segment byte-range object with the fields properties or undefined:
+
+`byterange` segment byte-range object with the following fields or undefined:
 - `offset` segment offset
 - `length` segment length
 
