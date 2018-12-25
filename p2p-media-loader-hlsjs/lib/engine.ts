@@ -16,7 +16,7 @@
 
 import {EventEmitter} from "events";
 import {Events, LoaderInterface, HybridLoader} from "p2p-media-loader-core";
-import {SegmentManager} from "./segment-manager";
+import {SegmentManager, Byterange} from "./segment-manager";
 import {HlsJsLoader} from "./hlsjs-loader";
 import {createHlsJsLoaderClass} from "./hlsjs-loader-class";
 
@@ -56,8 +56,7 @@ export class Engine extends EventEmitter {
         };
     }
 
-    public setPlayingSegment(url: string) {
-        this.segmentManager.setPlayingSegment(url);
+    public setPlayingSegment(url: string, byterange: Byterange) {
+        this.segmentManager.setPlayingSegment(url, byterange);
     }
-
 }

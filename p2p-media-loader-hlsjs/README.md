@@ -88,7 +88,7 @@ Returns result from `p2pml.core.HybridLoader.isSupported()`.
 
 Creates a new `Engine` instance.
 
-`settings` structure:
+`settings` object with the following fields:
 - `segments`
     + `forwardSegmentCount` - Number of segments for building up predicted forward segments sequence; used to predownload and share via P2P. Default is 20;
     + `swarmId` - Override default swarm ID that is used to identify unique media stream with trackers (manifest URL without query parameters is used as the swarm ID if the parameter is not specified);
@@ -103,11 +103,16 @@ Returns engine instance settings.
 
 Creates hls.js loader class bound to this engine.
 
-### `engine.setPlayingSegment(url)`
+### `engine.setPlayingSegment(url, byterange)`
 
-Notifies engine about current playing segment url.
+Notifies engine about current playing segment.
 
-Needed for own integrations with other players. If you write one, you should update engine with current playing segment url from your player.
+Needed for own integrations with other players. If you write one, you should update engine with current playing segment from your player.
+
+`url` segment URL.
+`byterange` segment byte-range object with the fields properties or undefined:
+- `offset` segment offset
+- `length` segment length
 
 ### `engine.destroy()`
 
@@ -125,7 +130,7 @@ In order a player to be able to integrate with the Engine, it should meet follow
 3. Player allows to subcribe to events on hls.js player.
     - If player exposes `hls` object, you just call `p2pml.hlsjs.initHlsJsPlayer(hls)`;
     - Or if player allows to directly subsctibe to hls.js events, you need to handle:
-        + `hlsFragChanged` - call `engine.setPlayingSegment(url)` to notify Engine about current playing segment url;
+        + `hlsFragChanged` - call `engine.setPlayingSegment(url, byterange)` to notify Engine about current playing segment url;
         + `hlsDestroying` - call `engine.destroy()` to inform Engine about destroying hls.js player;
 
 ### `initHlsJsPlayer(player)`

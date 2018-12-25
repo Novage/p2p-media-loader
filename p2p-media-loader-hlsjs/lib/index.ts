@@ -48,11 +48,17 @@ export function initVideoJsContribHlsJsPlayer(player: any): void {
 
 export function initMediaElementJsPlayer(mediaElement: any): void {
     mediaElement.addEventListener("hlsFragChanged", (event: any) => {
-        const url = event.data && event.data.length > 1 && event.data[ 1 ].frag ? event.data[ 1 ].frag.url : undefined;
         const hls = mediaElement.hlsPlayer;
         if (hls && hls.config && hls.config.loader && typeof hls.config.loader.getEngine === "function") {
             const engine: Engine = hls.config.loader.getEngine();
-            engine.setPlayingSegment(url);
+
+            if (event.data && (event.data.length > 1)) {
+                const frag = event.data[1].frag;
+                const byterange = (frag.byteRange.length !== 2)
+                    ? undefined
+                    : { offset: frag.byteRange[0], length: frag.byteRange[1] - frag.byteRange[0] };
+                engine.setPlayingSegment(frag.url, byterange);
+            }
         }
     });
     mediaElement.addEventListener("hlsDestroying", () => {
@@ -79,8 +85,11 @@ export const version = typeof(__P2PML_VERSION__) === "undefined" ? "__VERSION__"
 
 function initHlsJsEvents(player: any, engine: Engine): void {
     player.on("hlsFragChanged", function (event_unused: any, data: any) {
-        const url = data && data.frag ? data.frag.url : undefined;
-        engine.setPlayingSegment(url);
+        const frag = data.frag;
+        const byterange = (frag.byteRange.length !== 2)
+            ? undefined
+            : { offset: frag.byteRange[0], length: frag.byteRange[1] - frag.byteRange[0] };
+        engine.setPlayingSegment(frag.url, byterange);
     });
     player.on("hlsDestroying", function () {
         engine.destroy();

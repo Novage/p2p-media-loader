@@ -34,6 +34,9 @@ export class HlsJsLoader {
                 .catch((error: any) => this.error(error, context, callbacks));
         } else if (context.frag) {
             this.segmentManager.loadSegment(context.url,
+                (context.rangeStart == undefined) || (context.rangeEnd == undefined)
+                    ? undefined
+                    : { offset: context.rangeStart, length: context.rangeEnd - context.rangeStart },
                 (content: ArrayBuffer, downloadSpeed: number) => setTimeout(() => this.successSegment(content, downloadSpeed, context, callbacks), 0),
                 (error: any) => setTimeout(() => this.error(error, context, callbacks), 0)
             );
@@ -43,7 +46,10 @@ export class HlsJsLoader {
     }
 
     public abort(context: any): void {
-        this.segmentManager.abortSegment(context.url);
+        this.segmentManager.abortSegment(context.url,
+            (context.rangeStart == undefined) || (context.rangeEnd == undefined)
+                ? undefined
+                : { offset: context.rangeStart, length: context.rangeEnd - context.rangeStart });
     }
 
     private successPlaylist(content: string, context: any, callbacks: any): void {

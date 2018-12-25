@@ -16,11 +16,15 @@
 
 export default class Utils {
 
-    public static async fetchContentAsAny(url: string, responseType: XMLHttpRequestResponseType): Promise<any> {
+    public static async fetchContentAsAny(url: string, range: string | undefined, responseType: XMLHttpRequestResponseType): Promise<any> {
         return new Promise<string>((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             xhr.open("GET", url, true);
             xhr.responseType = responseType;
+
+            if (range !== undefined) {
+                xhr.setRequestHeader("Range", range);
+            }
 
             xhr.onreadystatechange = () => {
                 if (xhr.readyState !== 4) { return; }
@@ -36,11 +40,11 @@ export default class Utils {
     }
 
     public static async fetchContentAsText(url: string): Promise<string> {
-        return Utils.fetchContentAsAny(url, "text");
+        return Utils.fetchContentAsAny(url, undefined, "text");
     }
 
-    public static async fetchContentAsArrayBuffer(url: string): Promise<ArrayBuffer> {
-        return Utils.fetchContentAsAny(url, "arraybuffer");
+    public static async fetchContentAsArrayBuffer(url: string, range: string | undefined): Promise<ArrayBuffer> {
+        return Utils.fetchContentAsAny(url, range, "arraybuffer");
     }
 
 }
