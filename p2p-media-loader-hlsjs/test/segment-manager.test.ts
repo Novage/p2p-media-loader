@@ -71,7 +71,7 @@ describe("SegmentManager", () => {
 
         const manager = new SegmentManager(instance(loader));
         manager.processPlaylist(testPlaylist.url, testPlaylist.content);
-        manager.loadSegment(segment.url, onSuccess, () => {});
+        manager.loadSegment(segment.url, undefined, onSuccess, () => {});
         segmentLoadedListener(segment);
 
         onSuccess.calledWith(segment.data);
@@ -91,7 +91,7 @@ describe("SegmentManager", () => {
 
         const manager = new SegmentManager(instance(loader));
         manager.processPlaylist(testPlaylist.url, testPlaylist.content);
-        manager.loadSegment(url, () => {}, onError);
+        manager.loadSegment(url, undefined, () => {}, onError);
         segmentErrorListener(url, error);
 
         onError.calledWith(error);
@@ -112,8 +112,8 @@ describe("SegmentManager", () => {
 
         const manager = new SegmentManager(instance(loader));
         manager.processPlaylist(testPlaylist.url, testPlaylist.content);
-        manager.loadSegment(segment.url, onSuccess, onError);
-        manager.abortSegment(segment.url);
+        manager.loadSegment(segment.url, undefined, onSuccess, onError);
+        manager.abortSegment(segment.url, undefined);
         segmentLoadedListener(segment);
 
         sinon.assert.notCalled(onSuccess);
