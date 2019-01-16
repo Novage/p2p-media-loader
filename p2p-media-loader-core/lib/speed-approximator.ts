@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-const SMOOTH_INTERVAL = 4 * 1000;
+const SMOOTH_INTERVAL = 1 * 1000;
 const MEASURE_INTERVAL = 60 * 1000;
 
 class NumberWithTime {
