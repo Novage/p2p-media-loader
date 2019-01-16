@@ -173,14 +173,14 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
             if (!this.segments.has(segment.id)) {
                 if (segmentPriority <= this.settings.requiredSegmentsPriority) {
-                    if (segmentPriority == 0 && !this.httpManager.isDownloading(segment) && this.httpManager.getActiveDownloads().size > 0) {
+                    if (segmentPriority == 0 && !this.httpManager.isDownloading(segment) && this.httpManager.getActiveDownloadsCount() > 0) {
                         for (const s of this.segmentsQueue) {
                             this.httpManager.abort(s);
                             updateSegmentsMap = true;
                         }
                     }
 
-                    if (this.httpManager.getActiveDownloads().size == 0) {
+                    if (this.httpManager.getActiveDownloadsCount() == 0) {
                         this.p2pManager.abort(segment);
                         this.httpManager.download(segment);
                         this.debug("HTTP download (priority)", segment.priority, segment.url);
@@ -193,12 +193,12 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
                 }
             }
 
-            if (this.httpManager.getActiveDownloads().size == 1 && this.p2pManager.getActiveDownloadsCount() == this.settings.simultaneousP2PDownloads) {
+            if (this.httpManager.getActiveDownloadsCount() == 1 && this.p2pManager.getActiveDownloadsCount() == this.settings.simultaneousP2PDownloads) {
                 return updateSegmentsMap;
             }
         }
 
-        if (this.httpManager.getActiveDownloads().size > 0) {
+        if (this.httpManager.getActiveDownloadsCount() > 0) {
             return updateSegmentsMap;
         }
 
@@ -288,7 +288,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private createSegmentsMap(): string[][] {
         const segmentsMap: string[][] = [];
         this.segments.forEach((value, key) => segmentsMap.push([key, MediaPeerSegmentStatus.Loaded]));
-        this.httpManager.getActiveDownloads().forEach((value, key) => segmentsMap.push([key, MediaPeerSegmentStatus.LoadingByHttp]));
+        this.httpManager.getActiveDownloadsKeys().forEach(key => segmentsMap.push([key, MediaPeerSegmentStatus.LoadingByHttp]));
         return segmentsMap;
     }
 

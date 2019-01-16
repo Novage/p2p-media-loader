@@ -18,9 +18,9 @@ export class Segment {
     public constructor(
         readonly id: string,
         readonly url: string,
-        readonly range: string | undefined,
+        readonly range?: string,
         readonly priority = 0,
-        readonly data: ArrayBuffer | undefined = undefined,
+        readonly data?: ArrayBuffer,
         readonly downloadSpeed = 0
     ) {}
 }

@@ -35,8 +35,11 @@ describe("HybridLoader", () => {
     when(httpMediaManger.abort(anyOfClass(Segment))).thenCall((segment) => {
         httpDownloads.delete(segment.id);
     });
-    when(httpMediaManger.getActiveDownloads()).thenCall(() => {
-        return httpDownloads;
+    when(httpMediaManger.getActiveDownloadsCount()).thenCall(() => {
+        return httpDownloads.size;
+    });
+    when(httpMediaManger.getActiveDownloadsKeys()).thenCall(() => {
+        return [ ...httpDownloads.keys() ];
     });
     when(httpMediaManger.isDownloading(anyOfClass(Segment))).thenCall((segment) => {
         return httpDownloads.has(segment.id);

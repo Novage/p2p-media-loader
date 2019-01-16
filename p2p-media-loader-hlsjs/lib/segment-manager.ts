@@ -15,7 +15,6 @@
  */
 
 import {Events, Segment, LoaderInterface} from "p2p-media-loader-core";
-import Utils from "./utils";
 import {Parser} from "m3u8-parser";
 
 const defaultSettings: Settings = {
@@ -69,7 +68,7 @@ export class SegmentManager {
     }
 
     public async loadPlaylist(url: string): Promise<string> {
-        const content = await Utils.fetchContentAsText(url);
+        const content = await loadContentAsText(url);
         this.processPlaylist(url, content);
         return content;
     }
@@ -77,7 +76,7 @@ export class SegmentManager {
     public loadSegment(url: string, byterange: Byterange, onSuccess: (content: ArrayBuffer, downloadSpeed: number) => void, onError: (error: any) => void): void {
         const segmentLocation = this.getSegmentLocation(url, byterange);
         if (!segmentLocation) {
-            Utils.fetchContentAsArrayBuffer(url, byterangeToString(byterange))
+            loadContentAsArrayBuffer(url, byterangeToString(byterange))
                 .then((content: ArrayBuffer) => onSuccess(content, 0))
                 .catch((error: any) => onError(error));
             return;
@@ -299,7 +298,7 @@ interface Settings {
      * Override default swarm ID that is used to identify unique media stream with trackers (manifest URL without
      * query parameters is used as the swarm ID if the parameter is not specified)
      */
-    swarmId: string | undefined;
+    swarmId?: string;
 }
 
 function compareByterange(b1: Byterange, b2: Byterange) {
@@ -316,4 +315,35 @@ function byterangeToString(byterange: Byterange): string | undefined {
     const end = byterange.offset + byterange.length - 1;
 
     return `bytes=${byterange.offset}-${end}`;
+}
+
+async function loadContent(url: string, responseType: XMLHttpRequestResponseType, range?: string): Promise<any> {
+    return new Promise<string>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("GET", url, true);
+        xhr.responseType = responseType;
+
+        if (range) {
+            xhr.setRequestHeader("Range", range);
+        }
+
+        xhr.onreadystatechange = () => {
+            if (xhr.readyState !== 4) { return; }
+            if (xhr.status >= 200 && xhr.status < 300) {
+                resolve(xhr.response);
+            } else {
+                reject(xhr.statusText);
+            }
+        };
+
+        xhr.send();
+    });
+}
+
+async function loadContentAsText(url: string): Promise<string> {
+    return loadContent(url, "text");
+}
+
+async function loadContentAsArrayBuffer(url: string, range?: string): Promise<ArrayBuffer> {
+    return loadContent(url, "arraybuffer", range);
 }

@@ -33,6 +33,7 @@ export class HttpMediaManager extends STEEmitter<
         if (this.isDownloading(segment)) {
             return;
         }
+
         this.debug("http segment download", segment.url);
         const request = new XMLHttpRequest();
         request.open("GET", segment.url, true);
@@ -82,8 +83,12 @@ export class HttpMediaManager extends STEEmitter<
         return this.xhrRequests.has(segment.id);
     }
 
-    public getActiveDownloads() {
-        return this.xhrRequests;
+    public getActiveDownloadsKeys(): string[] {
+        return [ ...this.xhrRequests.keys() ];
+    }
+
+    public getActiveDownloadsCount(): number {
+        return this.xhrRequests.size;
     }
 
     public destroy(): void {
