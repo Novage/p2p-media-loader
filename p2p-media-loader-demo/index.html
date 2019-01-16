@@ -177,7 +177,7 @@
             function check() {
                 try {
                     resolve(require(moduleName));
-                } catch {
+                } catch (e) {
                     setTimeout(check, 200);
                 }
             }
