@@ -74,6 +74,7 @@ export interface LoaderInterface {
     load(segments: Segment[], swarmId: string): void;
     getSegment(id: string): Segment | undefined;
     getSettings(): any;
+    getDetails(): any;
     destroy(): void;
 }
 

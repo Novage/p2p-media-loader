@@ -142,6 +142,12 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         return this.settings;
     }
 
+    public getDetails() {
+        return {
+            peerId: this.p2pManager.getPeerId()
+        };
+    }
+
     public destroy(): void {
         this.segmentsQueue = [];
         this.httpManager.destroy();

@@ -28,6 +28,7 @@ class LoaderInterfaceEmptyImpl implements LoaderInterface {
     load(segments: Segment[], swarmId: string): void { }
     getSegment(id: string): Segment | undefined { return undefined; }
     getSettings(): any { }
+    getDetails(): any { }
     destroy(): void { }
 }
 

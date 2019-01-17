@@ -117,6 +117,10 @@ Listener args:
 
 Returns loader instance settings.
 
+### `engine.getDetails()`
+
+Returns loader instance details.
+
 ### `loader.getSegment(id)`
 
 Returns a segment from loader cache or undefined if the segment is not available.

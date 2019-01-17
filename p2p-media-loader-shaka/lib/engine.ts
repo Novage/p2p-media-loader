@@ -51,6 +51,12 @@ export class Engine extends EventEmitter {
         };
     }
 
+    public getDetails(): any {
+        return {
+            loader: this.loader.getDetails()
+        };
+    }
+
     public initShakaPlayer(player: any) {
         integration.initShakaPlayer(player, this.segmentManager);
     }

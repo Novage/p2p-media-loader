@@ -99,6 +99,10 @@ Creates a new `Engine` instance.
 
 Returns engine instance settings.
 
+### `engine.getDetails()`
+
+Returns engine instance details.
+
 ### `engine.createLoaderClass()`
 
 Creates hls.js loader class bound to this engine.

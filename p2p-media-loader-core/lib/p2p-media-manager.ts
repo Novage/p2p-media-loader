@@ -43,7 +43,7 @@ export class P2PMediaManager extends STEEmitter<
     private peerCandidates: Map<string, MediaPeer[]> = new Map();
     private peerSegmentRequests: Map<string, PeerSegmentRequest> = new Map();
     private swarmId: string | null = null;
-    private peerId: ArrayBuffer;
+    private readonly peerId: ArrayBuffer;
     private debug = Debug("p2pml:p2p-media-manager");
     private pendingTrackerClient: {
         isDestroyed: boolean
@@ -60,11 +60,17 @@ export class P2PMediaManager extends STEEmitter<
             }) {
         super();
 
-        this.peerId = crypto.getRandomValues(new Uint8Array(20)).buffer;
+        this.peerId = settings.useP2P
+            ? crypto.getRandomValues(new Uint8Array(20)).buffer
+            : new ArrayBuffer(0);
 
         if (this.debug.enabled) {
-            this.debug("peer ID", Buffer.from(this.peerId).toString("hex"));
+            this.debug("peer ID", this.getPeerId());
         }
+    }
+
+    public getPeerId(): string {
+        return Buffer.from(this.peerId).toString("hex");
     }
 
     public async setSwarmId(swarmId: string) {

@@ -88,6 +88,10 @@ Creates a new `Engine` instance.
 
 Returns engine instance settings.
 
+### `engine.getDetails()`
+
+Returns engine instance details.
+
 ### `engine.destroy()`
 
 Destroys engine; destroy loader and segment manager.

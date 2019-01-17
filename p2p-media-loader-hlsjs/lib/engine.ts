@@ -56,6 +56,12 @@ export class Engine extends EventEmitter {
         };
     }
 
+    public getDetails(): any {
+        return {
+            loader: this.loader.getDetails()
+        };
+    }
+
     public setPlayingSegment(url: string, byterange: Byterange) {
         this.segmentManager.setPlayingSegment(url, byterange);
     }
