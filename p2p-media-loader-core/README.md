@@ -111,7 +111,7 @@ Emitted when a segment piece uploaded.
 
 Listener args:
 - `method` - uploading method, possible values: `p2p`;
-- `bytes` - amount of bytes downloaded;
+- `bytes` - amount of bytes uploaded;
 
 ### `loader.getSettings()`
 
