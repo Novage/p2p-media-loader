@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import {Events, Segment, LoaderInterface} from "p2p-media-loader-core";
+import {Events, Segment, LoaderInterface, XhrSetupCallback} from "p2p-media-loader-core";
 import {Parser} from "m3u8-parser";
 
 const defaultSettings: Settings = {
@@ -26,9 +26,9 @@ export type Byterange = { length: number, offset: number } | undefined;
 
 export class SegmentManager {
 
-    private loader: LoaderInterface;
+    private readonly loader: LoaderInterface;
     private masterPlaylist: Playlist | null = null;
-    private variantPlaylists: Map<string, Playlist> = new Map();
+    private readonly variantPlaylists: Map<string, Playlist> = new Map();
     private segmentRequest: SegmentRequest | null = null;
     private playQueue: {segmentSequence: number, segmentUrl: string, segmentByterange: Byterange}[] = [];
     private readonly settings: Settings;
@@ -68,7 +68,7 @@ export class SegmentManager {
     }
 
     public async loadPlaylist(url: string): Promise<string> {
-        const content = await loadContentAsText(url);
+        const content = await this.loadContent(url, "text");
         this.processPlaylist(url, content);
         return content;
     }
@@ -76,7 +76,8 @@ export class SegmentManager {
     public loadSegment(url: string, byterange: Byterange, onSuccess: (content: ArrayBuffer, downloadSpeed: number) => void, onError: (error: any) => void): void {
         const segmentLocation = this.getSegmentLocation(url, byterange);
         if (!segmentLocation) {
-            loadContentAsArrayBuffer(url, byterangeToString(byterange))
+            // Unknown file, usually can be: audio segment, encription key, subtitles etc.
+            this.loadContent(url, "arraybuffer", byterangeToString(byterange))
                 .then((content: ArrayBuffer) => onSuccess(content, 0))
                 .catch((error: any) => onError(error));
             return;
@@ -247,6 +248,34 @@ export class SegmentManager {
         return playlistUrl;
     }
 
+    private async loadContent(url: string, responseType: XMLHttpRequestResponseType, range?: string): Promise<any> {
+        return new Promise<string>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open("GET", url, true);
+            xhr.responseType = responseType;
+
+            if (range) {
+                xhr.setRequestHeader("Range", range);
+            }
+
+            xhr.addEventListener("readystatechange", () => {
+                if (xhr.readyState !== 4) { return; }
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve(xhr.response);
+                } else {
+                    reject(xhr.statusText);
+                }
+            });
+
+            const xhrSetup: XhrSetupCallback = this.loader.getSettings().xhrSetup;
+            if (xhrSetup) {
+                xhrSetup(xhr, url);
+            }
+
+            xhr.send();
+        });
+    }
+
 }
 
 class Playlist {
@@ -315,35 +344,4 @@ function byterangeToString(byterange: Byterange): string | undefined {
     const end = byterange.offset + byterange.length - 1;
 
     return `bytes=${byterange.offset}-${end}`;
-}
-
-async function loadContent(url: string, responseType: XMLHttpRequestResponseType, range?: string): Promise<any> {
-    return new Promise<string>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("GET", url, true);
-        xhr.responseType = responseType;
-
-        if (range) {
-            xhr.setRequestHeader("Range", range);
-        }
-
-        xhr.onreadystatechange = () => {
-            if (xhr.readyState !== 4) { return; }
-            if (xhr.status >= 200 && xhr.status < 300) {
-                resolve(xhr.response);
-            } else {
-                reject(xhr.statusText);
-            }
-        };
-
-        xhr.send();
-    });
-}
-
-async function loadContentAsText(url: string): Promise<string> {
-    return loadContent(url, "text");
-}
-
-async function loadContentAsArrayBuffer(url: string, range?: string): Promise<ArrayBuffer> {
-    return loadContent(url, "arraybuffer", range);
 }

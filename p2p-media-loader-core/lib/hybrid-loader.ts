@@ -16,7 +16,7 @@
 
 import * as Debug from "debug";
 
-import {LoaderInterface, Events, Segment} from "./loader-interface";
+import {LoaderInterface, Events, Segment, XhrSetupCallback} from "./loader-interface";
 import {EventEmitter} from "events";
 import {HttpMediaManager} from "./http-media-manager";
 import {P2PMediaManager} from "./p2p-media-manager";
@@ -82,7 +82,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private createHttpManager() {
-        return new HttpMediaManager();
+        return new HttpMediaManager(this.settings);
     }
 
     private createP2PManager() {
@@ -402,4 +402,9 @@ interface Settings {
      * An RTCConfiguration dictionary providing options to configure WebRTC connections.
      */
     rtcConfig: any;
+
+    /**
+     * XMLHttpRequest setup callback. Handle it when you need additional setup for requests made by the library.
+     */
+    xhrSetup?: XhrSetupCallback;
 }

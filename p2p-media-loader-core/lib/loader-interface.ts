@@ -76,3 +76,7 @@ export interface LoaderInterface {
     getSettings(): any;
     destroy(): void;
 }
+
+export interface XhrSetupCallback {
+    (xhr: XMLHttpRequest, url: string): void;
+}

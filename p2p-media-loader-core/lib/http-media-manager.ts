@@ -16,7 +16,7 @@
 
 import * as Debug from "debug";
 import STEEmitter from "./stringly-typed-event-emitter";
-import {Segment} from "./loader-interface";
+import {Segment, XhrSetupCallback} from "./loader-interface";
 
 export class HttpMediaManager extends STEEmitter<
     "segment-loaded" | "segment-error" | "bytes-downloaded"
@@ -25,7 +25,9 @@ export class HttpMediaManager extends STEEmitter<
     private xhrRequests: Map<string, XMLHttpRequest> = new Map();
     private debug = Debug("p2pml:http-media-manager");
 
-    public constructor() {
+    public constructor(readonly settings: {
+        xhrSetup?: XhrSetupCallback
+    }) {
         super();
     }
 
@@ -35,22 +37,22 @@ export class HttpMediaManager extends STEEmitter<
         }
 
         this.debug("http segment download", segment.url);
-        const request = new XMLHttpRequest();
-        request.open("GET", segment.url, true);
-        request.responseType = "arraybuffer";
+        const xhr = new XMLHttpRequest();
+        xhr.open("GET", segment.url, true);
+        xhr.responseType = "arraybuffer";
 
         if (segment.range) {
-            request.setRequestHeader("Range", segment.range);
+            xhr.setRequestHeader("Range", segment.range);
         }
 
         let prevBytesLoaded = 0;
-        request.onprogress = (event: any) => {
+        xhr.addEventListener("progress", (event: any) => {
             const bytesLoaded = event.loaded - prevBytesLoaded;
             this.emit("bytes-downloaded", bytesLoaded);
             prevBytesLoaded = event.loaded;
-        };
+        });
 
-        request.onload = (event: any) => {
+        xhr.addEventListener("load", (event: any) => {
             this.xhrRequests.delete(segment.id);
 
             if (event.target.status >= 200 && 300 > event.target.status) {
@@ -58,16 +60,20 @@ export class HttpMediaManager extends STEEmitter<
             } else {
                 this.emit("segment-error", segment, event);
             }
-        };
+        });
 
-        request.onerror = (event: any) => {
+        xhr.addEventListener("error", (event: any) => {
             // TODO: retry with timeout?
             this.xhrRequests.delete(segment.id);
             this.emit("segment-error", segment, event);
-        };
+        });
 
-        this.xhrRequests.set(segment.id, request);
-        request.send();
+        if (this.settings.xhrSetup) {
+            this.settings.xhrSetup(xhr, segment.url);
+        }
+
+        this.xhrRequests.set(segment.id, xhr);
+        xhr.send();
     }
 
     public abort(segment: Segment): void {
