@@ -84,6 +84,13 @@ Creates a new `Engine` instance.
 - `loader`
     + settings for `HybridLoader` (see [P2P Media Loader Core API](../p2p-media-loader-core/README.md#loader--new-hybridloadersettings) for details);
 
+### `engine.on(event, handler)`
+
+Registers an event handler.
+
+- `event` - Event you want to handle; available events you can find [here](../p2p-media-loader-core/README.md#events).
+- `handler` - Function to handle the event
+
 ### `engine.getSettings()`
 
 Returns engine instance settings.
