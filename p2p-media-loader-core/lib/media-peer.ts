@@ -86,7 +86,7 @@ export class MediaPeer extends STEEmitter<
 
         this.downloadingSegment.bytesDownloaded += data.byteLength;
         this.downloadingSegment.pieces.push(data);
-        this.emit("bytes-downloaded", data.byteLength);
+        this.emit("bytes-downloaded", this, data.byteLength);
 
         const segmentId = this.downloadingSegment.id;
 
@@ -214,7 +214,7 @@ export class MediaPeer extends STEEmitter<
             bytesLeft -= bytesToSend;
         }
 
-        this.emit("bytes-uploaded", data.byteLength);
+        this.emit("bytes-uploaded", this, data.byteLength);
     }
 
     public sendSegmentAbsent(segmentId: string): void {

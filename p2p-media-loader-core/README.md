@@ -61,20 +61,22 @@ Function args:
 - `segments` - array of `Segment` class instances with populated `url` and `priority` field;
 - `swarmId` - used for gathering peers in pool;
 
-### `loader.on(Events.SegmentLoaded, function (segment) {})`
+### `loader.on(Events.SegmentLoaded, function (segment, peerId) {})`
 
 Emitted when segment have been downloaded.
 
 Listener args:
 - `segment` - instance of `Segment` class with populated `url` and `data` fields;
+- `peerId` - Id of the peer the segment was downloaded from; `undefined` for HTTP method;
 
-### `loader.on(Events.SegmentError, function (segment, error) {})`
+### `loader.on(Events.SegmentError, function (segment, error, peerId) {})`
 
 Emitted when an error occurred while loading the segment.
 
 Listener args:
 - `segment` - url of the segment;
 - `error` - error details;
+- `peerId` - Id of the peer the error occured with; `undefined` for HTTP method;
 
 ### `loader.on(Events.SegmentAbort, function (segment) {})`
 
@@ -97,13 +99,14 @@ Emitted when a peer is disconnected.
 Listener args:
 - `peerId` - Id of the disconnected peer;
 
-### `loader.on(Events.PieceBytesDownloaded, function (method, bytes) {})`
+### `loader.on(Events.PieceBytesDownloaded, function (method, bytes, peerId) {})`
 
 Emitted when a segment piece downloaded.
 
 Listener args:
 - `method` - downloading method, possible values: `http`, `p2p`;
 - `bytes` - amount of bytes downloaded;
+- `peerId` - Id of the peer these bytes downloaded from; `undefined` for HTTP method;
 
 ### `loader.on(Events.PieceBytesUploaded, function (method, bytes) {})`
 
@@ -112,12 +115,13 @@ Emitted when a segment piece uploaded.
 Listener args:
 - `method` - uploading method, possible values: `p2p`;
 - `bytes` - amount of bytes uploaded;
+- `peerId` - Id of the peer these bytes uploaded to; `undefined` for HTTP method;
 
 ### `loader.getSettings()`
 
 Returns loader instance settings.
 
-### `engine.getDetails()`
+### `loader.getDetails()`
 
 Returns loader instance details.
 
@@ -138,13 +142,13 @@ Destroys loader: abort all connections (http, tcp, peer), clears cached segments
 
 Events that are emitted by `HybridLoader`.
 
-- [SegmentLoaded](#loaderoneventssegmentloaded-function-segment-)
-- [SegmentError](#loaderoneventssegmenterror-function-segment-error-)
+- [SegmentLoaded](#loaderoneventssegmentloaded-function-segment-peerid-)
+- [SegmentError](#loaderoneventssegmenterror-function-segment-error-peerid-)
 - [SegmentAbort](#loaderoneventssegmentabort-function-segment-)
 - [PeerConnect](#loaderoneventspeerconnect-function-peer-)
 - [PeerClose](#loaderoneventspeerclose-function-peerid-)
-- [PieceBytesDownloaded](#loaderoneventspiecebytesdownloaded-function-method-bytes-)
-- [PieceBytesUploaded](#loaderoneventspiecebytesuploaded-function-method-bytes-)
+- [PieceBytesDownloaded](#loaderoneventspiecebytesdownloaded-function-method-bytes-peerid-)
+- [PieceBytesUploaded](#loaderoneventspiecebytesuploaded-function-method-bytes-peerid-)
 
 ---
 

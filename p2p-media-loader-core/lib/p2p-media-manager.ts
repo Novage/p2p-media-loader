@@ -245,12 +245,12 @@ export class P2PMediaManager extends STEEmitter<
         return overallSegmentsMap;
     }
 
-    private onPieceBytesDownloaded = (bytes: number) => {
-        this.emit("bytes-downloaded", bytes);
+    private onPieceBytesDownloaded = (peer: MediaPeer, bytes: number) => {
+        this.emit("bytes-downloaded", bytes, peer.id);
     }
 
-    private onPieceBytesUploaded = (bytes: number) => {
-        this.emit("bytes-uploaded", bytes);
+    private onPieceBytesUploaded = (peer: MediaPeer, bytes: number) => {
+        this.emit("bytes-uploaded", bytes, peer.id);
     }
 
     private onPeerConnect = (peer: MediaPeer) => {
@@ -329,7 +329,7 @@ export class P2PMediaManager extends STEEmitter<
         const peerSegmentRequest = this.peerSegmentRequests.get(segmentId);
         if (peerSegmentRequest) {
             this.peerSegmentRequests.delete(segmentId);
-            this.emit("segment-loaded", peerSegmentRequest.segment, data);
+            this.emit("segment-loaded", peerSegmentRequest.segment, data, peer.id);
         }
     }
 
@@ -342,7 +342,7 @@ export class P2PMediaManager extends STEEmitter<
         const peerSegmentRequest = this.peerSegmentRequests.get(segmentId);
         if (peerSegmentRequest) {
             this.peerSegmentRequests.delete(segmentId);
-            this.emit("segment-error", peerSegmentRequest.segment, description);
+            this.emit("segment-error", peerSegmentRequest.segment, description, peer.id);
         }
     }
 

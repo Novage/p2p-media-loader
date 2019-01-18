@@ -75,8 +75,8 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.p2pManager.on("segment-loaded", this.onSegmentLoaded);
         this.p2pManager.on("segment-error", this.onSegmentError);
         this.p2pManager.on("peer-data-updated", () => this.processSegmentsQueue());
-        this.p2pManager.on("bytes-downloaded", (bytes: number) => this.onPieceBytesDownloaded("p2p", bytes));
-        this.p2pManager.on("bytes-uploaded", (bytes: number) => this.onPieceBytesUploaded("p2p", bytes));
+        this.p2pManager.on("bytes-downloaded", (bytes: number, peerId: string) => this.onPieceBytesDownloaded("p2p", bytes, peerId));
+        this.p2pManager.on("bytes-uploaded", (bytes: number, peerId: string) => this.onPieceBytesUploaded("p2p", bytes, peerId));
         this.p2pManager.on("peer-connected", this.onPeerConnect);
         this.p2pManager.on("peer-closed", this.onPeerClose);
     }
@@ -243,17 +243,17 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         return updateSegmentsMap;
     }
 
-    private onPieceBytesDownloaded = (method: "http" | "p2p", bytes: number) => {
+    private onPieceBytesDownloaded = (method: "http" | "p2p", bytes: number, peerId?: string) => {
         this.speedApproximator.addBytes(bytes, this.now());
-        this.emit(Events.PieceBytesDownloaded, method, bytes);
+        this.emit(Events.PieceBytesDownloaded, method, bytes, peerId);
     }
 
-    private onPieceBytesUploaded = (method: "p2p", bytes: number) => {
+    private onPieceBytesUploaded = (method: "p2p", bytes: number, peerId?: string) => {
         this.speedApproximator.addBytes(bytes, this.now());
-        this.emit(Events.PieceBytesUploaded, method, bytes);
+        this.emit(Events.PieceBytesUploaded, method, bytes, peerId);
     }
 
-    private onSegmentLoaded = (segment: Segment, data: ArrayBuffer) => {
+    private onSegmentLoaded = (segment: Segment, data: ArrayBuffer, peerId?: string) => {
         this.debug("segment loaded", segment.id, segment.url);
 
         const segmentInternal = new SegmentInternal(
@@ -266,17 +266,17 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         );
 
         this.segments.set(segment.id, segmentInternal);
-        this.emitSegmentLoaded(segmentInternal);
+        this.emitSegmentLoaded(segmentInternal, peerId);
         this.processSegmentsQueue();
         this.p2pManager.sendSegmentsMapToAll(this.createSegmentsMap());
     }
 
-    private onSegmentError = (segment: Segment, event: any) => {
-        this.emit(Events.SegmentError, segment, event);
+    private onSegmentError = (segment: Segment, details: any, peerId?: string) => {
+        this.emit(Events.SegmentError, segment, details, peerId);
         this.processSegmentsQueue();
     }
 
-    private emitSegmentLoaded(segmentInternal: SegmentInternal): void {
+    private emitSegmentLoaded(segmentInternal: SegmentInternal, peerId?: string): void {
         segmentInternal.lastAccessed = this.now();
 
         const segment = new Segment(
@@ -288,7 +288,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             segmentInternal.downloadSpeed
         );
 
-        this.emit(Events.SegmentLoaded, segment);
+        this.emit(Events.SegmentLoaded, segment, peerId);
     }
 
     private createSegmentsMap(): string[][] {
