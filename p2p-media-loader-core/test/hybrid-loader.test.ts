@@ -82,7 +82,6 @@ describe("HybridLoader", () => {
     it("load", () => {
 
         const settings = {
-            segmentIdGenerator: (url: string): string => url,
             cachedSegmentExpiration: 5 * 60 * 1000,
             cachedSegmentsCount: 20,
             requiredSegmentsPriority: 1,

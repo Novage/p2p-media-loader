@@ -78,6 +78,10 @@ export interface LoaderInterface {
     destroy(): void;
 }
 
+export interface P2PSegmentValidatorCallback {
+    (segment: Segment, peerId: string): Promise<void>;
+}
+
 export interface XhrSetupCallback {
     (xhr: XMLHttpRequest, url: string): void;
 }

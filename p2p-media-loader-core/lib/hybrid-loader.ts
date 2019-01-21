@@ -16,7 +16,7 @@
 
 import * as Debug from "debug";
 
-import {LoaderInterface, Events, Segment, XhrSetupCallback} from "./loader-interface";
+import {LoaderInterface, Events, Segment, P2PSegmentValidatorCallback, XhrSetupCallback} from "./loader-interface";
 import {EventEmitter} from "events";
 import {HttpMediaManager} from "./http-media-manager";
 import {P2PMediaManager} from "./p2p-media-manager";
@@ -398,6 +398,11 @@ interface Settings {
      * Timeout to download a segment from a peer. If exceeded the peer is dropped.
      */
     p2pSegmentDownloadTimeout: number;
+
+    /**
+     * Segment validation callback - validates the data after it has been downloaded via P2P.
+     */
+    p2pSegmentValidator?: P2PSegmentValidatorCallback;
 
     /**
      * Torrent trackers (announcers) to use.

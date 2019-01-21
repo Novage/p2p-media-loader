@@ -18,7 +18,7 @@ import * as Debug from "debug";
 
 import {Client} from "bittorrent-tracker";
 import STEEmitter from "./stringly-typed-event-emitter";
-import {Segment} from "./loader-interface";
+import {Segment, P2PSegmentValidatorCallback} from "./loader-interface";
 import {MediaPeer, MediaPeerSegmentStatus} from "./media-peer";
 import {SegmentInternal} from "./segment-internal";
 import {Buffer} from "buffer";
@@ -55,6 +55,7 @@ export class P2PMediaManager extends STEEmitter<
                 useP2P: boolean,
                 trackerAnnounce: string[],
                 p2pSegmentDownloadTimeout: number,
+                p2pSegmentValidator?: P2PSegmentValidatorCallback,
                 webRtcMaxMessageSize: number,
                 rtcConfig?: RTCConfiguration
             }) {
@@ -325,12 +326,33 @@ export class P2PMediaManager extends STEEmitter<
         }
     }
 
-    private onSegmentLoaded = (peer: MediaPeer, segmentId: string, data: ArrayBuffer) => {
+    private onSegmentLoaded = async (peer: MediaPeer, segmentId: string, data: ArrayBuffer) => {
         const peerSegmentRequest = this.peerSegmentRequests.get(segmentId);
-        if (peerSegmentRequest) {
-            this.peerSegmentRequests.delete(segmentId);
-            this.emit("segment-loaded", peerSegmentRequest.segment, data, peer.id);
+        if (!peerSegmentRequest) {
+            return;
         }
+
+        const segment = peerSegmentRequest.segment;
+        this.peerSegmentRequests.delete(segmentId);
+
+        if (this.settings.p2pSegmentValidator) {
+            try {
+                await this.settings.p2pSegmentValidator(new Segment(
+                    segment.id,
+                    segment.url,
+                    segment.range,
+                    segment.priority,
+                    data
+                ), peer.id);
+            } catch (error) {
+                this.debug("segment validator failed", error);
+                this.emit("segment-error", segment, error, peer.id);
+                this.onPeerClose(peer);
+                return;
+            }
+        }
+
+        this.emit("segment-loaded", segment, data, peer.id);
     }
 
     private onSegmentAbsent = (peer: MediaPeer, segmentId: string) => {
