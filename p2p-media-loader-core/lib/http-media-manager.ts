@@ -16,7 +16,7 @@
 
 import * as Debug from "debug";
 import STEEmitter from "./stringly-typed-event-emitter";
-import {Segment, XhrSetupCallback} from "./loader-interface";
+import {Segment, SegmentValidatorCallback, XhrSetupCallback} from "./loader-interface";
 
 export class HttpMediaManager extends STEEmitter<
     "segment-loaded" | "segment-error" | "bytes-downloaded"
@@ -26,6 +26,7 @@ export class HttpMediaManager extends STEEmitter<
     private debug = Debug("p2pml:http-media-manager");
 
     public constructor(readonly settings: {
+        segmentValidator?: SegmentValidatorCallback,
         xhrSetup?: XhrSetupCallback
     }) {
         super();
@@ -56,7 +57,7 @@ export class HttpMediaManager extends STEEmitter<
             this.xhrRequests.delete(segment.id);
 
             if (event.target.status >= 200 && 300 > event.target.status) {
-                this.emit("segment-loaded", segment, event.target.response);
+                this.segmentDownloadFinished(segment, event.target.response);
             } else {
                 this.emit("segment-error", segment, event);
             }
@@ -100,6 +101,26 @@ export class HttpMediaManager extends STEEmitter<
     public destroy(): void {
         this.xhrRequests.forEach(xhr => xhr.abort());
         this.xhrRequests.clear();
+    }
+
+    private async segmentDownloadFinished(segment: Segment, data: ArrayBuffer) {
+        if (this.settings.segmentValidator) {
+            try {
+                await this.settings.segmentValidator(new Segment(
+                    segment.id,
+                    segment.url,
+                    segment.range,
+                    segment.priority,
+                    data
+                ), "http");
+            } catch (error) {
+                this.debug("segment validator failed", error);
+                this.emit("segment-error", segment, error);
+                return;
+            }
+        }
+
+        this.emit("segment-loaded", segment, data);
     }
 
 } // end of HttpMediaManager

@@ -16,7 +16,7 @@
 
 import * as Debug from "debug";
 
-import {LoaderInterface, Events, Segment, P2PSegmentValidatorCallback, XhrSetupCallback} from "./loader-interface";
+import {LoaderInterface, Events, Segment, SegmentValidatorCallback, XhrSetupCallback} from "./loader-interface";
 import {EventEmitter} from "events";
 import {HttpMediaManager} from "./http-media-manager";
 import {P2PMediaManager} from "./p2p-media-manager";
@@ -400,9 +400,9 @@ interface Settings {
     p2pSegmentDownloadTimeout: number;
 
     /**
-     * Segment validation callback - validates the data after it has been downloaded via P2P.
+     * Segment validation callback - validates the data after it has been downloaded.
      */
-    p2pSegmentValidator?: P2PSegmentValidatorCallback;
+    segmentValidator?: SegmentValidatorCallback;
 
     /**
      * Torrent trackers (announcers) to use.

@@ -18,7 +18,7 @@ import * as Debug from "debug";
 
 import {Client} from "bittorrent-tracker";
 import STEEmitter from "./stringly-typed-event-emitter";
-import {Segment, P2PSegmentValidatorCallback} from "./loader-interface";
+import {Segment, SegmentValidatorCallback} from "./loader-interface";
 import {MediaPeer, MediaPeerSegmentStatus} from "./media-peer";
 import {SegmentInternal} from "./segment-internal";
 import {Buffer} from "buffer";
@@ -55,7 +55,7 @@ export class P2PMediaManager extends STEEmitter<
                 useP2P: boolean,
                 trackerAnnounce: string[],
                 p2pSegmentDownloadTimeout: number,
-                p2pSegmentValidator?: P2PSegmentValidatorCallback,
+                segmentValidator?: SegmentValidatorCallback,
                 webRtcMaxMessageSize: number,
                 rtcConfig?: RTCConfiguration
             }) {
@@ -335,15 +335,15 @@ export class P2PMediaManager extends STEEmitter<
         const segment = peerSegmentRequest.segment;
         this.peerSegmentRequests.delete(segmentId);
 
-        if (this.settings.p2pSegmentValidator) {
+        if (this.settings.segmentValidator) {
             try {
-                await this.settings.p2pSegmentValidator(new Segment(
+                await this.settings.segmentValidator(new Segment(
                     segment.id,
                     segment.url,
                     segment.range,
                     segment.priority,
                     data
-                ), peer.id);
+                ), "p2p", peer.id);
             } catch (error) {
                 this.debug("segment validator failed", error);
                 this.emit("segment-error", segment, error, peer.id);
