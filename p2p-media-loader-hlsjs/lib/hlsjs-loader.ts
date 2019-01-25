@@ -30,7 +30,7 @@ export class HlsJsLoader {
     public load(context: any, config_unused: any, callbacks: any): void {
         if (context.type) {
             this.segmentManager.loadPlaylist(context.url)
-                .then((content: string) => this.successPlaylist(content, context, callbacks))
+                .then((xhr: XMLHttpRequest) => this.successPlaylist(xhr, context, callbacks))
                 .catch((error: any) => this.error(error, context, callbacks));
         } else if (context.frag) {
             this.segmentManager.loadSegment(context.url,
@@ -52,17 +52,17 @@ export class HlsJsLoader {
                 : { offset: context.rangeStart, length: context.rangeEnd - context.rangeStart });
     }
 
-    private successPlaylist(content: string, context: any, callbacks: any): void {
+    private successPlaylist(xhr: XMLHttpRequest, context: any, callbacks: any): void {
         const now = performance.now();
 
         this.stats.trequest = now - 300;
         this.stats.tfirst = now - 200;
         this.stats.tload = now;
-        this.stats.loaded = content.length;
+        this.stats.loaded = xhr.response.length;
 
         callbacks.onSuccess({
-            url: context.url,
-            data: content
+            url: xhr.responseURL,
+            data: xhr.response
         }, this.stats, context);
     }
 
