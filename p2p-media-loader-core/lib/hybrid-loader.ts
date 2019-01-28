@@ -36,6 +36,7 @@ const defaultSettings: Settings = {
     simultaneousP2PDownloads: 3,
     httpDownloadProbability: 0.06,
     httpDownloadProbabilityInterval: 500,
+    httpFailedSegmentTimeout: 10000,
     bufferedSegmentsCount: 20,
 
     webRtcMaxMessageSize: 64 * 1024 - 1,
@@ -178,7 +179,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             const segmentPriority = index + startingPriority;
 
             if (!this.segments.has(segment.id)) {
-                if (segmentPriority <= this.settings.requiredSegmentsPriority) {
+                if (segmentPriority <= this.settings.requiredSegmentsPriority && !this.httpManager.isFailed(segment)) {
                     if (segmentPriority == 0 && !this.httpManager.isDownloading(segment) && this.httpManager.getActiveDownloadsCount() > 0) {
                         for (const s of this.segmentsQueue) {
                             this.httpManager.abort(s);
@@ -227,12 +228,8 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         const segmentsMap = this.p2pManager.getOvrallSegmentsMap();
         pendingQueue = pendingQueue.filter(segment => !segmentsMap.get(segment.id));
 
-        if (pendingQueue.length == 0) {
-            return updateSegmentsMap;
-        }
-
         for (const segment of pendingQueue) {
-            if (Math.random() <= this.settings.httpDownloadProbability) {
+            if (Math.random() <= this.settings.httpDownloadProbability && !this.httpManager.isFailed(segment)) {
                 this.debug("HTTP download (random)", segment.priority, segment.url);
                 this.httpManager.download(segment);
                 updateSegmentsMap = true;
@@ -383,6 +380,11 @@ interface Settings {
      * Interval of the httpDownloadProbability check (in milliseconds).
      */
     httpDownloadProbabilityInterval: number;
+
+    /**
+     * Timeout before trying to load segment again via HTTP after failed attempt (in milliseconds).
+     */
+    httpFailedSegmentTimeout: number;
 
     /**
      * Max number of the segments to be downloaded via HTTP or P2P methods.

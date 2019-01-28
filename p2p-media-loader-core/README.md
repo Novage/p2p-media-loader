@@ -46,6 +46,7 @@ If `settings` is specified, then the default settings (shown below) will be over
 | `simultaneousP2PDownloads` | Integer | 3 | Max number of simultaneous downloads from peers
 | `httpDownloadProbability` | Float | 0.06 | Probability of downloading remaining not downloaded segment in the segments queue via HTTP
 | `httpDownloadProbabilityInterval` | Integer | 500 | Interval of the httpDownloadProbability check (in milliseconds)
+| `httpFailedSegmentTimeout` | Integer | 10000 | Timeout before trying to load segment again via HTTP after failed attempt (in milliseconds)
 | `bufferedSegmentsCount` | Integer | 20 | Max number of the segments to be downloaded via HTTP or P2P methods
 | `trackerAnnounce` | String[] | [ "wss://tracker.btorrent.xyz/", "wss://tracker.openwebtorrent.com/" ] | Torrent trackers (announcers) to use
 | `webRtcMaxMessageSize` | Integer | 64 * 1024 - 1 | Max WebRTC message size. 64KiB - 1B should work with most of recent browsers. Set it to 16KiB for older browsers support.

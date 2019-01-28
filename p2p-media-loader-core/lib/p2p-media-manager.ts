@@ -333,7 +333,6 @@ export class P2PMediaManager extends STEEmitter<
         }
 
         const segment = peerSegmentRequest.segment;
-        this.peerSegmentRequests.delete(segmentId);
 
         if (this.settings.segmentValidator) {
             try {
@@ -346,12 +345,14 @@ export class P2PMediaManager extends STEEmitter<
                 ), "p2p", peer.id);
             } catch (error) {
                 this.debug("segment validator failed", error);
+                this.peerSegmentRequests.delete(segmentId);
                 this.emit("segment-error", segment, error, peer.id);
                 this.onPeerClose(peer);
                 return;
             }
         }
 
+        this.peerSegmentRequests.delete(segmentId);
         this.emit("segment-loaded", segment, data, peer.id);
     }
 
