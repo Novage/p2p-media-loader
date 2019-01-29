@@ -1,7 +1,7 @@
 {
   "name": "p2p-media-loader-shaka",
   "description": "P2P Media Loader Shaka Player integration",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "license": "Apache-2.0",
   "author": "Novage",
   "homepage": "https://github.com/Novage/p2p-media-loader",
@@ -37,7 +37,7 @@
   "dependencies": {
     "debug": "^4.1.1",
     "events": "^3.0.0",
-    "p2p-media-loader-core": "^0.3.0"
+    "p2p-media-loader-core": "^0.4.0"
   },
   "devDependencies": {
     "@types/debug": "^0.0.31",
