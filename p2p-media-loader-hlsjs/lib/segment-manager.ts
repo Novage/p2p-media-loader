@@ -46,12 +46,12 @@ export class SegmentManager {
         return this.settings;
     }
 
-    public processPlaylist(requestUrl: string, xhr: XMLHttpRequest): void {
+    public processPlaylist(requestUrl: string, content: string, responseUrl: string): void {
         const parser = new Parser();
-        parser.push(xhr.response);
+        parser.push(content);
         parser.end();
 
-        const playlist = new Playlist(requestUrl, xhr.responseURL, parser.manifest);
+        const playlist = new Playlist(requestUrl, responseUrl, parser.manifest);
 
         if (playlist.manifest.playlists) {
             this.masterPlaylist = playlist;
@@ -77,7 +77,7 @@ export class SegmentManager {
 
     public async loadPlaylist(url: string): Promise<XMLHttpRequest> {
         const xhr = await this.loadContent(url, "text");
-        this.processPlaylist(url, xhr);
+        this.processPlaylist(url, xhr.response as string, xhr.responseURL);
         return xhr;
     }
 
