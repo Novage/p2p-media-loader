@@ -38,30 +38,30 @@
   },
   "dependencies": {
     "bittorrent-tracker": "^9.10.1",
-    "debug": "^4.1.0",
+    "debug": "^4.1.1",
     "events": "^3.0.0",
     "get-browser-rtc": "^1.0.2",
     "sha.js": "^2.4.11"
   },
   "devDependencies": {
-    "@types/assert": "^1.4.0",
+    "@types/assert": "^1.4.1",
     "@types/debug": "^0.0.31",
-    "@types/events": "^1.2.0",
+    "@types/events": "^3.0.0",
     "@types/mocha": "^5.2.5",
-    "@types/node": "^10.12.11",
+    "@types/node": "^10.12.19",
     "browserify": "^16.2.3",
     "browserify-versionify": "^1.0.6",
     "copyfiles": "^2.1.0",
     "mkdirp": "^0.5.1",
     "mocha": "^5.2.0",
-    "terser": "^3.11.0",
-    "ts-loader": "^5.3.1",
+    "terser": "^3.14.1",
+    "ts-loader": "^5.3.3",
     "ts-mockito": "^2.3.1",
-    "ts-node": "^7.0.1",
-    "tslint": "^5.11.0",
-    "typescript": "^3.2.1",
-    "webpack": "^4.26.1",
-    "webpack-cli": "^3.1.2"
+    "ts-node": "^8.0.2",
+    "tslint": "^5.12.1",
+    "typescript": "^3.2.4",
+    "webpack": "^4.29.0",
+    "webpack-cli": "^3.2.1"
   },
   "browserify": {
     "transform": [
