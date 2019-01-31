@@ -16,7 +16,7 @@
 
 import * as Debug from "debug";
 import STEEmitter from "./stringly-typed-event-emitter";
-import {Segment, SegmentValidatorCallback, XhrSetupCallback} from "./loader-interface";
+import {Segment, SegmentValidatorCallback, XhrSetupCallback, SegmentUrlBuilder} from "./loader-interface";
 
 export class HttpMediaManager extends STEEmitter<
     "segment-loaded" | "segment-error" | "bytes-downloaded"
@@ -30,6 +30,7 @@ export class HttpMediaManager extends STEEmitter<
         httpFailedSegmentTimeout: number,
         segmentValidator?: SegmentValidatorCallback,
         xhrSetup?: XhrSetupCallback
+        segmentUrlBuilder?: SegmentUrlBuilder
     }) {
         super();
     }
@@ -41,9 +42,14 @@ export class HttpMediaManager extends STEEmitter<
 
         this.cleanTimedOutFailedSegments();
 
-        this.debug("http segment download", segment.url);
+        const segmentUrl = this.settings.segmentUrlBuilder
+            ? this.settings.segmentUrlBuilder(segment)
+            : segment.url
+
+        this.debug("http segment download", segmentUrl);
+
         const xhr = new XMLHttpRequest();
-        xhr.open("GET", segment.url, true);
+        xhr.open("GET", segmentUrl, true);
         xhr.responseType = "arraybuffer";
 
         if (segment.range) {
@@ -72,7 +78,7 @@ export class HttpMediaManager extends STEEmitter<
         });
 
         if (this.settings.xhrSetup) {
-            this.settings.xhrSetup(xhr, segment.url);
+            this.settings.xhrSetup(xhr, segmentUrl);
         }
 
         this.xhrRequests.set(segment.id, xhr);
