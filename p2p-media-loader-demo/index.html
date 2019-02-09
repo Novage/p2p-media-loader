@@ -255,24 +255,27 @@
 
         initForm() {
             var form = document.getElementById("videoUrlForm");
-            window.location.search.substr(1).split("&").forEach((e) => {
-                var p = e.split("=");
-                if (p.length === 2) {
-                    var name = p[0];
-                    var value = window.decodeURIComponent(p[1]);
-                    switch (name) {
-                        case "url":
-                            form.url.value = value;
-                            break;
-                        case "type":
-                            form.type.value = value;
-                            break;
-                        case "swarm":
-                            this.swarmId = value;
-                            break;
-                    }
-                }
-            });
+            var params = new URLSearchParams(document.location.search);
+
+            var value = params.get("url");
+            if (value) {
+                form.url.value = value;
+            }
+
+            value = params.get("type");
+            if (value) {
+                form.type.value = value;
+            }
+
+            value = params.get("swarm");
+            if (value) {
+                this.swarmId = value;
+            }
+
+            value = params.get("trackers");
+            if (value) {
+                this.trackers = value.split(",");
+            }
         }
 
         async restartDemo() {
@@ -288,8 +291,14 @@
             const config = {
                 segments: {
                     swarmId: this.swarmId
+                },
+                loader: {
                 }
             };
+
+            if (this.trackers) {
+                config.loader.trackerAnnounce = this.trackers;
+            }
 
             switch (this.playerType) {
                 case "hlsjs":
