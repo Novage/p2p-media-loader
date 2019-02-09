@@ -16,7 +16,7 @@
 
 import * as Debug from "debug";
 
-import {LoaderInterface, Events, Segment, SegmentValidatorCallback, XhrSetupCallback} from "./loader-interface";
+import {LoaderInterface, Events, Segment, SegmentValidatorCallback, XhrSetupCallback, SegmentUrlBuilder} from "./loader-interface";
 import {EventEmitter} from "events";
 import {HttpMediaManager} from "./http-media-manager";
 import {P2PMediaManager} from "./p2p-media-manager";
@@ -420,4 +420,9 @@ interface Settings {
      * XMLHttpRequest setup callback. Handle it when you need additional setup for requests made by the library.
      */
     xhrSetup?: XhrSetupCallback;
+
+    /**
+     * Allow to modify the segment URL before HTTP request.
+     */
+    segmentUrlBuilder?: SegmentUrlBuilder;
 }

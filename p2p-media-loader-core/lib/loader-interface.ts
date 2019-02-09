@@ -85,3 +85,7 @@ export interface SegmentValidatorCallback {
 export interface XhrSetupCallback {
     (xhr: XMLHttpRequest, url: string): void;
 }
+
+export interface SegmentUrlBuilder {
+    (segment: Segment): string;
+}
