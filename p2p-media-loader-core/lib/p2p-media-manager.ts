@@ -23,6 +23,7 @@ import {MediaPeer, MediaPeerSegmentStatus} from "./media-peer";
 import {SegmentInternal} from "./segment-internal";
 import {Buffer} from "buffer";
 import * as sha1 from "sha.js/sha1";
+import {version} from "./index";
 
 const PEER_PROTOCOL_VERSION = 1;
 
@@ -31,6 +32,22 @@ class PeerSegmentRequest {
         readonly peerId: string,
         readonly segment: Segment
     ) {}
+}
+
+function generatePeerId(): ArrayBuffer {
+    const PEER_ID_VERSION_STRING = version.replace(/\d*./g, v => `0${parseInt(v, 10) % 100}`.slice(-2)).slice(0, 4);
+    // Using WebTorrent client ID in order to not be banned by websocket trackers
+    const PEER_ID_VERSION_PREFIX = `-WW${PEER_ID_VERSION_STRING}-`;
+    const PEER_ID_SYMBOLS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    const PEER_ID_LENGTH = 20;
+
+    let peerId = PEER_ID_VERSION_PREFIX;
+
+    for (let i = 0; i < PEER_ID_LENGTH - PEER_ID_VERSION_PREFIX.length; i++) {
+        peerId += PEER_ID_SYMBOLS.charAt(Math.floor(Math.random() * PEER_ID_SYMBOLS.length));
+    }
+
+    return new TextEncoder().encode(peerId).buffer;
 }
 
 export class P2PMediaManager extends STEEmitter<
@@ -61,12 +78,10 @@ export class P2PMediaManager extends STEEmitter<
             }) {
         super();
 
-        this.peerId = settings.useP2P
-            ? crypto.getRandomValues(new Uint8Array(20)).buffer
-            : new ArrayBuffer(0);
+        this.peerId = settings.useP2P ? generatePeerId() : new ArrayBuffer(0);
 
         if (this.debug.enabled) {
-            this.debug("peer ID", this.getPeerId());
+            this.debug("peer ID", this.getPeerId(), new TextDecoder().decode(this.peerId));
         }
     }
 
