@@ -39,16 +39,16 @@ If `settings` is specified, then the default settings (shown below) will be over
 
 | Name | Type | Default Value | Description |
 | --- | ---- | ------ | ------ |
-| `cachedSegmentExpiration` | Integer | 300000 | Segment lifetime in cache. The segment is deleted from the cache if the last access time is greater than this value (in milliseconds)
-| `cachedSegmentsCount` | Integer | 30 | Max number of segments that can be stored in the cache
+| `cachedSegmentExpiration` | Integer | 300000 | Segment lifetime in cache. The segment is deleted from the cache if the last access time is greater than this value (in milliseconds). Cached segments are shared over P2P network.
+| `cachedSegmentsCount` | Integer | 30 | Max number of segments that can be stored in the cache. Cached segments are shared over P2P network.
 | `requiredSegmentsPriority` | Integer | 1 | The maximum priority of the segments to be downloaded (if not available) as quickly as possible (i.e. via HTTP method)
 | `useP2P` | Boolean | true | Enable/Disable peers interaction
 | `simultaneousP2PDownloads` | Integer | 3 | Max number of simultaneous downloads from peers
 | `httpDownloadProbability` | Float | 0.06 | Probability of downloading remaining not downloaded segment in the segments queue via HTTP
 | `httpDownloadProbabilityInterval` | Integer | 500 | Interval of the httpDownloadProbability check (in milliseconds)
-| `httpFailedSegmentTimeout` | Integer | 10000 | Timeout before trying to load segment again via HTTP after failed attempt (in milliseconds)
+| `httpFailedSegmentTimeout` | Integer | 10000 | Timeout before trying to load a segment again via HTTP after failed attempt (in milliseconds)
 | `bufferedSegmentsCount` | Integer | 20 | Max number of the segments to be downloaded via HTTP or P2P methods
-| `trackerAnnounce` | String[] | [ "wss://tracker.btorrent.xyz/", "wss://tracker.openwebtorrent.com/" ] | Torrent trackers (announcers) to use
+| `trackerAnnounce` | String[] | wss://tracker.btorrent.xyz wss://tracker.openwebtorrent.com wss://tracker.fastcast.nz | Torrent trackers (announcers) to use
 | `webRtcMaxMessageSize` | Integer | 64 * 1024 - 1 | Max WebRTC message size. 64KiB - 1B should work with most of recent browsers. Set it to 16KiB for older browsers support.
 | `p2pSegmentDownloadTimeout` | Integer | 60000 | Time allowed for a segment to start downloading. This value only limits time needed for segment to start, not the time required for full download.
 | `segmentValidator` | Function | undefined | Segment validation callback - validates the data after it has been downloaded.<br><br>Arguments:<br>`segment` (Segment) - The segment object.<br>`method` (String) - Can be "http" or "p2p" only.<br>`peerId` (String) - The ID of the peer that the segment was downloaded from in case it is P2P download; and *undefined* for HTTP donwload.<br><br>Returns:<br>A promise - if resolved the segment considered to be valid, if rejected the error object will be passed to `SegmentError` event.
