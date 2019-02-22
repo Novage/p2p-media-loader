@@ -226,15 +226,15 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         }
 
         const segmentsMap = this.p2pManager.getOvrallSegmentsMap();
-        pendingQueue = pendingQueue.filter(segment => !segmentsMap.get(segment.id));
+        pendingQueue = pendingQueue.filter(segment => !(segmentsMap.get(segment.id) || this.httpManager.isFailed(segment)));
 
-        for (const segment of pendingQueue) {
-            if (Math.random() <= this.settings.httpDownloadProbability && !this.httpManager.isFailed(segment)) {
-                this.debug("HTTP download (random)", segment.priority, segment.url);
-                this.httpManager.download(segment);
-                updateSegmentsMap = true;
-                break;
-            }
+        if ((pendingQueue.length > 0) && (Math.random() <= this.settings.httpDownloadProbability * pendingQueue.length)) {
+            const segment = pendingQueue[Math.floor(Math.random() * pendingQueue.length)];
+
+            this.debug("HTTP download (random)", segment.priority, segment.url);
+
+            this.httpManager.download(segment);
+            updateSegmentsMap = true;
         }
 
         return updateSegmentsMap;
