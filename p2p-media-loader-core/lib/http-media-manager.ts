@@ -44,7 +44,7 @@ export class HttpMediaManager extends STEEmitter<
 
         const segmentUrl = this.settings.segmentUrlBuilder
             ? this.settings.segmentUrlBuilder(segment)
-            : segment.url
+            : segment.url;
 
         this.debug("http segment download", segmentUrl);
 
