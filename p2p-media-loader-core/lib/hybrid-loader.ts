@@ -183,8 +183,8 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
                     if (segmentPriority == 0 && !this.httpManager.isDownloading(segment) && this.httpManager.getActiveDownloadsCount() > 0) {
                         for (const s of this.segmentsQueue) {
                             this.httpManager.abort(s);
-                            updateSegmentsMap = true;
                         }
+                        updateSegmentsMap = true;
                     }
 
                     if (this.httpManager.getActiveDownloadsCount() == 0) {
