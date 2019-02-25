@@ -94,7 +94,7 @@ export class P2PMediaManager extends STEEmitter<
             return;
         }
 
-        this.destroy();
+        this.destroy(true);
 
         this.swarmId = swarmId;
         this.debug("swarm ID", this.swarmId);
@@ -115,6 +115,9 @@ export class P2PMediaManager extends STEEmitter<
         if (!pendingTrackerClient.isDestroyed) {
             this.pendingTrackerClient = null;
             this.createClient(infoHash);
+        } else if (this.trackerClient != null) {
+            this.trackerClient.destroy();
+            this.trackerClient = null;
         }
     }
 
@@ -130,6 +133,8 @@ export class P2PMediaManager extends STEEmitter<
             rtcConfig: this.settings.rtcConfig
         };
 
+        const oldTrackerClient = this.trackerClient;
+
         this.trackerClient = new Client(clientOptions);
         this.trackerClient.on("error", (error: any) => this.debug("tracker error", error));
         this.trackerClient.on("warning", (error: any) => this.debug("tracker warning", error));
@@ -137,6 +142,10 @@ export class P2PMediaManager extends STEEmitter<
         this.trackerClient.on("peer", this.onTrackerPeer.bind(this));
 
         this.trackerClient.start();
+
+        if (oldTrackerClient != null) {
+            oldTrackerClient.destroy();
+        }
     }
 
     private onTrackerPeer(trackerPeer: any): void {
@@ -207,13 +216,21 @@ export class P2PMediaManager extends STEEmitter<
         return this.peerSegmentRequests.size;
     }
 
-    public destroy(): void {
+    public destroy(swarmChange: boolean = false): void {
         this.swarmId = null;
 
         if (this.trackerClient) {
             this.trackerClient.stop();
-            this.trackerClient.destroy();
-            this.trackerClient = null;
+            if (swarmChange) {
+                // Don't destroy trackerClient to reuse its WebSocket connection to the tracker server
+                this.trackerClient.removeAllListeners("error");
+                this.trackerClient.removeAllListeners("warning");
+                this.trackerClient.removeAllListeners("update");
+                this.trackerClient.removeAllListeners("peer");
+            } else {
+                this.trackerClient.destroy();
+                this.trackerClient = null;
+            }
         }
 
         if (this.pendingTrackerClient) {
