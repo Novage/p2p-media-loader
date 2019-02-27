@@ -6,6 +6,11 @@ It allows creating Peer-to-Peer network (also called P2P CDN or P2PTV) for traff
 
 It significantly reduces traditional CDN traffic and cost while delivering media streams to more users.
 
+## Related projects
+
+* [wt-tracker](https://github.com/Novage/wt-tracker) - high-performance WebTorrent tracker
+* [WebTorrent](https://github.com/webtorrent/webtorrent) - streaming torrent client for the web https://webtorrent.io
+
 ## Useful links
 
 - [Demo](http://novage.com.ua/p2p-media-loader/demo.html)
