@@ -185,16 +185,23 @@ export class P2PMediaManager extends STEEmitter<
             return false;
         }
 
+        const candidates: MediaPeer[] = [];
+
         for (const peer of this.peers.values()) {
             if ((peer.getDownloadingSegmentId() == null) &&
                     (peer.getSegmentsMap().get(segment.id) === MediaPeerSegmentStatus.Loaded)) {
-                peer.requestSegment(segment.id);
-                this.peerSegmentRequests.set(segment.id, new PeerSegmentRequest(peer.id, segment));
-                return true;
+                candidates.push(peer);
             }
         }
 
-        return false;
+        if (candidates.length === 0) {
+            return false;
+        }
+
+        const peer = candidates[Math.floor(Math.random() * candidates.length)];
+        peer.requestSegment(segment.id);
+        this.peerSegmentRequests.set(segment.id, new PeerSegmentRequest(peer.id, segment));
+        return true;
     }
 
     public abort(segment: Segment): void {
