@@ -43,6 +43,7 @@ If `settings` is specified, then the default settings (shown below) will be over
 | `cachedSegmentsCount` | Integer | 30 | Max number of segments that can be stored in the cache. Cached segments are shared over P2P network.
 | `requiredSegmentsPriority` | Integer | 1 | The maximum priority of the segments to be downloaded (if not available) as quickly as possible (i.e. via HTTP method)
 | `useP2P` | Boolean | true | Enable/Disable peers interaction
+| `consumeOnly` | Boolean | false | The peer will not upload segments data to the P2P network but still download from others.
 | `simultaneousP2PDownloads` | Integer | 3 | Max number of simultaneous downloads from peers
 | `httpDownloadProbability` | Float | 0.06 | Probability of downloading remaining not downloaded segment in the segments queue via HTTP
 | `httpDownloadProbabilityInterval` | Integer | 500 | Interval of the httpDownloadProbability check (in milliseconds)

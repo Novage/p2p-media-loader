@@ -32,6 +32,8 @@ const defaultSettings: Settings = {
     cachedSegmentsCount: 30,
 
     useP2P: true,
+    consumeOnly: false,
+
     requiredSegmentsPriority: 1,
     simultaneousP2PDownloads: 3,
     httpDownloadProbability: 0.06,
@@ -125,7 +127,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         // collect garbage
         updateSegmentsMap = this.collectGarbage() || updateSegmentsMap;
 
-        if (updateSegmentsMap) {
+        if (updateSegmentsMap && !this.settings.consumeOnly) {
             this.p2pManager.sendSegmentsMapToAll(this.createSegmentsMap());
         }
     }
@@ -265,7 +267,9 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.segments.set(segment.id, segmentInternal);
         this.emitSegmentLoaded(segmentInternal, peerId);
         this.processSegmentsQueue();
-        this.p2pManager.sendSegmentsMapToAll(this.createSegmentsMap());
+        if (!this.settings.consumeOnly) {
+            this.p2pManager.sendSegmentsMapToAll(this.createSegmentsMap());
+        }
     }
 
     private onSegmentError = (segment: Segment, details: any, peerId?: string) => {
@@ -318,7 +322,9 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private onPeerConnect = (peer: {id: string}) => {
-        this.p2pManager.sendSegmentsMap(peer.id, this.createSegmentsMap());
+        if (!this.settings.consumeOnly) {
+            this.p2pManager.sendSegmentsMap(peer.id, this.createSegmentsMap());
+        }
         this.emit(Events.PeerConnect, peer);
     }
 
@@ -382,6 +388,11 @@ interface Settings {
      * Enable/Disable peers interaction.
      */
     useP2P: boolean;
+
+    /**
+     * The peer will not upload segments data to the P2P network but still download from others.
+     */
+    consumeOnly: boolean;
 
     /**
      * The maximum priority of the segments to be downloaded (if not available) as quickly as possible (i.e. via HTTP method).
