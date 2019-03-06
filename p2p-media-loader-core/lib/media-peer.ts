@@ -19,11 +19,11 @@ import STEEmitter from "./stringly-typed-event-emitter";
 import {Buffer} from "buffer";
 
 enum MediaPeerCommands {
-    SegmentData = "segment_data",
-    SegmentAbsent = "segment_absent",
-    SegmentsMap = "segments_map",
-    SegmentRequest = "segment_request",
-    CancelSegmentRequest = "cancel_segment_request",
+    SegmentData,
+    SegmentAbsent,
+    SegmentsMap,
+    SegmentRequest,
+    CancelSegmentRequest
 }
 
 export enum MediaPeerSegmentStatus {
@@ -141,28 +141,28 @@ export class MediaPeer extends STEEmitter<
 
         this.debug("peer receive command", this.id, command, this);
 
-        switch (command.command) {
+        switch (command.c) {
             case MediaPeerCommands.SegmentsMap:
-                this.segmentsMap = this.createSegmentsMap(command.segments);
+                this.segmentsMap = this.createSegmentsMap(command.m);
                 this.emit("data-updated");
                 break;
 
             case MediaPeerCommands.SegmentRequest:
-                this.emit("segment-request", this, command.segment_id);
+                this.emit("segment-request", this, command.i);
                 break;
 
             case MediaPeerCommands.SegmentData:
-                if (this.downloadingSegmentId === command.segment_id) {
-                    this.downloadingSegment = new DownloadingSegment(command.segment_id, command.segment_size);
+                if (this.downloadingSegmentId === command.i) {
+                    this.downloadingSegment = new DownloadingSegment(command.i, command.s);
                     this.cancelResponseTimeoutTimer();
                 }
                 break;
 
             case MediaPeerCommands.SegmentAbsent:
-                if (this.downloadingSegmentId === command.segment_id) {
+                if (this.downloadingSegmentId === command.i) {
                     this.terminateSegmentRequest();
-                    this.segmentsMap.delete(command.segment_id);
-                    this.emit("segment-absent", this, command.segment_id);
+                    this.segmentsMap.delete(command.i);
+                    this.emit("segment-absent", this, command.i);
                 }
                 break;
 
@@ -231,20 +231,20 @@ export class MediaPeer extends STEEmitter<
     }
 
     public sendSegmentsMap(segments: Map<string, [string[], MediaPeerSegmentStatus[]]>): void {
-        const segmentsData: {[key: string]: [string, number[]]} = {};
+        const segmentMap: {[key: string]: [string, number[]]} = {};
         for (const [swarmId, segmentsIdsAndStatuses] of segments) {
             const segmentsIds = segmentsIdsAndStatuses[0].join("|");
             const segmentsStatuses = segmentsIdsAndStatuses[1];
-            segmentsData[swarmId] = [segmentsIds, segmentsStatuses];
+            segmentMap[swarmId] = [segmentsIds, segmentsStatuses];
         }
-        this.sendCommand({"command": MediaPeerCommands.SegmentsMap, "segments": segmentsData});
+        this.sendCommand({c: MediaPeerCommands.SegmentsMap, m: segmentMap});
     }
 
     public sendSegmentData(segmentId: string, data: ArrayBuffer): void {
         this.sendCommand({
-            "command": MediaPeerCommands.SegmentData,
-            "segment_id": segmentId,
-            "segment_size": data.byteLength
+            c: MediaPeerCommands.SegmentData,
+            i: segmentId,
+            s: data.byteLength
         });
 
         let bytesLeft = data.byteLength;
@@ -260,7 +260,7 @@ export class MediaPeer extends STEEmitter<
     }
 
     public sendSegmentAbsent(segmentId: string): void {
-        this.sendCommand({"command": MediaPeerCommands.SegmentAbsent, "segment_id": segmentId});
+        this.sendCommand({c: MediaPeerCommands.SegmentAbsent, i: segmentId});
     }
 
     public requestSegment(segmentId: string): void {
@@ -268,7 +268,7 @@ export class MediaPeer extends STEEmitter<
             throw new Error("A segment is already downloading: " + this.downloadingSegmentId);
         }
 
-        this.sendCommand({"command": MediaPeerCommands.SegmentRequest, "segment_id": segmentId});
+        this.sendCommand({c: MediaPeerCommands.SegmentRequest, i: segmentId});
         this.downloadingSegmentId = segmentId;
         this.runResponseTimeoutTimer();
     }
@@ -277,7 +277,7 @@ export class MediaPeer extends STEEmitter<
         if (this.downloadingSegmentId) {
             const segmentId = this.downloadingSegmentId;
             this.terminateSegmentRequest();
-            this.sendCommand({"command": MediaPeerCommands.CancelSegmentRequest, "segment_id": segmentId});
+            this.sendCommand({c: MediaPeerCommands.CancelSegmentRequest, i: segmentId});
         }
     }
 
