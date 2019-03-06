@@ -69,11 +69,9 @@ export class HttpMediaManager extends STEEmitter<
             } else {
                 this.segmentFailure(segment, event);
             }
-            this.xhrRequests.delete(segment.id);
         });
 
         xhr.addEventListener("error", (event: any) => {
-            this.xhrRequests.delete(segment.id);
             this.segmentFailure(segment, event);
         });
 
@@ -133,10 +131,12 @@ export class HttpMediaManager extends STEEmitter<
             }
         }
 
+        this.xhrRequests.delete(segment.id);
         this.emit("segment-loaded", segment, data);
     }
 
     private segmentFailure(segment: Segment, error: any) {
+        this.xhrRequests.delete(segment.id);
         this.failedSegments.set(segment.id, this.now() + this.settings.httpFailedSegmentTimeout);
         this.emit("segment-error", segment, error);
     }
