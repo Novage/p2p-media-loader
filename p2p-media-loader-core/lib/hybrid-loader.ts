@@ -288,10 +288,32 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.emit(Events.SegmentLoaded, segment, peerId);
     }
 
-    private createSegmentsMap(): string[][] {
-        const segmentsMap: string[][] = [];
-        this.segments.forEach((value, key) => segmentsMap.push([key, MediaPeerSegmentStatus.Loaded]));
-        this.httpManager.getActiveDownloadsKeys().forEach(key => segmentsMap.push([key, MediaPeerSegmentStatus.LoadingByHttp]));
+    private createSegmentsMap() {
+        const segmentsMap: Map<string, [string[], MediaPeerSegmentStatus[]]> = new Map();
+
+        function addSegmentToMap(swarmWithSegmentId: string, status: MediaPeerSegmentStatus) {
+            // For now we rely on common format of segment ID = swarm ID + segment ID
+            // TODO: in next major relese segment should contain swarm ID and segment ID in the swarm fields.
+            const separatorIndex = swarmWithSegmentId.lastIndexOf("+");
+            const swarmId = swarmWithSegmentId.substring(0, separatorIndex);
+            const segmentId = swarmWithSegmentId.substring(separatorIndex + 1);
+            let segmentsStatuses = segmentsMap.get(swarmId);
+            if (!segmentsStatuses) {
+                segmentsStatuses = [[], []];
+                segmentsMap.set(swarmId, segmentsStatuses);
+            }
+            segmentsStatuses[0].push(segmentId);
+            segmentsStatuses[1].push(status);
+        }
+
+        for (const segmentId of this.segments.keys()) {
+            addSegmentToMap(segmentId, MediaPeerSegmentStatus.Loaded);
+        }
+
+        for (const segmentId of this.httpManager.getActiveDownloadsKeys()) {
+            addSegmentToMap(segmentId, MediaPeerSegmentStatus.LoadingByHttp);
+        }
+
         return segmentsMap;
     }
 

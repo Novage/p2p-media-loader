@@ -27,8 +27,8 @@ enum MediaPeerCommands {
 }
 
 export enum MediaPeerSegmentStatus {
-    Loaded = "loaded",
-    LoadingByHttp = "loading_by_http"
+    Loaded,
+    LoadingByHttp
 }
 
 class DownloadingSegment {
@@ -143,7 +143,7 @@ export class MediaPeer extends STEEmitter<
 
         switch (command.command) {
             case MediaPeerCommands.SegmentsMap:
-                this.segmentsMap = new Map(command.segments);
+                this.segmentsMap = this.createSegmentsMap(command.segments);
                 this.emit("data-updated");
                 break;
 
@@ -175,6 +175,42 @@ export class MediaPeer extends STEEmitter<
         }
     }
 
+    private createSegmentsMap(segments: any): Map<string, MediaPeerSegmentStatus> {
+        if (segments == undefined || !(segments instanceof Object)) {
+            return new Map();
+        }
+
+        const segmentsMap = new Map<string, MediaPeerSegmentStatus>();
+
+        for (const swarmId of Object.keys(segments)) {
+            const swarmData = segments[swarmId];
+            if (!(swarmData instanceof Array) ||
+                    (swarmData.length !== 2) ||
+                    (typeof swarmData[0] !== "string") ||
+                    !(swarmData[1] instanceof Array)) {
+                return new Map();
+            }
+
+            const segmentsIds = (swarmData[0] as string).split("|");
+            const segmentsStatuses = swarmData[1] as MediaPeerSegmentStatus[];
+
+            if (segmentsIds.length !== segmentsStatuses.length) {
+                return new Map();
+            }
+
+            for (let i = 0; i < segmentsIds.length; i++) {
+                const segmentStatus = segmentsStatuses[i];
+                if (typeof segmentStatus !== "number" || MediaPeerSegmentStatus[segmentStatus] === undefined) {
+                    return new Map();
+                }
+
+                segmentsMap.set(`${swarmId}+${segmentsIds[i]}`, segmentStatus);
+            }
+        }
+
+        return segmentsMap;
+    }
+
     private sendCommand(command: any): void {
         this.debug("peer send command", this.id, command, this);
         this.peer.write(JSON.stringify(command));
@@ -194,8 +230,14 @@ export class MediaPeer extends STEEmitter<
         return this.segmentsMap;
     }
 
-    public sendSegmentsMap(segments: string[][]): void {
-        this.sendCommand({"command": MediaPeerCommands.SegmentsMap, "segments": segments});
+    public sendSegmentsMap(segments: Map<string, [string[], MediaPeerSegmentStatus[]]>): void {
+        const segmentsData: {[key: string]: [string, number[]]} = {};
+        for (const [swarmId, segmentsIdsAndStatuses] of segments) {
+            const segmentsIds = segmentsIdsAndStatuses[0].join("|");
+            const segmentsStatuses = segmentsIdsAndStatuses[1];
+            segmentsData[swarmId] = [segmentsIds, segmentsStatuses];
+        }
+        this.sendCommand({"command": MediaPeerCommands.SegmentsMap, "segments": segmentsData});
     }
 
     public sendSegmentData(segmentId: string, data: ArrayBuffer): void {

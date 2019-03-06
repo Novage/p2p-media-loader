@@ -25,7 +25,7 @@ import {Buffer} from "buffer";
 import * as sha1 from "sha.js/sha1";
 import {version} from "./index";
 
-const PEER_PROTOCOL_VERSION = 1;
+const PEER_PROTOCOL_VERSION = 2;
 
 class PeerSegmentRequest {
     constructor(
@@ -251,11 +251,11 @@ export class P2PMediaManager extends STEEmitter<
         this.peerCandidates.clear();
     }
 
-    public sendSegmentsMapToAll(segmentsMap: string[][]): void {
+    public sendSegmentsMapToAll(segmentsMap: Map<string, [string[], MediaPeerSegmentStatus[]]>): void {
         this.peers.forEach(peer => peer.sendSegmentsMap(segmentsMap));
     }
 
-    public sendSegmentsMap(peerId: string, segmentsMap: string[][]): void {
+    public sendSegmentsMap(peerId: string, segmentsMap: Map<string, [string[], MediaPeerSegmentStatus[]]>): void {
         const peer = this.peers.get(peerId);
         if (peer) {
             peer.sendSegmentsMap(segmentsMap);
