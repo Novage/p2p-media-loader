@@ -85,6 +85,10 @@ export class P2PMediaManager extends STEEmitter<
         }
     }
 
+    public getPeers() {
+        return this.peers;
+    }
+
     public getPeerId(): string {
         return Buffer.from(this.peerId).toString("hex");
     }
@@ -139,7 +143,7 @@ export class P2PMediaManager extends STEEmitter<
         this.trackerClient.on("error", (error: any) => this.debug("tracker error", error));
         this.trackerClient.on("warning", (error: any) => this.debug("tracker warning", error));
         this.trackerClient.on("update", (data: any) => this.debug("tracker update", data));
-        this.trackerClient.on("peer", this.onTrackerPeer.bind(this));
+        this.trackerClient.on("peer", this.onTrackerPeer);
 
         this.trackerClient.start();
 
@@ -148,7 +152,7 @@ export class P2PMediaManager extends STEEmitter<
         }
     }
 
-    private onTrackerPeer(trackerPeer: any): void {
+    private onTrackerPeer = (trackerPeer: any): void => {
         this.debug("tracker peer", trackerPeer.id, trackerPeer);
 
         if (this.peers.has(trackerPeer.id)) {

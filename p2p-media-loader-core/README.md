@@ -41,19 +41,22 @@ If `settings` is specified, then the default settings (shown below) will be over
 | --- | ---- | ------ | ------ |
 | `cachedSegmentExpiration` | Integer | 300000 | Segment lifetime in cache. The segment is deleted from the cache if the last access time is greater than this value (in milliseconds). Cached segments are shared over P2P network.
 | `cachedSegmentsCount` | Integer | 30 | Max number of segments that can be stored in the cache. Cached segments are shared over P2P network.
-| `requiredSegmentsPriority` | Integer | 1 | The maximum priority of the segments to be downloaded (if not available) as quickly as possible (i.e. via HTTP method)
+| `requiredSegmentsPriority` | Integer | 1 | The maximum priority of the segments to be downloaded (if not available) as quickly as possible (i.e. via HTTP method). First segment that should be downloaded has priority 0.
 | `useP2P` | Boolean | true | Enable/Disable peers interaction
 | `consumeOnly` | Boolean | false | The peer will not upload segments data to the P2P network but still download from others.
-| `simultaneousP2PDownloads` | Integer | 3 | Max number of simultaneous downloads from peers
+| `simultaneousHttpDownloads` | Integer | 2 | Max number of simultaneous downloads from HTTP source
 | `httpDownloadProbability` | Float | 0.06 | Probability of downloading remaining not downloaded segment in the segments queue via HTTP
 | `httpDownloadProbabilityInterval` | Integer | 500 | Interval of the httpDownloadProbability check (in milliseconds)
+| `httpDownloadProbabilitySkipIfNoPeers` | Boolean | false | Don't download segments over HTTP randomly when there is no peers
 | `httpFailedSegmentTimeout` | Integer | 10000 | Timeout before trying to load a segment again via HTTP after failed attempt (in milliseconds)
-| `bufferedSegmentsCount` | Integer | 20 | Max number of the segments to be downloaded via HTTP or P2P methods
-| `trackerAnnounce` | String[] | wss://tracker.btorrent.xyz wss://tracker.openwebtorrent.com wss://tracker.fastcast.nz | Torrent trackers (announcers) to use
-| `webRtcMaxMessageSize` | Integer | 64 * 1024 - 1 | Max WebRTC message size. 64KiB - 1B should work with most of recent browsers. Set it to 16KiB for older browsers support.
+| `httpDownloadMaxPriority` | Integer | 20 | Segments with higher priority will not be downloaded over HTTP
+| `simultaneousP2PDownloads` | Integer | 3 | Max number of simultaneous downloads from peers
+| `p2pDownloadMaxPriority` | Integer | 20 | Segments with higher priority will not be downloaded over P2P
 | `p2pSegmentDownloadTimeout` | Integer | 60000 | Time allowed for a segment to start downloading. This value only limits time needed for segment to start, not the time required for full download.
-| `segmentValidator` | Function | undefined | Segment validation callback - validates the data after it has been downloaded.<br><br>Arguments:<br>`segment` (Segment) - The segment object.<br>`method` (String) - Can be "http" or "p2p" only.<br>`peerId` (String) - The ID of the peer that the segment was downloaded from in case it is P2P download; and *undefined* for HTTP donwload.<br><br>Returns:<br>A promise - if resolved the segment considered to be valid, if rejected the error object will be passed to `SegmentError` event.
+| `webRtcMaxMessageSize` | Integer | 64 * 1024 - 1 | Max WebRTC message size. 64KiB - 1B should work with most of recent browsers. Set it to 16KiB for older browsers support.
+| `trackerAnnounce` | String[] | wss://tracker.btorrent.xyz wss://tracker.openwebtorrent.com wss://tracker.fastcast.nz | Torrent trackers (announcers) to use
 | `rtcConfig` | [RTCConfiguration](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/RTCPeerConnection#RTCConfiguration_dictionary) | Object | An [RTCConfiguration](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/RTCPeerConnection#RTCConfiguration_dictionary) dictionary providing options to configure WebRTC connections.
+| `segmentValidator` | Function | undefined | Segment validation callback - validates the data after it has been downloaded.<br><br>Arguments:<br>`segment` (Segment) - The segment object.<br>`method` (String) - Can be "http" or "p2p" only.<br>`peerId` (String) - The ID of the peer that the segment was downloaded from in case it is P2P download; and *undefined* for HTTP donwload.<br><br>Returns:<br>A promise - if resolved the segment considered to be valid, if rejected the error object will be passed to `SegmentError` event.
 | `xhrSetup` | Function | undefined | XMLHttpRequest setup callback. Handle it when you need additional setup for requests made by the library. If handled, expected a function with two arguments: xhr (XMLHttpRequest), url (String).
 | `segmentUrlBuilder` | Function | undefined | Allow to modify the segment URL before HTTP request. If handled, expected a function of one argument of type `Segment` that returns a `string` - generated segment URL.
 
