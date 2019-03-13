@@ -74,7 +74,7 @@ export function initJwPlayer(player: any, hlsjsConfig: any): void {
     const iid = setInterval(() => {
         if (player.hls && player.hls.config) {
             clearInterval(iid);
-            player.hls.config = Object.assign(player.hls.config, hlsjsConfig);
+            Object.assign(player.hls.config, hlsjsConfig);
             initHlsJsPlayer(player.hls);
         }
     }, 200);

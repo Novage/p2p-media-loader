@@ -34,7 +34,7 @@ export class SegmentManager {
     private readonly settings: Settings;
 
     public constructor(loader: LoaderInterface, settings: any = {}) {
-        this.settings = Object.assign(defaultSettings, settings);
+        this.settings = { ...defaultSettings, ...settings };
 
         this.loader = loader;
         this.loader.on(Events.SegmentLoaded, this.onSegmentLoaded);
