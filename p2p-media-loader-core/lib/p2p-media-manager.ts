@@ -52,8 +52,8 @@ function generatePeerId(): ArrayBuffer {
 
 export class P2PMediaManager extends STEEmitter<
     "peer-connected" | "peer-closed" | "peer-data-updated" |
-    "segment-loaded" | "segment-error" |
-    "bytes-downloaded" | "bytes-uploaded"
+    "segment-loaded" | "segment-error" | "bytes-downloaded" |
+    "bytes-uploaded" | "tracker-update"
 > {
     private trackerClient: any = null;
     private peers: Map<string, MediaPeer> = new Map();
@@ -142,7 +142,7 @@ export class P2PMediaManager extends STEEmitter<
         this.trackerClient = new Client(clientOptions);
         this.trackerClient.on("error", (error: any) => this.debug("tracker error", error));
         this.trackerClient.on("warning", (error: any) => this.debug("tracker warning", error));
-        this.trackerClient.on("update", (data: any) => this.debug("tracker update", data));
+        this.trackerClient.on("update", this.onTrackerUpdate);
         this.trackerClient.on("peer", this.onTrackerPeer);
 
         this.trackerClient.start();
@@ -182,6 +182,11 @@ export class P2PMediaManager extends STEEmitter<
         }
 
         peerCandidatesById.push(peer);
+    }
+
+    private onTrackerUpdate = (data: any): void => {
+        this.debug("tracker update", data);
+        this.emit("tracker-update", data);
     }
 
     public download(segment: Segment): boolean {

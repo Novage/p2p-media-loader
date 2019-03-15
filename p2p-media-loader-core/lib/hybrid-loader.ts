@@ -42,6 +42,8 @@ const defaultSettings: Settings = {
     httpDownloadProbabilitySkipIfNoPeers: false,
     httpFailedSegmentTimeout: 10000,
     httpDownloadMaxPriority: 20,
+    httpDownloadInitialTimeout: 0,
+    httpDownloadInitialTimeoutPerSegment: 4000,
 
     simultaneousP2PDownloads: 3,
     p2pDownloadMaxPriority: 20,
@@ -63,6 +65,8 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private readonly speedApproximator = new SpeedApproximator();
     private readonly settings: Settings;
     private httpRandomDownloadInterval: ReturnType<typeof setInterval> | undefined;
+    private httpDownloadInitialTimeoutTimestamp = -Infinity;
+    private initialDownloadedViaP2PSegmentsCount = 0;
 
     public static isSupported(): boolean {
         const browserRtc = (getBrowserRTC as Function)();
@@ -105,6 +109,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.p2pManager.on("bytes-uploaded", (bytes: number, peerId: string) => this.onPieceBytesUploaded("p2p", bytes, peerId));
         this.p2pManager.on("peer-connected", this.onPeerConnect);
         this.p2pManager.on("peer-closed", this.onPeerClose);
+        this.p2pManager.on("tracker-update", this.onTrackerUpdate);
     }
 
     private createHttpManager() {
@@ -118,6 +123,27 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     public load(segments: Segment[], swarmId: string): void {
         if (this.httpRandomDownloadInterval === undefined) { // Do once on first call
             this.httpRandomDownloadInterval = setInterval(this.downloadRandomSegmentOverHttp, this.settings.httpDownloadProbabilityInterval);
+
+            if (this.settings.httpDownloadInitialTimeout > 0 && this.settings.httpDownloadInitialTimeoutPerSegment > 0) {
+                // Initialize initial HTTP download timeout (i.e. download initial segments over P2P)
+                this.debugSegments("enable initial HTTP download timeout", this.settings.httpDownloadInitialTimeout, "per segment", this.settings.httpDownloadInitialTimeoutPerSegment);
+                this.httpDownloadInitialTimeoutTimestamp = this.now();
+                const checkHttpTimeout = () => {
+                    if (this.httpRandomDownloadInterval === undefined) {
+                        return; // Instance destroyed
+                    }
+
+                    if (this.processSegmentsQueue() && !this.settings.consumeOnly) {
+                        this.p2pManager.sendSegmentsMapToAll(this.createSegmentsMap());
+                    }
+
+                    if (this.httpDownloadInitialTimeoutTimestamp !== -Infinity) {
+                        // Set one more timeout for a next segment
+                        setTimeout(checkHttpTimeout, this.settings.httpDownloadInitialTimeoutPerSegment);
+                    }
+                };
+                setTimeout(checkHttpTimeout, this.settings.httpDownloadInitialTimeoutPerSegment + 100);
+            }
         }
 
         this.p2pManager.setSwarmId(swarmId);
@@ -145,13 +171,9 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             }
         }
 
-        // renew segment queue
         this.segmentsQueue = segments;
 
-        // run main processing algorithm
         updateSegmentsMap = this.processSegmentsQueue() || updateSegmentsMap;
-
-        // collect garbage
         updateSegmentsMap = this.collectGarbage() || updateSegmentsMap;
 
         if (updateSegmentsMap && !this.settings.consumeOnly) {
@@ -183,6 +205,10 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             clearInterval(this.httpRandomDownloadInterval);
             this.httpRandomDownloadInterval = undefined;
         }
+
+        this.initialDownloadedViaP2PSegmentsCount = 0;
+        this.httpDownloadInitialTimeoutTimestamp = -Infinity;
+
         this.segmentsQueue = [];
         this.httpManager.destroy();
         this.p2pManager.destroy();
@@ -196,6 +222,20 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         let updateSegmentsMap = false;
         let segmentsMap: Map<string, MediaPeerSegmentStatus> | undefined;
 
+        let httpAllowed = true;
+
+        if (this.httpDownloadInitialTimeoutTimestamp !== -Infinity) {
+            const httpTimeout = this.now() - this.httpDownloadInitialTimeoutTimestamp;
+            httpAllowed =
+                (httpTimeout >= (this.initialDownloadedViaP2PSegmentsCount + 1) * this.settings.httpDownloadInitialTimeoutPerSegment) ||
+                (httpTimeout >= this.settings.httpDownloadInitialTimeout);
+
+            if (httpAllowed) {
+                this.debugSegments("cancel initial HTTP download timeout - timed out");
+                this.httpDownloadInitialTimeoutTimestamp = -Infinity;
+            }
+        }
+
         for (let index = 0; index < this.segmentsQueue.length; index++) {
             const segment = this.segmentsQueue[index];
 
@@ -203,7 +243,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
                 continue;
             }
 
-            if (segment.priority <= this.settings.requiredSegmentsPriority && !this.httpManager.isFailed(segment)) {
+            if (segment.priority <= this.settings.requiredSegmentsPriority && httpAllowed && !this.httpManager.isFailed(segment)) {
                 // Download required segments over HTTP
                 if (this.httpManager.getActiveDownloadsCount() >= this.settings.simultaneousHttpDownloads) {
                     // Not enough HTTP download resources. Abort one of the HTTP downloads.
@@ -231,8 +271,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
                 continue;
             }
 
-            if (segment.priority <= this.settings.requiredSegmentsPriority) {
-                // Download required segments over P2P
+            if (segment.priority <= this.settings.requiredSegmentsPriority) { // Download required segments over P2P
                 segmentsMap = segmentsMap ? segmentsMap : this.p2pManager.getOvrallSegmentsMap();
 
                 if (segmentsMap.get(segment.id) !== MediaPeerSegmentStatus.Loaded) {
@@ -273,9 +312,12 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private downloadRandomSegmentOverHttp = () => {
-        // TODO: check if destroyed
+        if (this.httpRandomDownloadInterval === undefined) {
+            return; // Instance destroyed
+        }
 
-        if (this.httpManager.getActiveDownloadsCount() >= this.settings.simultaneousHttpDownloads ||
+        if (this.httpDownloadInitialTimeoutTimestamp !== -Infinity ||
+                this.httpManager.getActiveDownloadsCount() >= this.settings.simultaneousHttpDownloads ||
                 (this.settings.httpDownloadProbabilitySkipIfNoPeers && this.p2pManager.getPeers().size === 0) ||
                 this.settings.consumeOnly) {
             return;
@@ -316,7 +358,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private onSegmentLoaded = (segment: Segment, data: ArrayBuffer, peerId?: string) => {
-        this.debug("segment loaded", segment.id, segment.url);
+        this.debugSegments("segment loaded", segment.id, segment.url);
 
         const segmentInternal = new SegmentInternal(
             segment.id,
@@ -329,6 +371,24 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
         this.segments.set(segment.id, segmentInternal);
         this.emitSegmentLoaded(segmentInternal, peerId);
+
+        if (this.httpDownloadInitialTimeoutTimestamp !== -Infinity) {
+            // If initial HTTP download timeout enabled then
+            // count sequential P2P segment downloads
+            let loadedSegmentFound = false;
+            for (const queueSegment of this.segmentsQueue) {
+                if (queueSegment.id === segment.id) {
+                    loadedSegmentFound = true;
+                } else if (!this.segments.has(queueSegment.id)) {
+                    break;
+                }
+
+                if (loadedSegmentFound) {
+                    this.initialDownloadedViaP2PSegmentsCount++;
+                }
+            }
+        }
+
         this.processSegmentsQueue();
         if (!this.settings.consumeOnly) {
             this.p2pManager.sendSegmentsMapToAll(this.createSegmentsMap());
@@ -336,6 +396,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private onSegmentError = (segment: Segment, details: any, peerId?: string) => {
+        this.debugSegments("segment error", segment.id, segment.url, peerId, details);
         this.emit(Events.SegmentError, segment, details, peerId);
         this.processSegmentsQueue();
     }
@@ -393,6 +454,19 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
     private onPeerClose = (peerId: string) => {
         this.emit(Events.PeerClose, peerId);
+    }
+
+    private onTrackerUpdate = (data: { incomplete?: number }) => {
+        if (this.httpDownloadInitialTimeoutTimestamp !== -Infinity &&
+                data.incomplete !== undefined && data.incomplete <= 1) {
+
+            this.debugSegments("cancel initial HTTP download timeout - no peers");
+
+            this.httpDownloadInitialTimeoutTimestamp = -Infinity;
+            if (this.processSegmentsQueue() && !this.settings.consumeOnly) {
+                this.p2pManager.sendSegmentsMapToAll(this.createSegmentsMap());
+            }
+        }
     }
 
     private collectGarbage(): boolean {
@@ -491,6 +565,20 @@ interface Settings {
      * Segments with higher priority will not be downloaded over HTTP.
      */
     httpDownloadMaxPriority: number;
+
+    /**
+     * Try to download initial segments over P2P if the value is > 0.
+     * But HTTP download will be forcibly enabled if there is no peers on tracker or
+     * single sequential segment P2P download is timed out (see httpDownloadInitialTimeoutPerSegment).
+     */
+    httpDownloadInitialTimeout: number;
+
+    /**
+     * If initial HTTP download timeout is enabled (see httpDownloadInitialTimeout)
+     * this parameter sets additional timeout for a single sequential segment download
+     * over P2P. It will cancel initial HTTP download timeout mode if a segment download is timed out.
+     */
+    httpDownloadInitialTimeoutPerSegment: number;
 
     /**
      * Max number of simultaneous downloads from peers.
