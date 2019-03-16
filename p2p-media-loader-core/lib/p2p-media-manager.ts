@@ -137,11 +137,11 @@ export class P2PMediaManager extends STEEmitter<
             rtcConfig: this.settings.rtcConfig
         };
 
-        const oldTrackerClient = this.trackerClient;
+        let oldTrackerClient = this.trackerClient;
 
         this.trackerClient = new Client(clientOptions);
-        this.trackerClient.on("error", (error: any) => this.debug("tracker error", error));
-        this.trackerClient.on("warning", (error: any) => this.debug("tracker warning", error));
+        this.trackerClient.on("error", this.onTrackerError);
+        this.trackerClient.on("warning", this.onTrackerWarning);
         this.trackerClient.on("update", this.onTrackerUpdate);
         this.trackerClient.on("peer", this.onTrackerPeer);
 
@@ -149,7 +149,21 @@ export class P2PMediaManager extends STEEmitter<
 
         if (oldTrackerClient != null) {
             oldTrackerClient.destroy();
+            oldTrackerClient = null;
         }
+    }
+
+    private onTrackerError = (error: any) => {
+        this.debug("tracker error", error);
+    }
+
+    private onTrackerWarning = (warning: any) => {
+        this.debug("tracker warning", warning)
+    }
+
+    private onTrackerUpdate = (data: any): void => {
+        this.debug("tracker update", data);
+        this.emit("tracker-update", data);
     }
 
     private onTrackerPeer = (trackerPeer: any): void => {
@@ -182,11 +196,6 @@ export class P2PMediaManager extends STEEmitter<
         }
 
         peerCandidatesById.push(peer);
-    }
-
-    private onTrackerUpdate = (data: any): void => {
-        this.debug("tracker update", data);
-        this.emit("tracker-update", data);
     }
 
     public download(segment: Segment): boolean {
