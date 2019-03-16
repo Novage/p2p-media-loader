@@ -56,24 +56,7 @@ export class HttpMediaManager extends STEEmitter<
             xhr.setRequestHeader("Range", segment.range);
         }
 
-        let prevBytesLoaded = 0;
-        xhr.addEventListener("progress", (event: any) => {
-            const bytesLoaded = event.loaded - prevBytesLoaded;
-            this.emit("bytes-downloaded", bytesLoaded);
-            prevBytesLoaded = event.loaded;
-        });
-
-        xhr.addEventListener("load", async (event: any) => {
-            if (event.target.status >= 200 && 300 > event.target.status) {
-                await this.segmentDownloadFinished(segment, event.target.response);
-            } else {
-                this.segmentFailure(segment, event);
-            }
-        });
-
-        xhr.addEventListener("error", (event: any) => {
-            this.segmentFailure(segment, event);
-        });
+        this.setupXhrEvents(xhr, segment);
 
         if (this.settings.xhrSetup) {
             this.settings.xhrSetup(xhr, segmentUrl);
@@ -112,6 +95,28 @@ export class HttpMediaManager extends STEEmitter<
     public destroy(): void {
         this.xhrRequests.forEach(xhr => xhr.abort());
         this.xhrRequests.clear();
+    }
+
+    private setupXhrEvents(xhr: XMLHttpRequest, segment: Segment) {
+        let prevBytesLoaded = 0;
+
+        xhr.addEventListener("progress", (event: any) => {
+            const bytesLoaded = event.loaded - prevBytesLoaded;
+            this.emit("bytes-downloaded", bytesLoaded);
+            prevBytesLoaded = event.loaded;
+        });
+
+        xhr.addEventListener("load", async (event: any) => {
+            if (event.target.status >= 200 && 300 > event.target.status) {
+                await this.segmentDownloadFinished(segment, event.target.response);
+            } else {
+                this.segmentFailure(segment, event);
+            }
+        });
+
+        xhr.addEventListener("error", (event: any) => {
+            this.segmentFailure(segment, event);
+        });
     }
 
     private async segmentDownloadFinished(segment: Segment, data: ArrayBuffer) {

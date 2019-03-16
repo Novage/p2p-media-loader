@@ -128,21 +128,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
                 // Initialize initial HTTP download timeout (i.e. download initial segments over P2P)
                 this.debugSegments("enable initial HTTP download timeout", this.settings.httpDownloadInitialTimeout, "per segment", this.settings.httpDownloadInitialTimeoutPerSegment);
                 this.httpDownloadInitialTimeoutTimestamp = this.now();
-                const checkHttpTimeout = () => {
-                    if (this.httpRandomDownloadInterval === undefined) {
-                        return; // Instance destroyed
-                    }
-
-                    if (this.processSegmentsQueue() && !this.settings.consumeOnly) {
-                        this.p2pManager.sendSegmentsMapToAll(this.createSegmentsMap());
-                    }
-
-                    if (this.httpDownloadInitialTimeoutTimestamp !== -Infinity) {
-                        // Set one more timeout for a next segment
-                        setTimeout(checkHttpTimeout, this.settings.httpDownloadInitialTimeoutPerSegment);
-                    }
-                };
-                setTimeout(checkHttpTimeout, this.settings.httpDownloadInitialTimeoutPerSegment + 100);
+                setTimeout(this.processInitialSegmentTimeout, this.settings.httpDownloadInitialTimeoutPerSegment + 100);
             }
         }
 
@@ -213,6 +199,21 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.httpManager.destroy();
         this.p2pManager.destroy();
         this.segments.clear();
+    }
+
+    private processInitialSegmentTimeout = () => {
+        if (this.httpRandomDownloadInterval === undefined) {
+            return; // Instance destroyed
+        }
+
+        if (this.processSegmentsQueue() && !this.settings.consumeOnly) {
+            this.p2pManager.sendSegmentsMapToAll(this.createSegmentsMap());
+        }
+
+        if (this.httpDownloadInitialTimeoutTimestamp !== -Infinity) {
+            // Set one more timeout for a next segment
+            setTimeout(this.processInitialSegmentTimeout, this.settings.httpDownloadInitialTimeoutPerSegment);
+        }
     }
 
     private processSegmentsQueue(): boolean {

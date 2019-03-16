@@ -57,24 +57,28 @@ export class MediaPeer extends STEEmitter<
             }) {
         super();
 
-        this.peer.on("connect", () => this.onPeerConnect());
-        this.peer.on("close", () => this.onPeerClose());
-        this.peer.on("error", (error: any) => this.debug("peer error", this.id, error, this));
-        this.peer.on("data", (data: any) => this.onPeerData(data));
+        this.peer.on("connect", this.onPeerConnect);
+        this.peer.on("close", this.onPeerClose);
+        this.peer.on("error", this.onPeerError);
+        this.peer.on("data", this.onPeerData);
 
         this.id = peer.id;
     }
 
-    private onPeerConnect(): void {
+    private onPeerConnect = () => {
         this.debug("peer connect", this.id, this);
         this.remoteAddress = this.peer.remoteAddress;
         this.emit("connect", this);
     }
 
-    private onPeerClose(): void {
+    private onPeerClose = () => {
         this.debug("peer close", this.id, this);
         this.terminateSegmentRequest();
         this.emit("close", this);
+    }
+
+    private onPeerError = (error: any) => {
+        this.debug("peer error", this.id, error, this);
     }
 
     private receiveSegmentPiece(data: ArrayBuffer): void {
@@ -122,7 +126,7 @@ export class MediaPeer extends STEEmitter<
         return null;
     }
 
-    private onPeerData(data: ArrayBuffer): void {
+    private onPeerData = (data: ArrayBuffer) => {
         const command = this.getJsonCommand(data);
 
         if (command == null) {
