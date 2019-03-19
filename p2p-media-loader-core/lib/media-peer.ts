@@ -57,10 +57,10 @@ export class MediaPeer extends STEEmitter<
             }) {
         super();
 
-        this.peer.on("connect", this.onPeerConnect);
-        this.peer.on("close", this.onPeerClose);
-        this.peer.on("error", this.onPeerError);
-        this.peer.on("data", this.onPeerData);
+        this.on("connect", this.onPeerConnect);
+        this.on("close", this.onPeerClose);
+        this.on("error", this.onPeerError);
+        this.on("data", this.onPeerData);
 
         this.id = peer.id;
     }
