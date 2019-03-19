@@ -16,7 +16,7 @@
 
 import * as Debug from "debug";
 
-import {Client} from "bittorrent-tracker";
+import * as Client from "bittorrent-tracker/client";
 import STEEmitter from "./stringly-typed-event-emitter";
 import {Segment, SegmentValidatorCallback} from "./loader-interface";
 import {MediaPeer, MediaPeerSegmentStatus} from "./media-peer";
