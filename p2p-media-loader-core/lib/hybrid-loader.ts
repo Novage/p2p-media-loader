@@ -52,7 +52,7 @@ const defaultSettings: Settings = {
     webRtcMaxMessageSize: 64 * 1024 - 1,
     trackerAnnounce: ["wss://tracker.btorrent.xyz", "wss://tracker.openwebtorrent.com", "wss://tracker.fastcast.nz"],
     rtcConfig: (Peer as any).config,
-    port: 0
+    port: 6881 // a dummy value allows running in Node.js environment
 };
 
 export default class HybridLoader extends EventEmitter implements LoaderInterface {
