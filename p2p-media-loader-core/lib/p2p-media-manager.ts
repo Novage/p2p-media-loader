@@ -135,7 +135,7 @@ export class P2PMediaManager extends STEEmitter<
             peerId: Buffer.from(this.peerId, 0, 20),
             announce: this.settings.trackerAnnounce,
             rtcConfig: this.settings.rtcConfig,
-            port: this.settings.clientPort
+            port: this.settings.port
         }
         
         let oldTrackerClient = this.trackerClient;
