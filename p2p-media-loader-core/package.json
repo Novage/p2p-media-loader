@@ -1,7 +1,7 @@
 {
   "name": "p2p-media-loader-core",
   "description": "P2P Media Loader core functionality",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "license": "Apache-2.0",
   "author": "Novage",
   "homepage": "https://github.com/Novage/p2p-media-loader",
@@ -44,24 +44,24 @@
     "sha.js": "^2.4.11"
   },
   "devDependencies": {
-    "@types/assert": "^1.4.1",
-    "@types/debug": "^0.0.31",
+    "@types/assert": "^1.4.2",
+    "@types/debug": "^4.1.2",
     "@types/events": "^3.0.0",
-    "@types/mocha": "^5.2.5",
-    "@types/node": "^10.12.19",
+    "@types/mocha": "^5.2.6",
+    "@types/node": "^11.11.4",
     "browserify": "^16.2.3",
     "browserify-versionify": "^1.0.6",
     "copyfiles": "^2.1.0",
     "mkdirp": "^0.5.1",
-    "mocha": "^5.2.0",
-    "terser": "^3.14.1",
+    "mocha": "^6.0.2",
+    "terser": "^3.17.0",
     "ts-loader": "^5.3.3",
     "ts-mockito": "^2.3.1",
-    "ts-node": "^8.0.2",
-    "tslint": "^5.12.1",
-    "typescript": "^3.2.4",
-    "webpack": "^4.29.0",
-    "webpack-cli": "^3.2.1"
+    "ts-node": "^8.0.3",
+    "tslint": "^5.14.0",
+    "typescript": "^3.3.4000",
+    "webpack": "^4.29.6",
+    "webpack-cli": "^3.3.0"
   },
   "browserify": {
     "transform": [

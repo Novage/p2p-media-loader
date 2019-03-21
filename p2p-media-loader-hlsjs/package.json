@@ -1,7 +1,7 @@
 {
   "name": "p2p-media-loader-hlsjs",
   "description": "P2P Media Loader hls.js integration",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "license": "Apache-2.0",
   "author": "Novage",
   "homepage": "https://github.com/Novage/p2p-media-loader",
@@ -38,28 +38,28 @@
   "dependencies": {
     "events": "^3.0.0",
     "m3u8-parser": "^4.3.0",
-    "p2p-media-loader-core": "^0.4.0"
+    "p2p-media-loader-core": "^0.5.0"
   },
   "devDependencies": {
     "@hola.org/jwplayer-hlsjs": "^0.0.79",
     "@types/events": "^3.0.0",
-    "@types/mocha": "^5.2.5",
-    "@types/node": "^10.12.19",
-    "@types/sinon": "^7.0.5",
+    "@types/mocha": "^5.2.6",
+    "@types/node": "^11.11.4",
+    "@types/sinon": "^7.0.10",
     "browserify": "^16.2.3",
     "browserify-versionify": "^1.0.6",
     "copyfiles": "^2.1.0",
     "mkdirp": "^0.5.1",
-    "mocha": "^5.2.0",
-    "sinon": "^7.2.3",
-    "terser": "^3.14.1",
+    "mocha": "^6.0.2",
+    "sinon": "^7.3.0",
+    "terser": "^3.17.0",
     "ts-loader": "^5.3.3",
     "ts-mockito": "^2.3.1",
-    "ts-node": "^8.0.2",
-    "tslint": "^5.12.1",
-    "typescript": "^3.2.4",
-    "webpack": "^4.29.0",
-    "webpack-cli": "^3.2.1"
+    "ts-node": "^8.0.3",
+    "tslint": "^5.14.0",
+    "typescript": "^3.3.4000",
+    "webpack": "^4.29.6",
+    "webpack-cli": "^3.3.0"
   },
   "browserify": {
     "transform": [
