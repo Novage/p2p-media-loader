@@ -6,6 +6,7 @@ Core functionality for P2P sharing of segmented media streams (i.e. HLS, MPEG-DA
 
 Useful links:
 - [Demo](http://novage.com.ua/p2p-media-loader/demo.html)
+- [FAQ](https://github.com/Novage/p2p-media-loader/blob/master/FAQ.md)
 - [Overview](http://novage.com.ua/p2p-media-loader/overview.html)
 - [Technical overview](http://novage.com.ua/p2p-media-loader/technical-overview.html)
 - JS CDN
