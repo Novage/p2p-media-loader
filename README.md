@@ -13,6 +13,7 @@ It significantly reduces traditional CDN traffic and cost while delivering media
 
 ## Useful links
 
+- [P2P development, support & consulting](https://novage.com.ua/)
 - [Demo](http://novage.com.ua/p2p-media-loader/demo.html)
 - [FAQ](FAQ.md)
 - [Overview](http://novage.com.ua/p2p-media-loader/overview.html)

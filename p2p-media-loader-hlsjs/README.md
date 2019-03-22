@@ -5,6 +5,7 @@
 P2P sharing of HLS media streams using WebRTC for [Hls.js](https://github.com/video-dev/hls.js)
 
 Useful links:
+- [P2P development, support & consulting](https://novage.com.ua/)
 - [Demo](http://novage.com.ua/p2p-media-loader/demo.html)
 - [FAQ](https://github.com/Novage/p2p-media-loader/blob/master/FAQ.md)
 - [Overview](http://novage.com.ua/p2p-media-loader/overview.html)
