@@ -159,7 +159,7 @@ export class P2PMediaManager extends STEEmitter<
     }
 
     private onTrackerWarning = (warning: any) => {
-        this.debug("tracker warning", warning)
+        this.debug("tracker warning", warning);
     }
 
     private onTrackerUpdate = (data: any): void => {
