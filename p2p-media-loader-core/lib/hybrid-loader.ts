@@ -418,7 +418,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private createSegmentsMap() {
-        const segmentsMap: Map<string, [string[], MediaPeerSegmentStatus[]]> = new Map();
+        const segmentsMap: {[key: string]: [string, number[]]} = {};
 
         function addSegmentToMap(swarmWithSegmentId: string, status: MediaPeerSegmentStatus) {
             // For now we rely on common format of segment ID = swarm ID + segment ID
@@ -426,13 +426,14 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             const separatorIndex = swarmWithSegmentId.lastIndexOf("+");
             const swarmId = swarmWithSegmentId.substring(0, separatorIndex);
             const segmentId = swarmWithSegmentId.substring(separatorIndex + 1);
-            let segmentsStatuses = segmentsMap.get(swarmId);
-            if (!segmentsStatuses) {
-                segmentsStatuses = [[], []];
-                segmentsMap.set(swarmId, segmentsStatuses);
+            let segmentsIdsAndStatuses = segmentsMap[swarmId];
+            if (segmentsIdsAndStatuses === undefined) {
+                segmentsIdsAndStatuses = ["", []];
+                segmentsMap[swarmId] = segmentsIdsAndStatuses;
             }
-            segmentsStatuses[0].push(segmentId);
-            segmentsStatuses[1].push(status);
+            const segmentsStatuses = segmentsIdsAndStatuses[1];
+            segmentsIdsAndStatuses[0] += ((segmentsStatuses.length == 0) ? segmentId : `|${segmentId}`);
+            segmentsStatuses.push(status);
         }
 
         for (const segmentId of this.segments.keys()) {

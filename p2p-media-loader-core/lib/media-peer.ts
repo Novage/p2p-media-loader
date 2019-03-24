@@ -234,14 +234,8 @@ export class MediaPeer extends STEEmitter<
         return this.segmentsMap;
     }
 
-    public sendSegmentsMap(segments: Map<string, [string[], MediaPeerSegmentStatus[]]>): void {
-        const segmentMap: {[key: string]: [string, number[]]} = {};
-        for (const [swarmId, segmentsIdsAndStatuses] of segments) {
-            const segmentsIds = segmentsIdsAndStatuses[0].join("|");
-            const segmentsStatuses = segmentsIdsAndStatuses[1];
-            segmentMap[swarmId] = [segmentsIds, segmentsStatuses];
-        }
-        this.sendCommand({c: MediaPeerCommands.SegmentsMap, m: segmentMap});
+    public sendSegmentsMap(segmentsMap: {[key: string]: [string, number[]]}): void {
+        this.sendCommand({c: MediaPeerCommands.SegmentsMap, m: segmentsMap});
     }
 
     public sendSegmentData(segmentId: string, data: ArrayBuffer): void {

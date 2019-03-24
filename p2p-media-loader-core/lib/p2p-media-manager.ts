@@ -277,11 +277,11 @@ export class P2PMediaManager extends STEEmitter<
         this.peerCandidates.clear();
     }
 
-    public sendSegmentsMapToAll(segmentsMap: Map<string, [string[], MediaPeerSegmentStatus[]]>): void {
+    public sendSegmentsMapToAll(segmentsMap: {[key: string]: [string, number[]]}): void {
         this.peers.forEach(peer => peer.sendSegmentsMap(segmentsMap));
     }
 
-    public sendSegmentsMap(peerId: string, segmentsMap: Map<string, [string[], MediaPeerSegmentStatus[]]>): void {
+    public sendSegmentsMap(peerId: string, segmentsMap: {[key: string]: [string, number[]]}): void {
         const peer = this.peers.get(peerId);
         if (peer) {
             peer.sendSegmentsMap(segmentsMap);
