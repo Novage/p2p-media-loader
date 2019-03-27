@@ -117,6 +117,10 @@ export class HttpMediaManager extends STEEmitter<
         xhr.addEventListener("error", (event: any) => {
             this.segmentFailure(segment, event);
         });
+
+        xhr.addEventListener("timeout", (event: any) => {
+            this.segmentFailure(segment, event);
+        });
     }
 
     private async segmentDownloadFinished(segment: Segment, data: ArrayBuffer) {
