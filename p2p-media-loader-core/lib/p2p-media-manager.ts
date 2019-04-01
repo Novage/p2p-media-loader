@@ -223,15 +223,17 @@ export class P2PMediaManager extends STEEmitter<
         return true;
     }
 
-    public abort(segment: Segment): void {
+    public abort(segment: Segment): ArrayBuffer[] | undefined {
+        let downloadingSegment: ArrayBuffer[] | undefined;
         const peerSegmentRequest = this.peerSegmentRequests.get(segment.id);
         if (peerSegmentRequest) {
             const peer = this.peers.get(peerSegmentRequest.peerId);
             if (peer) {
-                peer.cancelSegmentRequest();
+                downloadingSegment = peer.cancelSegmentRequest();
             }
             this.peerSegmentRequests.delete(segment.id);
         }
+        return downloadingSegment;
     }
 
     public isDownloading(segment: Segment): boolean {

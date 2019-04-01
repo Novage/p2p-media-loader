@@ -271,12 +271,17 @@ export class MediaPeer extends STEEmitter<
         this.runResponseTimeoutTimer();
     }
 
-    public cancelSegmentRequest(): void {
+    public cancelSegmentRequest(): ArrayBuffer[] | undefined {
+        let downloadingSegment: ArrayBuffer[] | undefined;
+
         if (this.downloadingSegmentId) {
             const segmentId = this.downloadingSegmentId;
+            downloadingSegment = this.downloadingSegment ? this.downloadingSegment.pieces : undefined;
             this.terminateSegmentRequest();
             this.sendCommand({c: MediaPeerCommands.CancelSegmentRequest, i: segmentId});
         }
+
+        return downloadingSegment;
     }
 
     private runResponseTimeoutTimer(): void {

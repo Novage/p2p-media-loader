@@ -28,6 +28,7 @@ export class HttpMediaManager extends STEEmitter<
 
     public constructor(readonly settings: {
         httpFailedSegmentTimeout: number,
+        httpUseRanges: boolean,
         segmentValidator?: SegmentValidatorCallback,
         xhrSetup?: XhrSetupCallback
         segmentUrlBuilder?: SegmentUrlBuilder
@@ -35,7 +36,7 @@ export class HttpMediaManager extends STEEmitter<
         super();
     }
 
-    public download(segment: Segment): void {
+    public download(segment: Segment, downloadedPieces?: ArrayBuffer[]): void {
         if (this.isDownloading(segment)) {
             return;
         }
@@ -54,9 +55,21 @@ export class HttpMediaManager extends STEEmitter<
 
         if (segment.range) {
             xhr.setRequestHeader("Range", segment.range);
+            downloadedPieces = undefined; // TODO: process downloadedPieces for segments with range headers too
+        } else if ((downloadedPieces !== undefined) && this.settings.httpUseRanges) {
+            let bytesDownloaded = 0;
+            for (const piece of downloadedPieces) {
+                bytesDownloaded += piece.byteLength;
+            }
+
+            xhr.setRequestHeader("Range", `bytes=${bytesDownloaded}-`);
+
+            this.debug("continue download from", bytesDownloaded);
+        } else {
+            downloadedPieces = undefined;
         }
 
-        this.setupXhrEvents(xhr, segment);
+        this.setupXhrEvents(xhr, segment, downloadedPieces);
 
         if (this.settings.xhrSetup) {
             this.settings.xhrSetup(xhr, segmentUrl);
@@ -97,7 +110,7 @@ export class HttpMediaManager extends STEEmitter<
         this.xhrRequests.clear();
     }
 
-    private setupXhrEvents(xhr: XMLHttpRequest, segment: Segment) {
+    private setupXhrEvents(xhr: XMLHttpRequest, segment: Segment, downloadedPieces?: ArrayBuffer[]) {
         let prevBytesLoaded = 0;
 
         xhr.addEventListener("progress", (event: any) => {
@@ -107,11 +120,32 @@ export class HttpMediaManager extends STEEmitter<
         });
 
         xhr.addEventListener("load", async (event: any) => {
-            if (event.target.status >= 200 && 300 > event.target.status) {
-                await this.segmentDownloadFinished(segment, event.target.response);
-            } else {
+            if ((event.target.status < 200) || (event.target.status >= 300)) {
                 this.segmentFailure(segment, event);
+                return;
             }
+
+            let data = event.target.response;
+
+            if ((downloadedPieces !== undefined) && (event.target.status === 206)) {
+                let bytesDownloaded = 0;
+                for (const piece of downloadedPieces) {
+                    bytesDownloaded += piece.byteLength;
+                }
+
+                const segmentData = new Uint8Array(bytesDownloaded + data.byteLength);
+                let offset = 0;
+
+                for (const piece of downloadedPieces) {
+                    segmentData.set(new Uint8Array(piece), offset);
+                    offset += piece.byteLength;
+                }
+
+                segmentData.set(new Uint8Array(data), offset);
+                data = segmentData.buffer;
+            }
+
+            await this.segmentDownloadFinished(segment, data);
         });
 
         xhr.addEventListener("error", (event: any) => {

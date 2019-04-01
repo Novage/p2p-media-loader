@@ -44,6 +44,7 @@ const defaultSettings: Settings = {
     httpDownloadMaxPriority: 20,
     httpDownloadInitialTimeout: 0,
     httpDownloadInitialTimeoutPerSegment: 4000,
+    httpUseRanges: false,
 
     simultaneousP2PDownloads: 3,
     p2pDownloadMaxPriority: 20,
@@ -260,8 +261,8 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
                 if (this.httpManager.getActiveDownloadsCount() < this.settings.simultaneousHttpDownloads) {
                     // Abort P2P download of the required segment if any and force HTTP download
-                    this.p2pManager.abort(segment);
-                    this.httpManager.download(segment);
+                    const downloadedPieces = this.p2pManager.abort(segment);
+                    this.httpManager.download(segment, downloadedPieces);
                     this.debugSegments("HTTP download (priority)", segment.priority, segment.url);
                     updateSegmentsMap = true;
                     continue;
@@ -574,6 +575,13 @@ interface Settings {
      * single sequential segment P2P download is timed out (see httpDownloadInitialTimeoutPerSegment).
      */
     httpDownloadInitialTimeout: number;
+
+
+    /**
+     * Use HTTP ranges requests where it is possible.
+     * Allows to continue (and not start over) aborted P2P downloads over HTTP.
+     */
+    httpUseRanges: boolean;
 
     /**
      * If initial HTTP download timeout is enabled (see httpDownloadInitialTimeout)

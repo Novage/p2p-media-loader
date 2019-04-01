@@ -54,6 +54,7 @@ If `settings` is specified, then the default settings (shown below) will be over
 | `httpDownloadMaxPriority` | Integer | 20 | Segments with higher priority will not be downloaded over HTTP
 | `httpDownloadInitialTimeout` | Integer | 0 | Try to download initial segments over P2P if the value is > 0. But HTTP download will be forcibly enabled if there is no peers on tracker or single sequential segment P2P download is timed out (see `httpDownloadInitialTimeoutPerSegment`).
 | `httpDownloadInitialTimeoutPerSegment` | Integer | 4000 | If initial HTTP download timeout is enabled (see `httpDownloadInitialTimeout`) this parameter sets additional timeout for a single sequential segment download over P2P. It will cancel initial HTTP download timeout mode if a segment download is timed out.
+| `httpUseRanges` | Boolean | false | Use HTTP ranges requests where it is possible. Allows to continue (and not start over) aborted P2P downloads over HTTP.
 | `simultaneousP2PDownloads` | Integer | 3 | Max number of simultaneous downloads from peers
 | `p2pDownloadMaxPriority` | Integer | 20 | Segments with higher priority will not be downloaded over P2P
 | `p2pSegmentDownloadTimeout` | Integer | 60000 | Time allowed for a segment to start downloading. This value only limits time needed for segment to start, not the time required for full download.
