@@ -26,6 +26,8 @@ import * as sha1 from "sha.js/sha1";
 import {version} from "./index";
 
 const PEER_PROTOCOL_VERSION = 2;
+const PEER_ID_VERSION_STRING = version.replace(/\d*./g, v => `0${parseInt(v, 10) % 100}`.slice(-2)).slice(0, 4);
+const PEER_ID_VERSION_PREFIX = `-WW${PEER_ID_VERSION_STRING}-`; // Using WebTorrent client ID in order to not be banned by websocket trackers
 
 class PeerSegmentRequest {
     constructor(
@@ -35,9 +37,6 @@ class PeerSegmentRequest {
 }
 
 function generatePeerId(): ArrayBuffer {
-    const PEER_ID_VERSION_STRING = version.replace(/\d*./g, v => `0${parseInt(v, 10) % 100}`.slice(-2)).slice(0, 4);
-    // Using WebTorrent client ID in order to not be banned by websocket trackers
-    const PEER_ID_VERSION_PREFIX = `-WW${PEER_ID_VERSION_STRING}-`;
     const PEER_ID_SYMBOLS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     const PEER_ID_LENGTH = 20;
 
