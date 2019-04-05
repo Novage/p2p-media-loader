@@ -15,6 +15,6 @@
  * limitations under the License.
  */
 
+export const version = typeof(__P2PML_VERSION__) === "undefined" ? "__VERSION__" : __P2PML_VERSION__;
 export {LoaderInterface, Events, Segment, XhrSetupCallback} from "./loader-interface";
 export {default as HybridLoader} from "./hybrid-loader";
-export const version = typeof(__P2PML_VERSION__) === "undefined" ? "__VERSION__" : __P2PML_VERSION__;
