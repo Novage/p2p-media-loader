@@ -6,7 +6,7 @@ Table of contents:
 - [How to achieve better P2P ratio for live streams?](#how-to-achieve-better-p2p-ratio-for-live-streams)
 - [How to achieve better P2P ratio for VOD streams?](#how-to-achieve-better-p2p-ratio-for-vod-streams)
 
-# What is tracker?
+## What is tracker?
 
 `P2P Media Loader` uses WebTorrent compatible trackers to do [WebRTC](https://en.wikipedia.org/wiki/WebRTC) signaling - exchanging [SDP](https://en.wikipedia.org/wiki/Session_Description_Protocol) data between peers to connect them into a swarm.
 
@@ -16,18 +16,18 @@ Any compatible WebTorrent tracker works for `P2P Media Loader`:
 - [wt-tracker](https://github.com/Novage/wt-tracker) - high-performance WebTorrent tracker by Novage that uses [uWebSockets.js](https://github.com/uNetworking/uWebSockets.js) for I/O.
 - [bittorrent-tracker](https://github.com/webtorrent/bittorrent-tracker) - tracker from WebTorrent project that uses Node.js I/O
 
-# Don't use public trackers in production
+## Don't use public trackers in production
 
 [Public trackers](https://openwebtorrent.com/) allow quickly begin development and testing of P2P technologies on the web.
 But they support a limited number of peers (about 500o peers from all the swarms) and can reject peers or even go down on heavy loads.
 
 That is why they can't be used in production environments. Consider running your personal tracker or buy resources from a tracker providers to go stable.
 
-# How to achieve better P2P ratio for live streams?
+## How to achieve better P2P ratio for live streams?
 
 The default configuration works best for live streams with 15-20 segments in the playlist. The segments duration sohould be about 5 seconds.
 
-# How to achieve better P2P ratio for VOD streams?
+## How to achieve better P2P ratio for VOD streams?
 
 An example of a good configuration tested in production for a VOD stream with segments 20 seconds long each:
 
