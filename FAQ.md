@@ -1,6 +1,7 @@
 # P2P Media Loader - FAQ
 
-- [What is tracker](#what-is-tracker)
+Table of contents:
+- [What is tracker?](#what-is-tracker)
 - [Don't use public trackers in production](#dont-use-public-trackers-in-production)
 
 # What is tracker?
