@@ -3,8 +3,8 @@
 Table of contents:
 - [What is tracker?](#what-is-tracker)
 - [Don't use public trackers in production](#dont-use-public-trackers-in-production)
-- [How to achieve better P2P ratio for live streams?](how-to-achieve-better-p2p-ratio-for-live-streams)
-- [How to achieve better P2P ratio for VOD streams?](how-to-achieve-better-p2p-ratio-for-vod-streams)
+- [How to achieve better P2P ratio for live streams?](#how-to-achieve-better-p2p-ratio-for-live-streams)
+- [How to achieve better P2P ratio for VOD streams?](#how-to-achieve-better-p2p-ratio-for-vod-streams)
 
 # What is tracker?
 
