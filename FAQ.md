@@ -34,7 +34,7 @@ An example of a good configuration tested in production for a VOD stream with se
 ```javascript
 segments:{
   // number of segments to pass for processing to P2P algorithm
-  forwardSegmentCount:50, // usually should be equal or greater than p2pDownloadMaxPriority
+  forwardSegmentCount:50, // usually should be equal or greater than p2pDownloadMaxPriority and httpDownloadMaxPriority
 },
 loader:{
   // how long to store the downloaded segments for P2P sharing
