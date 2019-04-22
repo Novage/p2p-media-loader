@@ -6,6 +6,7 @@ Table of contents:
 - [How to achieve better P2P ratio for live streams?](#how-to-achieve-better-p2p-ratio-for-live-streams)
 - [How to achieve better P2P ratio for VOD streams?](#how-to-achieve-better-p2p-ratio-for-vod-streams)
 - [What are the requirements to share a stream over P2P?](#what-are-the-requirements-to-share-a-stream-over-p2p)
+- [Is it possible to have 100% P2P ratio?](#is-it-possible-to-have-100-p2p-ratio)
 
 ## What is tracker?
 
@@ -79,3 +80,11 @@ The requirements to share a stream over P2P are:
 - The stream should have the same swarm ID on all the peers. Swarm ID is equal to the stream master manifest URL without query parameters by default. If a stream URL is not the same for different peers you can set the swarm ID manually using configuration.
 - The master manifest should have the same number of variants (i.e. qualities) in the same order.
 - Variants should consist of the same segments under the same sequence numbers (see #EXT-X-MEDIA-SEQUENCE for HLS).
+
+## Is it possible to have 100% P2P ratio?
+
+It is possible of a single peer but not possible for a swarm of peers in total.
+
+P2P Media Loader implements approach of P2P assisted video delivery. It means that the stream should be downloaded via HTTP(S) at least once to be shared between peers in a swarm.
+
+For example for 10 peers in the best case the maximum possible P2P ratio is 90% if a stream was downloaded from the source only once.
