@@ -7,6 +7,7 @@ Table of contents:
 - [How to achieve better P2P ratio for VOD streams?](#how-to-achieve-better-p2p-ratio-for-vod-streams)
 - [What are the requirements to share a stream over P2P?](#what-are-the-requirements-to-share-a-stream-over-p2p)
 - [Is it possible to have 100% P2P ratio?](#is-it-possible-to-have-100-p2p-ratio)
+- [What happens if there are no peers on a stream?](#what-happens-if-there-are-no-peers-on-a-stream)
 
 ## What is tracker?
 
@@ -88,3 +89,8 @@ It is possible of a single peer but not possible for a swarm of peers in total.
 P2P Media Loader implements approach of P2P assisted video delivery. It means that the stream should be downloaded via HTTP(S) at least once to be shared between peers in a swarm.
 
 For example for 10 peers in the best case the maximum possible P2P ratio is 90% if a stream was downloaded from the source only once.
+
+
+## What happens if there are no peers on a stream?
+
+P2P Media Loader downloads all the segments from HTTP(S) source in this case. It should not perform worse than a player configured without P2P at all.
