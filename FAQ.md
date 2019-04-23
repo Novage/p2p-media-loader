@@ -22,9 +22,9 @@ Any compatible WebTorrent tracker works for `P2P Media Loader`:
 ## Don't use public trackers in production
 
 [Public trackers](https://openwebtorrent.com/) allow quickly begin development and testing of P2P technologies on the web.
-But they support a limited number of peers (about 5000 peers from all the swarms) and can reject peers or even go down on heavy loads.
+But they support a limited number of peers and can reject connections or even go down on a heavy loads.
 
-That is why they can't be used in production environments. Consider running your personal tracker or buy resources from a tracker providers to go stable.
+That is why they can't be used in production environments. Consider running your personal tracker or buy resources from a tracker provider to go stable.
 
 ## How to achieve better P2P ratio for live streams?
 
