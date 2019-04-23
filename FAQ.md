@@ -79,8 +79,8 @@ loader:{
 
 The requirements to share a stream over P2P are:
 - The stream should have the same swarm ID on all the peers. Swarm ID is equal to the stream master manifest URL without query parameters by default. If a stream URL is not the same for different peers you can set the swarm ID manually using configuration.
-- The master manifest should have the same number of variants (i.e. qualities) in the same order.
-- Variants should consist of the same segments under the same sequence numbers (see #EXT-X-MEDIA-SEQUENCE for HLS).
+- The master manifest should have the same number of variants (i.e. qualities) in the same order on all the peers. URLs of the variant play lists don't matter.
+- Variants should consist of the same segments under the same sequence numbers (see #EXT-X-MEDIA-SEQUENCE for HLS) on all the peers. URLs of the segments don't matter.
 
 ## Is it possible to have 100% P2P ratio?
 
