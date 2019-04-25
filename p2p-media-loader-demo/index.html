@@ -137,7 +137,7 @@
             border-radius: .25em;
         }
 
-        #main-view button {
+        #main-view .form-button {
             text-align: center;
             white-space: nowrap;
             border: 1px solid transparent;
@@ -151,12 +151,12 @@
             margin-bottom: 5px;
         }
 
-        #main-view button:hover {
+        #main-view .form-button:hover {
             background-color: #c60000;
             border-color: #c60000;
         }
 
-        #main-view button:focus {
+        #main-view .form-button:focus {
             outline: none;
         }
 
@@ -288,8 +288,8 @@
                         </optgroup>
                     </select>
                 </div>
-                <button type="submit" class="btn btn-primary" onclick="this.form.target=''">Apply</button>
-                <button type="submit" class="btn btn-primary" onclick="this.form.target='_blank'">Create new peer</button>
+                <button type="submit" class="form-button" onclick="this.form.target=''">Apply</button>
+                <button type="submit" class="form-button" onclick="this.form.target='_blank'">Create new peer</button>
             </form>
             <div id="graph"></div>
             <h3>Trackers:</h3>
