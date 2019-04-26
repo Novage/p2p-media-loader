@@ -739,7 +739,7 @@
             this.videoContainer.appendChild(video);
 
             var player = jwplayer("video");
-            player.setup({ file: this.videoUrl, autostart: true, mute: true });
+            player.setup({ file: this.videoUrl, mute: true });
 
             var provider = require("@hola.org/jwplayer-hlsjs");
             provider.attach();
