@@ -20,7 +20,7 @@ export class Segment {
         readonly url: string,
         readonly range?: string,
         readonly priority = 0,
-        readonly data?: ArrayBuffer,
+        public data?: ArrayBuffer,
         readonly downloadBandwidth = 0
     ) {}
 }

@@ -20,7 +20,6 @@ import * as Client from "bittorrent-tracker/client";
 import STEEmitter from "./stringly-typed-event-emitter";
 import {Segment, SegmentValidatorCallback} from "./loader-interface";
 import {MediaPeer, MediaPeerSegmentStatus} from "./media-peer";
-import {SegmentInternal} from "./segment-internal";
 import {Buffer} from "buffer";
 import * as sha1 from "sha.js/sha1";
 import {version} from "./index";
@@ -66,7 +65,7 @@ export class P2PMediaManager extends STEEmitter<
     } | null = null;
 
     public constructor(
-            readonly cachedSegments: Map<string, SegmentInternal>,
+            readonly cachedSegments: Map<string, {segment: Segment, lastAccessed: number}>,
             readonly settings: {
                 useP2P: boolean,
                 trackerAnnounce: string[],
@@ -377,9 +376,9 @@ export class P2PMediaManager extends STEEmitter<
     }
 
     private onSegmentRequest = (peer: MediaPeer, segmentId: string) => {
-        const segment = this.cachedSegments.get(segmentId);
-        if (segment) {
-            peer.sendSegmentData(segmentId, segment.data!);
+        const cachedSegment = this.cachedSegments.get(segmentId);
+        if (cachedSegment) {
+            peer.sendSegmentData(segmentId, cachedSegment.segment.data!);
         } else {
             peer.sendSegmentAbsent(segmentId);
         }

@@ -21,7 +21,6 @@ import {EventEmitter} from "events";
 import {HttpMediaManager} from "./http-media-manager";
 import {P2PMediaManager} from "./p2p-media-manager";
 import {MediaPeerSegmentStatus} from "./media-peer";
-import {SegmentInternal} from "./segment-internal";
 import {BandwidthApproximator} from "./bandwidth-approximator";
 
 import * as getBrowserRTC from "get-browser-rtc";
@@ -61,7 +60,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private readonly debugSegments = Debug("p2pml:hybrid-loader-segments");
     private readonly httpManager: HttpMediaManager;
     private readonly p2pManager: P2PMediaManager;
-    private readonly segments: Map<string, SegmentInternal> = new Map();
+    private readonly cachedSegments: Map<string, {segment: Segment, lastAccessed: number}> = new Map();
     private segmentsQueue: Segment[] = [];
     private readonly bandwidthApproximator = new BandwidthApproximator();
     private readonly settings: Settings;
@@ -118,7 +117,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private createP2PManager() {
-        return new P2PMediaManager(this.segments, this.settings);
+        return new P2PMediaManager(this.cachedSegments, this.settings);
     }
 
     public load(segments: Segment[], variantSwarmId: string): void {
@@ -169,12 +168,13 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     public getSegment(id: string): Segment | undefined {
-        const segment = this.segments.get(id);
-        return segment
-            ? segment.data
-                ? new Segment(segment.id, segment.url, segment.range, segment.priority, segment.data, segment.downloadBandwidth)
-                : undefined
-            : undefined;
+        const cachedSegment = this.cachedSegments.get(id);
+        if (cachedSegment !== undefined) {
+            cachedSegment.lastAccessed = this.now();
+            return cachedSegment.segment;
+        } else {
+            return undefined;
+        }
     }
 
     public getSettings() {
@@ -199,7 +199,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.segmentsQueue = [];
         this.httpManager.destroy();
         this.p2pManager.destroy();
-        this.segments.clear();
+        this.cachedSegments.clear();
     }
 
     private processInitialSegmentTimeout = () => {
@@ -241,7 +241,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         for (let index = 0; index < this.segmentsQueue.length; index++) {
             const segment = this.segmentsQueue[index];
 
-            if (this.segments.has(segment.id) || this.httpManager.isDownloading(segment)) {
+            if (this.cachedSegments.has(segment.id) || this.httpManager.isDownloading(segment)) {
                 continue;
             }
 
@@ -328,7 +328,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         const segmentsMap = this.p2pManager.getOvrallSegmentsMap();
 
         const pendingQueue = this.segmentsQueue.filter(segment =>
-            !this.segments.has(segment.id) &&
+            !this.cachedSegments.has(segment.id) &&
             !this.p2pManager.isDownloading(segment) &&
             !this.httpManager.isDownloading(segment) &&
             !segmentsMap.has(segment.id) &&
@@ -361,17 +361,10 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private onSegmentLoaded = (segment: Segment, data: ArrayBuffer, peerId?: string) => {
         this.debugSegments("segment loaded", segment.id, segment.url);
 
-        const segmentInternal = new SegmentInternal(
-            segment.id,
-            segment.url,
-            segment.range,
-            segment.priority,
-            data,
-            this.bandwidthApproximator.getBandwidth(this.now())
-        );
+        segment.data = data;
 
-        this.segments.set(segment.id, segmentInternal);
-        this.emitSegmentLoaded(segmentInternal, peerId);
+        this.cachedSegments.set(segment.id, {segment, lastAccessed: this.now()});
+        this.emit(Events.SegmentLoaded, segment, peerId);
 
         if (this.httpDownloadInitialTimeoutTimestamp !== -Infinity) {
             // If initial HTTP download timeout enabled then
@@ -380,7 +373,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             for (const queueSegment of this.segmentsQueue) {
                 if (queueSegment.id === segment.id) {
                     loadedSegmentFound = true;
-                } else if (!this.segments.has(queueSegment.id)) {
+                } else if (!this.cachedSegments.has(queueSegment.id)) {
                     break;
                 }
 
@@ -402,21 +395,6 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.processSegmentsQueue();
     }
 
-    private emitSegmentLoaded(segmentInternal: SegmentInternal, peerId?: string): void {
-        segmentInternal.lastAccessed = this.now();
-
-        const segment = new Segment(
-            segmentInternal.id,
-            segmentInternal.url,
-            segmentInternal.range,
-            segmentInternal.priority,
-            segmentInternal.data,
-            segmentInternal.downloadBandwidth
-        );
-
-        this.emit(Events.SegmentLoaded, segment, peerId);
-    }
-
     private createSegmentsMap() {
         const segmentsMap: {[key: string]: [string, number[]]} = {};
 
@@ -436,7 +414,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             segmentsStatuses.push(status);
         }
 
-        for (const segmentId of this.segments.keys()) {
+        for (const segmentId of this.cachedSegments.keys()) {
             addSegmentToMap(segmentId, MediaPeerSegmentStatus.Loaded);
         }
 
@@ -473,16 +451,16 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
     private collectGarbage(): boolean {
         const segmentsToDelete: string[] = [];
-        const remainingSegments: SegmentInternal[] = [];
+        const remainingSegments: {segment: Segment, lastAccessed: number}[] = [];
 
         // Delete old segments
         const now = this.now();
 
-        for (const segment of this.segments.values()) {
-            if (now - segment.lastAccessed > this.settings.cachedSegmentExpiration) {
-                segmentsToDelete.push(segment.id);
+        for (const cachedSegment of this.cachedSegments.values()) {
+            if (now - cachedSegment.lastAccessed > this.settings.cachedSegmentExpiration) {
+                segmentsToDelete.push(cachedSegment.segment.id);
             } else {
-                remainingSegments.push(segment);
+                remainingSegments.push(cachedSegment);
             }
         }
 
@@ -491,9 +469,9 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         if (countOverhead > 0) {
             remainingSegments.sort((a, b) => a.lastAccessed - b.lastAccessed);
 
-            for (const segment of remainingSegments) {
-                if (!this.segmentsQueue.find(queueSegment => queueSegment.id == segment.id)) {
-                    segmentsToDelete.push(segment.id);
+            for (const cachedSegment of remainingSegments) {
+                if (!this.segmentsQueue.find(queueSegment => queueSegment.id === cachedSegment.segment.id)) {
+                    segmentsToDelete.push(cachedSegment.segment.id);
                     countOverhead--;
                     if (countOverhead == 0) {
                         break;
@@ -502,7 +480,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             }
         }
 
-        segmentsToDelete.forEach(id => this.segments.delete(id));
+        segmentsToDelete.forEach(id => this.cachedSegments.delete(id));
         return segmentsToDelete.length > 0;
     }
 
