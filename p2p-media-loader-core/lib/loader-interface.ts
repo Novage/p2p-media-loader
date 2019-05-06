@@ -75,7 +75,7 @@ export enum Events {
 
 export interface LoaderInterface {
     on(eventName: string, listener: Function): this;
-    load(segments: Segment[], variantSwarmId: string): void;
+    load(segments: Segment[], streamSwarmId: string): void;
     getSegment(id: string): Segment | undefined;
     getSettings(): any;
     getDetails(): any;

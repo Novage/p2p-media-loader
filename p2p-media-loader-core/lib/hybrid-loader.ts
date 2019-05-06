@@ -120,7 +120,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         return new P2PMediaManager(this.cachedSegments, this.settings);
     }
 
-    public load(segments: Segment[], variantSwarmId: string): void {
+    public load(segments: Segment[], streamSwarmId: string): void {
         if (this.httpRandomDownloadInterval === undefined) { // Do once on first call
             this.httpRandomDownloadInterval = setInterval(this.downloadRandomSegmentOverHttp, this.settings.httpDownloadProbabilityInterval);
 
@@ -132,7 +132,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             }
         }
 
-        this.p2pManager.setVariantSwarmId(variantSwarmId);
+        this.p2pManager.setStreamSwarmId(streamSwarmId);
         this.debug("load segments");
 
         let updateSegmentsMap = false;
@@ -400,15 +400,15 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         const segmentsMap: {[key: string]: [string, number[]]} = {};
 
         function addSegmentToMap(swarmWithSegmentId: string, status: MediaPeerSegmentStatus) {
-            // For now we rely on common format of segment ID = variant swarm ID + segment ID
+            // For now we rely on common format of segment ID = stream swarm ID + segment ID
             // TODO: in next major relese segment should contain swarm ID and segment ID in the swarm fields.
             const separatorIndex = swarmWithSegmentId.lastIndexOf("+");
-            const variantSwarmId = swarmWithSegmentId.substring(0, separatorIndex);
+            const streamSwarmId = swarmWithSegmentId.substring(0, separatorIndex);
             const segmentId = swarmWithSegmentId.substring(separatorIndex + 1);
-            let segmentsIdsAndStatuses = segmentsMap[variantSwarmId];
+            let segmentsIdsAndStatuses = segmentsMap[streamSwarmId];
             if (segmentsIdsAndStatuses === undefined) {
                 segmentsIdsAndStatuses = ["", []];
-                segmentsMap[variantSwarmId] = segmentsIdsAndStatuses;
+                segmentsMap[streamSwarmId] = segmentsIdsAndStatuses;
             }
             const segmentsStatuses = segmentsIdsAndStatuses[1];
             segmentsIdsAndStatuses[0] += ((segmentsStatuses.length == 0) ? segmentId : `|${segmentId}`);

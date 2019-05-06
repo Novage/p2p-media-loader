@@ -186,8 +186,8 @@ export class MediaPeer extends STEEmitter<
 
         const segmentsMap = new Map<string, MediaPeerSegmentStatus>();
 
-        for (const variantSwarmId of Object.keys(segments)) {
-            const swarmData = segments[variantSwarmId];
+        for (const streamSwarmId of Object.keys(segments)) {
+            const swarmData = segments[streamSwarmId];
             if (!(swarmData instanceof Array) ||
                     (swarmData.length !== 2) ||
                     (typeof swarmData[0] !== "string") ||
@@ -208,7 +208,7 @@ export class MediaPeer extends STEEmitter<
                     return new Map();
                 }
 
-                segmentsMap.set(`${variantSwarmId}+${segmentsIds[i]}`, segmentStatus);
+                segmentsMap.set(`${streamSwarmId}+${segmentsIds[i]}`, segmentStatus);
             }
         }
 
