@@ -47,8 +47,8 @@ export class ParserSegment {
             : `${streamTypeCode}${stream.id}`;
 
         const identity = streamIsHls
-            ? `${streamIdentity}+${position}`
-            : `${streamIdentity}+${Number(start).toFixed(3)}`;
+            ? `${position}`
+            : `${Number(start).toFixed(3)}`;
 
         return new ParserSegment(
             stream.id,

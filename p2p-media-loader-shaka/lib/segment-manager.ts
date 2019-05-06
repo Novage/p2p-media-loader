@@ -116,8 +116,12 @@ export class SegmentManager {
 
         const loaderSegments: LoaderSegment[] = sequence.map((s, i) => {
             return new LoaderSegment(
-                `${masterSwarmId}+${s.identity}`,
+                `${masterSwarmId}+${s.streamIdentity}+${s.identity}`,
                 s.uri,
+                masterSwarmId,
+                this.manifestUri,
+                s.streamIdentity,
+                s.identity,
                 s.range,
                 i
             );

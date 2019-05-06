@@ -57,18 +57,20 @@ export class SegmentManager {
             this.masterPlaylist = playlist;
 
             for (const [key, playlist] of this.variantPlaylists) {
-                const {variantSwarmId: variantSwarmId, found} = this.getVariantSwarmId(playlist.requestUrl);
+                const {variantSwarmId: variantSwarmId, found, index} = this.getVariantSwarmId(playlist.requestUrl);
                 if (!found) {
                     this.variantPlaylists.delete(key);
                 } else {
                     playlist.variantSwarmId = variantSwarmId;
+                    playlist.streamId = "V" + index.toString();
                 }
             }
         } else {
-            const {variantSwarmId: variantSwarmId, found} = this.getVariantSwarmId(requestUrl);
+            const {variantSwarmId: variantSwarmId, found, index} = this.getVariantSwarmId(requestUrl);
 
-            if (found || !this.masterPlaylist) { // do not add audio and subtitles to variants
+            if (found || (this.masterPlaylist === null)) { // do not add audio and subtitles to variants
                 playlist.variantSwarmId = variantSwarmId;
+                playlist.streamId = (this.masterPlaylist === null ? undefined : "V" + index.toString());
                 this.variantPlaylists.set(requestUrl, playlist);
                 this.updateSegments();
             }
@@ -149,14 +151,6 @@ export class SegmentManager {
         const segmentLocation = this.getSegmentLocation(this.segmentRequest.segmentUrl, this.segmentRequest.segmentByterange);
         if (segmentLocation) {
             this.loadSegments(segmentLocation.playlist, segmentLocation.segmentIndex, false);
-        } else { // the segment not found in current playlist
-            const playlist = this.variantPlaylists.get(this.segmentRequest.playlistRequestUrl);
-            if (playlist) {
-                this.loadSegments(playlist, 0, false, {
-                    url: this.segmentRequest.segmentUrl,
-                    byterange: this.segmentRequest.segmentByterange,
-                    sequence: this.segmentRequest.segmentSequence});
-            }
         }
     }
 
@@ -195,7 +189,7 @@ export class SegmentManager {
         return undefined;
     }
 
-    private loadSegments(playlist: Playlist, segmentIndex: number, requestFirstSegment: boolean, notInPlaylistSegment?: {url: string, byterange: Byterange, sequence: number}): void {
+    private loadSegments(playlist: Playlist, segmentIndex: number, requestFirstSegment: boolean): void {
         const segments: Segment[] = [];
         const playlistSegments: any[] = playlist.manifest.segments;
         const initialSequence: number = playlist.manifest.mediaSequence ? playlist.manifest.mediaSequence : 0;
@@ -203,15 +197,7 @@ export class SegmentManager {
 
         let priority = Math.max(0, this.playQueue.length - 1);
 
-        if (notInPlaylistSegment) {
-            const url = playlist.getSegmentAbsoluteUrl(notInPlaylistSegment.url);
-            const id = this.getSegmentId(playlist, notInPlaylistSegment.sequence);
-            segments.push(new Segment(id, url, byterangeToString(notInPlaylistSegment.byterange), priority++));
-
-            if (requestFirstSegment) {
-                loadSegmentId = id;
-            }
-        }
+        const masterSwarmId = this.getMasterSwarmId();
 
         for (let i = segmentIndex; i < playlistSegments.length && segments.length < this.settings.forwardSegmentCount; ++i) {
             const segment = playlist.manifest.segments[i];
@@ -219,8 +205,14 @@ export class SegmentManager {
             const url = playlist.getSegmentAbsoluteUrl(segment.uri);
             const byterange: Byterange = segment.byterange;
             const id = this.getSegmentId(playlist, initialSequence + i);
-            segments.push(new Segment(id, url, byterangeToString(byterange), priority++));
-
+            segments.push(new Segment(
+                id,
+                url,
+                masterSwarmId !== undefined ? masterSwarmId : playlist.variantSwarmId,
+                this.masterPlaylist !== null ? this.masterPlaylist.requestUrl : playlist.requestUrl,
+                playlist.streamId,
+                (initialSequence + i).toString(),
+                byterangeToString(byterange), priority++));
             if (requestFirstSegment && !loadSegmentId) {
                 loadSegmentId = id;
             }
@@ -240,21 +232,34 @@ export class SegmentManager {
         return `${playlist.variantSwarmId}+${segmentSequence}`;
     }
 
-    private getVariantSwarmId(playlistUrl: string): {variantSwarmId: string, found: boolean} {
+    private getMasterSwarmId() {
         const settingsSwarmId = (this.settings.swarmId && (this.settings.swarmId.length !== 0)) ? this.settings.swarmId : undefined;
+        if (settingsSwarmId !== undefined) {
+            return settingsSwarmId;
+        }
 
-        if (this.masterPlaylist) {
-            const masterSwarmId = (settingsSwarmId ? settingsSwarmId : this.masterPlaylist.requestUrl.split("?")[0]);
+        return (this.masterPlaylist !== null)
+            ? this.masterPlaylist.requestUrl.split("?")[0]
+            : undefined;
+    }
 
+    private getVariantSwarmId(playlistUrl: string): {variantSwarmId: string, found: boolean, index: number} {
+        const masterSwarmId = this.getMasterSwarmId();
+
+        if (this.masterPlaylist !== null) {
             for (let i = 0; i < this.masterPlaylist.manifest.playlists.length; ++i) {
                 const url = new URL(this.masterPlaylist.manifest.playlists[i].uri, this.masterPlaylist.responseUrl).toString();
                 if (url === playlistUrl) {
-                    return {variantSwarmId: `${masterSwarmId}+V${i}`, found: true};
+                    return {variantSwarmId: `${masterSwarmId}+V${i}`, found: true, index: i};
                 }
             }
         }
 
-        return {variantSwarmId: settingsSwarmId ? settingsSwarmId : playlistUrl, found: false};
+        return {
+            variantSwarmId: masterSwarmId !== undefined ? masterSwarmId : playlistUrl.split("?")[0],
+            found: false,
+            index: -1
+        };
     }
 
     private async loadContent(url: string, responseType: XMLHttpRequestResponseType, range?: string): Promise<XMLHttpRequest> {
@@ -289,6 +294,7 @@ export class SegmentManager {
 
 class Playlist {
     public variantSwarmId: string = "";
+    public streamId?: string;
 
     public constructor(readonly requestUrl: string, readonly responseUrl: string, readonly manifest: any) {}
 

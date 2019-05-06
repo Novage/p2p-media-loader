@@ -18,6 +18,10 @@ export class Segment {
     public constructor(
         readonly id: string,
         readonly url: string,
+        readonly swarmId: string,
+        readonly manifestUri: string,
+        readonly streamId: string | undefined,
+        readonly sequence: string,
         readonly range?: string,
         readonly priority = 0,
         public data?: ArrayBuffer,
