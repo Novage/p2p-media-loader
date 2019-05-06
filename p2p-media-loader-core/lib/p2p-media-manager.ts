@@ -58,7 +58,7 @@ export class P2PMediaManager extends STEEmitter<
     private peers: Map<string, MediaPeer> = new Map();
     private peerCandidates: Map<string, MediaPeer[]> = new Map();
     private peerSegmentRequests: Map<string, PeerSegmentRequest> = new Map();
-    private swarmId: string | null = null;
+    private variantSwarmId: string | null = null;
     private readonly peerId: ArrayBuffer;
     private debug = Debug("p2pml:p2p-media-manager");
     private pendingTrackerClient: {
@@ -92,15 +92,15 @@ export class P2PMediaManager extends STEEmitter<
         return Buffer.from(this.peerId).toString("hex");
     }
 
-    public async setSwarmId(swarmId: string) {
-        if (this.swarmId === swarmId) {
+    public async setVariantSwarmId(variantSwarmId: string) {
+        if (this.variantSwarmId === variantSwarmId) {
             return;
         }
 
         this.destroy(true);
 
-        this.swarmId = swarmId;
-        this.debug("swarm ID", this.swarmId);
+        this.variantSwarmId = variantSwarmId;
+        this.debug("variant swarm ID", this.variantSwarmId);
 
         this.pendingTrackerClient = {
             isDestroyed: false
@@ -110,9 +110,9 @@ export class P2PMediaManager extends STEEmitter<
 
         // TODO: native browser 'crypto.subtle' implementation doesn't work in Chrome in insecure pages
         // TODO: Edge doesn't support SHA-1. Change to SHA-256 once Edge support is required.
-        // const infoHash = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(PEER_PROTOCOL_VERSION + this.swarmId));
+        // const infoHash = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(PEER_PROTOCOL_VERSION + this.variantSwarmId));
 
-        const infoHash = new sha1().update(PEER_PROTOCOL_VERSION + this.swarmId).digest();
+        const infoHash = new sha1().update(PEER_PROTOCOL_VERSION + this.variantSwarmId).digest();
 
         // destroy may be called while waiting for the hash to be calculated
         if (!pendingTrackerClient.isDestroyed) {
@@ -244,7 +244,7 @@ export class P2PMediaManager extends STEEmitter<
     }
 
     public destroy(swarmChange: boolean = false): void {
-        this.swarmId = null;
+        this.variantSwarmId = null;
 
         if (this.trackerClient) {
             this.trackerClient.stop();

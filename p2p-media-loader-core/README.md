@@ -65,13 +65,13 @@ If `settings` is specified, then the default settings (shown below) will be over
 | `xhrSetup` | Function | undefined | XMLHttpRequest setup callback. Handle it when you need additional setup for requests made by the library. If handled, expected a function with two arguments: xhr (XMLHttpRequest), url (String).
 | `segmentUrlBuilder` | Function | undefined | Allow to modify the segment URL before HTTP request. If handled, expected a function of one argument of type `Segment` that returns a `string` - generated segment URL.
 
-### `loader.load(segments, swarmId)`
+### `loader.load(segments, variantSwarmId)`
 
 Creates new queue of segments to download. Aborts all http and peer connections for segments that are not in the new load and emits `Events.SegmentAbort` event for each aborted event.
 
 Function args:
 - `segments` - array of `Segment` class instances with populated `url` and `priority` field;
-- `swarmId` - used for gathering peers in pool;
+- `variantSwarmId` - current swarm;
 
 ### `loader.on(Events.SegmentLoaded, function (segment, peerId) {})`
 
