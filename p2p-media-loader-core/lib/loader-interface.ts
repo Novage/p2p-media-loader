@@ -21,7 +21,7 @@ export class Segment {
         readonly range?: string,
         readonly priority = 0,
         readonly data?: ArrayBuffer,
-        readonly downloadSpeed = 0
+        readonly downloadBandwidth = 0
     ) {}
 }
 

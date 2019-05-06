@@ -22,7 +22,7 @@ import {HttpMediaManager} from "./http-media-manager";
 import {P2PMediaManager} from "./p2p-media-manager";
 import {MediaPeerSegmentStatus} from "./media-peer";
 import {SegmentInternal} from "./segment-internal";
-import {SpeedApproximator} from "./speed-approximator";
+import {BandwidthApproximator} from "./bandwidth-approximator";
 
 import * as getBrowserRTC from "get-browser-rtc";
 import * as Peer from "simple-peer";
@@ -63,7 +63,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private readonly p2pManager: P2PMediaManager;
     private readonly segments: Map<string, SegmentInternal> = new Map();
     private segmentsQueue: Segment[] = [];
-    private readonly speedApproximator = new SpeedApproximator();
+    private readonly bandwidthApproximator = new BandwidthApproximator();
     private readonly settings: Settings;
     private httpRandomDownloadInterval: ReturnType<typeof setInterval> | undefined;
     private httpDownloadInitialTimeoutTimestamp = -Infinity;
@@ -172,7 +172,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         const segment = this.segments.get(id);
         return segment
             ? segment.data
-                ? new Segment(segment.id, segment.url, segment.range, segment.priority, segment.data, segment.downloadSpeed)
+                ? new Segment(segment.id, segment.url, segment.range, segment.priority, segment.data, segment.downloadBandwidth)
                 : undefined
             : undefined;
     }
@@ -350,12 +350,12 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private onPieceBytesDownloaded = (method: "http" | "p2p", bytes: number, peerId?: string) => {
-        this.speedApproximator.addBytes(bytes, this.now());
+        this.bandwidthApproximator.addBytes(bytes, this.now());
         this.emit(Events.PieceBytesDownloaded, method, bytes, peerId);
     }
 
     private onPieceBytesUploaded = (method: "p2p", bytes: number, peerId?: string) => {
-        this.speedApproximator.addBytes(bytes, this.now());
+        this.bandwidthApproximator.addBytes(bytes, this.now());
         this.emit(Events.PieceBytesUploaded, method, bytes, peerId);
     }
 
@@ -368,7 +368,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             segment.range,
             segment.priority,
             data,
-            this.speedApproximator.getSpeed(this.now())
+            this.bandwidthApproximator.getBandwidth(this.now())
         );
 
         this.segments.set(segment.id, segmentInternal);
@@ -412,7 +412,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             segmentInternal.range,
             segmentInternal.priority,
             segmentInternal.data,
-            segmentInternal.downloadSpeed
+            segmentInternal.downloadBandwidth
         );
 
         this.emit(Events.SegmentLoaded, segment, peerId);

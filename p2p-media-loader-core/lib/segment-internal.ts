@@ -23,6 +23,6 @@ export class SegmentInternal {
         readonly range: string | undefined,
         readonly priority = 0,
         readonly data: ArrayBuffer | undefined = undefined,
-        readonly downloadSpeed = 0
+        readonly downloadBandwidth = 0
     ) {}
 }

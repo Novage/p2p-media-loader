@@ -81,7 +81,7 @@ export class SegmentManager {
         return xhr;
     }
 
-    public loadSegment(url: string, byterange: Byterange, onSuccess: (content: ArrayBuffer, downloadSpeed: number) => void, onError: (error: any) => void): void {
+    public loadSegment(url: string, byterange: Byterange, onSuccess: (content: ArrayBuffer, downloadBandwidth: number) => void, onError: (error: any) => void): void {
         const segmentLocation = this.getSegmentLocation(url, byterange);
         if (!segmentLocation) {
             // Not a segment from variants; usually can be: init, audio or subtitles segment, encription key etc.
@@ -163,7 +163,7 @@ export class SegmentManager {
     private onSegmentLoaded = (segment: Segment) => {
         if (this.segmentRequest && (this.segmentRequest.segmentUrl === segment.url) &&
                 (byterangeToString(this.segmentRequest.segmentByterange) === segment.range)) {
-            this.segmentRequest.onSuccess(segment.data!.slice(0), segment.downloadSpeed);
+            this.segmentRequest.onSuccess(segment.data!.slice(0), segment.downloadBandwidth);
             this.segmentRequest = null;
         }
     }
@@ -316,7 +316,7 @@ class SegmentRequest {
         readonly segmentByterange: Byterange,
         readonly segmentSequence: number,
         readonly playlistRequestUrl: string,
-        readonly onSuccess: (content: ArrayBuffer, downloadSpeed: number) => void,
+        readonly onSuccess: (content: ArrayBuffer, downloadBandwidth: number) => void,
         readonly onError: (error: any) => void
     ) {}
 }

@@ -17,7 +17,7 @@
 import {SegmentManager} from "./segment-manager";
 
 const DEFAULT_DOWNLOAD_LATENCY = 1;
-const DEFAULT_DOWNLOAD_SPEED = 12500; // bytes per millisecond
+const DEFAULT_DOWNLOAD_BANDWIDTH = 12500; // bytes per millisecond
 
 export class HlsJsLoader {
     private segmentManager: SegmentManager;
@@ -37,7 +37,7 @@ export class HlsJsLoader {
                 (context.rangeStart == undefined) || (context.rangeEnd == undefined)
                     ? undefined
                     : { offset: context.rangeStart, length: context.rangeEnd - context.rangeStart },
-                (content: ArrayBuffer, downloadSpeed: number) => setTimeout(() => this.successSegment(content, downloadSpeed, context, callbacks), 0),
+                (content: ArrayBuffer, downloadBandwidth: number) => setTimeout(() => this.successSegment(content, downloadBandwidth, context, callbacks), 0),
                 (error: any) => setTimeout(() => this.error(error, context, callbacks), 0)
             );
         } else {
@@ -66,9 +66,9 @@ export class HlsJsLoader {
         }, this.stats, context);
     }
 
-    private successSegment(content: ArrayBuffer, downloadSpeed: number, context: any, callbacks: any): void {
+    private successSegment(content: ArrayBuffer, downloadBandwidth: number, context: any, callbacks: any): void {
         const now = performance.now();
-        const downloadTime = content.byteLength / ((downloadSpeed <= 0) ? DEFAULT_DOWNLOAD_SPEED : downloadSpeed);
+        const downloadTime = content.byteLength / ((downloadBandwidth <= 0) ? DEFAULT_DOWNLOAD_BANDWIDTH : downloadBandwidth);
 
         this.stats.trequest = now - DEFAULT_DOWNLOAD_LATENCY - downloadTime;
         this.stats.tfirst = now - downloadTime;
