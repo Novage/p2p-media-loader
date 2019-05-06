@@ -68,7 +68,14 @@ describe("SegmentManager", () => {
             segmentLoadedListener = listener;
         });
 
-        const segment = new Segment("id", testPlaylist.baseUrl + "segment-1045.ts", undefined, 0, new ArrayBuffer(0));
+        const segment = new Segment(
+            "id",
+            testPlaylist.baseUrl + "segment-1045.ts",
+            testPlaylist.url,
+            testPlaylist.url,
+            undefined,
+            "1045",
+            undefined, 0, new ArrayBuffer(0));
 
         const manager = new SegmentManager(instance(loader));
         manager.processPlaylist(testPlaylist.url, testPlaylist.content, testPlaylist.url);
@@ -109,7 +116,14 @@ describe("SegmentManager", () => {
 
         const onError = sinon.spy();
 
-        const segment = new Segment("id", testPlaylist.baseUrl + "segment-1045.ts", undefined, 0, new ArrayBuffer(0));
+        const segment = new Segment(
+            "id",
+            testPlaylist.baseUrl + "segment-1045.ts",
+            testPlaylist.url,
+            testPlaylist.url,
+            undefined,
+            "1045",
+            undefined, 0, new ArrayBuffer(0));
 
         const manager = new SegmentManager(instance(loader));
         manager.processPlaylist(testPlaylist.url, testPlaylist.content, testPlaylist.url);
