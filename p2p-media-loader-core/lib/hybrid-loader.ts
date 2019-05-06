@@ -355,7 +355,6 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private onPieceBytesUploaded = (method: "p2p", bytes: number, peerId?: string) => {
-        this.bandwidthApproximator.addBytes(bytes, this.now());
         this.emit(Events.PieceBytesUploaded, method, bytes, peerId);
     }
 
