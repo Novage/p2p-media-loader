@@ -362,6 +362,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.debugSegments("segment loaded", segment.id, segment.url);
 
         segment.data = data;
+        segment.downloadBandwidth = this.bandwidthApproximator.getBandwidth(this.now());
 
         this.cachedSegments.set(segment.id, {segment, lastAccessed: this.now()});
         this.emit(Events.SegmentLoaded, segment, peerId);
