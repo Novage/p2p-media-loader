@@ -22,7 +22,7 @@ export class HttpMediaManager extends STEEmitter<
     "segment-loaded" | "segment-error" | "bytes-downloaded"
 > {
 
-    private xhrRequests: Map<string, XMLHttpRequest> = new Map();
+    private xhrRequests: Map<string, {xhr: XMLHttpRequest, segment: Segment}> = new Map();
     private failedSegments: Map<string, number> = new Map();
     private debug = Debug("p2pml:http-media-manager");
 
@@ -75,14 +75,15 @@ export class HttpMediaManager extends STEEmitter<
             this.settings.xhrSetup(xhr, segmentUrl);
         }
 
-        this.xhrRequests.set(segment.id, xhr);
+        this.xhrRequests.set(segment.id, {xhr, segment});
         xhr.send();
     }
 
     public abort(segment: Segment): void {
-        const xhr = this.xhrRequests.get(segment.id);
-        if (xhr) {
-            xhr.abort();
+        const request = this.xhrRequests.get(segment.id);
+
+        if (request) {
+            request.xhr.abort();
             this.xhrRequests.delete(segment.id);
             this.debug("http segment abort", segment.id);
         }
@@ -97,8 +98,8 @@ export class HttpMediaManager extends STEEmitter<
         return time !== undefined && time > this.now();
     }
 
-    public getActiveDownloadsKeys(): string[] {
-        return [ ...this.xhrRequests.keys() ];
+    public getActiveDownloads(): ReadonlyMap<string, {segment: Segment}> {
+        return this.xhrRequests;
     }
 
     public getActiveDownloadsCount(): number {
@@ -106,7 +107,7 @@ export class HttpMediaManager extends STEEmitter<
     }
 
     public destroy(): void {
-        this.xhrRequests.forEach(xhr => xhr.abort());
+        this.xhrRequests.forEach(request => request.xhr.abort());
         this.xhrRequests.clear();
     }
 

@@ -396,15 +396,17 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.processSegmentsQueue();
     }
 
+    private getStreamSwarmId(segment: Segment) {
+        return segment.streamId === undefined ? segment.masterSwarmId : `${segment.masterSwarmId}+${segment.streamId}`
+    }
+
     private createSegmentsMap() {
         const segmentsMap: {[key: string]: [string, number[]]} = {};
 
-        function addSegmentToMap(swarmWithSegmentId: string, status: MediaPeerSegmentStatus) {
-            // For now we rely on common format of segment ID = stream swarm ID + segment ID
-            // TODO: in next major relese segment should contain swarm ID and segment ID in the swarm fields.
-            const separatorIndex = swarmWithSegmentId.lastIndexOf("+");
-            const streamSwarmId = swarmWithSegmentId.substring(0, separatorIndex);
-            const segmentId = swarmWithSegmentId.substring(separatorIndex + 1);
+        const addSegmentToMap = (segment: Segment, status: MediaPeerSegmentStatus) => {
+            const streamSwarmId = this.getStreamSwarmId(segment);
+            const segmentId = segment.sequence;
+
             let segmentsIdsAndStatuses = segmentsMap[streamSwarmId];
             if (segmentsIdsAndStatuses === undefined) {
                 segmentsIdsAndStatuses = ["", []];
@@ -415,12 +417,12 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             segmentsStatuses.push(status);
         }
 
-        for (const segmentId of this.cachedSegments.keys()) {
-            addSegmentToMap(segmentId, MediaPeerSegmentStatus.Loaded);
+        for (const cachedSegment of this.cachedSegments.values()) {
+            addSegmentToMap(cachedSegment.segment, MediaPeerSegmentStatus.Loaded);
         }
 
-        for (const segmentId of this.httpManager.getActiveDownloadsKeys()) {
-            addSegmentToMap(segmentId, MediaPeerSegmentStatus.LoadingByHttp);
+        for (const download of this.httpManager.getActiveDownloads().values()) {
+            addSegmentToMap(download.segment, MediaPeerSegmentStatus.LoadingByHttp);
         }
 
         return segmentsMap;
