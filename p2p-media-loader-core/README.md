@@ -176,10 +176,10 @@ Instance contains:
 - `url`
     + a `String`
     + URL of the segment
-`swarmId`
+`masterSwarmId`
     + a `String`
     + segment's master swarm ID
-`manifestUri`
+`masterManifestUri`
     + a `String`
     + segment's master manifest URI
 `streamId`

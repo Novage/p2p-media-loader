@@ -163,8 +163,8 @@ export class HttpMediaManager extends STEEmitter<
                 await this.settings.segmentValidator(new Segment(
                     segment.id,
                     segment.url,
-                    segment.swarmId,
-                    segment.manifestUri,
+                    segment.masterSwarmId,
+                    segment.masterManifestUri,
                     segment.streamId,
                     segment.sequence,
                     segment.range,
