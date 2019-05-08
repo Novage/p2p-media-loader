@@ -17,6 +17,8 @@
 
 import {Engine} from "./engine";
 
+declare const videojs: any;
+
 export function initHlsJsPlayer(player: any): void {
     if (player && player.config && player.config.loader && typeof player.config.loader.getEngine === "function") {
         initHlsJsEvents(player, player.config.loader.getEngine());
@@ -42,6 +44,18 @@ export function initVideoJsContribHlsJsPlayer(player: any): void {
         const options = player.tech_.options_;
         if (options && options.hlsjsConfig && options.hlsjsConfig.loader && typeof options.hlsjsConfig.loader.getEngine === "function") {
             initHlsJsEvents(player.tech_, options.hlsjsConfig.loader.getEngine());
+        }
+    });
+}
+
+export function initVideoJsHlsJsPlugin(): void {
+    if (videojs == undefined || videojs.Html5Hlsjs == undefined) {
+        return;
+    }
+
+    videojs.Html5Hlsjs.addHook("beforeinitialize", (videojsPlayer: any, hlsjs: any) => {
+        if (hlsjs.config && hlsjs.config.loader && typeof hlsjs.config.loader.getEngine === "function") {
+            initHlsJsEvents(hlsjs, hlsjs.config.loader.getEngine());
         }
     });
 }

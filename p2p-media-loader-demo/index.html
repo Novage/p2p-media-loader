@@ -280,6 +280,7 @@
                             <option value="flowplayer">Flowplayer</option>
                             <option value="mediaelement">MediaElement</option>
                             <option value="videojs-contrib-hlsjs">VideoJs-Contrib-HlsJs</option>
+                            <option value="videojs-hlsjs-plugin">VideoJs-HlsJs-Plugin</option>
                             <option value="jwplayer">JWPlayer</option>
                         </optgroup>
                         <optgroup label="Shaka P2P Engine (HLS and DASH)">
@@ -449,6 +450,7 @@
                 case "flowplayer":
                 case "mediaelement":
                 case "videojs-contrib-hlsjs":
+                case "videojs-hlsjs-plugin":
                 case "jwplayer":
                     await loadScript("https://cdn.jsdelivr.net/npm/hls.js@latest");
 
@@ -498,6 +500,10 @@
 
                 case "videojs-contrib-hlsjs":
                     this.initVideoJsContribHlsJsPlayer();
+                    break;
+
+                case "videojs-hlsjs-plugin":
+                    this.initVideoJsHlsJsPlugin();
                     break;
 
                 case "jwplayer":
@@ -682,8 +688,8 @@
 
         async initVideoJsContribHlsJsPlayer() {
             await Promise.all([
-                loadStyle("https://vjs.zencdn.net/7.2.0/video-js.css"),
-                loadScript("https://vjs.zencdn.net/7.2.0/video.js")
+                loadStyle("https://vjs.zencdn.net/7.5.4/video-js.css"),
+                loadScript("https://vjs.zencdn.net/7.5.4/video.js")
             ]);
 
             await loadScript("https://cdn.jsdelivr.net/npm/videojs-contrib-hls.js@latest");
@@ -723,6 +729,44 @@
             player.ready(() => {
                 player.volume(0);
                 player.play();
+            });
+        }
+
+        async initVideoJsHlsJsPlugin() {
+            await Promise.all([
+                loadStyle("https://vjs.zencdn.net/7.5.4/video-js.css"),
+                loadScript("https://vjs.zencdn.net/7.5.4/video.js")
+            ]);
+
+            await loadScript("https://cdn.streamroot.io/videojs-hlsjs-plugin/1/stable/videojs-hlsjs-plugin.js");
+
+            var outer = document.createElement("div");
+            outer.className = "embed-responsive embed-responsive-16by9";
+            var video = document.createElement("video");
+            video.id = "video";
+            video.className = "embed-responsive-item video-js vjs-default-skin";
+            video.setAttribute("muted", "");
+            video.setAttribute("autoplay", "");
+            video.setAttribute("controls", "");
+            outer.appendChild(video);
+            this.videoContainer.appendChild(outer);
+
+            if (this.isP2PSupported) {
+                p2pml.hlsjs.initVideoJsHlsJsPlugin();
+            }
+
+            var player = videojs("video", {
+                html5: {
+                    hlsjsConfig: {
+                        liveSyncDurationCount: this.liveSyncDurationCount,
+                        loader: this.isP2PSupported ? this.engine.createLoaderClass() : Hls.DefaultConfig.loader
+                    }
+                }
+            });
+
+            player.src({
+                src: this.videoUrl,
+                type: "application/x-mpegURL"
             });
         }
 
