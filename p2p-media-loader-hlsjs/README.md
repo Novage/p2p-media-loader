@@ -74,6 +74,7 @@ The library uses `window.p2pml.hlsjs` as a root namespace in Web browser for:
 - `initJwPlayer` - [JW Player](https://www.jwplayer.com) integration
 - `initMediaElementJsPlayer` - [MediaElement.js](https://www.mediaelementjs.com) player integration
 - `initVideoJsContribHlsJsPlayer` - [Video.js](https://videojs.com) player integration
+- `initVideoJsHlsJsPlugin` - another [Video.js](https://videojs.com) player integration
 - `version` - API version
 
 ---
