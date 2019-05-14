@@ -17,3 +17,8 @@
 export function getSchemedUri(uri: string) {
     return uri.startsWith("//") ? window.location.protocol + uri : uri;
 }
+
+export function getMasterSwarmId(masterManifestUri: string, settings: {swarmId?: string}) {
+    return (settings.swarmId && (settings.swarmId.length !== 0)) ?
+                settings.swarmId : masterManifestUri.split("?")[0];
+}

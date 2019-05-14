@@ -16,8 +16,9 @@
 
 import * as Debug from "debug";
 import {SegmentManager} from "./segment-manager";
-import {ShakaManifestParserProxy, ShakaDashManifestParserProxy, ShakaHlsManifestParserProxy} from "./manifest-parser-proxy";
-import {getSchemedUri} from "./utils";
+import {ShakaDashManifestParserProxy, ShakaHlsManifestParserProxy} from "./manifest-parser-proxy";
+import {getSchemedUri, getMasterSwarmId} from "./utils";
+import { ParserSegment } from "./parser-segment";
 
 const debug = Debug("p2pml:shaka:index");
 
@@ -28,7 +29,7 @@ export function initShakaPlayer(player: any, segmentManager: SegmentManager) {
     let intervalId: number = 0;
     let lastPlayheadTimeReported: number = 0;
 
-    player.addEventListener("loading", () => {
+    player.addEventListener("loading", async () => {
         if (intervalId > 0) {
             clearInterval(intervalId);
             intervalId = 0;
@@ -41,7 +42,7 @@ export function initShakaPlayer(player: any, segmentManager: SegmentManager) {
             manifest.p2pml.parser.reset();
         }
 
-        segmentManager.destroy();
+        await segmentManager.destroy();
 
         intervalId = setInterval(() => {
             const time = getPlayheadTime(player);
@@ -74,33 +75,71 @@ function initializeNetworkingEngine() {
 }
 
 function processNetworkRequest(uri: string, request: any, requestType: number) {
-    if (!request.p2pml || requestType !== shaka.net.NetworkingEngine.RequestType.SEGMENT) {
+    if (!request.p2pml) {
         return shaka.net.HttpXHRPlugin(uri, request, requestType);
     }
 
     const { player, segmentManager }: { player: any, segmentManager: SegmentManager } = request.p2pml;
+    let assetsStorage = segmentManager.getSettings().assetsStorage;
+    let masterManifestUri: string | undefined;
+    let masterSwarmId: string | undefined;
 
+    if (assetsStorage !== undefined
+            && player.getNetworkingEngine().p2pml !== undefined
+            && player.getNetworkingEngine().p2pml.masterManifestUri !== undefined) {
+        masterManifestUri = player.getNetworkingEngine().p2pml.masterManifestUri as string;
+        masterSwarmId = getMasterSwarmId(masterManifestUri, segmentManager.getSettings());
+    } else {
+        assetsStorage = undefined;
+    }
+
+    let segment: ParserSegment | undefined;
     const manifest = player.getManifest();
-    if (!manifest || !manifest.p2pml) {
-        return shaka.net.HttpXHRPlugin(uri, request, requestType);
+
+    if (requestType === shaka.net.NetworkingEngine.RequestType.SEGMENT
+            && manifest !== null
+            && manifest.p2pml !== undefined
+            && manifest.p2pml.parser !== undefined) {
+        segment = manifest.p2pml.parser.find(uri, request.headers.Range);
     }
 
-    const parser: ShakaManifestParserProxy = manifest.p2pml.parser;
-    const segment = parser.find(uri, request.headers.Range);
-    if (!segment || segment.streamType !== "video") {
+    if (segment !== undefined && segment.streamType === "video") { // load segment using P2P loader
+        debug("request", "load", segment.identity);
+
+        const promise = segmentManager.load(segment, getSchemedUri(player.getManifestUri()), getPlayheadTime(player));
+
+        const abort = async () => {
+            debug("request", "abort", segment!.identity);
+            // TODO: implement abort in SegmentManager
+        };
+
+        return new shaka.util.AbortableOperation(promise, abort);
+    } else if (assetsStorage) { // load or store the asset using assets storage
+        const responsePromise = (async () => {
+            const asset = await assetsStorage.getAsset(uri, request.headers.Range, masterSwarmId!);
+            if (asset !== undefined) {
+                return {
+                    data: asset.data,
+                    uri: asset.responseUri,
+                    fromCache: true
+                };
+            } else {
+                const response = await shaka.net.HttpXHRPlugin(uri, request, requestType).promise;
+                assetsStorage.storeAsset({
+                    masterManifestUri: masterManifestUri!,
+                    masterSwarmId: masterSwarmId!,
+                    requestUri: uri,
+                    requestRange: request.headers.Range,
+                    responseUri: response.uri,
+                    data: response.data
+                });
+                return response;
+            }
+        })();
+        return new shaka.util.AbortableOperation(responsePromise, async () => {});
+    } else { // load asset using default plugin
         return shaka.net.HttpXHRPlugin(uri, request, requestType);
     }
-
-    debug("request", "load", segment.identity);
-
-    const promise = segmentManager.load(segment, getSchemedUri(player.getManifestUri()), getPlayheadTime(player));
-
-    const abort = async () => {
-        debug("request", "abort", segment.identity);
-        // TODO: implement abort in SegmentManager
-    };
-
-    return new shaka.util.AbortableOperation(promise, abort);
 }
 
 function getPlayheadTime(player: any): number {

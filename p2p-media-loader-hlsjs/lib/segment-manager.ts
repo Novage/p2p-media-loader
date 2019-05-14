@@ -16,10 +16,12 @@
 
 import {Events, Segment, LoaderInterface, XhrSetupCallback} from "p2p-media-loader-core";
 import {Parser} from "m3u8-parser";
+import {AssetsStorage} from "./engine";
 
 const defaultSettings: Settings = {
     forwardSegmentCount: 20,
     swarmId: undefined,
+    assetsStorage: undefined,
 };
 
 export type Byterange = { length: number, offset: number } | undefined;
@@ -77,20 +79,88 @@ export class SegmentManager {
         }
     }
 
-    public async loadPlaylist(url: string): Promise<XMLHttpRequest> {
-        const xhr = await this.loadContent(url, "text");
-        this.processPlaylist(url, xhr.response as string, xhr.responseURL);
+    public async loadPlaylist(url: string): Promise<{response: string, responseURL: string}> {
+        const assetsStorage = this.settings.assetsStorage;
+        let xhr: {response: string, responseURL: string} | undefined;
+
+        if (assetsStorage !== undefined) {
+            let masterSwarmId: string | undefined;
+            masterSwarmId = this.getMasterSwarmId();
+            if (masterSwarmId === undefined) {
+                masterSwarmId = url.split("?")[0];
+            }
+            const asset = await assetsStorage.getAsset(url, undefined, masterSwarmId);
+
+            if (asset !== undefined) {
+                xhr = {
+                    responseURL: asset.responseUri,
+                    response: asset.data as string,
+                };
+            } else {
+                xhr = await this.loadContent(url, "text");
+                assetsStorage.storeAsset({
+                    masterManifestUri: this.masterPlaylist !== null ? this.masterPlaylist.requestUrl : url,
+                    masterSwarmId: masterSwarmId,
+                    requestUri: url,
+                    responseUri: xhr.responseURL,
+                    data: xhr.response as string,
+                });
+            }
+        } else {
+            xhr = await this.loadContent(url, "text");
+        }
+
+        this.processPlaylist(url, xhr.response, xhr.responseURL);
         return xhr;
     }
 
-    public loadSegment(url: string, byterange: Byterange, onSuccess: (content: ArrayBuffer, downloadBandwidth: number) => void, onError: (error: any) => void): void {
+    public async loadSegment(url: string, byterange: Byterange): Promise<{content: ArrayBuffer, downloadBandwidth: number}> {
         const segmentLocation = this.getSegmentLocation(url, byterange);
+        let content: ArrayBuffer | undefined;
+        const byteRangeString = byterangeToString(byterange);
+
         if (!segmentLocation) {
             // Not a segment from variants; usually can be: init, audio or subtitles segment, encription key etc.
-            this.loadContent(url, "arraybuffer", byterangeToString(byterange))
-                .then((xhr: XMLHttpRequest) => onSuccess(xhr.response as ArrayBuffer, 0))
-                .catch((error: any) => onError(error));
-            return;
+            const assetsStorage = this.settings.assetsStorage;
+            if (assetsStorage !== undefined) {
+                let masterManifestUri = this.masterPlaylist !== null ? this.masterPlaylist.requestUrl : undefined;
+
+                let masterSwarmId: string | undefined;
+                masterSwarmId = this.getMasterSwarmId();
+
+                if (masterSwarmId === undefined && this.variantPlaylists.size === 1) {
+                    masterSwarmId = this.variantPlaylists.values().next().value.requestUrl.split("?")[0];
+                }
+
+                if (masterManifestUri === undefined && this.variantPlaylists.size === 1) {
+                    masterManifestUri = this.variantPlaylists.values().next().value.requestUrl;
+                }
+
+                if (masterSwarmId !== undefined && masterManifestUri !== undefined) {
+                    const asset = await assetsStorage.getAsset(url, byteRangeString, masterSwarmId);
+                    if (asset !== undefined) {
+                        content = asset.data as ArrayBuffer;
+                    } else {
+                        const xhr = await this.loadContent(url, "arraybuffer", byteRangeString);
+                        content = xhr.response as ArrayBuffer;
+                        assetsStorage.storeAsset({
+                            masterManifestUri: masterManifestUri,
+                            masterSwarmId: masterSwarmId,
+                            requestUri: url,
+                            requestRange: byteRangeString,
+                            responseUri: xhr.responseURL,
+                            data: content,
+                        });
+                    }
+                }
+            }
+
+            if (content === undefined) {
+                const xhr = await this.loadContent(url, "arraybuffer", byteRangeString);
+                content = xhr.response as ArrayBuffer;
+            }
+
+            return { content, downloadBandwidth: 0 };
         }
 
         const segmentSequence = (segmentLocation.playlist.manifest.mediaSequence ? segmentLocation.playlist.manifest.mediaSequence : 0)
@@ -108,9 +178,16 @@ export class SegmentManager {
             this.segmentRequest.onError("Cancel segment request: simultaneous segment requests are not supported");
         }
 
-        this.segmentRequest = new SegmentRequest(url, byterange, segmentSequence, segmentLocation.playlist.requestUrl, onSuccess, onError);
+        const promise = new Promise<{content: ArrayBuffer, downloadBandwidth: number}>((resolve, reject) => {
+            this.segmentRequest = new SegmentRequest(url, byterange, segmentSequence, segmentLocation.playlist.requestUrl,
+                (content: ArrayBuffer, downloadBandwidth: number) => resolve({content, downloadBandwidth}),
+                (error) => reject(error));
+        });
+
         this.playQueue.push({segmentUrl: url, segmentByterange: byterange, segmentSequence: segmentSequence});
         this.loadSegments(segmentLocation.playlist, segmentLocation.segmentIndex, true);
+
+        return promise;
     }
 
     public setPlayingSegment(url: string, byterange: Byterange): void {
@@ -130,9 +207,7 @@ export class SegmentManager {
         }
     }
 
-    public destroy(): void {
-        this.loader.destroy();
-
+    public async destroy() {
         if (this.segmentRequest) {
             this.segmentRequest.onError("Loading aborted: object destroyed");
             this.segmentRequest = null;
@@ -141,6 +216,12 @@ export class SegmentManager {
         this.masterPlaylist = null;
         this.variantPlaylists.clear();
         this.playQueue = [];
+
+        if (this.settings.assetsStorage !== undefined) {
+            await this.settings.assetsStorage.destroy();
+        }
+
+        await this.loader.destroy();
     }
 
     private updateSegments(): void {
@@ -189,7 +270,7 @@ export class SegmentManager {
         return undefined;
     }
 
-    private loadSegments(playlist: Playlist, segmentIndex: number, requestFirstSegment: boolean): void {
+    private async loadSegments(playlist: Playlist, segmentIndex: number, requestFirstSegment: boolean) {
         const segments: Segment[] = [];
         const playlistSegments: any[] = playlist.manifest.segments;
         const initialSequence: number = playlist.manifest.mediaSequence ? playlist.manifest.mediaSequence : 0;
@@ -221,7 +302,7 @@ export class SegmentManager {
         this.loader.load(segments, playlist.streamSwarmId);
 
         if (loadSegmentId) {
-            const segment = this.loader.getSegment(loadSegmentId);
+            const segment = await this.loader.getSegment(loadSegmentId);
             if (segment) { // Segment already loaded by loader
                 this.onSegmentLoaded(segment);
             }
@@ -338,6 +419,11 @@ interface Settings {
      * query parameters is used as the swarm ID if the parameter is not specified)
      */
     swarmId?: string;
+
+    /**
+     * A storage for the downloaded assets: manifests, subtitles, init segments, DRM assets etc. By default the assets are not stored.
+     */
+    assetsStorage?: AssetsStorage;
 }
 
 function compareByterange(b1: Byterange, b2: Byterange) {

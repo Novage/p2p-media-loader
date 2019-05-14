@@ -18,7 +18,7 @@ import * as Debug from "debug";
 
 import * as Client from "bittorrent-tracker/client";
 import STEEmitter from "./stringly-typed-event-emitter";
-import {Segment, SegmentValidatorCallback} from "./loader-interface";
+import {Segment, SegmentValidatorCallback, SegmentsStorage} from "./loader-interface";
 import {MediaPeer, MediaPeerSegmentStatus} from "./media-peer";
 import {Buffer} from "buffer";
 import * as sha1 from "sha.js/sha1";
@@ -63,10 +63,11 @@ export class P2PMediaManager extends STEEmitter<
     private pendingTrackerClient: {
         isDestroyed: boolean
     } | null = null;
+    private masterSwarmId?: string;
 
     public constructor(
-            readonly cachedSegments: Map<string, {segment: Segment, lastAccessed: number}>,
-            readonly settings: {
+            private sementsStorage: SegmentsStorage,
+            private settings: {
                 useP2P: boolean,
                 trackerAnnounce: string[],
                 p2pSegmentDownloadTimeout: number,
@@ -91,7 +92,7 @@ export class P2PMediaManager extends STEEmitter<
         return Buffer.from(this.peerId).toString("hex");
     }
 
-    public async setStreamSwarmId(streamSwarmId: string) {
+    public async setStreamSwarmId(streamSwarmId: string, masterSwarmId: string) {
         if (this.streamSwarmId === streamSwarmId) {
             return;
         }
@@ -99,6 +100,7 @@ export class P2PMediaManager extends STEEmitter<
         this.destroy(true);
 
         this.streamSwarmId = streamSwarmId;
+        this.masterSwarmId = masterSwarmId;
         this.debug("stream swarm ID", this.streamSwarmId);
 
         this.pendingTrackerClient = {
@@ -375,10 +377,14 @@ export class P2PMediaManager extends STEEmitter<
         this.emit("peer-data-updated");
     }
 
-    private onSegmentRequest = (peer: MediaPeer, segmentId: string) => {
-        const cachedSegment = this.cachedSegments.get(segmentId);
-        if (cachedSegment) {
-            peer.sendSegmentData(segmentId, cachedSegment.segment.data!);
+    private onSegmentRequest = async (peer: MediaPeer, segmentId: string) => {
+        if (this.masterSwarmId === undefined) {
+            return;
+        }
+
+        const segment = await this.sementsStorage.getSegment(segmentId, this.masterSwarmId);
+        if (segment) {
+            peer.sendSegmentData(segmentId, segment.data!);
         } else {
             peer.sendSegmentAbsent(segmentId);
         }

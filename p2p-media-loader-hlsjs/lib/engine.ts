@@ -44,9 +44,8 @@ export class Engine extends EventEmitter {
         return createHlsJsLoaderClass(HlsJsLoader, this);
     }
 
-    public destroy() {
-        this.loader.destroy();
-        this.segmentManager.destroy();
+    public async destroy() {
+        await this.segmentManager.destroy();
     }
 
     public getSettings(): any {
@@ -65,4 +64,19 @@ export class Engine extends EventEmitter {
     public setPlayingSegment(url: string, byterange: Byterange) {
         this.segmentManager.setPlayingSegment(url, byterange);
     }
+}
+
+export interface Asset {
+    masterSwarmId: string;
+    masterManifestUri: string;
+    requestUri: string;
+    requestRange?: string;
+    responseUri: string;
+    data: ArrayBuffer | string;
+}
+
+export interface AssetsStorage {
+    storeAsset(asset: Asset): Promise<void>;
+    getAsset(requestUri: string, requestRange: string | undefined, masterSwarmId: string): Promise<Asset | undefined>;
+    destroy(): Promise<void>;
 }

@@ -76,10 +76,10 @@ export enum Events {
 export interface LoaderInterface {
     on(eventName: string, listener: Function): this;
     load(segments: Segment[], streamSwarmId: string): void;
-    getSegment(id: string): Segment | undefined;
+    getSegment(id: string): Promise<Segment | undefined>;
     getSettings(): any;
     getDetails(): any;
-    destroy(): void;
+    destroy(): Promise<void>;
 }
 
 export interface SegmentValidatorCallback {
@@ -92,4 +92,12 @@ export interface XhrSetupCallback {
 
 export interface SegmentUrlBuilder {
     (segment: Segment): string;
+}
+
+export interface SegmentsStorage {
+    storeSegment(segment: Segment): Promise<void>;
+    getSegmentsMap(masterSwarmId: string): Promise<Map<string, {segment: Segment}>>;
+    getSegment(id: string, masterSwarmId: string): Promise<Segment | undefined>;
+    clean(lockedSementsfilter?: (id: string) => boolean): Promise<boolean>;
+    destroy(): Promise<void>;
 }

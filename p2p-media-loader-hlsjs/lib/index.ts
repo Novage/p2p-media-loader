@@ -15,6 +15,8 @@
  * limitations under the License.
  */
 
+export const version = typeof(__P2PML_VERSION__) === "undefined" ? "__VERSION__" : __P2PML_VERSION__;
+
 import {Engine} from "./engine";
 
 declare const videojs: any;
@@ -75,11 +77,11 @@ export function initMediaElementJsPlayer(mediaElement: any): void {
             }
         }
     });
-    mediaElement.addEventListener("hlsDestroying", () => {
+    mediaElement.addEventListener("hlsDestroying", async () => {
         const hls = mediaElement.hlsPlayer;
         if (hls && hls.config && hls.config.loader && typeof hls.config.loader.getEngine === "function") {
             const engine: Engine = hls.config.loader.getEngine();
-            engine.destroy();
+            await engine.destroy();
         }
     });
 }
@@ -94,8 +96,8 @@ export function initJwPlayer(player: any, hlsjsConfig: any): void {
     }, 200);
 }
 
-export { Engine };
-export const version = typeof(__P2PML_VERSION__) === "undefined" ? "__VERSION__" : __P2PML_VERSION__;
+export {Engine};
+export {Asset, AssetsStorage} from "./engine";
 
 function initHlsJsEvents(player: any, engine: Engine): void {
     player.on("hlsFragChanged", function (event_unused: any, data: any) {
@@ -105,7 +107,7 @@ function initHlsJsEvents(player: any, engine: Engine): void {
             : { offset: frag.byteRange[0], length: frag.byteRange[1] - frag.byteRange[0] };
         engine.setPlayingSegment(frag.url, byterange);
     });
-    player.on("hlsDestroying", function () {
-        engine.destroy();
+    player.on("hlsDestroying", async () => {
+        await engine.destroy();
     });
 }

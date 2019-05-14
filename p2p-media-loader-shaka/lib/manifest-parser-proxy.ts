@@ -30,6 +30,12 @@ export class ShakaManifestParserProxy {
     public isDash() { return this.originalManifestParser instanceof shaka.dash.DashParser; }
 
     public start(uri: string, playerInterface: any) {
+        // Tell P2P Media Loader's networking engine code about currently loading manifest
+        if (playerInterface.networkingEngine.p2pml === undefined) {
+            playerInterface.networkingEngine.p2pml = {};
+        }
+        playerInterface.networkingEngine.p2pml.masterManifestUri = uri;
+
         return this.originalManifestParser.start(uri, playerInterface).then((manifest: any) => {
             this.manifest = manifest;
 

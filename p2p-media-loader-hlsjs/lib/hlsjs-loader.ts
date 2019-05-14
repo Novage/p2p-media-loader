@@ -27,19 +27,24 @@ export class HlsJsLoader {
         this.segmentManager = segmentManager;
     }
 
-    public load(context: any, config_unused: any, callbacks: any): void {
+    public async load(context: any, config_unused: any, callbacks: any) {
         if (context.type) {
-            this.segmentManager.loadPlaylist(context.url)
-                .then((xhr: XMLHttpRequest) => this.successPlaylist(xhr, context, callbacks))
-                .catch((error: any) => this.error(error, context, callbacks));
+            try {
+                const result = await this.segmentManager.loadPlaylist(context.url);
+                this.successPlaylist(result, context, callbacks);
+            } catch (e) {
+                this.error(e, context, callbacks);
+            }
         } else if (context.frag) {
-            this.segmentManager.loadSegment(context.url,
-                (context.rangeStart == undefined) || (context.rangeEnd == undefined)
-                    ? undefined
-                    : { offset: context.rangeStart, length: context.rangeEnd - context.rangeStart },
-                (content: ArrayBuffer, downloadBandwidth: number) => setTimeout(() => this.successSegment(content, downloadBandwidth, context, callbacks), 0),
-                (error: any) => setTimeout(() => this.error(error, context, callbacks), 0)
-            );
+            try {
+                const result = await this.segmentManager.loadSegment(context.url,
+                    (context.rangeStart == undefined) || (context.rangeEnd == undefined)
+                        ? undefined
+                        : { offset: context.rangeStart, length: context.rangeEnd - context.rangeStart });
+                setTimeout(() => this.successSegment(result.content, result.downloadBandwidth, context, callbacks), 0);
+            } catch (e) {
+                setTimeout(() => this.error(e, context, callbacks), 0);
+            }
         } else {
             console.warn("Unknown load request", context);
         }
@@ -52,7 +57,7 @@ export class HlsJsLoader {
                 : { offset: context.rangeStart, length: context.rangeEnd - context.rangeStart });
     }
 
-    private successPlaylist(xhr: XMLHttpRequest, context: any, callbacks: any): void {
+    private successPlaylist(xhr: {response: string, responseURL: string}, context: any, callbacks: any): void {
         const now = performance.now();
 
         this.stats.trequest = now - 300;

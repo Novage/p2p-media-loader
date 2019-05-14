@@ -41,8 +41,8 @@ If `settings` is specified, then the default settings (shown below) will be over
 
 | Name | Type | Default Value | Description |
 | --- | ---- | ------ | ------ |
-| `cachedSegmentExpiration` | Integer | 300000 | Segment lifetime in cache. The segment is deleted from the cache if the last access time is greater than this value (in milliseconds). Cached segments are shared over P2P network.
-| `cachedSegmentsCount` | Integer | 30 | Max number of segments that can be stored in the cache. Cached segments are shared over P2P network.
+| `cachedSegmentExpiration` | Integer | 300000 | Segment lifetime in cache. The segment is deleted from the cache if the last access time is greater than this value (in milliseconds). Cached segments are shared over P2P network. Affects only default segments storage.
+| `cachedSegmentsCount` | Integer | 30 | Max number of segments that can be stored in the cache. Cached segments are shared over P2P network. Affects only default segments storage.
 | `requiredSegmentsPriority` | Integer | 1 | The maximum priority of the segments to be downloaded (if not available) as quickly as possible (i.e. via HTTP method). First segment that should be downloaded has priority 0.
 | `useP2P` | Boolean | true | Enable/Disable peers interaction
 | `consumeOnly` | Boolean | false | The peer will not upload segments data to the P2P network but still download from others.
@@ -64,6 +64,18 @@ If `settings` is specified, then the default settings (shown below) will be over
 | `segmentValidator` | Function | undefined | Segment validation callback - validates the data after it has been downloaded.<br><br>Arguments:<br>`segment` (Segment) - The segment object.<br>`method` (String) - Can be "http" or "p2p" only.<br>`peerId` (String) - The ID of the peer that the segment was downloaded from in case it is P2P download; and *undefined* for HTTP donwload.<br><br>Returns:<br>A promise - if resolved the segment considered to be valid, if rejected the error object will be passed to `SegmentError` event.
 | `xhrSetup` | Function | undefined | XMLHttpRequest setup callback. Handle it when you need additional setup for requests made by the library. If handled, expected a function with two arguments: xhr (XMLHttpRequest), url (String).
 | `segmentUrlBuilder` | Function | undefined | Allow to modify the segment URL before HTTP request. If handled, expected a function of one argument of type `Segment` that returns a `string` - generated segment URL.
+| `segmentsStorage` | Object | undefined | A storage for the downloaded segments. By default the segments are stored in JavaScript memory. Can be used to implement offline plabyack. See [SegmentsStorage](#segmentsstorage-interface) interface for details.
+
+### SegmentsStorage interface
+```typescript
+interface SegmentsStorage {
+    storeSegment(segment: Segment): Promise<void>;
+    getSegmentsMap(masterSwarmId: string): Promise<Map<string, {segment: Segment}>>;
+    getSegment(id: string, masterSwarmId: string): Promise<Segment | undefined>;
+    clean(lockedSementsfilter?: (id: string) => boolean): Promise<boolean>;
+    destroy(): Promise<void>;
+}
+```
 
 ### `loader.load(segments, streamSwarmId)`
 

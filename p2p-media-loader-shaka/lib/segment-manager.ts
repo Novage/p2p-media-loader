@@ -17,11 +17,14 @@
 import * as Debug from "debug";
 import {Events, Segment as LoaderSegment, LoaderInterface} from "p2p-media-loader-core";
 import {ParserSegment} from "./parser-segment";
+import {getMasterSwarmId} from "./utils";
+import {AssetsStorage} from "./engine";
 
 const defaultSettings: Settings = {
     forwardSegmentCount: 20,
     maxHistorySegments: 50,
     swarmId: undefined,
+    assetsStorage: undefined,
 };
 
 export class SegmentManager {
@@ -43,7 +46,7 @@ export class SegmentManager {
         this.loader.on(Events.SegmentAbort, this.onSegmentAbort);
     }
 
-    public destroy() {
+    public async destroy() {
         if (this.requests.size !== 0) {
             console.error("Destroying segment manager with active request(s)!");
             this.requests.clear();
@@ -51,7 +54,12 @@ export class SegmentManager {
 
         this.playheadTime = 0;
         this.segmentHistory.splice(0);
-        this.loader.destroy();
+
+        if (this.settings.assetsStorage !== undefined) {
+            await this.settings.assetsStorage.destroy();
+        }
+
+        await this.loader.destroy();
     }
 
     public getSettings() {
@@ -65,7 +73,8 @@ export class SegmentManager {
         this.pushSegmentHistory(parserSegment);
 
         const lastRequestedSegment = this.refreshLoad();
-        const alreadyLoadedSegment = this.loader.getSegment(lastRequestedSegment.id);
+
+        const alreadyLoadedSegment = await this.loader.getSegment(lastRequestedSegment.id);
 
         return new Promise<{ data: ArrayBuffer, timeMs: number | undefined }>((resolve, reject) => {
             const request = new Request(lastRequestedSegment.id, resolve, reject);
@@ -111,8 +120,7 @@ export class SegmentManager {
             }
         } while (sequence.length < this.settings.forwardSegmentCount);
 
-        const masterSwarmId = (this.settings.swarmId && (this.settings.swarmId.length !== 0)) ?
-                this.settings.swarmId : this.manifestUri.split("?")[0];
+        const masterSwarmId = getMasterSwarmId(this.manifestUri, this.settings);
 
         const loaderSegments: LoaderSegment[] = sequence.map((s, i) => {
             return new LoaderSegment(
@@ -212,5 +220,10 @@ interface Settings {
      * Override default swarm ID that is used to identify unique media stream with trackers (manifest URL without
      * query parameters is used as the swarm ID if the parameter is not specified)
      */
-    swarmId: string | undefined;
+    swarmId?: string;
+
+    /**
+     * A storage for the downloaded assets: manifests, subtitles, init segments, DRM assets etc. By default the assets are not stored.
+     */
+    assetsStorage?: AssetsStorage;
 }

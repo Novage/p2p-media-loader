@@ -39,9 +39,8 @@ export class Engine extends EventEmitter {
             .forEach(event => this.loader.on(event, (...args: any[]) => this.emit(event, ...args)));
     }
 
-    public destroy() {
-        this.loader.destroy();
-        this.segmentManager.destroy();
+    public async destroy() {
+        await this.segmentManager.destroy();
     }
 
     public getSettings(): any {
@@ -61,4 +60,19 @@ export class Engine extends EventEmitter {
         integration.initShakaPlayer(player, this.segmentManager);
     }
 
+}
+
+export interface Asset {
+    masterSwarmId: string;
+    masterManifestUri: string;
+    requestUri: string;
+    requestRange?: string;
+    responseUri: string;
+    data: ArrayBuffer;
+}
+
+export interface AssetsStorage {
+    storeAsset(asset: Asset): Promise<void>;
+    getAsset(requestUri: string, requestRange: string | undefined, masterSwarmId: string): Promise<Asset | undefined>;
+    destroy(): Promise<void>;
 }

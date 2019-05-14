@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<!--
+    Copyright 2019 Novage LLC.
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+
+    <script src="../node_modules/p2p-media-loader-core/build/p2p-media-loader-core.js"></script>
+    <script src="../build/p2p-media-loader-shaka.js"></script>
+
+    <script src="https://github.com/videojs/mux.js/releases/download/v4.4.0/mux.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/2.4.4/shaka-player.compiled.js"></script>
+
+</head>
+<body>
+
+    <video id="video" width="640" poster="https://shaka-player-demo.appspot.com/assets/poster.jpg" controls autoplay muted></video>
+
+    <script>
+        function initIndexedDb() {
+            return new Promise((resolve, reject) => {
+                const request = window.indexedDB.open("assets", 1);
+
+                request.onupgradeneeded = (event) => {
+                    console.info("Upgrading from", event.oldVersion, "to", event.newVersion);
+                    const db = event.target.result;
+
+                    switch (event.oldVersion) {
+                        case 0: { // create DB
+                            db.createObjectStore("assets", { keyPath: ["requestUri", "requestRange", "masterSwarmId"] });
+                            db.createObjectStore("segmentsData", { keyPath: ["id", "masterSwarmId"] });
+                            const segments = db.createObjectStore("segments", { keyPath: ["id", "masterSwarmId"] });
+                            segments.createIndex("masterSwarmId", "masterSwarmId", { multiEntry: true });
+                        } break;
+
+                        default:
+                            throw new Error("unknown database version:", event.oldVersion);
+                    }
+                };
+
+                request.onerror = (event) => reject(event);
+                request.onsuccess = (event) => resolve(event.target.result);
+            });
+        }
+
+        class IdbAssetsStorage {
+            constructor(db) {
+                this.db = db;
+            }
+
+            storeAsset(asset) {
+                return new Promise((resolve, reject) => {
+                    const request = this.db.transaction(["assets"], "readwrite").objectStore("assets")
+                            .put(asset.requestRange === undefined ? {...asset, requestRange: ""} : asset);
+                    request.onerror = (event) => reject(event);
+                    request.onsuccess = (event) => resolve();
+                });
+            }
+
+            getAsset(requestUri, requestRange, masterSwarmId) {
+                return new Promise((resolve, reject) => {
+                    const request = this.db.transaction(["assets"]).objectStore("assets")
+                            .get([requestUri, requestRange === undefined ? "" : requestRange, masterSwarmId]);
+                    request.onerror = (event) => reject(event);
+                    request.onsuccess = (event) => resolve(event.target.result);
+                });
+            }
+
+            destroy() {
+            }
+        }
+
+        class IdbSegmentsStorage {
+            constructor(db) {
+                this.db = db;
+            }
+
+            storeSegment(segment) {
+                return new Promise((resolve, reject) => {
+                    const segmentWithoutData = {...segment};
+                    delete segmentWithoutData.data;
+
+                    const transaction = this.db.transaction(["segments", "segmentsData"], "readwrite")
+                    transaction.objectStore("segments").put(segmentWithoutData).onsuccess = () => {
+                        transaction.objectStore("segmentsData").put({
+                            id: segment.id,
+                            masterSwarmId: segment.masterSwarmId,
+                            data: segment.data
+                        });
+                    }
+
+                    transaction.onerror = (event) => reject(event);
+                    transaction.oncomplete = () => resolve();
+                });
+            }
+
+            getSegmentsMap(masterSwarmId) {
+                return new Promise((resolve, reject) => {
+                    const cursor = this.db.transaction(["segments"]).objectStore("segments").index("masterSwarmId").openCursor(IDBKeyRange.only(masterSwarmId));
+                    const result = new Map();
+
+                    cursor.onerror = (event) => reject(event);
+                    cursor.onsuccess = (event) => {
+                        const cursor = event.target.result;
+                        if (cursor) {
+                            result.set(cursor.value.id, {segment: cursor.value});
+                            cursor.continue();
+                        } else {
+                            resolve(result);
+                        }
+                    };
+                });
+            }
+
+            getSegment(id, masterSwarmId) {
+                return new Promise((resolve, reject) => {
+                    const transaction = this.db.transaction(["segments", "segmentsData"]);
+
+                    let segment;
+                    transaction.objectStore("segments").get([id, masterSwarmId]).onsuccess = (event) => {
+                        segment = event.target.result;
+                        if (segment === undefined) {
+                            return;
+                        }
+
+                        transaction.objectStore("segmentsData").get([id, masterSwarmId]).onsuccess = (event) => {
+                            segment.data = event.target.result.data;
+                        };
+                    };
+
+                    transaction.onerror = (event) => reject(event);
+                    transaction.oncomplete = () => resolve(segment);
+                });
+            }
+
+            clean() {}
+            destroy() {}
+        }
+
+        (async () => {
+            const db = await initIndexedDb();
+            const assetsStorage = new IdbAssetsStorage(db);
+            const segmentsStorage = new IdbSegmentsStorage(db);
+
+            shaka.polyfill.installAll();
+
+            if (shaka.Player.isBrowserSupported() && p2pml.shaka.Engine.isSupported()) {
+                var settings = {
+                    segments: {
+                        assetsStorage: assetsStorage
+                    },
+                    loader: {
+                        segmentsStorage: segmentsStorage
+                    }
+                };
+                var engine = new p2pml.shaka.Engine(settings);
+
+                var video = document.getElementById("video");
+                var player = new shaka.Player(video);
+                var onError = function(error) { console.error("Error code", error.code, "object", error); }
+                player.addEventListener("error", function(event) { onError(event.detail); });
+
+                engine.initShakaPlayer(player);
+
+                player.configure({ abr: { enabled: false }}); // disable ABR
+                player.load("https://storage.googleapis.com/shaka-demo-assets/angel-one/dash.mpd").catch(onError);
+            } else {
+                document.write("Not supported :(");
+            }
+        })();
+    </script>
+
+</body>
+</html>

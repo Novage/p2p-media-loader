@@ -16,12 +16,13 @@
 
 import * as Debug from "debug";
 
-import {LoaderInterface, Events, Segment, SegmentValidatorCallback, XhrSetupCallback, SegmentUrlBuilder} from "./loader-interface";
+import {LoaderInterface, Events, Segment, SegmentValidatorCallback, XhrSetupCallback, SegmentUrlBuilder, SegmentsStorage} from "./loader-interface";
 import {EventEmitter} from "events";
 import {HttpMediaManager} from "./http-media-manager";
 import {P2PMediaManager} from "./p2p-media-manager";
 import {MediaPeerSegmentStatus} from "./media-peer";
 import {BandwidthApproximator} from "./bandwidth-approximator";
+import {SegmentsMemoryStorage} from "./segments-memory-storage";
 
 import * as getBrowserRTC from "get-browser-rtc";
 import * as Peer from "simple-peer";
@@ -60,13 +61,14 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private readonly debugSegments = Debug("p2pml:hybrid-loader-segments");
     private readonly httpManager: HttpMediaManager;
     private readonly p2pManager: P2PMediaManager;
-    private readonly cachedSegments: Map<string, {segment: Segment, lastAccessed: number}> = new Map();
+    private segmentsStorage: SegmentsStorage;
     private segmentsQueue: Segment[] = [];
     private readonly bandwidthApproximator = new BandwidthApproximator();
     private readonly settings: Settings;
     private httpRandomDownloadInterval: ReturnType<typeof setInterval> | undefined;
     private httpDownloadInitialTimeoutTimestamp = -Infinity;
     private initialDownloadedViaP2PSegmentsCount = 0;
+    private masterSwarmId?: string;
 
     public static isSupported(): boolean {
         const browserRtc = (getBrowserRTC as Function)();
@@ -90,6 +92,10 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             delete (this.settings as any).bufferedSegmentsCount;
         }
 
+        this.segmentsStorage = (this.settings.segmentsStorage === undefined
+            ? new SegmentsMemoryStorage(settings)
+            : this.settings.segmentsStorage);
+
         this.debug("loader settings", this.settings);
 
         this.httpManager = this.createHttpManager();
@@ -100,9 +106,9 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.p2pManager = this.createP2PManager();
         this.p2pManager.on("segment-loaded", this.onSegmentLoaded);
         this.p2pManager.on("segment-error", this.onSegmentError);
-        this.p2pManager.on("peer-data-updated", () => {
-            if (this.processSegmentsQueue() && !this.settings.consumeOnly) {
-                this.p2pManager.sendSegmentsMapToAll(this.createSegmentsMap());
+        this.p2pManager.on("peer-data-updated", async () => {
+            if (await this.processSegmentsQueue() && !this.settings.consumeOnly) {
+                this.p2pManager.sendSegmentsMapToAll(await this.createSegmentsMap());
             }
         });
         this.p2pManager.on("bytes-downloaded", (bytes: number, peerId: string) => this.onPieceBytesDownloaded("p2p", bytes, peerId));
@@ -117,10 +123,10 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private createP2PManager() {
-        return new P2PMediaManager(this.cachedSegments, this.settings);
+        return new P2PMediaManager(this.segmentsStorage, this.settings);
     }
 
-    public load(segments: Segment[], streamSwarmId: string): void {
+    public async load(segments: Segment[], streamSwarmId: string) {
         if (this.httpRandomDownloadInterval === undefined) { // Do once on first call
             this.httpRandomDownloadInterval = setInterval(this.downloadRandomSegmentOverHttp, this.settings.httpDownloadProbabilityInterval);
 
@@ -132,7 +138,14 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             }
         }
 
-        this.p2pManager.setStreamSwarmId(streamSwarmId);
+        if (segments.length > 0) {
+            this.masterSwarmId = segments[0].masterSwarmId;
+        }
+
+        if (this.masterSwarmId !== undefined) {
+            this.p2pManager.setStreamSwarmId(streamSwarmId, this.masterSwarmId);
+        }
+
         this.debug("load segments");
 
         let updateSegmentsMap = false;
@@ -159,22 +172,18 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
 
         this.segmentsQueue = segments;
 
-        updateSegmentsMap = this.processSegmentsQueue() || updateSegmentsMap;
-        updateSegmentsMap = this.collectGarbage() || updateSegmentsMap;
+        updateSegmentsMap = (await this.processSegmentsQueue()) || updateSegmentsMap;
+        updateSegmentsMap = (await this.cleanSegmentsStorage()) || updateSegmentsMap;
 
         if (updateSegmentsMap && !this.settings.consumeOnly) {
-            this.p2pManager.sendSegmentsMapToAll(this.createSegmentsMap());
+            this.p2pManager.sendSegmentsMapToAll(await this.createSegmentsMap());
         }
     }
 
-    public getSegment(id: string): Segment | undefined {
-        const cachedSegment = this.cachedSegments.get(id);
-        if (cachedSegment !== undefined) {
-            cachedSegment.lastAccessed = this.now();
-            return cachedSegment.segment;
-        } else {
-            return undefined;
-        }
+    public async getSegment(id: string) {
+        return this.masterSwarmId === undefined
+            ? undefined
+            : await this.segmentsStorage.getSegment(id, this.masterSwarmId);
     }
 
     public getSettings() {
@@ -187,7 +196,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         };
     }
 
-    public destroy(): void {
+    public async destroy() {
         if (this.httpRandomDownloadInterval !== undefined) {
             clearInterval(this.httpRandomDownloadInterval);
             this.httpRandomDownloadInterval = undefined;
@@ -199,16 +208,17 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.segmentsQueue = [];
         this.httpManager.destroy();
         this.p2pManager.destroy();
-        this.cachedSegments.clear();
+        this.masterSwarmId = undefined;
+        await this.segmentsStorage.destroy();
     }
 
-    private processInitialSegmentTimeout = () => {
+    private processInitialSegmentTimeout = async () => {
         if (this.httpRandomDownloadInterval === undefined) {
             return; // Instance destroyed
         }
 
-        if (this.processSegmentsQueue() && !this.settings.consumeOnly) {
-            this.p2pManager.sendSegmentsMapToAll(this.createSegmentsMap());
+        if (await this.processSegmentsQueue() && !this.settings.consumeOnly) {
+            this.p2pManager.sendSegmentsMapToAll(await this.createSegmentsMap());
         }
 
         if (this.httpDownloadInitialTimeoutTimestamp !== -Infinity) {
@@ -217,7 +227,13 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         }
     }
 
-    private processSegmentsQueue(): boolean {
+    private async processSegmentsQueue() {
+        if (this.masterSwarmId === undefined) {
+            return false;
+        }
+
+        const storageSegments = await this.segmentsStorage.getSegmentsMap(this.masterSwarmId);
+
         this.debugSegments("process segments queue. priority",
                 this.segmentsQueue.length > 0 ? this.segmentsQueue[0].priority : 0);
 
@@ -241,7 +257,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         for (let index = 0; index < this.segmentsQueue.length; index++) {
             const segment = this.segmentsQueue[index];
 
-            if (this.cachedSegments.has(segment.id) || this.httpManager.isDownloading(segment)) {
+            if (storageSegments.has(segment.id) || this.httpManager.isDownloading(segment)) {
                 continue;
             }
 
@@ -313,12 +329,15 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         return updateSegmentsMap;
     }
 
-    private downloadRandomSegmentOverHttp = () => {
-        if (this.httpRandomDownloadInterval === undefined) {
-            return; // Instance destroyed
+    private downloadRandomSegmentOverHttp = async () => {
+        if (this.masterSwarmId === undefined) {
+            return;
         }
 
-        if (this.httpDownloadInitialTimeoutTimestamp !== -Infinity ||
+        const storageSegments = await this.segmentsStorage.getSegmentsMap(this.masterSwarmId);
+
+        if (this.httpRandomDownloadInterval === undefined ||
+                this.httpDownloadInitialTimeoutTimestamp !== -Infinity ||
                 this.httpManager.getActiveDownloadsCount() >= this.settings.simultaneousHttpDownloads ||
                 (this.settings.httpDownloadProbabilitySkipIfNoPeers && this.p2pManager.getPeers().size === 0) ||
                 this.settings.consumeOnly) {
@@ -328,12 +347,12 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         const segmentsMap = this.p2pManager.getOvrallSegmentsMap();
 
         const pendingQueue = this.segmentsQueue.filter(segment =>
-            !this.cachedSegments.has(segment.id) &&
             !this.p2pManager.isDownloading(segment) &&
             !this.httpManager.isDownloading(segment) &&
             !segmentsMap.has(segment.id) &&
             !this.httpManager.isFailed(segment) &&
-            (segment.priority <= this.settings.httpDownloadMaxPriority));
+            (segment.priority <= this.settings.httpDownloadMaxPriority) &&
+            !storageSegments.has(segment.id));
 
         if (pendingQueue.length == 0) {
             return;
@@ -346,7 +365,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         const segment = pendingQueue[Math.floor(Math.random() * pendingQueue.length)];
         this.debugSegments("HTTP download (random)", segment.priority, segment.url);
         this.httpManager.download(segment);
-        this.p2pManager.sendSegmentsMapToAll(this.createSegmentsMap());
+        this.p2pManager.sendSegmentsMapToAll(await this.createSegmentsMap());
     }
 
     private onPieceBytesDownloaded = (method: "http" | "p2p", bytes: number, peerId?: string) => {
@@ -358,13 +377,19 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.emit(Events.PieceBytesUploaded, method, bytes, peerId);
     }
 
-    private onSegmentLoaded = (segment: Segment, data: ArrayBuffer, peerId?: string) => {
+    private onSegmentLoaded = async (segment: Segment, data: ArrayBuffer, peerId?: string) => {
         this.debugSegments("segment loaded", segment.id, segment.url);
+
+        if (this.masterSwarmId === undefined) {
+            return;
+        }
+
+        const storageSegments = await this.segmentsStorage.getSegmentsMap(this.masterSwarmId);
 
         segment.data = data;
         segment.downloadBandwidth = this.bandwidthApproximator.getBandwidth(this.now());
 
-        this.cachedSegments.set(segment.id, {segment, lastAccessed: this.now()});
+        await this.segmentsStorage.storeSegment(segment);
         this.emit(Events.SegmentLoaded, segment, peerId);
 
         if (this.httpDownloadInitialTimeoutTimestamp !== -Infinity) {
@@ -374,7 +399,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             for (const queueSegment of this.segmentsQueue) {
                 if (queueSegment.id === segment.id) {
                     loadedSegmentFound = true;
-                } else if (!this.cachedSegments.has(queueSegment.id)) {
+                } else if (!storageSegments.has(queueSegment.id)) {
                     break;
                 }
 
@@ -384,9 +409,9 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             }
         }
 
-        this.processSegmentsQueue();
+        await this.processSegmentsQueue();
         if (!this.settings.consumeOnly) {
-            this.p2pManager.sendSegmentsMapToAll(this.createSegmentsMap());
+            this.p2pManager.sendSegmentsMapToAll(await this.createSegmentsMap());
         }
     }
 
@@ -400,7 +425,13 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         return segment.streamId === undefined ? segment.masterSwarmId : `${segment.masterSwarmId}+${segment.streamId}`
     }
 
-    private createSegmentsMap() {
+    private async createSegmentsMap() {
+        if (this.masterSwarmId === undefined) {
+            return {};
+        }
+
+        const storageSegments = await this.segmentsStorage.getSegmentsMap(this.masterSwarmId);
+
         const segmentsMap: {[key: string]: [string, number[]]} = {};
 
         const addSegmentToMap = (segment: Segment, status: MediaPeerSegmentStatus) => {
@@ -417,8 +448,8 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             segmentsStatuses.push(status);
         }
 
-        for (const cachedSegment of this.cachedSegments.values()) {
-            addSegmentToMap(cachedSegment.segment, MediaPeerSegmentStatus.Loaded);
+        for (const storageSegment of storageSegments.values()) {
+            addSegmentToMap(storageSegment.segment, MediaPeerSegmentStatus.Loaded);
         }
 
         for (const download of this.httpManager.getActiveDownloads().values()) {
@@ -428,63 +459,33 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         return segmentsMap;
     }
 
-    private onPeerConnect = (peer: {id: string}) => {
-        if (!this.settings.consumeOnly) {
-            this.p2pManager.sendSegmentsMap(peer.id, this.createSegmentsMap());
-        }
+    private onPeerConnect = async (peer: {id: string}) => {
         this.emit(Events.PeerConnect, peer);
+        if (!this.settings.consumeOnly) {
+            this.p2pManager.sendSegmentsMap(peer.id, await this.createSegmentsMap());
+        }
     }
 
     private onPeerClose = (peerId: string) => {
         this.emit(Events.PeerClose, peerId);
     }
 
-    private onTrackerUpdate = (data: { incomplete?: number }) => {
+    private onTrackerUpdate = async (data: { incomplete?: number }) => {
         if (this.httpDownloadInitialTimeoutTimestamp !== -Infinity &&
                 data.incomplete !== undefined && data.incomplete <= 1) {
 
             this.debugSegments("cancel initial HTTP download timeout - no peers");
 
             this.httpDownloadInitialTimeoutTimestamp = -Infinity;
-            if (this.processSegmentsQueue() && !this.settings.consumeOnly) {
-                this.p2pManager.sendSegmentsMapToAll(this.createSegmentsMap());
+            if (await this.processSegmentsQueue() && !this.settings.consumeOnly) {
+                this.p2pManager.sendSegmentsMapToAll(await this.createSegmentsMap());
             }
         }
     }
 
-    private collectGarbage(): boolean {
-        const segmentsToDelete: string[] = [];
-        const remainingSegments: {segment: Segment, lastAccessed: number}[] = [];
-
-        // Delete old segments
-        const now = this.now();
-
-        for (const cachedSegment of this.cachedSegments.values()) {
-            if (now - cachedSegment.lastAccessed > this.settings.cachedSegmentExpiration) {
-                segmentsToDelete.push(cachedSegment.segment.id);
-            } else {
-                remainingSegments.push(cachedSegment);
-            }
-        }
-
-        // Delete segments over cached count
-        let countOverhead = remainingSegments.length - this.settings.cachedSegmentsCount;
-        if (countOverhead > 0) {
-            remainingSegments.sort((a, b) => a.lastAccessed - b.lastAccessed);
-
-            for (const cachedSegment of remainingSegments) {
-                if (!this.segmentsQueue.find(queueSegment => queueSegment.id === cachedSegment.segment.id)) {
-                    segmentsToDelete.push(cachedSegment.segment.id);
-                    countOverhead--;
-                    if (countOverhead == 0) {
-                        break;
-                    }
-                }
-            }
-        }
-
-        segmentsToDelete.forEach(id => this.cachedSegments.delete(id));
-        return segmentsToDelete.length > 0;
+    private async cleanSegmentsStorage() {
+        return await this.segmentsStorage.clean(
+            (id: string) => this.segmentsQueue.find(queueSegment => queueSegment.id === id) !== undefined);
     }
 
     private now() {
@@ -614,4 +615,10 @@ interface Settings {
      * Allow to modify the segment URL before HTTP request.
      */
     segmentUrlBuilder?: SegmentUrlBuilder;
+
+    /**
+     * A storage for the downloaded segments.
+     * By default the segments are stored in JavaScript memory.
+     */
+    segmentsStorage?: SegmentsStorage;
 }

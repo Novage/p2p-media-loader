@@ -93,10 +93,29 @@ Creates a new `Engine` instance.
 
 `settings` object with the following fields:
 - `segments`
-    + `forwardSegmentCount` - Number of segments for building up predicted forward segments sequence; used to predownload and share via P2P. Default is 20;
-    + `swarmId` - Override default swarm ID that is used to identify unique media stream with trackers (manifest URL without query parameters is used as the swarm ID if the parameter is not specified);
+    + `forwardSegmentCount` - Number of segments for building up predicted forward segments sequence; used to predownload and share via P2P. Default is 20.
+    + `swarmId` - Override default swarm ID that is used to identify unique media stream with trackers (manifest URL without query parameters is used as the swarm ID if the parameter is not specified).
+    + `assetsStorage` - A storage for the downloaded assets: manifests, subtitles, init segments, DRM assets etc. By default the assets are not stored. Can be used to implement offline plabyack. See [AssetsStorage](#assetsstorage-interface) interface for details.
 - `loader`
-    + settings for `HybridLoader` (see [P2P Media Loader Core API](../p2p-media-loader-core/README.md#loader--new-hybridloadersettings) for details);
+    + settings for `HybridLoader` (see [P2P Media Loader Core API](../p2p-media-loader-core/README.md#loader--new-hybridloadersettings) for details).
+
+### AssetsStorage interface
+```typescript
+interface Asset {
+    masterSwarmId: string;
+    masterManifestUri: string;
+    requestUri: string;
+    requestRange?: string;
+    responseUri: string;
+    data: ArrayBuffer | string;
+}
+
+interface AssetsStorage {
+    storeAsset(asset: Asset): Promise<void>;
+    getAsset(requestUri: string, requestRange: string | undefined, masterSwarmId: string): Promise<Asset | undefined>;
+    destroy(): Promise<void>;
+}
+```
 
 ### `engine.on(event, handler)`
 
