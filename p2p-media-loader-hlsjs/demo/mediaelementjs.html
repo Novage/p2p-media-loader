@@ -19,16 +19,29 @@
 
     <meta charset="UTF-8">
 
+    <title>MediaElement player with hls.js engine and P2P demo</title>
+
     <script src="../node_modules/p2p-media-loader-core/build/p2p-media-loader-core.js"></script>
     <script src="../build/p2p-media-loader-hlsjs.js"></script>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mediaelement/4.2.9/mediaelementplayer.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mediaelement/4.2.9/mediaelement-and-player.min.js"></script>
 
+    <style>
+        #wrapper {
+            width: 720px;
+            margin-left: auto;
+            margin-right: auto;
+            display: block;
+        }
+    </style>
+
 </head>
 <body>
 
-    <video id="video"></video>
+    <div id="wrapper">
+        <video id="video"></video>
+    </div>
 
     <script>
 
