@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<!--
+    Copyright 2019 Novage LLC.
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>DPlayer with Shaka Player engine and P2P demo (HLS or MPEG-DASH)</title>
+
+    <script src="../node_modules/p2p-media-loader-core/build/p2p-media-loader-core.js"></script>
+    <script src="../build/p2p-media-loader-shaka.js"></script>
+
+    <script src="https://github.com/videojs/mux.js/releases/download/v4.4.0/mux.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/2.4.4/shaka-player.compiled.js"></script>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/p2p-dplayer@latest/dist/DPlayer.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/dplayer@latest"></script>
+
+</head>
+<body>
+
+    <div id="dplayer"></div>
+
+    <script>
+        shaka.polyfill.installAll();
+
+        if (shaka.Player.isBrowserSupported() && p2pml.shaka.Engine.isSupported()) {
+            window.dp = new DPlayer({
+                container: document.getElementById("dplayer"),
+                video: {
+                    url: "https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.mpd",
+                    //url: "https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.m3u8",
+                    type: "customHlsOrDash",
+                    customType: {
+                        "customHlsOrDash": function (video, player) {
+                            const engine = new p2pml.shaka.Engine();
+
+                            const src = video.src; // Shaka Player changes video.src to blob URL
+                            const shakaPlayer = new shaka.Player(video);
+
+                            const onError = function(error) { console.error("Error code", error.code, "object", error); }
+                            shakaPlayer.addEventListener("error", function(event) { onError(event.detail); });
+
+                            engine.initShakaPlayer(shakaPlayer);
+
+                            shakaPlayer.load(src).catch(onError);
+                        }
+                    }
+                }
+            });
+        } else {
+            document.write("Not supported :(");
+        }
+    </script>
+
+</body>
+</html>
