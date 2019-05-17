@@ -282,10 +282,12 @@
                             <option value="videojs-contrib-hlsjs">VideoJs-Contrib-HlsJs</option>
                             <option value="videojs-hlsjs-plugin">VideoJs-HlsJs-Plugin</option>
                             <option value="jwplayer">JWPlayer</option>
+                            <option value="dplayer">DPlayer</option>
                         </optgroup>
                         <optgroup label="Shaka P2P Engine (HLS and DASH)">
                             <option value="shakaplayer">ShakaPlayer</option>
                             <option value="clappr-shaka">Clappr (DASH only)</option>
+                            <option value="dplayer-shaka">DPlayer</option>
                         </optgroup>
                     </select>
                 </div>
@@ -451,6 +453,7 @@
                 case "mediaelement":
                 case "videojs-contrib-hlsjs":
                 case "videojs-hlsjs-plugin":
+                case "dplayer":
                 case "jwplayer":
                     await loadScript("https://cdn.jsdelivr.net/npm/hls.js@latest");
 
@@ -463,6 +466,7 @@
                     break;
 
                 case "shakaplayer":
+                case "dplayer-shaka":
                 case "clappr-shaka":
                     await loadScript("https://github.com/videojs/mux.js/releases/download/v5.0.1/mux.js");
                     await loadScript("https://cdnjs.cloudflare.com/ajax/libs/shaka-player/2.4.6/shaka-player.compiled.js");
@@ -510,12 +514,20 @@
                     this.initJwPlayer();
                     break;
 
+                case "dplayer":
+                    this.initDPlayerHlsJs();
+                    break;
+
                 case "shakaplayer":
                     this.initShakaPlayer();
                     break;
 
                 case "clappr-shaka":
                     this.initClapprPlayer(true);
+                    break;
+
+                case "dplayer-shaka":
+                    this.initDPlayerShaka();
                     break;
             }
 
@@ -794,6 +806,72 @@
                     loader: this.engine.createLoaderClass()
                 });
             }
+        }
+
+        async initDPlayerHlsJs() {
+            if (!Hls.isSupported()) {
+                return;
+            }
+            await loadStyle("https://cdn.jsdelivr.net/npm/p2p-dplayer@latest/dist/DPlayer.min.css");
+            await loadScript("https://cdn.jsdelivr.net/npm/dplayer@latest");
+
+            var outer = document.createElement("div");
+            outer.id = "dplayer";
+            this.videoContainer.appendChild(outer);
+
+            window.dp = new DPlayer({
+                container: document.getElementById("dplayer"),
+                video: {
+                    url: this.videoUrl,
+                    type: "customHls",
+                    customType: {
+                        "customHls": (video, player) => {
+                            const hls = new Hls({
+                                liveSyncDurationCount: 7, // To have at least 7 segments in queue
+                                loader: this.engine.createLoaderClass()
+                            });
+
+                            p2pml.hlsjs.initHlsJsPlayer(hls);
+
+                            hls.loadSource(video.src);
+                            hls.attachMedia(video);
+                        }
+                    }
+                }
+            });
+        }
+
+        async initDPlayerShaka() {
+            if (!shaka.Player.isBrowserSupported()) {
+                return;
+            }
+            await loadStyle("https://cdn.jsdelivr.net/npm/p2p-dplayer@latest/dist/DPlayer.min.css");
+            await loadScript("https://cdn.jsdelivr.net/npm/dplayer@latest");
+
+            var outer = document.createElement("div");
+            outer.id = "dplayer";
+            this.videoContainer.appendChild(outer);
+
+            window.dp = new DPlayer({
+                container: document.getElementById("dplayer"),
+                video: {
+                    url: this.videoUrl,
+                    type: "customHlsOrDash",
+                    customType: {
+                        "customHlsOrDash": (video, player) => {
+                            const src = video.src; // Shaka Player changes video.src to blob URL
+                            const shakaPlayer = new shaka.Player(video);
+
+                            const onError = function(error) { console.error("Error code", error.code, "object", error); }
+                            shakaPlayer.addEventListener("error", function(event) { onError(event.detail); });
+
+                            this.engine.initShakaPlayer(shakaPlayer);
+
+                            shakaPlayer.load(src).catch(onError);
+                        }
+                    }
+                }
+            });
         }
 
         initShakaPlayer() {
