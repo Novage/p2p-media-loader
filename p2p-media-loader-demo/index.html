@@ -784,7 +784,7 @@
 
         async initJwPlayer() {
             await loadScript("https://content.jwplatform.com/libraries/aG3IMhIy.js");
-            await loadScript("hola-jwplayer-hlsjs.min.js");
+            await loadScript("https://cdn.jsdelivr.net/npm/@hola.org/jwplayer-hlsjs@latest/dist/jwplayer.hlsjs.min.js");
 
             var video = document.createElement("div");
             video.id = "video";
@@ -797,8 +797,7 @@
             var player = jwplayer("video");
             player.setup({ file: this.videoUrl, mute: true });
 
-            var provider = require("@hola.org/jwplayer-hlsjs");
-            provider.attach();
+            jwplayer_hls_provider.attach();
 
             if (this.isP2PSupported) {
                 p2pml.hlsjs.initJwPlayer(player, {

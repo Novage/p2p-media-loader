@@ -23,8 +23,7 @@
   ],
   "scripts": {
     "build-p2p-graph": "browserify -r p2p-graph | terser -m -c > p2p-graph.js",
-    "build-hola-jwplayer-hlsjs": "browserify -r @hola.org/jwplayer-hlsjs | terser -m -c > hola-jwplayer-hlsjs.min.js",
-    "build": "npm run build-p2p-graph && npm run build-hola-jwplayer-hlsjs"
+    "build": "npm run build-p2p-graph"
   },
   "repository": {
     "type": "git",
@@ -37,7 +36,6 @@
     "p2p-graph": "^1.2.2"
   },
   "devDependencies": {
-    "@hola.org/jwplayer-hlsjs": "^0.0.79",
     "browserify": "^16.2.3",
     "browserify-versionify": "^1.0.6",
     "copyfiles": "^2.1.0",
