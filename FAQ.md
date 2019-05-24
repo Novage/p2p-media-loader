@@ -84,7 +84,7 @@ The requirements to share a stream over P2P are:
 
 ## Is it possible to have 100% P2P ratio?
 
-It is possible of a single peer but not possible for a swarm of peers in total.
+It is possible for a single peer but not possible for a swarm of peers in total.
 
 P2P Media Loader implements approach of P2P assisted video delivery. It means that the stream should be downloaded via HTTP(S) at least once to be shared between peers in a swarm.
 
