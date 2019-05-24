@@ -74,7 +74,7 @@ export enum Events {
 }
 
 export interface LoaderInterface {
-    on(eventName: string, listener: Function): this;
+    on(eventName: string, listener: (...params: any[]) => void): this;
     load(segments: Segment[], streamSwarmId: string): void;
     getSegment(id: string): Promise<Segment | undefined>;
     getSettings(): any;
@@ -82,17 +82,9 @@ export interface LoaderInterface {
     destroy(): Promise<void>;
 }
 
-export interface SegmentValidatorCallback {
-    (segment: Segment, method: "http" | "p2p", peerId?: string): Promise<void>;
-}
-
-export interface XhrSetupCallback {
-    (xhr: XMLHttpRequest, url: string): void;
-}
-
-export interface SegmentUrlBuilder {
-    (segment: Segment): string;
-}
+export type SegmentValidatorCallback = (segment: Segment, method: "http" | "p2p", peerId?: string) => Promise<void>;
+export type XhrSetupCallback = (xhr: XMLHttpRequest, url: string) => void;
+export type SegmentUrlBuilder = (segment: Segment) => string;
 
 export interface SegmentsStorage {
     storeSegment(segment: Segment): Promise<void>;
