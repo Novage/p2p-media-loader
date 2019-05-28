@@ -51,7 +51,7 @@ export class SegmentsMemoryStorage implements SegmentsStorage {
         return this.cache.has(id);
     }
 
-    public async clean(lockedSementsfilter?: (id: string) => boolean) {
+    public async clean(masterSwarmId: string, lockedSementsfilter?: (id: string) => boolean) {
         const segmentsToDelete: string[] = [];
         const remainingSegments: {segment: Segment, lastAccessed: number}[] = [];
 
