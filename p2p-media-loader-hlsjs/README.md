@@ -257,8 +257,7 @@ player.setup({
     file: "https://example.com/path/to/your/playlist.m3u8"
 });
 
-var provider = require("@hola.org/jwplayer-hlsjs");
-provider.attach();
+jwplayer_hls_provider.attach();
 
 p2pml.hlsjs.initJwPlayer(player, {
     liveSyncDurationCount: 7,
@@ -313,6 +312,31 @@ var player = videojs("video", {
 });
 
 p2pml.hlsjs.initVideoJsContribHlsJsPlayer(player);
+
+player.src({
+    src: "https://example.com/path/to/your/playlist.m3u8",
+    type: "application/x-mpegURL"
+});
+```
+
+### `initVideoJsHlsJsPlugin()`
+
+Another [Video.js](https://videojs.com) player integration.
+
+Example
+```javascript
+var engine = new p2pml.hlsjs.Engine();
+
+p2pml.hlsjs.initVideoJsHlsJsPlugin();
+
+var player = videojs("video", {
+    html5: {
+        hlsjsConfig: {
+            liveSyncDurationCount: 7,
+            loader: engine.createLoaderClass()
+        }
+    }
+});
 
 player.src({
     src: "https://example.com/path/to/your/playlist.m3u8",

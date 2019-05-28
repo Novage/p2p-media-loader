@@ -24,10 +24,9 @@
     "compile": "tsc && copyfiles -f ./lib/*.js ./dist",
     "browserify": "mkdirp ./build && browserify -r ./dist/index.js:p2p-media-loader-hlsjs ./dist/browser-init.js -x p2p-media-loader-core -x debug -x events > ./build/p2p-media-loader-hlsjs.js",
     "minify": "terser ./build/p2p-media-loader-hlsjs.js -m -c > ./build/p2p-media-loader-hlsjs.min.js",
-    "build-hola-jwplayer-hlsjs": "browserify -r @hola.org/jwplayer-hlsjs | terser -m -c > ./demo/hola-jwplayer-hlsjs.min.js",
     "webpack:build": "webpack --progress",
     "webpack:watch": "webpack --watch --progress",
-    "build": "npm run compile && npm run browserify && npm run minify && npm run build-hola-jwplayer-hlsjs",
+    "build": "npm run compile && npm run browserify && npm run minify",
     "lint": "tslint -c ./tslint.json -p ./tsconfig.tslint.json",
     "test": "TS_NODE_PROJECT=tsconfig.test.json TS_NODE_CACHE=false mocha -r ts-node/register test/*.test.ts"
   },
@@ -41,7 +40,6 @@
     "p2p-media-loader-core": "^0.5.0"
   },
   "devDependencies": {
-    "@hola.org/jwplayer-hlsjs": "^0.0.79",
     "@types/events": "^3.0.0",
     "@types/mocha": "^5.2.6",
     "@types/node": "^11.11.4",
