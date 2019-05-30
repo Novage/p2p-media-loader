@@ -484,7 +484,11 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private async cleanSegmentsStorage() {
-        return await this.segmentsStorage.clean(
+        if (this.masterSwarmId === undefined) {
+            return;
+        }
+
+        return await this.segmentsStorage.clean(this.masterSwarmId,
             (id: string) => this.segmentsQueue.find(queueSegment => queueSegment.id === id) !== undefined);
     }
 

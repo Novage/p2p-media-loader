@@ -90,6 +90,6 @@ export interface SegmentsStorage {
     storeSegment(segment: Segment): Promise<void>;
     getSegmentsMap(masterSwarmId: string): Promise<Map<string, {segment: Segment}>>;
     getSegment(id: string, masterSwarmId: string): Promise<Segment | undefined>;
-    clean(lockedSementsfilter?: (id: string) => boolean): Promise<boolean>;
+    clean(masterSwarmId: string, lockedSementsfilter?: (id: string) => boolean): Promise<boolean>;
     destroy(): Promise<void>;
 }
