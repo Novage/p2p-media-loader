@@ -74,9 +74,9 @@ function initializeNetworkingEngine() {
     shaka.net.NetworkingEngine.registerScheme("https", processNetworkRequest);
 }
 
-function processNetworkRequest(uri: string, request: any, requestType: number) {
+function processNetworkRequest(uri: string, request: any, requestType: number, progressUpdated?: Function) {
     if (!request.p2pml) {
-        return shaka.net.HttpXHRPlugin(uri, request, requestType);
+        return shaka.net.HttpXHRPlugin(uri, request, requestType, progressUpdated);
     }
 
     const { player, segmentManager }: { player: any, segmentManager: SegmentManager } = request.p2pml;
@@ -106,7 +106,7 @@ function processNetworkRequest(uri: string, request: any, requestType: number) {
     if (segment !== undefined && segment.streamType === "video") { // load segment using P2P loader
         debug("request", "load", segment.identity);
 
-        const promise = segmentManager.load(segment, getSchemedUri(player.getManifestUri()), getPlayheadTime(player));
+        const promise = segmentManager.load(segment, getSchemedUri(player.getAssetUri ? player.getAssetUri() : player.getManifestUri()), getPlayheadTime(player));
 
         const abort = async () => {
             debug("request", "abort", segment!.identity);
@@ -124,7 +124,7 @@ function processNetworkRequest(uri: string, request: any, requestType: number) {
                     fromCache: true
                 };
             } else {
-                const response = await shaka.net.HttpXHRPlugin(uri, request, requestType).promise;
+                const response = await shaka.net.HttpXHRPlugin(uri, request, requestType, progressUpdated).promise;
                 assetsStorage.storeAsset({
                     masterManifestUri: masterManifestUri!,
                     masterSwarmId: masterSwarmId!,
@@ -138,7 +138,7 @@ function processNetworkRequest(uri: string, request: any, requestType: number) {
         })();
         return new shaka.util.AbortableOperation(responsePromise, async () => {});
     } else { // load asset using default plugin
-        return shaka.net.HttpXHRPlugin(uri, request, requestType);
+        return shaka.net.HttpXHRPlugin(uri, request, requestType, progressUpdated);
     }
 }
 
