@@ -182,7 +182,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         }
 
         let storageSegments = await this.segmentsStorage.getSegmentsMap(this.masterSwarmId);
-        updateSegmentsMap = (await this.processSegmentsQueue(storageSegments)) || updateSegmentsMap;
+        updateSegmentsMap = (this.processSegmentsQueue(storageSegments) || updateSegmentsMap);
 
         if (await this.cleanSegmentsStorage()) {
             storageSegments = await this.segmentsStorage.getSegmentsMap(this.masterSwarmId);
@@ -346,13 +346,8 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private downloadRandomSegmentOverHttp = async () => {
-        if (this.masterSwarmId === undefined) {
-            return;
-        }
-
-        const storageSegments = await this.segmentsStorage.getSegmentsMap(this.masterSwarmId);
-
-        if (this.httpRandomDownloadInterval === undefined ||
+        if (this.masterSwarmId === undefined ||
+                this.httpRandomDownloadInterval === undefined ||
                 this.httpDownloadInitialTimeoutTimestamp !== -Infinity ||
                 this.httpManager.getActiveDownloadsCount() >= this.settings.simultaneousHttpDownloads ||
                 (this.settings.httpDownloadProbabilitySkipIfNoPeers && this.p2pManager.getPeers().size === 0) ||
@@ -360,6 +355,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             return;
         }
 
+        const storageSegments = await this.segmentsStorage.getSegmentsMap(this.masterSwarmId);
         const segmentsMap = this.p2pManager.getOvrallSegmentsMap();
 
         const pendingQueue = this.segmentsQueue.filter(segment =>
@@ -381,7 +377,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         const segment = pendingQueue[Math.floor(Math.random() * pendingQueue.length)];
         this.debugSegments("HTTP download (random)", segment.priority, segment.url);
         this.httpManager.download(segment);
-        this.p2pManager.sendSegmentsMapToAll(await this.createSegmentsMap(storageSegments));
+        this.p2pManager.sendSegmentsMapToAll(this.createSegmentsMap(storageSegments));
     }
 
     private onPieceBytesDownloaded = (method: "http" | "p2p", bytes: number, peerId?: string) => {
