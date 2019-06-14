@@ -169,9 +169,11 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             }
         }
 
-        for (const segment of segments) {
-            if (!this.segmentsQueue.find(f => f.url == segment.url)) {
-                this.debug("add segment", segment.url);
+        if (this.debug.enabled) {
+            for (const segment of segments) {
+                if (!this.segmentsQueue.find(f => f.url == segment.url)) {
+                    this.debug("add segment", segment.url);
+                }
             }
         }
 
