@@ -37,8 +37,8 @@ const defaultSettings: Settings = {
     requiredSegmentsPriority: 1,
 
     simultaneousHttpDownloads: 2,
-    httpDownloadProbability: 0.06,
-    httpDownloadProbabilityInterval: 500,
+    httpDownloadProbability: 0.1,
+    httpDownloadProbabilityInterval: 1000,
     httpDownloadProbabilitySkipIfNoPeers: false,
     httpFailedSegmentTimeout: 10000,
     httpDownloadMaxPriority: 20,

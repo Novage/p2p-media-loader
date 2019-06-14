@@ -47,8 +47,8 @@ If `settings` is specified, then the default settings (shown below) will be over
 | `useP2P` | Boolean | true | Enable/Disable peers interaction
 | `consumeOnly` | Boolean | false | The peer will not upload segments data to the P2P network but still download from others.
 | `simultaneousHttpDownloads` | Integer | 2 | Max number of simultaneous downloads from HTTP source
-| `httpDownloadProbability` | Float | 0.06 | Probability of downloading remaining not downloaded segment in the segments queue via HTTP
-| `httpDownloadProbabilityInterval` | Integer | 500 | Interval of the httpDownloadProbability check (in milliseconds)
+| `httpDownloadProbability` | Float | 0.1 | Probability of downloading remaining not downloaded segment in the segments queue via HTTP
+| `httpDownloadProbabilityInterval` | Integer | 1000 | Interval of the httpDownloadProbability check (in milliseconds)
 | `httpDownloadProbabilitySkipIfNoPeers` | Boolean | false | Don't download segments over HTTP randomly when there is no peers
 | `httpFailedSegmentTimeout` | Integer | 10000 | Timeout before trying to load a segment again via HTTP after failed attempt (in milliseconds)
 | `httpDownloadMaxPriority` | Integer | 20 | Segments with higher priority will not be downloaded over HTTP
