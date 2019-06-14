@@ -32,10 +32,6 @@ export class SegmentsMemoryStorage implements SegmentsStorage {
         return this.cache;
     }
 
-    public async listSegmentIds(masterSwarmId: string) {
-        return this.cache.keys;
-    }
-
     public async getSegment(id: string, masterSwarmId: string) {
         const cacheItem = this.cache.get(id);
 
