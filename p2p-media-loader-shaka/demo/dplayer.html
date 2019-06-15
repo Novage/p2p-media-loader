@@ -61,7 +61,7 @@
                             const src = video.src; // Shaka Player changes video.src to blob URL
                             const shakaPlayer = new shaka.Player(video);
 
-                            const onError = function(error) { console.error("Error code", error.code, "object", error); }
+                            const onError = function(error) { console.error("Error code", error.code, "object", error); };
                             shakaPlayer.addEventListener("error", function(event) { onError(event.detail); });
 
                             engine.initShakaPlayer(shakaPlayer);

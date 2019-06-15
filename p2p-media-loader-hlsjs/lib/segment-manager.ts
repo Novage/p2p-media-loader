@@ -241,7 +241,7 @@ export class SegmentManager {
             this.segmentRequest.onSuccess(segment.data!.slice(0), segment.downloadBandwidth);
             this.segmentRequest = null;
         }
-    }
+    };
 
     private onSegmentError = (segment: Segment, error: any) => {
         if (this.segmentRequest && (this.segmentRequest.segmentUrl === segment.url) &&
@@ -249,7 +249,7 @@ export class SegmentManager {
             this.segmentRequest.onError(error);
             this.segmentRequest = null;
         }
-    }
+    };
 
     private onSegmentAbort = (segment: Segment) => {
         if (this.segmentRequest && (this.segmentRequest.segmentUrl === segment.url) &&
@@ -257,7 +257,7 @@ export class SegmentManager {
             this.segmentRequest.onError("Loading aborted: internal abort");
             this.segmentRequest = null;
         }
-    }
+    };
 
     private getSegmentLocation(url: string, byterange: Byterange): { playlist: Playlist, segmentIndex: number } | undefined {
         for (const playlist of this.variantPlaylists.values()) {

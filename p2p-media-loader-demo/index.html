@@ -20,7 +20,12 @@
     <meta charset="UTF-8">
 
     <script async src="https://www.googletagmanager.com/gtag/js?id=UA-106860120-1"></script>
-    <script>window.dataLayer = window.dataLayer||[];function gtag(){dataLayer.push(arguments)};gtag('js',new Date());gtag('config','UA-106860120-1');</script>
+    <script>window.dataLayer = window.dataLayer || [];
+    function gtag() {
+        dataLayer.push(arguments)
+    }
+    gtag('js', new Date());
+    gtag('config', 'UA-106860120-1');</script>
 
     <title>P2P Media Loader</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -861,7 +866,7 @@
                             const src = video.src; // Shaka Player changes video.src to blob URL
                             const shakaPlayer = new shaka.Player(video);
 
-                            const onError = function(error) { console.error("Error code", error.code, "object", error); }
+                            const onError = function(error) { console.error("Error code", error.code, "object", error); };
                             shakaPlayer.addEventListener("error", function(event) { onError(event.detail); });
 
                             this.engine.initShakaPlayer(shakaPlayer);

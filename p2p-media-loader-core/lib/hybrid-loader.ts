@@ -245,7 +245,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             // Set one more timeout for a next segment
             setTimeout(this.processInitialSegmentTimeout, this.settings.httpDownloadInitialTimeoutPerSegment);
         }
-    }
+    };
 
     private processSegmentsQueue(storageSegments: Map<string, {segment: Segment}>) {
         if (this.masterSwarmId === undefined) {
@@ -380,16 +380,16 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         this.debugSegments("HTTP download (random)", segment.priority, segment.url);
         this.httpManager.download(segment);
         this.p2pManager.sendSegmentsMapToAll(this.createSegmentsMap(storageSegments));
-    }
+    };
 
     private onPieceBytesDownloaded = (method: "http" | "p2p", bytes: number, peerId?: string) => {
         this.bandwidthApproximator.addBytes(bytes, this.now());
         this.emit(Events.PieceBytesDownloaded, method, bytes, peerId);
-    }
+    };
 
     private onPieceBytesUploaded = (method: "p2p", bytes: number, peerId?: string) => {
         this.emit(Events.PieceBytesUploaded, method, bytes, peerId);
-    }
+    };
 
     private onSegmentLoaded = async (segment: Segment, data: ArrayBuffer, peerId?: string) => {
         this.debugSegments("segment loaded", segment.id, segment.url);
@@ -430,7 +430,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         if (!this.settings.consumeOnly) {
             this.p2pManager.sendSegmentsMapToAll(this.createSegmentsMap(storageSegments));
         }
-    }
+    };
 
     private onSegmentError = async (segment: Segment, details: any, peerId?: string) => {
         this.debugSegments("segment error", segment.id, segment.url, peerId, details);
@@ -441,7 +441,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
                 this.p2pManager.sendSegmentsMapToAll(this.createSegmentsMap(storageSegments));
             }
         }
-    }
+    };
 
     private getStreamSwarmId(segment: Segment) {
         return segment.streamId === undefined ? segment.masterSwarmId : `${segment.masterSwarmId}+${segment.streamId}`
@@ -462,7 +462,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             const segmentsStatuses = segmentsIdsAndStatuses[1];
             segmentsIdsAndStatuses[0] += ((segmentsStatuses.length == 0) ? segmentId : `|${segmentId}`);
             segmentsStatuses.push(status);
-        }
+        };
 
         for (const storageSegment of storageSegments.values()) {
             addSegmentToMap(storageSegment.segment, MediaPeerSegmentStatus.Loaded);
@@ -480,11 +480,11 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         if (!this.settings.consumeOnly && this.masterSwarmId !== undefined) {
             this.p2pManager.sendSegmentsMap(peer.id, this.createSegmentsMap(await this.segmentsStorage.getSegmentsMap(this.masterSwarmId)));
         }
-    }
+    };
 
     private onPeerClose = (peerId: string) => {
         this.emit(Events.PeerClose, peerId);
-    }
+    };
 
     private onTrackerUpdate = async (data: { incomplete?: number }) => {
         if (this.httpDownloadInitialTimeoutTimestamp !== -Infinity &&
@@ -502,7 +502,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
                 }
             }
         }
-    }
+    };
 
     private async cleanSegmentsStorage() {
         if (this.masterSwarmId === undefined) {

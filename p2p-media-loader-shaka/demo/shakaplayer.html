@@ -41,7 +41,7 @@
 
             var video = document.getElementById("video");
             var player = new shaka.Player(video);
-            var onError = function(error) { console.error("Error code", error.code, "object", error); }
+            var onError = function(error) { console.error("Error code", error.code, "object", error); };
             player.addEventListener("error", function(event) { onError(event.detail); });
 
             engine.initShakaPlayer(player);

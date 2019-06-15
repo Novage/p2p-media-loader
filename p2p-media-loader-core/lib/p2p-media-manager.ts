@@ -156,16 +156,16 @@ export class P2PMediaManager extends STEEmitter<
 
     private onTrackerError = (error: any) => {
         this.debug("tracker error", error);
-    }
+    };
 
     private onTrackerWarning = (warning: any) => {
         this.debug("tracker warning", warning);
-    }
+    };
 
     private onTrackerUpdate = (data: any): void => {
         this.debug("tracker update", data);
         this.emit("tracker-update", data);
-    }
+    };
 
     private onTrackerPeer = (trackerPeer: any): void => {
         this.debug("tracker peer", trackerPeer.id, trackerPeer);
@@ -197,7 +197,7 @@ export class P2PMediaManager extends STEEmitter<
         }
 
         peerCandidatesById.push(peer);
-    }
+    };
 
     public download(segment: Segment): boolean {
         if (this.isDownloading(segment)) {
@@ -308,11 +308,11 @@ export class P2PMediaManager extends STEEmitter<
 
     private onPieceBytesDownloaded = (peer: MediaPeer, bytes: number) => {
         this.emit("bytes-downloaded", bytes, peer.id);
-    }
+    };
 
     private onPieceBytesUploaded = (peer: MediaPeer, bytes: number) => {
         this.emit("bytes-uploaded", bytes, peer.id);
-    }
+    };
 
     private onPeerConnect = (peer: MediaPeer) => {
         const connectedPeer = this.peers.get(peer.id);
@@ -339,7 +339,7 @@ export class P2PMediaManager extends STEEmitter<
         }
 
         this.emit("peer-connected", {id: peer.id, remoteAddress: peer.remoteAddress});
-    }
+    };
 
     private onPeerClose = (peer: MediaPeer) => {
         if (this.peers.get(peer.id) != peer) {
@@ -371,11 +371,11 @@ export class P2PMediaManager extends STEEmitter<
         this.peers.delete(peer.id);
         this.emit("peer-data-updated");
         this.emit("peer-closed", peer.id);
-    }
+    };
 
     private onPeerDataUpdated = () => {
         this.emit("peer-data-updated");
-    }
+    };
 
     private onSegmentRequest = async (peer: MediaPeer, segmentId: string) => {
         if (this.masterSwarmId === undefined) {
@@ -388,7 +388,7 @@ export class P2PMediaManager extends STEEmitter<
         } else {
             peer.sendSegmentAbsent(segmentId);
         }
-    }
+    };
 
     private onSegmentLoaded = async (peer: MediaPeer, segmentId: string, data: ArrayBuffer) => {
         const peerSegmentRequest = this.peerSegmentRequests.get(segmentId);
@@ -422,12 +422,12 @@ export class P2PMediaManager extends STEEmitter<
 
         this.peerSegmentRequests.delete(segmentId);
         this.emit("segment-loaded", segment, data, peer.id);
-    }
+    };
 
     private onSegmentAbsent = (peer: MediaPeer, segmentId: string) => {
         this.peerSegmentRequests.delete(segmentId);
         this.emit("peer-data-updated");
-    }
+    };
 
     private onSegmentError = (peer: MediaPeer, segmentId: string, description: string) => {
         const peerSegmentRequest = this.peerSegmentRequests.get(segmentId);
@@ -435,7 +435,7 @@ export class P2PMediaManager extends STEEmitter<
             this.peerSegmentRequests.delete(segmentId);
             this.emit("segment-error", peerSegmentRequest.segment, description, peer.id);
         }
-    }
+    };
 
     private onSegmentTimeout = (peer: MediaPeer, segmentId: string) => {
         const peerSegmentRequest = this.peerSegmentRequests.get(segmentId);

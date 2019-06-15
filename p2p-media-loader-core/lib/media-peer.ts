@@ -69,17 +69,17 @@ export class MediaPeer extends STEEmitter<
         this.debug("peer connect", this.id, this);
         this.remoteAddress = this.peer.remoteAddress;
         this.emit("connect", this);
-    }
+    };
 
     private onPeerClose = () => {
         this.debug("peer close", this.id, this);
         this.terminateSegmentRequest();
         this.emit("close", this);
-    }
+    };
 
     private onPeerError = (error: any) => {
         this.debug("peer error", this.id, error, this);
-    }
+    };
 
     private receiveSegmentPiece(data: ArrayBuffer): void {
         if (!this.downloadingSegment) {
@@ -177,7 +177,7 @@ export class MediaPeer extends STEEmitter<
             default:
                 break;
         }
-    }
+    };
 
     private createSegmentsMap(segments: any): Map<string, MediaPeerSegmentStatus> {
         if (segments == undefined || !(segments instanceof Object)) {

@@ -104,14 +104,14 @@
                     const segmentWithoutData = {...segment};
                     delete segmentWithoutData.data;
 
-                    const transaction = this.db.transaction(["segments", "segmentsData"], "readwrite")
+                    const transaction = this.db.transaction(["segments", "segmentsData"], "readwrite");
                     transaction.objectStore("segments").put(segmentWithoutData).onsuccess = () => {
                         transaction.objectStore("segmentsData").put({
                             id: segment.id,
                             masterSwarmId: segment.masterSwarmId,
                             data: segment.data
                         });
-                    }
+                    };
 
                     transaction.onerror = (event) => reject(event);
                     transaction.oncomplete = () => resolve();

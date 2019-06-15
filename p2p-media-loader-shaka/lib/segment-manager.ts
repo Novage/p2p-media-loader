@@ -177,7 +177,7 @@ export class SegmentManager {
             this.debug("request delete", segment.id);
             this.requests.delete(segment.id);
         }
-    }
+    };
 
     private onSegmentError = (segment: LoaderSegment, error: any) => {
         if (this.requests.has(segment.id)) {
@@ -185,7 +185,7 @@ export class SegmentManager {
             this.debug("request delete from error", segment.id);
             this.requests.delete(segment.id);
         }
-    }
+    };
 
     private onSegmentAbort = (segment: LoaderSegment) => {
         if (this.requests.has(segment.id)) {
