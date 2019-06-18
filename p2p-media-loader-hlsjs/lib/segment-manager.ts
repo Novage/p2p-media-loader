@@ -58,13 +58,13 @@ export class SegmentManager {
         if (playlist.manifest.playlists) {
             this.masterPlaylist = playlist;
 
-            for (const [key, playlist] of this.variantPlaylists) {
-                const {streamSwarmId, found, index} = this.getStreamSwarmId(playlist.requestUrl);
+            for (const [key, variantPlaylist] of this.variantPlaylists) {
+                const {streamSwarmId, found, index} = this.getStreamSwarmId(variantPlaylist.requestUrl);
                 if (!found) {
                     this.variantPlaylists.delete(key);
                 } else {
-                    playlist.streamSwarmId = streamSwarmId;
-                    playlist.streamId = "V" + index.toString();
+                    variantPlaylist.streamSwarmId = streamSwarmId;
+                    variantPlaylist.streamId = "V" + index.toString();
                 }
             }
         } else {
@@ -116,10 +116,11 @@ export class SegmentManager {
 
     public async loadSegment(url: string, byterange: Byterange): Promise<{content: ArrayBuffer, downloadBandwidth: number}> {
         const segmentLocation = this.getSegmentLocation(url, byterange);
-        let content: ArrayBuffer | undefined;
         const byteRangeString = byterangeToString(byterange);
 
         if (!segmentLocation) {
+            let content: ArrayBuffer | undefined;
+
             // Not a segment from variants; usually can be: init, audio or subtitles segment, encription key etc.
             const assetsStorage = this.settings.assetsStorage;
             if (assetsStorage !== undefined) {
@@ -181,7 +182,7 @@ export class SegmentManager {
         const promise = new Promise<{content: ArrayBuffer, downloadBandwidth: number}>((resolve, reject) => {
             this.segmentRequest = new SegmentRequest(url, byterange, segmentSequence, segmentLocation.playlist.requestUrl,
                 (content: ArrayBuffer, downloadBandwidth: number) => resolve({content, downloadBandwidth}),
-                (error) => reject(error));
+                error => reject(error));
         });
 
         this.playQueue.push({segmentUrl: url, segmentByterange: byterange, segmentSequence: segmentSequence});

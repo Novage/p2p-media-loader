@@ -27,7 +27,7 @@ export class HlsJsLoader {
         this.segmentManager = segmentManager;
     }
 
-    public async load(context: any, config_unused: any, callbacks: any) {
+    public async load(context: any, _config: any, callbacks: any) {
         if (context.type) {
             try {
                 const result = await this.segmentManager.loadPlaylist(context.url);

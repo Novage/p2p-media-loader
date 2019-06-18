@@ -24,12 +24,12 @@ import {SegmentManager} from "../lib/segment-manager";
 import {Events, Segment, LoaderInterface} from "p2p-media-loader-core";
 
 class LoaderInterfaceEmptyImpl implements LoaderInterface {
-    on(eventName: string | symbol, listener: Function): this { return this; }
-    load(segments: Segment[], swarmId: string): void { }
-    getSegment(id: string): Segment | undefined { return undefined; }
-    getSettings(): any { }
-    getDetails(): any { }
-    destroy(): void { }
+    public on(eventName: string | symbol, listener: Function): this { return this; }
+    public load(segments: Segment[], swarmId: string): void { }
+    public getSegment(id: string): Segment | undefined { return undefined; }
+    public getSettings(): any { }
+    public getDetails(): any { }
+    public destroy(): void { }
 }
 
 const testPlaylist = {
@@ -63,8 +63,8 @@ describe("SegmentManager", () => {
         const loader = mock<LoaderInterface>(LoaderInterfaceEmptyImpl);
 
         const onSuccess = sinon.spy();
-        let segmentLoadedListener: Function = () => { throw new Error("SegmentLoaded listener not set"); };
-        when(loader.on(Events.SegmentLoaded, anyFunction())).thenCall((eventName_unused, listener) => {
+        let segmentLoadedListener = () => { throw new Error("SegmentLoaded listener not set"); };
+        when(loader.on(Events.SegmentLoaded, anyFunction())).thenCall((_eventName, listener) => {
             segmentLoadedListener = listener;
         });
 
@@ -89,8 +89,8 @@ describe("SegmentManager", () => {
         const loader = mock<LoaderInterface>(LoaderInterfaceEmptyImpl);
 
         const onError = sinon.spy();
-        let segmentErrorListener: Function = () => { throw new Error("SegmentError listener not set"); };
-        when(loader.on(Events.SegmentError, anyFunction())).thenCall((eventName_unused, listener) => {
+        let segmentErrorListener = () => { throw new Error("SegmentError listener not set"); };
+        when(loader.on(Events.SegmentError, anyFunction())).thenCall((_eventName, listener) => {
             segmentErrorListener = listener;
         });
 
@@ -109,8 +109,8 @@ describe("SegmentManager", () => {
         const loader = mock<LoaderInterface>(LoaderInterfaceEmptyImpl);
 
         const onSuccess = sinon.spy();
-        let segmentLoadedListener: Function = () => { throw new Error("SegmentLoaded listener not set"); };
-        when(loader.on(Events.SegmentLoaded, anyFunction())).thenCall((eventName_unused, listener) => {
+        let segmentLoadedListener = () => { throw new Error("SegmentLoaded listener not set"); };
+        when(loader.on(Events.SegmentLoaded, anyFunction())).thenCall((_eventName, listener) => {
             segmentLoadedListener = listener;
         });
 

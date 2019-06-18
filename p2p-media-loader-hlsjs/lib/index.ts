@@ -100,7 +100,7 @@ export {Engine};
 export {Asset, AssetsStorage} from "./engine";
 
 function initHlsJsEvents(player: any, engine: Engine): void {
-    player.on("hlsFragChanged", function (event_unused: any, data: any) {
+    player.on("hlsFragChanged", (_event: any, data: any) => {
         const frag = data.frag;
         const byterange = (frag.byteRange.length !== 2)
             ? undefined
