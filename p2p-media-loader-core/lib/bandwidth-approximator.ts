@@ -18,7 +18,7 @@ const SMOOTH_INTERVAL = 1 * 1000;
 const MEASURE_INTERVAL = 60 * 1000;
 
 class NumberWithTime {
-    constructor (readonly value: number, readonly timeStamp: number) {}
+    constructor(readonly value: number, readonly timeStamp: number) {}
 }
 
 export class BandwidthApproximator {

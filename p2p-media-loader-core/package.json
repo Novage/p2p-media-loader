@@ -41,7 +41,8 @@
     "debug": "^4.1.1",
     "events": "^3.0.0",
     "get-browser-rtc": "^1.0.2",
-    "sha.js": "^2.4.11"
+    "sha.js": "^2.4.11",
+    "simple-peer": "^9.3.0"
   },
   "devDependencies": {
     "@types/assert": "^1.4.2",

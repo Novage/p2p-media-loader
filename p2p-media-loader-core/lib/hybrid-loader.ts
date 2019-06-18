@@ -196,10 +196,10 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         }
     }
 
-    public async getSegment(id: string) {
+    public async getSegment(id: string): Promise<Segment | undefined> {
         return this.masterSwarmId === undefined
             ? undefined
-            : await this.segmentsStorage.getSegment(id, this.masterSwarmId);
+            : this.segmentsStorage.getSegment(id, this.masterSwarmId);
     }
 
     public getSettings() {
@@ -360,13 +360,13 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         const storageSegments = await this.segmentsStorage.getSegmentsMap(this.masterSwarmId);
         const segmentsMap = this.p2pManager.getOvrallSegmentsMap();
 
-        const pendingQueue = this.segmentsQueue.filter(segment =>
-            !this.p2pManager.isDownloading(segment) &&
-            !this.httpManager.isDownloading(segment) &&
-            !segmentsMap.has(segment.id) &&
-            !this.httpManager.isFailed(segment) &&
-            (segment.priority <= this.settings.httpDownloadMaxPriority) &&
-            !storageSegments.has(segment.id));
+        const pendingQueue = this.segmentsQueue.filter(s =>
+            !this.p2pManager.isDownloading(s) &&
+            !this.httpManager.isDownloading(s) &&
+            !segmentsMap.has(s.id) &&
+            !this.httpManager.isFailed(s) &&
+            (s.priority <= this.settings.httpDownloadMaxPriority) &&
+            !storageSegments.has(s.id));
 
         if (pendingQueue.length == 0) {
             return;
@@ -444,7 +444,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     }
 
     private getStreamSwarmId(segment: Segment) {
-        return segment.streamId === undefined ? segment.masterSwarmId : `${segment.masterSwarmId}+${segment.streamId}`
+        return segment.streamId === undefined ? segment.masterSwarmId : `${segment.masterSwarmId}+${segment.streamId}`;
     }
 
     private createSegmentsMap(storageSegments: Map<string, {segment: Segment}>) {
@@ -462,7 +462,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
             const segmentsStatuses = segmentsIdsAndStatuses[1];
             segmentsIdsAndStatuses[0] += ((segmentsStatuses.length == 0) ? segmentId : `|${segmentId}`);
             segmentsStatuses.push(status);
-        }
+        };
 
         for (const storageSegment of storageSegments.values()) {
             addSegmentToMap(storageSegment.segment, MediaPeerSegmentStatus.Loaded);
@@ -504,12 +504,12 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         }
     }
 
-    private async cleanSegmentsStorage() {
+    private async cleanSegmentsStorage(): Promise<boolean> {
         if (this.masterSwarmId === undefined) {
-            return;
+            return false;
         }
 
-        return await this.segmentsStorage.clean(this.masterSwarmId,
+        return this.segmentsStorage.clean(this.masterSwarmId,
             (id: string) => this.segmentsQueue.find(queueSegment => queueSegment.id === id) !== undefined);
     }
 
@@ -581,7 +581,6 @@ interface Settings {
      * single sequential segment P2P download is timed out (see httpDownloadInitialTimeoutPerSegment).
      */
     httpDownloadInitialTimeout: number;
-
 
     /**
      * Use HTTP ranges requests where it is possible.
