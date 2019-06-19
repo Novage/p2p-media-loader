@@ -18,8 +18,8 @@ import {ParserSegment, ParserSegmentCache} from "./parser-segment";
 
 export class ShakaManifestParserProxy {
 
-    readonly cache: ParserSegmentCache = new ParserSegmentCache(200);
-    readonly originalManifestParser: any;
+    private readonly cache: ParserSegmentCache = new ParserSegmentCache(200);
+    private readonly originalManifestParser: any;
     private manifest: any;
 
     public constructor(originalManifestParser: any) {
@@ -87,9 +87,9 @@ export class ShakaManifestParserProxy {
     private hookGetSegmentReference(stream: any): void {
         stream.getSegmentReferenceOriginal = stream.getSegmentReference;
 
-        stream.getSegmentReference = (number: any) => {
-            this.cache.add(stream, number);
-            return stream.getSegmentReferenceOriginal(number);
+        stream.getSegmentReference = (segmentNumber: any) => {
+            this.cache.add(stream, segmentNumber);
+            return stream.getSegmentReferenceOriginal(segmentNumber);
         };
 
         stream.getPosition = () => {

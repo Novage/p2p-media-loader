@@ -85,8 +85,8 @@ export class ParserSegment {
 
 export class ParserSegmentCache {
 
-    readonly segments: ParserSegment[] = [];
-    readonly maxSegments: number;
+    private readonly segments: ParserSegment[] = [];
+    private readonly maxSegments: number;
 
     public constructor(maxSegments: number) {
         this.maxSegments = maxSegments;

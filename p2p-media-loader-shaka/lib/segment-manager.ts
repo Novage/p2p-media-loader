@@ -154,14 +154,14 @@ export class SegmentManager {
     }
 
     private reportSuccess(request: Request, loaderSegment: LoaderSegment) {
-        let timeMs: number | undefined = undefined;
+        let timeMs: number | undefined;
 
         if (loaderSegment.downloadBandwidth > 0 && loaderSegment.data && loaderSegment.data.byteLength > 0) {
             timeMs = Math.trunc(loaderSegment.data.byteLength / loaderSegment.downloadBandwidth);
         }
 
         this.debug("report success", request.id);
-        request.resolve({ data: loaderSegment.data!, timeMs } );
+        request.resolve({ data: loaderSegment.data!, timeMs });
     }
 
     private reportError(request: Request, error: any) {
