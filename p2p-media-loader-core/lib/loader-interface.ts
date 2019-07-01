@@ -81,15 +81,3 @@ export interface LoaderInterface {
     getDetails(): any;
     destroy(): Promise<void>;
 }
-
-export type SegmentValidatorCallback = (segment: Segment, method: "http" | "p2p", peerId?: string) => Promise<void>;
-export type XhrSetupCallback = (xhr: XMLHttpRequest, url: string) => void;
-export type SegmentUrlBuilder = (segment: Segment) => string;
-
-export interface SegmentsStorage {
-    storeSegment(segment: Segment): Promise<void>;
-    getSegmentsMap(masterSwarmId: string): Promise<Map<string, {segment: Segment}>>;
-    getSegment(id: string, masterSwarmId: string): Promise<Segment | undefined>;
-    clean(masterSwarmId: string, lockedSementsfilter?: (id: string) => boolean): Promise<boolean>;
-    destroy(): Promise<void>;
-}

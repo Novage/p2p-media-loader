@@ -16,7 +16,8 @@
 
 import * as Debug from "debug";
 import STEEmitter from "./stringly-typed-event-emitter";
-import {Segment, SegmentValidatorCallback, XhrSetupCallback, SegmentUrlBuilder} from "./loader-interface";
+import {Segment} from "./loader-interface";
+import {SegmentValidatorCallback, XhrSetupCallback, SegmentUrlBuilder} from "./hybrid-loader";
 
 export class HttpMediaManager extends STEEmitter<
     "segment-loaded" | "segment-error" | "bytes-downloaded"

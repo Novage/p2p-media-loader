@@ -16,7 +16,7 @@
 
 import * as Debug from "debug";
 
-import {LoaderInterface, Events, Segment, SegmentValidatorCallback, XhrSetupCallback, SegmentUrlBuilder, SegmentsStorage} from "./loader-interface";
+import {LoaderInterface, Events, Segment} from "./loader-interface";
 import {EventEmitter} from "events";
 import {HttpMediaManager} from "./http-media-manager";
 import {P2PMediaManager} from "./p2p-media-manager";
@@ -27,7 +27,7 @@ import {SegmentsMemoryStorage} from "./segments-memory-storage";
 import * as getBrowserRTC from "get-browser-rtc";
 import * as Peer from "simple-peer";
 
-const defaultSettings: Settings = {
+const defaultSettings: HybridLoaderSettings = {
     cachedSegmentExpiration: 5 * 60 * 1000,
     cachedSegmentsCount: 30,
 
@@ -55,7 +55,7 @@ const defaultSettings: Settings = {
     rtcConfig: (Peer as any).config
 };
 
-export default class HybridLoader extends EventEmitter implements LoaderInterface {
+export class HybridLoader extends EventEmitter implements LoaderInterface {
 
     private readonly debug = Debug("p2pml:hybrid-loader");
     private readonly debugSegments = Debug("p2pml:hybrid-loader-segments");
@@ -64,7 +64,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
     private segmentsStorage: SegmentsStorage;
     private segmentsQueue: Segment[] = [];
     private readonly bandwidthApproximator = new BandwidthApproximator();
-    private readonly settings: Settings;
+    private readonly settings: HybridLoaderSettings;
     private httpRandomDownloadInterval: ReturnType<typeof setInterval> | undefined;
     private httpDownloadInitialTimeoutTimestamp = -Infinity;
     private initialDownloadedViaP2PSegmentsCount = 0;
@@ -75,7 +75,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         return (browserRtc && (browserRtc.RTCPeerConnection.prototype.createDataChannel !== undefined));
     }
 
-    public constructor(settings: any = {}) {
+    public constructor(settings: Partial<HybridLoaderSettings> = {}) {
         super();
 
         this.settings = { ...defaultSettings, ...settings };
@@ -93,7 +93,7 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         }
 
         this.segmentsStorage = (this.settings.segmentsStorage === undefined
-            ? new SegmentsMemoryStorage(settings)
+            ? new SegmentsMemoryStorage(this.settings)
             : this.settings.segmentsStorage);
 
         this.debug("loader settings", this.settings);
@@ -517,9 +517,21 @@ export default class HybridLoader extends EventEmitter implements LoaderInterfac
         return performance.now();
     }
 
-} // end of HybridLoader
+}
 
-interface Settings {
+export interface SegmentsStorage {
+    storeSegment(segment: Segment): Promise<void>;
+    getSegmentsMap(masterSwarmId: string): Promise<Map<string, {segment: Segment}>>;
+    getSegment(id: string, masterSwarmId: string): Promise<Segment | undefined>;
+    clean(masterSwarmId: string, lockedSementsfilter?: (id: string) => boolean): Promise<boolean>;
+    destroy(): Promise<void>;
+}
+
+export type SegmentValidatorCallback = (segment: Segment, method: "http" | "p2p", peerId?: string) => Promise<void>;
+export type XhrSetupCallback = (xhr: XMLHttpRequest, url: string) => void;
+export type SegmentUrlBuilder = (segment: Segment) => string;
+
+export interface HybridLoaderSettings {
     /**
      * Segment lifetime in cache. The segment is deleted from the cache if the last access time is greater than this value (in milliseconds).
      */

@@ -18,11 +18,12 @@ import * as Debug from "debug";
 
 import * as Client from "bittorrent-tracker/client";
 import STEEmitter from "./stringly-typed-event-emitter";
-import {Segment, SegmentValidatorCallback, SegmentsStorage} from "./loader-interface";
+import {Segment} from "./loader-interface";
 import {MediaPeer, MediaPeerSegmentStatus} from "./media-peer";
 import {Buffer} from "buffer";
 import * as sha1 from "sha.js/sha1";
 import {version} from "./index";
+import {SegmentsStorage, SegmentValidatorCallback} from "./hybrid-loader";
 
 const PEER_PROTOCOL_VERSION = 2;
 const PEER_ID_VERSION_STRING = version.replace(/\d*./g, v => `0${parseInt(v, 10) % 100}`.slice(-2)).slice(0, 4);
