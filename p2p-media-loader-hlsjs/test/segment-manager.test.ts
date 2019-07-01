@@ -20,8 +20,8 @@
 import * as sinon from "sinon";
 import { mock, instance, when, anyFunction } from "ts-mockito";
 
-import {SegmentManager} from "../lib/segment-manager";
-import {Events, Segment, LoaderInterface} from "p2p-media-loader-core";
+import { SegmentManager } from "../lib/segment-manager";
+import { Events, Segment, LoaderInterface } from "p2p-media-loader-core";
 
 class LoaderInterfaceEmptyImpl implements LoaderInterface {
     public on(eventName: string | symbol, listener: Function): this { return this; }

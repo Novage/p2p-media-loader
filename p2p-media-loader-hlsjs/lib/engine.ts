@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-import {EventEmitter} from "events";
-import {Events, LoaderInterface, HybridLoader} from "p2p-media-loader-core";
-import {SegmentManager, Byterange} from "./segment-manager";
-import {HlsJsLoader} from "./hlsjs-loader";
-import {createHlsJsLoaderClass} from "./hlsjs-loader-class";
+import { EventEmitter } from "events";
+import { Events, LoaderInterface, HybridLoader } from "p2p-media-loader-core";
+import { SegmentManager, Byterange } from "./segment-manager";
+import { HlsJsLoader } from "./hlsjs-loader";
+import { createHlsJsLoaderClass } from "./hlsjs-loader-class";
 
 export class Engine extends EventEmitter {
 

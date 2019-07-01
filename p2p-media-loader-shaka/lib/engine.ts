@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-import {EventEmitter} from "events";
-import {Events, LoaderInterface, HybridLoader} from "p2p-media-loader-core";
-import {SegmentManager} from "./segment-manager";
+import { EventEmitter } from "events";
+import { Events, LoaderInterface, HybridLoader } from "p2p-media-loader-core";
+import { SegmentManager } from "./segment-manager";
 import * as integration from "./integration";
 
 export class Engine extends EventEmitter {

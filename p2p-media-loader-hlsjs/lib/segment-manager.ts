@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-import {Events, Segment, LoaderInterface, XhrSetupCallback} from "p2p-media-loader-core";
-import {Parser} from "m3u8-parser";
-import {AssetsStorage} from "./engine";
+import { Events, Segment, LoaderInterface, XhrSetupCallback } from "p2p-media-loader-core";
+import { Parser } from "m3u8-parser";
+import { AssetsStorage } from "./engine";
 
 const defaultSettings: Settings = {
     forwardSegmentCount: 20,

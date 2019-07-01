@@ -16,13 +16,13 @@
 
 import * as Debug from "debug";
 
-import {LoaderInterface, Events, Segment} from "./loader-interface";
-import {EventEmitter} from "events";
-import {HttpMediaManager} from "./http-media-manager";
-import {P2PMediaManager} from "./p2p-media-manager";
-import {MediaPeerSegmentStatus} from "./media-peer";
-import {BandwidthApproximator} from "./bandwidth-approximator";
-import {SegmentsMemoryStorage} from "./segments-memory-storage";
+import { LoaderInterface, Events, Segment } from "./loader-interface";
+import { EventEmitter } from "events";
+import { HttpMediaManager } from "./http-media-manager";
+import { P2PMediaManager } from "./p2p-media-manager";
+import { MediaPeerSegmentStatus } from "./media-peer";
+import { BandwidthApproximator } from "./bandwidth-approximator";
+import { SegmentsMemoryStorage } from "./segments-memory-storage";
 
 import * as getBrowserRTC from "get-browser-rtc";
 import * as Peer from "simple-peer";

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import {ParserSegment, ParserSegmentCache} from "./parser-segment";
+import { ParserSegment, ParserSegmentCache } from "./parser-segment";
 
 export class ShakaManifestParserProxy {
 

@@ -15,10 +15,10 @@
  */
 
 import * as Debug from "debug";
-import {Events, Segment as LoaderSegment, LoaderInterface} from "p2p-media-loader-core";
-import {ParserSegment} from "./parser-segment";
-import {getMasterSwarmId} from "./utils";
-import {AssetsStorage} from "./engine";
+import { Events, Segment as LoaderSegment, LoaderInterface } from "p2p-media-loader-core";
+import { ParserSegment } from "./parser-segment";
+import { getMasterSwarmId } from "./utils";
+import { AssetsStorage } from "./engine";
 
 const defaultSettings: Settings = {
     forwardSegmentCount: 20,

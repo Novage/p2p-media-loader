@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import {SegmentManager} from "./segment-manager";
+import { SegmentManager } from "./segment-manager";
 
 const DEFAULT_DOWNLOAD_LATENCY = 1;
 const DEFAULT_DOWNLOAD_BANDWIDTH = 12500; // bytes per millisecond

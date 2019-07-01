@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import {getSchemedUri} from "./utils";
+import { getSchemedUri } from "./utils";
 
 export class ParserSegment {
 

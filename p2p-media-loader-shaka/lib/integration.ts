@@ -15,9 +15,9 @@
  */
 
 import * as Debug from "debug";
-import {SegmentManager} from "./segment-manager";
-import {ShakaDashManifestParserProxy, ShakaHlsManifestParserProxy} from "./manifest-parser-proxy";
-import {getSchemedUri, getMasterSwarmId} from "./utils";
+import { SegmentManager } from "./segment-manager";
+import { ShakaDashManifestParserProxy, ShakaHlsManifestParserProxy } from "./manifest-parser-proxy";
+import { getSchemedUri, getMasterSwarmId } from "./utils";
 import { ParserSegment } from "./parser-segment";
 
 const debug = Debug("p2pml:shaka:index");

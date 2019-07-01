@@ -17,7 +17,7 @@
 /// <reference path="../lib/declarations.d.ts" />
 /// <reference types="mocha" />
 
-import {BandwidthApproximator} from "../lib/bandwidth-approximator";
+import { BandwidthApproximator } from "../lib/bandwidth-approximator";
 import * as assert from "assert";
 
 describe("SpeedApproximator", () => {
