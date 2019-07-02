@@ -700,8 +700,8 @@
 
         async initVideoJsContribHlsJsPlayer() {
             await Promise.all([
-                loadStyle("https://vjs.zencdn.net/7.5.4/video-js.css"),
-                loadScript("https://vjs.zencdn.net/7.5.4/video.js")
+                loadStyle("https://vjs.zencdn.net/7.6.0/video-js.css"),
+                loadScript("https://vjs.zencdn.net/7.6.0/video.js")
             ]);
 
             await loadScript("https://cdn.jsdelivr.net/npm/videojs-contrib-hls.js@latest");
@@ -746,11 +746,13 @@
 
         async initVideoJsHlsJsPlugin() {
             await Promise.all([
-                loadStyle("https://vjs.zencdn.net/7.5.4/video-js.css"),
-                loadScript("https://vjs.zencdn.net/7.5.4/video.js")
+                loadStyle("https://vjs.zencdn.net/7.6.0/video-js.css"),
+                loadScript("https://vjs.zencdn.net/7.6.0/video.js")
             ]);
 
             await loadScript("https://cdn.streamroot.io/videojs-hlsjs-plugin/1/stable/videojs-hlsjs-plugin.js");
+            await loadScript("https://cdn.jsdelivr.net/npm/videojs-contrib-quality-levels@latest/dist/videojs-contrib-quality-levels.min.js");
+            await loadScript("https://cdn.jsdelivr.net/npm/videojs-http-source-selector@latest/dist/videojs-http-source-selector.js");
 
             var outer = document.createElement("div");
             outer.className = "embed-responsive embed-responsive-16by9";
@@ -775,6 +777,8 @@
                     }
                 }
             });
+
+            player.httpSourceSelector();
 
             player.src({
                 src: this.videoUrl,
