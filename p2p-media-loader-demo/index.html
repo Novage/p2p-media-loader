@@ -468,8 +468,10 @@
                 case "shakaplayer":
                 case "dplayer-shaka":
                 case "clappr-shaka":
-                    await loadScript("https://github.com/videojs/mux.js/releases/download/v5.1.2/mux.js");
-                    await loadScript("https://cdnjs.cloudflare.com/ajax/libs/shaka-player/2.5.1/shaka-player.compiled.js");
+                    await Promise.all([
+                        loadScript("https://github.com/videojs/mux.js/releases/download/v5.1.2/mux.js"),
+                        loadScript("https://cdnjs.cloudflare.com/ajax/libs/shaka-player/2.5.1/shaka-player.compiled.js")
+                    ]);
 
                     shaka.polyfill.installAll();
                     if (!shaka.Player.isBrowserSupported()) {
@@ -580,8 +582,10 @@
         }
 
         async initClapprPlayer(isShaka) {
-            await loadScript("https://cdn.jsdelivr.net/npm/clappr@latest");
-            await loadScript("https://cdn.jsdelivr.net/gh/clappr/clappr-level-selector-plugin@latest/dist/level-selector.min.js");
+            const scriptsPromise = (async () => {
+                await loadScript("https://cdn.jsdelivr.net/npm/clappr@latest");
+                await loadScript("https://cdn.jsdelivr.net/gh/clappr/clappr-level-selector-plugin@latest/dist/level-selector.min.js");
+            })();
 
             var outer = document.createElement("div");
             outer.className = "embed-responsive embed-responsive-16by9";
@@ -593,7 +597,7 @@
 
             var setup = {
                 parentId: "#video",
-                plugins: [LevelSelector],
+                plugins: [],
                 source: this.videoUrl,
                 width: "100%",
                 height: "100%",
@@ -606,6 +610,7 @@
             };
 
             if (isShaka) {
+                await scriptsPromise;
                 await loadScript("https://cdn.jsdelivr.net/gh/clappr/dash-shaka-playback@latest/dist/dash-shaka-playback.external.js");
                 setup.plugins.push(DashShakaPlayback);
                 setup.shakaOnBeforeLoad = (shakaPlayerInstance) => {
@@ -620,6 +625,10 @@
                 };
             }
 
+            await scriptsPromise;
+
+            setup.plugins.push(LevelSelector);
+
             var player = new Clappr.Player(setup);
 
             if (!isShaka && this.isP2PSupported) {
@@ -628,13 +637,8 @@
         }
 
         async initMediaElementPlayer() {
-            await Promise.all([
-                loadStyle("https://cdnjs.cloudflare.com/ajax/libs/mediaelement/4.2.9/mediaelementplayer.min.css"),
-                loadScript("https://cdnjs.cloudflare.com/ajax/libs/mediaelement/4.2.9/mediaelement-and-player.min.js")
-            ]);
-
-            // allow only one supported renderer
-            mejs.Renderers.order = [ "native_hls" ];
+            const scriptPromise = loadScript("https://cdnjs.cloudflare.com/ajax/libs/mediaelement/4.2.9/mediaelement-and-player.min.js");
+            loadStyle("https://cdnjs.cloudflare.com/ajax/libs/mediaelement/4.2.9/mediaelementplayer.min.css");
 
             var video = document.createElement("video");
             video.id = "video";
@@ -643,6 +647,11 @@
             video.setAttribute("muted", "");
             video.setAttribute("autoplay", "");
             this.videoContainer.appendChild(video);
+
+            await scriptPromise;
+
+            // allow only one supported renderer
+            mejs.Renderers.order = ["native_hls"];
 
             var player = new MediaElementPlayer("video", {
                 stretching: "responsive",
@@ -666,15 +675,15 @@
         }
 
         async initFlowplayerPlayer() {
-            await Promise.all([
-                loadStyle("https://releases.flowplayer.org/7.2.7/skin/skin.css"),
-                loadScript("https://releases.flowplayer.org/7.2.7/flowplayer.min.js")
-            ]);
+            const scriptPromise = loadScript("https://releases.flowplayer.org/7.2.7/flowplayer.min.js");
+            loadStyle("https://releases.flowplayer.org/7.2.7/skin/skin.css");
 
             var video = document.createElement("div");
             video.id = "video";
             video.className = "fp-slim";
             this.videoContainer.appendChild(video);
+
+            await scriptPromise;
 
             var player = flowplayer("#video", {
                 autoplay: true,
@@ -699,12 +708,12 @@
         }
 
         async initVideoJsContribHlsJsPlayer() {
-            await Promise.all([
-                loadStyle("https://vjs.zencdn.net/7.6.0/video-js.css"),
-                loadScript("https://vjs.zencdn.net/7.6.0/video.js")
-            ]);
+            const scriptPromise = (async () => {
+                await loadScript("https://vjs.zencdn.net/7.6.0/video.js");
+                await loadScript("https://cdn.jsdelivr.net/npm/videojs-contrib-hls.js@latest");
+            })();
 
-            await loadScript("https://cdn.jsdelivr.net/npm/videojs-contrib-hls.js@latest");
+            loadStyle("https://vjs.zencdn.net/7.6.0/video-js.css");
 
             var outer = document.createElement("div");
             outer.className = "embed-responsive embed-responsive-16by9";
@@ -719,6 +728,8 @@
             video.setAttribute("controls", "");
             outer.appendChild(video);
             this.videoContainer.appendChild(outer);
+
+            await scriptPromise;
 
             var player = videojs("video", {
                 html5: {
@@ -745,14 +756,16 @@
         }
 
         async initVideoJsHlsJsPlugin() {
-            await Promise.all([
-                loadStyle("https://vjs.zencdn.net/7.6.0/video-js.css"),
-                loadScript("https://vjs.zencdn.net/7.6.0/video.js")
-            ]);
+            const scriptPromise = await (async () => {
+                await loadScript("https://vjs.zencdn.net/7.6.0/video.js");
+                await Promise.all([
+                    loadScript("https://cdn.streamroot.io/videojs-hlsjs-plugin/1/stable/videojs-hlsjs-plugin.js"),
+                    loadScript("https://cdn.jsdelivr.net/npm/videojs-contrib-quality-levels@latest/dist/videojs-contrib-quality-levels.min.js"),
+                    loadScript("https://cdn.jsdelivr.net/npm/videojs-http-source-selector@latest/dist/videojs-http-source-selector.js")
+                ]);
+            })();
 
-            await loadScript("https://cdn.streamroot.io/videojs-hlsjs-plugin/1/stable/videojs-hlsjs-plugin.js");
-            await loadScript("https://cdn.jsdelivr.net/npm/videojs-contrib-quality-levels@latest/dist/videojs-contrib-quality-levels.min.js");
-            await loadScript("https://cdn.jsdelivr.net/npm/videojs-http-source-selector@latest/dist/videojs-http-source-selector.js");
+            loadStyle("https://vjs.zencdn.net/7.6.0/video-js.css");
 
             var outer = document.createElement("div");
             outer.className = "embed-responsive embed-responsive-16by9";
@@ -764,6 +777,8 @@
             video.setAttribute("controls", "");
             outer.appendChild(video);
             this.videoContainer.appendChild(outer);
+
+            await scriptPromise;
 
             if (this.isP2PSupported) {
                 p2pml.hlsjs.initVideoJsHlsJsPlugin();
@@ -787,8 +802,10 @@
         }
 
         async initJwPlayer() {
-            await loadScript("https://content.jwplatform.com/libraries/aG3IMhIy.js");
-            await loadScript("https://cdn.jsdelivr.net/npm/@hola.org/jwplayer-hlsjs@latest/dist/jwplayer.hlsjs.min.js");
+            const scriptPromise = await Promise.all([
+                loadScript("https://content.jwplatform.com/libraries/aG3IMhIy.js"),
+                loadScript("https://cdn.jsdelivr.net/npm/@hola.org/jwplayer-hlsjs@latest/dist/jwplayer.hlsjs.min.js")
+            ]);
 
             var video = document.createElement("div");
             video.id = "video";
@@ -797,6 +814,8 @@
             video.setAttribute("muted", "");
             video.setAttribute("autoplay", "");
             this.videoContainer.appendChild(video);
+
+            await scriptPromise;
 
             var player = jwplayer("video");
             player.setup({ file: this.videoUrl, mute: true });
@@ -815,12 +834,15 @@
             if (!Hls.isSupported()) {
                 return;
             }
-            await loadStyle("https://cdn.jsdelivr.net/npm/p2p-dplayer@latest/dist/DPlayer.min.css");
-            await loadScript("https://cdn.jsdelivr.net/npm/dplayer@latest");
+
+            const scriptPromise = loadScript("https://cdn.jsdelivr.net/npm/dplayer@latest");
+            loadStyle("https://cdn.jsdelivr.net/npm/p2p-dplayer@latest/dist/DPlayer.min.css");
 
             var outer = document.createElement("div");
             outer.id = "dplayer";
             this.videoContainer.appendChild(outer);
+
+            await scriptPromise;
 
             window.dp = new DPlayer({
                 container: document.getElementById("dplayer"),
@@ -848,12 +870,15 @@
             if (!shaka.Player.isBrowserSupported()) {
                 return;
             }
-            await loadStyle("https://cdn.jsdelivr.net/npm/p2p-dplayer@latest/dist/DPlayer.min.css");
-            await loadScript("https://cdn.jsdelivr.net/npm/dplayer@latest");
+
+            const scriptPromise = loadScript("https://cdn.jsdelivr.net/npm/dplayer@latest");
+            loadStyle("https://cdn.jsdelivr.net/npm/p2p-dplayer@latest/dist/DPlayer.min.css");
 
             var outer = document.createElement("div");
             outer.id = "dplayer";
             this.videoContainer.appendChild(outer);
+
+            await scriptPromise;
 
             window.dp = new DPlayer({
                 container: document.getElementById("dplayer"),
