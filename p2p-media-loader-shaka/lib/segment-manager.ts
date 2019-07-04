@@ -49,6 +49,11 @@ export class SegmentManager {
     public async destroy() {
         if (this.requests.size !== 0) {
             console.error("Destroying segment manager with active request(s)!");
+
+            for (const request of this.requests.values()) {
+                this.reportError(request, "Request aborted due to destroy call");
+            }
+
             this.requests.clear();
         }
 
