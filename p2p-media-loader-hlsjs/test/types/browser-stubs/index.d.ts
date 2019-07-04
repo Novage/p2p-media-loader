@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
-declare class XMLHttpRequest {
-    [key: string]: any;
-}
-
 type XMLHttpRequestResponseType = "" | "arraybuffer" | "blob" | "document" | "json" | "text";
+
+ declare class XMLHttpRequest {
+    [key: string]: any;
+    readonly response: any;
+    readonly responseURL: string;
+}
