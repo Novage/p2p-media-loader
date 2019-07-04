@@ -37,32 +37,32 @@
     "url": "https://github.com/Novage/p2p-media-loader.git"
   },
   "dependencies": {
-    "bittorrent-tracker": "^9.10.1",
+    "bittorrent-tracker": "^9.11.0",
     "debug": "^4.1.1",
     "events": "^3.0.0",
     "get-browser-rtc": "^1.0.2",
     "sha.js": "^2.4.11",
-    "simple-peer": "^9.3.0"
+    "simple-peer": "^9.4.0"
   },
   "devDependencies": {
     "@types/assert": "^1.4.2",
-    "@types/debug": "^4.1.2",
+    "@types/debug": "^4.1.4",
     "@types/events": "^3.0.0",
-    "@types/mocha": "^5.2.6",
-    "@types/node": "^11.11.4",
+    "@types/mocha": "^5.2.7",
+    "@types/node": "^12.0.12",
     "browserify": "^16.2.3",
     "browserify-versionify": "^1.0.6",
     "copyfiles": "^2.1.0",
     "mkdirp": "^0.5.1",
-    "mocha": "^6.0.2",
-    "terser": "^3.17.0",
-    "ts-loader": "^5.3.3",
+    "mocha": "^6.1.4",
+    "terser": "^4.0.2",
+    "ts-loader": "^6.0.4",
     "ts-mockito": "^2.3.1",
-    "ts-node": "^8.0.3",
-    "tslint": "^5.14.0",
-    "typescript": "^3.3.4000",
-    "webpack": "^4.29.6",
-    "webpack-cli": "^3.3.0"
+    "ts-node": "^8.3.0",
+    "tslint": "^5.18.0",
+    "typescript": "^3.5.2",
+    "webpack": "^4.35.2",
+    "webpack-cli": "^3.3.5"
   },
   "browserify": {
     "transform": [
