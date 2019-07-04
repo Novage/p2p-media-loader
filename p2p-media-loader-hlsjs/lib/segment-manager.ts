@@ -114,7 +114,7 @@ export class SegmentManager {
         return xhr;
     }
 
-    public async loadSegment(url: string, byterange: Byterange): Promise<{content: ArrayBuffer, downloadBandwidth: number}> {
+    public async loadSegment(url: string, byterange: Byterange): Promise<{content: ArrayBuffer | undefined, downloadBandwidth: number}> {
         const segmentLocation = this.getSegmentLocation(url, byterange);
         const byteRangeString = byterangeToString(byterange);
 
@@ -179,9 +179,9 @@ export class SegmentManager {
             this.segmentRequest.onError("Cancel segment request: simultaneous segment requests are not supported");
         }
 
-        const promise = new Promise<{content: ArrayBuffer, downloadBandwidth: number}>((resolve, reject) => {
+        const promise = new Promise<{content: ArrayBuffer | undefined, downloadBandwidth: number}>((resolve, reject) => {
             this.segmentRequest = new SegmentRequest(url, byterange, segmentSequence, segmentLocation.playlist.requestUrl,
-                (content: ArrayBuffer, downloadBandwidth: number) => resolve({content, downloadBandwidth}),
+                (content: ArrayBuffer | undefined, downloadBandwidth: number) => resolve({content, downloadBandwidth}),
                 error => reject(error));
         });
 
@@ -204,6 +204,7 @@ export class SegmentManager {
     public abortSegment(url: string, byterange: Byterange): void {
         if (this.segmentRequest && (this.segmentRequest.segmentUrl === url) &&
                 compareByterange(this.segmentRequest.segmentByterange, byterange)) {
+            this.segmentRequest.onSuccess(undefined, 0);
             this.segmentRequest = null;
         }
     }
@@ -404,7 +405,7 @@ class SegmentRequest {
         readonly segmentByterange: Byterange,
         readonly segmentSequence: number,
         readonly playlistRequestUrl: string,
-        readonly onSuccess: (content: ArrayBuffer, downloadBandwidth: number) => void,
+        readonly onSuccess: (content: ArrayBuffer | undefined, downloadBandwidth: number) => void,
         readonly onError: (error: any) => void
     ) {}
 }

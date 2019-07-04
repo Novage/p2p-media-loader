@@ -41,7 +41,9 @@ export class HlsJsLoader {
                     (context.rangeStart == undefined) || (context.rangeEnd == undefined)
                         ? undefined
                         : { offset: context.rangeStart, length: context.rangeEnd - context.rangeStart });
-                setTimeout(() => this.successSegment(result.content, result.downloadBandwidth, context, callbacks), 0);
+                if (result.content !== undefined) {
+                    setTimeout(() => this.successSegment(result.content!, result.downloadBandwidth, context, callbacks), 0);
+                }
             } catch (e) {
                 setTimeout(() => this.error(e, context, callbacks), 0);
             }
