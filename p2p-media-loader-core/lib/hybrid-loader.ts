@@ -52,6 +52,7 @@ const defaultSettings: HybridLoaderSettings = {
 
     webRtcMaxMessageSize: 64 * 1024 - 1,
     trackerAnnounce: ["wss://tracker.novage.com.ua", "wss://tracker.openwebtorrent.com"],
+    peerRequestsPerAnnounce: 10,
     rtcConfig: (Peer as any).config
 };
 
@@ -631,6 +632,11 @@ export interface HybridLoaderSettings {
      * Torrent trackers (announcers) to use.
      */
     trackerAnnounce: string[];
+
+    /**
+     * Number of requested peers in each announce for each tracker. Maximum is 10.
+     */
+    peerRequestsPerAnnounce: number;
 
     /**
      * An RTCConfiguration dictionary providing options to configure WebRTC connections.

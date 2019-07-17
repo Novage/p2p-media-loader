@@ -74,7 +74,8 @@ export class P2PMediaManager extends STEEmitter<
                 p2pSegmentDownloadTimeout: number,
                 segmentValidator?: SegmentValidatorCallback,
                 webRtcMaxMessageSize: number,
-                rtcConfig?: RTCConfiguration
+                rtcConfig?: RTCConfiguration,
+                peerRequestsPerAnnounce: number
             }) {
         super();
 
@@ -136,7 +137,10 @@ export class P2PMediaManager extends STEEmitter<
             peerId: Buffer.from(this.peerId, 0, 20),
             announce: this.settings.trackerAnnounce,
             rtcConfig: this.settings.rtcConfig,
-            port: 6881 // a dummy value allows running in Node.js environment
+            port: 6881, // a dummy value allows running in Node.js environment
+            getAnnounceOpts: () => {
+                return { numwant: this.settings.peerRequestsPerAnnounce };
+            }
         };
 
         let oldTrackerClient = this.trackerClient;
