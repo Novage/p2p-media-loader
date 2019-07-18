@@ -68,7 +68,6 @@ export class HybridLoader extends EventEmitter implements LoaderInterface {
     private readonly settings: HybridLoaderSettings;
     private httpRandomDownloadInterval: ReturnType<typeof setInterval> | undefined;
     private httpDownloadInitialTimeoutTimestamp = -Infinity;
-    private initialDownloadedViaP2PSegmentsCount = 0;
     private masterSwarmId?: string;
 
     public static isSupported(): boolean {
@@ -219,7 +218,6 @@ export class HybridLoader extends EventEmitter implements LoaderInterface {
             this.httpRandomDownloadInterval = undefined;
         }
 
-        this.initialDownloadedViaP2PSegmentsCount = 0;
         this.httpDownloadInitialTimeoutTimestamp = -Infinity;
 
         this.segmentsQueue = [];
@@ -249,12 +247,12 @@ export class HybridLoader extends EventEmitter implements LoaderInterface {
     }
 
     private processSegmentsQueue(storageSegments: Map<string, {segment: Segment}>) {
-        if (this.masterSwarmId === undefined) {
-            return false;
-        }
-
         this.debugSegments("process segments queue. priority",
                 this.segmentsQueue.length > 0 ? this.segmentsQueue[0].priority : 0);
+
+        if (this.masterSwarmId === undefined || this.segmentsQueue.length === 0) {
+            return false;
+        }
 
         let updateSegmentsMap = false;
         let segmentsMap: Map<string, MediaPeerSegmentStatus> | undefined;
@@ -262,10 +260,18 @@ export class HybridLoader extends EventEmitter implements LoaderInterface {
         let httpAllowed = true;
 
         if (this.httpDownloadInitialTimeoutTimestamp !== -Infinity) {
+            let firstNotDownloadePriority: number | undefined;
+
+            for (const segment of this.segmentsQueue) {
+                if (!storageSegments.has(segment.id)) {
+                    firstNotDownloadePriority = segment.priority;
+                    break;
+                }
+            }
+
             const httpTimeout = this.now() - this.httpDownloadInitialTimeoutTimestamp;
-            httpAllowed =
-                (httpTimeout >= (this.initialDownloadedViaP2PSegmentsCount + 1) * this.settings.httpDownloadInitialTimeoutPerSegment) ||
-                (httpTimeout >= this.settings.httpDownloadInitialTimeout);
+            httpAllowed = (httpTimeout >= this.settings.httpDownloadInitialTimeout)
+                    || ((firstNotDownloadePriority !== undefined) && (httpTimeout > this.settings.httpDownloadInitialTimeoutPerSegment) && (firstNotDownloadePriority <= 0));
 
             if (httpAllowed) {
                 this.debugSegments("cancel initial HTTP download timeout - timed out");
@@ -406,25 +412,6 @@ export class HybridLoader extends EventEmitter implements LoaderInterface {
         this.emit(Events.SegmentLoaded, segment, peerId);
 
         let storageSegments: Map<string, {segment: Segment}> | undefined;
-
-        if (this.httpDownloadInitialTimeoutTimestamp !== -Infinity) {
-            storageSegments = await this.segmentsStorage.getSegmentsMap(this.masterSwarmId);
-
-            // If initial HTTP download timeout enabled then
-            // count sequential P2P segment downloads
-            let loadedSegmentFound = false;
-            for (const queueSegment of this.segmentsQueue) {
-                if (queueSegment.id === segment.id) {
-                    loadedSegmentFound = true;
-                } else if (!storageSegments.has(queueSegment.id)) {
-                    break;
-                }
-
-                if (loadedSegmentFound) {
-                    this.initialDownloadedViaP2PSegmentsCount++;
-                }
-            }
-        }
 
         storageSegments = (storageSegments === undefined ? await this.segmentsStorage.getSegmentsMap(this.masterSwarmId) : storageSegments);
         this.processSegmentsQueue(storageSegments);
