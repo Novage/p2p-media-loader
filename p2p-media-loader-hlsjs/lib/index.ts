@@ -73,7 +73,7 @@ export function initMediaElementJsPlayer(mediaElement: any): void {
                 const byterange = (frag.byteRange.length !== 2)
                     ? undefined
                     : { offset: frag.byteRange[0], length: frag.byteRange[1] - frag.byteRange[0] };
-                engine.setPlayingSegment(frag.url, byterange);
+                engine.setPlayingSegment(frag.url, byterange, frag.start, frag.duration);
             }
         }
     });
@@ -82,6 +82,15 @@ export function initMediaElementJsPlayer(mediaElement: any): void {
         if (hls && hls.config && hls.config.loader && typeof hls.config.loader.getEngine === "function") {
             const engine: Engine = hls.config.loader.getEngine();
             await engine.destroy();
+        }
+    });
+    mediaElement.addEventListener("hlsError", (event: any) => {
+        const hls = mediaElement.hlsPlayer;
+        if (hls && hls.config && hls.config.loader && typeof hls.config.loader.getEngine === "function") {
+            if ((event.data !== undefined) && (event.data.details === "bufferStalledError")) {
+                const engine: Engine = hls.config.loader.getEngine();
+                engine.setPlayingSegmentByCurrentTime(hls.media.currentTime);
+            }
         }
     });
 }
@@ -96,8 +105,8 @@ export function initJwPlayer(player: any, hlsjsConfig: any): void {
     }, 200);
 }
 
-export {Engine};
-export {Asset, AssetsStorage} from "./engine";
+export { Engine };
+export { Asset, AssetsStorage } from "./engine";
 
 function initHlsJsEvents(player: any, engine: Engine): void {
     player.on("hlsFragChanged", (_event: any, data: any) => {
@@ -105,9 +114,14 @@ function initHlsJsEvents(player: any, engine: Engine): void {
         const byterange = (frag.byteRange.length !== 2)
             ? undefined
             : { offset: frag.byteRange[0], length: frag.byteRange[1] - frag.byteRange[0] };
-        engine.setPlayingSegment(frag.url, byterange);
+        engine.setPlayingSegment(frag.url, byterange, frag.start, frag.duration);
     });
     player.on("hlsDestroying", async () => {
         await engine.destroy();
+    });
+    player.on("hlsError", (_event: string, errorData: { details: string }) => {
+        if (errorData.details === "bufferStalledError") {
+            engine.setPlayingSegmentByCurrentTime(player.media.currentTime);
+        }
     });
 }

@@ -61,8 +61,12 @@ export class Engine extends EventEmitter {
         };
     }
 
-    public setPlayingSegment(url: string, byterange: Byterange) {
-        this.segmentManager.setPlayingSegment(url, byterange);
+    public setPlayingSegment(url: string, byterange: Byterange, start: number, duration: number) {
+        this.segmentManager.setPlayingSegment(url, byterange, start, duration);
+    }
+
+    public setPlayingSegmentByCurrentTime(playheadPosition: number) {
+        this.segmentManager.setPlayingSegmentByCurrentTime(playheadPosition);
     }
 }
 

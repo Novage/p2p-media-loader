@@ -27,12 +27,19 @@ const defaultSettings: Settings = {
 export type Byterange = { length: number, offset: number } | undefined;
 
 export class SegmentManager {
-
     private readonly loader: LoaderInterface;
     private masterPlaylist: Playlist | null = null;
     private readonly variantPlaylists: Map<string, Playlist> = new Map();
     private segmentRequest: SegmentRequest | null = null;
-    private playQueue: {segmentSequence: number, segmentUrl: string, segmentByterange: Byterange}[] = [];
+    private playQueue: {
+        segmentSequence: number,
+        segmentUrl: string,
+        segmentByterange: Byterange,
+        playPosition?: {
+            start: number,
+            duration: number
+        }
+    }[] = [];
     private readonly settings: Settings;
 
     public constructor(loader: LoaderInterface, settings: any = {}) {
@@ -191,12 +198,30 @@ export class SegmentManager {
         return promise;
     }
 
-    public setPlayingSegment(url: string, byterange: Byterange): void {
+    public setPlayingSegment(url: string, byterange: Byterange, start: number, duration: number): void {
         const urlIndex = this.playQueue.findIndex(segment =>
                 (segment.segmentUrl == url) && compareByterange(segment.segmentByterange, byterange));
 
         if (urlIndex >= 0) {
             this.playQueue = this.playQueue.slice(urlIndex);
+            this.playQueue[0].playPosition = { start, duration };
+            this.updateSegments();
+        }
+    }
+
+    public setPlayingSegmentByCurrentTime(playheadPosition: number) {
+        if (this.playQueue.length === 0 || !this.playQueue[0].playPosition) {
+            return;
+        }
+
+        const currentSegmentPosition = this.playQueue[0].playPosition;
+        const segmentEndTime = currentSegmentPosition.start + currentSegmentPosition.duration;
+
+        if (segmentEndTime - playheadPosition < 0.2) {
+            // means that current segment is (almost) finished playing
+            // remove it from queue
+
+            this.playQueue = this.playQueue.slice(1);
             this.updateSegments();
         }
     }
@@ -372,7 +397,6 @@ export class SegmentManager {
             xhr.send();
         });
     }
-
 }
 
 class Playlist {
