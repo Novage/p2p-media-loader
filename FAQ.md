@@ -71,7 +71,7 @@ loader:{
   httpDownloadInitialTimeoutPerSegment: 17000, // try to prevent HTTP download per segment during first 17 seconds
   
   // allow to continue aborted P2P downloads via HTTP
-  httpDownloadRanges:true,
+  httpUseRanges: true,
 }
 ```
 
