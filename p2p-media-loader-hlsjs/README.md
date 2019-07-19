@@ -148,6 +148,15 @@ Needed for own integrations with other players. If you write one, you should upd
 - `offset` segment offset
 - `length` segment length
 
+
+### `engine.setPlayingSegmentByCurrentTime(playheadPosition)`
+
+Notifies engine about current playing segment by giving playhead position.
+
+Needed for own integrations with other players. If you write one, you should update engine with current playhead position. Currenly usefull only when playback stalls.
+
+`playheadPosition` Playhead position that is usually `HTMLMediaElement.currentTime`
+
 ### `engine.destroy()`
 
 Destroys engine; destroy loader and segment manager.
