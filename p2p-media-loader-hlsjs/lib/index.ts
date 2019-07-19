@@ -121,7 +121,13 @@ function initHlsJsEvents(player: any, engine: Engine): void {
     });
     player.on("hlsError", (_event: string, errorData: { details: string }) => {
         if (errorData.details === "bufferStalledError") {
-            engine.setPlayingSegmentByCurrentTime(player.media.currentTime);
+            const htmlMediaElement = player.media === undefined
+                ? player.el_ // videojs-contrib-hlsjs
+                : player.media; // all others
+            if (htmlMediaElement === undefined) {
+                return;
+            }
+            engine.setPlayingSegmentByCurrentTime(htmlMediaElement.currentTime);
         }
     });
 }
