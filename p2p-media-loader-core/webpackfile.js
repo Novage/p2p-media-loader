@@ -20,12 +20,7 @@ function makeConfig({libName, entry, mode}) {
         output: {
             filename: libName + ".js",
             path: path.resolve(__dirname, OUTPUT_PATH)
-        },
-        plugins: [
-            new webpack.DefinePlugin({
-                __P2PML_VERSION__: JSON.stringify(require("./package.json").version)
-            })
-        ]
+        }
     }
 };
 

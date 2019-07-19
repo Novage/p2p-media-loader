@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-export const version = typeof(__P2PML_VERSION__) === "undefined" ? "__VERSION__" : __P2PML_VERSION__;
+export const version = "0.5.0";
 
 import { Engine } from "./engine";
 

@@ -43,7 +43,6 @@
     "@types/debug": "^4.1.4",
     "@types/events": "^3.0.0",
     "browserify": "^16.2.3",
-    "browserify-versionify": "^1.0.6",
     "copyfiles": "^2.1.0",
     "mkdirp": "^0.5.1",
     "terser": "^4.0.2",
@@ -52,10 +51,5 @@
     "typescript": "^3.5.2",
     "webpack": "^4.35.2",
     "webpack-cli": "^3.3.5"
-  },
-  "browserify": {
-    "transform": [
-      "browserify-versionify"
-    ]
   }
 }
