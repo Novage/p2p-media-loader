@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-export const version = "0.5.0";
+export const version = "0.6.1";
 
 import { Engine } from "./engine";
 
