@@ -10,6 +10,7 @@ Table of contents:
 - [What happens if there are no peers on a stream?](#what-happens-if-there-are-no-peers-on-a-stream)
 - [How to configure personal tracker and stun servers?](#how-to-configure-personal-tracker-and-stun-servers)
 - [How to manually set swarm ID?](#how-to-manually-set-swarm-id)
+- [How to see that P2P is actually working?](#how-to-see-that-p2p-is-actually-working)
 
 ## What is tracker?
 
@@ -132,3 +133,16 @@ const engineHlsJs = new p2pml.hlsjs.Engine(config);
 // or
 const engineShaka = new p2pml.shaka.Engine(config);
 ```
+## How to see that P2P is actually working?
+
+The easiest way is to subscribe to P2P [events](https://github.com/Novage/p2p-media-loader/tree/master/p2p-media-loader-core#loaderoneventssegmentloaded-function-segment-peerid-) and log them:
+
+```javascript
+const engine = new p2pml.hlsjs.Engine();
+  
+engine.on("peer_connect", peer => console.log("peer_connect", peer.id, peer.remoteAddress));
+engine.on("peer_close", peerId => console.log("peer_close", peerId));
+engine.on("segment_loaded", (segment, peerId) => console.log("segment_loaded from", peerId ? `peer ${peerId}` : "HTTP", segment.url));
+```
+
+Open few P2P enabled players with the same stream so they can connect.
