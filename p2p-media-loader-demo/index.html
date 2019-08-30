@@ -180,6 +180,7 @@
         }
 
         #main-view #level {
+            margin-top: 2px;
             width: auto;
             float: right;
         }
@@ -283,11 +284,13 @@
                             <option value="videojs-hlsjs-plugin">VideoJs-HlsJs-Plugin</option>
                             <option value="jwplayer">JWPlayer</option>
                             <option value="dplayer">DPlayer</option>
+                            <option value="plyr">PlyrPlayer</option>
                         </optgroup>
                         <optgroup label="Shaka P2P Engine (HLS and DASH)">
                             <option value="shakaplayer">ShakaPlayer</option>
                             <option value="clappr-shaka">Clappr (DASH only)</option>
                             <option value="dplayer-shaka">DPlayer</option>
+                            <option value="plyr-shaka">PlyrPlayer</option>
                         </optgroup>
                     </select>
                 </div>
@@ -455,6 +458,7 @@
                 case "videojs-hlsjs-plugin":
                 case "dplayer":
                 case "jwplayer":
+                case "plyr":
                     await loadScript("https://cdn.jsdelivr.net/npm/hls.js@latest");
 
                     if (!Hls.isSupported()) {
@@ -468,6 +472,7 @@
                 case "shakaplayer":
                 case "dplayer-shaka":
                 case "clappr-shaka":
+                case "plyr-shaka":
                     await Promise.all([
                         loadScript("https://github.com/videojs/mux.js/releases/download/v5.1.2/mux.js"),
                         loadScript("https://cdnjs.cloudflare.com/ajax/libs/shaka-player/2.5.1/shaka-player.compiled.js")
@@ -520,6 +525,10 @@
                     this.initDPlayerHlsJs();
                     break;
 
+                case "plyr":
+                    this.initPlyrPlayerHlsJs();
+                    break;
+
                 case "shakaplayer":
                     this.initShakaPlayer();
                     break;
@@ -530,6 +539,10 @@
 
                 case "dplayer-shaka":
                     this.initDPlayerShaka();
+                    break;
+
+                case "plyr-shaka":
+                    this.initPlyrPlayerShaka();
                     break;
             }
 
@@ -927,6 +940,84 @@
             }
             this.shakaLevelSwitcher.init(player, level);
             player.load(this.videoUrl);
+        }
+
+        async initPlyrPlayerHlsJs() {
+            if (!Hls.isSupported()) {
+                return;
+            }
+
+            const scriptPromise = loadScript("https://cdn.plyr.io/3.5.6/plyr.js");
+            loadStyle("https://cdn.plyr.io/3.5.6/plyr.css");
+
+            var video = document.createElement("video");
+            video.id = "video";
+            video.setAttribute("muted", "");
+            video.setAttribute("autoplay", "");
+            video.setAttribute("controls", "");
+            this.videoContainer.appendChild(video);
+
+            var level = document.createElement("select");
+            level.id = "level";
+            level.classList.add("form-control");
+            this.videoContainer.appendChild(level);
+
+            await scriptPromise;
+
+            var player = new Plyr(video, {
+                captions: {
+                    active: true,
+                    update: true,
+                }
+            });
+
+            var hls = new Hls({
+                liveSyncDurationCount: this.liveSyncDurationCount,
+                loader: this.isP2PSupported ? this.engine.createLoaderClass() : Hls.DefaultConfig.loader
+            });
+
+            if (this.isP2PSupported) {
+                p2pml.hlsjs.initHlsJsPlayer(hls);
+            }
+
+            hls.loadSource(this.videoUrl);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                this.hlsLevelSwitcher.init(hls, level);
+            });
+        }
+
+        async initPlyrPlayerShaka() {
+            if (!shaka.Player.isBrowserSupported()) {
+                return;
+            }
+
+            const scriptPromise = loadScript("https://cdn.plyr.io/3.5.6/plyr.js");
+            loadStyle("https://cdn.plyr.io/3.5.6/plyr.css");
+
+            var video = document.createElement("video");
+            video.id = "video";
+            video.volume = 0;
+            video.setAttribute("muted", "");
+            video.setAttribute("autoplay", "");
+            video.setAttribute("controls", "");
+            this.videoContainer.appendChild(video);
+
+            var level = document.createElement("select");
+            level.id = "level";
+            level.classList.add("form-control");
+            this.videoContainer.appendChild(level);
+
+            await scriptPromise;
+
+            var player = new Plyr(video);
+
+            var shakaPlayer = new shaka.Player(video);
+            if (this.isP2PSupported) {
+                this.engine.initShakaPlayer(shakaPlayer);
+            }
+            this.shakaLevelSwitcher.init(shakaPlayer, level);
+            shakaPlayer.load(this.videoUrl);
         }
 
         initChart() {
