@@ -37,30 +37,30 @@
     "url": "https://github.com/Novage/p2p-media-loader.git"
   },
   "dependencies": {
-    "bittorrent-tracker": "^9.11.0",
+    "bittorrent-tracker": "^9.14.4",
     "debug": "^4.1.1",
     "events": "^3.0.0",
     "get-browser-rtc": "^1.0.2",
     "sha.js": "^2.4.11",
-    "simple-peer": "^9.4.0"
+    "simple-peer": "^9.5.0"
   },
   "devDependencies": {
-    "@types/assert": "^1.4.2",
-    "@types/debug": "^4.1.4",
+    "@types/assert": "^1.4.3",
+    "@types/debug": "^4.1.5",
     "@types/events": "^3.0.0",
     "@types/mocha": "^5.2.7",
-    "@types/node": "^12.6.8",
-    "browserify": "^16.3.0",
+    "@types/node": "^12.7.3",
+    "browserify": "^16.5.0",
     "copyfiles": "^2.1.1",
     "mkdirp": "^0.5.1",
     "mocha": "^6.2.0",
-    "terser": "^4.1.2",
+    "terser": "^4.2.1",
     "ts-loader": "^6.0.4",
-    "ts-mockito": "^2.3.1",
+    "ts-mockito": "^2.4.2",
     "ts-node": "^8.3.0",
-    "tslint": "^5.18.0",
-    "typescript": "^3.5.3",
-    "webpack": "^4.36.1",
-    "webpack-cli": "^3.3.6"
+    "tslint": "^5.19.0",
+    "typescript": "^3.6.2",
+    "webpack": "^4.39.3",
+    "webpack-cli": "^3.3.7"
   }
 }

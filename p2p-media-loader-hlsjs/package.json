@@ -42,20 +42,20 @@
   "devDependencies": {
     "@types/events": "^3.0.0",
     "@types/mocha": "^5.2.7",
-    "@types/node": "^12.6.8",
+    "@types/node": "^12.7.3",
     "@types/sinon": "^7.0.13",
-    "browserify": "^16.3.0",
+    "browserify": "^16.5.0",
     "copyfiles": "^2.1.1",
     "mkdirp": "^0.5.1",
     "mocha": "^6.2.0",
-    "sinon": "^7.3.2",
-    "terser": "^4.1.2",
+    "sinon": "^7.4.2",
+    "terser": "^4.2.1",
     "ts-loader": "^6.0.4",
-    "ts-mockito": "^2.3.1",
+    "ts-mockito": "^2.4.2",
     "ts-node": "^8.3.0",
-    "tslint": "^5.18.0",
-    "typescript": "^3.5.3",
-    "webpack": "^4.36.1",
-    "webpack-cli": "^3.3.6"
+    "tslint": "^5.19.0",
+    "typescript": "^3.6.2",
+    "webpack": "^4.39.3",
+    "webpack-cli": "^3.3.7"
   }
 }
