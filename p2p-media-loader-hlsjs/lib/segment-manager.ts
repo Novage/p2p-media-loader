@@ -18,7 +18,7 @@ import { Events, Segment, LoaderInterface, XhrSetupCallback } from "p2p-media-lo
 import { Parser } from "m3u8-parser";
 import { AssetsStorage } from "./engine";
 
-const defaultSettings: Settings = {
+const defaultSettings: SegmentManagerSettings = {
     forwardSegmentCount: 20,
     swarmId: undefined,
     assetsStorage: undefined,
@@ -40,9 +40,9 @@ export class SegmentManager {
             duration: number
         }
     }[] = [];
-    private readonly settings: Settings;
+    private readonly settings: SegmentManagerSettings;
 
-    public constructor(loader: LoaderInterface, settings: any = {}) {
+    public constructor(loader: LoaderInterface, settings: Partial<SegmentManagerSettings> = {}) {
         this.settings = { ...defaultSettings, ...settings };
 
         this.loader = loader;
@@ -434,7 +434,7 @@ class SegmentRequest {
     ) {}
 }
 
-interface Settings {
+export interface SegmentManagerSettings {
     /**
      * Number of segments for building up predicted forward segments sequence; used to predownload and share via P2P
      */

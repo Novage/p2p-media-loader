@@ -16,6 +16,8 @@
  */
 
 export const version = "0.6.1";
+export * from "./engine";
+export * from "./segment-manager";
 
 import { Engine } from "./engine";
 
@@ -104,9 +106,6 @@ export function initJwPlayer(player: any, hlsjsConfig: any): void {
         }
     }, 200);
 }
-
-export { Engine };
-export { Asset, AssetsStorage } from "./engine";
 
 function initHlsJsEvents(player: any, engine: Engine): void {
     player.on("hlsFragChanged", (_event: any, data: any) => {

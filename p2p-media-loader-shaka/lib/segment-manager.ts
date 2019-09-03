@@ -20,7 +20,7 @@ import { ParserSegment } from "./parser-segment";
 import { getMasterSwarmId } from "./utils";
 import { AssetsStorage } from "./engine";
 
-const defaultSettings: Settings = {
+const defaultSettings: SegmentManagerSettings = {
     forwardSegmentCount: 20,
     maxHistorySegments: 50,
     swarmId: undefined,
@@ -35,9 +35,9 @@ export class SegmentManager {
     private manifestUri: string = "";
     private playheadTime: number = 0;
     private readonly segmentHistory: ParserSegment[] = [];
-    private readonly settings: Settings;
+    private readonly settings: SegmentManagerSettings;
 
-    public constructor(loader: LoaderInterface, settings: any = {}) {
+    public constructor(loader: LoaderInterface, settings: Partial<SegmentManagerSettings> = {}) {
         this.settings = { ...defaultSettings, ...settings };
 
         this.loader = loader;
@@ -210,7 +210,7 @@ class Request {
     ) {}
 }
 
-interface Settings {
+export interface SegmentManagerSettings {
     /**
      * Number of segments for building up predicted forward segments sequence; used to predownload and share via P2P
      */

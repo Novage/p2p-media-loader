@@ -15,10 +15,15 @@
  */
 
 import { EventEmitter } from "events";
-import { Events, LoaderInterface, HybridLoader } from "p2p-media-loader-core";
-import { SegmentManager, Byterange } from "./segment-manager";
+import { Events, LoaderInterface, HybridLoader, HybridLoaderSettings } from "p2p-media-loader-core";
+import { SegmentManager, Byterange, SegmentManagerSettings } from "./segment-manager";
 import { HlsJsLoader } from "./hlsjs-loader";
 import { createHlsJsLoaderClass } from "./hlsjs-loader-class";
+
+export interface HlsJsEngineSettings {
+    loader: Partial<HybridLoaderSettings>;
+    segments: Partial<SegmentManagerSettings>;
+}
 
 export class Engine extends EventEmitter {
 
@@ -29,14 +34,14 @@ export class Engine extends EventEmitter {
     private readonly loader: LoaderInterface;
     private readonly segmentManager: SegmentManager;
 
-    public constructor(settings: any = {}) {
+    public constructor(settings: Partial<HlsJsEngineSettings> = {}) {
         super();
 
         this.loader = new HybridLoader(settings.loader);
         this.segmentManager = new SegmentManager(this.loader, settings.segments);
 
         Object.keys(Events)
-            .map(eventKey => Events[eventKey as any])
+            .map(eventKey => Events[eventKey as keyof typeof Events])
             .forEach(event => this.loader.on(event, (...args: any[]) => this.emit(event, ...args)));
     }
 

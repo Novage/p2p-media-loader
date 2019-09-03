@@ -16,4 +16,5 @@
  */
 
 export const version = "0.6.1";
-export { Engine, Asset, AssetsStorage } from "./engine";
+export * from "./engine";
+export * from "./segment-manager";

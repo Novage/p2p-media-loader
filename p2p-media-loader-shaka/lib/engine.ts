@@ -15,9 +15,14 @@
  */
 
 import { EventEmitter } from "events";
-import { Events, LoaderInterface, HybridLoader } from "p2p-media-loader-core";
-import { SegmentManager } from "./segment-manager";
+import { Events, LoaderInterface, HybridLoader, HybridLoaderSettings } from "p2p-media-loader-core";
+import { SegmentManager, SegmentManagerSettings } from "./segment-manager";
 import * as integration from "./integration";
+
+export interface ShakaEngineSettings {
+    loader: Partial<HybridLoaderSettings>;
+    segments: Partial<SegmentManagerSettings>;
+}
 
 export class Engine extends EventEmitter {
 
@@ -28,14 +33,14 @@ export class Engine extends EventEmitter {
     private readonly loader: LoaderInterface;
     private readonly segmentManager: SegmentManager;
 
-    public constructor(settings: any = {}) {
+    public constructor(settings: Partial<ShakaEngineSettings> = {}) {
         super();
 
         this.loader = new HybridLoader(settings.loader);
         this.segmentManager = new SegmentManager(this.loader, settings.segments);
 
         Object.keys(Events)
-            .map(eventKey => Events[eventKey as any])
+            .map(eventKey => Events[eventKey as keyof typeof Events])
             .forEach(event => this.loader.on(event, (...args: any[]) => this.emit(event, ...args)));
     }
 
