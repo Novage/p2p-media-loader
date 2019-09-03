@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-import * as p2pMediaLoaderHlsjs from "./index";
+import * as p2pMediaLoaderHlsJs from "./index";
 
 if (!window.p2pml) {
     window.p2pml = {};
 }
 
-window.p2pml.hlsjs = p2pMediaLoaderHlsjs;
+window.p2pml.hlsjs = p2pMediaLoaderHlsJs;
