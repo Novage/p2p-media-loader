@@ -201,7 +201,7 @@ Instance contains:
 `sequence`
     + a `String`
     + segment's sequence ID
-- `range`
+- `range` or `undefined`
     + a `String`
     + must be valid HTTP Range header value or `undefined`
 - `priority`
@@ -209,12 +209,18 @@ Instance contains:
     + the lower value - the higher priority
     + default is `0`
 - `data`
-    + an `ArrayBuffer`
+    + an `ArrayBuffer` or `undefined`
     + available only when segment is fully loaded; subscribe to `SegmentLoaded`
       event for this very moment
 - `downloadSpeed`
     + a non-negative integer `Number`
     + download speed in bytes per millisecond or 0
+- `requestUrl`
+    + a `String` or `undefined`
+    + Request URL of the segment
+- `responseUrl`
+    + a `String` or `undefined`
+    + Response URL of the segment
 
 ---
 

@@ -414,7 +414,10 @@ export class P2PMediaManager extends STEEmitter<
                     segment.sequence,
                     segment.range,
                     segment.priority,
-                    data
+                    data,
+                    0,
+                    segment.requestUrl,
+                    segment.responseUrl,
                 ), "p2p", peer.id);
             } catch (error) {
                 this.debug("segment validator failed", error);

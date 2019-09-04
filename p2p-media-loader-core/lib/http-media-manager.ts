@@ -50,6 +50,8 @@ export class HttpMediaManager extends STEEmitter<
 
         this.debug("http segment download", segmentUrl);
 
+        segment.requestUrl = segmentUrl;
+
         const xhr = new XMLHttpRequest();
         xhr.open("GET", segmentUrl, true);
         xhr.responseType = "arraybuffer";
@@ -123,7 +125,7 @@ export class HttpMediaManager extends STEEmitter<
 
         xhr.addEventListener("load", async (event: any) => {
             if ((event.target.status < 200) || (event.target.status >= 300)) {
-                this.segmentFailure(segment, event);
+                this.segmentFailure(segment, event, xhr);
                 return;
             }
 
@@ -147,19 +149,21 @@ export class HttpMediaManager extends STEEmitter<
                 data = segmentData.buffer;
             }
 
-            await this.segmentDownloadFinished(segment, data);
+            await this.segmentDownloadFinished(segment, data, xhr);
         });
 
         xhr.addEventListener("error", (event: any) => {
-            this.segmentFailure(segment, event);
+            this.segmentFailure(segment, event, xhr);
         });
 
         xhr.addEventListener("timeout", (event: any) => {
-            this.segmentFailure(segment, event);
+            this.segmentFailure(segment, event, xhr);
         });
     }
 
-    private async segmentDownloadFinished(segment: Segment, data: ArrayBuffer) {
+    private async segmentDownloadFinished(segment: Segment, data: ArrayBuffer, xhr: XMLHttpRequest) {
+        segment.responseUrl = xhr.responseURL === null ? undefined : xhr.responseURL;
+
         if (this.settings.segmentValidator) {
             try {
                 await this.settings.segmentValidator(new Segment(
@@ -171,11 +175,14 @@ export class HttpMediaManager extends STEEmitter<
                     segment.sequence,
                     segment.range,
                     segment.priority,
-                    data
+                    data,
+                    0,
+                    segment.requestUrl,
+                    segment.responseUrl,
                 ), "http");
             } catch (error) {
                 this.debug("segment validator failed", error);
-                this.segmentFailure(segment, error);
+                this.segmentFailure(segment, error, xhr);
                 return;
             }
         }
@@ -184,7 +191,9 @@ export class HttpMediaManager extends STEEmitter<
         this.emit("segment-loaded", segment, data);
     }
 
-    private segmentFailure(segment: Segment, error: any) {
+    private segmentFailure(segment: Segment, error: any, xhr: XMLHttpRequest) {
+        segment.responseUrl = xhr.responseURL === null ? undefined : xhr.responseURL;
+
         this.xhrRequests.delete(segment.id);
         this.failedSegments.set(segment.id, this.now() + this.settings.httpFailedSegmentTimeout);
         this.emit("segment-error", segment, error);

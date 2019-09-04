@@ -25,7 +25,9 @@ export class Segment {
         readonly range?: string,
         readonly priority = 0,
         public data?: ArrayBuffer,
-        public downloadBandwidth = 0
+        public downloadBandwidth = 0,
+        public requestUrl?: string,
+        public responseUrl?: string,
     ) {}
 }
 
