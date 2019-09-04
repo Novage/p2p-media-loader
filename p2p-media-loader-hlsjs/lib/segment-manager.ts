@@ -121,7 +121,7 @@ export class SegmentManager {
         return xhr;
     }
 
-    public async loadSegment(url: string, byterange: Byterange): Promise<{content: ArrayBuffer | undefined, downloadBandwidth: number}> {
+    public async loadSegment(url: string, byterange: Byterange): Promise<{content: ArrayBuffer | undefined, downloadBandwidth?: number}> {
         const segmentLocation = this.getSegmentLocation(url, byterange);
         const byteRangeString = byterangeToString(byterange);
 
@@ -186,9 +186,9 @@ export class SegmentManager {
             this.segmentRequest.onError("Cancel segment request: simultaneous segment requests are not supported");
         }
 
-        const promise = new Promise<{content: ArrayBuffer | undefined, downloadBandwidth: number}>((resolve, reject) => {
+        const promise = new Promise<{content: ArrayBuffer | undefined, downloadBandwidth?: number}>((resolve, reject) => {
             this.segmentRequest = new SegmentRequest(url, byterange, segmentSequence, segmentLocation.playlist.requestUrl,
-                (content: ArrayBuffer | undefined, downloadBandwidth: number) => resolve({content, downloadBandwidth}),
+                (content: ArrayBuffer | undefined, downloadBandwidth?: number) => resolve({content, downloadBandwidth}),
                 error => reject(error));
         });
 
@@ -313,14 +313,16 @@ export class SegmentManager {
             const url = playlist.getSegmentAbsoluteUrl(segment.uri);
             const byterange: Byterange = segment.byterange;
             const id = this.getSegmentId(playlist, initialSequence + i);
-            segments.push(new Segment(
-                id,
-                url,
-                masterSwarmId !== undefined ? masterSwarmId : playlist.streamSwarmId,
-                this.masterPlaylist !== null ? this.masterPlaylist.requestUrl : playlist.requestUrl,
-                playlist.streamId,
-                (initialSequence + i).toString(),
-                byterangeToString(byterange), priority++));
+            segments.push({
+                id: id,
+                url: url,
+                masterSwarmId: masterSwarmId !== undefined ? masterSwarmId : playlist.streamSwarmId,
+                masterManifestUri: this.masterPlaylist !== null ? this.masterPlaylist.requestUrl : playlist.requestUrl,
+                streamId: playlist.streamId,
+                sequence: (initialSequence + i).toString(),
+                range: byterangeToString(byterange),
+                priority: priority++,
+            });
             if (requestFirstSegment && !loadSegmentId) {
                 loadSegmentId = id;
             }
@@ -429,7 +431,7 @@ class SegmentRequest {
         readonly segmentByterange: Byterange,
         readonly segmentSequence: number,
         readonly playlistRequestUrl: string,
-        readonly onSuccess: (content: ArrayBuffer | undefined, downloadBandwidth: number) => void,
+        readonly onSuccess: (content: ArrayBuffer | undefined, downloadBandwidth: number | undefined) => void,
         readonly onError: (error: any) => void
     ) {}
 }

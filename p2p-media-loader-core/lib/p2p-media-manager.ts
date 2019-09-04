@@ -405,20 +405,7 @@ export class P2PMediaManager extends STEEmitter<
 
         if (this.settings.segmentValidator) {
             try {
-                await this.settings.segmentValidator(new Segment(
-                    segment.id,
-                    segment.url,
-                    segment.masterSwarmId,
-                    segment.masterManifestUri,
-                    segment.streamId,
-                    segment.sequence,
-                    segment.range,
-                    segment.priority,
-                    data,
-                    0,
-                    segment.requestUrl,
-                    segment.responseUrl,
-                ), "p2p", peer.id);
+                await this.settings.segmentValidator({ ...segment, data: data }, "p2p", peer.id);
             } catch (error) {
                 this.debug("segment validator failed", error);
                 this.peerSegmentRequests.delete(segmentId);

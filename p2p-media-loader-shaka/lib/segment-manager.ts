@@ -127,18 +127,16 @@ export class SegmentManager {
 
         const masterSwarmId = getMasterSwarmId(this.manifestUri, this.settings);
 
-        const loaderSegments: LoaderSegment[] = sequence.map((s, i) => {
-            return new LoaderSegment(
-                `${masterSwarmId}+${s.streamIdentity}+${s.identity}`,
-                s.uri,
-                masterSwarmId,
-                this.manifestUri,
-                s.streamIdentity,
-                s.identity,
-                s.range,
-                i
-            );
-        });
+        const loaderSegments: LoaderSegment[] = sequence.map((s, i) => ({
+            id: `${masterSwarmId}+${s.streamIdentity}+${s.identity}`,
+            url: s.uri,
+            masterSwarmId: masterSwarmId,
+            masterManifestUri: this.manifestUri,
+            streamId: s.streamIdentity,
+            sequence: s.identity,
+            range: s.range,
+            priority: i,
+        }));
 
         this.loader.load(loaderSegments, `${masterSwarmId}+${lastRequestedSegment.streamIdentity}`);
         return loaderSegments[ lastRequestedSegmentIndex ];
@@ -161,7 +159,7 @@ export class SegmentManager {
     private reportSuccess(request: Request, loaderSegment: LoaderSegment) {
         let timeMs: number | undefined;
 
-        if (loaderSegment.downloadBandwidth > 0 && loaderSegment.data && loaderSegment.data.byteLength > 0) {
+        if (loaderSegment.downloadBandwidth !== undefined && loaderSegment.downloadBandwidth > 0 && loaderSegment.data && loaderSegment.data.byteLength > 0) {
             timeMs = Math.trunc(loaderSegment.data.byteLength / loaderSegment.downloadBandwidth);
         }
 

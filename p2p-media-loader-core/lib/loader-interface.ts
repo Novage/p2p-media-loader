@@ -14,21 +14,19 @@
  * limitations under the License.
  */
 
-export class Segment {
-    public constructor(
-        readonly id: string,
-        readonly url: string,
-        readonly masterSwarmId: string,
-        readonly masterManifestUri: string,
-        readonly streamId: string | undefined,
-        readonly sequence: string,
-        readonly range?: string,
-        readonly priority = 0,
-        public data?: ArrayBuffer,
-        public downloadBandwidth = 0,
-        public requestUrl?: string,
-        public responseUrl?: string,
-    ) {}
+export interface Segment {
+    readonly id: string;
+    readonly url: string;
+    readonly masterSwarmId: string;
+    readonly masterManifestUri: string;
+    readonly streamId: string | undefined;
+    readonly sequence: string;
+    readonly range: string | undefined;
+    readonly priority: number;
+    data?: ArrayBuffer;
+    downloadBandwidth?: number;
+    requestUrl?: string;
+    responseUrl?: string;
 }
 
 export enum Events {

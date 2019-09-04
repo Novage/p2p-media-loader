@@ -73,9 +73,9 @@ export class HlsJsLoader {
         }, this.stats, context);
     }
 
-    private successSegment(content: ArrayBuffer, downloadBandwidth: number, context: any, callbacks: any): void {
+    private successSegment(content: ArrayBuffer, downloadBandwidth: number | undefined, context: any, callbacks: any): void {
         const now = performance.now();
-        const downloadTime = content.byteLength / ((downloadBandwidth <= 0) ? DEFAULT_DOWNLOAD_BANDWIDTH : downloadBandwidth);
+        const downloadTime = content.byteLength / (((downloadBandwidth === undefined) || (downloadBandwidth <= 0)) ? DEFAULT_DOWNLOAD_BANDWIDTH : downloadBandwidth);
 
         this.stats.trequest = now - DEFAULT_DOWNLOAD_LATENCY - downloadTime;
         this.stats.tfirst = now - downloadTime;

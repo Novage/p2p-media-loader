@@ -212,7 +212,7 @@ Instance contains:
     + an `ArrayBuffer` or `undefined`
     + available only when segment is fully loaded; subscribe to `SegmentLoaded`
       event for this very moment
-- `downloadSpeed`
+- `downloadSpeed` or `undefined`
     + a non-negative integer `Number`
     + download speed in bytes per millisecond or 0
 - `requestUrl`
