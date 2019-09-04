@@ -15,6 +15,6 @@
  * limitations under the License.
  */
 
-export const version = "0.6.1";
+export const version = "0.6.2";
 export * from "./engine";
 export * from "./segment-manager";

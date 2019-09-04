@@ -1,7 +1,7 @@
 {
   "name": "p2p-media-loader-core",
   "description": "P2P Media Loader core functionality",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "license": "Apache-2.0",
   "author": "Novage",
   "homepage": "https://github.com/Novage/p2p-media-loader",
@@ -49,7 +49,7 @@
     "@types/debug": "^4.1.5",
     "@types/events": "^3.0.0",
     "@types/mocha": "^5.2.7",
-    "@types/node": "^12.7.3",
+    "@types/node": "^12.7.4",
     "browserify": "^16.5.0",
     "copyfiles": "^2.1.1",
     "mkdirp": "^0.5.1",
