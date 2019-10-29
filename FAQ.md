@@ -38,44 +38,48 @@ The default configuration works best for live streams with 15-20 segments in the
 An example of a good configuration tested in production for a VOD stream with segments 20 seconds long each:
 
 ```javascript
-segments:{
-  // number of segments to pass for processing to P2P algorithm
-  forwardSegmentCount:50, // usually should be equal or greater than p2pDownloadMaxPriority and httpDownloadMaxPriority
-},
-loader:{
-  // how long to store the downloaded segments for P2P sharing
-  cachedSegmentExpiration:86400000,
-  // count of the downloaded segments to store for P2P sharing
-  cachedSegmentsCount:1000,
-  
-  // first 4 segments (priorities 0, 1, 2 and 3) are required buffer for stable playback
-  requiredSegmentsPriority:3,
+const config = {
+  segments:{
+    // number of segments to pass for processing to P2P algorithm
+    forwardSegmentCount:50, // usually should be equal or greater than p2pDownloadMaxPriority and httpDownloadMaxPriority
+  },
+  loader:{
+    // how long to store the downloaded segments for P2P sharing
+    cachedSegmentExpiration:86400000,
+    // count of the downloaded segments to store for P2P sharing
+    cachedSegmentsCount:1000,
 
-  // each 1 second each of 10 segments ahead of playhead position gets 6% probability for random HTTP download
-  httpDownloadMaxPriority:9,
-  httpDownloadProbability:0.06,
-  httpDownloadProbabilityInterval: 1000,
-  
-  // disallow randomly download segments over HTTP if there are no connected peers
-  httpDownloadProbabilitySkipIfNoPeers: true,
-  
-  // P2P will try to download only first 51 segment ahead of playhead position
-  p2pDownloadMaxPriority: 50,
-  
-  // 1 second timeout before retrying HTTP download of a segment in case of an error
-  httpFailedSegmentTimeout:1000,
-  
-  // number of simultaneous downloads for P2P and HTTP methods
-  simultaneousP2PDownloads:20,
-  simultaneousHttpDownloads:3,
-  
-  // enable mode, that try to prevent HTTP downloads on stream start-up
-  httpDownloadInitialTimeout: 120000, // try to prevent HTTP downloads during first 2 minutes
-  httpDownloadInitialTimeoutPerSegment: 17000, // try to prevent HTTP download per segment during first 17 seconds
-  
-  // allow to continue aborted P2P downloads via HTTP
-  httpUseRanges: true,
-}
+    // first 4 segments (priorities 0, 1, 2 and 3) are required buffer for stable playback
+    requiredSegmentsPriority:3,
+
+    // each 1 second each of 10 segments ahead of playhead position gets 6% probability for random HTTP download
+    httpDownloadMaxPriority:9,
+    httpDownloadProbability:0.06,
+    httpDownloadProbabilityInterval: 1000,
+
+    // disallow randomly download segments over HTTP if there are no connected peers
+    httpDownloadProbabilitySkipIfNoPeers: true,
+
+    // P2P will try to download only first 51 segment ahead of playhead position
+    p2pDownloadMaxPriority: 50,
+
+    // 1 second timeout before retrying HTTP download of a segment in case of an error
+    httpFailedSegmentTimeout:1000,
+
+    // number of simultaneous downloads for P2P and HTTP methods
+    simultaneousP2PDownloads:20,
+    simultaneousHttpDownloads:3,
+
+    // enable mode, that try to prevent HTTP downloads on stream start-up
+    httpDownloadInitialTimeout: 120000, // try to prevent HTTP downloads during first 2 minutes
+    httpDownloadInitialTimeoutPerSegment: 17000, // try to prevent HTTP download per segment during first 17 seconds
+
+    // allow to continue aborted P2P downloads via HTTP
+    httpUseRanges: true,
+  }
+};
+
+const engineHlsJs = new p2pml.hlsjs.Engine(config);
 ```
 
 ## What are the requirements to share a stream over P2P?
