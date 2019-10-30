@@ -81,8 +81,8 @@ Only one media track is delivered over P2P. If video and audio tracks in HLS or 
 
 ## Web browsers support
 
-|                         | Chrome | Firefox | macOS Safari | iOS 13+ Safari on iPad | iOS Safari on iPhone | IE    | Edge  |
-|-------------------------|--------|---------|--------------|------------------------|----------------------|-------|-------|
-| WebRTC Data Channels    | +      | +       | +            | +                      | +                    | -     | -     |
-| Media Source Extensions | +      | +       | +            | +                      | -                    | +     | +     |
-| **P2P Media Loader**    | **+**  | **+**   | **+**        | **+**                  | **-**                | **-** | **-** |
+|                         | Chrome | Firefox | macOS Safari | iPadOS 13+ Safari (iPad) | iOS Safari (iPhone) | IE    | Edge  |
+|-------------------------|--------|---------|--------------|--------------------------|-----------------------|-------|-------|
+| WebRTC Data Channels    | +      | +       | +            | +                        | +                     | -     | -     |
+| Media Source Extensions | +      | +       | +            | +                        | -                     | +     | +     |
+| **P2P Media Loader**    | **+**  | **+**   | **+**        | **+**                    | **-**                 | **-** | **-** |
