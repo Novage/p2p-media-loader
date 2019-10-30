@@ -40,7 +40,7 @@ It significantly reduces traditional CDN traffic and cost while delivering media
 - Supports adaptive bitrate streaming of HLS and MPEG-DASH protocols
 - No need in server-side software. By default **P2P Media Loader** uses publicly available servers:
   - STUN servers - [Public STUN server list](https://gist.github.com/mondain/b0ec1cf5f60ae726202e)
-  - WebTorrent trackers - [https://openwebtorrent.com/](https://openwebtorrent.com/)
+  - WebTorrent trackers - [https://openwebtorrent.com/](https://openwebtorrent.com/), [https://tracker.novage.com.ua/](https://tracker.novage.com.ua/)
 
 ## Key components of the P2P network
 
