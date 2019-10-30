@@ -56,8 +56,8 @@ All the components of the P2P network are free and open-source.
 There are many running public servers available on [Public STUN server list](https://gist.github.com/mondain/b0ec1cf5f60ae726202e).
 
 [**WebTorrent**](https://webtorrent.io/) tracker is used for WebRTC signaling and to create swarms of peers that download the same media stream.
-Few running public trackers are available: [https://openwebtorrent.com/](https://openwebtorrent.com/).
-It is possible to run personal WebTorrent tracker using open-source implementations: [bittorrent-tracker](https://github.com/webtorrent/bittorrent-tracker), [uWebTorrentTracker](https://github.com/DiegoRBaquero/uWebTorrentTracker).
+Few running public trackers are available: [https://openwebtorrent.com](https://openwebtorrent.com), [https://tracker.novage.com.ua](https://tracker.novage.com.ua).
+It is possible to run personal WebTorrent tracker using open-source implementations: [bittorrent-tracker](https://github.com/webtorrent/bittorrent-tracker), [wt-tracker](https://github.com/Novage/wt-tracker).
 
 **P2P Media Loader** is configured to use public **STUN** and **WebTorrent** servers by default. It means that it is not required to run any server-side software for the P2P network to function.
 
