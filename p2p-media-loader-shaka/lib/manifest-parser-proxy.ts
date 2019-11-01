@@ -44,12 +44,20 @@ export class ShakaManifestParserProxy {
 
                 for (const variant of period.variants) {
                     if ((variant.video != null) && (processedStreams.indexOf(variant.video) == -1)) {
-                        this.hookGetSegmentReference(variant.video);
+                        if (variant.video.getSegmentReference) {
+                            this.hookGetSegmentReference(variant.video);
+                        } else {
+                            this.hookSegmentIndex(variant.video);
+                        }
                         processedStreams.push(variant.video);
                     }
 
                     if ((variant.audio != null) && (processedStreams.indexOf(variant.audio) == -1)) {
-                        this.hookGetSegmentReference(variant.audio);
+                        if (variant.audio.getSegmentReference) {
+                            this.hookGetSegmentReference(variant.audio);
+                        } else {
+                            this.hookSegmentIndex(variant.audio);
+                        }
                         processedStreams.push(variant.audio);
                     }
                 }
@@ -85,30 +93,53 @@ export class ShakaManifestParserProxy {
     }
 
     private hookGetSegmentReference(stream: any): void {
+        // Works for Shaka Player version <= 2.5
+
         stream.getSegmentReferenceOriginal = stream.getSegmentReference;
 
         stream.getSegmentReference = (segmentNumber: any) => {
-            const reference = stream.getSegmentReferenceOriginal(segmentNumber)
+            const reference = stream.getSegmentReferenceOriginal(segmentNumber);
             this.cache.add(stream, reference);
             return reference;
         };
 
-        stream.getPosition = () => {
-            if (this.isHls()) {
-                if (stream.type === "video") {
-                    return this.manifest.periods[0].variants.reduce((a: any, i: any) => {
-                        if (i.video && i.video.id && !a.includes(i.video.id)) {
-                            a.push(i.video.id);
-                        }
-                        return a;
-                    }, []).indexOf(stream.id);
-                }
-            }
-            return -1;
-        };
+        stream.getPosition = () => this.getPosition(stream);
     }
 
-} // end of ShakaManifestParserProxy
+    private hookSegmentIndex(stream: any): void {
+        // Works for Shaka Player version >= 2.6
+
+        stream.createSegmentIndexOriginal = stream.createSegmentIndex;
+        stream.createSegmentIndex = async () => {
+            await stream.createSegmentIndexOriginal();
+
+            const getOriginal = stream.segmentIndex.get;
+            stream.getSegmentReferenceOriginal = (segmentNumber: number) => getOriginal.call(stream.segmentIndex, segmentNumber);
+
+            stream.segmentIndex.get = (segmentNumber: number) => {
+                const reference = stream.getSegmentReferenceOriginal(segmentNumber);
+                this.cache.add(stream, reference);
+                return reference;
+            };
+        };
+
+        stream.getPosition = () => this.getPosition(stream);
+    }
+
+    private getPosition = (stream: any) => {
+        if (this.isHls()) {
+            if (stream.type === "video") {
+                return this.manifest.periods[0].variants.reduce((a: any, i: any) => {
+                    if (i.video && i.video.id && !a.includes(i.video.id)) {
+                        a.push(i.video.id);
+                    }
+                    return a;
+                }, []).indexOf(stream.id);
+            }
+        }
+        return -1;
+    }
+}
 
 export class ShakaDashManifestParserProxy extends ShakaManifestParserProxy {
     public constructor() {
