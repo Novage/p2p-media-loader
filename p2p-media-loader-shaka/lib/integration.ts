@@ -75,8 +75,10 @@ function initializeNetworkingEngine() {
 }
 
 function processNetworkRequest(uri: string, request: any, requestType: number, progressUpdated?: Function) {
+    const xhrPlugin = shaka.net.HttpXHRPlugin.parse ? shaka.net.HttpXHRPlugin.parse : shaka.net.HttpXHRPlugin;
+
     if (!request.p2pml) {
-        return shaka.net.HttpXHRPlugin(uri, request, requestType, progressUpdated);
+        return xhrPlugin(uri, request, requestType, progressUpdated);
     }
 
     const { player, segmentManager }: { player: any, segmentManager: SegmentManager } = request.p2pml;
@@ -124,7 +126,7 @@ function processNetworkRequest(uri: string, request: any, requestType: number, p
                     fromCache: true
                 };
             } else {
-                const response = await shaka.net.HttpXHRPlugin(uri, request, requestType, progressUpdated).promise;
+                const response = await xhrPlugin(uri, request, requestType, progressUpdated).promise;
                 assetsStorage.storeAsset({
                     masterManifestUri: masterManifestUri!,
                     masterSwarmId: masterSwarmId!,
@@ -138,7 +140,7 @@ function processNetworkRequest(uri: string, request: any, requestType: number, p
         })();
         return new shaka.util.AbortableOperation(responsePromise, async () => {});
     } else { // load asset using default plugin
-        return shaka.net.HttpXHRPlugin(uri, request, requestType, progressUpdated);
+        return xhrPlugin(uri, request, requestType, progressUpdated);
     }
 }
 
