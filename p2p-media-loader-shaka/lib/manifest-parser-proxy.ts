@@ -88,8 +88,9 @@ export class ShakaManifestParserProxy {
         stream.getSegmentReferenceOriginal = stream.getSegmentReference;
 
         stream.getSegmentReference = (segmentNumber: any) => {
-            this.cache.add(stream, segmentNumber);
-            return stream.getSegmentReferenceOriginal(segmentNumber);
+            const reference = stream.getSegmentReferenceOriginal(segmentNumber)
+            this.cache.add(stream, reference);
+            return reference;
         };
 
         stream.getPosition = () => {
