@@ -1,5 +1,6 @@
 # P2P Media Loader Core
 
+[![](https://data.jsdelivr.com/v1/package/npm/p2p-media-loader-hlsjs/badge)](https://www.jsdelivr.com/package/npm/p2p-media-loader-hlsjs)
 [![npm version](https://badge.fury.io/js/p2p-media-loader-core.svg)](https://npmjs.com/package/p2p-media-loader-core)
 
 Core functionality for P2P sharing of segmented media streams (i.e. HLS, MPEG-DASH) using WebRTC.
