@@ -33,12 +33,12 @@
     "p2p-media-loader-core": "^0.6.2",
     "p2p-media-loader-hlsjs": "^0.6.2",
     "p2p-media-loader-shaka": "^0.6.2",
-    "p2p-graph": "^1.2.3"
+    "p2p-graph": "^2.0.0"
   },
   "devDependencies": {
-    "browserify": "^16.5.0",
+    "browserify": "^16.5.1",
     "browserify-versionify": "^1.0.6",
-    "copyfiles": "^2.1.1",
-    "terser": "^4.2.1"
+    "copyfiles": "^2.3.0",
+    "terser": "^4.8.0"
   }
 }
