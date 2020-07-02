@@ -67,14 +67,17 @@ describe("SegmentManager", () => {
             segmentLoadedListener = listener;
         });
 
-        const segment = new Segment(
-            "id",
-            testPlaylist.baseUrl + "segment-1045.ts",
-            testPlaylist.url,
-            testPlaylist.url,
-            undefined,
-            "1045",
-            undefined, 0, new ArrayBuffer(1));
+        const segment = {
+            id: "id",
+            url: testPlaylist.baseUrl + "segment-1045.ts",
+            masterSwarmId: testPlaylist.url,
+            masterManifestUri: testPlaylist.url,
+            streamId: undefined,
+            sequence: "1045",
+            range: undefined,
+            priority: 0,
+            data: new ArrayBuffer(1)
+        };
 
         const manager = new SegmentManager(instance(loader));
         manager.processPlaylist(testPlaylist.url, testPlaylist.content, testPlaylist.url);
@@ -96,14 +99,17 @@ describe("SegmentManager", () => {
 
         const error = "Test error message content";
 
-        const segment = new Segment(
-            "id",
-            testPlaylist.baseUrl + "segment-1045.ts",
-            testPlaylist.url,
-            testPlaylist.url,
-            undefined,
-            "1045",
-            undefined, 0, undefined);
+        const segment = {
+            id: "id",
+            url: testPlaylist.baseUrl + "segment-1045.ts",
+            masterSwarmId: testPlaylist.url,
+            masterManifestUri: testPlaylist.url,
+            streamId: undefined,
+            sequence: "1045",
+            range: undefined,
+            priority: 0,
+            data: undefined,
+        };
 
         const manager = new SegmentManager(instance(loader));
         manager.processPlaylist(testPlaylist.url, testPlaylist.content, testPlaylist.url);
@@ -126,14 +132,17 @@ describe("SegmentManager", () => {
             segmentLoadedListener = listener;
         });
 
-        const segment = new Segment(
-            "id",
-            testPlaylist.baseUrl + "segment-1045.ts",
-            testPlaylist.url,
-            testPlaylist.url,
-            undefined,
-            "1045",
-            undefined, 0, new ArrayBuffer(0));
+        const segment = {
+            id: "id",
+            url: testPlaylist.baseUrl + "segment-1045.ts",
+            masterSwarmId: testPlaylist.url,
+            masterManifestUri: testPlaylist.url,
+            streamId: undefined,
+            sequence: "1045",
+            range: undefined,
+            priority: 0,
+            data: new ArrayBuffer(0),
+        };
 
         const manager = new SegmentManager(instance(loader));
         manager.processPlaylist(testPlaylist.url, testPlaylist.content, testPlaylist.url);
