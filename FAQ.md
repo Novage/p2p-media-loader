@@ -11,6 +11,7 @@ Table of contents:
 - [How to configure personal tracker and stun servers?](#how-to-configure-personal-tracker-and-stun-servers)
 - [How to manually set swarm ID?](#how-to-manually-set-swarm-id)
 - [How to see that P2P is actually working?](#how-to-see-that-p2p-is-actually-working)
+- [How to debug?](#how-to-debug)
 
 ## What is tracker?
 
@@ -150,3 +151,11 @@ engine.on("segment_loaded", (segment, peerId) => console.log("segment_loaded fro
 ```
 
 Open few P2P enabled players with the same stream so they can connect.
+
+## How to debug?
+
+To enable ALL debugging type in browser's console `localStorage.debug = 'p2pml:*'` and reload the webpage.
+
+To enable specific logs use filtering like `localStorage.debug = 'p2pml:media-peer'`.
+
+Check the source code for all the possible log types.
