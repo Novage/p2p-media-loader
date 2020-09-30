@@ -17,6 +17,6 @@
 import { EventEmitter } from "events";
 
 export class STEEmitter<T extends string> extends EventEmitter {
-    public on(event: T, listener: (...args: any[]) => void) { return super.on(event, listener); }
-    public emit(event: T, ...args: any[]) { return super.emit(event, ...args); }
+    public on(event: T, listener: (...args: unknown[]) => void): this { return super.on(event, listener); }
+    public emit(event: T, ...args: unknown[]): boolean { return super.emit(event, ...args); }
 }

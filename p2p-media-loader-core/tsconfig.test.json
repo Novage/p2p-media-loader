@@ -1,20 +1,17 @@
 {
   "compilerOptions": {
-    "target": "es6",
+    "target": "es2017",
     "module": "commonjs",
-    "lib": ["es6"],
+    "lib": ["es2017"],
     "strict": true,
     "moduleResolution": "node",
     "declaration": true,
     "noEmit": true,
     "noUnusedLocals": true,
     "noUnusedParameters": false,
-    "strictNullChecks": true,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,
-    "noImplicitThis": true,
-    "noImplicitAny": true,
     "types": ["mocha", "node", "browser-stubs"],
     "typeRoots" : ["./node_modules/@types", "./test/types"],
     "baseUrl": "."

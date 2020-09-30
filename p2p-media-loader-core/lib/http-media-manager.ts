@@ -117,13 +117,13 @@ export class HttpMediaManager extends STEEmitter<
     private setupXhrEvents(xhr: XMLHttpRequest, segment: Segment, downloadedPieces?: ArrayBuffer[]) {
         let prevBytesLoaded = 0;
 
-        xhr.addEventListener("progress", (event: any) => {
+        xhr.addEventListener("progress", (event) => {
             const bytesLoaded = event.loaded - prevBytesLoaded;
             this.emit("bytes-downloaded", bytesLoaded);
             prevBytesLoaded = event.loaded;
         });
 
-        xhr.addEventListener("load", async (event: any) => {
+        xhr.addEventListener("load", async (event) => {
             if ((event.target.status < 200) || (event.target.status >= 300)) {
                 this.segmentFailure(segment, event, xhr);
                 return;
