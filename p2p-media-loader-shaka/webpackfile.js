@@ -30,6 +30,6 @@ function makeConfig({libName, entry, mode}) {
 };
 
 module.exports = [
-    makeConfig({entry: "./lib/browser-init-webpack.js", mode: "development", libName: "p2p-media-loader-shaka", }),
-    makeConfig({entry: "./lib/browser-init-webpack.js", mode: "production", libName: "p2p-media-loader-shaka.min"})
+    makeConfig({entry: "./lib/browser-init.ts", mode: "development", libName: "p2p-media-loader-shaka", }),
+    makeConfig({entry: "./lib/browser-init.ts", mode: "production", libName: "p2p-media-loader-shaka.min"})
 ];
