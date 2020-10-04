@@ -17,5 +17,3 @@
 declare module "m3u8-parser" {
     export const Parser: any;
 }
-
-declare const __P2PML_VERSION__: string;
