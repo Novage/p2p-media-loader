@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
+import * as hlsjs from "./index";
+
 if (!window.p2pml) {
     window.p2pml = {};
 }
 
-window.p2pml.hlsjs = require("p2p-media-loader-hlsjs");
+window.p2pml.hlsjs = hlsjs;

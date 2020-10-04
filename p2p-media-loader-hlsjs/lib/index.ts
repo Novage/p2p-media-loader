@@ -23,6 +23,12 @@ import { Engine } from "./engine";
 
 declare const videojs: any;
 
+declare global {
+    interface Window {
+        p2pml: Record<string, unknown>;
+    }
+}
+
 export function initHlsJsPlayer(player: any): void {
     if (player && player.config && player.config.loader && typeof player.config.loader.getEngine === "function") {
         initHlsJsEvents(player, player.config.loader.getEngine());
