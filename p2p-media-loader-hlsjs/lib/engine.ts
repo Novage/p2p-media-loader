@@ -18,7 +18,6 @@ import { EventEmitter } from "events";
 import { Events, LoaderInterface, HybridLoader, HybridLoaderSettings } from "p2p-media-loader-core";
 import { SegmentManager, Byterange, SegmentManagerSettings } from "./segment-manager";
 import { HlsJsLoader } from "./hlsjs-loader";
-import { createHlsJsLoaderClass } from "./hlsjs-loader-class";
 
 export interface HlsJsEngineSettings {
     loader: Partial<HybridLoaderSettings>;
@@ -45,8 +44,38 @@ export class Engine extends EventEmitter {
             .forEach(event => this.loader.on(event, (...args: any[]) => this.emit(event, ...args)));
     }
 
-    public createLoaderClass(): any {
-        return createHlsJsLoaderClass(HlsJsLoader, this);
+    public createLoaderClass(): new() => unknown {
+        const engine = this;
+        return class {
+            public stats: Record<string, unknown>;
+
+            private impl: HlsJsLoader;
+            private context: Record<string, unknown> | undefined;
+
+            constructor () {
+                this.impl = new HlsJsLoader(engine.segmentManager);
+                this.stats = this.impl.stats;
+            }
+
+            load = (context: Record<string, unknown>, config: unknown, callbacks: unknown) => {
+                this.context = context;
+                this.impl.load(context, config, callbacks);
+            };
+
+            abort = () => {
+                this.impl.abort(this.context);
+            };
+
+            destroy = () => {
+                if (this.context) {
+                    this.impl.abort(this.context);
+                }
+            };
+
+            static getEngine = () => {
+                return engine;
+            };
+        };
     }
 
     public async destroy() {

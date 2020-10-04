@@ -21,7 +21,7 @@ const DEFAULT_DOWNLOAD_BANDWIDTH = 12500; // bytes per millisecond
 
 export class HlsJsLoader {
     private segmentManager: SegmentManager;
-    private readonly stats: any = {}; // required for older versions of hls.js
+    public readonly stats: Record<string, unknown> = {}; // required for older versions of hls.js
 
     public constructor(segmentManager: SegmentManager) {
         this.segmentManager = segmentManager;
