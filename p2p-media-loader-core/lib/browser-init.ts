@@ -14,20 +14,10 @@
  * limitations under the License.
  */
 
-declare class RTCConfiguration {
+import * as p2pml from "./index";
+
+if (!window.p2pml) {
+    window.p2pml = {};
 }
 
-declare class XMLHttpRequest {
-    [key: string]: any;
-}
-
-declare class TextEncoder {
-    [key: string]: any;
-}
-
-declare class TextDecoder {
-    [key: string]: any;
-}
-
-declare const performance: any;
-declare const crypto: any;
+window.p2pml.core = p2pml;

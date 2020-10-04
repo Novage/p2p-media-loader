@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-import * as Debug from "debug";
+import Debug from "debug";
+
 import { STEEmitter } from "./stringly-typed-event-emitter";
 import { Segment } from "./loader-interface";
 import { SegmentValidatorCallback, XhrSetupCallback, SegmentUrlBuilder } from "./hybrid-loader";
@@ -23,8 +24,8 @@ export class HttpMediaManager extends STEEmitter<
     "segment-loaded" | "segment-error" | "bytes-downloaded"
 > {
 
-    private xhrRequests: Map<string, {xhr: XMLHttpRequest, segment: Segment}> = new Map();
-    private failedSegments: Map<string, number> = new Map();
+    private xhrRequests = new Map<string, {xhr: XMLHttpRequest, segment: Segment}>();
+    private failedSegments = new Map<string, number>();
     private debug = Debug("p2pml:http-media-manager");
 
     public constructor(readonly settings: {
@@ -37,7 +38,7 @@ export class HttpMediaManager extends STEEmitter<
         super();
     }
 
-    public download(segment: Segment, downloadedPieces?: ArrayBuffer[]): void {
+    public download = (segment: Segment, downloadedPieces?: ArrayBuffer[]): void => {
         if (this.isDownloading(segment)) {
             return;
         }
@@ -82,7 +83,7 @@ export class HttpMediaManager extends STEEmitter<
         xhr.send();
     }
 
-    public abort(segment: Segment): void {
+    public abort = (segment: Segment): void => {
         const request = this.xhrRequests.get(segment.id);
 
         if (request) {
@@ -92,29 +93,29 @@ export class HttpMediaManager extends STEEmitter<
         }
     }
 
-    public isDownloading(segment: Segment): boolean {
+    public isDownloading = (segment: Segment): boolean => {
         return this.xhrRequests.has(segment.id);
     }
 
-    public isFailed(segment: Segment): boolean {
+    public isFailed = (segment: Segment): boolean => {
         const time = this.failedSegments.get(segment.id);
         return time !== undefined && time > this.now();
     }
 
-    public getActiveDownloads(): ReadonlyMap<string, {segment: Segment}> {
+    public getActiveDownloads = (): ReadonlyMap<string, {segment: Segment}> => {
         return this.xhrRequests;
     }
 
-    public getActiveDownloadsCount(): number {
+    public getActiveDownloadsCount = (): number => {
         return this.xhrRequests.size;
     }
 
-    public destroy(): void {
+    public destroy = (): void => {
         this.xhrRequests.forEach(request => request.xhr.abort());
         this.xhrRequests.clear();
     }
 
-    private setupXhrEvents(xhr: XMLHttpRequest, segment: Segment, downloadedPieces?: ArrayBuffer[]) {
+    private setupXhrEvents = (xhr: XMLHttpRequest, segment: Segment, downloadedPieces?: ArrayBuffer[]) => {
         let prevBytesLoaded = 0;
 
         xhr.addEventListener("progress", (event) => {
@@ -124,14 +125,14 @@ export class HttpMediaManager extends STEEmitter<
         });
 
         xhr.addEventListener("load", async (event) => {
-            if ((event.target.status < 200) || (event.target.status >= 300)) {
+            if ((xhr.status < 200) || (xhr.status >= 300)) {
                 this.segmentFailure(segment, event, xhr);
                 return;
             }
 
-            let data = event.target.response;
+            let data = xhr.response as ArrayBuffer;
 
-            if ((downloadedPieces !== undefined) && (event.target.status === 206)) {
+            if ((downloadedPieces !== undefined) && (xhr.status === 206)) {
                 let bytesDownloaded = 0;
                 for (const piece of downloadedPieces) {
                     bytesDownloaded += piece.byteLength;
@@ -152,16 +153,16 @@ export class HttpMediaManager extends STEEmitter<
             await this.segmentDownloadFinished(segment, data, xhr);
         });
 
-        xhr.addEventListener("error", (event: any) => {
+        xhr.addEventListener("error", (event: unknown) => {
             this.segmentFailure(segment, event, xhr);
         });
 
-        xhr.addEventListener("timeout", (event: any) => {
+        xhr.addEventListener("timeout", (event: unknown) => {
             this.segmentFailure(segment, event, xhr);
         });
     }
 
-    private async segmentDownloadFinished(segment: Segment, data: ArrayBuffer, xhr: XMLHttpRequest) {
+    private segmentDownloadFinished = async (segment: Segment, data: ArrayBuffer, xhr: XMLHttpRequest) => {
         segment.responseUrl = xhr.responseURL === null ? undefined : xhr.responseURL;
 
         if (this.settings.segmentValidator) {
@@ -178,7 +179,7 @@ export class HttpMediaManager extends STEEmitter<
         this.emit("segment-loaded", segment, data);
     }
 
-    private segmentFailure(segment: Segment, error: any, xhr: XMLHttpRequest) {
+    private segmentFailure = (segment: Segment, error: unknown, xhr: XMLHttpRequest) => {
         segment.responseUrl = xhr.responseURL === null ? undefined : xhr.responseURL;
 
         this.xhrRequests.delete(segment.id);
@@ -186,7 +187,7 @@ export class HttpMediaManager extends STEEmitter<
         this.emit("segment-error", segment, error);
     }
 
-    private cleanTimedOutFailedSegments() {
+    private cleanTimedOutFailedSegments = () => {
         const now = this.now();
         const candidates: string[] = [];
 

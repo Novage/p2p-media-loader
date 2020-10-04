@@ -5,16 +5,12 @@
     "strict": true,
     "moduleResolution": "node",
     "declaration": true,
-    "noEmit": true,
     "noUnusedLocals": true,
     "noUnusedParameters": false,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,
-    "types": []
+    "skipLibCheck": true,
+    "esModuleInterop": true,
   },
-  "include": [
-    "lib/**/*",
-    "test/**/*"
-  ]
 }

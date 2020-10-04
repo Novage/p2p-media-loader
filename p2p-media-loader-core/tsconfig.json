@@ -1,20 +1,9 @@
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "target": "es2017",
-    "module": "commonjs",
-    "strict": true,
-    "moduleResolution": "node",
-    "declaration": true,
     "outDir": "./dist",
-    "noUnusedLocals": true,
-    "noUnusedParameters": false,
-    "forceConsistentCasingInFileNames": true,
-    "noFallthroughCasesInSwitch": true,
-    "noImplicitReturns": true,
-    "types": []
+    "types": [],
   },
   "compileOnSave": true,
-  "include": [
-    "lib/**/*"
-  ]
+  "include": ["lib/**/*"],
 }

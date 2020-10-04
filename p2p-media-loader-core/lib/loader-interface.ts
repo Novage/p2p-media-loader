@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-export interface Segment {
+export type Segment = {
     readonly id: string;
     readonly url: string;
     readonly masterSwarmId: string;
@@ -27,7 +27,7 @@ export interface Segment {
     downloadBandwidth?: number;
     requestUrl?: string;
     responseUrl?: string;
-}
+};
 
 export enum Events {
     /**
@@ -74,10 +74,10 @@ export enum Events {
 }
 
 export interface LoaderInterface {
-    on(eventName: string, listener: (...params: any[]) => void): this;
-    load(segments: Segment[], streamSwarmId: string): void;
-    getSegment(id: string): Promise<Segment | undefined>;
-    getSettings(): any;
-    getDetails(): any;
-    destroy(): Promise<void>;
+    on: (eventName: string, listener: (...params: unknown[]) => void) => this;
+    load: (segments: Segment[], streamSwarmId: string) => void;
+    getSegment: (id: string) => Promise<Segment | undefined>;
+    getSettings: () => unknown;
+    getDetails: () => unknown;
+    destroy: () => Promise<void>;
 }

@@ -25,6 +25,6 @@ function makeConfig({libName, entry, mode}) {
 };
 
 module.exports = [
-    makeConfig({entry: "./lib/browser-init-webpack.js", mode: "development", libName: "p2p-media-loader-core", }),
-    makeConfig({entry: "./lib/browser-init-webpack.js", mode: "production", libName: "p2p-media-loader-core.min"})
+    makeConfig({entry: "./lib/browser-init-webpack.ts", mode: "development", libName: "p2p-media-loader-core", }),
+    makeConfig({entry: "./lib/browser-init-webpack.ts", mode: "production", libName: "p2p-media-loader-core.min"})
 ];

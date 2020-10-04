@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-/// <reference path="../lib/declarations.d.ts" />
 /// <reference types="mocha" />
 
 import { BandwidthApproximator } from "../lib/bandwidth-approximator";
@@ -26,32 +25,32 @@ describe("SpeedApproximator", () => {
         const smoothInterval = bandwidthApp.getSmoothInterval();
         const measureInterval = bandwidthApp.getMeasureInterval();
 
-        assert.equal(bandwidthApp.getBandwidth(1), 0);
-        assert.equal(bandwidthApp.getBandwidth(1), 0);
+        assert.strictEqual(bandwidthApp.getBandwidth(1), 0);
+        assert.strictEqual(bandwidthApp.getBandwidth(1), 0);
 
         bandwidthApp.addBytes(1, 1);
-        assert.equal(bandwidthApp.getBandwidth(1), 1 / smoothInterval);
+        assert.strictEqual(bandwidthApp.getBandwidth(1), 1 / smoothInterval);
 
         bandwidthApp.addBytes(1, 2);
-        assert.equal(bandwidthApp.getBandwidth(2), 2 / smoothInterval);
+        assert.strictEqual(bandwidthApp.getBandwidth(2), 2 / smoothInterval);
 
         bandwidthApp.addBytes(1, 3);
-        assert.equal(bandwidthApp.getBandwidth(4), 3 / smoothInterval);
-        assert.equal(bandwidthApp.getBandwidth(4), 3 / smoothInterval);
-        assert.equal(bandwidthApp.getBandwidth(5), 3 / smoothInterval);
-        assert.equal(bandwidthApp.getBandwidth(5), 3 / smoothInterval);
+        assert.strictEqual(bandwidthApp.getBandwidth(4), 3 / smoothInterval);
+        assert.strictEqual(bandwidthApp.getBandwidth(4), 3 / smoothInterval);
+        assert.strictEqual(bandwidthApp.getBandwidth(5), 3 / smoothInterval);
+        assert.strictEqual(bandwidthApp.getBandwidth(5), 3 / smoothInterval);
 
         bandwidthApp.addBytes(1, smoothInterval + 3);
-        assert.equal(bandwidthApp.getBandwidth(smoothInterval + 3), 3 / smoothInterval);
+        assert.strictEqual(bandwidthApp.getBandwidth(smoothInterval + 3), 3 / smoothInterval);
 
-        assert.equal(bandwidthApp.getBandwidth(measureInterval), 3 / smoothInterval);
-        assert.equal(bandwidthApp.getBandwidth(measureInterval + 1), 3 / smoothInterval);
-        assert.equal(bandwidthApp.getBandwidth(measureInterval + 2), 3 / smoothInterval);
-        assert.equal(bandwidthApp.getBandwidth(measureInterval + 3), 3 / smoothInterval);
-        assert.equal(bandwidthApp.getBandwidth(measureInterval + 4), 2 / smoothInterval);
-        assert.equal(bandwidthApp.getBandwidth(measureInterval + 5), 2 / smoothInterval);
-        assert.equal(bandwidthApp.getBandwidth(measureInterval + smoothInterval + 3), 2 / smoothInterval);
-        assert.equal(bandwidthApp.getBandwidth(measureInterval + smoothInterval + 4), 0);
-        assert.equal(bandwidthApp.getBandwidth(measureInterval + smoothInterval + 5), 0);
+        assert.strictEqual(bandwidthApp.getBandwidth(measureInterval), 3 / smoothInterval);
+        assert.strictEqual(bandwidthApp.getBandwidth(measureInterval + 1), 3 / smoothInterval);
+        assert.strictEqual(bandwidthApp.getBandwidth(measureInterval + 2), 3 / smoothInterval);
+        assert.strictEqual(bandwidthApp.getBandwidth(measureInterval + 3), 3 / smoothInterval);
+        assert.strictEqual(bandwidthApp.getBandwidth(measureInterval + 4), 2 / smoothInterval);
+        assert.strictEqual(bandwidthApp.getBandwidth(measureInterval + 5), 2 / smoothInterval);
+        assert.strictEqual(bandwidthApp.getBandwidth(measureInterval + smoothInterval + 3), 2 / smoothInterval);
+        assert.strictEqual(bandwidthApp.getBandwidth(measureInterval + smoothInterval + 4), 0);
+        assert.strictEqual(bandwidthApp.getBandwidth(measureInterval + smoothInterval + 5), 0);
     });
 });
