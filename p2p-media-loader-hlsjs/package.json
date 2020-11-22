@@ -22,7 +22,7 @@
   ],
   "scripts": {
     "compile": "tsc",
-    "browserify": "mkdirp ./build && browserify -r ./dist/index.js:p2p-media-loader-hlsjs ./dist/browser-init.js -x p2p-media-loader-core -x debug -x events > ./build/p2p-media-loader-hlsjs.js",
+    "browserify": "mkdirp ./build && browserify -r ./dist/index.js:p2p-media-loader-hlsjs ./dist/browser-init.js -x p2p-media-loader-core -x debug -x events -x buffer > ./build/p2p-media-loader-hlsjs.js",
     "minify": "terser ./build/p2p-media-loader-hlsjs.js -m -c > ./build/p2p-media-loader-hlsjs.min.js",
     "webpack:build": "webpack --progress -c webpackfile.js",
     "webpack:watch": "webpack --watch --progress -c webpackfile.js",
