@@ -27,8 +27,8 @@
     "browserify": "mkdirp ./build && browserify -r ./dist/index.js:p2p-media-loader-core -r debug -r events ./dist/browser-init.js > ./build/p2p-media-loader-core.js",
     "minify": "terser ./build/p2p-media-loader-core.js -m -c > ./build/p2p-media-loader-core.min.js",
     "build": "npm run compile && npm run browserify && npm run minify",
-    "webpack:build": "webpack --progress",
-    "webpack:watch": "webpack --watch --progress",
+    "webpack:build": "webpack --progress -c webpackfile.js",
+    "webpack:watch": "webpack --watch --progress -c webpackfile.js",
     "lint": "eslint . --ext .ts",
     "test": "TS_NODE_PROJECT=tsconfig.test.json TS_NODE_CACHE=false mocha -r ts-node/register test/*.test.ts"
   },
