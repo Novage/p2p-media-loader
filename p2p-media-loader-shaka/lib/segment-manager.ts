@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import * as Debug from "debug";
+import Debug from "debug";
 import { Events, Segment as LoaderSegment, LoaderInterface } from "p2p-media-loader-core";
 import { ParserSegment } from "./parser-segment";
 import { getMasterSwarmId } from "./utils";

@@ -28,7 +28,7 @@
     "build": "npm run compile && npm run browserify && npm run minify",
     "webpack:build": "webpack --progress -c webpackfile.js",
     "webpack:watch": "webpack --watch --progress -c webpackfile.js",
-    "lint": "tslint -c ./tslint.json -p ./tsconfig.tslint.json"
+    "lint": "eslint . --ext .ts"
   },
   "repository": {
     "type": "git",
@@ -42,13 +42,15 @@
   "devDependencies": {
     "@types/debug": "^4.1.5",
     "@types/events": "^3.0.0",
+    "@typescript-eslint/eslint-plugin": "^4.8.2",
+    "@typescript-eslint/parser": "^4.8.2",
     "browserify": "^17.0.0",
+    "eslint": "^7.14.0",
     "mkdirp": "^1.0.4",
-    "terser": "^5.5.0",
+    "terser": "^5.5.1",
     "ts-loader": "^8.0.11",
-    "tslint": "^6.1.3",
     "typescript": "^4.1.2",
-    "webpack": "^5.6.0",
+    "webpack": "^5.9.0",
     "webpack-cli": "^4.2.0"
   }
 }

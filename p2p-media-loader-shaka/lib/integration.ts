@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import * as Debug from "debug";
+import Debug from "debug";
 import { SegmentManager } from "./segment-manager";
 import { ShakaDashManifestParserProxy, ShakaHlsManifestParserProxy } from "./manifest-parser-proxy";
 import { getSchemedUri, getMasterSwarmId } from "./utils";

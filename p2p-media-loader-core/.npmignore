@@ -1,10 +1,6 @@
-tsconfig.base.json
-tsconfig.json
-tsconfig.test.json
+.*
+tsconfig.*
 lib
 test
-.editorconfig
-.eslintignore
-.eslintrc
 webpackfile.js
 *.tgz
