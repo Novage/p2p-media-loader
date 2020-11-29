@@ -78,10 +78,10 @@ export function initMediaElementJsPlayer(mediaElement: any): void {
 
             if (event.data && (event.data.length > 1)) {
                 const frag = event.data[1].frag;
-                const byterange = (frag.byteRange.length !== 2)
+                const byteRange = (frag.byteRange.length !== 2)
                     ? undefined
                     : { offset: frag.byteRange[0], length: frag.byteRange[1] - frag.byteRange[0] };
-                engine.setPlayingSegment(frag.url, byterange, frag.start, frag.duration);
+                engine.setPlayingSegment(frag.url, byteRange, frag.start, frag.duration);
             }
         }
     });
@@ -116,10 +116,10 @@ export function initJwPlayer(player: any, hlsjsConfig: any): void {
 function initHlsJsEvents(player: any, engine: Engine): void {
     player.on("hlsFragChanged", (_event: any, data: any) => {
         const frag = data.frag;
-        const byterange = (frag.byteRange.length !== 2)
+        const byteRange = (frag.byteRange.length !== 2)
             ? undefined
             : { offset: frag.byteRange[0], length: frag.byteRange[1] - frag.byteRange[0] };
-        engine.setPlayingSegment(frag.url, byterange, frag.start, frag.duration);
+        engine.setPlayingSegment(frag.url, byteRange, frag.start, frag.duration);
     });
     player.on("hlsDestroying", async () => {
         await engine.destroy();
