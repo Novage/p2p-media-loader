@@ -21,7 +21,22 @@ const DEFAULT_DOWNLOAD_BANDWIDTH = 12500; // bytes per millisecond
 
 export class HlsJsLoader {
     private segmentManager: SegmentManager;
-    private readonly stats: any = {}; // required for older versions of hls.js
+    private readonly stats = {
+        // compat with HLS < 1.0.0
+        trequest: 0,
+        tfirst: 0,
+        tload: 0,
+
+        aborted: false,
+        loaded: 0,
+        retry: 0,
+        total: 0,
+        chunkCount: 0,
+        bwEstimate: 0,
+        loading: { start: 0, first: 0, end: 0 },
+        parsing: { start: 0, end: 0 },
+        buffering: { start: 0, first: 0, end: 0 }
+    };
 
     public constructor(segmentManager: SegmentManager) {
         this.segmentManager = segmentManager;
@@ -65,7 +80,13 @@ export class HlsJsLoader {
         this.stats.trequest = now - 300;
         this.stats.tfirst = now - 200;
         this.stats.tload = now;
+        this.stats.loading = {
+            first: this.stats.trequest,
+            start: this.stats.tfirst,
+            end: this.stats.tload
+        };
         this.stats.loaded = xhr.response.length;
+        this.stats.total = xhr.response.length;
 
         callbacks.onSuccess({
             url: xhr.responseURL,
@@ -80,7 +101,15 @@ export class HlsJsLoader {
         this.stats.trequest = now - DEFAULT_DOWNLOAD_LATENCY - downloadTime;
         this.stats.tfirst = now - downloadTime;
         this.stats.tload = now;
+        this.stats.loading = {
+            first: this.stats.tfirst,
+            start: this.stats.trequest,
+            end: this.stats.tload
+        };
         this.stats.loaded = content.byteLength;
+        this.stats.total = content.byteLength;
+
+        callbacks.onProgress(this.stats, context, content);
 
         callbacks.onSuccess({
             url: context.url,
