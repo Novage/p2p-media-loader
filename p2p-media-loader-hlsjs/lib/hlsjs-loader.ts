@@ -109,7 +109,9 @@ export class HlsJsLoader {
         this.stats.loaded = content.byteLength;
         this.stats.total = content.byteLength;
 
-        callbacks.onProgress(this.stats, context, content);
+        if (callbacks.onProgress) {
+            callbacks.onProgress(this.stats, context, content);
+        }
 
         callbacks.onSuccess({
             url: context.url,
