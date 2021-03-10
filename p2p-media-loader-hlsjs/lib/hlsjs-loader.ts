@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { SegmentManager } from "./segment-manager";
+import { Byterange, SegmentManager } from "./segment-manager";
 
 const DEFAULT_DOWNLOAD_LATENCY = 1;
 const DEFAULT_DOWNLOAD_BANDWIDTH = 12500; // bytes per millisecond
@@ -52,10 +52,7 @@ export class HlsJsLoader {
             }
         } else if (context.frag) {
             try {
-                const result = await this.segmentManager.loadSegment(context.url,
-                    (context.rangeStart == undefined) || (context.rangeEnd == undefined)
-                        ? undefined
-                        : { offset: context.rangeStart, length: context.rangeEnd - context.rangeStart });
+                const result = await this.segmentManager.loadSegment(context.url, this.buildByterange(context));
                 if (result.content !== undefined) {
                     setTimeout(() => this.successSegment(result.content!, result.downloadBandwidth, context, callbacks), 0);
                 }
@@ -72,6 +69,20 @@ export class HlsJsLoader {
             (context.rangeStart == undefined) || (context.rangeEnd == undefined)
                 ? undefined
                 : { offset: context.rangeStart, length: context.rangeEnd - context.rangeStart });
+    }
+
+    private buildByterange (context: { rangeStart?: number, rangeEnd?: number}): Byterange | undefined {
+        if (
+            (context.rangeStart == undefined || context.rangeEnd == undefined) || // hls.js < 1.0.0
+            (context.rangeStart === 0 && context.rangeEnd === 0) // hls.js >= 1.0.0
+        ) {
+            return undefined;
+        }
+
+        return {
+            offset: context.rangeStart,
+            length: context.rangeEnd - context.rangeStart
+        };
     }
 
     private successPlaylist(xhr: {response: string, responseURL: string}, context: any, callbacks: any): void {
