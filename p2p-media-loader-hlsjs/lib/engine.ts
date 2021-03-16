@@ -83,7 +83,9 @@ export class Engine extends EventEmitter {
             };
 
             abort = () => {
-                this.impl.abort(this.context!);
+                if (this.context) {
+                    this.impl.abort(this.context);
+                }
             };
 
             destroy = () => {

@@ -18,7 +18,7 @@
     },
     "rules": {
         "quotes": ["error", "double"],
-        "no-console": "error",
+        "no-console": ["error", { "allow": ["warn", "error"] }],
         "eqeqeq": "error",
         "brace-style": ["error", "1tbs"],
         "eol-last": "error",
