@@ -74,7 +74,11 @@ export enum Events {
 }
 
 export interface LoaderInterface {
-    on: (eventName: string, listener: (...params: unknown[]) => void) => this;
+    on:
+        ((eventName: string, listener: (...params: unknown[]) => void) => this) & 
+        ((eventName: Events.SegmentLoaded, listener: (segment: Segment) => void) => this) &
+        ((eventName: Events.SegmentError, listener: (segment: Segment, error: unknown) => void) => this) &
+        ((eventName: Events.SegmentAbort, listener: (segment: Segment) => void) => this);
     load: (segments: Segment[], streamSwarmId: string) => void;
     getSegment: (id: string) => Promise<Segment | undefined>;
     getSettings: () => unknown;
