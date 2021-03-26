@@ -24,12 +24,24 @@ import { SegmentManager } from "../lib/segment-manager";
 import { Events, Segment, LoaderInterface } from "p2p-media-loader-core";
 
 class LoaderInterfaceEmptyImpl implements LoaderInterface {
-    public on(eventName: string | symbol, listener: Function): this { return this; }
-    public load(segments: Segment[], swarmId: string): void { }
-    public async getSegment(id: string): Promise<Segment | undefined> { return undefined; }
-    public getSettings(): any { }
-    public getDetails(): any { }
-    public async destroy(): Promise<void> { }
+    public on() {
+        return this;
+    }
+    public load() {
+        return;
+    }
+    public async getSegment() {
+        return undefined;
+    }
+    public getSettings() {
+        return;
+    }
+    public getDetails() {
+        return;
+    }
+    public async destroy() {
+        return;
+    }
 }
 
 const testPlaylist = {
@@ -62,8 +74,11 @@ describe("SegmentManager", () => {
     it("should call succeed after segment loading succeeded", async () => {
         const loader = mock<LoaderInterface>(LoaderInterfaceEmptyImpl);
 
-        let segmentLoadedListener = (segment: Segment) => { throw new Error("SegmentLoaded listener not set"); };
+        let segmentLoadedListener: (segment: Segment) => void = () => {
+            throw new Error("SegmentLoaded listener not set");
+        }
         when(loader.on(Events.SegmentLoaded, anyFunction())).thenCall((_eventName, listener) => {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             segmentLoadedListener = listener;
         });
 
@@ -92,8 +107,11 @@ describe("SegmentManager", () => {
     it("should fail after segment loading failed", async () => {
         const loader = mock<LoaderInterface>(LoaderInterfaceEmptyImpl);
 
-        let segmentErrorListener = (segment: Segment, error: any) => { throw new Error("SegmentError listener not set"); };
+        let segmentErrorListener: (segment: Segment, error: unknown) => void = () => {
+            throw new Error("SegmentError listener not set");
+        };
         when(loader.on(Events.SegmentError, anyFunction())).thenCall((_eventName, listener) => {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             segmentErrorListener = listener;
         });
 
@@ -127,8 +145,11 @@ describe("SegmentManager", () => {
     it("should return undefined content after abortSegment call", async () => {
         const loader = mock<LoaderInterface>(LoaderInterfaceEmptyImpl);
 
-        let segmentLoadedListener = (segment: Segment) => { throw new Error("SegmentLoaded listener not set"); };
+        let segmentLoadedListener: (segment: Segment) => void = () => {
+            throw new Error("SegmentLoaded listener not set");
+        };
         when(loader.on(Events.SegmentLoaded, anyFunction())).thenCall((_eventName, listener) => {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             segmentLoadedListener = listener;
         });
 

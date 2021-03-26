@@ -48,6 +48,7 @@
     "@typescript-eslint/parser": "^4.8.2",
     "browserify": "^17.0.0",
     "eslint": "^7.14.0",
+    "hls.js": "^0.14.17",
     "mkdirp": "^1.0.4",
     "mocha": "^8.2.1",
     "sinon": "^9.2.1",

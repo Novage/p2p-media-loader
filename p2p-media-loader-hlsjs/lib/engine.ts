@@ -27,7 +27,7 @@ import {
     SegmentManagerSettings,
 } from "./segment-manager";
 import { HlsJsLoader } from "./hlsjs-loader";
-import { HlsjsContext } from "./hlsjs-types";
+import type { LoaderCallbacks, LoaderConfiguration, LoaderContext } from "hls.js/src/types/loader";
 
 export interface HlsJsEngineSettings {
     loader: Partial<HybridLoaderSettings>;
@@ -63,20 +63,17 @@ export class Engine extends EventEmitter {
     public createLoaderClass(): new () => unknown {
         const engine = this; // eslint-disable-line @typescript-eslint/no-this-alias
         return class {
-            public stats: Record<string, unknown>;
-
             private impl: HlsJsLoader;
-            private context: HlsjsContext | undefined;
+            private context: LoaderContext | undefined;
 
             constructor() {
                 this.impl = new HlsJsLoader(engine.segmentManager);
-                this.stats = this.impl.stats;
             }
 
             load = async (
-                context: HlsjsContext,
-                config: unknown,
-                callbacks: unknown
+                context: LoaderContext,
+                config: LoaderConfiguration,
+                callbacks: LoaderCallbacks<LoaderContext>
             ) => {
                 this.context = context;
                 await this.impl.load(context, config, callbacks);
