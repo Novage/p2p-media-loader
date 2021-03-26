@@ -26,13 +26,13 @@ export function initShakaPlayer(player: any, segmentManager: SegmentManager) {
     registerParserProxies();
     initializeNetworkingEngine();
 
-    let intervalId: number = 0;
+    let intervalId: ReturnType<typeof setInterval> | undefined;
     let lastPlayheadTimeReported: number = 0;
 
     player.addEventListener("loading", async () => {
-        if (intervalId > 0) {
+        if (intervalId) {
             clearInterval(intervalId);
-            intervalId = 0;
+            intervalId = undefined;
         }
 
         lastPlayheadTimeReported = 0;
