@@ -30,10 +30,10 @@
     "url": "https://github.com/Novage/p2p-media-loader.git"
   },
   "dependencies": {
+    "p2p-graph": "^2.0.0",
     "p2p-media-loader-core": "^0.6.2",
     "p2p-media-loader-hlsjs": "^0.6.2",
-    "p2p-media-loader-shaka": "^0.6.2",
-    "p2p-graph": "^2.0.0"
+    "p2p-media-loader-shaka": "^0.6.2"
   },
   "devDependencies": {
     "browserify": "^17.0.0",
