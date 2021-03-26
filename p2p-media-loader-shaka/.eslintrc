@@ -26,6 +26,7 @@
         "no-trailing-spaces": "error",
         "no-multi-spaces": "error",
         "@typescript-eslint/no-misused-promises": ["error", { "checksVoidReturn": false }],
-        "@typescript-eslint/require-await": "off"
+        "@typescript-eslint/require-await": "off",
+        "@typescript-eslint/triple-slash-reference": "off"
     }
 }
