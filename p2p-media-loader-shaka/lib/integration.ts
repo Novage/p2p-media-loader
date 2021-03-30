@@ -146,7 +146,7 @@ function processNetworkRequest(uri: string, request: HookedRequest, requestType:
             }
         })();
 
-        return new shaka.util.AbortableOperation(responsePromise, async () => {});
+        return new shaka.util.AbortableOperation(responsePromise, async () => undefined);
     } else { // load asset using default plugin
         return xhrPlugin(uri, request, requestType, progressUpdated);
     }

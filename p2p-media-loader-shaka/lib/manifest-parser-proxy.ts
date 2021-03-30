@@ -16,12 +16,11 @@
 
 import { ParserSegment, ParserSegmentCache } from "./parser-segment";
 
-type HookedShakaStream = shaka.extern.Stream & {
+export type HookedShakaStream = shaka.extern.Stream & {
     getSegmentReferenceOriginal: shaka.extern.GetSegmentReferenceFunction;
     createSegmentIndexOriginal: shaka.extern.CreateSegmentIndexFunction;
-    getPosition: (stream: shaka.extern.Stream) => number
+    getPosition: () => number
 };
-
 export type HookedShakaManifest = shaka.extern.Manifest & { p2pml?: { parser: ShakaManifestParserProxy } };
 export type HookedShakaNetworkingEngine = shaka.net.NetworkingEngine & { p2pml?: { masterManifestUri: string } };
 

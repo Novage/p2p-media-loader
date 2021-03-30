@@ -15,10 +15,11 @@
  */
 
 import { getSchemedUri } from "./utils";
+import { HookedShakaStream } from "./manifest-parser-proxy";
 
 export class ParserSegment {
 
-    public static create(stream: any, segmentReference: any): ParserSegment | undefined {
+    public static create(stream: HookedShakaStream, segmentReference: shaka.media.SegmentReference | null): ParserSegment | undefined {
         if (!segmentReference) {
             return undefined;
         }
@@ -46,7 +47,7 @@ export class ParserSegment {
             : `${streamTypeCode}${stream.id}`;
 
         const identity = streamIsHls
-            ? `${segmentReference.position}`
+            ? `${segmentReference.getPosition()}`
             : `${Number(start).toFixed(3)}`;
 
         return new ParserSegment(
@@ -55,12 +56,12 @@ export class ParserSegment {
             streamPosition,
             streamIdentity,
             identity,
-            segmentReference.position,
+            segmentReference.getPosition(),
             start,
             end,
             getSchemedUri(uris[ 0 ]),
             range,
-            () => ParserSegment.create(stream, stream.getSegmentReferenceOriginal(segmentReference.position - 1)),
+            () => ParserSegment.create(stream, stream.getSegmentReferenceOriginal(segmentReference.getPosition() - 1)),
         );
     }
 
@@ -89,11 +90,11 @@ export class ParserSegmentCache {
         this.maxSegments = maxSegments;
     }
 
-    public find(uri: string, range?: string) {
+    public find(uri: string, range?: string): ParserSegment | undefined {
         return this.segments.find(i => i.uri === uri && i.range === range);
     }
 
-    public add(stream: any, segmentReference: any) {
+    public add(stream: HookedShakaStream, segmentReference: shaka.media.SegmentReference | null): void {
         const segment = ParserSegment.create(stream, segmentReference);
         if (segment && !this.find(segment.uri, segment.range)) {
             this.segments.push(segment);
@@ -103,7 +104,7 @@ export class ParserSegmentCache {
         }
     }
 
-    public clear() {
+    public clear(): void {
         this.segments.splice(0);
     }
 

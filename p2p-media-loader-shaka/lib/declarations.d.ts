@@ -248,9 +248,6 @@ namespace shaka {
 
         getAssetUri(): string | null;
 
-        // In older versions
-        getManifestUri(): string | null;
-
         /**
          * Return a list of audio languages available for the
          * current period. If the player has not loaded any
@@ -314,6 +311,7 @@ namespace shaka {
 
         getManifestParserFactory(): extern.ManifestParser.Factory | null;
 
+        // In older versions
         /** @deprecated */
         getManifestUri(): string | null;
 
