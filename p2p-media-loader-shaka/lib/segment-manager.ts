@@ -31,9 +31,9 @@ export class SegmentManager {
 
     private readonly debug = Debug("p2pml:shaka:sm");
     private readonly loader: LoaderInterface;
-    private readonly requests: Map<string, Request> = new Map();
-    private manifestUri: string = "";
-    private playheadTime: number = 0;
+    private readonly requests = new Map<string, Request>();
+    private manifestUri = "";
+    private playheadTime = 0;
     private readonly segmentHistory: ParserSegment[] = [];
     private readonly settings: SegmentManagerSettings;
 
@@ -46,7 +46,7 @@ export class SegmentManager {
         this.loader.on(Events.SegmentAbort, this.onSegmentAbort);
     }
 
-    public async destroy() {
+    public async destroy(): Promise<void> {
         if (this.requests.size !== 0) {
             console.error("Destroying segment manager with active request(s)!");
 
@@ -67,11 +67,11 @@ export class SegmentManager {
         await this.loader.destroy();
     }
 
-    public getSettings() {
+    public getSettings(): SegmentManagerSettings {
         return this.settings;
     }
 
-    public async load(parserSegment: ParserSegment, manifestUri: string, playheadTime: number): Promise<{ data: ArrayBuffer, timeMs: number | undefined }> {
+    public async load(parserSegment: ParserSegment, manifestUri: string, playheadTime: number): Promise<shaka.extern.Response> {
         this.manifestUri = manifestUri;
         this.playheadTime = playheadTime;
 
@@ -81,7 +81,7 @@ export class SegmentManager {
 
         const alreadyLoadedSegment = await this.loader.getSegment(lastRequestedSegment.id);
 
-        return new Promise<{ data: ArrayBuffer, timeMs: number | undefined }>((resolve, reject) => {
+        return new Promise<shaka.extern.Response>((resolve, reject) => {
             const request = new Request(lastRequestedSegment.id, resolve, reject);
             if (alreadyLoadedSegment) {
                 this.reportSuccess(request, alreadyLoadedSegment);
@@ -92,7 +92,7 @@ export class SegmentManager {
         });
     }
 
-    public setPlayheadTime(time: number) {
+    public setPlayheadTime(time: number): void {
         this.playheadTime = time;
 
         if (this.segmentHistory.length > 0) {
@@ -164,10 +164,19 @@ export class SegmentManager {
         }
 
         this.debug("report success", request.id);
-        request.resolve({ data: loaderSegment.data!, timeMs });
+        request.resolve({
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            data: loaderSegment.data!,
+            timeMs,
+            headers: {},
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            originalUri: loaderSegment.requestUrl!,
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            uri: loaderSegment.requestUrl!,
+        });
     }
 
-    private reportError(request: Request, error: any) {
+    private reportError(request: Request, error: unknown) {
         if (request.reject) {
             this.debug("report error", request.id);
             request.reject(error);
@@ -176,14 +185,16 @@ export class SegmentManager {
 
     private onSegmentLoaded = (segment: LoaderSegment) => {
         if (this.requests.has(segment.id)) {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             this.reportSuccess(this.requests.get(segment.id)!, segment);
             this.debug("request delete", segment.id);
             this.requests.delete(segment.id);
         }
     }
 
-    private onSegmentError = (segment: LoaderSegment, error: any) => {
+    private onSegmentError = (segment: LoaderSegment, error: unknown) => {
         if (this.requests.has(segment.id)) {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             this.reportError(this.requests.get(segment.id)!, error);
             this.debug("request delete from error", segment.id);
             this.requests.delete(segment.id);
@@ -192,19 +203,20 @@ export class SegmentManager {
 
     private onSegmentAbort = (segment: LoaderSegment) => {
         if (this.requests.has(segment.id)) {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             this.reportError(this.requests.get(segment.id)!, "Internal abort");
             this.debug("request delete from abort", segment.id);
             this.requests.delete(segment.id);
         }
     }
 
-} // end of SegmentManager
+}
 
 class Request {
     public constructor(
         readonly id: string,
-        readonly resolve: (value: { data: ArrayBuffer, timeMs: number | undefined }) => void,
-        readonly reject: (reason?: any) => void
+        readonly resolve: (value: shaka.extern.Response) => void,
+        readonly reject: (reason?: unknown) => void
     ) {}
 }
 
