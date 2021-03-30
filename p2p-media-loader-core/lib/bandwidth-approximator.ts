@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-const SMOOTH_INTERVAL = 1 * 1000;
+const SMOOTH_INTERVAL = 15 * 1000;
 const MEASURE_INTERVAL = 60 * 1000;
 
 class NumberWithTime {
@@ -34,7 +34,8 @@ export class BandwidthApproximator {
             this.currentBytesSum -= this.lastBytes.shift()!.value;
         }
 
-        this.lastBandwidth.push(new NumberWithTime(this.currentBytesSum / SMOOTH_INTERVAL, timeStamp));
+        const interval = Math.min(SMOOTH_INTERVAL, timeStamp);
+        this.lastBandwidth.push(new NumberWithTime(this.currentBytesSum / interval, timeStamp));
     }
 
     // in bytes per millisecond
