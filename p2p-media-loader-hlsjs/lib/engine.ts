@@ -15,10 +15,19 @@
  */
 
 import { EventEmitter } from "events";
-import { Events, LoaderInterface, HybridLoader, HybridLoaderSettings } from "p2p-media-loader-core";
-import { SegmentManager, Byterange, SegmentManagerSettings } from "./segment-manager";
+import {
+    Events,
+    LoaderInterface,
+    HybridLoader,
+    HybridLoaderSettings,
+} from "p2p-media-loader-core";
+import {
+    SegmentManager,
+    ByteRange,
+    SegmentManagerSettings,
+} from "./segment-manager";
 import { HlsJsLoader } from "./hlsjs-loader";
-import { createHlsJsLoaderClass } from "./hlsjs-loader-class";
+import type { LoaderCallbacks, LoaderConfiguration, LoaderContext } from "hls.js/src/types/loader";
 
 export interface HlsJsEngineSettings {
     loader: Partial<HybridLoaderSettings>;
@@ -26,7 +35,6 @@ export interface HlsJsEngineSettings {
 }
 
 export class Engine extends EventEmitter {
-
     public static isSupported(): boolean {
         return HybridLoader.isSupported();
     }
@@ -38,39 +46,87 @@ export class Engine extends EventEmitter {
         super();
 
         this.loader = new HybridLoader(settings.loader);
-        this.segmentManager = new SegmentManager(this.loader, settings.segments);
+        this.segmentManager = new SegmentManager(
+            this.loader,
+            settings.segments
+        );
 
         Object.keys(Events)
-            .map(eventKey => Events[eventKey as keyof typeof Events])
-            .forEach(event => this.loader.on(event, (...args: any[]) => this.emit(event, ...args)));
+            .map((eventKey) => Events[eventKey as keyof typeof Events])
+            .forEach((event) =>
+                this.loader.on(event, (...args: unknown[]) =>
+                    this.emit(event, ...args)
+                )
+            );
     }
 
-    public createLoaderClass(): any {
-        return createHlsJsLoaderClass(HlsJsLoader, this);
+    public createLoaderClass(): new () => unknown {
+        const engine = this; // eslint-disable-line @typescript-eslint/no-this-alias
+        return class {
+            private impl: HlsJsLoader;
+            private context: LoaderContext | undefined;
+
+            constructor() {
+                this.impl = new HlsJsLoader(engine.segmentManager);
+            }
+
+            load = async (
+                context: LoaderContext,
+                config: LoaderConfiguration,
+                callbacks: LoaderCallbacks<LoaderContext>
+            ) => {
+                this.context = context;
+                await this.impl.load(context, config, callbacks);
+            };
+
+            abort = () => {
+                if (this.context) {
+                    this.impl.abort(this.context);
+                }
+            };
+
+            destroy = () => {
+                if (this.context) {
+                    this.impl.abort(this.context);
+                }
+            };
+
+            static getEngine = () => {
+                return engine;
+            };
+        };
     }
 
-    public async destroy() {
+    public async destroy(): Promise<void> {
         await this.segmentManager.destroy();
     }
 
-    public getSettings(): any {
+    public getSettings(): {
+        segments: SegmentManagerSettings;
+        loader: unknown;
+    } {
         return {
             segments: this.segmentManager.getSettings(),
-            loader: this.loader.getSettings()
+            loader: this.loader.getSettings(),
         };
     }
 
-    public getDetails(): any {
+    public getDetails(): unknown {
         return {
-            loader: this.loader.getDetails()
+            loader: this.loader.getDetails(),
         };
     }
 
-    public setPlayingSegment(url: string, byterange: Byterange, start: number, duration: number) {
-        this.segmentManager.setPlayingSegment(url, byterange, start, duration);
+    public setPlayingSegment(
+        url: string,
+        byteRange: ByteRange,
+        start: number,
+        duration: number
+    ): void {
+        this.segmentManager.setPlayingSegment(url, byteRange, start, duration);
     }
 
-    public setPlayingSegmentByCurrentTime(playheadPosition: number) {
+    public setPlayingSegmentByCurrentTime(playheadPosition: number): void {
         this.segmentManager.setPlayingSegmentByCurrentTime(playheadPosition);
     }
 }
@@ -86,6 +142,10 @@ export interface Asset {
 
 export interface AssetsStorage {
     storeAsset(asset: Asset): Promise<void>;
-    getAsset(requestUri: string, requestRange: string | undefined, masterSwarmId: string): Promise<Asset | undefined>;
+    getAsset(
+        requestUri: string,
+        requestRange: string | undefined,
+        masterSwarmId: string
+    ): Promise<Asset | undefined>;
     destroy(): Promise<void>;
 }

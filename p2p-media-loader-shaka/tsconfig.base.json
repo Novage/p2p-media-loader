@@ -1,23 +1,16 @@
 {
   "compilerOptions": {
-    "target": "es6",
+    "target": "es2017",
     "module": "commonjs",
     "strict": true,
     "moduleResolution": "node",
     "declaration": true,
-    "noEmit": true,
     "noUnusedLocals": true,
     "noUnusedParameters": false,
-    "strictNullChecks": true,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,
-    "noImplicitThis": true,
-    "noImplicitAny": true,
-    "types": []
+    "skipLibCheck": true,
+    "esModuleInterop": true,
   },
-  "include": [
-    "lib/**/*",
-    "test/**/*"
-  ]
 }

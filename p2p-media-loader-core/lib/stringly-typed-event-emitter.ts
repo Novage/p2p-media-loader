@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { EventEmitter } from "events";
 
-export class STEEmitter<T extends string> extends EventEmitter {
-    public on(event: T, listener: (...args: any[]) => void) { return super.on(event, listener); }
-    public emit(event: T, ...args: any[]) { return super.emit(event, ...args); }
+export class STEEmitter<T extends (string | symbol)> extends EventEmitter {
+    public on = (event: T, listener: (...args: any[]) => void): this => super.on(event, listener);
+    public emit = (event: T, ...args: any[]): boolean => super.emit(event, ...args);
 }

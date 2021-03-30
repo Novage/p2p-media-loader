@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
-import { HlsJsLoader } from "./hlsjs-loader";
-import { Engine } from "./engine";
+import * as hlsjs from "./index";
 
-export function createHlsJsLoaderClass(type: typeof HlsJsLoader, engine: Engine): any;
+if (!window.p2pml) {
+    window.p2pml = {};
+}
+
+window.p2pml.hlsjs = hlsjs;

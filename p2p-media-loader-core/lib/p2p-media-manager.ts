@@ -14,14 +14,18 @@
  * limitations under the License.
  */
 
-import * as Debug from "debug";
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 
-import * as Client from "bittorrent-tracker/client";
+import Debug from "debug";
+import Client from "bittorrent-tracker/client";
+import { Buffer } from "buffer";
+import sha1 from "sha.js/sha1";
+
 import { STEEmitter } from "./stringly-typed-event-emitter";
 import { Segment } from "./loader-interface";
 import { MediaPeer, MediaPeerSegmentStatus } from "./media-peer";
-import { Buffer } from "buffer";
-import * as sha1 from "sha.js/sha1";
 import { version } from "./index";
 import { SegmentsStorage, SegmentValidatorCallback } from "./hybrid-loader";
 
@@ -54,10 +58,11 @@ export class P2PMediaManager extends STEEmitter<
     "segment-loaded" | "segment-error" | "bytes-downloaded" |
     "bytes-uploaded" | "tracker-update"
 > {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private trackerClient: any = null;
-    private peers: Map<string, MediaPeer> = new Map();
-    private peerCandidates: Map<string, MediaPeer[]> = new Map();
-    private peerSegmentRequests: Map<string, PeerSegmentRequest> = new Map();
+    private peers = new Map<string, MediaPeer>();
+    private peerCandidates = new Map<string, MediaPeer[]>();
+    private peerSegmentRequests = new Map<string, PeerSegmentRequest>();
     private streamSwarmId: string | null = null;
     private readonly peerId: ArrayBuffer;
     private debug = Debug("p2pml:p2p-media-manager");
@@ -67,7 +72,7 @@ export class P2PMediaManager extends STEEmitter<
     private masterSwarmId?: string;
 
     public constructor(
-            private sementsStorage: SegmentsStorage,
+            private segmentsStorage: SegmentsStorage,
             private settings: {
                 useP2P: boolean,
                 trackerAnnounce: string[],
@@ -86,15 +91,15 @@ export class P2PMediaManager extends STEEmitter<
         }
     }
 
-    public getPeers() {
+    public getPeers = (): Map<string, MediaPeer> => {
         return this.peers;
     }
 
-    public getPeerId(): string {
+    public getPeerId = (): string => {
         return Buffer.from(this.peerId).toString("hex");
     }
 
-    public async setStreamSwarmId(streamSwarmId: string, masterSwarmId: string) {
+    public setStreamSwarmId = (streamSwarmId: string, masterSwarmId: string): void => {
         if (this.streamSwarmId === streamSwarmId) {
             return;
         }
@@ -115,19 +120,19 @@ export class P2PMediaManager extends STEEmitter<
         // TODO: Edge doesn't support SHA-1. Change to SHA-256 once Edge support is required.
         // const infoHash = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(PEER_PROTOCOL_VERSION + this.streamSwarmId));
 
-        const infoHash = new sha1().update(PEER_PROTOCOL_VERSION + this.streamSwarmId).digest();
+        const infoHash = new sha1().update(`${PEER_PROTOCOL_VERSION}${this.streamSwarmId}`).digest();
 
         // destroy may be called while waiting for the hash to be calculated
         if (!pendingTrackerClient.isDestroyed) {
             this.pendingTrackerClient = null;
             this.createClient(infoHash);
-        } else if (this.trackerClient != null) {
+        } else if (this.trackerClient !== null) {
             this.trackerClient.destroy();
             this.trackerClient = null;
         }
     }
 
-    private createClient(infoHash: ArrayBuffer): void {
+    private createClient = (infoHash: ArrayBuffer): void => {
         if (!this.settings.useP2P) {
             return;
         }
@@ -153,25 +158,26 @@ export class P2PMediaManager extends STEEmitter<
 
         this.trackerClient.start();
 
-        if (oldTrackerClient != null) {
+        if (oldTrackerClient !== null) {
             oldTrackerClient.destroy();
             oldTrackerClient = null;
         }
     }
 
-    private onTrackerError = (error: any) => {
+    private onTrackerError = (error: unknown) => {
         this.debug("tracker error", error);
     }
 
-    private onTrackerWarning = (warning: any) => {
+    private onTrackerWarning = (warning: unknown) => {
         this.debug("tracker warning", warning);
     }
 
-    private onTrackerUpdate = (data: any): void => {
+    private onTrackerUpdate = (data: unknown): void => {
         this.debug("tracker update", data);
         this.emit("tracker-update", data);
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private onTrackerPeer = (trackerPeer: any): void => {
         this.debug("tracker peer", trackerPeer.id, trackerPeer);
 
@@ -204,7 +210,7 @@ export class P2PMediaManager extends STEEmitter<
         peerCandidatesById.push(peer);
     }
 
-    public download(segment: Segment): boolean {
+    public download = (segment: Segment): boolean => {
         if (this.isDownloading(segment)) {
             return false;
         }
@@ -212,7 +218,7 @@ export class P2PMediaManager extends STEEmitter<
         const candidates: MediaPeer[] = [];
 
         for (const peer of this.peers.values()) {
-            if ((peer.getDownloadingSegmentId() == null) &&
+            if ((peer.getDownloadingSegmentId() === null) &&
                     (peer.getSegmentsMap().get(segment.id) === MediaPeerSegmentStatus.Loaded)) {
                 candidates.push(peer);
             }
@@ -228,7 +234,7 @@ export class P2PMediaManager extends STEEmitter<
         return true;
     }
 
-    public abort(segment: Segment): ArrayBuffer[] | undefined {
+    public abort = (segment: Segment): ArrayBuffer[] | undefined => {
         let downloadingSegment: ArrayBuffer[] | undefined;
         const peerSegmentRequest = this.peerSegmentRequests.get(segment.id);
         if (peerSegmentRequest) {
@@ -241,15 +247,15 @@ export class P2PMediaManager extends STEEmitter<
         return downloadingSegment;
     }
 
-    public isDownloading(segment: Segment): boolean {
+    public isDownloading = (segment: Segment): boolean => {
         return this.peerSegmentRequests.has(segment.id);
     }
 
-    public getActiveDownloadsCount(): number {
+    public getActiveDownloadsCount = (): number => {
         return this.peerSegmentRequests.size;
     }
 
-    public destroy(swarmChange: boolean = false): void {
+    public destroy = (swarmChange = false): void => {
         this.streamSwarmId = null;
 
         if (this.trackerClient) {
@@ -284,19 +290,19 @@ export class P2PMediaManager extends STEEmitter<
         this.peerCandidates.clear();
     }
 
-    public sendSegmentsMapToAll(segmentsMap: {[key: string]: [string, number[]]}): void {
+    public sendSegmentsMapToAll = (segmentsMap: {[key: string]: [string, number[]]}): void => {
         this.peers.forEach(peer => peer.sendSegmentsMap(segmentsMap));
     }
 
-    public sendSegmentsMap(peerId: string, segmentsMap: {[key: string]: [string, number[]]}): void {
+    public sendSegmentsMap = (peerId: string, segmentsMap: {[key: string]: [string, number[]]}): void => {
         const peer = this.peers.get(peerId);
         if (peer) {
             peer.sendSegmentsMap(segmentsMap);
         }
     }
 
-    public getOvrallSegmentsMap(): Map<string, MediaPeerSegmentStatus> {
-        const overallSegmentsMap: Map<string, MediaPeerSegmentStatus> = new Map();
+    public getOverallSegmentsMap = (): Map<string, MediaPeerSegmentStatus> => {
+        const overallSegmentsMap = new Map<string, MediaPeerSegmentStatus>();
 
         for (const peer of this.peers.values()) {
             for (const [segmentId, segmentStatus] of peer.getSegmentsMap()) {
@@ -335,7 +341,7 @@ export class P2PMediaManager extends STEEmitter<
         const peerCandidatesById = this.peerCandidates.get(peer.id);
         if (peerCandidatesById) {
             for (const peerCandidate of peerCandidatesById) {
-                if (peerCandidate != peer) {
+                if (peerCandidate !== peer) {
                     peerCandidate.destroy();
                 }
             }
@@ -347,7 +353,7 @@ export class P2PMediaManager extends STEEmitter<
     }
 
     private onPeerClose = (peer: MediaPeer) => {
-        if (this.peers.get(peer.id) != peer) {
+        if (this.peers.get(peer.id) !== peer) {
             // Try to delete the peer candidate
 
             const peerCandidatesById = this.peerCandidates.get(peer.id);
@@ -356,11 +362,11 @@ export class P2PMediaManager extends STEEmitter<
             }
 
             const index = peerCandidatesById.indexOf(peer);
-            if (index != -1) {
+            if (index !== -1) {
                 peerCandidatesById.splice(index, 1);
             }
 
-            if (peerCandidatesById.length == 0) {
+            if (peerCandidatesById.length === 0) {
                 this.peerCandidates.delete(peer.id);
             }
 
@@ -368,7 +374,7 @@ export class P2PMediaManager extends STEEmitter<
         }
 
         for (const [key, value] of this.peerSegmentRequests) {
-            if (value.peerId == peer.id) {
+            if (value.peerId === peer.id) {
                 this.peerSegmentRequests.delete(key);
             }
         }
@@ -387,9 +393,9 @@ export class P2PMediaManager extends STEEmitter<
             return;
         }
 
-        const segment = await this.sementsStorage.getSegment(segmentId, this.masterSwarmId);
-        if (segment) {
-            peer.sendSegmentData(segmentId, segment.data!);
+        const segment = await this.segmentsStorage.getSegment(segmentId, this.masterSwarmId);
+        if (segment && segment.data) {
+            peer.sendSegmentData(segmentId, segment.data);
         } else {
             peer.sendSegmentAbsent(segmentId);
         }

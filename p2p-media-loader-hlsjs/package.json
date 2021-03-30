@@ -21,13 +21,13 @@
     "hlsjs"
   ],
   "scripts": {
-    "compile": "tsc && copyfiles -f ./lib/*.js ./dist",
-    "browserify": "mkdirp ./build && browserify -r ./dist/index.js:p2p-media-loader-hlsjs ./dist/browser-init.js -x p2p-media-loader-core -x debug -x events > ./build/p2p-media-loader-hlsjs.js",
+    "compile": "tsc",
+    "browserify": "mkdirp ./build && browserify -r ./dist/index.js:p2p-media-loader-hlsjs ./dist/browser-init.js -x p2p-media-loader-core -x debug -x events -x buffer > ./build/p2p-media-loader-hlsjs.js",
     "minify": "terser ./build/p2p-media-loader-hlsjs.js -m -c > ./build/p2p-media-loader-hlsjs.min.js",
-    "webpack:build": "webpack --progress",
-    "webpack:watch": "webpack --watch --progress",
+    "webpack:build": "webpack --progress -c webpackfile.js",
+    "webpack:watch": "webpack --watch --progress -c webpackfile.js",
     "build": "npm run compile && npm run browserify && npm run minify",
-    "lint": "tslint -c ./tslint.json -p ./tsconfig.tslint.json",
+    "lint": "eslint . --ext .ts",
     "test": "TS_NODE_PROJECT=tsconfig.test.json TS_NODE_CACHE=false mocha -r ts-node/register test/*.test.ts"
   },
   "repository": {
@@ -36,26 +36,28 @@
   },
   "dependencies": {
     "events": "^3.2.0",
-    "m3u8-parser": "^4.4.3",
+    "m3u8-parser": "^4.5.0",
     "p2p-media-loader-core": "^0.6.2"
   },
   "devDependencies": {
     "@types/events": "^3.0.0",
-    "@types/mocha": "^8.0.3",
-    "@types/node": "^14.11.2",
-    "@types/sinon": "^9.0.7",
-    "browserify": "^16.5.2",
-    "copyfiles": "^2.3.0",
+    "@types/mocha": "^8.0.4",
+    "@types/node": "^14.14.10",
+    "@types/sinon": "^9.0.9",
+    "@typescript-eslint/eslint-plugin": "^4.8.2",
+    "@typescript-eslint/parser": "^4.8.2",
+    "browserify": "^17.0.0",
+    "eslint": "^7.14.0",
+    "hls.js": "^0.14.17",
     "mkdirp": "^1.0.4",
-    "mocha": "^8.1.3",
-    "sinon": "^9.0.3",
-    "terser": "^5.3.3",
-    "ts-loader": "^8.0.4",
+    "mocha": "^8.2.1",
+    "sinon": "^9.2.1",
+    "terser": "^5.5.1",
+    "ts-loader": "^8.0.11",
     "ts-mockito": "^2.6.1",
     "ts-node": "^9.0.0",
-    "tslint": "^6.1.3",
-    "typescript": "^4.0.3",
-    "webpack": "^4.44.2",
-    "webpack-cli": "^3.3.12"
+    "typescript": "^4.1.2",
+    "webpack": "^5.9.0",
+    "webpack-cli": "^4.2.0"
   }
 }

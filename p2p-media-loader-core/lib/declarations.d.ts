@@ -15,8 +15,9 @@
  */
 
 declare module "bittorrent-tracker/client";
-declare module "get-browser-rtc";
 declare module "simple-peer";
-declare module "sha.js/sha1";
-
-declare const __P2PML_VERSION__: string;
+declare module "sha.js/sha1" {
+    import { HashStatic } from "sha.js";
+    const sha1: HashStatic;
+    export default sha1;
+}

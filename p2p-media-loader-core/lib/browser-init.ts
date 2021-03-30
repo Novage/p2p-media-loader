@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-type XMLHttpRequestResponseType = "" | "arraybuffer" | "blob" | "document" | "json" | "text";
+import * as p2pml from "./index";
 
- declare class XMLHttpRequest {
-    [key: string]: any;
-    readonly response: any;
-    readonly responseURL: string;
+if (!window.p2pml) {
+    window.p2pml = {};
 }
+
+window.p2pml.core = p2pml;

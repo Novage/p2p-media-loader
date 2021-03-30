@@ -16,88 +16,97 @@
 
 import { ParserSegment, ParserSegmentCache } from "./parser-segment";
 
-export class ShakaManifestParserProxy {
+export type HookedShakaStream = shaka.extern.Stream & {
+    getSegmentReferenceOriginal: shaka.extern.GetSegmentReferenceFunction;
+    createSegmentIndexOriginal: shaka.extern.CreateSegmentIndexFunction;
+    getPosition: () => number
+};
+export type HookedShakaManifest = shaka.extern.Manifest & { p2pml?: { parser: ShakaManifestParserProxy } };
+export type HookedShakaNetworkingEngine = shaka.net.NetworkingEngine & { p2pml?: { masterManifestUri: string } };
+
+export class ShakaManifestParserProxy implements shaka.extern.ManifestParser {
 
     private readonly cache: ParserSegmentCache = new ParserSegmentCache(200);
-    private readonly originalManifestParser: any;
-    private manifest: any;
+    private readonly originalManifestParser: shaka.extern.ManifestParser;
+    private manifest?: HookedShakaManifest;
 
-    public constructor(originalManifestParser: any) {
+    public constructor(originalManifestParser: shaka.extern.ManifestParser) {
         this.originalManifestParser = originalManifestParser;
     }
 
-    public isHls() { return this.originalManifestParser instanceof shaka.hls.HlsParser; }
-    public isDash() { return this.originalManifestParser instanceof shaka.dash.DashParser; }
-
-    public start(uri: string, playerInterface: any) {
-        // Tell P2P Media Loader's networking engine code about currently loading manifest
-        if (playerInterface.networkingEngine.p2pml === undefined) {
-            playerInterface.networkingEngine.p2pml = {};
-        }
-        playerInterface.networkingEngine.p2pml.masterManifestUri = uri;
-
-        return this.originalManifestParser.start(uri, playerInterface).then((manifest: any) => {
-            this.manifest = manifest;
-
-            for (const period of manifest.periods) {
-                const processedStreams = [];
-
-                for (const variant of period.variants) {
-                    if ((variant.video != null) && (processedStreams.indexOf(variant.video) == -1)) {
-                        if (variant.video.getSegmentReference) {
-                            this.hookGetSegmentReference(variant.video);
-                        } else {
-                            this.hookSegmentIndex(variant.video);
-                        }
-                        processedStreams.push(variant.video);
-                    }
-
-                    if ((variant.audio != null) && (processedStreams.indexOf(variant.audio) == -1)) {
-                        if (variant.audio.getSegmentReference) {
-                            this.hookGetSegmentReference(variant.audio);
-                        } else {
-                            this.hookSegmentIndex(variant.audio);
-                        }
-                        processedStreams.push(variant.audio);
-                    }
-                }
-            }
-
-            manifest.p2pml = {parser: this};
-            return manifest;
-        });
+    isHls(): boolean {
+        return this.originalManifestParser instanceof shaka.hls.HlsParser;
     }
 
-    public configure(config: any) {
+    isDash(): boolean {
+        return this.originalManifestParser instanceof shaka.dash.DashParser;
+    }
+
+    public async start(uri: string, playerInterface: shaka.extern.ManifestParser.PlayerInterface): Promise<shaka.extern.Manifest> {
+        // Tell P2P Media Loader's networking engine code about currently loading manifest
+        const networkingEngine = playerInterface.networkingEngine as shaka.net.NetworkingEngine & { p2pml?: { masterManifestUri: string } };
+        networkingEngine.p2pml = { masterManifestUri: uri };
+
+        this.manifest = await this.originalManifestParser.start(uri, playerInterface);
+
+        for (const period of this.manifest.periods) {
+            const processedStreams = [];
+
+            for (const variant of period.variants) {
+                if ((variant.video !== null) && (processedStreams.indexOf(variant.video) === -1)) {
+                    if (variant.video.getSegmentReference as shaka.extern.GetSegmentReferenceFunction | undefined) {
+                        this.hookGetSegmentReference(variant.video as HookedShakaStream);
+                    } else {
+                        this.hookSegmentIndex(variant.video as HookedShakaStream);
+                    }
+                    processedStreams.push(variant.video);
+                }
+
+                if ((variant.audio !== null) && (processedStreams.indexOf(variant.audio) === -1)) {
+                    if (variant.audio.getSegmentReference as shaka.extern.GetSegmentReferenceFunction | undefined) {
+                        this.hookGetSegmentReference(variant.audio as HookedShakaStream);
+                    } else {
+                        this.hookSegmentIndex(variant.audio as HookedShakaStream);
+                    }
+                    processedStreams.push(variant.audio);
+                }
+            }
+        }
+
+        this.manifest.p2pml = { parser: this };
+        return this.manifest;
+    }
+
+    public configure(config: shaka.extern.ManifestConfiguration): void {
         return this.originalManifestParser.configure(config);
     }
 
-    public stop() {
+    public stop(): Promise<unknown> {
         return this.originalManifestParser.stop();
     }
 
-    public update() {
+    public update(): void {
         return this.originalManifestParser.update();
     }
 
-    public onExpirationUpdated() {
-        return this.originalManifestParser.onExpirationUpdated();
+    public onExpirationUpdated(sessionId: string, expiration: number): void {
+        return this.originalManifestParser.onExpirationUpdated(sessionId, expiration);
     }
 
     public find(uri: string, range?: string): ParserSegment | undefined {
         return this.cache.find(uri, range);
     }
 
-    public reset() {
+    public reset(): void {
         this.cache.clear();
     }
 
-    private hookGetSegmentReference(stream: any): void {
+    private hookGetSegmentReference(stream: HookedShakaStream): void {
         // Works for Shaka Player version <= 2.5
 
         stream.getSegmentReferenceOriginal = stream.getSegmentReference;
 
-        stream.getSegmentReference = (segmentNumber: any) => {
+        stream.getSegmentReference = (segmentNumber: number) => {
             const reference = stream.getSegmentReferenceOriginal(segmentNumber);
             this.cache.add(stream, reference);
             return reference;
@@ -106,13 +115,14 @@ export class ShakaManifestParserProxy {
         stream.getPosition = () => this.getPosition(stream);
     }
 
-    private hookSegmentIndex(stream: any): void {
+    private hookSegmentIndex(stream: HookedShakaStream): void {
         // Works for Shaka Player version >= 2.6
 
         stream.createSegmentIndexOriginal = stream.createSegmentIndex;
         stream.createSegmentIndex = async () => {
-            await stream.createSegmentIndexOriginal();
+            const result = await stream.createSegmentIndexOriginal();
 
+            // eslint-disable-next-line @typescript-eslint/unbound-method
             const getOriginal = stream.segmentIndex.get;
             stream.getSegmentReferenceOriginal = (segmentNumber: number) => getOriginal.call(stream.segmentIndex, segmentNumber);
 
@@ -121,19 +131,22 @@ export class ShakaManifestParserProxy {
                 this.cache.add(stream, reference);
                 return reference;
             };
+
+            return result;
         };
 
         stream.getPosition = () => this.getPosition(stream);
     }
 
-    private getPosition = (stream: any) => {
+    private getPosition = (stream: shaka.extern.Stream): number => {
         if (this.isHls()) {
             if (stream.type === "video") {
-                return this.manifest.periods[0].variants.reduce((a: any, i: any) => {
-                    if (i.video && i.video.id && !a.includes(i.video.id)) {
-                        a.push(i.video.id);
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                return this.manifest!.periods[0].variants.reduce((streams: number[], stream: shaka.extern.Variant) => {
+                    if (stream.video && stream.video.id && !streams.includes(stream.video.id)) {
+                        streams.push(stream.video.id);
                     }
-                    return a;
+                    return streams;
                 }, []).indexOf(stream.id);
             }
         }

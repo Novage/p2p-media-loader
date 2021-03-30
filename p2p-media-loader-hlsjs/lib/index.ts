@@ -15,6 +15,8 @@
  * limitations under the License.
  */
 
+/* eslint-disable */
+
 export const version = "0.6.2";
 export * from "./engine";
 export * from "./segment-manager";
@@ -22,6 +24,12 @@ export * from "./segment-manager";
 import { Engine } from "./engine";
 
 declare const videojs: any;
+
+declare global {
+    interface Window {
+        p2pml: Record<string, unknown>;
+    }
+}
 
 export function initHlsJsPlayer(player: any): void {
     if (player && player.config && player.config.loader && typeof player.config.loader.getEngine === "function") {
@@ -40,7 +48,7 @@ export function initClapprPlayer(player: any): void {
 }
 
 export function initFlowplayerHlsJsPlayer(player: any): void {
-    player.on("ready", () => initHlsJsPlayer(player.engine.hlsjs ? player.engine.hlsjs : player.engine.hls));
+    player.on("ready", () => initHlsJsPlayer(player.engine.hlsjs ?? player.engine.hls));
 }
 
 export function initVideoJsContribHlsJsPlayer(player: any): void {
@@ -72,10 +80,10 @@ export function initMediaElementJsPlayer(mediaElement: any): void {
 
             if (event.data && (event.data.length > 1)) {
                 const frag = event.data[1].frag;
-                const byterange = (frag.byteRange.length !== 2)
+                const byteRange = (frag.byteRange.length !== 2)
                     ? undefined
                     : { offset: frag.byteRange[0], length: frag.byteRange[1] - frag.byteRange[0] };
-                engine.setPlayingSegment(frag.url, byterange, frag.start, frag.duration);
+                engine.setPlayingSegment(frag.url, byteRange, frag.start, frag.duration);
             }
         }
     });
@@ -108,25 +116,25 @@ export function initJwPlayer(player: any, hlsjsConfig: any): void {
 }
 
 function initHlsJsEvents(player: any, engine: Engine): void {
-    player.on("hlsFragChanged", (_event: any, data: any) => {
+    player.on("hlsFragChanged", (_event: string, data: any) => {
         const frag = data.frag;
-        const byterange = (frag.byteRange.length !== 2)
+        const byteRange = (frag.byteRange.length !== 2)
             ? undefined
             : { offset: frag.byteRange[0], length: frag.byteRange[1] - frag.byteRange[0] };
-        engine.setPlayingSegment(frag.url, byterange, frag.start, frag.duration);
+        engine.setPlayingSegment(frag.url, byteRange, frag.start, frag.duration);
     });
     player.on("hlsDestroying", async () => {
         await engine.destroy();
     });
     player.on("hlsError", (_event: string, errorData: { details: string }) => {
         if (errorData.details === "bufferStalledError") {
-            const htmlMediaElement = player.media === undefined
+            const htmlMediaElement = (player.media === undefined
                 ? player.el_ // videojs-contrib-hlsjs
-                : player.media; // all others
-            if (htmlMediaElement === undefined) {
-                return;
+                : player.media // all others
+            ) as HTMLMediaElement | undefined;
+            if (htmlMediaElement) {
+                engine.setPlayingSegmentByCurrentTime(htmlMediaElement.currentTime);
             }
-            engine.setPlayingSegmentByCurrentTime(htmlMediaElement.currentTime);
         }
     });
 }

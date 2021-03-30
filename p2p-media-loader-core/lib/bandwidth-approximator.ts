@@ -26,11 +26,12 @@ export class BandwidthApproximator {
     private currentBytesSum = 0;
     private lastBandwidth: NumberWithTime[] = [];
 
-    public addBytes(bytes: number, timeStamp: number): void {
+    public addBytes = (bytes: number, timeStamp: number): void => {
         this.lastBytes.push(new NumberWithTime(bytes, timeStamp));
         this.currentBytesSum += bytes;
 
         while (timeStamp - this.lastBytes[0].timeStamp > SMOOTH_INTERVAL) {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             this.currentBytesSum -= this.lastBytes.shift()!.value;
         }
 
@@ -38,8 +39,8 @@ export class BandwidthApproximator {
     }
 
     // in bytes per millisecond
-    public getBandwidth(timeStamp: number): number {
-        while (this.lastBandwidth.length != 0 && timeStamp - this.lastBandwidth[0].timeStamp > MEASURE_INTERVAL) {
+    public getBandwidth = (timeStamp: number): number => {
+        while (this.lastBandwidth.length !== 0 && timeStamp - this.lastBandwidth[0].timeStamp > MEASURE_INTERVAL) {
             this.lastBandwidth.shift();
         }
 
@@ -53,11 +54,11 @@ export class BandwidthApproximator {
         return maxBandwidth;
     }
 
-    public getSmoothInterval(): number {
+    public getSmoothInterval = (): number => {
         return SMOOTH_INTERVAL;
     }
 
-    public getMeasureInterval(): number {
+    public getMeasureInterval = (): number => {
         return MEASURE_INTERVAL;
     }
 }

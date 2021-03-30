@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-export function getSchemedUri(uri: string) {
+export function getSchemedUri(uri: string): string {
     return uri.startsWith("//") ? window.location.protocol + uri : uri;
 }
 
-export function getMasterSwarmId(masterManifestUri: string, settings: {swarmId?: string}) {
+export function getMasterSwarmId(masterManifestUri: string, settings: {swarmId?: string}) : string {
     return (settings.swarmId && (settings.swarmId.length !== 0)) ?
                 settings.swarmId : masterManifestUri.split("?")[0];
 }

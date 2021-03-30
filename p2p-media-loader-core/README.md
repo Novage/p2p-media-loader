@@ -71,11 +71,11 @@ If `settings` is specified, then the default settings (shown below) will be over
 ### SegmentsStorage interface
 ```typescript
 interface SegmentsStorage {
-    storeSegment(segment: Segment): Promise<void>;
-    getSegmentsMap(masterSwarmId: string): Promise<Map<string, {segment: Segment}>>;
-    getSegment(id: string, masterSwarmId: string): Promise<Segment | undefined>;
-    clean(lockedSementsfilter?: (id: string) => boolean): Promise<boolean>;
-    destroy(): Promise<void>;
+    storeSegment: (segment: Segment) => Promise<void>;
+    getSegmentsMap: (masterSwarmId: string) => Promise<Map<string, {segment: Segment}>>;
+    getSegment: (id: string, masterSwarmId: string) => Promise<Segment | undefined>;
+    clean: (lockedSegmentsFilter?: (id: string) => boolean) => Promise<boolean>;
+    destroy: () => Promise<void>;
 }
 ```
 

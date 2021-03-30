@@ -15,34 +15,35 @@
  */
 
 import { SegmentManager } from "./segment-manager";
+import type { LoaderCallbacks, LoaderConfiguration, LoaderContext } from "hls.js/src/types/loader";
 
 const DEFAULT_DOWNLOAD_LATENCY = 1;
 const DEFAULT_DOWNLOAD_BANDWIDTH = 12500; // bytes per millisecond
 
 export class HlsJsLoader {
     private segmentManager: SegmentManager;
-    private readonly stats: any = {}; // required for older versions of hls.js
 
     public constructor(segmentManager: SegmentManager) {
         this.segmentManager = segmentManager;
     }
 
-    public async load(context: any, _config: any, callbacks: any) {
-        if (context.type) {
+    public async load(context: LoaderContext, _config: LoaderConfiguration, callbacks: LoaderCallbacks<LoaderContext>): Promise<void> {
+        if ((context as unknown as { type: unknown }).type) {
             try {
                 const result = await this.segmentManager.loadPlaylist(context.url);
                 this.successPlaylist(result, context, callbacks);
             } catch (e) {
                 this.error(e, context, callbacks);
             }
-        } else if (context.frag) {
+        } else if ((context as unknown as { frag: unknown }).frag) {
             try {
                 const result = await this.segmentManager.loadSegment(context.url,
-                    (context.rangeStart == undefined) || (context.rangeEnd == undefined)
+                    (context.rangeStart === undefined) || (context.rangeEnd === undefined)
                         ? undefined
                         : { offset: context.rangeStart, length: context.rangeEnd - context.rangeStart });
-                if (result.content !== undefined) {
-                    setTimeout(() => this.successSegment(result.content!, result.downloadBandwidth, context, callbacks), 0);
+                const { content } = result;
+                if (content !== undefined) {
+                    setTimeout(() => this.successSegment(content, result.downloadBandwidth, context, callbacks), 0);
                 }
             } catch (e) {
                 setTimeout(() => this.error(e, context, callbacks), 0);
@@ -52,43 +53,51 @@ export class HlsJsLoader {
         }
     }
 
-    public abort(context: any): void {
+    public abort(context: LoaderContext): void {
         this.segmentManager.abortSegment(context.url,
-            (context.rangeStart == undefined) || (context.rangeEnd == undefined)
+            (context.rangeStart === undefined) || (context.rangeEnd === undefined)
                 ? undefined
                 : { offset: context.rangeStart, length: context.rangeEnd - context.rangeStart });
     }
 
-    private successPlaylist(xhr: {response: string, responseURL: string}, context: any, callbacks: any): void {
+    private successPlaylist(xhr: {response: string, responseURL: string}, context: LoaderContext, callbacks: LoaderCallbacks<LoaderContext>): void {
         const now = performance.now();
 
-        this.stats.trequest = now - 300;
-        this.stats.tfirst = now - 200;
-        this.stats.tload = now;
-        this.stats.loaded = xhr.response.length;
+        const stats = {
+            trequest: now - 300,
+            tfirst: now - 200,
+            tload: now - 1,
+            tparsed: now,
+            loaded: xhr.response.length,
+            total: xhr.response.length,
+        };
 
         callbacks.onSuccess({
             url: xhr.responseURL,
             data: xhr.response
-        }, this.stats, context);
+        }, stats, context, undefined);
     }
 
-    private successSegment(content: ArrayBuffer, downloadBandwidth: number | undefined, context: any, callbacks: any): void {
+    private successSegment(content: ArrayBuffer, downloadBandwidth: number | undefined, context: LoaderContext, callbacks: LoaderCallbacks<LoaderContext>): void {
         const now = performance.now();
         const downloadTime = content.byteLength / (((downloadBandwidth === undefined) || (downloadBandwidth <= 0)) ? DEFAULT_DOWNLOAD_BANDWIDTH : downloadBandwidth);
 
-        this.stats.trequest = now - DEFAULT_DOWNLOAD_LATENCY - downloadTime;
-        this.stats.tfirst = now - downloadTime;
-        this.stats.tload = now;
-        this.stats.loaded = content.byteLength;
+        const stats = {
+            trequest: now - DEFAULT_DOWNLOAD_LATENCY - downloadTime,
+            tfirst: now - downloadTime,
+            tload: now - 1,
+            tparsed: now,
+            loaded: content.byteLength,
+            total: content.byteLength
+        }
 
         callbacks.onSuccess({
             url: context.url,
             data: content
-        }, this.stats, context);
+        }, stats, context, undefined);
     }
 
-    private error(error: any, context: any, callbacks: any): void {
-        callbacks.onError(error, context);
+    private error(error: { code: number; text: string; }, context: LoaderContext, callbacks: LoaderCallbacks<LoaderContext>): void {
+        callbacks.onError(error, context, undefined);
     }
 }

@@ -15,7 +15,7 @@
  */
 
 import { Events, Segment, LoaderInterface, XhrSetupCallback } from "p2p-media-loader-core";
-import { Parser } from "m3u8-parser";
+import { Manifest, Parser } from "m3u8-parser";
 import { AssetsStorage } from "./engine";
 
 const defaultSettings: SegmentManagerSettings = {
@@ -24,17 +24,17 @@ const defaultSettings: SegmentManagerSettings = {
     assetsStorage: undefined,
 };
 
-export type Byterange = { length: number, offset: number } | undefined;
+export type ByteRange = { length: number, offset: number } | undefined;
 
 export class SegmentManager {
     private readonly loader: LoaderInterface;
     private masterPlaylist: Playlist | null = null;
-    private readonly variantPlaylists: Map<string, Playlist> = new Map();
+    private readonly variantPlaylists = new Map<string, Playlist>();
     private segmentRequest: SegmentRequest | null = null;
     private playQueue: {
         segmentSequence: number,
         segmentUrl: string,
-        segmentByterange: Byterange,
+        segmentByteRange: ByteRange,
         playPosition?: {
             start: number,
             duration: number
@@ -51,7 +51,7 @@ export class SegmentManager {
         this.loader.on(Events.SegmentAbort, this.onSegmentAbort);
     }
 
-    public getSettings() {
+    public getSettings(): SegmentManagerSettings {
         return this.settings;
     }
 
@@ -105,12 +105,12 @@ export class SegmentManager {
                 };
             } else {
                 xhr = await this.loadContent(url, "text");
-                assetsStorage.storeAsset({
+                void assetsStorage.storeAsset({
                     masterManifestUri: this.masterPlaylist !== null ? this.masterPlaylist.requestUrl : url,
                     masterSwarmId: masterSwarmId,
                     requestUri: url,
                     responseUri: xhr.responseURL,
-                    data: xhr.response as string,
+                    data: xhr.response,
                 });
             }
         } else {
@@ -121,9 +121,9 @@ export class SegmentManager {
         return xhr;
     }
 
-    public async loadSegment(url: string, byterange: Byterange): Promise<{content: ArrayBuffer | undefined, downloadBandwidth?: number}> {
-        const segmentLocation = this.getSegmentLocation(url, byterange);
-        const byteRangeString = byterangeToString(byterange);
+    public async loadSegment(url: string, byteRange: ByteRange): Promise<{content: ArrayBuffer | undefined, downloadBandwidth?: number}> {
+        const segmentLocation = this.getSegmentLocation(url, byteRange);
+        const byteRangeString = byteRangeToString(byteRange);
 
         if (!segmentLocation) {
             let content: ArrayBuffer | undefined;
@@ -131,17 +131,23 @@ export class SegmentManager {
             // Not a segment from variants; usually can be: init, audio or subtitles segment, encription key etc.
             const assetsStorage = this.settings.assetsStorage;
             if (assetsStorage !== undefined) {
-                let masterManifestUri = this.masterPlaylist !== null ? this.masterPlaylist.requestUrl : undefined;
+                let masterManifestUri = this.masterPlaylist?.requestUrl;
 
                 let masterSwarmId: string | undefined;
                 masterSwarmId = this.getMasterSwarmId();
 
                 if (masterSwarmId === undefined && this.variantPlaylists.size === 1) {
-                    masterSwarmId = this.variantPlaylists.values().next().value.requestUrl.split("?")[0];
+                    const result = this.variantPlaylists.values().next();
+                    if (!result.done) { // always true
+                        masterSwarmId = result.value.requestUrl.split("?")[0];
+                    }
                 }
 
                 if (masterManifestUri === undefined && this.variantPlaylists.size === 1) {
-                    masterManifestUri = this.variantPlaylists.values().next().value.requestUrl;
+                    const result = this.variantPlaylists.values().next();
+                    if (!result.done) { // always true
+                        masterManifestUri = result.value.requestUrl;
+                    }
                 }
 
                 if (masterSwarmId !== undefined && masterManifestUri !== undefined) {
@@ -151,7 +157,7 @@ export class SegmentManager {
                     } else {
                         const xhr = await this.loadContent(url, "arraybuffer", byteRangeString);
                         content = xhr.response as ArrayBuffer;
-                        assetsStorage.storeAsset({
+                        void assetsStorage.storeAsset({
                             masterManifestUri: masterManifestUri,
                             masterSwarmId: masterSwarmId,
                             requestUri: url,
@@ -187,20 +193,20 @@ export class SegmentManager {
         }
 
         const promise = new Promise<{content: ArrayBuffer | undefined, downloadBandwidth?: number}>((resolve, reject) => {
-            this.segmentRequest = new SegmentRequest(url, byterange, segmentSequence, segmentLocation.playlist.requestUrl,
+            this.segmentRequest = new SegmentRequest(url, byteRange, segmentSequence, segmentLocation.playlist.requestUrl,
                 (content: ArrayBuffer | undefined, downloadBandwidth?: number) => resolve({content, downloadBandwidth}),
                 error => reject(error));
         });
 
-        this.playQueue.push({segmentUrl: url, segmentByterange: byterange, segmentSequence: segmentSequence});
-        this.loadSegments(segmentLocation.playlist, segmentLocation.segmentIndex, true);
+        this.playQueue.push({segmentUrl: url, segmentByteRange: byteRange, segmentSequence: segmentSequence});
+        void this.loadSegments(segmentLocation.playlist, segmentLocation.segmentIndex, true);
 
         return promise;
     }
 
-    public setPlayingSegment(url: string, byterange: Byterange, start: number, duration: number): void {
+    public setPlayingSegment(url: string, byteRange: ByteRange, start: number, duration: number): void {
         const urlIndex = this.playQueue.findIndex(segment =>
-                (segment.segmentUrl == url) && compareByterange(segment.segmentByterange, byterange));
+                (segment.segmentUrl === url) && compareByteRanges(segment.segmentByteRange, byteRange));
 
         if (urlIndex >= 0) {
             this.playQueue = this.playQueue.slice(urlIndex);
@@ -209,7 +215,7 @@ export class SegmentManager {
         }
     }
 
-    public setPlayingSegmentByCurrentTime(playheadPosition: number) {
+    public setPlayingSegmentByCurrentTime(playheadPosition: number): void {
         if (this.playQueue.length === 0 || !this.playQueue[0].playPosition) {
             return;
         }
@@ -226,15 +232,15 @@ export class SegmentManager {
         }
     }
 
-    public abortSegment(url: string, byterange: Byterange): void {
+    public abortSegment(url: string, byteRange: ByteRange): void {
         if (this.segmentRequest && (this.segmentRequest.segmentUrl === url) &&
-                compareByterange(this.segmentRequest.segmentByterange, byterange)) {
+                compareByteRanges(this.segmentRequest.segmentByteRange, byteRange)) {
             this.segmentRequest.onSuccess(undefined, 0);
             this.segmentRequest = null;
         }
     }
 
-    public async destroy() {
+    public async destroy(): Promise<void> {
         if (this.segmentRequest) {
             this.segmentRequest.onError("Loading aborted: object destroyed");
             this.segmentRequest = null;
@@ -256,23 +262,24 @@ export class SegmentManager {
             return;
         }
 
-        const segmentLocation = this.getSegmentLocation(this.segmentRequest.segmentUrl, this.segmentRequest.segmentByterange);
+        const segmentLocation = this.getSegmentLocation(this.segmentRequest.segmentUrl, this.segmentRequest.segmentByteRange);
         if (segmentLocation) {
-            this.loadSegments(segmentLocation.playlist, segmentLocation.segmentIndex, false);
+            void this.loadSegments(segmentLocation.playlist, segmentLocation.segmentIndex, false);
         }
     }
 
     private onSegmentLoaded = (segment: Segment) => {
         if (this.segmentRequest && (this.segmentRequest.segmentUrl === segment.url) &&
-                (byterangeToString(this.segmentRequest.segmentByterange) === segment.range)) {
+                (byteRangeToString(this.segmentRequest.segmentByteRange) === segment.range)) {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             this.segmentRequest.onSuccess(segment.data!.slice(0), segment.downloadBandwidth);
             this.segmentRequest = null;
         }
     }
 
-    private onSegmentError = (segment: Segment, error: any) => {
+    private onSegmentError = (segment: Segment, error: unknown) => {
         if (this.segmentRequest && (this.segmentRequest.segmentUrl === segment.url) &&
-                (byterangeToString(this.segmentRequest.segmentByterange) === segment.range)) {
+                (byteRangeToString(this.segmentRequest.segmentByteRange) === segment.range)) {
             this.segmentRequest.onError(error);
             this.segmentRequest = null;
         }
@@ -280,15 +287,15 @@ export class SegmentManager {
 
     private onSegmentAbort = (segment: Segment) => {
         if (this.segmentRequest && (this.segmentRequest.segmentUrl === segment.url) &&
-                (byterangeToString(this.segmentRequest.segmentByterange) === segment.range)) {
+                (byteRangeToString(this.segmentRequest.segmentByteRange) === segment.range)) {
             this.segmentRequest.onError("Loading aborted: internal abort");
             this.segmentRequest = null;
         }
     }
 
-    private getSegmentLocation(url: string, byterange: Byterange): { playlist: Playlist, segmentIndex: number } | undefined {
+    private getSegmentLocation(url: string, byteRange: ByteRange): { playlist: Playlist, segmentIndex: number } | undefined {
         for (const playlist of this.variantPlaylists.values()) {
-            const segmentIndex = playlist.getSegmentIndex(url, byterange);
+            const segmentIndex = playlist.getSegmentIndex(url, byteRange);
             if (segmentIndex >= 0) {
                 return { playlist: playlist, segmentIndex: segmentIndex };
             }
@@ -299,8 +306,8 @@ export class SegmentManager {
 
     private async loadSegments(playlist: Playlist, segmentIndex: number, requestFirstSegment: boolean) {
         const segments: Segment[] = [];
-        const playlistSegments: any[] = playlist.manifest.segments;
-        const initialSequence: number = playlist.manifest.mediaSequence ? playlist.manifest.mediaSequence : 0;
+        const playlistSegments = playlist.manifest.segments;
+        const initialSequence = playlist.manifest.mediaSequence ?? 0;
         let loadSegmentId: string | null = null;
 
         let priority = Math.max(0, this.playQueue.length - 1);
@@ -311,7 +318,7 @@ export class SegmentManager {
             const segment = playlist.manifest.segments[i];
 
             const url = playlist.getSegmentAbsoluteUrl(segment.uri);
-            const byterange: Byterange = segment.byterange;
+            const byteRange: ByteRange = segment.byteRange;
             const id = this.getSegmentId(playlist, initialSequence + i);
             segments.push({
                 id: id,
@@ -320,7 +327,7 @@ export class SegmentManager {
                 masterManifestUri: this.masterPlaylist !== null ? this.masterPlaylist.requestUrl : playlist.requestUrl,
                 streamId: playlist.streamId,
                 sequence: (initialSequence + i).toString(),
-                range: byterangeToString(byterange),
+                range: byteRangeToString(byteRange),
                 priority: priority++,
             });
             if (requestFirstSegment && !loadSegmentId) {
@@ -356,7 +363,7 @@ export class SegmentManager {
     private getStreamSwarmId(playlistUrl: string): {streamSwarmId: string, found: boolean, index: number} {
         const masterSwarmId = this.getMasterSwarmId();
 
-        if (this.masterPlaylist !== null) {
+        if (this.masterPlaylist && this.masterPlaylist.manifest.playlists && masterSwarmId) {
             for (let i = 0; i < this.masterPlaylist.manifest.playlists.length; ++i) {
                 const url = new URL(this.masterPlaylist.manifest.playlists[i].uri, this.masterPlaylist.responseUrl).toString();
                 if (url === playlistUrl) {
@@ -366,7 +373,7 @@ export class SegmentManager {
         }
 
         return {
-            streamSwarmId: masterSwarmId !== undefined ? masterSwarmId : playlistUrl.split("?")[0],
+            streamSwarmId: masterSwarmId ?? playlistUrl.split("?")[0],
             found: false,
             index: -1
         };
@@ -383,7 +390,7 @@ export class SegmentManager {
             }
 
             xhr.addEventListener("readystatechange", () => {
-                if (xhr.readyState !== 4) { return; }
+                if (xhr.readyState !== 4) return;
                 if (xhr.status >= 200 && xhr.status < 300) {
                     resolve(xhr);
                 } else {
@@ -391,7 +398,7 @@ export class SegmentManager {
                 }
             });
 
-            const xhrSetup: XhrSetupCallback = this.loader.getSettings().xhrSetup;
+            const xhrSetup = (this.loader.getSettings() as { xhrSetup?: XhrSetupCallback }).xhrSetup;
             if (xhrSetup) {
                 xhrSetup(xhr, url);
             }
@@ -402,17 +409,17 @@ export class SegmentManager {
 }
 
 class Playlist {
-    public streamSwarmId: string = "";
+    public streamSwarmId = "";
     public streamId?: string;
 
-    public constructor(readonly requestUrl: string, readonly responseUrl: string, readonly manifest: any) {}
+    public constructor(readonly requestUrl: string, readonly responseUrl: string, readonly manifest: Manifest) {}
 
-    public getSegmentIndex(url: string, byterange: Byterange): number {
+    public getSegmentIndex(url: string, byteRange: ByteRange): number {
         for (let i = 0; i < this.manifest.segments.length; ++i) {
             const segment = this.manifest.segments[i];
             const segmentUrl = this.getSegmentAbsoluteUrl(segment.uri);
 
-            if ((url === segmentUrl) && compareByterange(segment.byterange, byterange)) {
+            if ((url === segmentUrl) && compareByteRanges(segment.byteRange, byteRange)) {
                 return i;
             }
         }
@@ -428,11 +435,11 @@ class Playlist {
 class SegmentRequest {
     public constructor(
         readonly segmentUrl: string,
-        readonly segmentByterange: Byterange,
+        readonly segmentByteRange: ByteRange,
         readonly segmentSequence: number,
         readonly playlistRequestUrl: string,
         readonly onSuccess: (content: ArrayBuffer | undefined, downloadBandwidth: number | undefined) => void,
-        readonly onError: (error: any) => void
+        readonly onError: (error: unknown) => void
     ) {}
 }
 
@@ -454,18 +461,18 @@ export interface SegmentManagerSettings {
     assetsStorage?: AssetsStorage;
 }
 
-function compareByterange(b1: Byterange, b2: Byterange) {
+function compareByteRanges(b1: ByteRange, b2: ByteRange) {
     return (b1 === undefined)
         ? (b2 === undefined)
         : ((b2 !== undefined) && (b1.length === b2.length) && (b1.offset === b2.offset));
 }
 
-function byterangeToString(byterange: Byterange): string | undefined {
-    if (byterange === undefined) {
+function byteRangeToString(byteRange: ByteRange): string | undefined {
+    if (byteRange === undefined) {
         return undefined;
     }
 
-    const end = byterange.offset + byterange.length - 1;
+    const end = byteRange.offset + byteRange.length - 1;
 
-    return `bytes=${byterange.offset}-${end}`;
+    return `bytes=${byteRange.offset}-${end}`;
 }

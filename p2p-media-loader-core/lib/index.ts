@@ -18,3 +18,9 @@
 export const version = "0.6.2";
 export * from "./loader-interface";
 export * from "./hybrid-loader";
+
+declare global {
+    interface Window {
+        p2pml: Record<string, unknown>;
+    }
+}

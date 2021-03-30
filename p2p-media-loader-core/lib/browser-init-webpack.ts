@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-if (!window.p2pml) {
-    window.p2pml = {};
-}
+import debug from "debug";
+import * as events from "events";
 
-window.p2pml.shaka = require("p2p-media-loader-shaka");
+import "./browser-init";
+
+window.p2pml._shared = { debug, events };

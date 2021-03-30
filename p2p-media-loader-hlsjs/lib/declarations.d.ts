@@ -15,7 +15,30 @@
  */
 
 declare module "m3u8-parser" {
-    export const Parser: any;
+    export class Parser {
+        constructor();
+        push (m3u8: string): void;
+        end (): void;
+        manifest: Manifest;
+    }
+
+    export type Manifest = {
+        mediaSequence?: number;
+        segments: Segment[];
+        playlists?: Playlist[];
+    };
+
+    export type Segment = {
+        uri: string;
+        byteRange?: { length: number; offset: number; };
+    }
+
+    export type Playlist = {
+        uri: string;
+    }
 }
 
-declare const __P2PML_VERSION__: string;
+// FIXME: fixes hls.js internal .js module import
+declare module "*/loader/level" {
+    export default class {}
+}
