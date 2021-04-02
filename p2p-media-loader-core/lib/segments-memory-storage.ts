@@ -18,20 +18,22 @@ import { Segment } from "./loader-interface";
 import { SegmentsStorage } from "./hybrid-loader";
 
 export class SegmentsMemoryStorage implements SegmentsStorage {
-    private cache = new Map<string, {segment: Segment, lastAccessed: number}>();
+    private cache = new Map<string, { segment: Segment; lastAccessed: number }>();
 
-    constructor(private settings: {
-        cachedSegmentExpiration: number,
-        cachedSegmentsCount: number
-    }) { }
+    constructor(
+        private settings: {
+            cachedSegmentExpiration: number;
+            cachedSegmentsCount: number;
+        }
+    ) {}
 
     public storeSegment = async (segment: Segment): Promise<void> => {
-        this.cache.set(segment.id, {segment, lastAccessed: performance.now()});
-    }
+        this.cache.set(segment.id, { segment, lastAccessed: performance.now() });
+    };
 
-    public getSegmentsMap = async (): Promise<Map<string, {segment: Segment}>> => {
+    public getSegmentsMap = async (): Promise<Map<string, { segment: Segment }>> => {
         return this.cache;
-    }
+    };
 
     public getSegment = async (id: string): Promise<Segment | undefined> => {
         const cacheItem = this.cache.get(id);
@@ -42,15 +44,15 @@ export class SegmentsMemoryStorage implements SegmentsStorage {
 
         cacheItem.lastAccessed = performance.now();
         return cacheItem.segment;
-    }
+    };
 
     public hasSegment = async (id: string): Promise<boolean> => {
         return this.cache.has(id);
-    }
+    };
 
     public clean = async (masterSwarmId: string, lockedSegmentsFilter?: (id: string) => boolean): Promise<boolean> => {
         const segmentsToDelete: string[] = [];
-        const remainingSegments: {segment: Segment, lastAccessed: number}[] = [];
+        const remainingSegments: { segment: Segment; lastAccessed: number }[] = [];
 
         // Delete old segments
         const now = performance.now();
@@ -69,7 +71,7 @@ export class SegmentsMemoryStorage implements SegmentsStorage {
             remainingSegments.sort((a, b) => a.lastAccessed - b.lastAccessed);
 
             for (const cachedSegment of remainingSegments) {
-                if ((lockedSegmentsFilter === undefined) || !lockedSegmentsFilter(cachedSegment.segment.id)) {
+                if (lockedSegmentsFilter === undefined || !lockedSegmentsFilter(cachedSegment.segment.id)) {
                     segmentsToDelete.push(cachedSegment.segment.id);
                     countOverhead--;
                     if (countOverhead === 0) {
@@ -79,11 +81,11 @@ export class SegmentsMemoryStorage implements SegmentsStorage {
             }
         }
 
-        segmentsToDelete.forEach(id => this.cache.delete(id));
+        segmentsToDelete.forEach((id) => this.cache.delete(id));
         return segmentsToDelete.length > 0;
-    }
+    };
 
     public destroy = async (): Promise<void> => {
         this.cache.clear();
-    }
+    };
 }

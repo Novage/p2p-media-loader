@@ -15,17 +15,8 @@
  */
 
 import { EventEmitter } from "events";
-import {
-    Events,
-    LoaderInterface,
-    HybridLoader,
-    HybridLoaderSettings,
-} from "p2p-media-loader-core";
-import {
-    SegmentManager,
-    ByteRange,
-    SegmentManagerSettings,
-} from "./segment-manager";
+import { Events, LoaderInterface, HybridLoader, HybridLoaderSettings } from "p2p-media-loader-core";
+import { SegmentManager, ByteRange, SegmentManagerSettings } from "./segment-manager";
 import { HlsJsLoader } from "./hlsjs-loader";
 import type { LoaderCallbacks, LoaderConfiguration, LoaderContext } from "hls.js/src/types/loader";
 
@@ -46,18 +37,11 @@ export class Engine extends EventEmitter {
         super();
 
         this.loader = new HybridLoader(settings.loader);
-        this.segmentManager = new SegmentManager(
-            this.loader,
-            settings.segments
-        );
+        this.segmentManager = new SegmentManager(this.loader, settings.segments);
 
         Object.keys(Events)
             .map((eventKey) => Events[eventKey as keyof typeof Events])
-            .forEach((event) =>
-                this.loader.on(event, (...args: unknown[]) =>
-                    this.emit(event, ...args)
-                )
-            );
+            .forEach((event) => this.loader.on(event, (...args: unknown[]) => this.emit(event, ...args)));
     }
 
     public createLoaderClass(): new () => unknown {
@@ -117,12 +101,7 @@ export class Engine extends EventEmitter {
         };
     }
 
-    public setPlayingSegment(
-        url: string,
-        byteRange: ByteRange,
-        start: number,
-        duration: number
-    ): void {
+    public setPlayingSegment(url: string, byteRange: ByteRange, start: number, duration: number): void {
         this.segmentManager.setPlayingSegment(url, byteRange, start, duration);
     }
 
@@ -142,10 +121,6 @@ export interface Asset {
 
 export interface AssetsStorage {
     storeAsset(asset: Asset): Promise<void>;
-    getAsset(
-        requestUri: string,
-        requestRange: string | undefined,
-        masterSwarmId: string
-    ): Promise<Asset | undefined>;
+    getAsset(requestUri: string, requestRange: string | undefined, masterSwarmId: string): Promise<Asset | undefined>;
     destroy(): Promise<void>;
 }

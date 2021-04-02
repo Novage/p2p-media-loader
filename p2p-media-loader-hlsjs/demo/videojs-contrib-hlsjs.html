@@ -15,63 +15,57 @@
     limitations under the License.
 -->
 <html lang="en">
-<head>
+    <head>
+        <meta charset="UTF-8" />
 
-    <meta charset="UTF-8">
+        <title>Video.js player with hls.js engine and P2P demo</title>
 
-    <title>Video.js player with hls.js engine and P2P demo</title>
+        <script src="../node_modules/p2p-media-loader-core/build/p2p-media-loader-core.js"></script>
+        <script src="../build/p2p-media-loader-hlsjs.js"></script>
 
-    <script src="../node_modules/p2p-media-loader-core/build/p2p-media-loader-core.js"></script>
-    <script src="../build/p2p-media-loader-hlsjs.js"></script>
+        <link href="https://vjs.zencdn.net/7.6.0/video-js.css" rel="stylesheet" />
+        <script src="https://vjs.zencdn.net/7.6.0/video.js"></script>
 
-    <link href="https://vjs.zencdn.net/7.6.0/video-js.css" rel="stylesheet">
-    <script src="https://vjs.zencdn.net/7.6.0/video.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/videojs-contrib-hls.js@latest"></script>
 
-    <script src="https://cdn.jsdelivr.net/npm/videojs-contrib-hls.js@latest"></script>
+        <style>
+            #video {
+                max-width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+                display: block;
+            }
+        </style>
+    </head>
+    <body>
+        <video id="video" class="video-js vjs-default-skin" preload="none" autoplay controls></video>
 
-    <style>
-        #video {
-            max-width: 100%;
-            margin-left: auto;
-            margin-right: auto;
-            display: block;
-        }
-    </style>
+        <script>
+            if (p2pml.hlsjs.Engine.isSupported()) {
+                var engine = new p2pml.hlsjs.Engine();
 
-</head>
-<body>
+                var player = videojs("video", {
+                    html5: {
+                        hlsjsConfig: {
+                            liveSyncDurationCount: 7, // To have at least 7 segments in queue
+                            loader: engine.createLoaderClass(),
+                        },
+                    },
+                });
 
-    <video id="video" class="video-js vjs-default-skin" preload="none" autoplay controls></video>
+                p2pml.hlsjs.initVideoJsContribHlsJsPlayer(player);
 
-    <script>
+                player.src({
+                    src: "https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.m3u8",
+                    type: "application/x-mpegURL",
+                });
 
-        if (p2pml.hlsjs.Engine.isSupported()) {
-            var engine = new p2pml.hlsjs.Engine();
-
-            var player = videojs("video", {
-                html5: {
-                    hlsjsConfig: {
-                        liveSyncDurationCount: 7, // To have at least 7 segments in queue
-                        loader: engine.createLoaderClass()
-                    }
-                }
-            });
-
-            p2pml.hlsjs.initVideoJsContribHlsJsPlayer(player);
-
-            player.src({
-                src: "https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.m3u8",
-                type: "application/x-mpegURL"
-            });
-
-            player.ready(function() {
-                player.volume(0.01); // 1%
-            });
-        } else {
-            document.write("Not supported :(");
-        }
-
-    </script>
-
-</body>
+                player.ready(function () {
+                    player.volume(0.01); // 1%
+                });
+            } else {
+                document.write("Not supported :(");
+            }
+        </script>
+    </body>
 </html>

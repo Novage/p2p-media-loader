@@ -15,56 +15,50 @@
     limitations under the License.
 -->
 <html lang="en">
-<head>
+    <head>
+        <meta charset="UTF-8" />
 
-    <meta charset="UTF-8">
+        <title>Clappr player with hls.js engine and P2P demo</title>
 
-    <title>Clappr player with hls.js engine and P2P demo</title>
+        <script src="../node_modules/p2p-media-loader-core/build/p2p-media-loader-core.js"></script>
+        <script src="../build/p2p-media-loader-hlsjs.js"></script>
 
-    <script src="../node_modules/p2p-media-loader-core/build/p2p-media-loader-core.js"></script>
-    <script src="../build/p2p-media-loader-hlsjs.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/clappr@latest"></script>
 
-    <script src="https://cdn.jsdelivr.net/npm/clappr@latest"></script>
+        <style>
+            #video {
+                width: 720px;
+                margin-left: auto;
+                margin-right: auto;
+                display: block;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="video"></div>
 
-    <style>
-        #video {
-            width: 720px;
-            margin-left: auto;
-            margin-right: auto;
-            display: block;
-        }
-    </style>
+        <script>
+            if (p2pml.hlsjs.Engine.isSupported()) {
+                var engine = new p2pml.hlsjs.Engine();
 
-</head>
-<body>
+                var player = new Clappr.Player({
+                    parentId: "#video",
+                    source: "https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.m3u8",
+                    playback: {
+                        hlsjsConfig: {
+                            liveSyncDurationCount: 7, // To have at least 7 segments in queue
+                            loader: engine.createLoaderClass(),
+                        },
+                    },
+                });
 
-    <div id="video"></div>
+                p2pml.hlsjs.initClapprPlayer(player);
 
-    <script>
-
-        if (p2pml.hlsjs.Engine.isSupported()) {
-            var engine = new p2pml.hlsjs.Engine();
-
-            var player = new Clappr.Player({
-                parentId: "#video",
-                source: "https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.m3u8",
-                playback: {
-                    hlsjsConfig: {
-                        liveSyncDurationCount: 7, // To have at least 7 segments in queue
-                        loader: engine.createLoaderClass()
-                    }
-                }
-            });
-
-            p2pml.hlsjs.initClapprPlayer(player);
-
-            player.setVolume(1); // 1%
-            player.play();
-        } else {
-            document.write("Not supported :(");
-        }
-
-    </script>
-
-</body>
+                player.setVolume(1); // 1%
+                player.play();
+            } else {
+                document.write("Not supported :(");
+            }
+        </script>
+    </body>
 </html>

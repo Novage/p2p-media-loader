@@ -15,59 +15,53 @@
     limitations under the License.
 -->
 <html lang="en">
-<head>
+    <head>
+        <meta charset="UTF-8" />
 
-    <meta charset="UTF-8">
+        <title>Video.js player with hls.js engine and P2P demo</title>
 
-    <title>Video.js player with hls.js engine and P2P demo</title>
+        <script src="../node_modules/p2p-media-loader-core/build/p2p-media-loader-core.js"></script>
+        <script src="../build/p2p-media-loader-hlsjs.js"></script>
 
-    <script src="../node_modules/p2p-media-loader-core/build/p2p-media-loader-core.js"></script>
-    <script src="../build/p2p-media-loader-hlsjs.js"></script>
+        <link href="http://vjs.zencdn.net/7.6.0/video-js.css" rel="stylesheet" />
+        <script src="http://vjs.zencdn.net/7.6.0/video.js"></script>
 
-    <link href="http://vjs.zencdn.net/7.6.0/video-js.css" rel="stylesheet">
-    <script src="http://vjs.zencdn.net/7.6.0/video.js"></script>
+        <script src="https://cdn.streamroot.io/videojs-hlsjs-plugin/1/stable/videojs-hlsjs-plugin.js"></script>
 
-    <script src="https://cdn.streamroot.io/videojs-hlsjs-plugin/1/stable/videojs-hlsjs-plugin.js"></script>
+        <style>
+            #video {
+                max-width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+                display: block;
+            }
+        </style>
+    </head>
+    <body>
+        <video id="video" class="video-js vjs-default-skin" controls autoplay muted></video>
 
-    <style>
-        #video {
-            max-width: 100%;
-            margin-left: auto;
-            margin-right: auto;
-            display: block;
-        }
-    </style>
+        <script>
+            if (p2pml.hlsjs.Engine.isSupported()) {
+                var engine = new p2pml.hlsjs.Engine();
 
-</head>
-<body>
+                p2pml.hlsjs.initVideoJsHlsJsPlugin();
 
-    <video id="video" class="video-js vjs-default-skin" controls autoplay muted></video>
+                var player = videojs("video", {
+                    html5: {
+                        hlsjsConfig: {
+                            liveSyncDurationCount: 7, // To have at least 7 segments in queue
+                            loader: engine.createLoaderClass(),
+                        },
+                    },
+                });
 
-    <script>
-
-        if (p2pml.hlsjs.Engine.isSupported()) {
-            var engine = new p2pml.hlsjs.Engine();
-
-            p2pml.hlsjs.initVideoJsHlsJsPlugin();
-
-            var player = videojs("video", {
-                html5: {
-                    hlsjsConfig: {
-                        liveSyncDurationCount: 7, // To have at least 7 segments in queue
-                        loader: engine.createLoaderClass()
-                    }
-                }
-            });
-
-            player.src({
-                src: "https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.m3u8",
-                type: "application/x-mpegURL"
-            });
-        } else {
-            document.write("Not supported :(");
-        }
-
-    </script>
-
-</body>
+                player.src({
+                    src: "https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.m3u8",
+                    type: "application/x-mpegURL",
+                });
+            } else {
+                document.write("Not supported :(");
+            }
+        </script>
+    </body>
 </html>

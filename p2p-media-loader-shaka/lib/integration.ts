@@ -16,13 +16,18 @@
 
 import Debug from "debug";
 import { SegmentManager } from "./segment-manager";
-import { HookedShakaManifest, HookedShakaNetworkingEngine, ShakaDashManifestParserProxy, ShakaHlsManifestParserProxy } from "./manifest-parser-proxy";
+import {
+    HookedShakaManifest,
+    HookedShakaNetworkingEngine,
+    ShakaDashManifestParserProxy,
+    ShakaHlsManifestParserProxy,
+} from "./manifest-parser-proxy";
 import { getSchemedUri, getMasterSwarmId } from "./utils";
 import { ParserSegment } from "./parser-segment";
 
 const debug = Debug("p2pml:shaka:index");
 
-type HookedRequest = shaka.extern.Request & { p2pml?: { player: shaka.Player, segmentManager: SegmentManager } };
+type HookedRequest = shaka.extern.Request & { p2pml?: { player: shaka.Player; segmentManager: SegmentManager } };
 
 export function initShakaPlayer(player: shaka.Player, segmentManager: SegmentManager): void {
     registerParserProxies();
@@ -40,7 +45,7 @@ export function initShakaPlayer(player: shaka.Player, segmentManager: SegmentMan
 
             lastPlayheadTimeReported = 0;
 
-            const manifest = player.getManifest() as (HookedShakaManifest | null);
+            const manifest = player.getManifest() as HookedShakaManifest | null;
             if (manifest && manifest.p2pml) {
                 manifest.p2pml.parser.reset();
             }
@@ -60,9 +65,11 @@ export function initShakaPlayer(player: shaka.Player, segmentManager: SegmentMan
     });
 
     debug("register request filter");
-    player.getNetworkingEngine().registerRequestFilter((requestType: shaka.net.NetworkingEngine.RequestType, request: shaka.extern.Request) => {
-        (request as HookedRequest).p2pml = { player, segmentManager };
-    });
+    player
+        .getNetworkingEngine()
+        .registerRequestFilter((requestType: shaka.net.NetworkingEngine.RequestType, request: shaka.extern.Request) => {
+            (request as HookedRequest).p2pml = { player, segmentManager };
+        });
 }
 
 function registerParserProxies() {
@@ -80,7 +87,12 @@ function initializeNetworkingEngine() {
     shaka.net.NetworkingEngine.registerScheme("https", processNetworkRequest);
 }
 
-function processNetworkRequest(uri: string, request: HookedRequest, requestType: shaka.net.NetworkingEngine.RequestType, progressUpdated?: shaka.extern.ProgressUpdated): shaka.util.AbortableOperation<shaka.extern.Response> {
+function processNetworkRequest(
+    uri: string,
+    request: HookedRequest,
+    requestType: shaka.net.NetworkingEngine.RequestType,
+    progressUpdated?: shaka.extern.ProgressUpdated
+): shaka.util.AbortableOperation<shaka.extern.Response> {
     const xhrPlugin = shaka.net.HttpXHRPlugin.parse ? shaka.net.HttpXHRPlugin.parse : shaka.net.HttpXHRPlugin;
 
     const { p2pml } = request;
@@ -108,11 +120,16 @@ function processNetworkRequest(uri: string, request: HookedRequest, requestType:
         segment = manifest?.p2pml?.parser?.find(uri, request.headers?.Range);
     }
 
-    if (segment !== undefined && segment.streamType === "video") { // load segment using P2P loader
+    if (segment !== undefined && segment.streamType === "video") {
+        // load segment using P2P loader
         debug("request", "load", segment.identity);
 
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        const promise = segmentManager.load(segment, getSchemedUri((player.getAssetUri ? player.getAssetUri() : player.getManifestUri())!), getPlayheadTime(player));
+        const promise = segmentManager.load(
+            segment,
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            getSchemedUri((player.getAssetUri ? player.getAssetUri() : player.getManifestUri())!),
+            getPlayheadTime(player)
+        );
 
         const abort = async () => {
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -121,7 +138,8 @@ function processNetworkRequest(uri: string, request: HookedRequest, requestType:
         };
 
         return new shaka.util.AbortableOperation(promise, abort);
-    } else if (assetsStorage && masterSwarmId && masterManifestUri) { // load or store the asset using assets storage
+    } else if (assetsStorage && masterSwarmId && masterManifestUri) {
+        // load or store the asset using assets storage
         const responsePromise = (async () => {
             const asset = await assetsStorage.getAsset(uri, request.headers?.Range, masterSwarmId);
             if (asset !== undefined) {
@@ -130,7 +148,7 @@ function processNetworkRequest(uri: string, request: HookedRequest, requestType:
                     uri: asset.responseUri,
                     originalUri: asset.requestUri,
                     fromCache: true,
-                    headers: {}
+                    headers: {},
                 };
             } else {
                 const response = await xhrPlugin(uri, request, requestType, progressUpdated).promise;
@@ -140,14 +158,15 @@ function processNetworkRequest(uri: string, request: HookedRequest, requestType:
                     requestUri: uri,
                     requestRange: request.headers?.Range,
                     responseUri: response.uri,
-                    data: response.data
+                    data: response.data,
                 });
                 return response;
             }
         })();
 
         return new shaka.util.AbortableOperation(responsePromise, async () => undefined);
-    } else { // load asset using default plugin
+    } else {
+        // load asset using default plugin
         return xhrPlugin(uri, request, requestType, progressUpdated);
     }
 }

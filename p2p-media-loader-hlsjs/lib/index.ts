@@ -54,7 +54,12 @@ export function initFlowplayerHlsJsPlayer(player: any): void {
 export function initVideoJsContribHlsJsPlayer(player: any): void {
     player.ready(() => {
         const options = player.tech_.options_;
-        if (options && options.hlsjsConfig && options.hlsjsConfig.loader && typeof options.hlsjsConfig.loader.getEngine === "function") {
+        if (
+            options &&
+            options.hlsjsConfig &&
+            options.hlsjsConfig.loader &&
+            typeof options.hlsjsConfig.loader.getEngine === "function"
+        ) {
             initHlsJsEvents(player.tech_, options.hlsjsConfig.loader.getEngine());
         }
     });
@@ -78,11 +83,12 @@ export function initMediaElementJsPlayer(mediaElement: any): void {
         if (hls && hls.config && hls.config.loader && typeof hls.config.loader.getEngine === "function") {
             const engine: Engine = hls.config.loader.getEngine();
 
-            if (event.data && (event.data.length > 1)) {
+            if (event.data && event.data.length > 1) {
                 const frag = event.data[1].frag;
-                const byteRange = (frag.byteRange.length !== 2)
-                    ? undefined
-                    : { offset: frag.byteRange[0], length: frag.byteRange[1] - frag.byteRange[0] };
+                const byteRange =
+                    frag.byteRange.length !== 2
+                        ? undefined
+                        : { offset: frag.byteRange[0], length: frag.byteRange[1] - frag.byteRange[0] };
                 engine.setPlayingSegment(frag.url, byteRange, frag.start, frag.duration);
             }
         }
@@ -97,7 +103,7 @@ export function initMediaElementJsPlayer(mediaElement: any): void {
     mediaElement.addEventListener("hlsError", (event: any) => {
         const hls = mediaElement.hlsPlayer;
         if (hls && hls.config && hls.config.loader && typeof hls.config.loader.getEngine === "function") {
-            if ((event.data !== undefined) && (event.data.details === "bufferStalledError")) {
+            if (event.data !== undefined && event.data.details === "bufferStalledError") {
                 const engine: Engine = hls.config.loader.getEngine();
                 engine.setPlayingSegmentByCurrentTime(hls.media.currentTime);
             }
@@ -118,9 +124,10 @@ export function initJwPlayer(player: any, hlsjsConfig: any): void {
 function initHlsJsEvents(player: any, engine: Engine): void {
     player.on("hlsFragChanged", (_event: string, data: any) => {
         const frag = data.frag;
-        const byteRange = (frag.byteRange.length !== 2)
-            ? undefined
-            : { offset: frag.byteRange[0], length: frag.byteRange[1] - frag.byteRange[0] };
+        const byteRange =
+            frag.byteRange.length !== 2
+                ? undefined
+                : { offset: frag.byteRange[0], length: frag.byteRange[1] - frag.byteRange[0] };
         engine.setPlayingSegment(frag.url, byteRange, frag.start, frag.duration);
     });
     player.on("hlsDestroying", async () => {
@@ -130,8 +137,7 @@ function initHlsJsEvents(player: any, engine: Engine): void {
         if (errorData.details === "bufferStalledError") {
             const htmlMediaElement = (player.media === undefined
                 ? player.el_ // videojs-contrib-hlsjs
-                : player.media // all others
-            ) as HTMLMediaElement | undefined;
+                : player.media) as HTMLMediaElement | undefined; // all others
             if (htmlMediaElement) {
                 engine.setPlayingSegmentByCurrentTime(htmlMediaElement.currentTime);
             }

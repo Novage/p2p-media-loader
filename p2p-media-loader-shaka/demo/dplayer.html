@@ -15,66 +15,66 @@
     limitations under the License.
 -->
 <html lang="en">
-<head>
+    <head>
+        <meta charset="UTF-8" />
 
-    <meta charset="UTF-8">
+        <title>DPlayer with Shaka Player engine and P2P demo (HLS or MPEG-DASH)</title>
 
-    <title>DPlayer with Shaka Player engine and P2P demo (HLS or MPEG-DASH)</title>
+        <script src="../node_modules/p2p-media-loader-core/build/p2p-media-loader-core.js"></script>
+        <script src="../build/p2p-media-loader-shaka.js"></script>
 
-    <script src="../node_modules/p2p-media-loader-core/build/p2p-media-loader-core.js"></script>
-    <script src="../build/p2p-media-loader-shaka.js"></script>
+        <script src="https://github.com/videojs/mux.js/releases/download/v5.1.2/mux.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/2.5.1/shaka-player.compiled.js"></script>
 
-    <script src="https://github.com/videojs/mux.js/releases/download/v5.1.2/mux.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/2.5.1/shaka-player.compiled.js"></script>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/p2p-dplayer@latest/dist/DPlayer.min.css" />
+        <script src="https://cdn.jsdelivr.net/npm/dplayer@latest"></script>
 
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/p2p-dplayer@latest/dist/DPlayer.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/dplayer@latest"></script>
+        <style>
+            #dplayer {
+                width: 720px;
+                margin-left: auto;
+                margin-right: auto;
+                display: block;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="dplayer"></div>
 
-    <style>
-        #dplayer {
-            width: 720px;
-            margin-left: auto;
-            margin-right: auto;
-            display: block;
-        }
-    </style>
+        <script>
+            shaka.polyfill.installAll();
 
-</head>
-<body>
+            if (shaka.Player.isBrowserSupported() && p2pml.shaka.Engine.isSupported()) {
+                window.dp = new DPlayer({
+                    container: document.getElementById("dplayer"),
+                    video: {
+                        url: "https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.mpd",
+                        //url: "https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.m3u8",
+                        type: "customHlsOrDash",
+                        customType: {
+                            customHlsOrDash: function (video, player) {
+                                const engine = new p2pml.shaka.Engine();
 
-    <div id="dplayer"></div>
+                                const src = video.src; // Shaka Player changes video.src to blob URL
+                                const shakaPlayer = new shaka.Player(video);
 
-    <script>
-        shaka.polyfill.installAll();
+                                const onError = function (error) {
+                                    console.error("Error code", error.code, "object", error);
+                                };
+                                shakaPlayer.addEventListener("error", function (event) {
+                                    onError(event.detail);
+                                });
 
-        if (shaka.Player.isBrowserSupported() && p2pml.shaka.Engine.isSupported()) {
-            window.dp = new DPlayer({
-                container: document.getElementById("dplayer"),
-                video: {
-                    url: "https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.mpd",
-                    //url: "https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.m3u8",
-                    type: "customHlsOrDash",
-                    customType: {
-                        "customHlsOrDash": function (video, player) {
-                            const engine = new p2pml.shaka.Engine();
+                                engine.initShakaPlayer(shakaPlayer);
 
-                            const src = video.src; // Shaka Player changes video.src to blob URL
-                            const shakaPlayer = new shaka.Player(video);
-
-                            const onError = function(error) { console.error("Error code", error.code, "object", error); }
-                            shakaPlayer.addEventListener("error", function(event) { onError(event.detail); });
-
-                            engine.initShakaPlayer(shakaPlayer);
-
-                            shakaPlayer.load(src).catch(onError);
-                        }
-                    }
-                }
-            });
-        } else {
-            document.write("Not supported :(");
-        }
-    </script>
-
-</body>
+                                shakaPlayer.load(src).catch(onError);
+                            },
+                        },
+                    },
+                });
+            } else {
+                document.write("Not supported :(");
+            }
+        </script>
+    </body>
 </html>
