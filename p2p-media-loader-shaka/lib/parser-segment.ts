@@ -18,8 +18,10 @@ import { getSchemedUri } from "./utils";
 import { HookedShakaStream } from "./manifest-parser-proxy";
 
 export class ParserSegment {
-
-    public static create(stream: HookedShakaStream, segmentReference: shaka.media.SegmentReference | null): ParserSegment | undefined {
+    public static create(
+        stream: HookedShakaStream,
+        segmentReference: shaka.media.SegmentReference | null
+    ): ParserSegment | undefined {
         if (!segmentReference) {
             return undefined;
         }
@@ -34,21 +36,15 @@ export class ParserSegment {
 
         const startByte = segmentReference.getStartByte();
         const endByte = segmentReference.getEndByte();
-        const range = startByte || endByte
-            ? `bytes=${startByte || ""}-${endByte || ""}`
-            : undefined;
+        const range = startByte || endByte ? `bytes=${startByte || ""}-${endByte || ""}` : undefined;
 
         const streamTypeCode = stream.type.substring(0, 1).toUpperCase();
         const streamPosition = stream.getPosition();
         const streamIsHls = streamPosition >= 0;
 
-        const streamIdentity = streamIsHls
-            ? `${streamTypeCode}${streamPosition}`
-            : `${streamTypeCode}${stream.id}`;
+        const streamIdentity = streamIsHls ? `${streamTypeCode}${streamPosition}` : `${streamTypeCode}${stream.id}`;
 
-        const identity = streamIsHls
-            ? `${segmentReference.getPosition()}`
-            : `${Number(start).toFixed(3)}`;
+        const identity = streamIsHls ? `${segmentReference.getPosition()}` : `${Number(start).toFixed(3)}`;
 
         return new ParserSegment(
             stream.id,
@@ -59,9 +55,9 @@ export class ParserSegment {
             segmentReference.getPosition(),
             start,
             end,
-            getSchemedUri(uris[ 0 ]),
+            getSchemedUri(uris[0]),
             range,
-            () => ParserSegment.create(stream, stream.getSegmentReferenceOriginal(segmentReference.getPosition() - 1)),
+            () => ParserSegment.create(stream, stream.getSegmentReferenceOriginal(segmentReference.getPosition() - 1))
         );
     }
 
@@ -78,11 +74,9 @@ export class ParserSegment {
         readonly range: string | undefined,
         readonly next: () => ParserSegment | undefined
     ) {}
-
 } // end of ParserSegment
 
 export class ParserSegmentCache {
-
     private readonly segments: ParserSegment[] = [];
     private readonly maxSegments: number;
 
@@ -91,7 +85,7 @@ export class ParserSegmentCache {
     }
 
     public find(uri: string, range?: string): ParserSegment | undefined {
-        return this.segments.find(i => i.uri === uri && i.range === range);
+        return this.segments.find((i) => i.uri === uri && i.range === range);
     }
 
     public add(stream: HookedShakaStream, segmentReference: shaka.media.SegmentReference | null): void {
@@ -107,5 +101,4 @@ export class ParserSegmentCache {
     public clear(): void {
         this.segments.splice(0);
     }
-
 } // end of ParserSegmentCache

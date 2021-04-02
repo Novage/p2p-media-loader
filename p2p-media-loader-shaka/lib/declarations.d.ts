@@ -27,14 +27,14 @@ namespace shaka {
             static install(): void;
         }
 
-        class Fullscreen extends polyfill_install { }
-        class IndexedDB extends polyfill_install { }
-        class InputEvent extends polyfill_install { }
-        class MathRound extends polyfill_install { }
-        class MediaSource extends polyfill_install { }
-        class VideoPlaybackQuality extends polyfill_install { }
-        class VideoPlayPromise extends polyfill_install { }
-        class VTTCue extends polyfill_install { }
+        class Fullscreen extends polyfill_install {}
+        class IndexedDB extends polyfill_install {}
+        class InputEvent extends polyfill_install {}
+        class MathRound extends polyfill_install {}
+        class MediaSource extends polyfill_install {}
+        class VideoPlaybackQuality extends polyfill_install {}
+        class VideoPlayPromise extends polyfill_install {}
+        class VTTCue extends polyfill_install {}
 
         class PatchedMediaKeysMs extends polyfill_install {
             static setMediaKeys(mediaKeys: MediaKeys): void;
@@ -62,27 +62,27 @@ namespace shaka {
     }
 
     interface EventMap {
-        "abrstatuschanged": Player.AbrStatusChangedEvent,
-        "adaptation": Player.AdaptationEvent,
-        "buffering": Player.BufferingEvent,
-        "drmsessionupdate": Player.DrmSessionUpdateEvent,
-        "emsg": Player.EmsgEvent,
-        "error": Player.ErrorEvent,
-        "expirationupdated": Player.ExpirationUpdatedEvent,
-        "largegap": Player.LargeGapEvent,
-        "loading": Player.LoadingEvent,
-        "manifestparsed": Player.ManifestParsedEvent,
-        "onstatechange": Player.StateChangeEvent,
-        "onstateidle": Player.StateIdleEvent,
-        "streaming": Player.StreamingEvent,
-        "textchanged": Player.TextChangedEvent,
-        "texttrackvisibility": Player.TextTrackVisibilityEvent,
-        "timelineregionadded": Player.TimelineRegionAddedEvent,
-        "timelineregionenter": Player.TimelineRegionEnterEvent,
-        "timelineregionexit": Player.TimelineRegionExitEvent,
-        "trackschanged": Player.TracksChangedEvent,
-        "unloading": Player.UnloadingEvent,
-        "variantchanged": Player.VariantChangedEvent,
+        abrstatuschanged: Player.AbrStatusChangedEvent;
+        adaptation: Player.AdaptationEvent;
+        buffering: Player.BufferingEvent;
+        drmsessionupdate: Player.DrmSessionUpdateEvent;
+        emsg: Player.EmsgEvent;
+        error: Player.ErrorEvent;
+        expirationupdated: Player.ExpirationUpdatedEvent;
+        largegap: Player.LargeGapEvent;
+        loading: Player.LoadingEvent;
+        manifestparsed: Player.ManifestParsedEvent;
+        onstatechange: Player.StateChangeEvent;
+        onstateidle: Player.StateIdleEvent;
+        streaming: Player.StreamingEvent;
+        textchanged: Player.TextChangedEvent;
+        texttrackvisibility: Player.TextTrackVisibilityEvent;
+        timelineregionadded: Player.TimelineRegionAddedEvent;
+        timelineregionenter: Player.TimelineRegionEnterEvent;
+        timelineregionexit: Player.TimelineRegionExitEvent;
+        trackschanged: Player.TracksChangedEvent;
+        unloading: Player.UnloadingEvent;
+        variantchanged: Player.VariantChangedEvent;
     }
 
     class Player extends util.FakeEventTarget implements util.IDestroyable {
@@ -139,7 +139,8 @@ namespace shaka {
         addEventListener<K extends keyof EventMap>(
             type: K,
             listener: (event: EventMap[K]) => boolean | void | undefined,
-            options?: AddEventListenerOptions): void;
+            options?: AddEventListenerOptions
+        ): void;
 
         // eslint-disable-next-line no-dupe-class-members
         addEventListener(
@@ -975,13 +976,24 @@ namespace shaka {
             destroy(): Promise<unknown>;
         }
 
-
-        declare const HttpXHRPlugin: {
-            static parse: (uri: string, request: extern.Request, requestType: net.NetworkingEngine.RequestType, progressUpdated?: shaka.extern.ProgressUpdated) => util.AbortableOperation.<shaka.extern.Response>
-        } | {
-            (uri: string, request: extern.Request, requestType: net.NetworkingEngine.RequestType, progressUpdated?: shaka.extern.ProgressUpdated): util.AbortableOperation.<shaka.extern.Response>;
-            static parse: undefined;
-        };
+        declare const HttpXHRPlugin:
+            | {
+                  static parse: (
+                      uri: string,
+                      request: extern.Request,
+                      requestType: net.NetworkingEngine.RequestType,
+                      progressUpdated?: shaka.extern.ProgressUpdated
+                  ) => util.AbortableOperation<shaka.extern.Response>;
+              }
+            | {
+                  (
+                      uri: string,
+                      request: extern.Request,
+                      requestType: net.NetworkingEngine.RequestType,
+                      progressUpdated?: shaka.extern.ProgressUpdated
+                  ): util.AbortableOperation<shaka.extern.Response>;
+                  static parse: undefined;
+              };
     }
 
     namespace media {
@@ -1244,11 +1256,7 @@ namespace shaka {
         namespace StringUtils {
             function fromBytesAutoDetect(data: BufferSource | null): string;
             function fromUTF8(data: BufferSource | null): string;
-            function fromUTF16(
-                data: BufferSource | null,
-                littleEndian?: boolean,
-                opt_noThrow?: boolean
-            ): string;
+            function fromUTF16(data: BufferSource | null, littleEndian?: boolean, opt_noThrow?: boolean): string;
             function toUTF8(str: string): ArrayBuffer;
         }
 
@@ -1257,7 +1265,6 @@ namespace shaka {
         }
 
         class FakeEventTarget {
-
             /**
              * A work-alike for EventTarget. Only DOM elements may be true
              * EventTargets, but this can be used as a base class to
@@ -1315,12 +1322,7 @@ namespace shaka {
         }
 
         class Error {
-            constructor(
-                severity: Error.Severity,
-                category: Error.Category,
-                code: Error.Code,
-                ...var_args: unknown
-            );
+            constructor(severity: Error.Severity, category: Error.Category, code: Error.Code, ...var_args: unknown);
 
             data: Array<unknown>;
             category: util.Error.Category;
@@ -1461,19 +1463,9 @@ namespace shaka {
     }
 
     namespace extern {
-        type ProgressUpdated = (
-            duration: number,
-            downloadedBytes: number,
-            remainingBytes: number
-        ) => void;
-        type RequestFilter = (
-            type: net.NetworkingEngine.RequestType,
-            request: Request
-        ) => void | Promise<unknown>;
-        type ResponseFilter = (
-            type: net.NetworkingEngine.RequestType,
-            response: Response
-        ) => void | Promise<unknown>;
+        type ProgressUpdated = (duration: number, downloadedBytes: number, remainingBytes: number) => void;
+        type RequestFilter = (type: net.NetworkingEngine.RequestType, request: Request) => void | Promise<unknown>;
+        type ResponseFilter = (type: net.NetworkingEngine.RequestType, response: Response) => void | Promise<unknown>;
         type SchemePlugin = (
             uri: string,
             request: Request,
@@ -1954,7 +1946,7 @@ namespace shaka {
             update(): void;
         }
 
-        interface TimelineRegionInfo { }
+        interface TimelineRegionInfo {}
     }
 
     namespace hls {

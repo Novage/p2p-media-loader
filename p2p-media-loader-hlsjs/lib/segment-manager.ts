@@ -24,7 +24,7 @@ const defaultSettings: SegmentManagerSettings = {
     assetsStorage: undefined,
 };
 
-export type ByteRange = { length: number, offset: number } | undefined;
+export type ByteRange = { length: number; offset: number } | undefined;
 
 export class SegmentManager {
     private readonly loader: LoaderInterface;
@@ -32,13 +32,13 @@ export class SegmentManager {
     private readonly variantPlaylists = new Map<string, Playlist>();
     private segmentRequest: SegmentRequest | null = null;
     private playQueue: {
-        segmentSequence: number,
-        segmentUrl: string,
-        segmentByteRange: ByteRange,
+        segmentSequence: number;
+        segmentUrl: string;
+        segmentByteRange: ByteRange;
         playPosition?: {
-            start: number,
-            duration: number
-        }
+            start: number;
+            duration: number;
+        };
     }[] = [];
     private readonly settings: SegmentManagerSettings;
 
@@ -66,7 +66,7 @@ export class SegmentManager {
             this.masterPlaylist = playlist;
 
             for (const [key, variantPlaylist] of this.variantPlaylists) {
-                const {streamSwarmId, found, index} = this.getStreamSwarmId(variantPlaylist.requestUrl);
+                const { streamSwarmId, found, index } = this.getStreamSwarmId(variantPlaylist.requestUrl);
                 if (!found) {
                     this.variantPlaylists.delete(key);
                 } else {
@@ -75,20 +75,21 @@ export class SegmentManager {
                 }
             }
         } else {
-            const {streamSwarmId, found, index} = this.getStreamSwarmId(requestUrl);
+            const { streamSwarmId, found, index } = this.getStreamSwarmId(requestUrl);
 
-            if (found || (this.masterPlaylist === null)) { // do not add audio and subtitles to variants
+            if (found || this.masterPlaylist === null) {
+                // do not add audio and subtitles to variants
                 playlist.streamSwarmId = streamSwarmId;
-                playlist.streamId = (this.masterPlaylist === null ? undefined : "V" + index.toString());
+                playlist.streamId = this.masterPlaylist === null ? undefined : "V" + index.toString();
                 this.variantPlaylists.set(requestUrl, playlist);
                 this.updateSegments();
             }
         }
     }
 
-    public async loadPlaylist(url: string): Promise<{response: string, responseURL: string}> {
+    public async loadPlaylist(url: string): Promise<{ response: string; responseURL: string }> {
         const assetsStorage = this.settings.assetsStorage;
-        let xhr: {response: string, responseURL: string} | undefined;
+        let xhr: { response: string; responseURL: string } | undefined;
 
         if (assetsStorage !== undefined) {
             let masterSwarmId: string | undefined;
@@ -121,7 +122,10 @@ export class SegmentManager {
         return xhr;
     }
 
-    public async loadSegment(url: string, byteRange: ByteRange): Promise<{content: ArrayBuffer | undefined, downloadBandwidth?: number}> {
+    public async loadSegment(
+        url: string,
+        byteRange: ByteRange
+    ): Promise<{ content: ArrayBuffer | undefined; downloadBandwidth?: number }> {
         const segmentLocation = this.getSegmentLocation(url, byteRange);
         const byteRangeString = byteRangeToString(byteRange);
 
@@ -138,14 +142,16 @@ export class SegmentManager {
 
                 if (masterSwarmId === undefined && this.variantPlaylists.size === 1) {
                     const result = this.variantPlaylists.values().next();
-                    if (!result.done) { // always true
+                    if (!result.done) {
+                        // always true
                         masterSwarmId = result.value.requestUrl.split("?")[0];
                     }
                 }
 
                 if (masterManifestUri === undefined && this.variantPlaylists.size === 1) {
                     const result = this.variantPlaylists.values().next();
-                    if (!result.done) { // always true
+                    if (!result.done) {
+                        // always true
                         masterManifestUri = result.value.requestUrl;
                     }
                 }
@@ -177,8 +183,9 @@ export class SegmentManager {
             return { content, downloadBandwidth: 0 };
         }
 
-        const segmentSequence = (segmentLocation.playlist.manifest.mediaSequence ? segmentLocation.playlist.manifest.mediaSequence : 0)
-            + segmentLocation.segmentIndex;
+        const segmentSequence =
+            (segmentLocation.playlist.manifest.mediaSequence ? segmentLocation.playlist.manifest.mediaSequence : 0) +
+            segmentLocation.segmentIndex;
 
         if (this.playQueue.length > 0) {
             const previousSegment = this.playQueue[this.playQueue.length - 1];
@@ -192,21 +199,30 @@ export class SegmentManager {
             this.segmentRequest.onError("Cancel segment request: simultaneous segment requests are not supported");
         }
 
-        const promise = new Promise<{content: ArrayBuffer | undefined, downloadBandwidth?: number}>((resolve, reject) => {
-            this.segmentRequest = new SegmentRequest(url, byteRange, segmentSequence, segmentLocation.playlist.requestUrl,
-                (content: ArrayBuffer | undefined, downloadBandwidth?: number) => resolve({content, downloadBandwidth}),
-                error => reject(error));
-        });
+        const promise = new Promise<{ content: ArrayBuffer | undefined; downloadBandwidth?: number }>(
+            (resolve, reject) => {
+                this.segmentRequest = new SegmentRequest(
+                    url,
+                    byteRange,
+                    segmentSequence,
+                    segmentLocation.playlist.requestUrl,
+                    (content: ArrayBuffer | undefined, downloadBandwidth?: number) =>
+                        resolve({ content, downloadBandwidth }),
+                    (error) => reject(error)
+                );
+            }
+        );
 
-        this.playQueue.push({segmentUrl: url, segmentByteRange: byteRange, segmentSequence: segmentSequence});
+        this.playQueue.push({ segmentUrl: url, segmentByteRange: byteRange, segmentSequence: segmentSequence });
         void this.loadSegments(segmentLocation.playlist, segmentLocation.segmentIndex, true);
 
         return promise;
     }
 
     public setPlayingSegment(url: string, byteRange: ByteRange, start: number, duration: number): void {
-        const urlIndex = this.playQueue.findIndex(segment =>
-                (segment.segmentUrl === url) && compareByteRanges(segment.segmentByteRange, byteRange));
+        const urlIndex = this.playQueue.findIndex(
+            (segment) => segment.segmentUrl === url && compareByteRanges(segment.segmentByteRange, byteRange)
+        );
 
         if (urlIndex >= 0) {
             this.playQueue = this.playQueue.slice(urlIndex);
@@ -233,8 +249,11 @@ export class SegmentManager {
     }
 
     public abortSegment(url: string, byteRange: ByteRange): void {
-        if (this.segmentRequest && (this.segmentRequest.segmentUrl === url) &&
-                compareByteRanges(this.segmentRequest.segmentByteRange, byteRange)) {
+        if (
+            this.segmentRequest &&
+            this.segmentRequest.segmentUrl === url &&
+            compareByteRanges(this.segmentRequest.segmentByteRange, byteRange)
+        ) {
             this.segmentRequest.onSuccess(undefined, 0);
             this.segmentRequest = null;
         }
@@ -262,38 +281,53 @@ export class SegmentManager {
             return;
         }
 
-        const segmentLocation = this.getSegmentLocation(this.segmentRequest.segmentUrl, this.segmentRequest.segmentByteRange);
+        const segmentLocation = this.getSegmentLocation(
+            this.segmentRequest.segmentUrl,
+            this.segmentRequest.segmentByteRange
+        );
         if (segmentLocation) {
             void this.loadSegments(segmentLocation.playlist, segmentLocation.segmentIndex, false);
         }
     }
 
     private onSegmentLoaded = (segment: Segment) => {
-        if (this.segmentRequest && (this.segmentRequest.segmentUrl === segment.url) &&
-                (byteRangeToString(this.segmentRequest.segmentByteRange) === segment.range)) {
+        if (
+            this.segmentRequest &&
+            this.segmentRequest.segmentUrl === segment.url &&
+            byteRangeToString(this.segmentRequest.segmentByteRange) === segment.range
+        ) {
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             this.segmentRequest.onSuccess(segment.data!.slice(0), segment.downloadBandwidth);
             this.segmentRequest = null;
         }
-    }
+    };
 
     private onSegmentError = (segment: Segment, error: unknown) => {
-        if (this.segmentRequest && (this.segmentRequest.segmentUrl === segment.url) &&
-                (byteRangeToString(this.segmentRequest.segmentByteRange) === segment.range)) {
+        if (
+            this.segmentRequest &&
+            this.segmentRequest.segmentUrl === segment.url &&
+            byteRangeToString(this.segmentRequest.segmentByteRange) === segment.range
+        ) {
             this.segmentRequest.onError(error);
             this.segmentRequest = null;
         }
-    }
+    };
 
     private onSegmentAbort = (segment: Segment) => {
-        if (this.segmentRequest && (this.segmentRequest.segmentUrl === segment.url) &&
-                (byteRangeToString(this.segmentRequest.segmentByteRange) === segment.range)) {
+        if (
+            this.segmentRequest &&
+            this.segmentRequest.segmentUrl === segment.url &&
+            byteRangeToString(this.segmentRequest.segmentByteRange) === segment.range
+        ) {
             this.segmentRequest.onError("Loading aborted: internal abort");
             this.segmentRequest = null;
         }
-    }
+    };
 
-    private getSegmentLocation(url: string, byteRange: ByteRange): { playlist: Playlist, segmentIndex: number } | undefined {
+    private getSegmentLocation(
+        url: string,
+        byteRange: ByteRange
+    ): { playlist: Playlist; segmentIndex: number } | undefined {
         for (const playlist of this.variantPlaylists.values()) {
             const segmentIndex = playlist.getSegmentIndex(url, byteRange);
             if (segmentIndex >= 0) {
@@ -314,7 +348,11 @@ export class SegmentManager {
 
         const masterSwarmId = this.getMasterSwarmId();
 
-        for (let i = segmentIndex; i < playlistSegments.length && segments.length < this.settings.forwardSegmentCount; ++i) {
+        for (
+            let i = segmentIndex;
+            i < playlistSegments.length && segments.length < this.settings.forwardSegmentCount;
+            ++i
+        ) {
             const segment = playlist.manifest.segments[i];
 
             const url = playlist.getSegmentAbsoluteUrl(segment.uri);
@@ -339,7 +377,8 @@ export class SegmentManager {
 
         if (loadSegmentId) {
             const segment = await this.loader.getSegment(loadSegmentId);
-            if (segment) { // Segment already loaded by loader
+            if (segment) {
+                // Segment already loaded by loader
                 this.onSegmentLoaded(segment);
             }
         }
@@ -350,24 +389,26 @@ export class SegmentManager {
     }
 
     private getMasterSwarmId() {
-        const settingsSwarmId = (this.settings.swarmId && (this.settings.swarmId.length !== 0)) ? this.settings.swarmId : undefined;
+        const settingsSwarmId =
+            this.settings.swarmId && this.settings.swarmId.length !== 0 ? this.settings.swarmId : undefined;
         if (settingsSwarmId !== undefined) {
             return settingsSwarmId;
         }
 
-        return (this.masterPlaylist !== null)
-            ? this.masterPlaylist.requestUrl.split("?")[0]
-            : undefined;
+        return this.masterPlaylist !== null ? this.masterPlaylist.requestUrl.split("?")[0] : undefined;
     }
 
-    private getStreamSwarmId(playlistUrl: string): {streamSwarmId: string, found: boolean, index: number} {
+    private getStreamSwarmId(playlistUrl: string): { streamSwarmId: string; found: boolean; index: number } {
         const masterSwarmId = this.getMasterSwarmId();
 
         if (this.masterPlaylist && this.masterPlaylist.manifest.playlists && masterSwarmId) {
             for (let i = 0; i < this.masterPlaylist.manifest.playlists.length; ++i) {
-                const url = new URL(this.masterPlaylist.manifest.playlists[i].uri, this.masterPlaylist.responseUrl).toString();
+                const url = new URL(
+                    this.masterPlaylist.manifest.playlists[i].uri,
+                    this.masterPlaylist.responseUrl
+                ).toString();
                 if (url === playlistUrl) {
-                    return {streamSwarmId: `${masterSwarmId}+V${i}`, found: true, index: i};
+                    return { streamSwarmId: `${masterSwarmId}+V${i}`, found: true, index: i };
                 }
             }
         }
@@ -375,11 +416,15 @@ export class SegmentManager {
         return {
             streamSwarmId: masterSwarmId ?? playlistUrl.split("?")[0],
             found: false,
-            index: -1
+            index: -1,
         };
     }
 
-    private async loadContent(url: string, responseType: XMLHttpRequestResponseType, range?: string): Promise<XMLHttpRequest> {
+    private async loadContent(
+        url: string,
+        responseType: XMLHttpRequestResponseType,
+        range?: string
+    ): Promise<XMLHttpRequest> {
         return new Promise<XMLHttpRequest>((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             xhr.open("GET", url, true);
@@ -419,7 +464,7 @@ class Playlist {
             const segment = this.manifest.segments[i];
             const segmentUrl = this.getSegmentAbsoluteUrl(segment.uri);
 
-            if ((url === segmentUrl) && compareByteRanges(segment.byteRange, byteRange)) {
+            if (url === segmentUrl && compareByteRanges(segment.byteRange, byteRange)) {
                 return i;
             }
         }
@@ -462,9 +507,7 @@ export interface SegmentManagerSettings {
 }
 
 function compareByteRanges(b1: ByteRange, b2: ByteRange) {
-    return (b1 === undefined)
-        ? (b2 === undefined)
-        : ((b2 !== undefined) && (b1.length === b2.length) && (b1.offset === b2.offset));
+    return b1 === undefined ? b2 === undefined : b2 !== undefined && b1.length === b2.length && b1.offset === b2.offset;
 }
 
 function byteRangeToString(byteRange: ByteRange): string | undefined {

@@ -37,7 +37,7 @@ export class BandwidthApproximator {
 
         const interval = Math.min(SMOOTH_INTERVAL, timeStamp);
         this.lastBandwidth.push(new NumberWithTime(this.currentBytesSum / interval, timeStamp));
-    }
+    };
 
     // in bytes per millisecond
     public getBandwidth = (timeStamp: number): number => {
@@ -53,13 +53,13 @@ export class BandwidthApproximator {
         }
 
         return maxBandwidth;
-    }
+    };
 
     public getSmoothInterval = (): number => {
         return SMOOTH_INTERVAL;
-    }
+    };
 
     public getMeasureInterval = (): number => {
         return MEASURE_INTERVAL;
-    }
+    };
 }

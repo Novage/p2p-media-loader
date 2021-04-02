@@ -15,55 +15,49 @@
     limitations under the License.
 -->
 <html lang="en">
-<head>
+    <head>
+        <meta charset="UTF-8" />
 
-    <meta charset="UTF-8">
+        <title>Clappr player with Shaka Player engine and P2P demo (MPEG-DASH only)</title>
 
-    <title>Clappr player with Shaka Player engine and P2P demo (MPEG-DASH only)</title>
+        <script src="../node_modules/p2p-media-loader-core/build/p2p-media-loader-core.js"></script>
+        <script src="../build/p2p-media-loader-shaka.js"></script>
 
-    <script src="../node_modules/p2p-media-loader-core/build/p2p-media-loader-core.js"></script>
-    <script src="../build/p2p-media-loader-shaka.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/clappr@latest"></script>
+        <script src="https://github.com/videojs/mux.js/releases/download/v5.1.2/mux.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/2.5.1/shaka-player.compiled.js"></script>
+        <script src="https://cdn.jsdelivr.net/gh/clappr/dash-shaka-playback@latest/dist/dash-shaka-playback.external.js"></script>
 
-    <script src="https://cdn.jsdelivr.net/npm/clappr@latest"></script>
-    <script src="https://github.com/videojs/mux.js/releases/download/v5.1.2/mux.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/2.5.1/shaka-player.compiled.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/clappr/dash-shaka-playback@latest/dist/dash-shaka-playback.external.js"></script>
+        <style>
+            #video {
+                width: 720px;
+                margin-left: auto;
+                margin-right: auto;
+                display: block;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="video"></div>
 
-    <style>
-        #video {
-            width: 720px;
-            margin-left: auto;
-            margin-right: auto;
-            display: block;
-        }
-    </style>
+        <script>
+            if (p2pml.shaka.Engine.isSupported()) {
+                var engine = new p2pml.shaka.Engine();
 
-</head>
-<body>
+                var player = new Clappr.Player({
+                    parentId: "#video",
+                    source: "https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.mpd",
+                    plugins: [DashShakaPlayback],
+                    shakaOnBeforeLoad: function (shakaPlayerInstance) {
+                        engine.initShakaPlayer(shakaPlayerInstance);
+                    },
+                });
 
-    <div id="video"></div>
-
-    <script>
-
-        if (p2pml.shaka.Engine.isSupported()) {
-            var engine = new p2pml.shaka.Engine();
-
-            var player = new Clappr.Player({
-                parentId: "#video",
-                source: "https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.mpd",
-                plugins: [DashShakaPlayback],
-                shakaOnBeforeLoad: function(shakaPlayerInstance) {
-                    engine.initShakaPlayer(shakaPlayerInstance);
-                }
-            });
-
-            player.setVolume(1); // 1%
-            player.play();
-        } else {
-            document.write("Not supported :(");
-        }
-
-    </script>
-
-</body>
+                player.setVolume(1); // 1%
+                player.play();
+            } else {
+                document.write("Not supported :(");
+            }
+        </script>
+    </body>
 </html>

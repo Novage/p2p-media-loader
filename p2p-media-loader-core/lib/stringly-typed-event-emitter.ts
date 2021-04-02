@@ -18,7 +18,7 @@
 
 import { EventEmitter } from "events";
 
-export class STEEmitter<T extends (string | symbol)> extends EventEmitter {
+export class STEEmitter<T extends string | symbol> extends EventEmitter {
     public on = (event: T, listener: (...args: any[]) => void): this => super.on(event, listener);
     public emit = (event: T, ...args: any[]): boolean => super.emit(event, ...args);
 }

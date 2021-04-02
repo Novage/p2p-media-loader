@@ -15,56 +15,51 @@
     limitations under the License.
 -->
 <html lang="en">
-<head>
+    <head>
+        <meta charset="UTF-8" />
 
-    <meta charset="UTF-8">
+        <title>JWPlayer with hls.js engine and P2P demo</title>
 
-    <title>JWPlayer with hls.js engine and P2P demo</title>
+        <script src="../node_modules/p2p-media-loader-core/build/p2p-media-loader-core.js"></script>
+        <script src="../build/p2p-media-loader-hlsjs.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/@hola.org/jwplayer-hlsjs@latest/dist/jwplayer.hlsjs.min.js"></script>
 
-    <script src="../node_modules/p2p-media-loader-core/build/p2p-media-loader-core.js"></script>
-    <script src="../build/p2p-media-loader-hlsjs.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@hola.org/jwplayer-hlsjs@latest/dist/jwplayer.hlsjs.min.js"></script>
+        <script src="https://content.jwplatform.com/libraries/aG3IMhIy.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
-    <script src="https://content.jwplatform.com/libraries/aG3IMhIy.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+        <style>
+            #wrapper {
+                width: 720px;
+                margin-left: auto;
+                margin-right: auto;
+                display: block;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="wrapper">
+            <div id="player"></div>
+        </div>
 
-    <style>
-        #wrapper {
-            width: 720px;
-            margin-left: auto;
-            margin-right: auto;
-            display: block;
-        }
-    </style>
+        <script>
+            if (Hls.isSupported() && p2pml.hlsjs.Engine.isSupported()) {
+                var engine = new p2pml.hlsjs.Engine();
 
-</head>
-<body>
-    <div id="wrapper">
-        <div id="player"></div>
-    </div>
+                var player = jwplayer("player");
 
-    <script>
+                player.setup({
+                    file: "https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.m3u8",
+                });
 
-        if (Hls.isSupported() && p2pml.hlsjs.Engine.isSupported()) {
-            var engine = new p2pml.hlsjs.Engine();
+                jwplayer_hls_provider.attach();
 
-            var player = jwplayer("player");
-
-            player.setup({
-                file: "https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.m3u8"
-            });
-
-            jwplayer_hls_provider.attach();
-
-            p2pml.hlsjs.initJwPlayer(player, {
-                liveSyncDurationCount: 7, // To have at least 7 segments in queue
-                loader: engine.createLoaderClass()
-            });
-        } else {
-            document.write("Not supported :(");
-        }
-
-    </script>
-
-</body>
+                p2pml.hlsjs.initJwPlayer(player, {
+                    liveSyncDurationCount: 7, // To have at least 7 segments in queue
+                    loader: engine.createLoaderClass(),
+                });
+            } else {
+                document.write("Not supported :(");
+            }
+        </script>
+    </body>
 </html>

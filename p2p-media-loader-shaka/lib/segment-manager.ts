@@ -28,7 +28,6 @@ const defaultSettings: SegmentManagerSettings = {
 };
 
 export class SegmentManager {
-
     private readonly debug = Debug("p2pml:shaka:sm");
     private readonly loader: LoaderInterface;
     private readonly requests = new Map<string, Request>();
@@ -71,7 +70,11 @@ export class SegmentManager {
         return this.settings;
     }
 
-    public async load(parserSegment: ParserSegment, manifestUri: string, playheadTime: number): Promise<shaka.extern.Response> {
+    public async load(
+        parserSegment: ParserSegment,
+        manifestUri: string,
+        playheadTime: number
+    ): Promise<shaka.extern.Response> {
         this.manifestUri = manifestUri;
         this.playheadTime = playheadTime;
 
@@ -101,7 +104,7 @@ export class SegmentManager {
     }
 
     private refreshLoad(): LoaderSegment {
-        const lastRequestedSegment = this.segmentHistory[ this.segmentHistory.length - 1 ];
+        const lastRequestedSegment = this.segmentHistory[this.segmentHistory.length - 1];
         const safePlayheadTime = this.playheadTime > 0.1 ? this.playheadTime : lastRequestedSegment.start;
         const sequence: ParserSegment[] = this.segmentHistory.reduce((a: ParserSegment[], i) => {
             if (i.start >= safePlayheadTime) {
@@ -117,7 +120,7 @@ export class SegmentManager {
         const lastRequestedSegmentIndex = sequence.length - 1;
 
         do {
-            const next = sequence[ sequence.length - 1 ].next();
+            const next = sequence[sequence.length - 1].next();
             if (next) {
                 sequence.push(next);
             } else {
@@ -139,7 +142,7 @@ export class SegmentManager {
         }));
 
         this.loader.load(loaderSegments, `${masterSwarmId}+${lastRequestedSegment.streamIdentity}`);
-        return loaderSegments[ lastRequestedSegmentIndex ];
+        return loaderSegments[lastRequestedSegmentIndex];
     }
 
     private pushSegmentHistory(segment: ParserSegment) {
@@ -148,7 +151,10 @@ export class SegmentManager {
             this.segmentHistory.splice(0, this.settings.maxHistorySegments * 0.2);
         }
 
-        if (this.segmentHistory.length > 0 && this.segmentHistory[ this.segmentHistory.length - 1 ].start > segment.start) {
+        if (
+            this.segmentHistory.length > 0 &&
+            this.segmentHistory[this.segmentHistory.length - 1].start > segment.start
+        ) {
             this.debug("segment history reset due to playhead seek back");
             this.segmentHistory.splice(0);
         }
@@ -159,7 +165,12 @@ export class SegmentManager {
     private reportSuccess(request: Request, loaderSegment: LoaderSegment) {
         let timeMs: number | undefined;
 
-        if (loaderSegment.downloadBandwidth !== undefined && loaderSegment.downloadBandwidth > 0 && loaderSegment.data && loaderSegment.data.byteLength > 0) {
+        if (
+            loaderSegment.downloadBandwidth !== undefined &&
+            loaderSegment.downloadBandwidth > 0 &&
+            loaderSegment.data &&
+            loaderSegment.data.byteLength > 0
+        ) {
             timeMs = Math.trunc(loaderSegment.data.byteLength / loaderSegment.downloadBandwidth);
         }
 
@@ -190,7 +201,7 @@ export class SegmentManager {
             this.debug("request delete", segment.id);
             this.requests.delete(segment.id);
         }
-    }
+    };
 
     private onSegmentError = (segment: LoaderSegment, error: unknown) => {
         if (this.requests.has(segment.id)) {
@@ -199,7 +210,7 @@ export class SegmentManager {
             this.debug("request delete from error", segment.id);
             this.requests.delete(segment.id);
         }
-    }
+    };
 
     private onSegmentAbort = (segment: LoaderSegment) => {
         if (this.requests.has(segment.id)) {
@@ -208,8 +219,7 @@ export class SegmentManager {
             this.debug("request delete from abort", segment.id);
             this.requests.delete(segment.id);
         }
-    }
-
+    };
 }
 
 class Request {

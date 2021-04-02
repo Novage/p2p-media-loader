@@ -17,8 +17,8 @@
 declare module "m3u8-parser" {
     export class Parser {
         constructor();
-        push (m3u8: string): void;
-        end (): void;
+        push(m3u8: string): void;
+        end(): void;
         manifest: Manifest;
     }
 
@@ -30,12 +30,12 @@ declare module "m3u8-parser" {
 
     export type Segment = {
         uri: string;
-        byteRange?: { length: number; offset: number; };
-    }
+        byteRange?: { length: number; offset: number };
+    };
 
     export type Playlist = {
         uri: string;
-    }
+    };
 }
 
 // FIXME: fixes hls.js internal .js module import

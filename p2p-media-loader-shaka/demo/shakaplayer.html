@@ -15,46 +15,53 @@
     limitations under the License.
 -->
 <html lang="en">
-<head>
+    <head>
+        <meta charset="UTF-8" />
 
-    <meta charset="UTF-8">
+        <title>Shaka Player with P2P demo (HLS or MPEG-DASH)</title>
 
-    <title>Shaka Player with P2P demo (HLS or MPEG-DASH)</title>
+        <script src="../node_modules/p2p-media-loader-core/build/p2p-media-loader-core.js"></script>
+        <script src="../build/p2p-media-loader-shaka.js"></script>
 
-    <script src="../node_modules/p2p-media-loader-core/build/p2p-media-loader-core.js"></script>
-    <script src="../build/p2p-media-loader-shaka.js"></script>
+        <script src="https://github.com/videojs/mux.js/releases/download/v5.1.2/mux.js"></script>
+        <script src="https://ajax.googleapis.com/ajax/libs/shaka-player/2.5.1/shaka-player.compiled.js"></script>
+    </head>
+    <body>
+        <video
+            id="video"
+            width="640"
+            poster="https://shaka-player-demo.appspot.com/assets/poster.jpg"
+            controls
+            autoplay
+            muted
+        ></video>
 
-    <script src="https://github.com/videojs/mux.js/releases/download/v5.1.2/mux.js"></script>
-    <script src="https://ajax.googleapis.com/ajax/libs/shaka-player/2.5.1/shaka-player.compiled.js"></script>
+        <script>
+            shaka.polyfill.installAll();
 
-</head>
-<body>
+            if (shaka.Player.isBrowserSupported() && p2pml.shaka.Engine.isSupported()) {
+                var engine = new p2pml.shaka.Engine();
 
-    <video id="video" width="640" poster="https://shaka-player-demo.appspot.com/assets/poster.jpg" controls autoplay muted></video>
+                var video = document.getElementById("video");
+                var player = new shaka.Player(video);
+                var onError = function (error) {
+                    console.error("Error code", error.code, "object", error);
+                };
+                player.addEventListener("error", function (event) {
+                    onError(event.detail);
+                });
 
-    <script>
+                engine.initShakaPlayer(player);
 
-        shaka.polyfill.installAll();
-
-        if (shaka.Player.isBrowserSupported() && p2pml.shaka.Engine.isSupported()) {
-            var engine = new p2pml.shaka.Engine();
-
-            var video = document.getElementById("video");
-            var player = new shaka.Player(video);
-            var onError = function(error) { console.error("Error code", error.code, "object", error); }
-            player.addEventListener("error", function(event) { onError(event.detail); });
-
-            engine.initShakaPlayer(player);
-
-            player.load(
-                //"https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.m3u8"
-                "https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.mpd"
-            ).catch(onError);
-        } else {
-            document.write("Not supported :(");
-        }
-
-    </script>
-
-</body>
+                player
+                    .load(
+                        //"https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.m3u8"
+                        "https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.mpd"
+                    )
+                    .catch(onError);
+            } else {
+                document.write("Not supported :(");
+            }
+        </script>
+    </body>
 </html>
