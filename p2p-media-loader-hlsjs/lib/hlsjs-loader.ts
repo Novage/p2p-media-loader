@@ -15,13 +15,48 @@
  */
 
 import { SegmentManager } from "./segment-manager";
-import type { LoaderCallbacks, LoaderConfiguration, LoaderContext } from "hls.js/src/types/loader";
+import type { LoaderCallbacks, LoaderConfiguration, LoaderContext, LoaderStats } from "hls.js";
 
 const DEFAULT_DOWNLOAD_LATENCY = 1;
 const DEFAULT_DOWNLOAD_BANDWIDTH = 12500; // bytes per millisecond
 
+type HlsJsV0Stats = {
+    trequest: number;
+    tfirst: number;
+    tload: number;
+    tparsed: number;
+    loaded: number;
+    total: number;
+};
+
 export class HlsJsLoader {
     private segmentManager: SegmentManager;
+    public stats: HlsJsV0Stats & LoaderStats = {
+        trequest: 0,
+        tfirst: 0,
+        tload: 0,
+        tparsed: 0,
+        loaded: 0,
+        total: 0,
+        aborted: false,
+        retry: 0,
+        chunkCount: 1,
+        bwEstimate: 0,
+        loading: {
+            start: 0,
+            end: 0,
+            first: 0,
+        },
+        parsing: {
+            start: 0,
+            end: 0,
+        },
+        buffering: {
+            start: 0,
+            end: 0,
+            first: 0,
+        },
+    };
 
     public constructor(segmentManager: SegmentManager) {
         this.segmentManager = segmentManager;
@@ -41,12 +76,7 @@ export class HlsJsLoader {
             }
         } else if (((context as unknown) as { frag: unknown }).frag) {
             try {
-                const result = await this.segmentManager.loadSegment(
-                    context.url,
-                    context.rangeStart === undefined || context.rangeEnd === undefined
-                        ? undefined
-                        : { offset: context.rangeStart, length: context.rangeEnd - context.rangeStart }
-                );
+                const result = await this.segmentManager.loadSegment(context.url, getByteRange(context));
                 const { content } = result;
                 if (content !== undefined) {
                     setTimeout(() => this.successSegment(content, result.downloadBandwidth, context, callbacks), 0);
@@ -60,12 +90,7 @@ export class HlsJsLoader {
     }
 
     public abort(context: LoaderContext): void {
-        this.segmentManager.abortSegment(
-            context.url,
-            context.rangeStart === undefined || context.rangeEnd === undefined
-                ? undefined
-                : { offset: context.rangeStart, length: context.rangeEnd - context.rangeStart }
-        );
+        this.segmentManager.abortSegment(context.url, getByteRange(context));
     }
 
     private successPlaylist(
@@ -75,21 +100,21 @@ export class HlsJsLoader {
     ): void {
         const now = performance.now();
 
-        const stats = {
-            trequest: now - 300,
-            tfirst: now - 200,
-            tload: now - 1,
-            tparsed: now,
-            loaded: xhr.response.length,
-            total: xhr.response.length,
-        };
+        this.stats.trequest = now - 300;
+        this.stats.tfirst = now - 200;
+        this.stats.tload = now - 1;
+        this.stats.tparsed = now;
+        this.stats.loaded = xhr.response.length;
+        this.stats.total = xhr.response.length;
+
+        createUniversalStats(this.stats);
 
         callbacks.onSuccess(
             {
                 url: xhr.responseURL,
                 data: xhr.response,
             },
-            stats,
+            this.stats,
             context,
             undefined
         );
@@ -108,21 +133,25 @@ export class HlsJsLoader {
                 ? DEFAULT_DOWNLOAD_BANDWIDTH
                 : downloadBandwidth);
 
-        const stats = {
-            trequest: now - DEFAULT_DOWNLOAD_LATENCY - downloadTime,
-            tfirst: now - downloadTime,
-            tload: now - 1,
-            tparsed: now,
-            loaded: content.byteLength,
-            total: content.byteLength,
-        };
+        this.stats.trequest = now - DEFAULT_DOWNLOAD_LATENCY - downloadTime;
+        this.stats.tfirst = now - downloadTime;
+        this.stats.tload = now - 1;
+        this.stats.tparsed = now;
+        this.stats.loaded = content.byteLength;
+        this.stats.total = content.byteLength;
+
+        createUniversalStats(this.stats);
+
+        if (callbacks.onProgress) {
+            callbacks.onProgress(this.stats, context, content, undefined);
+        }
 
         callbacks.onSuccess(
             {
                 url: context.url,
                 data: content,
             },
-            stats,
+            this.stats,
             context,
             undefined
         );
@@ -135,4 +164,37 @@ export class HlsJsLoader {
     ): void {
         callbacks.onError(error, context, undefined);
     }
+}
+
+/**
+ * Create universal stats entity for both hls.js v0 and v1
+ * @param stats hls.js v0 stats
+ */
+function createUniversalStats(stats: HlsJsV0Stats & LoaderStats) {
+    stats.aborted = false;
+    stats.retry = 0;
+    stats.chunkCount = 1;
+    stats.bwEstimate = 0;
+    stats.loading = {
+        start: stats.trequest,
+        end: stats.tload,
+        first: stats.tfirst,
+    };
+    stats.parsing = {
+        start: stats.tload,
+        end: stats.tparsed,
+    };
+    stats.buffering = {
+        start: stats.tload,
+        end: stats.tparsed,
+        first: stats.tload,
+    };
+}
+
+function getByteRange(context: LoaderContext) {
+    return context.rangeStart === undefined ||
+        context.rangeEnd === undefined ||
+        (context.rangeStart === 0 && context.rangeEnd === 0)
+        ? undefined
+        : { offset: context.rangeStart, length: context.rangeEnd - context.rangeStart };
 }
