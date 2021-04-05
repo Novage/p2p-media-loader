@@ -40,7 +40,7 @@ export class HlsJsLoader {
         total: 0,
         aborted: false,
         retry: 0,
-        chunkCount: 1,
+        chunkCount: 0,
         bwEstimate: 0,
         loading: {
             start: 0,
@@ -103,7 +103,6 @@ export class HlsJsLoader {
         this.stats.trequest = now - 300;
         this.stats.tfirst = now - 200;
         this.stats.tload = now - 1;
-        this.stats.tparsed = now;
         this.stats.loaded = xhr.response.length;
         this.stats.total = xhr.response.length;
 
@@ -136,7 +135,6 @@ export class HlsJsLoader {
         this.stats.trequest = now - DEFAULT_DOWNLOAD_LATENCY - downloadTime;
         this.stats.tfirst = now - downloadTime;
         this.stats.tload = now - 1;
-        this.stats.tparsed = now;
         this.stats.loaded = content.byteLength;
         this.stats.total = content.byteLength;
 
@@ -171,30 +169,13 @@ export class HlsJsLoader {
  * @param stats hls.js v0 stats
  */
 function createUniversalStats(stats: HlsJsV0Stats & LoaderStats) {
-    stats.aborted = false;
-    stats.retry = 0;
-    stats.chunkCount = 1;
-    stats.bwEstimate = 0;
-    stats.loading = {
-        start: stats.trequest,
-        end: stats.tload,
-        first: stats.tfirst,
-    };
-    stats.parsing = {
-        start: stats.tload,
-        end: stats.tparsed,
-    };
-    stats.buffering = {
-        start: stats.tload,
-        end: stats.tparsed,
-        first: stats.tload,
-    };
+    stats.loading.start = stats.trequest;
+    stats.loading.first = stats.tfirst;
+    stats.loading.end = stats.tload;
 }
 
 function getByteRange(context: LoaderContext) {
-    return context.rangeStart === undefined ||
-        context.rangeEnd === undefined ||
-        (context.rangeStart === 0 && context.rangeEnd === 0)
-        ? undefined
-        : { offset: context.rangeStart, length: context.rangeEnd - context.rangeStart };
+    return context.rangeEnd && context.rangeStart !== undefined
+        ? { offset: context.rangeStart, length: context.rangeEnd - context.rangeStart }
+        : undefined;
 }
