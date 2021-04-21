@@ -356,7 +356,7 @@ export class SegmentManager {
             const segment = playlist.manifest.segments[i];
 
             const url = playlist.getSegmentAbsoluteUrl(segment.uri);
-            const byteRange: ByteRange = segment.byteRange;
+            const byteRange: ByteRange = segment.byterange;
             const id = this.getSegmentId(playlist, initialSequence + i);
             segments.push({
                 id: id,
@@ -464,7 +464,7 @@ class Playlist {
             const segment = this.manifest.segments[i];
             const segmentUrl = this.getSegmentAbsoluteUrl(segment.uri);
 
-            if (url === segmentUrl && compareByteRanges(segment.byteRange, byteRange)) {
+            if (url === segmentUrl && compareByteRanges(segment.byterange, byteRange)) {
                 return i;
             }
         }
