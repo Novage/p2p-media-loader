@@ -30,6 +30,7 @@ type HlsJsV0Stats = {
 };
 
 export class HlsJsLoader {
+    private isLoaded = false;
     private segmentManager: SegmentManager;
     public stats: HlsJsV0Stats & LoaderStats = {
         trequest: 0,
@@ -70,6 +71,7 @@ export class HlsJsLoader {
         if (((context as unknown) as { type: unknown }).type) {
             try {
                 const result = await this.segmentManager.loadPlaylist(context.url);
+                this.isLoaded = true;
                 this.successPlaylist(result, context, callbacks);
             } catch (e) {
                 this.error(e, context, callbacks);
@@ -78,7 +80,8 @@ export class HlsJsLoader {
             try {
                 const result = await this.segmentManager.loadSegment(context.url, getByteRange(context));
                 const { content } = result;
-                if (content !== undefined) {
+                if (content) {
+                    this.isLoaded = true;
                     setTimeout(() => this.successSegment(content, result.downloadBandwidth, context, callbacks), 0);
                 }
             } catch (e) {
@@ -89,8 +92,16 @@ export class HlsJsLoader {
         }
     }
 
-    public abort(context: LoaderContext): void {
+    public abort(context: LoaderContext, callbacks?: LoaderCallbacks<LoaderContext>): void {
+        if (this.isLoaded) return;
+
         this.segmentManager.abortSegment(context.url, getByteRange(context));
+        this.stats.aborted = true;
+
+        const onAbort = callbacks?.onAbort;
+        if (onAbort) {
+            onAbort(this.stats, context, undefined);
+        }
     }
 
     private successPlaylist(

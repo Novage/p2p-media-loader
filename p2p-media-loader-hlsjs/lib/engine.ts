@@ -48,7 +48,8 @@ export class Engine extends EventEmitter {
         const engine = this; // eslint-disable-line @typescript-eslint/no-this-alias
         return class {
             private impl: HlsJsLoader;
-            private context: LoaderContext | undefined;
+            private context?: LoaderContext;
+            private callbacks?: LoaderCallbacks<LoaderContext>;
             public stats: LoaderStats;
 
             constructor() {
@@ -62,12 +63,13 @@ export class Engine extends EventEmitter {
                 callbacks: LoaderCallbacks<LoaderContext>
             ) => {
                 this.context = context;
+                this.callbacks = callbacks;
                 await this.impl.load(context, config, callbacks);
             };
 
             abort = () => {
                 if (this.context) {
-                    this.impl.abort(this.context);
+                    this.impl.abort(this.context, this.callbacks);
                 }
             };
 
