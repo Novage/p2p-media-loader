@@ -223,6 +223,10 @@ export class HybridLoader extends EventEmitter implements LoaderInterface {
         };
     };
 
+    public getBandwidthEstimate = (): number => {
+        return this.bandwidthApproximator.getBandwidth(this.now());
+    };
+
     public destroy = async (): Promise<void> => {
         if (this.httpRandomDownloadInterval !== undefined) {
             clearInterval(this.httpRandomDownloadInterval);

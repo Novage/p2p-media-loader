@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import type { EventEmitter } from "events";
+
 export type Segment = {
     readonly id: string;
     readonly url: string;
@@ -73,7 +75,7 @@ export enum Events {
     PieceBytesUploaded = "piece_bytes_uploaded",
 }
 
-export interface LoaderInterface {
+export interface LoaderInterface extends EventEmitter {
     on: ((eventName: string, listener: (...params: unknown[]) => void) => this) &
         ((eventName: Events.SegmentLoaded, listener: (segment: Segment) => void) => this) &
         ((eventName: Events.SegmentError, listener: (segment: Segment, error: unknown) => void) => this) &
@@ -82,5 +84,6 @@ export interface LoaderInterface {
     getSegment: (id: string) => Promise<Segment | undefined>;
     getSettings: () => unknown;
     getDetails: () => unknown;
+    getBandwidthEstimate: () => number;
     destroy: () => Promise<void>;
 }
