@@ -16,6 +16,7 @@
 
 import { SegmentManager } from "./segment-manager";
 import type { LoaderCallbacks, LoaderConfiguration, LoaderContext, LoaderStats } from "hls.js";
+import { Events } from "p2p-media-loader-core";
 
 const DEFAULT_DOWNLOAD_LATENCY = 1;
 const DEFAULT_DOWNLOAD_BANDWIDTH = 12500; // bytes per millisecond
@@ -68,6 +69,10 @@ export class HlsJsLoader {
         _config: LoaderConfiguration,
         callbacks: LoaderCallbacks<LoaderContext>
     ): Promise<void> {
+        const start = performance.now();
+        this.stats.loading.start = start - DEFAULT_DOWNLOAD_LATENCY;
+        this.stats.loading.first = start;
+
         if (((context as unknown) as { type: unknown }).type) {
             try {
                 const result = await this.segmentManager.loadPlaylist(context.url);
@@ -77,6 +82,16 @@ export class HlsJsLoader {
                 this.error(e, context, callbacks);
             }
         } else if (((context as unknown) as { frag: unknown }).frag) {
+            const { loader } = this.segmentManager;
+
+            const updateBandwidthEstimate = () => {
+                const bandwidthEstimate = loader.getBandwidthEstimate();
+                // convert bytes per millisecond to bits per second
+                this.stats.bwEstimate = bandwidthEstimate * 8000;
+                this.stats.loaded = (performance.now() - start) * bandwidthEstimate;
+            };
+            loader.on(Events.PieceBytesDownloaded, updateBandwidthEstimate);
+
             try {
                 const result = await this.segmentManager.loadSegment(context.url, getByteRange(context));
                 const { content } = result;
@@ -86,6 +101,8 @@ export class HlsJsLoader {
                 }
             } catch (e) {
                 setTimeout(() => this.error(e, context, callbacks), 0);
+            } finally {
+                loader.removeListener(Events.PieceBytesDownloaded, updateBandwidthEstimate);
             }
         } else {
             console.warn("Unknown load request", context);
@@ -148,6 +165,8 @@ export class HlsJsLoader {
         this.stats.tload = now - 1;
         this.stats.loaded = content.byteLength;
         this.stats.total = content.byteLength;
+        // convert bytes per millisecond to bits per second
+        this.stats.bwEstimate = (downloadBandwidth ?? DEFAULT_DOWNLOAD_BANDWIDTH) * 8000;
 
         createUniversalStats(this.stats);
 

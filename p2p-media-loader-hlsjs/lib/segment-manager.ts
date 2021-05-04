@@ -27,7 +27,7 @@ const defaultSettings: SegmentManagerSettings = {
 export type ByteRange = { length: number; offset: number } | undefined;
 
 export class SegmentManager {
-    private readonly loader: LoaderInterface;
+    public readonly loader: LoaderInterface;
     private masterPlaylist: Playlist | null = null;
     private readonly variantPlaylists = new Map<string, Playlist>();
     private segmentRequest: SegmentRequest | null = null;
@@ -132,7 +132,7 @@ export class SegmentManager {
         if (!segmentLocation) {
             let content: ArrayBuffer | undefined;
 
-            // Not a segment from variants; usually can be: init, audio or subtitles segment, encription key etc.
+            // Not a segment from variants; usually can be: init, audio or subtitles segment, encryption key etc.
             const assetsStorage = this.settings.assetsStorage;
             if (assetsStorage !== undefined) {
                 let masterManifestUri = this.masterPlaylist?.requestUrl;
