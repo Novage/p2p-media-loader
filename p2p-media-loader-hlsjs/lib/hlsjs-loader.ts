@@ -17,9 +17,6 @@
 import { SegmentManager } from "./segment-manager";
 import type { LoaderCallbacks, LoaderConfiguration, LoaderContext } from "hls.js/src/types/loader";
 
-const DEFAULT_DOWNLOAD_LATENCY = 1;
-const DEFAULT_DOWNLOAD_BANDWIDTH = 12500; // bytes per millisecond
-
 export class HlsJsLoader {
     private segmentManager: SegmentManager;
 
@@ -43,7 +40,7 @@ export class HlsJsLoader {
             try {
                 const result = await this.segmentManager.loadSegment(
                     context.url,
-                    context.rangeStart === undefined || context.rangeEnd === undefined
+                    context.rangeStart === undefined || context.rangeEnd === undefined || !(context.rangeEnd - context.rangeStart)
                         ? undefined
                         : { offset: context.rangeStart, length: context.rangeEnd - context.rangeStart }
                 );
@@ -73,13 +70,14 @@ export class HlsJsLoader {
         context: LoaderContext,
         callbacks: LoaderCallbacks<LoaderContext>
     ): void {
-        const now = performance.now();
-
         const stats = {
-            trequest: now - 300,
-            tfirst: now - 200,
-            tload: now - 1,
-            tparsed: now,
+            aborted: false,
+            retry: 0,
+            chunkCount: 0,
+            bwEstimate: 0,
+            parsing: { start: 0, end: 0},
+            loading: { start: 0, first: 0, end: 0 },
+            buffering: { start: 0, first: 0, end: 0 },
             loaded: xhr.response.length,
             total: xhr.response.length,
         };
@@ -101,21 +99,21 @@ export class HlsJsLoader {
         context: LoaderContext,
         callbacks: LoaderCallbacks<LoaderContext>
     ): void {
-        const now = performance.now();
-        const downloadTime =
-            content.byteLength /
-            (downloadBandwidth === undefined || downloadBandwidth <= 0
-                ? DEFAULT_DOWNLOAD_BANDWIDTH
-                : downloadBandwidth);
-
         const stats = {
-            trequest: now - DEFAULT_DOWNLOAD_LATENCY - downloadTime,
-            tfirst: now - downloadTime,
-            tload: now - 1,
-            tparsed: now,
+            aborted: false,
+            retry: 0,
+            chunkCount: 0,
+            bwEstimate: 0,
+            parsing: { start: 0, end: 0},
+            loading: { start: 0, first: 0, end: 0 },
+            buffering: { start: 0, first: 0, end: 0 },
             loaded: content.byteLength,
             total: content.byteLength,
         };
+
+        if(callbacks.onProgress){
+            callbacks.onProgress(stats, context, content, undefined)
+        }
 
         callbacks.onSuccess(
             {
@@ -129,7 +127,7 @@ export class HlsJsLoader {
     }
 
     private error(
-        error: { code: number; text: string },
+        error: any,
         context: LoaderContext,
         callbacks: LoaderCallbacks<LoaderContext>
     ): void {
