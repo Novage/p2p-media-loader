@@ -7,6 +7,7 @@ function makeConfig({ libName, entry, mode }) {
     return {
         mode,
         entry,
+        devtool: 'source-map',
         resolve: {
             extensions: [".ts", ".js"],
         },

@@ -50,8 +50,21 @@ export class Engine extends EventEmitter {
             private impl: HlsJsLoader;
             private context: LoaderContext | undefined;
 
+            public stats : any;
+
             constructor() {
                 this.impl = new HlsJsLoader(engine.segmentManager);
+                this.stats = {
+                    aborted: false,
+                    retry: 0,
+                    chunkCount: 0,
+                    bwEstimate: 0,
+                    parsing: { start: 0, end: 0},
+                    loading: { start: 0, first: 0, end: 0 },
+                    buffering: { start: 0, first: 0, end: 0 },
+                    loaded: 0,
+                    total: 0,
+                }
             }
 
             load = async (

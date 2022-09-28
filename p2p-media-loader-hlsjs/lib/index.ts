@@ -17,7 +17,7 @@
 
 /* eslint-disable */
 
-export const version = "0.6.2";
+export const version = "0.7.0";
 export * from "./engine";
 export * from "./segment-manager";
 
