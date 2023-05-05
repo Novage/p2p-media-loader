@@ -17,7 +17,8 @@
     "build:umd-min": "vite build --mode umd-min",
     "build:es": "tsc",
     "preview": "vite preview",
-    "prettier": "prettier --write ."
+    "prettier": "prettier --write .",
+    "lint": "eslint . --ext .ts"
   },
   "devDependencies": {
     "prettier": "2.8.8",

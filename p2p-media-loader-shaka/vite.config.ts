@@ -26,7 +26,12 @@ const getUMDConfig = ({ minify }: { minify: boolean }): UserConfig => {
 };
 
 export default defineConfig(({ mode }) => {
-  if (mode === "umd") return getUMDConfig({ minify: false });
-  if (mode === "umd-min") return getUMDConfig({ minify: true });
-  return getUMDConfig({ minify: true });
+  switch (mode) {
+    case "umd":
+      return getUMDConfig({ minify: false });
+
+    case "umd-min":
+    default:
+      return getUMDConfig({ minify: true });
+  }
 });
