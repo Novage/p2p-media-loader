@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "files": [
     "dist",
-    "lib"
+    "lib",
+    "src"
   ],
   "exports": "./lib/index.js",
   "types": "./lib/index.d.ts",
