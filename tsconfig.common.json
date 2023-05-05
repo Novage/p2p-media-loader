@@ -5,8 +5,6 @@
     "module": "ESNext",
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
-
-    /* Bundler mode */
     "moduleResolution": "Node",
     "allowImportingTsExtensions": false,
     "resolveJsonModule": false,
@@ -15,8 +13,6 @@
     "outDir": "lib",
     "declaration": true,
     "declarationMap": true,
-
-    /* Linting */
     "strict": true,
     "strictNullChecks": true,
     "strictFunctionTypes": true,
@@ -24,5 +20,5 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
-  },
+  }
 }
