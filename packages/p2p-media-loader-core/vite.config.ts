@@ -6,6 +6,7 @@ const getUMDConfig = ({ minify }: { minify: boolean }): UserConfig => {
     build: {
       emptyOutDir: false,
       minify: minify ? "esbuild" : false,
+      sourcemap: true,
       lib: {
         name: "p2pml.core",
         fileName: (format) =>
