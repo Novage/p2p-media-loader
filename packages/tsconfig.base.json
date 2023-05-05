@@ -12,12 +12,14 @@
     "noEmit": false,
     "declaration": true,
     "declarationMap": true,
+    "sourceMap": true,
     "strict": true,
     "strictNullChecks": true,
     "strictFunctionTypes": true,
     "noImplicitAny": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "composite": true
   }
 }
