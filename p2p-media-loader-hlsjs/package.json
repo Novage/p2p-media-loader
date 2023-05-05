@@ -12,11 +12,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run build:umd && npm run build:umd-min && npm run build:es",
+    "build": "npm run build:es && npm run build:umd && npm run build:umd-min",
     "build:umd": "vite build --mode umd",
     "build:umd-min": "vite build --mode umd-min",
     "build:es": "tsc",
-    "type-check": "tsc --noEmit",
     "preview": "vite preview",
     "prettier": "prettier --write ."
   },
