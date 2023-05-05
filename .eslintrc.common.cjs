@@ -9,7 +9,7 @@ module.exports = {
     "plugin:@typescript-eslint/recommended",
   ],
   plugins: ["@typescript-eslint", "prettier"],
-  ignorePatterns: ["/.eslintrc.cjs", "/lib", "/dist"],
+  ignorePatterns: ["/.eslintrc.cjs", "/lib", "/dist", "/vite.config.ts"],
   rules: {
     "prettier/prettier": "error",
   },

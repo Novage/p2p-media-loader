@@ -1,4 +1,7 @@
 {
   "extends": "../tsconfig.common.json",
-  "include": ["src/**/*", "vite.config.ts"]
+  "compilerOptions": {
+    "outDir": "lib"
+  },
+  "include": ["src/**/*"]
 }

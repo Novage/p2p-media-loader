@@ -18,16 +18,18 @@
     "build:es": "tsc",
     "preview": "vite preview",
     "prettier": "prettier --write .",
-    "lint": "eslint . --ext .ts"
+    "lint": "eslint . --ext .ts",
+    "clean": "rimraf lib dist"
   },
   "devDependencies": {
-    "prettier": "2.8.8",
-    "typescript": "^5.0.2",
-    "vite": "^4.3.2",
     "@typescript-eslint/eslint-plugin": "^5.59.2",
     "@typescript-eslint/parser": "^5.59.2",
     "eslint": "^8.39.0",
-    "eslint-plugin-prettier": "^4.2.1"
+    "eslint-plugin-prettier": "^4.2.1",
+    "prettier": "2.8.8",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.0.2",
+    "vite": "^4.3.2"
   },
   "dependencies": {
     "p2p-media-loader-core": "file:../p2p-media-loader-core/p2p-media-loader-core-1.0.0.tgz"
