@@ -1,6 +1,6 @@
 module.exports = {
   root: true,
-  extends: ["../.eslintrc.common.cjs"],
+  extends: ["../../.eslintrc.common.cjs"],
   parser: "@typescript-eslint/parser",
   parserOptions: {
     tsconfigRootDir: __dirname,
