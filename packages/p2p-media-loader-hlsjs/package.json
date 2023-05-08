@@ -1,0 +1,32 @@
+{
+  "name": "p2p-media-loader-hlsjs",
+  "version": "1.0.0",
+  "files": [
+    "dist",
+    "lib",
+    "src"
+  ],
+  "exports": "./src/index.ts",
+  "types": "./src/index.ts",
+  "publishConfig": {
+    "exports": "./lib/index.js",
+    "types": "./lib/index.d.ts"
+  },
+  "sideEffects": false,
+  "private": false,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "pnpm run build:es && pnpm run build:umd && pnpm run build:umd-min",
+    "build:umd": "vite build --mode umd",
+    "build:umd-min": "vite build --mode umd-min",
+    "build:es": "tsc",
+    "preview": "vite preview",
+    "prettier": "prettier --write .",
+    "lint": "eslint . --ext .ts",
+    "clean": "rimraf lib dist build"
+  },
+  "dependencies": {
+    "p2p-media-loader-core": "workspace:*"
+  }
+}
