@@ -5,3 +5,4 @@ dist
 README.md
 LICENSE
 package-lock.json
+pnpm-lock.yaml
