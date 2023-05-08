@@ -3,4 +3,8 @@ export class HybridLoader {
     console.log("isSupported");
     return false;
   }
+
+  static text() {
+    return "Text";
+  }
 }

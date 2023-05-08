@@ -6,14 +6,18 @@
     "lib",
     "src"
   ],
-  "exports": "./lib/index.js",
-  "types": "./lib/index.d.ts",
+  "exports": "./src/index.ts",
+  "types": "./src/index.ts",
+  "publishConfig": {
+    "exports": "./lib/index.js",
+    "types": "./lib/index.d.ts"
+  },
   "sideEffects": false,
   "private": false,
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run build:es && npm run build:umd && npm run build:umd-min",
+    "build": "pnpm run build:es && pnpm run build:umd && pnpm run build:umd-min",
     "build:umd": "vite build --mode umd",
     "build:umd-min": "vite build --mode umd-min",
     "build:es": "tsc",
@@ -22,17 +26,7 @@
     "lint": "eslint . --ext .ts",
     "clean": "rimraf lib dist build"
   },
-  "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^5.59.2",
-    "@typescript-eslint/parser": "^5.59.2",
-    "eslint": "^8.39.0",
-    "eslint-plugin-prettier": "^4.2.1",
-    "prettier": "2.8.8",
-    "rimraf": "^5.0.0",
-    "typescript": "^5.0.2",
-    "vite": "^4.3.2"
-  },
   "dependencies": {
-    "p2p-media-loader-core": "file:../p2p-media-loader-core/p2p-media-loader-core-1.0.0.tgz"
+    "p2p-media-loader-core": "workspace:*"
   }
 }
