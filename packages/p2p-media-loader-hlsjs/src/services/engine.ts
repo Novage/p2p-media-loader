@@ -1,4 +1,4 @@
-import { HybridLoader } from "p2p-media-loader-core";
+import { HybridLoader, Math } from "p2p-media-loader-core";
 
 export class Engine {
   static isSupported() {
@@ -11,5 +11,9 @@ export class Engine {
 
   createLoaderClass() {
     return { name: "loader class" };
+  }
+
+  increment(num: number) {
+    return Math.add(num, 1);
   }
 }
