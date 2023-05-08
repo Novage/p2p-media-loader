@@ -6,7 +6,7 @@ export class Engine {
   }
 
   static getText(): string {
-    return "Some stupid text with no sence. " + HybridLoader.text();
+    return "Some stupid text with no sense. " + HybridLoader.text();
   }
 
   getSettings() {

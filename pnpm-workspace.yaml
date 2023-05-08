@@ -1,2 +1,3 @@
 packages:
   - 'packages/*'
+  - 'p2p-media-loader-demo'

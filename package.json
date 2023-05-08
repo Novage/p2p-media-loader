@@ -3,12 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "pnpm --recursive run build",
-    "build:es": "pnpm --recursive run build:es",
-    "build:umd": "pnpm --recursive run build:umd",
-    "build:umd-min": "pnpm --recursive run build:umd-min",
-    "clean": "pnpm --recursive run clean",
-    "pack-packages": "pnpm --recursive exec -- pnpm pack",
+    "build": "pnpm --filter './packages/**' run build",
+    "build:es": "pnpm --filter './packages/**' run build:es",
+    "build:umd": "pnpm --filter './packages/**' run build:umd",
+    "build:umd-min": "pnpm --filter './packages/**' run build:umd-min",
+    "clean": "pnpm --filter './packages/**' run clean",
+    "pack-packages": "pnpm --filter './packages/**' exec -- pnpm pack",
     "lint": "pnpm --recursive run lint",
     "prettier": "pnpm --recursive run prettier"
   },
