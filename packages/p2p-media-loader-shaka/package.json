@@ -1,5 +1,5 @@
 {
-  "name": "p2p-media-loader-hlsjs",
+  "name": "p2p-media-loader-shaka",
   "version": "1.0.0",
   "files": [
     "dist",
