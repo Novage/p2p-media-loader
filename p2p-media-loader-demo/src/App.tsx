@@ -9,7 +9,11 @@ function App() {
     <>
       <h1>Vite + React</h1>
       <div>
-        <button onClick={() => setCount((count) => new HlsJSEngine().increment(count))}>
+        <button
+          onClick={() =>
+            setCount((count) => new HlsJSEngine().increment(count))
+          }
+        >
           count is {count}
         </button>
       </div>
