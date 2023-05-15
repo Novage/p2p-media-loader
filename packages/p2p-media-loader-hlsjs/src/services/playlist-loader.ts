@@ -3,26 +3,25 @@ import type {
   LoaderCallbacks,
   LoaderConfiguration,
   LoaderContext,
-  FragmentLoaderContext,
+  PlaylistLoaderContext,
 } from "hls.js";
-
 import { LoaderBase, Helper, FetchError } from "./loader-base";
-import type { ByteRange } from "./loader-base";
 
-export class FragmentLoader extends LoaderBase<FragmentLoaderContext> {
+export class PlaylistLoader extends LoaderBase<PlaylistLoaderContext> {
   constructor(config: HlsConfig) {
     super(config);
   }
 
   public async loadAndReport(
-    context: FragmentLoaderContext,
+    context: PlaylistLoaderContext,
     config: LoaderConfiguration,
     callbacks: LoaderCallbacks<LoaderContext>
   ) {
     const stats = this.stats;
     const { loading } = stats;
     try {
-      const requestPromise = this.fetchFragment(context.url);
+      console.log();
+      const requestPromise = this.fetchPlaylist(context.url);
       loading.start = performance.now();
       const { maxTimeToFirstByteMs, maxLoadTimeMs } = config.loadPolicy;
       const timeout =
@@ -45,11 +44,11 @@ export class FragmentLoader extends LoaderBase<FragmentLoaderContext> {
         );
       }
 
-      const fragmentData = await response.arrayBuffer();
+      const playlist = await response.text();
       this.clearTimeout();
       loading.end = Math.max(self.performance.now(), stats.loading.first);
 
-      stats.total = fragmentData.byteLength;
+      stats.total = playlist.length;
       if (stats.total) stats.loaded = stats.total;
       stats.parsing = { start: performance.now() - 1, end: performance.now() };
       stats.buffering = {
@@ -63,7 +62,7 @@ export class FragmentLoader extends LoaderBase<FragmentLoaderContext> {
       );
 
       callbacks.onSuccess(
-        { url: context.url, data: fragmentData, code: response.status },
+        { url: context.url, data: playlist, code: response.status },
         stats,
         context,
         response
@@ -83,25 +82,14 @@ export class FragmentLoader extends LoaderBase<FragmentLoaderContext> {
     }
   }
 
-  private async fetchFragment(url: string, byteRange?: Partial<ByteRange>) {
-    const headers = new Headers(new Headers({ ...this.context.headers }));
-    if (
-      byteRange &&
-      byteRange.rangeStart !== undefined &&
-      byteRange.rangeEnd !== undefined
-    ) {
-      headers.append(
-        "Range",
-        Helper.getByteRangeHeaderString(byteRange as ByteRange)
-      );
-    }
-    const requestInit: RequestInit = {
+  private async fetchPlaylist(url: string) {
+    const { headers } = this.context;
+    return fetch(url, {
       method: "GET",
       mode: "cors",
       credentials: "same-origin",
-      signal: this.abortController?.signal,
-      headers,
-    };
-    return fetch(url, requestInit);
+      signal: this.abortController.signal,
+      headers: new Headers({ ...headers }),
+    });
   }
 }

@@ -13,6 +13,7 @@ module.exports = {
   ignorePatterns: ["/.eslintrc.cjs", "/lib", "/dist", "/vite.config.ts"],
   rules: {
     "prettier/prettier": "warn",
-    "@typescript-eslint/no-non-null-assertion": 0
+    "@typescript-eslint/no-non-null-assertion": 0,
+    "no-console": 1,
   }
 };
