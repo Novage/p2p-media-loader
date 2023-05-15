@@ -20,7 +20,6 @@ export class PlaylistLoader extends LoaderBase<PlaylistLoaderContext> {
     const stats = this.stats;
     const { loading } = stats;
     try {
-      console.log();
       const requestPromise = this.fetchPlaylist(context.url);
       loading.start = performance.now();
       const { maxTimeToFirstByteMs, maxLoadTimeMs } = config.loadPolicy;
