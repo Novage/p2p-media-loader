@@ -118,11 +118,14 @@ export class Helper {
 
   static getLoadingStartBasedOnBitrate(
     bitrate: number,
+    nextBitrate: number,
     loadingEnd: number,
     byteLength: number
   ) {
     const bites = byteLength * 8;
-    const targetBandwidth = Math.ceil(bitrate * 1.5);
+    const levelsRatio = nextBitrate / bitrate;
+    const targetBandwidthRatio = (levelsRatio - 1) / 2 + 1;
+    const targetBandwidth = Math.ceil(bitrate * targetBandwidthRatio);
     const necessaryTime = Math.floor((bites / targetBandwidth) * 1000);
     return {
       loadingStart: loadingEnd - necessaryTime,

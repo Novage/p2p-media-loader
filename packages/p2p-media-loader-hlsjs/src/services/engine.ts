@@ -24,6 +24,13 @@ export class Engine {
     hls.config.pLoader = this.pLoader;
     hls.config.fLoader = this.fLoader;
     hls.config.maxBufferSize = 5;
+
+    this.hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+      console.log(data.levels.map((i) => i.bitrate));
+    });
+    this.hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
+      console.log(data);
+    });
   }
 
   initClapprPlayer(player: any) {

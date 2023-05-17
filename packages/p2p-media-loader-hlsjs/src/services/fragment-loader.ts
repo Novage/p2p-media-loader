@@ -59,10 +59,15 @@ export class FragmentLoader extends LoaderBase<FragmentLoaderContext> {
       stats.loaded = fragmentData.byteLength;
 
       if (this.segmentManager.masterManifest) {
-        const bitrate = this.segmentManager.masterManifest.getBitrateOfLevel(2);
+        const level = 2;
+        const bitrate =
+          this.segmentManager.masterManifest.getBitrateOfLevel(level);
+        const nextBitrate =
+          this.segmentManager.masterManifest.getBitrateOfLevel(level + 1);
         const { loadingStart, bandwidth } =
           Helper.getLoadingStartBasedOnBitrate(
             bitrate,
+            nextBitrate,
             loading.first,
             fragmentData.byteLength
           );
