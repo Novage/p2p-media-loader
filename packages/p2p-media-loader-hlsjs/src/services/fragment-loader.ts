@@ -59,7 +59,7 @@ export class FragmentLoader extends LoaderBase<FragmentLoaderContext> {
       stats.loaded = fragmentData.byteLength;
 
       if (this.segmentManager.masterManifest) {
-        const level = 2;
+        const level = 3;
         const bitrate =
           this.segmentManager.masterManifest.getBitrateOfLevel(level);
         const nextBitrate =
