@@ -1,4 +1,4 @@
-import { SegmentManager } from "./engine";
+import { SegmentManager } from "./segment-manager";
 import {
   HlsConfig,
   LoaderCallbacks,
@@ -40,7 +40,6 @@ export abstract class LoaderBase<
     };
   }
 
-  //should not be overridden
   public load(
     context: Context,
     config: LoaderConfiguration,
@@ -49,10 +48,10 @@ export abstract class LoaderBase<
     this.context = context;
     this.config = config;
     this.callbacks = callbacks;
-    this.loadAndReport(context, config, callbacks);
+    this.loadInternal(context, config, callbacks);
   }
 
-  protected abstract loadAndReport(
+  protected abstract loadInternal(
     context: Context,
     config: LoaderConfiguration,
     callbacks: LoaderCallbacks<Context>
@@ -70,16 +69,17 @@ export abstract class LoaderBase<
     this.callbacks?.onAbort?.(this.stats, this.context, this.response);
   }
 
-  destroy() {
+  public destroy() {
     this.callbacks = null;
     this.config = null;
     this.abortInternal();
+    this.clearTimeout();
   }
 
   protected setAbortTimeout(timeout: number) {
     this.clearTimeout();
     this.requestTimeout = setTimeout(() => {
-      this.abort();
+      this.abortInternal();
       this.callbacks?.onTimeout(this.stats, this.context, undefined);
     }, timeout);
   }
@@ -113,7 +113,21 @@ export class Helper {
   }
 
   static getBandwidth(contentLength: number, fetchDuration: number) {
-    return (contentLength * 8) / fetchDuration;
+    return Math.round((contentLength * 8000) / fetchDuration);
+  }
+
+  static getLoadingStartBasedOnBitrate(
+    bitrate: number,
+    loadingEnd: number,
+    byteLength: number
+  ) {
+    const bites = byteLength * 8;
+    const targetBandwidth = Math.ceil(bitrate * 1.5);
+    const necessaryTime = Math.floor((bites / targetBandwidth) * 1000);
+    return {
+      loadingStart: loadingEnd - necessaryTime,
+      bandwidth: targetBandwidth,
+    };
   }
 
   static sleep(milliseconds: number) {

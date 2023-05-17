@@ -12,7 +12,7 @@ export class PlaylistLoader extends LoaderBase<PlaylistLoaderContext> {
     super(config);
   }
 
-  public async loadAndReport(
+  protected async loadInternal(
     context: PlaylistLoaderContext,
     config: LoaderConfiguration,
     callbacks: LoaderCallbacks<LoaderContext>
@@ -29,42 +29,37 @@ export class PlaylistLoader extends LoaderBase<PlaylistLoaderContext> {
           : maxLoadTimeMs;
       this.setAbortTimeout(timeout);
 
-      const response = (this.response = await requestPromise);
+      this.response = await requestPromise;
       loading.first = Math.max(performance.now(), loading.start);
       this.clearTimeout();
       this.setAbortTimeout(maxLoadTimeMs - (loading.first - loading.start));
 
-      if (!response.ok) {
-        const { status, statusText } = response;
+      if (!this.response.ok) {
+        const { status, statusText } = this.response;
         throw new FetchError(
           statusText || "Fetch, bad network response",
           status,
-          response
+          this.response
         );
       }
 
-      const playlist = await response.text();
+      const playlist = await this.response.text();
+      this.segmentManager.parsePlaylist(playlist);
       this.clearTimeout();
       loading.end = Math.max(self.performance.now(), stats.loading.first);
 
+      stats.loaded = playlist.length;
       stats.total = playlist.length;
-      if (stats.total) stats.loaded = stats.total;
-      stats.parsing = { start: performance.now() - 1, end: performance.now() };
-      stats.buffering = {
-        start: performance.now() - 2,
-        first: performance.now() - 1,
-        end: performance.now(),
-      };
       stats.bwEstimate = Helper.getBandwidth(
         stats.loaded,
         stats.loading.end - stats.loading.start
       );
 
       callbacks.onSuccess(
-        { url: context.url, data: playlist, code: response.status },
+        { url: this.response.url, data: playlist, code: this.response.status },
         stats,
         context,
-        response
+        this.response
       );
     } catch (error: unknown) {
       this.clearTimeout();

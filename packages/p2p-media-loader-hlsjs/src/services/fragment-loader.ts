@@ -14,7 +14,7 @@ export class FragmentLoader extends LoaderBase<FragmentLoaderContext> {
     super(config);
   }
 
-  public async loadAndReport(
+  protected async loadInternal(
     context: FragmentLoaderContext,
     config: LoaderConfiguration,
     callbacks: LoaderCallbacks<LoaderContext>
@@ -22,7 +22,11 @@ export class FragmentLoader extends LoaderBase<FragmentLoaderContext> {
     const stats = this.stats;
     const { loading } = stats;
     try {
-      const requestPromise = this.fetchFragment(context.url);
+      const { rangeStart, rangeEnd } = context;
+      const requestPromise = this.fetchFragment(context.url, {
+        rangeStart,
+        rangeEnd,
+      });
       loading.start = performance.now();
       const { maxTimeToFirstByteMs, maxLoadTimeMs } = config.loadPolicy;
       const timeout =
@@ -31,42 +35,55 @@ export class FragmentLoader extends LoaderBase<FragmentLoaderContext> {
           : maxLoadTimeMs;
       this.setAbortTimeout(timeout);
 
-      const response = (this.response = await requestPromise);
-      loading.first = Math.max(performance.now(), loading.start);
+      this.response = await requestPromise;
+      loading.first = Math.round(Math.max(performance.now(), loading.start));
       this.clearTimeout();
       this.setAbortTimeout(maxLoadTimeMs - (loading.first - loading.start));
 
-      if (!response.ok) {
-        const { status, statusText } = response;
+      if (!this.response.ok) {
+        const { status, statusText } = this.response;
         throw new FetchError(
           statusText || "Fetch, bad network response",
           status,
-          response
+          this.response
         );
       }
 
-      const fragmentData = await response.arrayBuffer();
+      const fragmentData = await this.response.arrayBuffer();
       this.clearTimeout();
-      loading.end = Math.max(self.performance.now(), stats.loading.first);
-
-      stats.total = fragmentData.byteLength;
-      if (stats.total) stats.loaded = stats.total;
-      stats.parsing = { start: performance.now() - 1, end: performance.now() };
-      stats.buffering = {
-        start: performance.now() - 2,
-        first: performance.now() - 1,
-        end: performance.now(),
-      };
-      stats.bwEstimate = Helper.getBandwidth(
-        stats.loaded,
-        stats.loading.end - stats.loading.start
+      loading.end = Math.round(
+        Math.max(performance.now(), stats.loading.first)
       );
 
+      stats.total = fragmentData.byteLength;
+      stats.loaded = fragmentData.byteLength;
+
+      if (this.segmentManager.masterManifest) {
+        const bitrate = this.segmentManager.masterManifest.getBitrateOfLevel(2);
+        const { loadingStart, bandwidth } =
+          Helper.getLoadingStartBasedOnBitrate(
+            bitrate,
+            loading.first,
+            fragmentData.byteLength
+          );
+        loading.start = loadingStart;
+        stats.bwEstimate = bandwidth;
+      } else {
+        stats.bwEstimate = Helper.getBandwidth(
+          stats.total,
+          loading.first - loading.start
+        );
+      }
+
       callbacks.onSuccess(
-        { url: context.url, data: fragmentData, code: response.status },
+        {
+          url: this.response.url,
+          data: fragmentData,
+          code: this.response.status,
+        },
         stats,
         context,
-        response
+        this.response
       );
     } catch (error: unknown) {
       this.clearTimeout();
