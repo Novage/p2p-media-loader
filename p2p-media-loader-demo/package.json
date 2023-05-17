@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "dplayer": "^1.27.1",
+    "hls.js": "^1.4.1",
     "p2p-media-loader-hlsjs": "workspace:*",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
