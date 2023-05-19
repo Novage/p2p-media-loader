@@ -123,9 +123,8 @@ export class Helper {
     byteLength: number
   ) {
     const bites = byteLength * 8;
-    const levelsRatio = nextBitrate / bitrate;
-    const targetBandwidthRatio = (levelsRatio - 1) / 2 + 1;
-    const targetBandwidth = Math.ceil(bitrate * targetBandwidthRatio);
+    const bitrateDiff = nextBitrate - bitrate;
+    const targetBandwidth = Math.ceil(bitrate + bitrateDiff * 0.5);
     const necessaryTime = Math.floor((bites / targetBandwidth) * 1000);
     return {
       loadingStart: loadingEnd - necessaryTime,
