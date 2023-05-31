@@ -1,5 +1,5 @@
-import Hls from "hls.js";
-import type { HlsConfig } from "hls.js";
+import type Hls from "hls.js";
+import type { HlsConfig, Events } from "hls.js";
 import { FragmentLoader } from "./fragment-loader";
 import { PlaylistLoader } from "./playlist-loader";
 import type { Writable } from "type-fest";
@@ -25,10 +25,13 @@ export class Engine {
     hls.config.fLoader = this.fLoader;
     hls.config.maxBufferSize = 5;
 
-    this.hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
-      console.log(data.levels.map((i) => i.bitrate));
-    });
-    this.hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
+    this.hls.on(
+      "hlsManifestParsed" as Events.MANIFEST_PARSED,
+      (event, data) => {
+        console.log(data.levels.map((i) => i.bitrate));
+      }
+    );
+    this.hls.on("hlsLevelSwitched" as Events.LEVEL_SWITCHED, (event, data) => {
       console.log(data);
     });
   }
@@ -69,7 +72,7 @@ export class Engine {
     const { hls } = this;
     if (!hls) return;
 
-    hls.on(Hls.Events.FRAG_CHANGED, (event, data) => {
+    hls.on("hlsFragChanged" as Events.FRAG_CHANGED, (event, data) => {
       const frag = data.frag;
       const byteRange: ByteRange | undefined =
         frag.byteRange.length !== 2
@@ -81,11 +84,11 @@ export class Engine {
       this.setPlayingSegment(frag.url, byteRange, frag.start, frag.duration);
     });
 
-    hls.on(Hls.Events.DESTROYING, async () => {
+    hls.on("hlsDestroying" as Events.DESTROYING, async () => {
       await this.destroy();
     });
 
-    hls.on(Hls.Events.ERROR, (event, errorData) => {
+    hls.on("hlsError" as Events.ERROR, (event, errorData) => {
       if (errorData.details === "bufferStalledError") {
         const htmlMediaElement = !hls.media
           ? ((hls as any).el_ as HTMLMediaElement | undefined) // videojs-contrib-hlsjs
