@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "pnpm --filter './packages/**' run build",
+    "build": "pnpm --recursive run build",
     "build:es": "pnpm --filter './packages/**' run build:es",
     "build:umd": "pnpm --filter './packages/**' run build:umd",
     "build:umd-min": "pnpm --filter './packages/**' run build:umd-min",
