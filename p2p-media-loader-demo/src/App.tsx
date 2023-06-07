@@ -10,13 +10,11 @@ const videoUrl = {
   live: "https://fcc3ddae59ed.us-west-2.playback.live-video.net/api/video/v1/us-west-2.893648527354.channel.DmumNckWFTqz.m3u8",
 };
 
-enum Player {
-  DPlayer = "DPlayer",
-  HjlJS = "HjlJS",
-}
+const players = ["hlsjs", "dplayer"] as const;
+type Player = (typeof players)[number];
 
 function App() {
-  const [playerType, setPlayerType] = useState<Player>(Player.DPlayer);
+  const [playerType, setPlayerType] = useState<Player>("dplayer");
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -25,7 +23,7 @@ function App() {
 
     let player: DPlayer | Hls;
     const url = videoUrl.live;
-    if (playerType === Player.DPlayer && containerRef.current) {
+    if (playerType === "dplayer" && containerRef.current) {
       const engine = new HlsJsEngine();
       const hls = new Hls({
         ...engine.getConfig(),
@@ -44,7 +42,7 @@ function App() {
           },
         },
       });
-    } else if (playerType === Player.HjlJS && videoRef.current) {
+    } else if (playerType === "hlsjs" && videoRef.current) {
       const engine = new HlsJsEngine();
       const hls = new Hls({
         ...engine.getConfig(),
@@ -67,7 +65,7 @@ function App() {
             value={playerType}
             onChange={(event) => setPlayerType(event.target.value as Player)}
           >
-            {Object.values(Player).map((player) => {
+            {players.map((player) => {
               return (
                 <option key={player} value={player}>
                   {player}
@@ -84,9 +82,7 @@ function App() {
           style={{ width: 1000 }}
         ></div>
       </div>
-      {playerType === Player.HjlJS && (
-        <video ref={videoRef} controls muted></video>
-      )}
+      {playerType === "hlsjs" && <video ref={videoRef} controls muted></video>}
     </div>
   );
 }
