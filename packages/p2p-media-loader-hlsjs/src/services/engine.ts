@@ -1,19 +1,52 @@
-import { HybridLoader, Math } from "p2p-media-loader-core";
+import type { HlsConfig } from "hls.js";
+import { PlaylistLoaderBase } from "./playlist-loader";
+import { FragmentLoaderBase } from "./fragment-loader";
+
+export type SegmentManager = object;
 
 export class Engine {
-  static isSupported() {
-    return HybridLoader.isSupported();
+  segmentManager: SegmentManager;
+
+  constructor() {
+    this.segmentManager = {};
   }
 
-  getSettings() {
-    return { opt1: 1, opt2: 2 };
+  public getConfig(): Pick<HlsConfig, "pLoader" | "fLoader"> {
+    return {
+      pLoader: this.createPlaylistLoaderClass(),
+      fLoader: this.createFragmentLoaderClass(),
+    };
   }
 
-  createLoaderClass() {
-    return { name: "loader class" };
+  private createPlaylistLoaderClass() {
+    const segmentManager = this.segmentManager;
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const engine = this;
+
+    return class PlaylistLoader extends PlaylistLoaderBase {
+      constructor(config: HlsConfig) {
+        super(config, segmentManager);
+      }
+
+      static getEngine() {
+        return engine;
+      }
+    };
   }
 
-  increment(num: number) {
-    return Math.add(num, 1);
+  private createFragmentLoaderClass() {
+    const segmentManager = this.segmentManager;
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const engine = this;
+
+    return class FragmentLoader extends FragmentLoaderBase {
+      constructor(config: HlsConfig) {
+        super(config, segmentManager);
+      }
+
+      static getEngine() {
+        return engine;
+      }
+    };
   }
 }
