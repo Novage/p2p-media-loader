@@ -27,6 +27,7 @@
     "clean": "rimraf lib dist build"
   },
   "dependencies": {
+    "hls.js": "^1.4.5",
     "p2p-media-loader-core": "workspace:*"
   }
 }
