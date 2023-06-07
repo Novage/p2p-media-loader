@@ -1,0 +1,32 @@
+name: Lint and Build
+
+on:
+  push:
+    branches: [v1]
+  pull_request:
+    branches: [v1]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v2
+        with:
+          version: latest
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - run: pnpm i
+      - run: pnpm lint
+      - run: pnpm build
+      - run: npx tsc
+        working-directory: ./p2p-media-loader-demo
