@@ -6,18 +6,18 @@ import type {
   HlsConfig,
   LoaderStats,
 } from "hls.js";
-import type { SegmentManager } from "./engine";
+import { HybridLoader } from "p2p-media-loader-core";
 
 export class PlaylistLoaderBase implements Loader<PlaylistLoaderContext> {
   context!: PlaylistLoaderContext;
   config!: LoaderConfiguration;
   callbacks!: LoaderCallbacks<PlaylistLoaderContext>;
   stats!: LoaderStats;
-  segmentManager: SegmentManager;
+  hybridLoader: HybridLoader;
   defaultLoader: Loader<PlaylistLoaderContext>;
 
-  constructor(config: HlsConfig, segmentManager: SegmentManager) {
-    this.segmentManager = segmentManager;
+  constructor(config: HlsConfig, hybridLoader: HybridLoader) {
+    this.hybridLoader = hybridLoader;
     this.defaultLoader = new config.loader(
       config
     ) as Loader<PlaylistLoaderContext>;

@@ -1,14 +1,13 @@
 import type { HlsConfig } from "hls.js";
 import { PlaylistLoaderBase } from "./playlist-loader";
 import { FragmentLoaderBase } from "./fragment-loader";
-
-export type SegmentManager = object;
+import { HybridLoader } from "p2p-media-loader-core";
 
 export class Engine {
-  segmentManager: SegmentManager;
+  hybridLoader: HybridLoader;
 
   constructor() {
-    this.segmentManager = {};
+    this.hybridLoader = new HybridLoader();
   }
 
   public getConfig(): Pick<HlsConfig, "pLoader" | "fLoader"> {
@@ -19,13 +18,13 @@ export class Engine {
   }
 
   private createPlaylistLoaderClass() {
-    const segmentManager = this.segmentManager;
+    const hybridLoader = this.hybridLoader;
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const engine = this;
 
     return class PlaylistLoader extends PlaylistLoaderBase {
       constructor(config: HlsConfig) {
-        super(config, segmentManager);
+        super(config, hybridLoader);
       }
 
       static getEngine() {
@@ -35,13 +34,13 @@ export class Engine {
   }
 
   private createFragmentLoaderClass() {
-    const segmentManager = this.segmentManager;
+    const hybridLoader = this.hybridLoader;
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const engine = this;
 
     return class FragmentLoader extends FragmentLoaderBase {
       constructor(config: HlsConfig) {
-        super(config, segmentManager);
+        super(config, hybridLoader);
       }
 
       static getEngine() {
