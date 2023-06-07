@@ -24,11 +24,6 @@ function App() {
     let player: DPlayer | Hls;
     const url = videoUrl.live;
     if (playerType === "dplayer" && containerRef.current) {
-      const engine = new HlsJsEngine();
-      const hls = new Hls({
-        ...engine.getConfig(),
-      });
-
       player = new DPlayer({
         container: containerRef.current,
         video: {
@@ -36,6 +31,10 @@ function App() {
           type: "customHls",
           customType: {
             customHls: (video: HTMLVideoElement) => {
+              const engine = new HlsJsEngine();
+              const hls = new Hls({
+                ...engine.getConfig(),
+              });
               hls.loadSource(video.src);
               hls.attachMedia(video);
             },
