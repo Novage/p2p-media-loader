@@ -5,29 +5,25 @@ import type {
   LoaderCallbacks,
   HlsConfig,
   LoaderStats,
+  LoaderContext,
 } from "hls.js";
-import { HybridLoader } from "p2p-media-loader-core";
 
 export class PlaylistLoaderBase implements Loader<PlaylistLoaderContext> {
   context!: PlaylistLoaderContext;
   config!: LoaderConfiguration;
   callbacks!: LoaderCallbacks<PlaylistLoaderContext>;
   stats!: LoaderStats;
-  hybridLoader: HybridLoader;
-  defaultLoader: Loader<PlaylistLoaderContext>;
+  defaultLoader: Loader<LoaderContext>;
 
-  constructor(config: HlsConfig, hybridLoader: HybridLoader) {
-    this.hybridLoader = hybridLoader;
-    this.defaultLoader = new config.loader(
-      config
-    ) as Loader<PlaylistLoaderContext>;
+  constructor(config: HlsConfig) {
+    this.defaultLoader = new config.loader(config);
     this.stats = this.defaultLoader.stats;
   }
 
   load(
     context: PlaylistLoaderContext,
     config: LoaderConfiguration,
-    callbacks: LoaderCallbacks<PlaylistLoaderContext>
+    callbacks: LoaderCallbacks<LoaderContext>
   ) {
     this.context = context;
     this.config = config;
