@@ -38,4 +38,12 @@ export class PlaylistLoaderBase implements Loader<PlaylistLoaderContext> {
   destroy() {
     this.defaultLoader.destroy();
   }
+
+  getCacheAge() {
+    return this.defaultLoader.getCacheAge?.() || null;
+  }
+
+  getResponseHeader(name: string) {
+    return this.defaultLoader.getResponseHeader?.(name) || null;
+  }
 }
