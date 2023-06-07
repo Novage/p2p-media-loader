@@ -3,14 +3,12 @@ import { Engine as HlsJsEngine } from "p2p-media-loader-hlsjs";
 import Hls from "hls.js";
 import DPlayer from "dplayer";
 
-const bigBunnyBuck = "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8";
-const anotherVideo =
-  "https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8";
-const byteRangeVideo =
-  "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8";
-
-const live =
-  "https://fcc3ddae59ed.us-west-2.playback.live-video.net/api/video/v1/us-west-2.893648527354.channel.DmumNckWFTqz.m3u8";
+const videoUrl = {
+  bigBunnyBuck: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+  byteRangeVideo:
+    "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8",
+  live: "https://fcc3ddae59ed.us-west-2.playback.live-video.net/api/video/v1/us-west-2.893648527354.channel.DmumNckWFTqz.m3u8",
+};
 
 enum Player {
   DPlayer = "DPlayer",
@@ -26,6 +24,7 @@ function App() {
     if (!Hls.isSupported()) return;
 
     let player: DPlayer | Hls;
+    const url = videoUrl.live;
     if (playerType === Player.DPlayer && containerRef.current) {
       const engine = new HlsJsEngine();
       const hls = new Hls({
@@ -35,7 +34,7 @@ function App() {
       player = new DPlayer({
         container: containerRef.current,
         video: {
-          url: live,
+          url,
           type: "customHls",
           customType: {
             customHls: (video: HTMLVideoElement) => {
@@ -51,7 +50,7 @@ function App() {
         ...engine.getConfig(),
       });
 
-      hls.loadSource(bigBunnyBuck);
+      hls.loadSource(url);
       hls.attachMedia(videoRef.current);
       player = hls;
     }
