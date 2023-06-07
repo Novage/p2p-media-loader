@@ -1,12 +1,10 @@
-import { HybridLoader } from "p2p-media-loader-core";
-
 export class Engine {
   static isSupported() {
-    return HybridLoader.isSupported();
+    return true;
   }
 
   static getText(): string {
-    return "Some stupid text with no sense. " + HybridLoader.text();
+    return "Some stupid text with no sense.";
   }
 
   getSettings() {
