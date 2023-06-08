@@ -34,7 +34,11 @@ export class PlaylistLoaderBase implements Loader<PlaylistLoaderContext> {
     this.defaultLoader.load(context, config, {
       ...callbacks,
       onSuccess: (response, stats, context, networkDetails) => {
-        console.log(response);
+        const { data, url: responseUrl } = response;
+        const { url: requestUrl } = context;
+        if (typeof data === "string") {
+          this.segmentManager.processPlaylist(data, requestUrl, responseUrl);
+        }
         return callbacks.onSuccess(response, stats, context, networkDetails);
       },
     });

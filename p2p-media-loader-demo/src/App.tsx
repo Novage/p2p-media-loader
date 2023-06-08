@@ -8,6 +8,8 @@ const videoUrl = {
   byteRangeVideo:
     "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8",
   live: "https://fcc3ddae59ed.us-west-2.playback.live-video.net/api/video/v1/us-west-2.893648527354.channel.DmumNckWFTqz.m3u8",
+  advancedVideo:
+    "https://devstreaming-cdn.apple.com/videos/streaming/examples/adv_dv_atmos/main.m3u8",
 };
 
 const players = ["hlsjs", "dplayer"] as const;
@@ -22,7 +24,7 @@ function App() {
     if (!Hls.isSupported()) return;
 
     let player: DPlayer | Hls;
-    const url = videoUrl.live;
+    const url = videoUrl.advancedVideo;
     if (playerType === "dplayer" && containerRef.current) {
       player = new DPlayer({
         container: containerRef.current,
