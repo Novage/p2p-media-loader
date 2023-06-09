@@ -35,9 +35,13 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       ...callbacks,
       onSuccess: (response, stats, context, networkDetails) => {
         // console.log("fragment: ", response.url);
-        const playlist = this.segmentManager.manifest?.getPlaylistBySegmentUrl(
-          response.url
-        );
+        const playlist =
+          this.segmentManager.videoPlaylists?.getPlaylistBySegmentUrl(
+            response.url
+          ) ??
+          this.segmentManager.audioPlaylists?.getPlaylistBySegmentUrl(
+            response.url
+          );
         // console.log(playlist);
 
         return callbacks.onSuccess(response, stats, context, networkDetails);

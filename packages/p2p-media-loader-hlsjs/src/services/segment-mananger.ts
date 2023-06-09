@@ -2,11 +2,12 @@ import {
   Parser,
   type PlaylistManifest,
   type MasterManifest,
-  type Segment,
+  type Segment as ParserSegment,
 } from "m3u8-parser";
 
 export class SegmentManager {
-  manifest?: Manifest;
+  videoPlaylists: VideoPlaylistsContainer = new VideoPlaylistsContainer();
+  audioPlaylists: AudioPlaylistsContainer = new AudioPlaylistsContainer();
 
   processPlaylist(content: string, requestUrl: string, responseUrl: string) {
     const parser = new Parser();
@@ -15,77 +16,78 @@ export class SegmentManager {
 
     const { manifest } = parser;
     if (TypeGuard.isMasterManifest(manifest)) {
-      this.manifest = new Manifest(responseUrl, manifest);
+      this.videoPlaylists.setFromMasterManifest(responseUrl, manifest);
+      this.audioPlaylists.setFromMasterManifest(responseUrl, manifest);
     } else {
-      const playlist = this.manifest?.getPlaylist(responseUrl);
+      const playlist =
+        this.videoPlaylists?.getPlaylist(responseUrl) ??
+        this.audioPlaylists?.getPlaylist(responseUrl);
       if (playlist) playlist.setSegments(manifest.segments);
     }
   }
 }
 
-class Manifest {
-  url: string;
-  playlists: Playlist[];
-  playlistsMap: Map<string, Playlist>;
-  audioPlaylists?: Playlist[];
-  audioPlaylistsMap?: Map<string, Playlist>;
+abstract class PlaylistsContainer {
+  masterPlaylistUrl?: string;
+  playlists: Playlist[] = [];
+  playlistMap: Map<string, Playlist> = new Map<string, Playlist>();
 
-  constructor(url: string, manifest: MasterManifest) {
-    this.url = url;
-    const { playlists: videoPlaylists, mediaGroups } = manifest;
+  abstract setFromMasterManifest(
+    masterManifestUrl: string,
+    masterManifest: MasterManifest
+  ): void;
+
+  getPlaylist(playlistUrl: string): Playlist | null {
+    return this.playlistMap.get(playlistUrl) ?? null;
+  }
+
+  getPlaylistBySegmentUrl(segmentUrl: string): Playlist | null {
+    for (const playlist of this.playlists) {
+      if (playlist.segmentsMap.has(segmentUrl)) return playlist;
+    }
+    return null;
+  }
+}
+
+class AudioPlaylistsContainer extends PlaylistsContainer {
+  setFromMasterManifest(
+    masterManifestUrl: string,
+    masterManifest: MasterManifest
+  ) {
+    this.masterPlaylistUrl = masterManifestUrl;
+    const { mediaGroups } = masterManifest;
+
     const audioPlaylists = Object.values(mediaGroups.AUDIO);
-
-    this.playlists = videoPlaylists.map(
-      (p) => new Playlist("video", p.uri, url)
-    );
-    this.playlistsMap = new Map(
-      this.playlists.map<[string, Playlist]>((p) => [p.url, p])
-    );
-
     if (audioPlaylists.length) {
-      this.audioPlaylists = [];
+      this.playlists = [];
       audioPlaylists.forEach((languageMap) => {
         const languages = Object.values(languageMap);
         languages.forEach((i) => {
-          this.audioPlaylists?.push(new Playlist("audio", i.uri, url));
+          this.playlists?.push(new Playlist("audio", i.uri, masterManifestUrl));
         });
       });
 
-      this.audioPlaylistsMap = new Map(
-        this.audioPlaylists.map<[string, Playlist]>((p) => [p.url, p])
+      this.playlistMap = new Map(
+        this.playlists.map<[string, Playlist]>((p) => [p.url, p])
       );
     }
   }
+}
 
-  getPlaylist(playlistUrl: string) {
-    return (
-      this.playlistsMap.get(playlistUrl) ??
-      this.audioPlaylistsMap?.get(playlistUrl) ??
-      null
+class VideoPlaylistsContainer extends PlaylistsContainer {
+  setFromMasterManifest(
+    masterManifestUrl: string,
+    masterManifest: MasterManifest
+  ) {
+    this.masterPlaylistUrl = masterManifestUrl;
+    const { playlists } = masterManifest;
+
+    this.playlists = playlists.map(
+      (p) => new Playlist("video", p.uri, masterManifestUrl)
     );
-  }
-
-  getPlaylistBySegmentUrl(segmentUrl: string) {
-    return (
-      this.playlists.find((p) => p.segmentsMap.has(segmentUrl)) ??
-      this.audioPlaylists?.find((p) => p.segmentsMap.has(segmentUrl)) ??
-      null
+    this.playlistMap = new Map(
+      this.playlists.map<[string, Playlist]>((p) => [p.url, p])
     );
-  }
-
-  getSegment(segmentUrl: string) {
-    for (
-      let i = 0;
-      i < this.playlists.length ||
-      (!!this.audioPlaylists && i < this.audioPlaylists.length);
-      i++
-    ) {
-      const segment =
-        this.playlists[i].segmentsMap.get(segmentUrl) ??
-        this.audioPlaylists?.[i].segmentsMap.get(segmentUrl);
-      if (segment) return segment;
-    }
-    return null;
   }
 }
 
@@ -93,7 +95,7 @@ class Playlist {
   uri: string;
   url: string;
   type: SegmentType;
-  segmentsMap: Map<string, Segment1> = new Map<string, Segment1>();
+  segmentsMap: Map<string, Segment> = new Map<string, Segment>();
 
   constructor(type: SegmentType, uri: string, baseUrl: string) {
     this.type = type;
@@ -101,16 +103,16 @@ class Playlist {
     this.url = new URL(uri, baseUrl).toString();
   }
 
-  setSegments(segments: Segment[]) {
-    const mapEntries = segments.map<[string, Segment1]>((s) => {
-      const segment = new Segment1(this.type, s.uri, this.url);
+  setSegments(segments: ParserSegment[]) {
+    const mapEntries = segments.map<[string, Segment]>((s) => {
+      const segment = new Segment(this.type, s.uri, this.url);
       return [segment.url, segment];
     });
     this.segmentsMap = new Map(mapEntries);
   }
 }
 
-class Segment1 {
+class Segment {
   url: string;
   uri: string;
   type: SegmentType;
