@@ -34,12 +34,13 @@ export class Engine {
   }
 
   private createFragmentLoaderClass() {
+    const segmentManager = this.segmentManager;
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const engine = this;
 
     return class FragmentLoader extends FragmentLoaderBase {
       constructor(config: HlsConfig) {
-        super(config);
+        super(config, segmentManager);
       }
 
       static getEngine() {

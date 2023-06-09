@@ -7,6 +7,7 @@ import {
   HlsConfig,
   LoaderContext,
 } from "hls.js";
+import { SegmentManager } from "./segment-mananger";
 
 export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   context!: FragmentLoaderContext;
@@ -14,8 +15,10 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   callbacks!: LoaderCallbacks<FragmentLoaderContext> | null;
   stats: LoaderStats;
   defaultLoader: Loader<LoaderContext>;
+  segmentManager: SegmentManager;
 
-  constructor(config: HlsConfig) {
+  constructor(config: HlsConfig, segmentManager: SegmentManager) {
+    this.segmentManager = segmentManager;
     this.defaultLoader = new config.loader(config);
     this.stats = this.defaultLoader.stats;
   }
@@ -28,7 +31,18 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     this.context = context;
     this.config = config;
     this.callbacks = callbacks;
-    this.defaultLoader.load(context, config, callbacks);
+    this.defaultLoader.load(context, config, {
+      ...callbacks,
+      onSuccess: (response, stats, context, networkDetails) => {
+        // console.log("fragment: ", response.url);
+        const playlist = this.segmentManager.manifest?.getPlaylistBySegmentUrl(
+          response.url
+        );
+        // console.log(playlist);
+
+        return callbacks.onSuccess(response, stats, context, networkDetails);
+      },
+    });
   }
 
   abort() {
