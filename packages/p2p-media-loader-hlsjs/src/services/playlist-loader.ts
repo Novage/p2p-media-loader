@@ -40,10 +40,10 @@ export class PlaylistLoaderBase implements Loader<PlaylistLoaderContext> {
   }
 
   getCacheAge() {
-    return this.defaultLoader.getCacheAge?.() || null;
+    return this.defaultLoader.getCacheAge?.() ?? null;
   }
 
   getResponseHeader(name: string) {
-    return this.defaultLoader.getResponseHeader?.(name) || null;
+    return this.defaultLoader.getResponseHeader?.(name) ?? null;
   }
 }
