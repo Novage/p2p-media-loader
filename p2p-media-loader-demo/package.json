@@ -20,10 +20,10 @@
   },
   "devDependencies": {
     "@types/dplayer": "^1.25.2",
-    "@types/react": "^18.0.28",
-    "@types/react-dom": "^18.0.11",
+    "@types/react": "^18.2.9",
+    "@types/react-dom": "^18.2.4",
     "@vitejs/plugin-react": "^4.0.0",
     "eslint-plugin-react-hooks": "^4.6.0",
-    "eslint-plugin-react-refresh": "^0.3.4"
+    "eslint-plugin-react-refresh": "^0.4.1"
   }
 }
