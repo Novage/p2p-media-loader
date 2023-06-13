@@ -1,13 +1,8 @@
-import {
-  Parser,
-  type PlaylistManifest,
-  type MasterManifest,
-  type Segment as ParserSegment,
-} from "m3u8-parser";
+import { Parser, Segment as ParserSegment } from "m3u8-parser";
+import * as ManifestUtil from "./manifest-util";
 
 export class SegmentManager {
-  videoPlaylists: VideoPlaylistsContainer = new VideoPlaylistsContainer();
-  audioPlaylists: AudioPlaylistsContainer = new AudioPlaylistsContainer();
+  playlists: Map<string, Playlist> = new Map();
 
   processPlaylist(content: string, requestUrl: string, responseUrl: string) {
     const parser = new Parser();
@@ -15,92 +10,59 @@ export class SegmentManager {
     parser.end();
 
     const { manifest } = parser;
-    if (TypeGuard.isMasterManifest(manifest)) {
-      this.videoPlaylists.setFromMasterManifest(responseUrl, manifest);
-      this.audioPlaylists.setFromMasterManifest(responseUrl, manifest);
+    if (ManifestUtil.isMasterManifest(manifest)) {
+      const playlists = [
+        ...ManifestUtil.getVideoPlaylistsFromMasterManifest(
+          responseUrl,
+          manifest
+        ),
+        ...ManifestUtil.getAudioPlaylistsFromMasterManifest(
+          responseUrl,
+          manifest
+        ),
+      ];
+
+      playlists.forEach((p) => this.playlists.set(p.url, p));
     } else {
-      const playlist =
-        this.videoPlaylists?.getPlaylist(responseUrl) ??
-        this.audioPlaylists?.getPlaylist(responseUrl);
-      if (playlist) playlist.setSegments(manifest.segments);
+      const { segments, mediaSequence } = manifest;
+      const playlist = this.playlists.get(responseUrl);
+      if (playlist) {
+        playlist.setSegments(segments);
+      } else {
+        const playlist = new Playlist(
+          "unknown",
+          responseUrl,
+          undefined,
+          mediaSequence
+        );
+        playlist.setSegments(segments);
+        this.playlists.set(responseUrl, playlist);
+      }
     }
   }
-}
 
-abstract class PlaylistsContainer {
-  masterPlaylistUrl?: string;
-  playlists: Playlist[] = [];
-  playlistMap: Map<string, Playlist> = new Map<string, Playlist>();
-
-  abstract setFromMasterManifest(
-    masterManifestUrl: string,
-    masterManifest: MasterManifest
-  ): void;
-
-  getPlaylist(playlistUrl: string): Playlist | null {
-    return this.playlistMap.get(playlistUrl) ?? null;
-  }
-
-  getPlaylistBySegmentId(segmentId: string): Playlist | null {
-    for (const playlist of this.playlists) {
+  getPlaylistBySegmentId(segmentId: string): Playlist | undefined {
+    for (const [, playlist] of this.playlists) {
       if (playlist.segmentsMap.has(segmentId)) return playlist;
     }
-    return null;
   }
 }
 
-class AudioPlaylistsContainer extends PlaylistsContainer {
-  setFromMasterManifest(
-    masterManifestUrl: string,
-    masterManifest: MasterManifest
-  ) {
-    this.masterPlaylistUrl = masterManifestUrl;
-    const { mediaGroups } = masterManifest;
-
-    const audioPlaylists = Object.values(mediaGroups.AUDIO);
-    if (audioPlaylists.length) {
-      this.playlists = [];
-      audioPlaylists.forEach((languageMap) => {
-        const languages = Object.values(languageMap);
-        languages.forEach((i) => {
-          this.playlists?.push(new Playlist("audio", i.uri, masterManifestUrl));
-        });
-      });
-
-      this.playlistMap = new Map(
-        this.playlists.map<[string, Playlist]>((p) => [p.url, p])
-      );
-    }
-  }
-}
-
-class VideoPlaylistsContainer extends PlaylistsContainer {
-  setFromMasterManifest(
-    masterManifestUrl: string,
-    masterManifest: MasterManifest
-  ) {
-    this.masterPlaylistUrl = masterManifestUrl;
-    const { playlists } = masterManifest;
-
-    this.playlists = playlists.map(
-      (p) => new Playlist("video", p.uri, masterManifestUrl)
-    );
-    this.playlistMap = new Map(
-      this.playlists.map<[string, Playlist]>((p) => [p.url, p])
-    );
-  }
-}
-
-class Playlist {
-  uri: string;
+export class Playlist {
   url: string;
   type: SegmentType;
   segmentsMap: Map<string, Segment> = new Map<string, Segment>();
+  mediaSequence: number;
 
-  constructor(type: SegmentType, uri: string, baseUrl: string) {
+  constructor(
+    type: SegmentType,
+    url: string,
+    baseUrl: string | undefined,
+    mediaSequence: number
+  ) {
     this.type = type;
-    this.uri = uri;
-    this.url = new URL(uri, baseUrl).toString();
+    this.url = new URL(url, baseUrl).toString();
+    this.mediaSequence = mediaSequence;
   }
 
   setSegments(segments: ParserSegment[]) {
@@ -152,17 +114,6 @@ export class Segment {
   }
 }
 
-class TypeGuard {
-  static isMasterManifest(
-    manifest: PlaylistManifest | MasterManifest
-  ): manifest is MasterManifest {
-    return (
-      !!(manifest as MasterManifest).playlists &&
-      !!(manifest as MasterManifest).mediaGroups
-    );
-  }
-}
-
-type SegmentType = "video" | "audio";
+type SegmentType = "video" | "audio" | "unknown";
 
 export type ByteRange = { offset: number; length: number };
