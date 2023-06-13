@@ -41,9 +41,9 @@ abstract class PlaylistsContainer {
     return this.playlistMap.get(playlistUrl) ?? null;
   }
 
-  getPlaylistBySegmentUrl(segmentUrl: string): Playlist | null {
+  getPlaylistBySegmentId(segmentId: string): Playlist | null {
     for (const playlist of this.playlists) {
-      if (playlist.segmentsMap.has(segmentUrl)) return playlist;
+      if (playlist.segmentsMap.has(segmentId)) return playlist;
     }
     return null;
   }
@@ -105,22 +105,50 @@ class Playlist {
 
   setSegments(segments: ParserSegment[]) {
     const mapEntries = segments.map<[string, Segment]>((s) => {
-      const segment = new Segment(this.type, s.uri, this.url);
-      return [segment.url, segment];
+      const segment = new Segment(this.type, s.uri, this.url, s.byterange);
+      return [segment.id, segment];
     });
     this.segmentsMap = new Map(mapEntries);
   }
 }
 
-class Segment {
+export class Segment {
+  id: string;
   url: string;
   uri: string;
   type: SegmentType;
+  byteRange?: ByteRange;
 
-  constructor(type: SegmentType, uri: string, playlistUrl: string) {
+  constructor(
+    type: SegmentType,
+    uri: string,
+    playlistUrl: string,
+    byteRange?: ByteRange
+  ) {
     this.type = type;
     this.uri = uri;
     this.url = new URL(uri, playlistUrl).toString();
+    this.byteRange = byteRange;
+    this.id = Segment.getSegmentId(this.url, this.byteRange);
+  }
+
+  static getSegmentId(url: string, byteRange?: ByteRange) {
+    if (!byteRange) return url;
+    const end = byteRange.offset + byteRange.length - 1;
+    return `${url}?bytes=${byteRange.offset}-${end}`;
+  }
+
+  static getByteRange(
+    rangeStart?: number,
+    rangeEnd?: number
+  ): ByteRange | undefined {
+    if (
+      rangeStart === undefined ||
+      rangeEnd === undefined ||
+      rangeStart >= rangeEnd
+    )
+      return undefined;
+    return { offset: rangeStart, length: rangeEnd - rangeStart };
   }
 }
 
@@ -136,3 +164,5 @@ class TypeGuard {
 }
 
 type SegmentType = "video" | "audio";
+
+export type ByteRange = { offset: number; length: number };

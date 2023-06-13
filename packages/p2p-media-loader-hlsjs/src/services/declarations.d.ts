@@ -30,7 +30,7 @@ declare module "m3u8-parser" {
 
   export type Segment = {
     uri: string;
-    byteRange?: { length: number; offset: number };
+    byterange?: { length: number; offset: number };
   };
 
   export type Playlist = {
