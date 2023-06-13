@@ -22,10 +22,15 @@ export class SegmentManager {
         ),
       ];
 
-      playlists.forEach((p) => this.playlists.set(p.url, p));
+      playlists.forEach((p) => {
+        const playlist = this.playlists.get(p.url);
+        if (!playlist) this.playlists.set(p.url, p);
+        else if (playlist.type !== p.type) playlist.setType(p.type);
+      });
     } else {
       const { segments, mediaSequence } = manifest;
       const playlist = this.playlists.get(responseUrl);
+
       if (playlist) {
         playlist.setSegments(segments);
       } else {
@@ -42,7 +47,7 @@ export class SegmentManager {
   }
 
   getPlaylistBySegmentId(segmentId: string): Playlist | undefined {
-    for (const [, playlist] of this.playlists) {
+    for (const playlist of this.playlists.values()) {
       if (playlist.segmentsMap.has(segmentId)) return playlist;
     }
   }
@@ -63,6 +68,13 @@ export class Playlist {
     this.type = type;
     this.url = new URL(url, baseUrl).toString();
     this.mediaSequence = mediaSequence;
+  }
+
+  setType(type: SegmentType) {
+    this.type = type;
+    for (const segment of this.segmentsMap.values()) {
+      segment.type = type;
+    }
   }
 
   setSegments(segments: ParserSegment[]) {
