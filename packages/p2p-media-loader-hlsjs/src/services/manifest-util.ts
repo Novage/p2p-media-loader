@@ -21,8 +21,16 @@ export function getAudioPlaylistsFromMasterManifest(
   if (audio.length) {
     audio.forEach((languageMap) => {
       const languages = Object.values(languageMap);
-      languages.forEach((i) => {
-        playlists.push(new Playlist("audio", i.uri, masterManifestUrl, 0));
+      languages.forEach((item, index) => {
+        playlists.push(
+          new Playlist({
+            type: "audio",
+            url: item.uri,
+            manifestUrl: masterManifestUrl,
+            mediaSequence: 0,
+            index,
+          })
+        );
       });
     });
   }
@@ -35,6 +43,13 @@ export function getVideoPlaylistsFromMasterManifest(
   masterManifest: MasterManifest
 ): Playlist[] {
   return masterManifest.playlists.map(
-    (p) => new Playlist("video", p.uri, masterManifestUrl, 0)
+    (p, index) =>
+      new Playlist({
+        type: "video",
+        url: p.uri,
+        manifestUrl: masterManifestUrl,
+        mediaSequence: 0,
+        index,
+      })
   );
 }

@@ -2,6 +2,7 @@ import { Parser, Segment as ParserSegment } from "m3u8-parser";
 import * as ManifestUtil from "./manifest-util";
 
 export class SegmentManager {
+  manifestUrl?: string;
   playlists: Map<string, Playlist> = new Map();
 
   processPlaylist(content: string, requestUrl: string, responseUrl: string) {
@@ -11,6 +12,7 @@ export class SegmentManager {
 
     const { manifest } = parser;
     if (ManifestUtil.isMasterManifest(manifest)) {
+      this.manifestUrl = responseUrl;
       const playlists = [
         ...ManifestUtil.getVideoPlaylistsFromMasterManifest(
           responseUrl,
@@ -25,7 +27,10 @@ export class SegmentManager {
       playlists.forEach((p) => {
         const playlist = this.playlists.get(p.url);
         if (!playlist) this.playlists.set(p.url, p);
-        else if (playlist.type !== p.type) playlist.setType(p.type);
+        else {
+          p.segmentsMap = playlist.segmentsMap;
+          this.playlists.set(p.url, p);
+        }
       });
     } else {
       const { segments, mediaSequence } = manifest;
@@ -34,12 +39,13 @@ export class SegmentManager {
       if (playlist) {
         playlist.setSegments(segments);
       } else {
-        const playlist = new Playlist(
-          "unknown",
-          responseUrl,
-          undefined,
-          mediaSequence
-        );
+        const playlist = new Playlist({
+          type: "unknown",
+          url: responseUrl,
+          manifestUrl: this.manifestUrl,
+          mediaSequence,
+          index: -1,
+        });
         playlist.setSegments(segments);
         this.playlists.set(responseUrl, playlist);
       }
@@ -54,32 +60,36 @@ export class SegmentManager {
 }
 
 export class Playlist {
-  url: string;
+  id: string;
+  index: number;
   type: SegmentType;
+  url: string;
   segmentsMap: Map<string, Segment> = new Map<string, Segment>();
   mediaSequence: number;
 
-  constructor(
-    type: SegmentType,
-    url: string,
-    baseUrl: string | undefined,
-    mediaSequence: number
-  ) {
+  constructor({
+    type,
+    url,
+    manifestUrl,
+    mediaSequence,
+    index,
+  }: {
+    type: SegmentType;
+    url: string;
+    manifestUrl?: string;
+    mediaSequence: number;
+    index: number;
+  }) {
     this.type = type;
-    this.url = new URL(url, baseUrl).toString();
+    this.index = index;
+    this.url = new URL(url, manifestUrl).toString();
+    this.id = manifestUrl ? `${manifestUrl}-${type}-V${index}` : this.url;
     this.mediaSequence = mediaSequence;
-  }
-
-  setType(type: SegmentType) {
-    this.type = type;
-    for (const segment of this.segmentsMap.values()) {
-      segment.type = type;
-    }
   }
 
   setSegments(segments: ParserSegment[]) {
     const mapEntries = segments.map<[string, Segment]>((s) => {
-      const segment = new Segment(this.type, s.uri, this.url, s.byterange);
+      const segment = new Segment(s.uri, this.url, s.byterange);
       return [segment.id, segment];
     });
     this.segmentsMap = new Map(mapEntries);
@@ -90,16 +100,9 @@ export class Segment {
   id: string;
   url: string;
   uri: string;
-  type: SegmentType;
   byteRange?: ByteRange;
 
-  constructor(
-    type: SegmentType,
-    uri: string,
-    playlistUrl: string,
-    byteRange?: ByteRange
-  ) {
-    this.type = type;
+  constructor(uri: string, playlistUrl: string, byteRange?: ByteRange) {
     this.uri = uri;
     this.url = new URL(uri, playlistUrl).toString();
     this.byteRange = byteRange;
