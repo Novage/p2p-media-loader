@@ -1,8 +1,9 @@
-import { Parser, Segment as ParserSegment } from "m3u8-parser";
+import { MasterManifest, Parser, Segment as ParserSegment } from "m3u8-parser";
 import * as ManifestUtil from "./manifest-util";
 
 export class SegmentManager {
   manifestUrl?: string;
+  manifest?: MasterManifest;
   playlists: Map<string, Playlist> = new Map();
 
   processPlaylist(content: string, requestUrl: string, responseUrl: string) {
@@ -13,6 +14,7 @@ export class SegmentManager {
     const { manifest } = parser;
     if (ManifestUtil.isMasterManifest(manifest)) {
       this.manifestUrl = responseUrl;
+      this.manifest = manifest;
       const playlists = [
         ...ManifestUtil.getVideoPlaylistsFromMasterManifest(
           responseUrl,
@@ -38,7 +40,7 @@ export class SegmentManager {
 
       if (playlist) {
         playlist.setSegments(segments);
-      } else {
+      } else if (!this.manifest) {
         const playlist = new Playlist({
           type: "unknown",
           url: responseUrl,
