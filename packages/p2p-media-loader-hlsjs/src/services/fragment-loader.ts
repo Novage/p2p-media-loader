@@ -7,7 +7,8 @@ import type {
   HlsConfig,
   LoaderContext,
 } from "hls.js";
-import { SegmentManager, Segment, ByteRange } from "./segment-mananger";
+import { SegmentManager } from "./segment-mananger";
+import { Segment, ByteRange } from "./playlist";
 import Debug from "debug";
 
 export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {

@@ -1,5 +1,5 @@
 import { MasterManifest, PlaylistManifest } from "m3u8-parser";
-import { Playlist } from "./segment-mananger";
+import { Playlist } from "./playlist";
 
 export function isMasterManifest(
   manifest: PlaylistManifest | MasterManifest
