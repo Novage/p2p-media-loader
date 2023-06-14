@@ -7,7 +7,8 @@ import {
   HlsConfig,
   LoaderContext,
 } from "hls.js";
-import { SegmentManager } from "./segment-mananger";
+import { SegmentManager, Segment, ByteRange } from "./segment-mananger";
+import Debug from "debug";
 
 export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   context!: FragmentLoaderContext;
@@ -16,6 +17,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   stats: LoaderStats;
   defaultLoader: Loader<LoaderContext>;
   segmentManager: SegmentManager;
+  private debug = Debug("p2pml:fragment-loader");
 
   constructor(config: HlsConfig, segmentManager: SegmentManager) {
     this.segmentManager = segmentManager;
@@ -34,16 +36,14 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     this.defaultLoader.load(context, config, {
       ...callbacks,
       onSuccess: (response, stats, context, networkDetails) => {
-        // console.log("fragment: ", response.url);
-        const playlist =
-          this.segmentManager.videoPlaylists?.getPlaylistBySegmentUrl(
-            response.url
-          ) ??
-          this.segmentManager.audioPlaylists?.getPlaylistBySegmentUrl(
-            response.url
-          );
-        // console.log(playlist);
-
+        const { rangeStart, rangeEnd } = context;
+        const byteRange: ByteRange | undefined = Segment.getByteRange(
+          rangeStart,
+          rangeEnd
+        );
+        const segmentId = Segment.getSegmentId(response.url, byteRange);
+        const playlist = this.segmentManager.getPlaylistBySegmentId(segmentId);
+        this.debug("downloaded segment from playlist", playlist);
         return callbacks.onSuccess(response, stats, context, networkDetails);
       },
     });

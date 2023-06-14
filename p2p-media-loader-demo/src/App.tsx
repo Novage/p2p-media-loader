@@ -41,7 +41,6 @@ function App() {
               const hls = new Hls({
                 ...engine.getConfig(),
               });
-              engine.initHlsEvents(hls);
               hls.loadSource(video.src);
               hls.attachMedia(video);
             },
