@@ -35,7 +35,7 @@ export class SegmentManager {
           this.playlists.set(p.url, p);
         }
       });
-    } else {
+    } else if (ManifestUtil.isPlaylistManifest(manifest)) {
       const { segments, mediaSequence } = manifest;
       const playlist = this.playlists.get(responseUrl);
 

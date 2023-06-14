@@ -4,9 +4,24 @@ import { Playlist } from "./playlist";
 export function isMasterManifest(
   manifest: PlaylistManifest | MasterManifest
 ): manifest is MasterManifest {
+  const { mediaGroups, playlists } = manifest as MasterManifest;
   return (
-    !!(manifest as MasterManifest).playlists &&
-    !!(manifest as MasterManifest).mediaGroups
+    playlists !== undefined &&
+    Array.isArray(playlists) &&
+    mediaGroups !== undefined &&
+    typeof mediaGroups === "object"
+  );
+}
+
+export function isPlaylistManifest(
+  manifest: PlaylistManifest | MasterManifest
+) {
+  const { mediaSequence, segments } = manifest as PlaylistManifest;
+  return (
+    mediaSequence !== undefined &&
+    typeof mediaSequence === "number" &&
+    segments !== undefined &&
+    Array.isArray(segments)
   );
 }
 
@@ -43,6 +58,7 @@ export function getVideoPlaylistsFromMasterManifest(
   masterManifest: MasterManifest
 ): Playlist[] {
   const uriSet = new Set<string>();
+  console.log(masterManifest.playlists);
   return masterManifest.playlists.reduce<Playlist[]>((list, p) => {
     if (!uriSet.has(p.uri)) {
       const playlist = new Playlist({
