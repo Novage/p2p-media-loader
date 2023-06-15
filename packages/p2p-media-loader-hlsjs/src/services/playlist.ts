@@ -4,7 +4,8 @@ export class Playlist {
   id: string;
   index: number;
   type: SegmentType;
-  url: string;
+  requestUrl: string;
+  responseUrl?: string;
   segmentsMap: Map<string, Segment> = new Map<string, Segment>();
   mediaSequence: number;
 
@@ -23,16 +24,17 @@ export class Playlist {
   }) {
     this.type = type;
     this.index = index;
-    this.url = new URL(url, manifestUrl?.response).toString();
-    this.id = this.id = manifestUrl?.request
+    this.requestUrl = new URL(url, manifestUrl?.response).toString();
+    this.id = manifestUrl?.request
       ? `${getUrlWithoutParameters(manifestUrl.request)}-${type}-V${index}`
-      : getUrlWithoutParameters(this.url);
+      : getUrlWithoutParameters(this.requestUrl);
     this.mediaSequence = mediaSequence;
   }
 
-  setSegments(segments: ParserSegment[]) {
+  setSegments(playlistResponseUrl: string, segments: ParserSegment[]) {
+    this.responseUrl = playlistResponseUrl;
     const mapEntries = segments.map<[string, Segment]>((s) => {
-      const segment = new Segment(s.uri, this.url, s.byterange);
+      const segment = new Segment(s.uri, playlistResponseUrl, s.byterange);
       return [segment.localId, segment];
     });
     this.segmentsMap = new Map(mapEntries);

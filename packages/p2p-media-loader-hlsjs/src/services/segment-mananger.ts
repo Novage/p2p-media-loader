@@ -28,12 +28,12 @@ export class SegmentManager {
       ];
 
       playlists.forEach((p) => {
-        const playlist = this.playlists.get(p.url);
+        const playlist = this.playlists.get(p.requestUrl);
         if (!playlist) {
-          this.playlists.set(p.url, p);
+          this.playlists.set(p.requestUrl, p);
         } else {
           p.segmentsMap = playlist.segmentsMap;
-          this.playlists.set(p.url, p);
+          this.playlists.set(p.requestUrl, p);
         }
       });
     } else if (ManifestUtil.isPlaylistManifest(manifest)) {
@@ -50,7 +50,7 @@ export class SegmentManager {
         this.playlists.set(requestUrl, playlist);
       }
 
-      if (playlist) playlist.setSegments(segments);
+      if (playlist) playlist.setSegments(responseUrl, segments);
     }
   }
 
