@@ -3,7 +3,7 @@ import * as ManifestUtil from "./manifest-util";
 import { Playlist } from "./playlist";
 
 export class SegmentManager {
-  manifestUrl?: string;
+  manifestUrl?: { request: string; response: string };
   manifest?: MasterManifest;
   playlists: Map<string, Playlist> = new Map();
 
@@ -14,7 +14,7 @@ export class SegmentManager {
 
     const { manifest } = parser;
     if (ManifestUtil.isMasterManifest(manifest)) {
-      this.manifestUrl = responseUrl;
+      this.manifestUrl = { request: requestUrl, response: responseUrl };
       this.manifest = manifest;
       const playlists = [
         ...ManifestUtil.getVideoPlaylistsFromMasterManifest(
@@ -38,17 +38,16 @@ export class SegmentManager {
       });
     } else if (ManifestUtil.isPlaylistManifest(manifest)) {
       const { segments, mediaSequence } = manifest;
-      let playlist = this.playlists.get(responseUrl);
+      let playlist = this.playlists.get(requestUrl);
 
       if (!playlist && !this.manifest) {
         playlist = new Playlist({
           type: "unknown",
-          url: responseUrl,
-          manifestUrl: this.manifestUrl,
+          url: requestUrl,
           mediaSequence,
           index: -1,
         });
-        this.playlists.set(responseUrl, playlist);
+        this.playlists.set(requestUrl, playlist);
       }
 
       if (playlist) playlist.setSegments(segments);

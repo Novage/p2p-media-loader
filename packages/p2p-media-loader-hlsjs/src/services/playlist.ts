@@ -17,14 +17,18 @@ export class Playlist {
   }: {
     type: SegmentType;
     url: string;
-    manifestUrl?: string;
+    manifestUrl?: { request: string; response: string };
     mediaSequence: number;
     index: number;
   }) {
     this.type = type;
     this.index = index;
-    this.url = getUrlWithoutParameters(new URL(url, manifestUrl).toString());
-    this.id = manifestUrl ? `${manifestUrl}-${type}-V${index}` : this.url;
+    this.url = getUrlWithoutParameters(
+      new URL(url, manifestUrl?.response).toString()
+    );
+    this.id = manifestUrl?.request
+      ? `${manifestUrl?.request}-${type}-V${index}`
+      : this.url;
     this.mediaSequence = mediaSequence;
   }
 
@@ -50,10 +54,10 @@ export class Segment {
     this.localId = Segment.getSegmentLocalId(this.url, this.byteRange);
   }
 
-  static getSegmentLocalId(url: string, byteRange?: ByteRange) {
-    if (!byteRange) return url;
+  static getSegmentLocalId(segmentRequestUrl: string, byteRange?: ByteRange) {
+    if (!byteRange) return segmentRequestUrl;
     const end = byteRange.offset + byteRange.length - 1;
-    return `${url}|${byteRange.offset}-${end}`;
+    return `${segmentRequestUrl}|${byteRange.offset}-${end}`;
   }
 
   static getByteRange(

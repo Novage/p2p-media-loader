@@ -42,7 +42,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
           rangeStart,
           rangeEnd
         );
-        const segmentId = Segment.getSegmentLocalId(response.url, byteRange);
+        const segmentId = Segment.getSegmentLocalId(context.url, byteRange);
         const playlist = this.segmentManager.getPlaylistBySegmentId(segmentId);
         this.debug("downloaded segment from playlist", playlist);
         return callbacks.onSuccess(response, stats, context, networkDetails);

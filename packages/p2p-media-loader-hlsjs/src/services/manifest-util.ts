@@ -26,7 +26,7 @@ export function isPlaylistManifest(
 }
 
 export function getAudioPlaylistsFromMasterManifest(
-  masterManifestUrl: string,
+  masterManifestUrl: { request: string; response: string },
   masterManifest: MasterManifest
 ): Playlist[] {
   const { mediaGroups } = masterManifest;
@@ -54,7 +54,7 @@ export function getAudioPlaylistsFromMasterManifest(
 }
 
 export function getVideoPlaylistsFromMasterManifest(
-  masterManifestUrl: string,
+  masterManifestUrl: { request: string; response: string },
   masterManifest: MasterManifest
 ): Playlist[] {
   const uriSet = new Set<string>();
