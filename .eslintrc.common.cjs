@@ -14,5 +14,6 @@ module.exports = {
     "prettier/prettier": "error",
     "no-console": "warn",
     "@typescript-eslint/prefer-nullish-coalescing": "error",
+    "curly": ["warn", "multi-line", "consistent"]
   },
 };

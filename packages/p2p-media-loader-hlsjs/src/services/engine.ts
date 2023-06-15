@@ -1,8 +1,15 @@
 import type { HlsConfig } from "hls.js";
 import { PlaylistLoaderBase } from "./playlist-loader";
 import { FragmentLoaderBase } from "./fragment-loader";
+import { SegmentManager } from "./segment-mananger";
 
 export class Engine {
+  segmentManager: SegmentManager;
+
+  constructor() {
+    this.segmentManager = new SegmentManager();
+  }
+
   public getConfig(): Pick<HlsConfig, "pLoader" | "fLoader"> {
     return {
       pLoader: this.createPlaylistLoaderClass(),
@@ -11,12 +18,13 @@ export class Engine {
   }
 
   private createPlaylistLoaderClass() {
+    const segmentManager = this.segmentManager;
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const engine = this;
 
     return class PlaylistLoader extends PlaylistLoaderBase {
       constructor(config: HlsConfig) {
-        super(config);
+        super(config, segmentManager);
       }
 
       static getEngine() {
@@ -26,12 +34,13 @@ export class Engine {
   }
 
   private createFragmentLoaderClass() {
+    const segmentManager = this.segmentManager;
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const engine = this;
 
     return class FragmentLoader extends FragmentLoaderBase {
       constructor(config: HlsConfig) {
-        super(config);
+        super(config, segmentManager);
       }
 
       static getEngine() {

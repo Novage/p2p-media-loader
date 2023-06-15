@@ -7,17 +7,20 @@ import type {
   LoaderStats,
   LoaderContext,
 } from "hls.js";
+import { SegmentManager } from "./segment-mananger";
 
 export class PlaylistLoaderBase implements Loader<PlaylistLoaderContext> {
   context!: PlaylistLoaderContext;
   config!: LoaderConfiguration;
   callbacks!: LoaderCallbacks<PlaylistLoaderContext>;
-  stats!: LoaderStats;
+  stats: LoaderStats;
   defaultLoader: Loader<LoaderContext>;
+  segmentManager: SegmentManager;
 
-  constructor(config: HlsConfig) {
+  constructor(config: HlsConfig, segmentManager: SegmentManager) {
     this.defaultLoader = new config.loader(config);
     this.stats = this.defaultLoader.stats;
+    this.segmentManager = segmentManager;
   }
 
   load(
@@ -28,7 +31,17 @@ export class PlaylistLoaderBase implements Loader<PlaylistLoaderContext> {
     this.context = context;
     this.config = config;
     this.callbacks = callbacks;
-    this.defaultLoader.load(context, config, callbacks);
+    this.defaultLoader.load(context, config, {
+      ...callbacks,
+      onSuccess: (response, stats, context, networkDetails) => {
+        const { data, url: responseUrl } = response;
+        const { url: requestUrl } = context;
+        if (typeof data === "string") {
+          this.segmentManager.processPlaylist(data, requestUrl, responseUrl);
+        }
+        return callbacks.onSuccess(response, stats, context, networkDetails);
+      },
+    });
   }
 
   abort() {
