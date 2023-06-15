@@ -58,7 +58,6 @@ export function getVideoPlaylistsFromMasterManifest(
   masterManifest: MasterManifest
 ): Playlist[] {
   const uriSet = new Set<string>();
-  console.log(masterManifest.playlists);
   return masterManifest.playlists.reduce<Playlist[]>((list, p) => {
     if (!uriSet.has(p.uri)) {
       const playlist = new Playlist({

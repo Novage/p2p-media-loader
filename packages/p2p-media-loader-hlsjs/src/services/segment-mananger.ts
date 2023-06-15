@@ -29,8 +29,9 @@ export class SegmentManager {
 
       playlists.forEach((p) => {
         const playlist = this.playlists.get(p.url);
-        if (!playlist) this.playlists.set(p.url, p);
-        else {
+        if (!playlist) {
+          this.playlists.set(p.url, p);
+        } else {
           p.segmentsMap = playlist.segmentsMap;
           this.playlists.set(p.url, p);
         }

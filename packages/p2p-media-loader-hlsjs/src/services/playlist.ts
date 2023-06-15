@@ -64,8 +64,9 @@ export class Segment {
       rangeStart === undefined ||
       rangeEnd === undefined ||
       rangeStart >= rangeEnd
-    )
+    ) {
       return undefined;
+    }
     return { offset: rangeStart, length: rangeEnd - rangeStart };
   }
 }
