@@ -27,12 +27,8 @@
     "clean": "rimraf lib dist build"
   },
   "dependencies": {
-    "debug": "^4.3.4",
     "hls.js": "^1.4.5",
     "m3u8-parser": "^6.2.0",
     "p2p-media-loader-core": "workspace:*"
-  },
-  "devDependencies": {
-    "@types/debug": "^4.1.8"
   }
 }
