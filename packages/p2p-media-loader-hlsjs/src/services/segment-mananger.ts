@@ -33,6 +33,7 @@ export class SegmentManager {
           this.playlists.set(p.requestUrl, p);
         } else {
           p.segmentsMap = playlist.segmentsMap;
+          p.sequence = playlist.sequence;
           this.playlists.set(p.requestUrl, p);
         }
       });
@@ -44,13 +45,15 @@ export class SegmentManager {
         playlist = new Playlist({
           type: "unknown",
           url: requestUrl,
-          mediaSequence,
+          sequence: mediaSequence,
           index: -1,
         });
         this.playlists.set(requestUrl, playlist);
       }
 
-      if (playlist) playlist.setSegments(responseUrl, segments);
+      if (playlist) {
+        playlist.setSegments(responseUrl, mediaSequence, segments);
+      }
     }
   }
 

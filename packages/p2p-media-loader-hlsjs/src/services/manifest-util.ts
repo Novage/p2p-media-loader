@@ -42,7 +42,7 @@ export function getAudioPlaylistsFromMasterManifest(
             type: "audio",
             url: item.uri,
             manifestUrl: masterManifestUrl,
-            mediaSequence: 0,
+            sequence: 0,
             index: playlists.length,
           })
         );
@@ -64,7 +64,7 @@ export function getVideoPlaylistsFromMasterManifest(
         type: "video",
         url: p.uri,
         manifestUrl: masterManifestUrl,
-        mediaSequence: 0,
+        sequence: 0,
         index: list.length,
       });
       list.push(playlist);

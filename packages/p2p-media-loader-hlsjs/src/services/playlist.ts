@@ -7,19 +7,19 @@ export class Playlist {
   requestUrl: string;
   responseUrl?: string;
   segmentsMap: Map<string, Segment> = new Map<string, Segment>();
-  mediaSequence: number;
+  sequence: number;
 
   constructor({
     type,
     url,
     manifestUrl,
-    mediaSequence,
+    sequence,
     index,
   }: {
     type: SegmentType;
     url: string;
     manifestUrl?: { request: string; response: string };
-    mediaSequence: number;
+    sequence: number;
     index: number;
   }) {
     this.type = type;
@@ -28,13 +28,23 @@ export class Playlist {
     this.id = manifestUrl?.request
       ? `${getUrlWithoutParameters(manifestUrl.request)}-${type}-V${index}`
       : getUrlWithoutParameters(this.requestUrl);
-    this.mediaSequence = mediaSequence;
+    this.sequence = sequence;
   }
 
-  setSegments(playlistResponseUrl: string, segments: ParserSegment[]) {
+  setSegments(
+    playlistResponseUrl: string,
+    sequence: number,
+    segments: ParserSegment[]
+  ) {
     this.responseUrl = playlistResponseUrl;
-    const mapEntries = segments.map<[string, Segment]>((s) => {
-      const segment = new Segment(s.uri, playlistResponseUrl, s.byterange);
+    this.sequence = sequence;
+    const mapEntries = segments.map<[string, Segment]>((s, index) => {
+      const segment = new Segment({
+        uri: s.uri,
+        playlistUrl: playlistResponseUrl,
+        byteRange: s.byterange,
+        sequence: sequence + index,
+      });
       return [segment.localId, segment];
     });
     this.segmentsMap = new Map(mapEntries);
@@ -46,9 +56,21 @@ export class Segment {
   url: string;
   uri: string;
   byteRange?: ByteRange;
+  sequence: number;
 
-  constructor(uri: string, playlistUrl: string, byteRange?: ByteRange) {
+  constructor({
+    uri,
+    byteRange,
+    playlistUrl,
+    sequence,
+  }: {
+    uri: string;
+    playlistUrl: string;
+    byteRange?: ByteRange;
+    sequence: number;
+  }) {
     this.uri = uri;
+    this.sequence = sequence;
     this.url = new URL(uri, playlistUrl).toString();
     this.byteRange = byteRange;
     this.localId = Segment.getSegmentLocalId(this.url, this.byteRange);

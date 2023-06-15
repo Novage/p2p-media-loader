@@ -44,7 +44,14 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
         );
         const segmentId = Segment.getSegmentLocalId(context.url, byteRange);
         const playlist = this.segmentManager.getPlaylistBySegmentId(segmentId);
-        this.debug("downloaded segment from playlist", playlist);
+        if (playlist?.type === "video") {
+          this.debug(
+            "downloaded segment from playlist\n",
+            `playlist v: ${playlist?.index}\n`,
+            `segment: `,
+            playlist?.segmentsMap.get(segmentId)?.sequence
+          );
+        }
         return callbacks.onSuccess(response, stats, context, networkDetails);
       },
     });
