@@ -18,11 +18,11 @@ export class SegmentManager {
       this.manifest = manifest;
       const playlists = [
         ...ManifestUtil.getVideoPlaylistsFromMasterManifest(
-          responseUrl,
+          this.manifestUrl,
           manifest
         ),
         ...ManifestUtil.getAudioPlaylistsFromMasterManifest(
-          responseUrl,
+          this.manifestUrl,
           manifest
         ),
       ];
@@ -38,21 +38,20 @@ export class SegmentManager {
       });
     } else if (ManifestUtil.isPlaylistManifest(manifest)) {
       const { segments, mediaSequence } = manifest;
-      const playlist = this.playlists.get(responseUrl);
+      let playlist = this.playlists.get(responseUrl);
 
-      if (playlist) {
-        playlist.setSegments(segments);
-      } else if (!this.manifest) {
-        const playlist = new Playlist({
+      if (!playlist && !this.manifest) {
+        playlist = new Playlist({
           type: "unknown",
           url: responseUrl,
           manifestUrl: this.manifestUrl,
           mediaSequence,
           index: -1,
         });
-        playlist.setSegments(segments);
         this.playlists.set(responseUrl, playlist);
       }
+
+      if (playlist) playlist.setSegments(segments);
     }
   }
 
