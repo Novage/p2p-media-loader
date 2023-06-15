@@ -4,7 +4,8 @@ export class Playlist {
   id: string;
   index: number;
   type: SegmentType;
-  url: string;
+  requestUrl: string;
+  responseUrl?: string;
   segmentsMap: Map<string, Segment> = new Map<string, Segment>();
   sequence: number;
 
@@ -23,21 +24,24 @@ export class Playlist {
   }) {
     this.type = type;
     this.index = index;
-    this.url = getUrlWithoutParameters(
-      new URL(url, manifestUrl?.response).toString()
-    );
+    this.requestUrl = new URL(url, manifestUrl?.response).toString();
     this.id = manifestUrl?.request
       ? `${getUrlWithoutParameters(manifestUrl.request)}-${type}-V${index}`
-      : this.url;
+      : getUrlWithoutParameters(this.requestUrl);
     this.sequence = sequence;
   }
 
-  setSegments(sequence: number, segments: ParserSegment[]) {
+  setSegments(
+    playlistResponseUrl: string,
+    sequence: number,
+    segments: ParserSegment[]
+  ) {
+    this.responseUrl = playlistResponseUrl;
     this.sequence = sequence;
     const mapEntries = segments.map<[string, Segment]>((s, index) => {
       const segment = new Segment({
         uri: s.uri,
-        playlistUrl: this.url,
+        playlistUrl: playlistResponseUrl,
         byteRange: s.byterange,
         sequence: sequence + index,
       });
@@ -73,10 +77,9 @@ export class Segment {
   }
 
   static getSegmentLocalId(segmentRequestUrl: string, byteRange?: ByteRange) {
-    const url = getUrlWithoutParameters(segmentRequestUrl);
-    if (!byteRange) return url;
+    if (!byteRange) return segmentRequestUrl;
     const end = byteRange.offset + byteRange.length - 1;
-    return `${url}|${byteRange.offset}-${end}`;
+    return `${segmentRequestUrl}|${byteRange.offset}-${end}`;
   }
 
   static getByteRange(
