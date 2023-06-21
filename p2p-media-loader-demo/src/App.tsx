@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Engine as HlsJsEngine } from "p2p-media-loader-hlsjs";
+import { Engine as ShakaEngine } from "p2p-media-loader-shaka";
 import Hls from "hls.js";
 import DPlayer from "dplayer";
+import shaka from "shaka-player";
+import muxjs from "mux.js";
+
+window.muxjs = muxjs;
 
 const videoUrl = {
   bigBunnyBuck: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
@@ -16,49 +21,79 @@ const videoUrl = {
     "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8",
 };
 
-const players = ["hlsjs", "dplayer"] as const;
+const players = ["hlsjs", "dplayer", "shaka-dplayer"] as const;
 type Player = (typeof players)[number];
 
 function App() {
-  const [playerType, setPlayerType] = useState<Player>("dplayer");
+  const [playerType, setPlayerType] = useState<Player>("shaka-dplayer");
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    if (!Hls.isSupported()) return;
-
+    if (!Hls.isSupported() || (window as any).player) return;
     let player: DPlayer | Hls;
-    const url = videoUrl.advancedVideo2;
-    if (playerType === "dplayer" && containerRef.current) {
-      player = new DPlayer({
-        container: containerRef.current,
-        video: {
-          url,
-          type: "customHls",
-          customType: {
-            customHls: (video: HTMLVideoElement) => {
-              const engine = new HlsJsEngine();
-              const hls = new Hls({
-                ...engine.getConfig(),
-              });
-              hls.loadSource(video.src);
-              hls.attachMedia(video);
+    const url = videoUrl.live;
+
+    switch (playerType) {
+      case "dplayer": {
+        player = new DPlayer({
+          container: containerRef.current,
+          video: {
+            url,
+            type: "customHls",
+            customType: {
+              customHls: (video: HTMLVideoElement) => {
+                const engine = new HlsJsEngine();
+                const hls = new Hls({
+                  ...engine.getConfig(),
+                });
+                hls.loadSource(video.src);
+                hls.attachMedia(video);
+              },
             },
           },
-        },
-      });
-    } else if (playerType === "hlsjs" && videoRef.current) {
-      const engine = new HlsJsEngine();
-      const hls = new Hls({
-        ...engine.getConfig(),
-      });
+        });
+        break;
+      }
+      case "shaka-dplayer":
+        // shaka.polyfill.installAll();
+        player = new DPlayer({
+          container: containerRef.current,
+          video: {
+            url,
+            type: "customHlsOrDash",
+            customType: {
+              customHlsOrDash: (video: HTMLVideoElement) => {
+                const engine = new ShakaEngine();
 
-      hls.loadSource(url);
-      hls.attachMedia(videoRef.current);
-      player = hls;
+                const src = video.src;
+                const shakaPlayer = new shaka.Player(video);
+                const onError = function (error: { code: number }) {
+                  console.error("Error code", error.code, "object", error);
+                };
+                shakaPlayer.addEventListener("error", (event: any) => {
+                  onError(event);
+                });
+                engine.initShakaPlayer(shaka, shakaPlayer);
+                shakaPlayer.load(src).catch(onError);
+              },
+            },
+          },
+        });
+        (window as any).player = player;
+        break;
+      case "hlsjs":
+        if (videoRef.current) {
+          const engine = new HlsJsEngine();
+          const hls = new Hls({
+            ...engine.getConfig(),
+          });
+          hls.loadSource(url);
+          hls.attachMedia(videoRef.current);
+          player = hls;
+        }
+        break;
     }
-
-    return () => player.destroy();
   }, [playerType]);
 
   return (
