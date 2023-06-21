@@ -65,9 +65,9 @@ export class Engine {
         request.headers.Range
       );
       const segmentId = Segment.getLocalId(url, byteRange);
-      const segment = this.segmentManager.getSegment(segmentId);
+      const stream = this.segmentManager.getStreamBySegmentLocalId(segmentId);
       this.debug(`Loading segment with id: ${segmentId}`);
-      this.debug(`Stream id: ${segment?.streamId}`);
+      this.debug(`Stream id: ${stream?.id}`);
     }
 
     return result;

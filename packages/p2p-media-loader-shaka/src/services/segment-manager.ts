@@ -1,13 +1,25 @@
-import { Segment, Stream } from "./segment";
+import { Segment, Stream, StreamType } from "./segment";
 
 export class SegmentManager {
-  streams: Map<number, Stream> = new Map();
+  private manifestUrl?: string;
+  readonly streams: Map<number, Stream> = new Map();
 
-  setStream(stream: shaka.extern.Stream) {
+  setManifestUrl(url: string) {
+    this.manifestUrl = url.split("?")[0];
+  }
+
+  setStream(stream: shaka.extern.Stream, order: number) {
+    if (!this.manifestUrl) return;
+
     let managerStream = this.streams.get(stream.id);
     if (!managerStream) {
-      managerStream = new Stream(stream.id);
-      this.streams.set(managerStream.id, managerStream);
+      managerStream = new Stream({
+        localId: stream.id,
+        order,
+        type: stream.type as StreamType,
+        manifestUrl: this.manifestUrl,
+      });
+      this.streams.set(managerStream.localId, managerStream);
     }
 
     const { segmentIndex } = stream;
@@ -19,9 +31,13 @@ export class SegmentManager {
   }
 
   getSegment(segmentLocalId: string) {
+    const stream = this.getStreamBySegmentLocalId(segmentLocalId);
+    return stream?.segments.get(segmentLocalId);
+  }
+
+  getStreamBySegmentLocalId(segmentLocalId: string) {
     for (const stream of this.streams.values()) {
-      const segment = stream.segments.get(segmentLocalId);
-      if (segment) return segment;
+      if (stream.segments.has(segmentLocalId)) return stream;
     }
   }
 }

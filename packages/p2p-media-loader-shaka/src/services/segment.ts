@@ -59,10 +59,26 @@ export class Segment {
 type ByteRange = { offset: number; length?: number };
 
 export class Stream {
-  id: number;
+  id: string;
+  localId: number;
+  type: StreamType;
   segments: Map<string, Segment> = new Map();
 
-  constructor(id: number) {
-    this.id = id;
+  constructor({
+    localId,
+    manifestUrl,
+    order,
+    type,
+  }: {
+    localId: number;
+    manifestUrl: string;
+    order: number;
+    type: StreamType;
+  }) {
+    this.localId = localId;
+    this.type = type;
+    this.id = `${manifestUrl}-${type}-V${order}`;
   }
 }
+
+export type StreamType = "video" | "audio";

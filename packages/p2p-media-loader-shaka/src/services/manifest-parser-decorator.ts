@@ -26,20 +26,25 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       uri,
       playerInterface
     );
+    this.segmentManager.setManifestUrl(uri);
 
     const processedStreams = new Set<number>();
 
+    let videoCount = 0;
+    let audioCount = 0;
     for (const variant of manifest.variants) {
       const { video, audio } = variant;
       if (video && !processedStreams.has(video.id)) {
         this.hookSegmentIndex(video);
-        void this.retrieveSegments(video);
+        this.segmentManager.setStream(video, videoCount);
         processedStreams.add(video.id);
+        videoCount++;
       }
       if (audio && !processedStreams.has(audio.id)) {
         this.hookSegmentIndex(audio);
-        void this.retrieveSegments(audio);
+        this.segmentManager.setStream(audio, audioCount);
         processedStreams.add(audio.id);
+        audioCount++;
       }
     }
 
@@ -59,10 +64,6 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       sessionId,
       expiration
     );
-  }
-
-  private async retrieveSegments(stream: shaka.extern.Stream) {
-    this.segmentManager.setStream(stream);
   }
 
   private hookSegmentIndex(stream: shaka.extern.Stream): void {
@@ -93,7 +94,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
           }
 
           if (firstItemReference !== prevFirstItemReference) {
-            this.segmentManager.setStream(stream);
+            this.segmentManager.setStream(stream, -1);
             this.debug(`Stream ${stream.id} is updated`);
             prevFirstItemReference = firstItemReference;
           }
