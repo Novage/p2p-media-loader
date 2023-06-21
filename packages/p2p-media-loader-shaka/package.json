@@ -27,6 +27,7 @@
     "clean": "rimraf lib dist build"
   },
   "dependencies": {
-    "p2p-media-loader-core": "workspace:*"
+    "p2p-media-loader-core": "workspace:*",
+    "shaka-player": "^4.3.6"
   }
 }

@@ -40,10 +40,13 @@ importers:
     dependencies:
       dplayer:
         specifier: ^1.27.1
-        version: 1.27.1(debug@4.3.4)
+        version: 1.27.1
       hls.js:
         specifier: ^1.4.5
         version: 1.4.5
+      mux.js:
+        specifier: ^6.3.0
+        version: 6.3.0
       p2p-media-loader-hlsjs:
         specifier: workspace:*
         version: link:../packages/p2p-media-loader-hlsjs
@@ -56,6 +59,9 @@ importers:
       react-dom:
         specifier: ^18.2.0
         version: 18.2.0(react@18.2.0)
+      shaka-player:
+        specifier: ^4.3.6
+        version: 4.3.6
     devDependencies:
       '@types/dplayer':
         specifier: ^1.25.2
@@ -95,6 +101,9 @@ importers:
       p2p-media-loader-core:
         specifier: workspace:*
         version: link:../p2p-media-loader-core
+      shaka-player:
+        specifier: ^4.3.6
+        version: 4.3.6
 
 packages:
 
@@ -925,10 +934,10 @@ packages:
     resolution: {integrity: sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==}
     dev: false
 
-  /axios@1.2.3(debug@4.3.4):
+  /axios@1.2.3:
     resolution: {integrity: sha512-pdDkMYJeuXLZ6Xj/Q5J3Phpe+jbGdsSzlQaFVkMQzRUL05+6+tetX8TV3p4HrU4kzuO9bt+io/yGQxuyxA/xcw==}
     dependencies:
-      follow-redirects: 1.15.2(debug@4.3.4)
+      follow-redirects: 1.15.2
       form-data: 4.0.0
       proxy-from-env: 1.1.0
     transitivePeerDependencies:
@@ -1087,10 +1096,10 @@ packages:
     resolution: {integrity: sha512-6QvTW9mrGeIegrFXdtQi9pk7O/nSK6lSdXW2eqUspN5LWD7UTji2Fqw5V2YLjBpHEoU9Xl/eUWNpDeZvoyOv2w==}
     dev: false
 
-  /dplayer@1.27.1(debug@4.3.4):
+  /dplayer@1.27.1:
     resolution: {integrity: sha512-2laBMXs5V1B9zPwJ7eAIw/OBo+Xjvy03i4GHTk3Cg+IWbrq8rKMFO0fFr6ClAYotYOCcFGOvaJDkOZcgKllsCA==}
     dependencies:
-      axios: 1.2.3(debug@4.3.4)
+      axios: 1.2.3
       balloon-css: 1.2.0
       promise-polyfill: 8.3.0
     transitivePeerDependencies:
@@ -1104,6 +1113,10 @@ packages:
   /electron-to-chromium@1.4.430:
     resolution: {integrity: sha512-FytjTbGwz///F+ToZ5XSeXbbSaXalsVRXsz2mHityI5gfxft7ieW3HqFLkU5V1aIrY42aflICqbmFoDxW10etg==}
     dev: true
+
+  /eme-encryption-scheme-polyfill@2.1.1:
+    resolution: {integrity: sha512-njD17wcUrbqCj0ArpLu5zWXtaiupHb/2fIUQGdInf83GlI+Q6mmqaPGLdrke4savKAu15J/z1Tg/ivDgl14g0g==}
+    dev: false
 
   /emoji-regex@8.0.0:
     resolution: {integrity: sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==}
@@ -1366,7 +1379,7 @@ packages:
     resolution: {integrity: sha512-5nqDSxl8nn5BSNxyR3n4I6eDmbolI6WT+QqR547RwxQapgjQBmtktdP+HTBb/a/zLsbzERTONyUB5pefh5TtjQ==}
     dev: true
 
-  /follow-redirects@1.15.2(debug@4.3.4):
+  /follow-redirects@1.15.2:
     resolution: {integrity: sha512-VQLG33o04KaQ8uYi2tVNbdrWp1QWxNNea+nmIB4EVM28v0hmP17z7aG1+wAkNzVq4KeXTq3221ye5qTJP91JwA==}
     engines: {node: '>=4.0'}
     peerDependencies:
@@ -1374,8 +1387,6 @@ packages:
     peerDependenciesMeta:
       debug:
         optional: true
-    dependencies:
-      debug: 4.3.4
     dev: false
 
   /foreground-child@3.1.1:
@@ -1705,6 +1716,15 @@ packages:
   /ms@2.1.2:
     resolution: {integrity: sha512-sGkPx+VjMtmA6MX27oA4FBFELFCZZ4S4XqeGOXCv68tT+jb3vk/RyaKWP0PTKyWtmLSM0b+adUTEvbs1PEaH2w==}
 
+  /mux.js@6.3.0:
+    resolution: {integrity: sha512-/QTkbSAP2+w1nxV+qTcumSDN5PA98P0tjrADijIzQHe85oBK3Akhy9AHlH0ne/GombLMz1rLyvVsmrgRxoPDrQ==}
+    engines: {node: '>=8', npm: '>=5'}
+    hasBin: true
+    dependencies:
+      '@babel/runtime': 7.22.5
+      global: 4.4.0
+    dev: false
+
   /nanoid@3.3.6:
     resolution: {integrity: sha512-BGcqMMJuToF7i1rt+2PWSNVnWIkGCU78jBG3RxO/bZlnZPK2Cmi2QaffxGO/2RvWi9sL+FAiRiXMgsyxQ1DIDA==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
@@ -1931,6 +1951,13 @@ packages:
     dependencies:
       lru-cache: 6.0.0
     dev: true
+
+  /shaka-player@4.3.6:
+    resolution: {integrity: sha512-IX0rJY9NZyENcFH3MDf50cpOLOBsWWdaX8D3Fy0kSl7j1D1I+sXrzOQ2LxFgwmlqbIX3XrHzY9bxiWapV3ZjEg==}
+    engines: {node: '>=14'}
+    dependencies:
+      eme-encryption-scheme-polyfill: 2.1.1
+    dev: false
 
   /shebang-command@2.0.0:
     resolution: {integrity: sha512-kHxr2zZpYtdmrN1qDjrrX/Z1rR1kG8Dx+gkpK1G4eXmvXswmcE1hTWBWYUzlraYw1/yZp6YuDY77YtvbN0dmDA==}
