@@ -2,10 +2,12 @@ import "shaka-player/dist/shaka-player.compiled.d.ts";
 import { HlsManifestParser } from "./manifest-parser-decorator";
 import { SegmentManager } from "./segment-manager";
 import { Segment } from "./segment";
+import Debug from "debug";
 
 export class Engine {
-  player!: shaka.Player;
-  private segmentManager: SegmentManager = new SegmentManager();
+  private player!: shaka.Player;
+  private readonly segmentManager: SegmentManager = new SegmentManager();
+  private debug = Debug("p2pml-shaka:engine");
 
   initShakaPlayer(shaka: any, player: shaka.Player) {
     self.shaka = shaka;
@@ -56,7 +58,7 @@ export class Engine {
     );
 
     if (requestType === shaka.net.NetworkingEngine.RequestType.MANIFEST) {
-      console.log("manifest loading");
+      this.debug("Manifest is loading");
     }
     if (requestType === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
       const byteRange = Segment.getByteRangeFromHeaderString(
@@ -64,8 +66,8 @@ export class Engine {
       );
       const segmentId = Segment.getLocalId(url, byteRange);
       const segment = this.segmentManager.getSegment(segmentId);
-      console.log(segmentId);
-      console.log(segment);
+      this.debug(`Loading segment with id: ${segmentId}`);
+      this.debug(`Stream id: ${segment?.streamId}`);
     }
 
     return result;

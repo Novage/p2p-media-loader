@@ -1,8 +1,10 @@
 import { SegmentManager } from "./segment-manager";
+import Debug from "debug";
 
 export class ManifestParserDecorator implements shaka.extern.ManifestParser {
-  originalManifestParser: shaka.extern.ManifestParser;
-  segmentManager: SegmentManager;
+  private readonly originalManifestParser: shaka.extern.ManifestParser;
+  private readonly segmentManager: SegmentManager;
+  private readonly debug = Debug("p2pml-shaka:manifest-parser");
 
   constructor(
     originalManifestParser: shaka.extern.ManifestParser,
@@ -86,14 +88,13 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
               break;
             }
           } catch (err) {
-            //For the situations when segmentIndex is not iterable (inner array length is 0)
+            //For situations when segmentIndex is not iterable (inner array length is 0)
             return reference;
           }
 
           if (firstItemReference !== prevFirstItemReference) {
-            console.log("stream update");
             this.segmentManager.setStream(stream);
-            console.log(this.segmentManager.streams);
+            this.debug(`Stream ${stream.id} is updated`);
             prevFirstItemReference = firstItemReference;
           }
 
