@@ -1,8 +1,14 @@
 import { Segment, Stream, StreamType } from "./segment";
+import { StreamInfo } from "../types/types";
 
 export class SegmentManager {
   private manifestUrl?: string;
   readonly streams: Map<number, Stream> = new Map();
+  readonly streamInfo: StreamInfo;
+
+  constructor(streamInfo: StreamInfo) {
+    this.streamInfo = streamInfo;
+  }
 
   setManifestUrl(url: string) {
     this.manifestUrl = url.split("?")[0];
@@ -10,6 +16,10 @@ export class SegmentManager {
 
   setStream(stream: shaka.extern.Stream, order: number) {
     if (!this.manifestUrl) return;
+
+    if (this.streamInfo.protocol === "hls") {
+      // console.log(this.streamInfo);
+    }
 
     let managerStream = this.streams.get(stream.id);
     if (!managerStream) {
@@ -24,7 +34,9 @@ export class SegmentManager {
 
     const { segmentIndex } = stream;
     if (!segmentIndex) return;
+    // console.log(segmentIndex.getIteratorForTime(13)?.currentPosition());
     for (const segmentReference of segmentIndex) {
+      console.log(segmentReference, (segmentReference as any).ag());
       const segment = Segment.create(stream, segmentReference);
       managerStream.segments.set(segment.localId, segment);
     }

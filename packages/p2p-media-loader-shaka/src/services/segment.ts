@@ -1,20 +1,20 @@
 export class Segment {
-  streamId: number;
+  streamLocalId: number;
   localId: string;
   url: string;
 
   constructor({
     url,
     localId,
-    streamId,
+    streamLocalId,
   }: {
     url: string;
     localId: string;
-    streamId: number;
+    streamLocalId: number;
   }) {
     this.url = url;
     this.localId = localId;
-    this.streamId = streamId;
+    this.streamLocalId = streamLocalId;
   }
 
   static create(
@@ -23,7 +23,7 @@ export class Segment {
   ) {
     const [uri] = segmentReference.getUris();
     const localId = Segment.getLocalIdFromSegmentReference(segmentReference);
-    return new Segment({ localId, url: uri, streamId: stream.id });
+    return new Segment({ localId, url: uri, streamLocalId: stream.id });
   }
 
   static getLocalIdFromSegmentReference(

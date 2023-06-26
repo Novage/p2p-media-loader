@@ -17,22 +17,34 @@ const videoUrl = {
     "https://devstreaming-cdn.apple.com/videos/streaming/examples/adv_dv_atmos/main.m3u8",
   advancedVideo2:
     "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_adv_example_hevc/master.m3u8",
+  advancedVideo3:
+    "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8",
+  advancedVideo4:
+    "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_fmp4/master.m3u8",
   basicExample:
     "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8",
+  bigBunnyBuckDash: "https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd",
+  live2: "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8",
 };
 
 const players = ["hlsjs", "dplayer", "shaka-dplayer"] as const;
 type Player = (typeof players)[number];
 
 function App() {
-  const [playerType, setPlayerType] = useState<Player>("shaka-dplayer");
+  const [playerType, setPlayerType] = useState<Player | undefined>(
+    localStorage.player
+  );
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     if (!Hls.isSupported() || (window as any).player) return;
+    if (!localStorage.player) {
+      localStorage.player = "dplayer";
+      setPlayerType("dplayer");
+    }
     let player: DPlayer | Hls;
-    const url = videoUrl.live;
+    const url = videoUrl.live2;
 
     switch (playerType) {
       case "dplayer": {
@@ -96,6 +108,11 @@ function App() {
     }
   }, [playerType]);
 
+  const setPlayer = (player: Player) => {
+    localStorage.player = player;
+    setPlayerType(player);
+  };
+
   return (
     <div style={{ textAlign: "center" }}>
       <div style={{ marginBottom: 20 }}>
@@ -103,7 +120,7 @@ function App() {
         <div>
           <select
             value={playerType}
-            onChange={(event) => setPlayerType(event.target.value as Player)}
+            onChange={(event) => setPlayer(event.target.value as Player)}
           >
             {players.map((player) => {
               return (
