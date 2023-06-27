@@ -27,6 +27,8 @@ const videoUrl = {
   live2: "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8",
   dashLiveWithSeparateVideoAudio:
     "https://livesim.dashif.org/livesim/testpic_2s/Manifest.mpd",
+  hlsAkamaiLive:
+    "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8",
 };
 
 const players = ["hlsjs", "dplayer", "shaka-dplayer"] as const;
@@ -47,7 +49,7 @@ function App() {
       setPlayerType("dplayer");
     }
     let player: DPlayer | Hls;
-    const url = videoUrl.live;
+    const url = videoUrl.live2;
 
     switch (playerType) {
       case "dplayer": {

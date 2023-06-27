@@ -82,8 +82,8 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       let prevLastItemReference: shaka.media.SegmentReference | null = null;
       if (segmentIndex) {
         const getOriginal = segmentIndex.get;
-        segmentIndex.get = (segmentNumber) => {
-          const reference = getOriginal.call(segmentIndex, segmentNumber);
+        segmentIndex.get = (position) => {
+          const reference = getOriginal.call(segmentIndex, position);
           if (reference === prevReference) return reference;
           prevReference = reference;
 
@@ -91,6 +91,10 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
           let lastItemReference: shaka.media.SegmentReference | null = null;
           const currentGet = segmentIndex.get;
           segmentIndex.get = getOriginal;
+
+          const videoMap = (this.originalManifestParser as any).F.get("video");
+          const times: number[] = Array.from(videoMap.values());
+          const sequences = Array.from(videoMap.keys());
 
           let references: shaka.media.SegmentReference[];
           try {
@@ -106,7 +110,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
             firstItemReference !== prevFirstItemReference ||
             lastItemReference !== prevLastItemReference
           ) {
-            //Segment index have been updated
+            // Segment index have been updated
             this.segmentManager.setStream({
               stream,
               segmentReferences: references,

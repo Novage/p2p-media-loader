@@ -58,6 +58,10 @@ export class SegmentManager {
     }
 
     for (const id of staleSegmentsIds) managerStream.segments.delete(id);
+
+    console.log(
+      Array.from(managerStream.segments.values()).map((s) => s.index)
+    );
   }
 
   getSegment(segmentLocalId: string) {
@@ -78,7 +82,7 @@ export class SegmentManager {
   ) {
     const staleSegmentsIds = new Set(managerStream.segments.keys());
     for (const reference of segmentReferences) {
-      const index = reference.getStartByte();
+      const index = reference.getStartTime();
 
       const segmentLocalId = Segment.getLocalIdFromSegmentReference(reference);
       if (!managerStream.segments.has(segmentLocalId)) {
@@ -101,31 +105,52 @@ export class SegmentManager {
     stream: shaka.extern.Stream,
     segmentReferences: shaka.media.SegmentReference[]
   ) {
-    let index =
+    // console.log("MEDIA SEQUENCE: ", this.streamInfo.mediaSequence.video);
+    // console.log(
+    //   segmentReferences.map((s) => Segment.getLocalIdFromSegmentReference(s))
+    // );
+    const mediaSequence =
       stream.type === "video"
         ? this.streamInfo.mediaSequence.video
         : this.streamInfo.mediaSequence.audio;
-    const staleSegmentsIds = new Set(managerStream.segments.keys());
 
-    for (let i = 0; i < segmentReferences.length; i++) {
-      const reference = segmentReferences[i];
+    const segments = Array.from(managerStream.segments.values());
+    const lastSegmentIndex = segments[segments.length - 1]?.index ?? -1;
 
+    let staleSegmentsIds: string[] = [];
+    if (mediaSequence > lastSegmentIndex) {
+      staleSegmentsIds = segments.map((s) => s.localId);
+    } else {
+      for (const segment of segments) {
+        if (segment.index < mediaSequence) {
+          staleSegmentsIds.push(segment.localId);
+        } else {
+          break;
+        }
+      }
+    }
+
+    const staleSegmentsIdsSet = new Set(staleSegmentsIds);
+    let sequence = Math.max(lastSegmentIndex + 1, mediaSequence);
+    for (const reference of segmentReferences) {
       const segmentLocalId = Segment.getLocalIdFromSegmentReference(reference);
       const segment = managerStream.segments.get(segmentLocalId);
       if (!segment) {
         const segment = Segment.create({
           stream,
           segmentReference: reference,
-          index,
+          index: sequence,
           localId: segmentLocalId,
         });
         managerStream.segments.set(segment.localId, segment);
-      } else if (i === 0) {
-        index = segment.index;
+        sequence++;
       }
-      index++;
-      staleSegmentsIds.delete(segmentLocalId);
     }
-    return staleSegmentsIds;
+
+    // console.log(
+    //   Array.from(managerStream.segments.values()).map((i) => i.index)
+    // );
+
+    return staleSegmentsIdsSet;
   }
 }

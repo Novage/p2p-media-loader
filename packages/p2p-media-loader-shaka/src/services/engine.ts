@@ -151,6 +151,7 @@ export class Engine {
         if (!this.hlsStreamType) {
           void this.parseM3U8MasterManifest(result);
         } else {
+          console.log("PLAYLIST LOAD");
           void this.parseHlsPlaylistRetrieveMediaSequence(url, result);
         }
       }
@@ -163,6 +164,13 @@ export class Engine {
       const stream = this.segmentManager.getStreamBySegmentLocalId(segmentId);
       this.debug(`Loading segment with id: ${segmentId}`);
       this.debug(`Stream id: ${stream?.id}`);
+      // const segment = stream?.segments.get(segmentId);
+      // console.log(url);
+      // // console.log(
+      // //   Array.from(stream?.segments.values() ?? []).map((i) => i.index)
+      // // );
+      // console.log(segment?.index);
+      // console.log("");
     }
 
     return result;
