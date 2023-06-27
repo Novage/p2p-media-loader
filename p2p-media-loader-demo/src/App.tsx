@@ -25,10 +25,13 @@ const videoUrl = {
     "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8",
   bigBunnyBuckDash: "https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd",
   live2: "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8",
+  dashLiveWithSeparateVideoAudio:
+    "https://livesim.dashif.org/livesim/testpic_2s/Manifest.mpd",
 };
 
 const players = ["hlsjs", "dplayer", "shaka-dplayer"] as const;
 type Player = (typeof players)[number];
+self.shaka = shaka;
 
 function App() {
   const [playerType, setPlayerType] = useState<Player | undefined>(
@@ -44,7 +47,7 @@ function App() {
       setPlayerType("dplayer");
     }
     let player: DPlayer | Hls;
-    const url = videoUrl.live2;
+    const url = videoUrl.live;
 
     switch (playerType) {
       case "dplayer": {
@@ -86,7 +89,7 @@ function App() {
                 shakaPlayer.addEventListener("error", (event: any) => {
                   onError(event);
                 });
-                engine.initShakaPlayer(shaka, shakaPlayer);
+                engine.initShakaPlayer(shakaPlayer);
                 shakaPlayer.load(src).catch(onError);
               },
             },

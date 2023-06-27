@@ -1,29 +1,44 @@
+import { ByteRange, StreamType } from "../types/types";
+
 export class Segment {
   streamLocalId: number;
   localId: string;
   url: string;
+  index: number;
 
   constructor({
     url,
     localId,
     streamLocalId,
+    index,
   }: {
     url: string;
     localId: string;
     streamLocalId: number;
+    index: number;
   }) {
     this.url = url;
     this.localId = localId;
     this.streamLocalId = streamLocalId;
+    this.index = index;
   }
 
-  static create(
-    stream: shaka.extern.Stream,
-    segmentReference: shaka.media.SegmentReference
-  ) {
+  static create({
+    stream,
+    segmentReference,
+    index,
+    localId: segmentLocalId,
+  }: {
+    stream: shaka.extern.Stream;
+    segmentReference: shaka.media.SegmentReference;
+    index: number;
+    localId?: string;
+  }) {
     const [uri] = segmentReference.getUris();
-    const localId = Segment.getLocalIdFromSegmentReference(segmentReference);
-    return new Segment({ localId, url: uri, streamLocalId: stream.id });
+    const localId =
+      segmentLocalId ??
+      Segment.getLocalIdFromSegmentReference(segmentReference);
+    return new Segment({ localId, url: uri, streamLocalId: stream.id, index });
   }
 
   static getLocalIdFromSegmentReference(
@@ -56,8 +71,6 @@ export class Segment {
   }
 }
 
-type ByteRange = { offset: number; length?: number };
-
 export class Stream {
   id: string;
   localId: number;
@@ -80,5 +93,3 @@ export class Stream {
     this.id = `${manifestUrl}-${type}-V${order}`;
   }
 }
-
-export type StreamType = "video" | "audio";

@@ -52,7 +52,6 @@ export class SegmentManager {
       }
 
       if (playlist) {
-        console.log(manifest);
         playlist.setSegments(responseUrl, mediaSequence, segments);
       }
     }
