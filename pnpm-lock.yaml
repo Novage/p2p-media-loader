@@ -40,7 +40,7 @@ importers:
     dependencies:
       dplayer:
         specifier: ^1.27.1
-        version: 1.27.1
+        version: 1.27.1(debug@4.3.4)
       hls.js:
         specifier: ^1.4.5
         version: 1.4.5
@@ -98,6 +98,9 @@ importers:
 
   packages/p2p-media-loader-shaka:
     dependencies:
+      m3u8-parser:
+        specifier: ^6.2.0
+        version: 6.2.0
       p2p-media-loader-core:
         specifier: workspace:*
         version: link:../p2p-media-loader-core
@@ -934,10 +937,10 @@ packages:
     resolution: {integrity: sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==}
     dev: false
 
-  /axios@1.2.3:
+  /axios@1.2.3(debug@4.3.4):
     resolution: {integrity: sha512-pdDkMYJeuXLZ6Xj/Q5J3Phpe+jbGdsSzlQaFVkMQzRUL05+6+tetX8TV3p4HrU4kzuO9bt+io/yGQxuyxA/xcw==}
     dependencies:
-      follow-redirects: 1.15.2
+      follow-redirects: 1.15.2(debug@4.3.4)
       form-data: 4.0.0
       proxy-from-env: 1.1.0
     transitivePeerDependencies:
@@ -1096,10 +1099,10 @@ packages:
     resolution: {integrity: sha512-6QvTW9mrGeIegrFXdtQi9pk7O/nSK6lSdXW2eqUspN5LWD7UTji2Fqw5V2YLjBpHEoU9Xl/eUWNpDeZvoyOv2w==}
     dev: false
 
-  /dplayer@1.27.1:
+  /dplayer@1.27.1(debug@4.3.4):
     resolution: {integrity: sha512-2laBMXs5V1B9zPwJ7eAIw/OBo+Xjvy03i4GHTk3Cg+IWbrq8rKMFO0fFr6ClAYotYOCcFGOvaJDkOZcgKllsCA==}
     dependencies:
-      axios: 1.2.3
+      axios: 1.2.3(debug@4.3.4)
       balloon-css: 1.2.0
       promise-polyfill: 8.3.0
     transitivePeerDependencies:
@@ -1379,7 +1382,7 @@ packages:
     resolution: {integrity: sha512-5nqDSxl8nn5BSNxyR3n4I6eDmbolI6WT+QqR547RwxQapgjQBmtktdP+HTBb/a/zLsbzERTONyUB5pefh5TtjQ==}
     dev: true
 
-  /follow-redirects@1.15.2:
+  /follow-redirects@1.15.2(debug@4.3.4):
     resolution: {integrity: sha512-VQLG33o04KaQ8uYi2tVNbdrWp1QWxNNea+nmIB4EVM28v0hmP17z7aG1+wAkNzVq4KeXTq3221ye5qTJP91JwA==}
     engines: {node: '>=4.0'}
     peerDependencies:
@@ -1387,6 +1390,8 @@ packages:
     peerDependenciesMeta:
       debug:
         optional: true
+    dependencies:
+      debug: 4.3.4
     dev: false
 
   /foreground-child@3.1.1:
