@@ -6,7 +6,7 @@ export class SegmentManager {
   readonly streams: Map<number, Stream> = new Map();
   readonly urlStreamMap: Map<string, Stream> = new Map();
   readonly streamInfo: StreamInfo;
-  readonly lastMediaSequence: { audio?: number; video?: number } = {};
+  readonly firstMediaSequence: { audio?: number; video?: number } = {};
   mediaSequenceTimeMap: {
     video: Map<number, number>;
     audio: Map<number, number>;
@@ -140,22 +140,28 @@ export class SegmentManager {
       return;
     }
 
-    let prevMediaSequence = segments[segments.length - 1].index;
+    let index = lastMediaSequence;
     const startSize = managerStream.segments.size;
-    for (const reference of segmentReferences) {
+
+    const newSegments: Segment[] = [];
+    for (let i = segmentReferences.length - 1; i >= 0; i--) {
+      const reference = segmentReferences[i];
       const localId = Segment.getLocalIdFromSegmentReference(reference);
       if (!managerStream.segments.has(localId)) {
-        ++prevMediaSequence;
         const segment = Segment.create({
           localId,
           stream,
           segmentReference: reference,
-          index: prevMediaSequence,
+          index,
         });
-        managerStream.segments.set(localId, segment);
+        newSegments.push(segment);
+        index--;
+      } else {
+        break;
       }
     }
-    this.lastMediaSequence[streamType] = prevMediaSequence;
+    newSegments.reverse();
+    newSegments.forEach((s) => managerStream.segments.set(s.localId, s));
 
     const deleteCount = managerStream.segments.size - startSize;
     for (let i = 0; i < deleteCount; i++) {
@@ -165,16 +171,18 @@ export class SegmentManager {
   }
 
   private getLastMediaSequence(streamType: StreamType) {
-    const lastMediaSequence = this.lastMediaSequence[streamType];
-    if (lastMediaSequence !== undefined) return lastMediaSequence;
-
     const map =
       streamType === "video"
         ? this.mediaSequenceTimeMap.video
         : this.mediaSequenceTimeMap.audio;
 
-    const sequence = [...map.keys()].pop();
-    this.lastMediaSequence[streamType] = sequence;
-    return sequence;
+    let firstMediaSequence = this.firstMediaSequence[streamType];
+    if (firstMediaSequence !== undefined) {
+      return firstMediaSequence + map.size - 1;
+    }
+
+    firstMediaSequence = [...map.keys()][0];
+    this.firstMediaSequence[streamType] = firstMediaSequence;
+    return firstMediaSequence + map.size - 1;
   }
 }
