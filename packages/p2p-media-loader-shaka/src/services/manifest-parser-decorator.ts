@@ -8,8 +8,6 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   private readonly debug = Debug("p2pml-shaka:manifest-parser");
   private readonly isHLS: boolean;
   private readonly isDash: boolean;
-  private readonly videoMediaSequenceTimeMap: Map<number, number> = new Map();
-  private readonly audioMediaSequenceTimeMap: Map<number, number> = new Map();
 
   constructor(
     originalManifestParser: shaka.extern.ManifestParser,
@@ -24,8 +22,8 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
 
     if (this.isHLS) {
       const { video, audio } = this.getStreamMediaSequenceTimeMaps();
-      this.videoMediaSequenceTimeMap = video;
-      this.audioMediaSequenceTimeMap = audio;
+      this.segmentManager.mediaSequenceTimeMap.video = video;
+      this.segmentManager.mediaSequenceTimeMap.audio = audio;
     }
   }
 
@@ -70,7 +68,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     for (const variant of variants) {
       const { video, audio } = variant;
       if (video && !processedStreams.has(video.id)) {
-        this.hookSegmentIndex(video);
+        if (this.isDash) this.hookSegmentIndex(video);
         this.segmentManager.setStream({
           stream: video as HookedStream,
           streamOrder: videoCount,
@@ -79,7 +77,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
         videoCount++;
       }
       if (audio && !processedStreams.has(audio.id)) {
-        this.hookSegmentIndex(audio);
+        if (this.isDash) this.hookSegmentIndex(audio);
         this.segmentManager.setStream({
           stream: audio,
           streamOrder: audioCount,
@@ -127,7 +125,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
           lastItemReference !== prevLastItemReference
         ) {
           // Segment index have been updated
-          this.segmentManager.setStream({
+          this.segmentManager.updateStream({
             stream,
             segmentReferences: references,
           });

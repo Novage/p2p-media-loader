@@ -95,6 +95,17 @@ export class Engine {
     );
     if (requestType === shaka.net.NetworkingEngine.RequestType.MANIFEST) {
       this.debug("Manifest is loading");
+      if (
+        this.streamInfo.protocol === "hls" &&
+        this.segmentManager.urlStreamMap.has(url)
+      ) {
+        (async () => {
+          await result.promise;
+          //Waiting for playlist is parsed
+          await new Promise((res) => setTimeout(res, 0));
+          this.segmentManager.updateHLSStreamByUrl(url);
+        })();
+      }
     }
     if (requestType === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
       const byteRange = Segment.getByteRangeFromHeaderString(
@@ -104,13 +115,6 @@ export class Engine {
       const stream = this.segmentManager.getStreamBySegmentLocalId(segmentId);
       this.debug(`Loading segment with id: ${segmentId}`);
       this.debug(`Stream id: ${stream?.id}`);
-      // const segment = stream?.segments.get(segmentId);
-      // console.log(url);
-      // // console.log(
-      // //   Array.from(stream?.segments.values() ?? []).map((i) => i.index)
-      // // );
-      // console.log(segment?.index);
-      // console.log("");
     }
 
     return result;

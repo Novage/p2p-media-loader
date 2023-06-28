@@ -76,6 +76,7 @@ export class Stream {
   localId: number;
   type: StreamType;
   segments: Map<string, Segment> = new Map();
+  shakaStream: shaka.extern.Stream;
   url?: string;
 
   constructor({
@@ -84,16 +85,19 @@ export class Stream {
     order,
     type,
     url,
+    shakaStream,
   }: {
     localId: number;
     manifestUrl: string;
     order: number;
     type: StreamType;
     url?: string;
+    shakaStream: shaka.extern.Stream;
   }) {
     this.localId = localId;
     this.type = type;
     this.id = `${manifestUrl}-${type}-V${order}`;
     this.url = url;
+    this.shakaStream = shakaStream;
   }
 }
