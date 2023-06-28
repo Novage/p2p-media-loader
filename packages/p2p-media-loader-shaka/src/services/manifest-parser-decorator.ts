@@ -98,46 +98,47 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       let prevReference: shaka.media.SegmentReference | null = null;
       let prevFirstItemReference: shaka.media.SegmentReference | null = null;
       let prevLastItemReference: shaka.media.SegmentReference | null = null;
-      if (segmentIndex) {
-        const getOriginal = segmentIndex.get;
-        segmentIndex.get = (position) => {
-          const reference = getOriginal.call(segmentIndex, position);
-          if (reference === prevReference) return reference;
-          prevReference = reference;
 
-          let firstItemReference: shaka.media.SegmentReference | null = null;
-          let lastItemReference: shaka.media.SegmentReference | null = null;
-          const currentGet = segmentIndex.get;
-          segmentIndex.get = getOriginal;
+      if (!segmentIndex) return result;
 
-          let references: shaka.media.SegmentReference[];
-          try {
-            references = Array.from(segmentIndex);
-            firstItemReference = references[0];
-            lastItemReference = references[references.length - 1];
-          } catch (err) {
-            //For situations when segmentIndex is not iterable (inner array length is 0)
-            return reference;
-          }
+      const getOriginal = segmentIndex.get;
+      segmentIndex.get = (position) => {
+        const reference = getOriginal.call(segmentIndex, position);
+        if (reference === prevReference) return reference;
+        prevReference = reference;
 
-          if (
-            firstItemReference !== prevFirstItemReference ||
-            lastItemReference !== prevLastItemReference
-          ) {
-            // Segment index have been updated
-            this.segmentManager.setStream({
-              stream,
-              segmentReferences: references,
-            });
-            this.debug(`Stream ${stream.id} is updated`);
-            prevFirstItemReference = firstItemReference;
-            prevLastItemReference = lastItemReference;
-          }
+        let firstItemReference: shaka.media.SegmentReference | null = null;
+        let lastItemReference: shaka.media.SegmentReference | null = null;
+        const currentGet = segmentIndex.get;
+        segmentIndex.get = getOriginal;
 
-          segmentIndex.get = currentGet;
+        let references: shaka.media.SegmentReference[];
+        try {
+          references = Array.from(segmentIndex);
+          firstItemReference = references[0];
+          lastItemReference = references[references.length - 1];
+        } catch (err) {
+          //For situations when segmentIndex is not iterable (inner array length is 0)
           return reference;
-        };
-      }
+        }
+
+        if (
+          firstItemReference !== prevFirstItemReference ||
+          lastItemReference !== prevLastItemReference
+        ) {
+          // Segment index have been updated
+          this.segmentManager.setStream({
+            stream,
+            segmentReferences: references,
+          });
+          this.debug(`Stream ${stream.id} is updated`);
+          prevFirstItemReference = firstItemReference;
+          prevLastItemReference = lastItemReference;
+        }
+
+        segmentIndex.get = currentGet;
+        return reference;
+      };
       return result;
     };
   }
