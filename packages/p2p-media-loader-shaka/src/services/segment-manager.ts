@@ -1,9 +1,10 @@
 import { Segment, Stream } from "./segment";
-import { StreamInfo, StreamType } from "../types/types";
+import { HookedStream, StreamInfo, StreamType } from "../types/types";
 
 export class SegmentManager {
   private manifestUrl?: string;
   readonly streams: Map<number, Stream> = new Map();
+  readonly urlStreamMap: Map<string, Stream> = new Map();
   readonly streamInfo: StreamInfo;
 
   constructor(streamInfo: StreamInfo) {
@@ -19,21 +20,26 @@ export class SegmentManager {
     streamOrder = -1,
     segmentReferences,
   }: {
-    stream: shaka.extern.Stream;
+    stream: HookedStream;
     segmentReferences?: shaka.media.SegmentReference[];
     streamOrder?: number;
   }) {
     if (!this.manifestUrl) return;
 
     let managerStream = this.streams.get(stream.id);
+    const isHLS = this.streamInfo.protocol === "hls";
     if (!managerStream) {
       managerStream = new Stream({
         localId: stream.id,
         order: streamOrder,
         type: stream.type as StreamType,
         manifestUrl: this.manifestUrl,
+        url: stream.streamUrl,
       });
       this.streams.set(managerStream.localId, managerStream);
+      if (isHLS && managerStream.url) {
+        this.urlStreamMap.set(managerStream.url, managerStream);
+      }
     }
 
     const { segmentIndex } = stream;
@@ -43,7 +49,7 @@ export class SegmentManager {
 
     let staleSegmentsIds: Set<string>;
 
-    if (this.streamInfo.protocol === "hls") {
+    if (isHLS) {
       staleSegmentsIds = this.processHlsSegmentReferences(
         managerStream,
         stream,
@@ -105,7 +111,7 @@ export class SegmentManager {
     stream: shaka.extern.Stream,
     segmentReferences: shaka.media.SegmentReference[]
   ) {
-    // console.log("MEDIA SEQUENCE: ", this.streamInfo.mediaSequence.video);
+    console.log("MEDIA SEQUENCE: ", this.streamInfo.mediaSequence.video);
     // console.log(
     //   segmentReferences.map((s) => Segment.getLocalIdFromSegmentReference(s))
     // );
