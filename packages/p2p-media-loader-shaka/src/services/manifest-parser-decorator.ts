@@ -1,18 +1,32 @@
 import { SegmentManager } from "./segment-manager";
 import Debug from "debug";
-import { StreamProtocol } from "../types/types";
+import { HookedStream, StreamProtocol } from "../types/types";
 
 export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   private readonly originalManifestParser: shaka.extern.ManifestParser;
   private readonly segmentManager: SegmentManager;
   private readonly debug = Debug("p2pml-shaka:manifest-parser");
+  private readonly isHLS: boolean;
+  private readonly isDash: boolean;
+  private readonly videoMediaSequenceTimeMap: Map<number, number> = new Map();
+  private readonly audioMediaSequenceTimeMap: Map<number, number> = new Map();
 
   constructor(
     originalManifestParser: shaka.extern.ManifestParser,
-    segmentManager: SegmentManager
+    segmentManager: SegmentManager,
+    protocol: StreamProtocol
   ) {
     this.originalManifestParser = originalManifestParser;
     this.segmentManager = segmentManager;
+
+    this.isHLS = protocol === "hls";
+    this.isDash = protocol === "dash";
+
+    if (this.isHLS) {
+      const { video, audio } = this.getStreamMediaSequenceTimeMaps();
+      this.videoMediaSequenceTimeMap = video;
+      this.audioMediaSequenceTimeMap = audio;
+    }
   }
 
   configure(config: shaka.extern.ManifestConfiguration) {
@@ -28,16 +42,37 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       playerInterface
     );
     this.segmentManager.setManifestUrl(uri);
-    const processedStreams = new Set<number>();
+    if (this.isHLS) this.hookStreamUrls();
+    this.processStreams(manifest.variants);
 
+    return manifest;
+  }
+
+  stop() {
+    return this.originalManifestParser.stop();
+  }
+
+  update() {
+    return this.originalManifestParser.update();
+  }
+
+  onExpirationUpdated(sessionId: string, expiration: number) {
+    return this.originalManifestParser.onExpirationUpdated(
+      sessionId,
+      expiration
+    );
+  }
+
+  private processStreams(variants: shaka.extern.Variant[]) {
+    const processedStreams = new Set<number>();
     let videoCount = 0;
     let audioCount = 0;
-    for (const variant of manifest.variants) {
+    for (const variant of variants) {
       const { video, audio } = variant;
       if (video && !processedStreams.has(video.id)) {
         this.hookSegmentIndex(video);
         this.segmentManager.setStream({
-          stream: video,
+          stream: video as HookedStream,
           streamOrder: videoCount,
         });
         processedStreams.add(video.id);
@@ -53,23 +88,6 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
         audioCount++;
       }
     }
-
-    return manifest;
-  }
-
-  stop() {
-    return this.originalManifestParser.stop();
-  }
-
-  async update() {
-    return this.originalManifestParser.update();
-  }
-
-  onExpirationUpdated(sessionId: string, expiration: number) {
-    return this.originalManifestParser.onExpirationUpdated(
-      sessionId,
-      expiration
-    );
   }
 
   private hookSegmentIndex(stream: shaka.extern.Stream): void {
@@ -91,10 +109,6 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
           let lastItemReference: shaka.media.SegmentReference | null = null;
           const currentGet = segmentIndex.get;
           segmentIndex.get = getOriginal;
-
-          const videoMap = (this.originalManifestParser as any).F.get("video");
-          const times: number[] = Array.from(videoMap.values());
-          const sequences = Array.from(videoMap.keys());
 
           let references: shaka.media.SegmentReference[];
           try {
@@ -127,6 +141,59 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       return result;
     };
   }
+
+  private getStreamMediaSequenceTimeMaps() {
+    const properties = Object.values(this.originalManifestParser);
+    let video: Map<number, number> = new Map();
+    let audio: Map<number, number> = new Map();
+
+    for (const property of properties) {
+      if (typeof property === "object" && property instanceof Map) {
+        const keys = Array.from(property.keys());
+        if (
+          ["video", "audio", "text", "image"].every((i) => keys.includes(i))
+        ) {
+          video = property.get("video");
+          audio = property.get("audio");
+          break;
+        }
+      }
+    }
+
+    return { video, audio };
+  }
+
+  private hookStreamUrls() {
+    const properties = Object.values(this.originalManifestParser);
+
+    let objects: any[] = [];
+    for (const property of properties) {
+      if (typeof property === "object" && property instanceof Map) {
+        objects = Array.from(property.values());
+        const [object] = objects;
+        if (
+          typeof object === "object" &&
+          typeof object.type === "string" &&
+          !!object.stream?.createSegmentIndex
+        ) {
+          break;
+        }
+      }
+    }
+
+    for (const obj of objects) {
+      const stream = obj.stream;
+      const properties = Object.values(obj);
+      let streamUrl = "";
+      for (const property of properties) {
+        if (typeof property === "string" && property.startsWith("http")) {
+          streamUrl = property;
+        }
+      }
+
+      stream.streamUrl = streamUrl;
+    }
+  }
 }
 
 export class HlsManifestParser extends ManifestParserDecorator {
@@ -134,7 +201,7 @@ export class HlsManifestParser extends ManifestParserDecorator {
     segmentManager: SegmentManager,
     setProtocol: (protocol: StreamProtocol) => void
   ) {
-    super(new shaka.hls.HlsParser(), segmentManager);
+    super(new shaka.hls.HlsParser(), segmentManager, "hls");
     setProtocol("hls");
   }
 }
@@ -144,7 +211,7 @@ export class DashManifestParser extends ManifestParserDecorator {
     segmentsManager: SegmentManager,
     setProtocol: (protocol: StreamProtocol) => void
   ) {
-    super(new shaka.dash.DashParser(), segmentsManager);
+    super(new shaka.dash.DashParser(), segmentsManager, "dash");
     setProtocol("dash");
   }
 }

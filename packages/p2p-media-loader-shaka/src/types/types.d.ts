@@ -8,3 +8,5 @@ export type StreamInfo = {
 export type StreamType = "video" | "audio";
 
 type ByteRange = { offset: number; length?: number };
+
+type HookedStream = shaka.extern.Stream & { streamUrl?: string };

@@ -76,20 +76,24 @@ export class Stream {
   localId: number;
   type: StreamType;
   segments: Map<string, Segment> = new Map();
+  url?: string;
 
   constructor({
     localId,
     manifestUrl,
     order,
     type,
+    url,
   }: {
     localId: number;
     manifestUrl: string;
     order: number;
     type: StreamType;
+    url?: string;
   }) {
     this.localId = localId;
     this.type = type;
     this.id = `${manifestUrl}-${type}-V${order}`;
+    this.url = url;
   }
 }
