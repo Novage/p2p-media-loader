@@ -42,7 +42,7 @@ export class Playlist {
       const segment = new Segment({
         uri: s.uri,
         playlistUrl: playlistResponseUrl,
-        byteRange: s.byterange,
+        byteRange: s.byterange && Segment.parserByteRangeToCommon(s.byterange),
         sequence: sequence + index,
       });
       return [segment.localId, segment];
@@ -76,10 +76,12 @@ export class Segment {
     this.localId = Segment.getSegmentLocalId(this.url, this.byteRange);
   }
 
-  static getSegmentLocalId(segmentRequestUrl: string, byteRange?: ByteRange) {
-    if (!byteRange) return segmentRequestUrl;
-    const end = byteRange.offset + byteRange.length - 1;
-    return `${segmentRequestUrl}|${byteRange.offset}-${end}`;
+  static getSegmentLocalId(
+    segmentRequestUrl: string,
+    byteRange?: Partial<ByteRange>
+  ) {
+    if (!byteRange || !byteRange.start) return segmentRequestUrl;
+    return `${segmentRequestUrl}|${byteRange.start}-${byteRange.end ?? ""}`;
   }
 
   static getByteRange(
@@ -93,13 +95,23 @@ export class Segment {
     ) {
       return undefined;
     }
-    return { offset: rangeStart, length: rangeEnd - rangeStart };
+    return { start: rangeStart, end: rangeEnd - 1 };
+  }
+
+  static parserByteRangeToCommon(byteRange: {
+    offset: number;
+    length: number;
+  }): ByteRange {
+    return {
+      start: byteRange.offset,
+      end: byteRange.offset + byteRange.length - 1,
+    };
   }
 }
 
 type SegmentType = "video" | "audio" | "unknown";
 
-export type ByteRange = { offset: number; length: number };
+export type ByteRange = { start: number; end?: number };
 
 function getUrlWithoutParameters(url: string) {
   return url.split("?")[0];

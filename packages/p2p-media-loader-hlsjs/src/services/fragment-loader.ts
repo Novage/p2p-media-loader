@@ -37,21 +37,26 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     this.defaultLoader.load(context, config, {
       ...callbacks,
       onSuccess: (response, stats, context, networkDetails) => {
-        const { rangeStart, rangeEnd } = context;
-        const byteRange: ByteRange | undefined = Segment.getByteRange(
-          rangeStart,
-          rangeEnd
-        );
-        const segmentId = Segment.getSegmentLocalId(context.url, byteRange);
+        const { rangeStart: start, rangeEnd: end } = context;
+        const segmentId = Segment.getSegmentLocalId(context.url, {
+          start,
+          end: end !== undefined ? end - 1 : undefined,
+        });
         const playlist = this.segmentManager.getPlaylistBySegmentId(segmentId);
-        if (playlist?.type === "video") {
-          this.debug(
-            "downloaded segment from playlist\n",
-            `playlist v: ${playlist?.index}\n`,
-            `segment: `,
-            playlist?.segmentsMap.get(segmentId)?.sequence
-          );
+        this.debug(
+          "downloaded segment from playlist\n",
+          `playlist v: ${playlist?.index}\n`,
+          `segment: `,
+          playlist?.segmentsMap.get(segmentId)?.sequence
+        );
+        const type = "video";
+        if (playlist?.type === type) {
+          const segment = playlist?.segmentsMap.get(segmentId);
+          console.log(context.url);
+          console.log(playlist?.id, segment?.sequence, segment?.byteRange);
+          console.log("");
         }
+
         return callbacks.onSuccess(response, stats, context, networkDetails);
       },
     });

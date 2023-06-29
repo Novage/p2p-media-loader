@@ -38,7 +38,8 @@ export class SegmentManager {
         }
       });
     } else if (ManifestUtil.isPlaylistManifest(manifest)) {
-      const { segments, mediaSequence } = manifest;
+      const { segments } = manifest;
+      const mediaSequence = manifest.mediaSequence || 1;
       let playlist = this.playlists.get(requestUrl);
 
       if (!playlist && !this.manifest) {

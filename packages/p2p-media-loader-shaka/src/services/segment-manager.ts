@@ -69,8 +69,6 @@ export class SegmentManager {
     } else {
       this.processDashSegmentReferences(managerStream, references);
     }
-
-    console.log([...managerStream.segments.values()].map((i) => i.index));
   }
 
   updateHLSStreamByUrl(url: string) {
@@ -127,7 +125,7 @@ export class SegmentManager {
     if (segments.length === 0) {
       const firstMediaSequence =
         lastMediaSequence === undefined
-          ? 0
+          ? 1
           : lastMediaSequence - segmentReferences.length + 1;
       segmentReferences.forEach((reference, index) => {
         const segment = Segment.create({
@@ -140,7 +138,7 @@ export class SegmentManager {
       return;
     }
 
-    let index = lastMediaSequence;
+    let index = lastMediaSequence ?? 0;
     const startSize = managerStream.segments.size;
 
     const newSegments: Segment[] = [];
@@ -179,10 +177,10 @@ export class SegmentManager {
     let firstMediaSequence = this.firstMediaSequence[streamType];
     if (firstMediaSequence !== undefined) {
       return firstMediaSequence + map.size - 1;
+    } else if (map.size) {
+      firstMediaSequence = [...map.keys()][0];
+      this.firstMediaSequence[streamType] = firstMediaSequence;
+      return firstMediaSequence + map.size - 1;
     }
-
-    firstMediaSequence = [...map.keys()][0];
-    this.firstMediaSequence[streamType] = firstMediaSequence;
-    return firstMediaSequence + map.size - 1;
   }
 }

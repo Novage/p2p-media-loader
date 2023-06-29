@@ -165,7 +165,10 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   private hookStreamUrls() {
     const properties = Object.values(this.originalManifestParser);
 
-    let objects: any[] = [];
+    let objects: {
+      type: string;
+      stream: { createSegmentIndex: () => void; streamUrl?: string };
+    }[] = [];
     for (const property of properties) {
       if (typeof property === "object" && property instanceof Map) {
         objects = Array.from(property.values());

@@ -3,6 +3,7 @@ import { ByteRange, StreamType } from "../types/types";
 export class Segment {
   streamLocalId: number;
   localId: string;
+  byteRange?: ByteRange;
   url: string;
   index: number;
 
@@ -11,49 +12,64 @@ export class Segment {
     localId,
     streamLocalId,
     index,
+    byteRange,
   }: {
     url: string;
-    localId: string;
+    localId?: string;
     streamLocalId: number;
     index: number;
+    byteRange?: ByteRange;
   }) {
     this.url = url;
-    this.localId = localId;
     this.streamLocalId = streamLocalId;
     this.index = index;
+    this.byteRange = byteRange;
+    this.localId = localId ?? Segment.getLocalId(url, byteRange);
   }
 
   static create({
     stream,
     segmentReference,
     index,
-    localId: segmentLocalId,
+    localId,
   }: {
     stream: shaka.extern.Stream;
     segmentReference: shaka.media.SegmentReference;
     index: number;
     localId?: string;
   }) {
-    const [uri] = segmentReference.getUris();
-    const localId =
-      segmentLocalId ??
-      Segment.getLocalIdFromSegmentReference(segmentReference);
-    return new Segment({ localId, url: uri, streamLocalId: stream.id, index });
+    const { uri, byteRange } =
+      Segment.getSegmentInfoFromReference(segmentReference);
+    return new Segment({
+      localId,
+      byteRange,
+      url: uri,
+      streamLocalId: stream.id,
+      index,
+    });
   }
 
   static getLocalIdFromSegmentReference(
     segmentReference: shaka.media.SegmentReference
   ) {
-    const [uri] = segmentReference.getUris();
-    const offset = segmentReference.getStartByte();
-    const length = segmentReference.getEndByte() ?? undefined;
-    return Segment.getLocalId(uri, { offset, length });
+    const { uri, byteRange } =
+      Segment.getSegmentInfoFromReference(segmentReference);
+    return Segment.getLocalId(uri, byteRange);
   }
 
-  static getLocalId(url: string, byteRange?: ByteRange) {
+  static getLocalId(url: string, byteRange?: ByteRange | string) {
     if (!byteRange) return url;
-    const { offset, length } = byteRange;
-    if (length !== undefined) return `${url}|${offset}-${length ?? ""}`;
+
+    let range: ByteRange | undefined;
+    if (typeof byteRange === "string") {
+      range = Segment.getByteRangeFromHeaderString(byteRange);
+    } else {
+      range = byteRange;
+    }
+    if (!range) return url;
+
+    const { start, end } = range;
+    if (length !== undefined) return `${url}|${start}-${end ?? ""}`;
     return url;
   }
 
@@ -65,9 +81,22 @@ export class Segment {
         .split("=")[1]
         .split("-")
         .map((i) => parseInt(i));
-      const [offset, length] = range;
-      return { offset, length };
+      const [start, end] = range;
+      return { start, end };
     }
+  }
+
+  static getSegmentInfoFromReference(
+    segmentReference: shaka.media.SegmentReference
+  ) {
+    const [uri] = segmentReference.getUris();
+    const start = segmentReference.getStartByte();
+    const end = segmentReference.getEndByte() ?? undefined;
+
+    return {
+      byteRange: { start, end },
+      uri,
+    };
   }
 }
 

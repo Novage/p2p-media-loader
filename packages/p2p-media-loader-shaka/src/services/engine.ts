@@ -108,13 +108,19 @@ export class Engine {
       }
     }
     if (requestType === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
-      const byteRange = Segment.getByteRangeFromHeaderString(
-        request.headers.Range
-      );
-      const segmentId = Segment.getLocalId(url, byteRange);
+      const segmentId = Segment.getLocalId(url, request.headers.Range);
       const stream = this.segmentManager.getStreamBySegmentLocalId(segmentId);
       this.debug(`Loading segment with id: ${segmentId}`);
       this.debug(`Stream id: ${stream?.id}`);
+
+      const type = "video";
+
+      if (stream?.type === type) {
+        const segment = stream?.segments.get(segmentId);
+        console.log(url);
+        console.log(stream?.id, segment?.index, segment?.byteRange);
+        console.log("");
+      }
     }
 
     return result;
