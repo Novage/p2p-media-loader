@@ -49,13 +49,6 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
           `segment: `,
           playlist?.segmentsMap.get(segmentId)?.sequence
         );
-        const type = "video";
-        if (playlist?.type === type) {
-          const segment = playlist?.segmentsMap.get(segmentId);
-          console.log(context.url);
-          console.log(playlist?.id, segment?.sequence, segment?.byteRange);
-          console.log("");
-        }
 
         return callbacks.onSuccess(response, stats, context, networkDetails);
       },

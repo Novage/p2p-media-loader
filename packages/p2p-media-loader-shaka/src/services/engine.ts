@@ -112,15 +112,6 @@ export class Engine {
       const stream = this.segmentManager.getStreamBySegmentLocalId(segmentId);
       this.debug(`Loading segment with id: ${segmentId}`);
       this.debug(`Stream id: ${stream?.id}`);
-
-      const type = "video";
-
-      if (stream?.type === type) {
-        const segment = stream?.segments.get(segmentId);
-        console.log(url);
-        console.log(stream?.id, segment?.index, segment?.byteRange);
-        console.log("");
-      }
     }
 
     return result;

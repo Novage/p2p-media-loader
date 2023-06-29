@@ -81,7 +81,7 @@ export class Segment {
     byteRange?: Partial<ByteRange>
   ) {
     if (!byteRange || !byteRange.start) return segmentRequestUrl;
-    return `${segmentRequestUrl}|${byteRange.start}-${byteRange.end ?? ""}`;
+    return `${segmentRequestUrl}|${byteRange.start}-${byteRange.end}`;
   }
 
   static getByteRange(
@@ -111,7 +111,7 @@ export class Segment {
 
 type SegmentType = "video" | "audio" | "unknown";
 
-export type ByteRange = { start: number; end?: number };
+export type ByteRange = { start: number; end: number };
 
 function getUrlWithoutParameters(url: string) {
   return url.split("?")[0];

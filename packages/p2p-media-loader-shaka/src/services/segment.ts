@@ -23,7 +23,14 @@ export class Segment {
     this.url = url;
     this.streamLocalId = streamLocalId;
     this.index = index;
-    this.byteRange = byteRange;
+
+    if (
+      byteRange &&
+      byteRange.start !== undefined &&
+      byteRange.end !== undefined
+    ) {
+      this.byteRange = byteRange;
+    }
     this.localId = localId ?? Segment.getLocalId(url, byteRange);
   }
 
@@ -63,13 +70,13 @@ export class Segment {
     let range: ByteRange | undefined;
     if (typeof byteRange === "string") {
       range = Segment.getByteRangeFromHeaderString(byteRange);
-    } else {
+    } else if (byteRange.start !== undefined && byteRange.end !== undefined) {
       range = byteRange;
     }
     if (!range) return url;
 
     const { start, end } = range;
-    if (length !== undefined) return `${url}|${start}-${end ?? ""}`;
+    if (length !== undefined) return `${url}|${start}-${end}`;
     return url;
   }
 
@@ -94,7 +101,7 @@ export class Segment {
     const end = segmentReference.getEndByte() ?? undefined;
 
     return {
-      byteRange: { start, end },
+      byteRange: end !== undefined ? { start, end } : undefined,
       uri,
     };
   }
