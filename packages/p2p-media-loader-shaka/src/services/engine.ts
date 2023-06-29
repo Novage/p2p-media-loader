@@ -65,19 +65,6 @@ export class Engine {
     );
   }
 
-  private async getContent(
-    request: shaka.extern.IAbortableOperation<any>
-  ): Promise<{
-    content: string;
-    responseUrl: string;
-  }> {
-    const response = await request.promise;
-    return {
-      content: new TextDecoder().decode(response.data),
-      responseUrl: response.uri,
-    };
-  }
-
   private processNetworkRequest: shaka.extern.SchemePlugin = (
     url,
     request,
