@@ -4,9 +4,9 @@ import {
   DashManifestParser,
 } from "./manifest-parser-decorator";
 import { SegmentManager } from "./segment-manager";
-import { Segment } from "./segment";
 import Debug from "debug";
 import { StreamInfo, StreamProtocol } from "../types/types";
+import { getLoadingHandler } from "./loading-handler";
 
 export class Engine {
   private player!: shaka.Player;
@@ -53,53 +53,12 @@ export class Engine {
   }
 
   private initializeNetworkingEngine() {
-    shaka.net.NetworkingEngine.registerScheme(
-      "http",
-      this.processNetworkRequest
+    const loadingHandler = getLoadingHandler(
+      this.segmentManager,
+      this.streamInfo,
+      this.debug
     );
-    shaka.net.NetworkingEngine.registerScheme(
-      "https",
-      this.processNetworkRequest
-    );
+    shaka.net.NetworkingEngine.registerScheme("http", loadingHandler);
+    shaka.net.NetworkingEngine.registerScheme("https", loadingHandler);
   }
-
-  private processNetworkRequest: shaka.extern.SchemePlugin = (
-    url,
-    request,
-    requestType,
-    progressUpdated,
-    receivedHeaders
-  ) => {
-    const xhrPlugin = shaka.net.HttpFetchPlugin;
-    const result = xhrPlugin.parse(
-      url,
-      request,
-      requestType,
-      progressUpdated,
-      receivedHeaders
-    );
-    if (requestType === shaka.net.NetworkingEngine.RequestType.MANIFEST) {
-      if (
-        this.streamInfo.protocol === "hls" &&
-        this.segmentManager.urlStreamMap.has(url)
-      ) {
-        (async () => {
-          await result.promise;
-          //Waiting for playlist is parsed
-          await new Promise((res) => setTimeout(res, 0));
-          this.segmentManager.updateHLSStreamByUrl(url);
-        })();
-      }
-    }
-    if (requestType === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
-      const segmentId = Segment.getLocalId(url, request.headers.Range);
-      const stream = this.segmentManager.getStreamBySegmentLocalId(segmentId);
-      const segment = stream?.segments.get(segmentId);
-      this.debug(`\n\nLoading segment with id: ${segmentId}`);
-      this.debug(`Stream id: ${stream?.id}`);
-      this.debug(`Segment: ${segment?.index}`);
-    }
-
-    return result;
-  };
 }

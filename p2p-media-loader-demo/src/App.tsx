@@ -53,7 +53,8 @@ function App() {
       setPlayerType("dplayer");
     }
     let player: DPlayer | Hls;
-    const url = videoUrl.advancedVideo2;
+    // const url = videoUrl.live2;
+    const url = videoUrl.live;
 
     switch (playerType) {
       case "dplayer": {
@@ -74,6 +75,7 @@ function App() {
             },
           },
         });
+        (window as unknown as ExtendedWindow).player = player;
         break;
       }
       case "shaka-dplayer":
@@ -121,6 +123,7 @@ function App() {
           hls.loadSource(url);
           hls.attachMedia(videoRef.current);
           player = hls;
+          (window as unknown as ExtendedWindow).player = player;
         }
         break;
     }
