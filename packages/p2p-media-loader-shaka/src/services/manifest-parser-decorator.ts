@@ -117,7 +117,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
           firstItemReference = references[0];
           lastItemReference = references[references.length - 1];
         } catch (err) {
-          //For situations when segmentIndex is not iterable (inner array length is 0)
+          // For situations when segmentIndex is not iterable (inner array length is 0)
           segmentIndex.get = getOriginal;
           return reference;
         }
@@ -145,7 +145,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   private retrieveStreamMediaSequenceTimeMaps(
     variants: shaka.extern.Variant[]
   ) {
-    //For version 4.3
+    // For version 4.3
     const manifestProperties = Object.values(this.originalManifestParser);
     let videoMap: Map<number, number> | undefined = undefined;
     let audioMap: Map<number, number> | undefined = undefined;
@@ -202,7 +202,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       }
       if (!retrieveMediaSequenceMaps) break;
 
-      //For version 4.2; Retrieving mediaSequence map for each of HLS playlists
+      // For version 4.2; Retrieving mediaSequence map for each of HLS playlists
       for (const variant of manifestVariantMapValues) {
         const variantProps = Object.values(variant);
         const mediaSequenceTimeMap = variantProps.find((p) => p instanceof Map);
@@ -217,7 +217,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       break;
     }
 
-    //Retrieve HLS playlists urls
+    // Retrieve HLS playlists urls
     for (const variant of manifestVariantMapValues) {
       const variantProps = Object.values(variant) as unknown[];
       let streamUrl = "";
