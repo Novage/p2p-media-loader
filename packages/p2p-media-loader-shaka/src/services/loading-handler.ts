@@ -24,9 +24,8 @@ export function getLoadingHandler(
       ) {
         (async () => {
           await result.promise;
-          //Waiting for playlist is parsed
-          await new Promise((res) => setTimeout(res, 0));
-          segmentManager.updateHLSStreamByUrl(url);
+          // Waiting for the playlist to be parsed
+          setTimeout(() => segmentManager.updateHLSStreamByUrl(url), 0);
         })();
       }
     }
