@@ -7,6 +7,7 @@ import shaka from "shaka-player";
 import muxjs from "mux.js";
 
 window.muxjs = muxjs;
+type ExtendedWindow = Window & { player: object };
 
 const videoUrl = {
   bigBunnyBuck: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
@@ -44,7 +45,9 @@ function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    if (!Hls.isSupported() || (window as any).player) return;
+    if (!Hls.isSupported() || (window as unknown as ExtendedWindow).player) {
+      return;
+    }
     if (!localStorage.player) {
       localStorage.player = "dplayer";
       setPlayerType("dplayer");
@@ -87,6 +90,7 @@ function App() {
                 const src = video.src;
                 const shakaPlayer = new shaka.Player(video);
                 const onError = function (error: { code: number }) {
+                  // eslint-disable-next-line no-console
                   console.error(
                     "Error code",
                     error.toString(),
@@ -94,16 +98,19 @@ function App() {
                     error
                   );
                 };
-                shakaPlayer.addEventListener("error", (event: any) => {
-                  onError(event);
-                });
+                shakaPlayer.addEventListener(
+                  "error",
+                  (event: { code: number }) => {
+                    onError(event);
+                  }
+                );
                 engine.initShakaPlayer(shakaPlayer);
                 shakaPlayer.load(src).catch(onError);
               },
             },
           },
         });
-        (window as any).player = player;
+        (window as unknown as ExtendedWindow).player = player;
         break;
       case "hlsjs":
         if (videoRef.current) {
