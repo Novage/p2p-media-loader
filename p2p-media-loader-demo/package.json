@@ -18,7 +18,7 @@
     "p2p-media-loader-shaka": "workspace:*",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "shaka-player": "^4.3.6"
+    "shaka-player": "^4.3.7"
   },
   "devDependencies": {
     "@types/dplayer": "^1.25.2",

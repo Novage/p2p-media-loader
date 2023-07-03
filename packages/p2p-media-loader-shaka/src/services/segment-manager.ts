@@ -6,14 +6,6 @@ export class SegmentManager {
   readonly streams: Map<number, Stream> = new Map();
   readonly urlStreamMap: Map<string, Stream> = new Map();
   readonly streamInfo: StreamInfo;
-  readonly firstMediaSequence: { audio?: number; video?: number } = {};
-  mediaSequenceTimeMap: {
-    video: Map<number, number>;
-    audio: Map<number, number>;
-  } = {
-    video: new Map(),
-    audio: new Map(),
-  };
 
   constructor(streamInfo: StreamInfo) {
     this.streamInfo = streamInfo;
@@ -119,8 +111,7 @@ export class SegmentManager {
   ) {
     const segments = [...managerStream.segments.values()];
     const stream = managerStream.shakaStream;
-    const streamType = stream.type as StreamType;
-    const lastMediaSequence = this.getLastMediaSequence(streamType);
+    const lastMediaSequence = managerStream.getLastMediaSequence();
 
     if (segments.length === 0) {
       const firstMediaSequence =
@@ -165,22 +156,6 @@ export class SegmentManager {
     for (let i = 0; i < deleteCount; i++) {
       const segment = segments[i];
       managerStream.segments.delete(segment.localId);
-    }
-  }
-
-  private getLastMediaSequence(streamType: StreamType) {
-    const map =
-      streamType === "video"
-        ? this.mediaSequenceTimeMap.video
-        : this.mediaSequenceTimeMap.audio;
-
-    let firstMediaSequence = this.firstMediaSequence[streamType];
-    if (firstMediaSequence !== undefined) {
-      return firstMediaSequence + map.size - 1;
-    } else if (map.size) {
-      firstMediaSequence = [...map.keys()][0];
-      this.firstMediaSequence[streamType] = firstMediaSequence;
-      return firstMediaSequence + map.size - 1;
     }
   }
 }

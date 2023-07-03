@@ -1,4 +1,4 @@
-import { ByteRange, StreamType } from "../types/types";
+import { ByteRange, HookedStream, StreamType } from "../types/types";
 
 export class Segment {
   streamLocalId: number;
@@ -112,8 +112,9 @@ export class Stream {
   localId: number;
   type: StreamType;
   segments: Map<string, Segment> = new Map();
-  shakaStream: shaka.extern.Stream;
+  shakaStream: HookedStream;
   url?: string;
+  firstMediaSequence?: number;
 
   constructor({
     localId,
@@ -135,5 +136,19 @@ export class Stream {
     this.id = `${manifestUrl}-${type}-V${order}`;
     this.url = url;
     this.shakaStream = shakaStream;
+  }
+
+  getLastMediaSequence() {
+    const map =
+      this.shakaStream.mediaSequenceTimeMap ?? new Map<number, number>();
+
+    let firstMediaSequence = this.firstMediaSequence;
+    if (firstMediaSequence !== undefined) {
+      return firstMediaSequence + map.size - 1;
+    } else if (map.size) {
+      firstMediaSequence = [...map.keys()][0];
+      this.firstMediaSequence = firstMediaSequence;
+      return firstMediaSequence + map.size - 1;
+    }
   }
 }

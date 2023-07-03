@@ -10,9 +10,7 @@ import { StreamInfo, StreamProtocol } from "../types/types";
 
 export class Engine {
   private player!: shaka.Player;
-  private readonly streamInfo: StreamInfo = {
-    mediaSequence: { video: 0, audio: 0 },
-  };
+  private readonly streamInfo: StreamInfo = {};
 
   private readonly segmentManager: SegmentManager = new SegmentManager(
     this.streamInfo
@@ -72,7 +70,7 @@ export class Engine {
     progressUpdated,
     receivedHeaders
   ) => {
-    const xhrPlugin = shaka.net.HttpXHRPlugin;
+    const xhrPlugin = shaka.net.HttpFetchPlugin;
     const result = xhrPlugin.parse(
       url,
       request,
@@ -81,7 +79,6 @@ export class Engine {
       receivedHeaders
     );
     if (requestType === shaka.net.NetworkingEngine.RequestType.MANIFEST) {
-      this.debug("Manifest is loading");
       if (
         this.streamInfo.protocol === "hls" &&
         this.segmentManager.urlStreamMap.has(url)
@@ -97,8 +94,10 @@ export class Engine {
     if (requestType === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
       const segmentId = Segment.getLocalId(url, request.headers.Range);
       const stream = this.segmentManager.getStreamBySegmentLocalId(segmentId);
-      this.debug(`Loading segment with id: ${segmentId}`);
+      const segment = stream?.segments.get(segmentId);
+      this.debug(`\n\nLoading segment with id: ${segmentId}`);
       this.debug(`Stream id: ${stream?.id}`);
+      this.debug(`Segment: ${segment?.index}`);
     }
 
     return result;

@@ -29,6 +29,7 @@ const videoUrl = {
     "https://livesim.dashif.org/livesim/testpic_2s/Manifest.mpd",
   hlsAkamaiLive:
     "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8",
+  mss: "https://playready.directtaps.net/smoothstreaming/SSWSS720H264/SuperSpeedway_720.ism/Manifest",
 };
 
 const players = ["hlsjs", "dplayer", "shaka-dplayer"] as const;
@@ -49,7 +50,7 @@ function App() {
       setPlayerType("dplayer");
     }
     let player: DPlayer | Hls;
-    const url = videoUrl.live2;
+    const url = videoUrl.advancedVideo2;
 
     switch (playerType) {
       case "dplayer": {
@@ -86,7 +87,12 @@ function App() {
                 const src = video.src;
                 const shakaPlayer = new shaka.Player(video);
                 const onError = function (error: { code: number }) {
-                  console.error("Error code", error.code, "object", error);
+                  console.error(
+                    "Error code",
+                    error.toString(),
+                    "object",
+                    error
+                  );
                 };
                 shakaPlayer.addEventListener("error", (event: any) => {
                   onError(event);

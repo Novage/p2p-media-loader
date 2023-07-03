@@ -19,12 +19,6 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
 
     this.isHLS = protocol === "hls";
     this.isDash = protocol === "dash";
-
-    if (this.isHLS) {
-      const { video, audio } = this.getStreamMediaSequenceTimeMaps();
-      this.segmentManager.mediaSequenceTimeMap.video = video;
-      this.segmentManager.mediaSequenceTimeMap.audio = audio;
-    }
   }
 
   configure(config: shaka.extern.ManifestConfiguration) {
@@ -40,7 +34,12 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       playerInterface
     );
     this.segmentManager.setManifestUrl(uri);
-    if (this.isHLS) this.hookStreamUrls();
+    if (this.isHLS) {
+      const success = this.retrieveStreamMediaSequenceTimeMaps(
+        manifest.variants
+      );
+      this.retrieveStreamUrls(!success);
+    }
     this.processStreams(manifest.variants);
 
     return manifest;
@@ -63,28 +62,30 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
 
   private processStreams(variants: shaka.extern.Variant[]) {
     const processedStreams = new Set<number>();
+
+    const processStream = (
+      stream: shaka.extern.Stream | null,
+      count: number
+    ) => {
+      if (!stream || processedStreams.has(stream.id)) return false;
+      if (this.isDash) this.hookSegmentIndex(stream);
+      this.segmentManager.setStream({
+        stream: stream as HookedStream,
+        streamOrder: count,
+      });
+      if (stream.segmentIndex) {
+        this.segmentManager.updateStream({ stream });
+      }
+      processedStreams.add(stream.id);
+      return true;
+    };
+
     let videoCount = 0;
     let audioCount = 0;
     for (const variant of variants) {
       const { video, audio } = variant;
-      if (video && !processedStreams.has(video.id)) {
-        if (this.isDash) this.hookSegmentIndex(video);
-        this.segmentManager.setStream({
-          stream: video as HookedStream,
-          streamOrder: videoCount,
-        });
-        processedStreams.add(video.id);
-        videoCount++;
-      }
-      if (audio && !processedStreams.has(audio.id)) {
-        if (this.isDash) this.hookSegmentIndex(audio);
-        this.segmentManager.setStream({
-          stream: audio,
-          streamOrder: audioCount,
-        });
-        processedStreams.add(audio.id);
-        audioCount++;
-      }
+      if (processStream(video, videoCount)) videoCount++;
+      if (processStream(audio, audioCount)) audioCount++;
     }
   }
 
@@ -117,9 +118,9 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
           lastItemReference = references[references.length - 1];
         } catch (err) {
           //For situations when segmentIndex is not iterable (inner array length is 0)
+          segmentIndex.get = getOriginal;
           return reference;
         }
-
         if (
           firstItemReference !== prevFirstItemReference ||
           lastItemReference !== prevLastItemReference
@@ -141,59 +142,92 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     };
   }
 
-  private getStreamMediaSequenceTimeMaps() {
-    const properties = Object.values(this.originalManifestParser);
-    let video: Map<number, number> = new Map();
-    let audio: Map<number, number> = new Map();
+  private retrieveStreamMediaSequenceTimeMaps(
+    variants: shaka.extern.Variant[]
+  ) {
+    //For version 4.3
+    const manifestProperties = Object.values(this.originalManifestParser);
+    let videoMap: Map<number, number> | undefined = undefined;
+    let audioMap: Map<number, number> | undefined = undefined;
 
-    for (const property of properties) {
-      if (typeof property === "object" && property instanceof Map) {
-        const keys = Array.from(property.keys());
+    for (const manifestProp of manifestProperties) {
+      if (typeof manifestProp === "object" && manifestProp instanceof Map) {
+        const mapKeys = Array.from(manifestProp.keys());
         if (
-          ["video", "audio", "text", "image"].every((i) => keys.includes(i))
+          ["video", "audio", "text", "image"].every((i) => mapKeys.includes(i))
         ) {
-          video = property.get("video");
-          audio = property.get("audio");
+          videoMap = manifestProp.get("video");
+          audioMap = manifestProp.get("audio");
           break;
         }
       }
     }
 
-    return { video, audio };
+    if (!videoMap && !audioMap) return false;
+
+    for (const variant of variants) {
+      const { video: videoStream, audio: audioStream } = variant;
+      if (videoStream && videoMap) {
+        (videoStream as HookedStream).mediaSequenceTimeMap = videoMap;
+      }
+      if (audioStream && audioMap) {
+        (audioStream as HookedStream).mediaSequenceTimeMap = videoMap;
+      }
+    }
+
+    return true;
   }
 
-  private hookStreamUrls() {
-    const properties = Object.values(this.originalManifestParser);
+  private retrieveStreamUrls(retrieveMediaSequenceMaps: boolean) {
+    const manifestProperties = Object.values(this.originalManifestParser);
 
-    let objects: {
-      type: string;
-      stream: { createSegmentIndex: () => void; streamUrl?: string };
+    let manifestVariantMapValues: {
+      stream: {
+        createSegmentIndex: () => void;
+        type: string;
+        streamUrl?: string;
+        mediaSequenceTimeMap?: Map<number, number>;
+      };
+      [key: string]: unknown;
     }[] = [];
-    for (const property of properties) {
-      if (typeof property === "object" && property instanceof Map) {
-        objects = Array.from(property.values());
-        const [object] = objects;
-        if (
-          typeof object === "object" &&
-          typeof object.type === "string" &&
-          !!object.stream?.createSegmentIndex
-        ) {
-          break;
-        }
+    for (const manifestProp of manifestProperties) {
+      if (typeof manifestProp !== "object" || !(manifestProp instanceof Map)) {
+        continue;
       }
+
+      manifestVariantMapValues = Array.from(manifestProp.values());
+      const [value] = manifestVariantMapValues;
+      if (typeof value !== "object" || !value.stream?.createSegmentIndex) {
+        continue;
+      }
+      if (!retrieveMediaSequenceMaps) break;
+
+      //For version 4.2; Retrieving mediaSequence map for each of HLS playlists
+      for (const variant of manifestVariantMapValues) {
+        const variantProps = Object.values(variant);
+        const mediaSequenceTimeMap = variantProps.find((p) => p instanceof Map);
+        if (!mediaSequenceTimeMap || variant.stream.mediaSequenceTimeMap) {
+          continue;
+        }
+        variant.stream.mediaSequenceTimeMap = mediaSequenceTimeMap as Map<
+          number,
+          number
+        >;
+      }
+      break;
     }
 
-    for (const obj of objects) {
-      const stream = obj.stream;
-      const properties = Object.values(obj);
+    //Retrieve HLS playlists urls
+    for (const variant of manifestVariantMapValues) {
+      const variantProps = Object.values(variant) as unknown[];
       let streamUrl = "";
-      for (const property of properties) {
+      for (const property of variantProps) {
         if (typeof property === "string" && property.startsWith("http")) {
           streamUrl = property;
         }
       }
 
-      stream.streamUrl = streamUrl;
+      variant.stream.streamUrl = streamUrl;
     }
   }
 }
