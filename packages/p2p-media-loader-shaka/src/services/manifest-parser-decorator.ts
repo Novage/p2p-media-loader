@@ -1,6 +1,6 @@
 import { SegmentManager } from "./segment-manager";
 import Debug from "debug";
-import { HookedStream, StreamProtocol } from "../types/types";
+import { HookedStream, StreamProtocol, Shaka } from "../types/types";
 
 export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   private readonly originalManifestParser: shaka.extern.ManifestParser;
@@ -234,6 +234,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
 
 export class HlsManifestParser extends ManifestParserDecorator {
   public constructor(
+    shaka: Shaka,
     segmentManager: SegmentManager,
     setProtocol: (protocol: StreamProtocol) => void
   ) {
@@ -244,6 +245,7 @@ export class HlsManifestParser extends ManifestParserDecorator {
 
 export class DashManifestParser extends ManifestParserDecorator {
   public constructor(
+    shaka: Shaka,
     segmentsManager: SegmentManager,
     setProtocol: (protocol: StreamProtocol) => void
   ) {

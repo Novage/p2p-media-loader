@@ -35,7 +35,6 @@ const videoUrl = {
 
 const players = ["hlsjs", "dplayer", "shaka-dplayer"] as const;
 type Player = (typeof players)[number];
-self.shaka = shaka;
 
 function App() {
   const [playerType, setPlayerType] = useState<Player | undefined>(
@@ -87,7 +86,7 @@ function App() {
             type: "customHlsOrDash",
             customType: {
               customHlsOrDash: (video: HTMLVideoElement) => {
-                const engine = new ShakaEngine();
+                const engine = new ShakaEngine(shaka);
 
                 const src = video.src;
                 const shakaPlayer = new shaka.Player(video);

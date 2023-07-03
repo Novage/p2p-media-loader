@@ -5,10 +5,11 @@ import {
 } from "./manifest-parser-decorator";
 import { SegmentManager } from "./segment-manager";
 import Debug from "debug";
-import { StreamInfo, StreamProtocol } from "../types/types";
+import { StreamInfo, StreamProtocol, Shaka } from "../types/types";
 import { getLoadingHandler } from "./loading-handler";
 
 export class Engine {
+  private readonly shaka: Shaka;
   private player!: shaka.Player;
   private readonly streamInfo: StreamInfo = {};
 
@@ -16,6 +17,10 @@ export class Engine {
     this.streamInfo
   );
   private debug = Debug("p2pml-shaka:engine");
+
+  constructor(shaka?: Shaka) {
+    this.shaka = shaka ?? window.shaka;
+  }
 
   initShakaPlayer(player: shaka.Player) {
     this.player = player;
@@ -27,26 +32,26 @@ export class Engine {
     const setProtocol = (protocol: StreamProtocol) =>
       (this.streamInfo.protocol = protocol);
     const hlsParserFactory = () =>
-      new HlsManifestParser(this.segmentManager, setProtocol);
+      new HlsManifestParser(this.shaka, this.segmentManager, setProtocol);
     const dashParserFactory = () =>
-      new DashManifestParser(this.segmentManager, setProtocol);
-    shaka.media.ManifestParser.registerParserByExtension(
+      new DashManifestParser(this.shaka, this.segmentManager, setProtocol);
+    this.shaka.media.ManifestParser.registerParserByExtension(
       "mpd",
       dashParserFactory
     );
-    shaka.media.ManifestParser.registerParserByMime(
+    this.shaka.media.ManifestParser.registerParserByMime(
       "application/dash+xml",
       dashParserFactory
     );
-    shaka.media.ManifestParser.registerParserByExtension(
+    this.shaka.media.ManifestParser.registerParserByExtension(
       "m3u8",
       hlsParserFactory
     );
-    shaka.media.ManifestParser.registerParserByMime(
+    this.shaka.media.ManifestParser.registerParserByMime(
       "application/x-mpegurl",
       hlsParserFactory
     );
-    shaka.media.ManifestParser.registerParserByMime(
+    this.shaka.media.ManifestParser.registerParserByMime(
       "application/vnd.apple.mpegurl",
       hlsParserFactory
     );
@@ -54,11 +59,12 @@ export class Engine {
 
   private initializeNetworkingEngine() {
     const loadingHandler = getLoadingHandler(
+      this.shaka,
       this.segmentManager,
       this.streamInfo,
       this.debug
     );
-    shaka.net.NetworkingEngine.registerScheme("http", loadingHandler);
-    shaka.net.NetworkingEngine.registerScheme("https", loadingHandler);
+    this.shaka.net.NetworkingEngine.registerScheme("http", loadingHandler);
+    this.shaka.net.NetworkingEngine.registerScheme("https", loadingHandler);
   }
 }

@@ -2,8 +2,10 @@ import { Segment } from "./segment";
 import { SegmentManager } from "./segment-manager";
 import { StreamInfo } from "../types/types";
 import { Debugger } from "debug";
+import { Shaka } from "../types/types";
 
 export function getLoadingHandler(
+  shaka: Shaka,
   segmentManager: SegmentManager,
   streamInfo: StreamInfo,
   debug: Debugger
