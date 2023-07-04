@@ -1,2 +1,2 @@
-declare module "shaka-player";
 declare module "mux.js";
+// declare module "shaka-player";

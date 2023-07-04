@@ -1,4 +1,5 @@
-import type { HlsConfig } from "hls.js";
+import type Hls from "hls.js";
+import type { HlsConfig, Events } from "hls.js";
 import { PlaylistLoaderBase } from "./playlist-loader";
 import { FragmentLoaderBase } from "./fragment-loader";
 import { SegmentManager } from "./segment-mananger";
@@ -15,6 +16,17 @@ export class Engine {
       pLoader: this.createPlaylistLoaderClass(),
       fLoader: this.createFragmentLoaderClass(),
     };
+  }
+
+  public initHlsEvents(hls: Hls) {
+    hls.on("hlsManifestLoading" as Events.MANIFEST_LOADING, (event) => {
+      console.log(event);
+      console.log(this.segmentManager);
+    });
+    hls.on("hlsDestroying" as Events.DESTROYING, (event) => {
+      console.log(event);
+      this.segmentManager = new SegmentManager();
+    });
   }
 
   private createPlaylistLoaderClass() {
