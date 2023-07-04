@@ -28,7 +28,6 @@
   },
   "dependencies": {
     "hls.js": "^1.4.5",
-    "m3u8-parser": "^6.2.0",
     "p2p-media-loader-core": "workspace:*"
   }
 }
