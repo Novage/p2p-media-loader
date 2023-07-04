@@ -47,7 +47,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
           "downloaded segment from playlist\n",
           `playlist v: ${playlist?.index}\n`,
           `segment: `,
-          playlist?.segmentsMap.get(segmentId)?.sequence
+          playlist?.segments.get(segmentId)?.index
         );
 
         return callbacks.onSuccess(response, stats, context, networkDetails);

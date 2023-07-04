@@ -52,7 +52,6 @@ function App() {
       setPlayerType("dplayer");
     }
     let player: DPlayer | Hls;
-    // const url = videoUrl.live2;
     const url = videoUrl.live;
 
     switch (playerType) {
@@ -68,6 +67,7 @@ function App() {
                 const hls = new Hls({
                   ...engine.getConfig(),
                 });
+                engine.initHlsJsEvents(hls);
                 hls.loadSource(video.src);
                 hls.attachMedia(video);
               },

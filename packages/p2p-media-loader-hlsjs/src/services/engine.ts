@@ -1,5 +1,5 @@
-import type { HlsConfig } from "hls.js";
-import { PlaylistLoaderBase } from "./playlist-loader";
+import type Hls from "hls.js";
+import type { HlsConfig, Events } from "hls.js";
 import { FragmentLoaderBase } from "./fragment-loader";
 import { SegmentManager } from "./segment-mananger";
 
@@ -10,27 +10,20 @@ export class Engine {
     this.segmentManager = new SegmentManager();
   }
 
-  public getConfig(): Pick<HlsConfig, "pLoader" | "fLoader"> {
+  public getConfig(): Pick<HlsConfig, "fLoader"> {
     return {
-      pLoader: this.createPlaylistLoaderClass(),
       fLoader: this.createFragmentLoaderClass(),
     };
   }
 
-  private createPlaylistLoaderClass() {
-    const segmentManager = this.segmentManager;
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const engine = this;
+  public initHlsJsEvents(hls: Hls) {
+    hls.on("hlsManifestLoaded" as Events.MANIFEST_LOADED, (event, data) => {
+      this.segmentManager.processMasterManifest(data);
+    });
 
-    return class PlaylistLoader extends PlaylistLoaderBase {
-      constructor(config: HlsConfig) {
-        super(config, segmentManager);
-      }
-
-      static getEngine() {
-        return engine;
-      }
-    };
+    hls.on("hlsLevelLoaded" as Events.LEVEL_LOADED, (event, data) => {
+      this.segmentManager.setPlaylist(data);
+    });
   }
 
   private createFragmentLoaderClass() {
