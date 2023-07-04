@@ -35,22 +35,24 @@ export class Segment {
     segmentUrl,
     index,
     byteRange,
+    localId,
   }: {
     segmentUrl: string;
     index: number;
     byteRange?: ByteRange;
+    localId?: string;
   }) {
     this.index = index;
-    this.localId = byteRange
-      ? `${segmentUrl}|${byteRange.start}-${byteRange.end}`
-      : segmentUrl;
+    this.localId = localId ?? Segment.getSegmentLocalId(segmentUrl, byteRange);
   }
 
   static getSegmentLocalId(
     segmentRequestUrl: string,
     byteRange?: Partial<ByteRange>
   ) {
-    if (!byteRange || !byteRange.start) return segmentRequestUrl;
+    if (!byteRange || !byteRange.start || !byteRange.end) {
+      return segmentRequestUrl;
+    }
     return `${segmentRequestUrl}|${byteRange.start}-${byteRange.end}`;
   }
 }
