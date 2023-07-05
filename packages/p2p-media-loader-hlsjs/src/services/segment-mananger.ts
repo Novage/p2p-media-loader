@@ -1,66 +1,62 @@
-import { MasterManifest, Parser } from "m3u8-parser";
-import * as ManifestUtil from "./manifest-util";
-import { Playlist } from "./playlist";
+import { Playlist, Segment } from "./playlist";
+import type { LevelLoadedData, ManifestLoadedData } from "hls.js";
 
 export class SegmentManager {
-  manifestUrl?: { request: string; response: string };
-  manifest?: MasterManifest;
+  isLive?: boolean;
   playlists: Map<string, Playlist> = new Map();
-
-  processPlaylist(content: string, requestUrl: string, responseUrl: string) {
-    const parser = new Parser();
-    parser.push(content);
-    parser.end();
-
-    const { manifest } = parser;
-    if (ManifestUtil.isMasterManifest(manifest)) {
-      this.manifestUrl = { request: requestUrl, response: responseUrl };
-      this.manifest = manifest;
-      const playlists = [
-        ...ManifestUtil.getVideoPlaylistsFromMasterManifest(
-          this.manifestUrl,
-          manifest
-        ),
-        ...ManifestUtil.getAudioPlaylistsFromMasterManifest(
-          this.manifestUrl,
-          manifest
-        ),
-      ];
-
-      playlists.forEach((p) => {
-        const playlist = this.playlists.get(p.requestUrl);
-        if (!playlist) {
-          this.playlists.set(p.requestUrl, p);
-        } else {
-          p.segmentsMap = playlist.segmentsMap;
-          p.sequence = playlist.sequence;
-          this.playlists.set(p.requestUrl, p);
-        }
-      });
-    } else if (ManifestUtil.isPlaylistManifest(manifest)) {
-      const { segments } = manifest;
-      const mediaSequence = manifest.mediaSequence || 1;
-      let playlist = this.playlists.get(requestUrl);
-
-      if (!playlist && !this.manifest) {
-        playlist = new Playlist({
-          type: "unknown",
-          url: requestUrl,
-          sequence: mediaSequence,
-          index: -1,
-        });
-        this.playlists.set(requestUrl, playlist);
-      }
-
-      if (playlist) {
-        playlist.setSegments(responseUrl, mediaSequence, segments);
-      }
-    }
-  }
 
   getPlaylistBySegmentId(segmentId: string): Playlist | undefined {
     for (const playlist of this.playlists.values()) {
-      if (playlist.segmentsMap.has(segmentId)) return playlist;
+      if (playlist.segments.has(segmentId)) return playlist;
     }
+  }
+
+  processMasterManifest(data: ManifestLoadedData) {
+    const { levels, audioTracks, url } = data;
+    levels.forEach((level, index) => {
+      if (this.playlists.has(level.url)) return;
+      this.playlists.set(
+        level.url,
+        new Playlist({ type: "video", index, masterManifestUrl: url })
+      );
+    });
+
+    audioTracks.forEach((track, index) => {
+      if (this.playlists.has(track.url)) return;
+      this.playlists.set(
+        track.url,
+        new Playlist({ type: "audio", index, masterManifestUrl: url })
+      );
+    });
+  }
+
+  setPlaylist(data: LevelLoadedData) {
+    const {
+      details: { url, fragments, live },
+    } = data;
+    const playlist = this.playlists.get(url);
+    if (!playlist) return;
+
+    this.isLive = live;
+
+    const segmentToRemoveIds = new Set(playlist.segments.keys());
+    fragments.forEach((fragment, index) => {
+      const { url, byteRange, sn } = fragment;
+      if (sn === "initSegment") return;
+
+      const [start, end] = byteRange;
+      const segmentLocalId = Segment.getSegmentLocalId(url, { start, end });
+      segmentToRemoveIds.delete(segmentLocalId);
+
+      if (playlist.segments.has(segmentLocalId)) return;
+      const segment = new Segment({
+        segmentUrl: url,
+        index: live ? sn : index,
+        ...(start && end ? { byteRange: { start, end } } : {}),
+      });
+      playlist.segments.set(segment.localId, segment);
+    });
+
+    segmentToRemoveIds.forEach((value) => playlist.segments.delete(value));
   }
 }
