@@ -89,9 +89,6 @@ importers:
       hls.js:
         specifier: ^1.4.5
         version: 1.4.5
-      m3u8-parser:
-        specifier: ^6.2.0
-        version: 6.2.0
       p2p-media-loader-core:
         specifier: workspace:*
         version: link:../p2p-media-loader-core
@@ -844,15 +841,6 @@ packages:
       '@typescript-eslint/types': 5.59.2
       eslint-visitor-keys: 3.4.1
     dev: true
-
-  /@videojs/vhs-utils@3.0.5:
-    resolution: {integrity: sha512-PKVgdo8/GReqdx512F+ombhS+Bzogiofy1LgAj4tN8PfdBx3HSS7V5WfJotKTqtOWGwVfSWsrYN/t09/DSryrw==}
-    engines: {node: '>=8', npm: '>=5'}
-    dependencies:
-      '@babel/runtime': 7.22.5
-      global: 4.4.0
-      url-toolkit: 2.2.5
-    dev: false
 
   /@vitejs/plugin-react@4.0.0(vite@4.3.2):
     resolution: {integrity: sha512-HX0XzMjL3hhOYm+0s95pb0Z7F8O81G7joUHgfDd/9J/ZZf5k4xX6QAMFkKsHFxaHlf6X7GD7+XuaZ66ULiJuhQ==}
@@ -1658,14 +1646,6 @@ packages:
     engines: {node: 14 || >=16.14}
     dev: true
 
-  /m3u8-parser@6.2.0:
-    resolution: {integrity: sha512-qlC00JTxYOxawcqg+RB8jbyNwL3foY/nCY61kyWP+RCuJE9APLeqB/nSlTjb4Mg0yRmyERgjswpdQxMvkeoDrg==}
-    dependencies:
-      '@babel/runtime': 7.22.5
-      '@videojs/vhs-utils': 3.0.5
-      global: 4.4.0
-    dev: false
-
   /merge2@1.4.1:
     resolution: {integrity: sha512-8q7VEgMJW4J8tcfVPy8g09NcQwZdbwFEqhe/WZkoIzjn/3TGDwtOCYtXGxA3O8tPzpczCCDgv+P2P5y00ZJOOg==}
     engines: {node: '>= 8'}
@@ -2103,10 +2083,6 @@ packages:
     dependencies:
       punycode: 2.3.0
     dev: true
-
-  /url-toolkit@2.2.5:
-    resolution: {integrity: sha512-mtN6xk+Nac+oyJ/PrI7tzfmomRVNFIWKUbG8jdYFt52hxbiReFAXIjYskvu64/dvuW71IcB7lV8l0HvZMac6Jg==}
-    dev: false
 
   /vite@4.3.2:
     resolution: {integrity: sha512-9R53Mf+TBoXCYejcL+qFbZde+eZveQLDYd9XgULILLC1a5ZwPaqgmdVpL8/uvw2BM/1TzetWjglwm+3RO+xTyw==}

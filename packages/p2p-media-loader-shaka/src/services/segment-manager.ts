@@ -122,7 +122,7 @@ export class SegmentManager {
     if (segments.length === 0) {
       const firstMediaSequence =
         lastMediaSequence === undefined
-          ? 1
+          ? 0
           : lastMediaSequence - segmentReferences.length + 1;
       segmentReferences.forEach((reference, index) => {
         const segment = Segment.create({
