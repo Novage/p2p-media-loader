@@ -4,15 +4,20 @@ import { Engine as ShakaEngine } from "p2p-media-loader-shaka";
 import Hls from "hls.js";
 import DPlayer from "dplayer";
 // @ts-ignore
-import shaka from "shaka-player";
+import shakaLib from "shaka-player";
 import muxjs from "mux.js";
 
 window.muxjs = muxjs;
 
-const players = ["hlsjs", "hls-dplayer", "shaka-dplayer"] as const;
+const players = [
+  "hlsjs",
+  "hls-dplayer",
+  "shaka-dplayer",
+  "shaka-player",
+] as const;
 type Player = (typeof players)[number];
-type ShakaPlayer = object;
-type ExtendedWindow = Window & { videoPlayer?: object };
+type ShakaPlayer = shaka.Player;
+type ExtendedWindow = Window & { videoPlayer?: { destroy?: () => void } };
 
 const videoUrl = {
   bigBunnyBuck: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
@@ -42,7 +47,9 @@ function App() {
   const [playerType, setPlayerType] = useState<Player | undefined>(
     localStorage.player
   );
-  const [engine, setEngine] = useState<HlsJsEngine | ShakaEngine>();
+  const [url, setUrl] = useState<string>(localStorage.videoUrl);
+  const shakaEngine = useRef<ShakaEngine>(new ShakaEngine(shakaLib));
+  const hlsEngine = useRef<HlsJsEngine>(new HlsJsEngine());
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -57,26 +64,33 @@ function App() {
       localStorage.player = "hls-dplayer";
       setPlayerType("hls-dplayer");
     }
-    const url = videoUrl.live;
+    if (!localStorage.videoUrl) {
+      localStorage.videoUrl = videoUrl.live2;
+      setUrl(videoUrl.live2);
+    }
 
     switch (playerType) {
       case "hls-dplayer":
         initHlsDplayer(url);
         break;
-      case "shaka-dplayer":
-        initShakaDplayer(url);
-        break;
       case "hlsjs":
         initHlsJsPlayer(url);
         break;
+      case "shaka-dplayer":
+        initShakaDplayer(url);
+        break;
+      case "shaka-player":
+        initShakaPlayer(url);
+        break;
     }
-  }, [playerType]);
+  }, [playerType, url]);
 
-  const setPlayerLocalStorage = (player: DPlayer | ShakaPlayer | Hls) => {
+  const setPlayerToWindow = (player: DPlayer | ShakaPlayer | Hls) => {
     (window as unknown as ExtendedWindow).videoPlayer = player;
   };
 
   const initShakaDplayer = (url: string) => {
+    const engine = shakaEngine.current;
     const player = new DPlayer({
       container: containerRef.current,
       video: {
@@ -84,10 +98,8 @@ function App() {
         type: "customHlsOrDash",
         customType: {
           customHlsOrDash: (video: HTMLVideoElement) => {
-            const engine = new ShakaEngine(shaka);
-
             const src = video.src;
-            const shakaPlayer = new shaka.Player(video);
+            const shakaPlayer = new shakaLib.Player(video);
             const onError = (error: { code: number }) => {
               // eslint-disable-next-line no-console
               console.error("Error code", error.toString(), "object", error);
@@ -101,28 +113,51 @@ function App() {
         },
       },
     });
-    setPlayerLocalStorage(player);
+    setPlayerToWindow(player);
+  };
+
+  const initShakaPlayer = (url: string) => {
+    if (!videoRef.current) return;
+    const engine = shakaEngine.current;
+
+    const player = new shakaLib.Player(videoRef.current);
+    const onError = (error: { code: unknown }) => {
+      // eslint-disable-next-line no-console
+      console.error("Error code", error.code, "object", error);
+    };
+    player.addEventListener("error", (event: { detail: { code: unknown } }) => {
+      onError(event.detail);
+    });
+    engine.initShakaPlayer(player);
+    player.load(url).catch(onError);
+
+    setPlayerToWindow(player);
   };
 
   const initHlsJsPlayer = (url: string) => {
     if (!videoRef.current) return;
-    const hlsEngine =
-      engine instanceof HlsJsEngine ? engine : new HlsJsEngine();
-    setEngine(hlsEngine);
+    const engine = hlsEngine.current;
     const hls = new Hls({
-      ...hlsEngine.getConfig(),
+      ...engine.getConfig(),
     });
-    hlsEngine.initHlsEvents(hls);
     hls.loadSource(url);
     hls.attachMedia(videoRef.current);
-    setPlayerLocalStorage(hls);
+    setPlayerToWindow(hls);
+
+    // setTimeout(() => {
+    //   hls.destroy();
+    //   console.log("DESTROY");
+    // }, 5000);
+    // setTimeout(() => {
+    //   if (!videoRef.current) return;
+    //   hls.loadSource(url);
+    //   hls.attachMedia(videoRef.current);
+    //   console.log("LOAD");
+    // }, 10000);
   };
 
   const initHlsDplayer = (url: string) => {
-    const hlsEngine =
-      engine && engine instanceof HlsJsEngine ? engine : new HlsJsEngine();
-    setEngine(hlsEngine);
-
+    const engine = hlsEngine.current;
     const player = new DPlayer({
       container: containerRef.current,
       video: {
@@ -131,35 +166,45 @@ function App() {
         customType: {
           customHls: (video: HTMLVideoElement) => {
             const hls = new Hls({
-              ...hlsEngine.getConfig(),
+              ...engine.getConfig(),
             });
-            hlsEngine.initHlsEvents(hls);
             hls.loadSource(video.src);
             hls.attachMedia(video);
           },
         },
       },
     });
-    setPlayerLocalStorage(player);
+    setPlayerToWindow(player);
   };
 
-  const setPlayer = (newPlayer: Player) => {
+  const destroyAndWindowPlayer = () => {
+    const extendedWindow = window as ExtendedWindow;
+    extendedWindow.videoPlayer?.destroy?.();
+    extendedWindow.videoPlayer = undefined;
+  };
+
+  const onPlayerTypeChange = (newPlayer: Player) => {
     localStorage.player = newPlayer;
     setPlayerType(newPlayer);
-    if ((window as any).videoPlayer) {
-      (window as any).videoPlayer.destroy?.();
-      (window as any).videoPlayer = undefined;
-    }
+    destroyAndWindowPlayer();
+  };
+
+  const onVideoUrlChange = (url: string) => {
+    localStorage.url = url;
+    setUrl(url);
+    destroyAndWindowPlayer();
   };
 
   return (
     <div style={{ textAlign: "center", width: 1000, margin: "auto" }}>
       <div style={{ marginBottom: 20 }}>
-        <h1>This is HLS.JS Player Demo</h1>
+        <h1>This is Demo</h1>
         <div style={{ textAlign: "start" }}>
           <select
             value={playerType}
-            onChange={(event) => setPlayer(event.target.value as Player)}
+            onChange={(event) =>
+              onPlayerTypeChange(event.target.value as Player)
+            }
           >
             {players.map((player) => {
               return (
@@ -169,8 +214,18 @@ function App() {
               );
             })}
           </select>
-          {/*<button onClick={start}>Start</button>*/}
-          {/*<button onClick={destroy}>Stop</button>*/}
+          <select
+            value={url}
+            onChange={(event) => onVideoUrlChange(event.target.value)}
+          >
+            {Object.entries(videoUrl).map(([name, url]) => {
+              return (
+                <option key={name} value={url}>
+                  {name}
+                </option>
+              );
+            })}
+          </select>
         </div>
       </div>
       <div style={{ display: "flex", justifyContent: "center" }}>
@@ -180,7 +235,9 @@ function App() {
           style={{ width: 1000 }}
         ></div>
       </div>
-      {playerType === "hlsjs" && <video ref={videoRef} controls muted></video>}
+      {!!playerType && ["hlsjs", "shaka-player"].includes(playerType) && (
+        <video ref={videoRef} controls muted style={{ width: 800 }} />
+      )}
     </div>
   );
 }
