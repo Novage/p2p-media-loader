@@ -26,6 +26,8 @@ const videoUrl = {
     "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8",
   bigBunnyBuckDash: "https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd",
   live2: "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8",
+  live2OnlyLevel4:
+    "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/level_4.m3u8",
   dashLiveWithSeparateVideoAudio:
     "https://livesim.dashif.org/livesim/testpic_2s/Manifest.mpd",
   hlsAkamaiLive:
@@ -52,7 +54,7 @@ function App() {
       setPlayerType("dplayer");
     }
     let player: DPlayer | Hls;
-    const url = videoUrl.live;
+    const url = videoUrl.live2OnlyLevel4;
 
     switch (playerType) {
       case "dplayer": {
