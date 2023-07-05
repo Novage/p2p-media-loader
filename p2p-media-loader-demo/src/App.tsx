@@ -3,11 +3,21 @@ import { Engine as HlsJsEngine } from "p2p-media-loader-hlsjs";
 import { Engine as ShakaEngine } from "p2p-media-loader-shaka";
 import Hls from "hls.js";
 import DPlayer from "dplayer";
-import shaka from "shaka-player";
+// @ts-ignore
+import shakaLib from "shaka-player";
 import muxjs from "mux.js";
 
 window.muxjs = muxjs;
-type ExtendedWindow = Window & { player: object };
+
+const players = [
+  "hlsjs",
+  "hls-dplayer",
+  "shaka-dplayer",
+  "shaka-player",
+] as const;
+type Player = (typeof players)[number];
+type ShakaPlayer = shaka.Player;
+type ExtendedWindow = Window & { videoPlayer?: { destroy?: () => void } };
 
 const videoUrl = {
   bigBunnyBuck: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
@@ -35,119 +45,176 @@ const videoUrl = {
   mss: "https://playready.directtaps.net/smoothstreaming/SSWSS720H264/SuperSpeedway_720.ism/Manifest",
 };
 
-const players = ["hlsjs", "dplayer", "shaka-dplayer"] as const;
-type Player = (typeof players)[number];
-
 function App() {
   const [playerType, setPlayerType] = useState<Player | undefined>(
     localStorage.player
   );
+  const [url, setUrl] = useState<string>(localStorage.videoUrl);
+  const shakaEngine = useRef<ShakaEngine>(new ShakaEngine(shakaLib));
+  const hlsEngine = useRef<HlsJsEngine>(new HlsJsEngine());
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    if (!Hls.isSupported() || (window as unknown as ExtendedWindow).player) {
+    if (
+      !Hls.isSupported() ||
+      (window as unknown as ExtendedWindow).videoPlayer
+    ) {
       return;
     }
     if (!localStorage.player) {
-      localStorage.player = "dplayer";
-      setPlayerType("dplayer");
+      localStorage.player = "hls-dplayer";
+      setPlayerType("hls-dplayer");
     }
-    let player: DPlayer | Hls;
-    const url = videoUrl.live2OnlyLevel4;
+    if (!localStorage.videoUrl) {
+      localStorage.videoUrl = videoUrl.live2;
+      setUrl(videoUrl.live2);
+    }
 
     switch (playerType) {
-      case "dplayer": {
-        player = new DPlayer({
-          container: containerRef.current,
-          video: {
-            url,
-            type: "customHls",
-            customType: {
-              customHls: (video: HTMLVideoElement) => {
-                const engine = new HlsJsEngine();
-                const hls = new Hls({
-                  ...engine.getConfig(),
-                });
-                engine.initHlsJsEvents(hls);
-                hls.loadSource(video.src);
-                hls.attachMedia(video);
-              },
-            },
-          },
-        });
-        (window as unknown as ExtendedWindow).player = player;
-        break;
-      }
-      case "shaka-dplayer":
-        // shaka.polyfill.installAll();
-        player = new DPlayer({
-          container: containerRef.current,
-          video: {
-            url,
-            type: "customHlsOrDash",
-            customType: {
-              customHlsOrDash: (video: HTMLVideoElement) => {
-                const engine = new ShakaEngine(shaka);
-
-                const src = video.src;
-                const shakaPlayer = new shaka.Player(video);
-                const onError = function (error: { code: number }) {
-                  // eslint-disable-next-line no-console
-                  console.error(
-                    "Error code",
-                    error.toString(),
-                    "object",
-                    error
-                  );
-                };
-                shakaPlayer.addEventListener(
-                  "error",
-                  (event: { code: number }) => {
-                    onError(event);
-                  }
-                );
-                engine.initShakaPlayer(shakaPlayer);
-                shakaPlayer.load(src).catch(onError);
-              },
-            },
-          },
-        });
-        (window as unknown as ExtendedWindow).player = player;
+      case "hls-dplayer":
+        initHlsDplayer(url);
         break;
       case "hlsjs":
-        if (videoRef.current) {
-          const engine = new HlsJsEngine();
-          const hls = new Hls({
-            ...engine.getConfig(),
-          });
-          hls.loadSource(url);
-          hls.attachMedia(videoRef.current);
-          player = hls;
-          (window as unknown as ExtendedWindow).player = player;
-        }
+        initHlsJsPlayer(url);
+        break;
+      case "shaka-dplayer":
+        initShakaDplayer(url);
+        break;
+      case "shaka-player":
+        initShakaPlayer(url);
         break;
     }
-  }, [playerType]);
+  }, [playerType, url]);
 
-  const setPlayer = (player: Player) => {
-    localStorage.player = player;
-    setPlayerType(player);
+  const setPlayerToWindow = (player: DPlayer | ShakaPlayer | Hls) => {
+    (window as unknown as ExtendedWindow).videoPlayer = player;
+  };
+
+  const initShakaDplayer = (url: string) => {
+    const engine = shakaEngine.current;
+    const player = new DPlayer({
+      container: containerRef.current,
+      video: {
+        url,
+        type: "customHlsOrDash",
+        customType: {
+          customHlsOrDash: (video: HTMLVideoElement) => {
+            const src = video.src;
+            const shakaPlayer = new shakaLib.Player(video);
+            const onError = (error: { code: number }) => {
+              // eslint-disable-next-line no-console
+              console.error("Error code", error.toString(), "object", error);
+            };
+            shakaPlayer.addEventListener("error", (event: { code: number }) => {
+              onError(event);
+            });
+            engine.initShakaPlayer(shakaPlayer);
+            shakaPlayer.load(src).catch(onError);
+          },
+        },
+      },
+    });
+    setPlayerToWindow(player);
+  };
+
+  const initShakaPlayer = (url: string) => {
+    if (!videoRef.current) return;
+    const engine = shakaEngine.current;
+
+    const player = new shakaLib.Player(videoRef.current);
+    const onError = (error: { code: unknown }) => {
+      // eslint-disable-next-line no-console
+      console.error("Error code", error.code, "object", error);
+    };
+    player.addEventListener("error", (event: { detail: { code: unknown } }) => {
+      onError(event.detail);
+    });
+    engine.initShakaPlayer(player);
+    player.load(url).catch(onError);
+
+    setPlayerToWindow(player);
+  };
+
+  const initHlsJsPlayer = (url: string) => {
+    if (!videoRef.current) return;
+    const engine = hlsEngine.current;
+    const hls = new Hls({
+      ...engine.getConfig(),
+    });
+    engine.initHlsJsEvents(hls);
+    hls.loadSource(url);
+    hls.attachMedia(videoRef.current);
+    setPlayerToWindow(hls);
+  };
+
+  const initHlsDplayer = (url: string) => {
+    const engine = hlsEngine.current;
+    const player = new DPlayer({
+      container: containerRef.current,
+      video: {
+        url,
+        type: "customHls",
+        customType: {
+          customHls: (video: HTMLVideoElement) => {
+            const hls = new Hls({
+              ...engine.getConfig(),
+            });
+            engine.initHlsJsEvents(hls);
+            hls.loadSource(video.src);
+            hls.attachMedia(video);
+          },
+        },
+      },
+    });
+    setPlayerToWindow(player);
+  };
+
+  const destroyAndWindowPlayer = () => {
+    const extendedWindow = window as ExtendedWindow;
+    extendedWindow.videoPlayer?.destroy?.();
+    extendedWindow.videoPlayer = undefined;
+  };
+
+  const onPlayerTypeChange = (newPlayer: Player) => {
+    localStorage.player = newPlayer;
+    setPlayerType(newPlayer);
+    destroyAndWindowPlayer();
+  };
+
+  const onVideoUrlChange = (url: string) => {
+    localStorage.url = url;
+    setUrl(url);
+    destroyAndWindowPlayer();
   };
 
   return (
-    <div style={{ textAlign: "center" }}>
+    <div style={{ textAlign: "center", width: 1000, margin: "auto" }}>
       <div style={{ marginBottom: 20 }}>
-        <h1>This is HLS.JS Player Demo</h1>
-        <div>
+        <h1>This is Demo</h1>
+        <div style={{ textAlign: "start" }}>
           <select
             value={playerType}
-            onChange={(event) => setPlayer(event.target.value as Player)}
+            onChange={(event) =>
+              onPlayerTypeChange(event.target.value as Player)
+            }
           >
             {players.map((player) => {
               return (
                 <option key={player} value={player}>
                   {player}
+                </option>
+              );
+            })}
+          </select>
+          <select
+            value={url}
+            onChange={(event) => onVideoUrlChange(event.target.value)}
+          >
+            {Object.entries(videoUrl).map(([name, url]) => {
+              return (
+                <option key={name} value={url}>
+                  {name}
                 </option>
               );
             })}
@@ -161,7 +228,9 @@ function App() {
           style={{ width: 1000 }}
         ></div>
       </div>
-      {playerType === "hlsjs" && <video ref={videoRef} controls muted></video>}
+      {!!playerType && ["hlsjs", "shaka-player"].includes(playerType) && (
+        <video ref={videoRef} controls muted style={{ width: 800 }} />
+      )}
     </div>
   );
 }

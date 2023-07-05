@@ -52,8 +52,14 @@ export class SegmentManager {
     if (!managerStream) return;
 
     const { segmentIndex } = stream;
-    const references =
-      segmentReferences ?? (segmentIndex && Array.from(segmentIndex));
+    let references = segmentReferences;
+    if (!references && segmentIndex) {
+      try {
+        references = [...segmentIndex];
+      } catch (err) {
+        return;
+      }
+    }
     if (!references) return;
 
     if (this.streamInfo.protocol === "hls") {
