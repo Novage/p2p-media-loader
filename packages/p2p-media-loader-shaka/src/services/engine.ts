@@ -17,8 +17,8 @@ export class Engine {
   );
   private debug = Debug("p2pml-shaka:engine");
 
-  constructor(shaka?: Shaka) {
-    this.shaka = shaka ?? window.shaka;
+  constructor(shaka?: unknown) {
+    this.shaka = (shaka as Shaka | undefined) ?? window.shaka;
   }
 
   initShakaPlayer(player: shaka.Player) {

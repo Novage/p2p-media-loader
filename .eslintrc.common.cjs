@@ -15,6 +15,6 @@ module.exports = {
     "no-console": "warn",
     "@typescript-eslint/prefer-nullish-coalescing": "error",
     "curly": ["warn", "multi-line", "consistent"],
-    "spaced-comment": ["warn", "always"]
+    "spaced-comment": ["warn", "always", {"markers": ["/"]}]
   }
 };

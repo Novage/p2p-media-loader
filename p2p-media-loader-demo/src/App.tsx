@@ -3,7 +3,6 @@ import { Engine as HlsJsEngine } from "p2p-media-loader-hlsjs";
 import { Engine as ShakaEngine } from "p2p-media-loader-shaka";
 import Hls from "hls.js";
 import DPlayer from "dplayer";
-// @ts-ignore
 import shakaLib from "shaka-player";
 import muxjs from "mux.js";
 
