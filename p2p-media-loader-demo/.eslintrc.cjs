@@ -1,5 +1,5 @@
 module.exports = {
-  env: { es2020: true },
+  env: {es2020: true},
   extends: ["../.eslintrc.common.cjs", "plugin:react-hooks/recommended"],
   parser: "@typescript-eslint/parser",
   parserOptions: {
@@ -11,5 +11,7 @@ module.exports = {
   plugins: ["react-refresh"],
   rules: {
     "react-refresh/only-export-components": "warn",
+    "@typescript-eslint/ban-ts-comment": 0,
+    "react-hooks/exhaustive-deps": 0
   },
 };
