@@ -164,4 +164,10 @@ export class SegmentManager {
       managerStream.segments.delete(segment.localId);
     }
   }
+
+  destroy() {
+    this.manifestUrl = undefined;
+    this.streams.clear();
+    this.urlStreamMap.clear();
+  }
 }
