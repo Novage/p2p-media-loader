@@ -79,6 +79,14 @@ export class LoadingHandler implements LoadingHandlerInterface {
     if (!stream) return this.defaultLoad();
 
     const promise = this.fetchSegment(segmentUrl, byteRangeString);
+    promise.then((response) => {
+      response.timeMs = getLoadingDurationBasedOnBitrate({
+        bitrate: 2749539,
+        bytesLoaded: response.data.byteLength,
+      });
+
+      return response;
+    });
     return new this.shaka.util.AbortableOperation(
       promise,
       async () => undefined
@@ -106,4 +114,16 @@ export class LoadingHandler implements LoadingHandlerInterface {
       originalUri: segmentUrl,
     };
   }
+}
+
+function getLoadingDurationBasedOnBitrate({
+  bitrate,
+  bytesLoaded,
+}: {
+  bitrate: number;
+  bytesLoaded: number;
+}) {
+  const bites = bytesLoaded * 8;
+  const targetBandwidth = Math.round(bitrate * 1.1);
+  return Math.round(bites / targetBandwidth) * 1000;
 }
