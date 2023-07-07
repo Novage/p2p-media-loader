@@ -182,7 +182,7 @@ function App() {
   };
 
   const onVideoUrlChange = (url: string) => {
-    localStorage.url = url;
+    localStorage.videoUrl = url;
     setUrl(url);
     destroyAndWindowPlayer();
   };

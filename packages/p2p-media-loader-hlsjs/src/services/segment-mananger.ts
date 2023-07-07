@@ -1,5 +1,9 @@
 import { Playlist, Segment } from "./playlist";
-import type { LevelLoadedData, ManifestLoadedData } from "hls.js";
+import type {
+  LevelLoadedData,
+  ManifestLoadedData,
+  LevelUpdatedData,
+} from "hls.js";
 
 export class SegmentManager {
   isLive?: boolean;
@@ -17,7 +21,12 @@ export class SegmentManager {
       if (this.playlists.has(level.url)) return;
       this.playlists.set(
         level.url,
-        new Playlist({ type: "video", index, masterManifestUrl: url })
+        new Playlist({
+          type: "video",
+          index,
+          masterManifestUrl: url,
+          bitrate: level.bitrate,
+        })
       );
     });
 
@@ -25,12 +34,47 @@ export class SegmentManager {
       if (this.playlists.has(track.url)) return;
       this.playlists.set(
         track.url,
-        new Playlist({ type: "audio", index, masterManifestUrl: url })
+        new Playlist({
+          type: "audio",
+          index,
+          masterManifestUrl: url,
+          bitrate: track.bitrate,
+        })
       );
     });
   }
 
-  setPlaylist(data: LevelLoadedData) {
+  // setPlaylist(data: LevelLoadedData) {
+  //   const {
+  //     details: { url, fragments, live },
+  //   } = data;
+  //   const playlist = this.playlists.get(url);
+  //   if (!playlist) return;
+  //
+  //   this.isLive = live;
+  //
+  //   const segmentToRemoveIds = new Set(playlist.segments.keys());
+  //   fragments.forEach((fragment, index) => {
+  //     const { url, byteRange, sn } = fragment;
+  //     if (sn === "initSegment") return;
+  //
+  //     const [start, end] = byteRange;
+  //     const segmentLocalId = Segment.getSegmentLocalId(url, { start, end });
+  //     segmentToRemoveIds.delete(segmentLocalId);
+  //
+  //     if (playlist.segments.has(segmentLocalId)) return;
+  //     const segment = new Segment({
+  //       segmentUrl: url,
+  //       index: live ? sn : index,
+  //       ...(start && end ? { byteRange: { start, end } } : {}),
+  //     });
+  //     playlist.segments.set(segment.localId, segment);
+  //   });
+  //
+  //   segmentToRemoveIds.forEach((value) => playlist.segments.delete(value));
+  // }
+
+  setPlaylist(data: LevelUpdatedData) {
     const {
       details: { url, fragments, live },
     } = data;
