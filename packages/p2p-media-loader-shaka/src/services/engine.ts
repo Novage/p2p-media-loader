@@ -4,9 +4,8 @@ import {
   DashManifestParser,
 } from "./manifest-parser-decorator";
 import { SegmentManager } from "./segment-manager";
-import Debug from "debug";
 import { StreamInfo, StreamProtocol, Shaka } from "../types/types";
-import { getLoadingHandler } from "./loading-handler";
+import { LoadingHandler } from "./loading-handler";
 
 export class Engine {
   private readonly shaka: Shaka;
@@ -15,10 +14,15 @@ export class Engine {
   private readonly segmentManager: SegmentManager = new SegmentManager(
     this.streamInfo
   );
-  private debug = Debug("p2pml-shaka:engine");
+  private loadingHandler: LoadingHandler;
 
   constructor(shaka?: unknown) {
     this.shaka = (shaka as Shaka | undefined) ?? window.shaka;
+    this.loadingHandler = new LoadingHandler({
+      shaka: this.shaka,
+      streamInfo: this.streamInfo,
+      segmentManager: this.segmentManager,
+    });
   }
 
   initShakaPlayer(player: shaka.Player) {
@@ -57,12 +61,8 @@ export class Engine {
   }
 
   private initializeNetworkingEngine() {
-    const loadingHandler = getLoadingHandler(
-      this.shaka,
-      this.segmentManager,
-      this.streamInfo,
-      this.debug
-    );
+    const loadingHandler: shaka.extern.SchemePlugin = (...args) =>
+      this.loadingHandler.handleLoad(...args);
     this.shaka.net.NetworkingEngine.registerScheme("http", loadingHandler);
     this.shaka.net.NetworkingEngine.registerScheme("https", loadingHandler);
   }

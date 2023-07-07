@@ -1,45 +1,109 @@
 import { Segment } from "./segment";
 import { SegmentManager } from "./segment-manager";
 import { StreamInfo } from "../types/types";
-import { Debugger } from "debug";
+import Debug from "debug";
 import { Shaka } from "../types/types";
 
-export function getLoadingHandler(
-  shaka: Shaka,
-  segmentManager: SegmentManager,
-  streamInfo: StreamInfo,
-  debug: Debugger
-): shaka.extern.SchemePlugin {
-  return (url, request, requestType, progressUpdated, receivedHeaders) => {
-    const xhrPlugin = shaka.net.HttpFetchPlugin;
-    const result = xhrPlugin.parse(
-      url,
-      request,
-      requestType,
-      progressUpdated,
-      receivedHeaders
-    );
-    if (requestType === shaka.net.NetworkingEngine.RequestType.MANIFEST) {
-      if (
-        streamInfo.protocol === "hls" &&
-        segmentManager.urlStreamMap.has(url)
-      ) {
-        (async () => {
-          await result.promise;
-          // Waiting for the playlist to be parsed
-          setTimeout(() => segmentManager.updateHLSStreamByUrl(url), 0);
-        })();
-      }
-    }
-    if (requestType === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
-      const segmentId = Segment.getLocalId(url, request.headers.Range);
-      const stream = segmentManager.getStreamBySegmentLocalId(segmentId);
-      const segment = stream?.segments.get(segmentId);
-      debug(`\n\nLoading segment with id: ${segmentId}`);
-      debug(`Stream id: ${stream?.id}`);
-      debug(`Segment: ${segment?.index}`);
+interface LoadingHandlerInterface {
+  handleLoad: shaka.extern.SchemePlugin;
+}
+
+type LoadingHandlerParams = Parameters<shaka.extern.SchemePlugin>;
+type Response = shaka.extern.Response;
+type LoadingHandlerResult = shaka.extern.IAbortableOperation<Response>;
+
+export class LoadingHandler implements LoadingHandlerInterface {
+  private readonly shaka: Shaka;
+  private readonly segmentManager: SegmentManager;
+  private readonly streamInfo: StreamInfo;
+  private loadArgs!: LoadingHandlerParams;
+  private readonly debug = Debug("shaka:loading");
+
+  constructor({
+    shaka,
+    streamInfo,
+    segmentManager,
+  }: {
+    shaka: Shaka;
+    segmentManager: SegmentManager;
+    streamInfo: StreamInfo;
+  }) {
+    this.shaka = shaka;
+    this.segmentManager = segmentManager;
+    this.streamInfo = streamInfo;
+  }
+
+  private defaultLoad() {
+    const fetchPlugin = this.shaka.net.HttpFetchPlugin;
+    return fetchPlugin.parse(...this.loadArgs);
+  }
+
+  handleLoad(...args: LoadingHandlerParams): LoadingHandlerResult {
+    this.loadArgs = args;
+    const { RequestType } = this.shaka.net.NetworkingEngine;
+    const [url, request, requestType] = args;
+    if (requestType === RequestType.SEGMENT) {
+      return this.handleSegmentLoading(url, request.headers.Range);
     }
 
-    return result;
-  };
+    const loading = this.defaultLoad();
+    if (
+      requestType === RequestType.MANIFEST &&
+      this.streamInfo.protocol === "hls"
+    ) {
+      void this.handleStreamLoading(url, loading.promise);
+    }
+    return loading;
+  }
+
+  private async handleStreamLoading(
+    streamUrl: string,
+    loadingPromise: Promise<unknown>
+  ) {
+    if (!this.segmentManager.urlStreamMap.has(streamUrl)) return;
+    await loadingPromise;
+    // Waiting for the playlist to be parsed
+    setTimeout(() => this.segmentManager.updateHlsStreamByUrl(streamUrl), 0);
+  }
+
+  private handleSegmentLoading(
+    segmentUrl: string,
+    byteRangeString: string
+  ): LoadingHandlerResult {
+    const segmentId = Segment.getLocalId(segmentUrl, byteRangeString);
+    const stream = this.segmentManager.getStreamBySegmentLocalId(segmentId);
+    const segment = stream?.segments.get(segmentId);
+    this.debug(`\n\nLoading segment with id: ${segmentId}`);
+    this.debug(`Stream id: ${stream?.id}`);
+    this.debug(`Segment: ${segment?.index}`);
+    if (!stream) return this.defaultLoad();
+
+    const promise = this.fetchSegment(segmentUrl, byteRangeString);
+    return new this.shaka.util.AbortableOperation(
+      promise,
+      async () => undefined
+    );
+  }
+
+  private async fetchSegment(
+    segmentUrl: string,
+    byteRangeString?: string
+  ): Promise<Response> {
+    const headers = new Headers();
+
+    if (byteRangeString) headers.set("Range", byteRangeString);
+    const response = await fetch(segmentUrl, {
+      headers,
+    });
+    const data = await response.arrayBuffer();
+    const { status, url } = response;
+
+    return {
+      data,
+      headers: {},
+      status,
+      uri: url,
+      originalUri: segmentUrl,
+    };
+  }
 }

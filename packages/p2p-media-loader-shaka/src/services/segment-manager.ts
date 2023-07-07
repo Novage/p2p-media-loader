@@ -69,7 +69,7 @@ export class SegmentManager {
     }
   }
 
-  updateHLSStreamByUrl(url: string) {
+  updateHlsStreamByUrl(url: string) {
     const stream = this.urlStreamMap.get(url);
     if (!stream || !stream.shakaStream) return;
     this.updateStream({ stream: stream.shakaStream });
