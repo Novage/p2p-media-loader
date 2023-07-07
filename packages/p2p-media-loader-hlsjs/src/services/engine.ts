@@ -18,23 +18,11 @@ export class Engine {
 
   public initHlsJsEvents(hls: Hls) {
     hls.on("hlsManifestLoaded" as Events.MANIFEST_LOADED, (event, data) => {
-      console.log(data.levels);
       this.segmentManager.processMasterManifest(data);
     });
 
-    hls.on("hlsLevelLoaded" as Events.LEVEL_LOADING, (event, data) => {
-      console.log("LEVEL_LOADING", data);
-      // this.segmentManager.setPlaylist(data);
-    });
-
     hls.on("hlsLevelUpdated" as Events.LEVEL_UPDATED, (event, data) => {
-      console.log("LEVEL_UPDATED", data);
       this.segmentManager.setPlaylist(data);
-    });
-
-    hls.on("hlsLevelLoaded" as Events.LEVEL_LOADED, (event, data) => {
-      console.log("LEVEL_LOADED");
-      // this.segmentManager.setPlaylist(data);
     });
   }
 

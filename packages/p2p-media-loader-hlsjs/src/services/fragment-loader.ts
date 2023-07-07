@@ -11,8 +11,6 @@ import { SegmentManager } from "./segment-mananger";
 import { ByteRange, Segment } from "./playlist";
 import Debug from "debug";
 
-let prev: string | undefined;
-
 export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   context!: FragmentLoaderContext;
   config!: LoaderConfiguration | null;
@@ -20,23 +18,14 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   stats: LoaderStats;
   defaultLoader: Loader<LoaderContext>;
   segmentManager: SegmentManager;
+  response?: { status: number; data: ArrayBuffer; url: string; ok: boolean };
+  abortController: AbortController = new AbortController();
   private debug = Debug("hls:fragment-loading");
 
   constructor(config: HlsConfig, segmentManager: SegmentManager) {
     this.segmentManager = segmentManager;
     this.defaultLoader = new config.loader(config);
     this.stats = this.defaultLoader.stats;
-    // this.stats = {
-    //   loading: { start: 0, end: 0, first: 0 },
-    //   total: 0,
-    //   loaded: 0,
-    //   bwEstimate: 0,
-    //   buffering: { start: 0, end: 0, first: 0 },
-    //   aborted: false,
-    //   retry: 0,
-    //   parsing: { start: 0, end: 0 },
-    //   chunkCount: 0,
-    // };
   }
 
   async load(
@@ -49,7 +38,11 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     this.callbacks = callbacks;
     const stats = this.stats;
 
-    this.identifyPlaylist(context);
+    const playlist = this.identifyPlaylist(context);
+    if (!playlist) {
+      return this.defaultLoader.load(context, config, callbacks);
+    }
+
     let byteRange: ByteRange | undefined;
     const { rangeStart, rangeEnd } = context;
     if (
@@ -59,34 +52,32 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     ) {
       byteRange = { start: rangeStart, end: rangeEnd };
     }
-    const response = await this.fetchSegment(context.url, byteRange);
+    this.response = await this.fetchSegment(context.url, byteRange);
     const { loading } = stats;
-    const loadedBytes = response.data.byteLength;
+    const loadedBytes = this.response.data.byteLength;
     loading.first = performance.now();
     loading.end = performance.now() + 1;
 
-    const { bandwidth, loadingStartTime } =
-      this.getLoadingStartByTargetBandwidth({
-        targetLevelBandwidth: 460560,
-        aboveLevelBandwidth: 836280,
-        loadingEndTime: loading.first,
-        loadedBytes,
-      });
+    const { bandwidth, loadingStartTime } = this.getLoadingStatByTargetBitrate({
+      targetLevelBitrate: 1650064,
+      aboveLevelBitrate: 2749539,
+      loadingEndTime: loading.first,
+      loadedBytes,
+    });
 
-    console.log("bandwidth", bandwidth);
     loading.start = loadingStartTime;
     stats.bwEstimate = bandwidth;
     stats.total = stats.loaded = loadedBytes;
 
     callbacks.onSuccess(
       {
-        url: response.url,
-        code: response.status,
-        data: response.data,
+        url: this.response.url,
+        code: this.response.status,
+        data: this.response.data,
       },
       this.stats,
       context,
-      response
+      this.response
     );
   }
 
@@ -96,18 +87,8 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       start,
       end,
     });
-    const prevPlaylist = prev
-      ? this.segmentManager.getPlaylistBySegmentId(prev)
-      : undefined;
 
     const playlist = this.segmentManager.getPlaylistBySegmentId(segmentId);
-    prev = segmentId;
-    console.log("");
-    console.log("PREV_PLAYLIST", prevPlaylist?.index);
-    console.log(context.url);
-    // console.log("SEGMENT_ID: ", segmentId);
-    console.log("PLAYLIST_INDEX: ", playlist?.index);
-    console.log("PLAYLIST_TYPE: ", playlist?.type);
     this.debug(
       "downloaded segment from playlist\n",
       `playlist v: ${playlist?.index}\n`,
@@ -115,24 +96,23 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       playlist?.segments.get(segmentId)?.index,
       `bitrate: ${playlist?.bitrate}`
     );
+    return playlist;
   }
 
-  getLoadingStartByTargetBandwidth({
+  getLoadingStatByTargetBitrate({
     loadedBytes,
-    targetLevelBandwidth,
-    aboveLevelBandwidth,
+    targetLevelBitrate,
+    aboveLevelBitrate,
     loadingEndTime,
   }: {
-    targetLevelBandwidth: number;
-    aboveLevelBandwidth: number;
+    targetLevelBitrate: number;
+    aboveLevelBitrate: number;
     loadingEndTime: number;
     loadedBytes: number;
   }) {
     const bites = loadedBytes * 8;
-    const levelBandwidthDiff = aboveLevelBandwidth - targetLevelBandwidth;
-    const targetBandwidth = Math.round(
-      targetLevelBandwidth + levelBandwidthDiff * 0.4
-    );
+    const bitrateDiff = aboveLevelBitrate - targetLevelBitrate;
+    const targetBandwidth = Math.round(targetLevelBitrate + bitrateDiff * 0.4);
     const timeForLoading = Math.round((bites / targetBandwidth) * 1000);
     const loadingStartTime = loadingEndTime - timeForLoading;
     return { loadingStartTime, bandwidth: targetBandwidth };
@@ -146,14 +126,26 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       const byteRangeString = `bytes=${start}-${end}`;
       headers.set("Range", byteRangeString);
     }
-    const response = await fetch(segmentUrl, { headers });
+    const response = await fetch(segmentUrl, {
+      headers,
+      signal: this.abortController.signal,
+    });
     const data = await response.arrayBuffer();
-    const { status, url } = response;
+    const { status, url, ok } = response;
 
-    return { status, data, url };
+    return { status, data, url, ok };
+  }
+
+  private abortInternal() {
+    if (!this.response?.ok) {
+      this.abortController.abort();
+      this.stats.aborted = true;
+    }
   }
 
   abort() {
+    this.abortInternal();
+    this.callbacks?.onAbort?.(this.stats, this.context, {});
     this.defaultLoader.abort();
   }
 
