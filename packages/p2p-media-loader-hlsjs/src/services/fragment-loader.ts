@@ -52,7 +52,14 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     ) {
       byteRange = { start: rangeStart, end: rangeEnd };
     }
-    this.response = await this.fetchSegment(context.url, byteRange);
+    try {
+      this.response = await this.fetchSegment(context.url, byteRange);
+    } catch (error) {
+      if (!this.stats.aborted) {
+        return this.handleError(error as { code: number; text: string });
+      }
+    }
+    if (!this.response) return;
     const { loading } = stats;
     const loadedBytes = this.response.data.byteLength;
     loading.first = performance.now();
@@ -141,6 +148,10 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       this.abortController.abort();
       this.stats.aborted = true;
     }
+  }
+
+  private handleError(error: { code: number; text: string }) {
+    this.callbacks?.onError(error, this.context, undefined, this.stats);
   }
 
   abort() {
