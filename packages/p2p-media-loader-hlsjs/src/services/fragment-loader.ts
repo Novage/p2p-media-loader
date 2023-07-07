@@ -151,5 +151,8 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
 
   destroy() {
     this.defaultLoader.destroy();
+    this.abortInternal();
+    this.callbacks = null;
+    this.config = null;
   }
 }
