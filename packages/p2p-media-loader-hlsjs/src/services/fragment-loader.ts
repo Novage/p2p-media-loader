@@ -19,7 +19,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   createDefaultLoader: () => Loader<LoaderContext>;
   defaultLoader?: Loader<LoaderContext>;
   segmentManager: SegmentManager;
-  response?: { status: number; data: ArrayBuffer; url: string; ok: boolean };
+  response?: Response;
   abortController: AbortController = new AbortController();
   private debug = Debug("hls:fragment-loading");
 
@@ -57,6 +57,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
 
     let byteRange: ByteRange | undefined;
     const { rangeStart, rangeEnd } = context;
+    const { loading } = stats;
     if (
       rangeStart !== undefined &&
       rangeEnd !== undefined &&
@@ -66,33 +67,29 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     }
     try {
       this.response = await this.fetchSegment(context.url, byteRange);
+      loading.first = performance.now();
     } catch (error) {
       if (!this.stats.aborted) {
         return this.handleError(error as { code: number; text: string });
       }
     }
     if (!this.response) return;
-    const { loading } = stats;
-    const loadedBytes = this.response.data.byteLength;
-    loading.first = performance.now();
-    loading.end = performance.now() + 1;
+    const data = await this.response.arrayBuffer();
+    loading.end = performance.now();
+    const loadedBytes = data.byteLength;
 
-    const { bandwidth, loadingStartTime } = this.getLoadingStatByTargetBitrate({
-      targetLevelBitrate: 1650064,
-      aboveLevelBitrate: 2749539,
-      loadingEndTime: loading.first,
+    loading.start = this.getLoadingStatByTargetBitrate({
+      targetLevelBitrate: 480000,
+      loadingEndTime: loading.end,
       loadedBytes,
     });
-
-    loading.start = loadingStartTime;
-    stats.bwEstimate = bandwidth;
     stats.total = stats.loaded = loadedBytes;
 
     callbacks.onSuccess(
       {
         url: this.response.url,
         code: this.response.status,
-        data: this.response.data,
+        data,
       },
       this.stats,
       context,
@@ -120,20 +117,15 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   getLoadingStatByTargetBitrate({
     loadedBytes,
     targetLevelBitrate,
-    aboveLevelBitrate,
     loadingEndTime,
   }: {
     targetLevelBitrate: number;
-    aboveLevelBitrate: number;
     loadingEndTime: number;
     loadedBytes: number;
   }) {
     const bites = loadedBytes * 8;
-    const bitrateDiff = aboveLevelBitrate - targetLevelBitrate;
-    const targetBandwidth = Math.round(targetLevelBitrate + bitrateDiff * 0.4);
-    const timeForLoading = Math.round((bites / targetBandwidth) * 1000);
-    const loadingStartTime = loadingEndTime - timeForLoading;
-    return { loadingStartTime, bandwidth: targetBandwidth };
+    const timeForLoading = Math.round((bites / targetLevelBitrate) * 1000);
+    return loadingEndTime - timeForLoading;
   }
 
   async fetchSegment(segmentUrl: string, byteRange?: ByteRange) {
@@ -144,14 +136,10 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       const byteRangeString = `bytes=${start}-${end}`;
       headers.set("Range", byteRangeString);
     }
-    const response = await fetch(segmentUrl, {
+    return fetch(segmentUrl, {
       headers,
       signal: this.abortController.signal,
     });
-    const data = await response.arrayBuffer();
-    const { status, url, ok } = response;
-
-    return { status, data, url, ok };
   }
 
   private abortInternal() {
