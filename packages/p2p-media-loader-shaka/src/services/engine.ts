@@ -6,6 +6,7 @@ import {
 import { SegmentManager } from "./segment-manager";
 import { StreamInfo, StreamProtocol, Shaka } from "../types/types";
 import { LoadingHandler } from "./loading-handler";
+import { decorateMethod } from "./utils";
 
 export class Engine {
   private readonly shaka: Shaka;
@@ -15,6 +16,8 @@ export class Engine {
     this.streamInfo
   );
   private loadingHandler: LoadingHandler;
+  private debugLoading = Debug("shaka:segment-loading");
+  private debugDestroying = Debug("shaka:destroying");
 
   constructor(shaka?: unknown) {
     this.shaka = (shaka as Shaka | undefined) ?? window.shaka;
@@ -29,6 +32,19 @@ export class Engine {
     this.player = player;
     this.initializeNetworkingEngine();
     this.registerParsers();
+
+    player.addEventListener("loading", () => {
+      this.debugDestroying("Loading manifest");
+      this.destroy();
+    });
+    decorateMethod(player, "destroy", () => {
+      this.debugDestroying("Shaka player destroying");
+      this.destroy();
+    });
+  }
+
+  destroy() {
+    this.segmentManager.destroy();
   }
 
   private registerParsers() {
