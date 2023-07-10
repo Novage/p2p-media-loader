@@ -2,7 +2,6 @@ import { Playlist, Segment } from "./playlist";
 import type { LevelLoadedData, ManifestLoadedData } from "hls.js";
 
 export class SegmentManager {
-  isLive?: boolean;
   playlists: Map<string, Playlist> = new Map();
 
   getPlaylistBySegmentId(segmentId: string): Playlist | undefined {
@@ -37,8 +36,6 @@ export class SegmentManager {
     const playlist = this.playlists.get(url);
     if (!playlist) return;
 
-    this.isLive = live;
-
     const segmentToRemoveIds = new Set(playlist.segments.keys());
     fragments.forEach((fragment, index) => {
       const { url, byteRange, sn } = fragment;
@@ -58,5 +55,9 @@ export class SegmentManager {
     });
 
     segmentToRemoveIds.forEach((value) => playlist.segments.delete(value));
+  }
+
+  destroy() {
+    this.playlists.clear();
   }
 }
