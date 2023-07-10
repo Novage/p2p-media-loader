@@ -21,7 +21,6 @@ export class SegmentManager {
           type: "video",
           index,
           masterManifestUrl: url,
-          bitrate: level.bitrate,
         })
       );
     });
@@ -34,7 +33,6 @@ export class SegmentManager {
           type: "audio",
           index,
           masterManifestUrl: url,
-          bitrate: track.bitrate,
         })
       );
     });

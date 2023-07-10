@@ -16,7 +16,8 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   config!: LoaderConfiguration | null;
   callbacks!: LoaderCallbacks<FragmentLoaderContext> | null;
   stats: LoaderStats;
-  defaultLoader: Loader<LoaderContext>;
+  createDefaultLoader: () => Loader<LoaderContext>;
+  defaultLoader?: Loader<LoaderContext>;
   segmentManager: SegmentManager;
   response?: { status: number; data: ArrayBuffer; url: string; ok: boolean };
   abortController: AbortController = new AbortController();
@@ -24,8 +25,18 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
 
   constructor(config: HlsConfig, segmentManager: SegmentManager) {
     this.segmentManager = segmentManager;
-    this.defaultLoader = new config.loader(config);
-    this.stats = this.defaultLoader.stats;
+    this.createDefaultLoader = () => new config.loader(config);
+    this.stats = {
+      aborted: false,
+      chunkCount: 0,
+      loading: { start: 0, first: 0, end: 0 },
+      buffering: { start: 0, first: 0, end: 0 },
+      parsing: { start: 0, end: 0 },
+      total: 0,
+      loaded: 0,
+      bwEstimate: 0,
+      retry: 0,
+    };
   }
 
   async load(
@@ -40,7 +51,8 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
 
     const playlist = this.identifyPlaylist(context);
     if (!playlist) {
-      return this.defaultLoader.load(context, config, callbacks);
+      this.defaultLoader = this.createDefaultLoader();
+      this.defaultLoader.load(context, config, callbacks);
     }
 
     let byteRange: ByteRange | undefined;
@@ -100,8 +112,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       "downloaded segment from playlist\n",
       `playlist v: ${playlist?.index}\n`,
       `segment: `,
-      playlist?.segments.get(segmentId)?.index,
-      `bitrate: ${playlist?.bitrate}`
+      playlist?.segments.get(segmentId)?.index
     );
     return playlist;
   }
@@ -157,11 +168,11 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   abort() {
     this.abortInternal();
     this.callbacks?.onAbort?.(this.stats, this.context, {});
-    this.defaultLoader.abort();
+    this.defaultLoader?.abort();
   }
 
   destroy() {
-    this.defaultLoader.destroy();
+    this.defaultLoader?.destroy();
     this.abortInternal();
     this.callbacks = null;
     this.config = null;

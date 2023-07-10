@@ -10,24 +10,20 @@ export class Playlist {
   id: string;
   index: number;
   type: SegmentType;
-  bitrate: number;
   segments: Map<string, Segment> = new Map();
 
   constructor({
     masterManifestUrl,
     index,
     type,
-    bitrate,
   }: {
     masterManifestUrl: string;
     index: number;
     type: SegmentType;
-    bitrate: number;
   }) {
     this.index = index;
     this.type = type;
     this.id = `${getUrlWithoutParameters(masterManifestUrl)}-${type}-V${index}`;
-    this.bitrate = bitrate;
   }
 }
 
