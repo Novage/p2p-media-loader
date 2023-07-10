@@ -4,6 +4,7 @@ import {
   DashManifestParser,
 } from "./manifest-parser-decorator";
 import { SegmentManager } from "./segment-manager";
+import Debug from "debug";
 import { StreamInfo, StreamProtocol, Shaka } from "../types/types";
 import { LoadingHandler } from "./loading-handler";
 import { decorateMethod } from "./utils";
