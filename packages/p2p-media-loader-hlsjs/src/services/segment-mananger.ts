@@ -1,5 +1,11 @@
 import { Playlist, Segment } from "./playlist";
-import type { ManifestLoadedData, LevelUpdatedData } from "hls.js";
+import type {
+  ManifestLoadedData,
+  LevelUpdatedData,
+  AudioTracksUpdatedData,
+  MediaPlaylist,
+} from "hls.js";
+import { Fragment } from "hls.js";
 
 export class SegmentManager {
   isLive?: boolean;
@@ -38,14 +44,37 @@ export class SegmentManager {
     });
   }
 
-  setPlaylist(data: LevelUpdatedData) {
+  updateVideoPlaylist(data: LevelUpdatedData | MediaPlaylist) {
+    if (!data.details) return;
     const {
       details: { url, fragments, live },
     } = data;
+    this.updatePlaylist({ url, fragments, isLive: live });
+  }
+
+  updateAudioPlaylist(data: AudioTracksUpdatedData) {
+    const { audioTracks } = data;
+
+    for (const track of audioTracks) {
+      const { details, url } = track;
+      console.log(details?.fragments.length ?? 0);
+      if (!details || !details.fragments.length) continue;
+
+      this.updatePlaylist({ url, fragments: details.fragments, isLive: true });
+    }
+  }
+
+  private updatePlaylist({
+    url,
+    fragments,
+    isLive,
+  }: {
+    url: string;
+    fragments: Fragment[];
+    isLive: boolean;
+  }) {
     const playlist = this.playlists.get(url);
     if (!playlist) return;
-
-    this.isLive = live;
 
     const segmentToRemoveIds = new Set(playlist.segments.keys());
     fragments.forEach((fragment, index) => {
@@ -59,12 +88,14 @@ export class SegmentManager {
       if (playlist.segments.has(segmentLocalId)) return;
       const segment = new Segment({
         segmentUrl: url,
-        index: live ? sn : index,
+        index: isLive ? sn : index,
         ...(start && end ? { byteRange: { start, end } } : {}),
       });
       playlist.segments.set(segment.localId, segment);
     });
 
     segmentToRemoveIds.forEach((value) => playlist.segments.delete(value));
+
+    console.log(playlist);
   }
 }
