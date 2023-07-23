@@ -2,13 +2,12 @@ import { Playlist, Segment } from "./playlist";
 import type {
   ManifestLoadedData,
   LevelUpdatedData,
-  AudioTracksUpdatedData,
   MediaPlaylist,
+  Fragment,
+  LevelParsed,
 } from "hls.js";
-import { Fragment } from "hls.js";
 
 export class SegmentManager {
-  isLive?: boolean;
   playlists: Map<string, Playlist> = new Map();
 
   getPlaylistBySegmentId(segmentId: string): Playlist | undefined {
@@ -44,7 +43,16 @@ export class SegmentManager {
     });
   }
 
-  updateVideoPlaylist(data: LevelUpdatedData | MediaPlaylist) {
+  updatePlaylistByUrl(playlistUrl: string) {
+    const hlsPlaylist = this.hlsjsPlaylists.get(playlistUrl);
+    if (!hlsPlaylist) return;
+
+    this.updateVideoPlaylist(hlsPlaylist);
+    console.log(hlsPlaylist.details?.fragments.length);
+    console.log("PLAYLIST UPDATED");
+  }
+
+  updateVideoPlaylist(data: LevelParsed | MediaPlaylist | LevelUpdatedData) {
     if (!data.details) return;
     const {
       details: { url, fragments, live },
@@ -52,17 +60,17 @@ export class SegmentManager {
     this.updatePlaylist({ url, fragments, isLive: live });
   }
 
-  updateAudioPlaylist(data: AudioTracksUpdatedData) {
-    const { audioTracks } = data;
-
-    for (const track of audioTracks) {
-      const { details, url } = track;
-      console.log(details?.fragments.length ?? 0);
-      if (!details || !details.fragments.length) continue;
-
-      this.updatePlaylist({ url, fragments: details.fragments, isLive: true });
-    }
-  }
+  // updateAudioPlaylist(data: AudioTracksUpdatedData) {
+  //   const { audioTracks } = data;
+  //
+  //   for (const track of audioTracks) {
+  //     const { details, url } = track;
+  //     console.log(details?.fragments.length ?? 0);
+  //     if (!details || !details.fragments.length) continue;
+  //
+  //     this.updatePlaylist({ url, fragments: details.fragments, isLive: true });
+  //   }
+  // }
 
   private updatePlaylist({
     url,
@@ -76,6 +84,7 @@ export class SegmentManager {
     const playlist = this.playlists.get(url);
     if (!playlist) return;
 
+    console.log(playlist);
     const segmentToRemoveIds = new Set(playlist.segments.keys());
     fragments.forEach((fragment, index) => {
       const { url, byteRange, sn } = fragment;
@@ -95,7 +104,5 @@ export class SegmentManager {
     });
 
     segmentToRemoveIds.forEach((value) => playlist.segments.delete(value));
-
-    console.log(playlist);
   }
 }
