@@ -11,6 +11,8 @@ import { SegmentManager } from "./segment-mananger";
 import { ByteRange, Segment } from "./playlist";
 import Debug from "debug";
 
+const DEFAULT_DOWNLOAD_LATENCY = 10;
+
 export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   context!: FragmentLoaderContext;
   config!: LoaderConfiguration | null;
@@ -30,27 +32,13 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       aborted: false,
       chunkCount: 0,
       loading: { start: 0, first: 0, end: 0 },
-      buffering: new Proxy(
-        { start: 0, first: 0, end: 0, addToStart: 0 },
-        handler
-      ),
-      parsing: new Proxy({ start: 0, end: 0, addToStart: 0 }, handler),
+      buffering: { start: 0, first: 0, end: 0 },
+      parsing: { start: 0, end: 0 },
       total: 0,
       loaded: 0,
       bwEstimate: 0,
       retry: 0,
-    } as any;
-    // this.stats = {
-    //   aborted: false,
-    //   chunkCount: 0,
-    //   loading: { start: 0, first: 0, end: 0 },
-    //   buffering: { start: 0, first: 0, end: 0 },
-    //   parsing: { start: 0, end: 0 },
-    //   total: 0,
-    //   loaded: 0,
-    //   bwEstimate: 0,
-    //   retry: 0,
-    // };
+    };
   }
 
   async load(
@@ -63,7 +51,6 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     this.callbacks = callbacks;
     const stats = this.stats;
 
-    console.log(context.url);
     const playlist = this.identifyPlaylist(context);
     if (!playlist) {
       this.defaultLoader = this.createDefaultLoader();
@@ -72,15 +59,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       return;
     }
 
-    let byteRange: ByteRange | undefined;
-    const { rangeStart, rangeEnd } = context;
-    if (
-      rangeStart !== undefined &&
-      rangeEnd !== undefined &&
-      rangeEnd > rangeStart
-    ) {
-      byteRange = { start: rangeStart, end: rangeEnd };
-    }
+    const byteRange = getByteRange(context.rangeStart, context.rangeEnd);
     try {
       this.response = await this.fetchSegment(context.url, byteRange);
     } catch (error) {
@@ -91,28 +70,22 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     if (!this.response) return;
     const loadedBytes = this.response.data.byteLength;
 
-    const { addToStart, ...loading } = getLoadingStat({
-      targetBitrate: 895755 * 1.1,
+    stats.loading = getLoadingStat({
+      targetBitrate: 630000 * 1.1,
       loadingEndTime: performance.now(),
       loadedBytes,
     });
-    (stats.parsing as any).addToStart = addToStart;
-    (stats.buffering as any).addToStart = addToStart;
-    stats.loading = loading;
     stats.total = stats.loaded = loadedBytes;
 
-    // console.log(stats.loading);
     const { start, first, end } = stats.loading;
     const latency = first - start;
     const loadingTime = end - first;
     const bandwidth = (stats.loaded * 8) / (loadingTime / 1000) / 1000;
-    // console.log("latency: ", latency);
-    // console.log("loading: ", loadingTime);
-    // console.log("bandwidth: ", bandwidth);
-    // console.log("loaded: ", stats.loaded);
-    this.stats.bwEstimate = 1;
-    // console.log(this.stats);
-    // console.log("");
+    console.log("latency: ", latency);
+    console.log("loading: ", loadingTime);
+    console.log("bandwidth: ", bandwidth);
+    console.log("loaded: ", stats.loaded);
+    console.log("");
 
     callbacks.onSuccess(
       {
@@ -167,15 +140,15 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     };
   }
 
-  private abortInternal() {
-    // if (!this.response?.ok) {
-    //   this.abortController.abort();
-    //   this.stats.aborted = true;S
-    // }
-  }
-
   private handleError(error: { code: number; text: string }) {
     this.callbacks?.onError(error, this.context, undefined, this.stats);
+  }
+
+  private abortInternal() {
+    if (!this.response?.ok) {
+      this.abortController.abort();
+      this.stats.aborted = true;
+    }
   }
 
   abort() {
@@ -198,7 +171,14 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   }
 }
 
-const DEFAULT_DOWNLOAD_LATENCY = 50;
+function getByteRange(
+  start: number | undefined,
+  end: number | undefined
+): ByteRange | undefined {
+  if (start !== undefined && end !== undefined && end > start) {
+    return { start, end };
+  }
+}
 
 function getLoadingStat({
   loadedBytes,
@@ -211,48 +191,8 @@ function getLoadingStat({
 }) {
   const bites = loadedBytes * 8;
   const timeForLoading = (bites / targetBitrate) * 1000;
-  let start = loadingEndTime - timeForLoading - getRandomNumberInRange(20, 200);
-  let first = loadingEndTime - timeForLoading;
-  let end = loadingEndTime;
-  let addToStart: number | undefined = undefined;
+  const start = loadingEndTime - timeForLoading - DEFAULT_DOWNLOAD_LATENCY;
+  const first = loadingEndTime - timeForLoading;
 
-  if (start < 0) {
-    first += -start;
-    end += -start;
-    addToStart = -start;
-    start = 0;
-  }
-
-  return { start, first, end, addToStart };
+  return { start, first, end: loadingEndTime };
 }
-
-function getRandomNumberInRange(min: number, max: number): number {
-  // Generate a random number between 0 and 1
-  const random = Math.random();
-
-  // Scale the random number to fit within the range
-  const scaled = random * (max - min + 1);
-
-  // Shift the scaled number to the appropriate range starting from the minimum value
-  const result = Math.floor(scaled) + min;
-
-  return result;
-}
-
-const handler = {
-  set<T extends object, P extends keyof T>(
-    target: T,
-    property: P,
-    value: T[P]
-  ) {
-    if (
-      typeof (target as { addToStart?: unknown }).addToStart === "number" &&
-      typeof target[property] === "number" &&
-      typeof value === "number"
-    ) {
-      (target[property] as number) =
-        value + (target as { addToStart: number }).addToStart;
-    }
-    return true;
-  },
-};
