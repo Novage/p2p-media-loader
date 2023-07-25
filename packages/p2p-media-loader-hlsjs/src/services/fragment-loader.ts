@@ -21,7 +21,13 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   createDefaultLoader: () => Loader<LoaderContext>;
   defaultLoader?: Loader<LoaderContext>;
   segmentManager: SegmentManager;
-  response?: { status: number; ok: boolean; url: string; data: ArrayBuffer };
+  response?: {
+    status: number;
+    ok: boolean;
+    url: string;
+    data: ArrayBuffer;
+    fetchResponse: Response;
+  };
   abortController: AbortController = new AbortController();
   private debug = Debug("hls:fragment-loading");
 
@@ -59,8 +65,8 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       return;
     }
 
-    const byteRange = getByteRange(context.rangeStart, context.rangeEnd);
     try {
+      const byteRange = getByteRange(context.rangeStart, context.rangeEnd);
       this.response = await this.fetchSegment(context.url, byteRange);
     } catch (error) {
       if (!this.stats.aborted) {
@@ -88,14 +94,10 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     console.log("");
 
     callbacks.onSuccess(
-      {
-        url: this.response.url,
-        code: this.response.status,
-        data: this.response.data,
-      },
+      this.response,
       this.stats,
       context,
-      this.response
+      this.response.fetchResponse
     );
   }
 
@@ -105,7 +107,6 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       start,
       end,
     });
-
     const playlist = this.segmentManager.getPlaylistBySegmentId(segmentId);
     this.debug(
       "downloaded segment from playlist\n",
@@ -137,6 +138,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       status: response.status,
       data,
       url: response.url,
+      fetchResponse: response,
     };
   }
 
@@ -176,7 +178,7 @@ function getByteRange(
   end: number | undefined
 ): ByteRange | undefined {
   if (start !== undefined && end !== undefined && end > start) {
-    return { start, end };
+    return { start, end: end - 1 };
   }
 }
 
