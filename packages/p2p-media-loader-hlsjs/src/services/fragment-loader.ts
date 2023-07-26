@@ -178,8 +178,8 @@ function getLoadingStat({
 }) {
   const bites = loadedBytes * 8;
   const timeForLoading = (bites / targetBitrate) * 1000;
-  const start = loadingEndTime - timeForLoading - DEFAULT_DOWNLOAD_LATENCY;
   const first = loadingEndTime - timeForLoading;
+  const start = first - DEFAULT_DOWNLOAD_LATENCY;
 
   return { start, first, end: loadingEndTime };
 }
