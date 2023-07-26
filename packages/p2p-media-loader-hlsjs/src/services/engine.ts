@@ -18,7 +18,6 @@ export class Engine {
 
   public initHlsJsEvents(hls: Hls) {
     hls.on("hlsManifestLoaded" as Events.MANIFEST_LOADED, (event, data) => {
-      console.log("MANIFEST_LOADED", data);
       this.segmentManager.processMasterManifest(data);
     });
 

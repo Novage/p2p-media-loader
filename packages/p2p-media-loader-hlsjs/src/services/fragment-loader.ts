@@ -26,7 +26,6 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     ok: boolean;
     url: string;
     data: ArrayBuffer;
-    fetchResponse: Response;
   };
   abortController: AbortController = new AbortController();
   private debug = Debug("hls:fragment-loading");
@@ -40,8 +39,10 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       loading: { start: 0, first: 0, end: 0 },
       buffering: { start: 0, first: 0, end: 0 },
       parsing: { start: 0, end: 0 },
-      total: 0,
-      loaded: 0,
+      // set total and loaded to 1 to prevent hls.js
+      // on progress loading monitoring in AbrController
+      total: 1,
+      loaded: 1,
       bwEstimate: 0,
       retry: 0,
     };
@@ -60,7 +61,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     const playlist = this.identifyPlaylist(context);
     if (!playlist) {
       this.defaultLoader = this.createDefaultLoader();
-      this.stats = this.defaultLoader.stats;
+      this.defaultLoader.stats = this.stats;
       this.defaultLoader?.load(context, config, callbacks);
       return;
     }
@@ -77,28 +78,13 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     const loadedBytes = this.response.data.byteLength;
 
     stats.loading = getLoadingStat({
-      targetBitrate: 630000 * 1.1,
+      targetBitrate: 4947980 * (10 / 6.8),
       loadingEndTime: performance.now(),
       loadedBytes,
     });
     stats.total = stats.loaded = loadedBytes;
 
-    const { start, first, end } = stats.loading;
-    const latency = first - start;
-    const loadingTime = end - first;
-    const bandwidth = (stats.loaded * 8) / (loadingTime / 1000) / 1000;
-    console.log("latency: ", latency);
-    console.log("loading: ", loadingTime);
-    console.log("bandwidth: ", bandwidth);
-    console.log("loaded: ", stats.loaded);
-    console.log("");
-
-    callbacks.onSuccess(
-      this.response,
-      this.stats,
-      context,
-      this.response.fetchResponse
-    );
+    callbacks.onSuccess(this.response, this.stats, context, this.response);
   }
 
   private identifyPlaylist(context: LoaderContext) {
@@ -138,7 +124,6 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       status: response.status,
       data,
       url: response.url,
-      fetchResponse: response,
     };
   }
 

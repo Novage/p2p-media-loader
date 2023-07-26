@@ -1,5 +1,3 @@
-import { Fragment } from "hls.js";
-
 type SegmentType = "video" | "audio";
 
 export type ByteRange = { start: number; end: number };
