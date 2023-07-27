@@ -140,7 +140,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
 
   abort() {
     if (this.defaultLoader) {
-      this.defaultLoader?.abort();
+      this.defaultLoader.abort();
     } else {
       this.abortInternal();
       this.callbacks?.onAbort?.(this.stats, this.context, {});
@@ -149,7 +149,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
 
   destroy() {
     if (this.defaultLoader) {
-      this.defaultLoader?.destroy();
+      this.defaultLoader.destroy();
     } else {
       this.abortInternal();
       this.callbacks = null;
@@ -176,8 +176,8 @@ function getLoadingStat({
   loadedBytes: number;
   loadingEndTime: number;
 }) {
-  const bites = loadedBytes * 8;
-  const timeForLoading = (bites / targetBitrate) * 1000;
+  const bits = loadedBytes * 8;
+  const timeForLoading = (bits / targetBitrate) * 1000;
   const first = loadingEndTime - timeForLoading;
   const start = first - DEFAULT_DOWNLOAD_LATENCY;
 
