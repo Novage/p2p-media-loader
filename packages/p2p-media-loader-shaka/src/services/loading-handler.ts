@@ -35,6 +35,12 @@ export function getLoadingHandler(
       const segmentId = Segment.getLocalId(url, request.headers.Range);
       const stream = segmentManager.getStreamBySegmentLocalId(segmentId);
       const segment = stream?.segments.get(segmentId);
+
+      (async () => {
+        await result.promise;
+        segmentManager.addLoadedSegment(segmentId);
+      })();
+
       debug(`\n\nLoading segment with id: ${segmentId}`);
       debug(`Stream id: ${stream?.id}`);
       debug(`Segment: ${segment?.index}`);

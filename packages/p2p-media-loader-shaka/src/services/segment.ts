@@ -6,6 +6,8 @@ export class Segment {
   byteRange?: ByteRange;
   url: string;
   index: number;
+  startTime: number;
+  endTime: number;
 
   constructor({
     url,
@@ -13,16 +15,22 @@ export class Segment {
     streamLocalId,
     index,
     byteRange,
+    startTime,
+    endTime,
   }: {
     url: string;
     localId?: string;
     streamLocalId: number;
     index: number;
     byteRange?: ByteRange;
+    startTime: number;
+    endTime: number;
   }) {
     this.url = url;
     this.streamLocalId = streamLocalId;
     this.index = index;
+    this.startTime = startTime;
+    this.endTime = endTime;
 
     if (
       byteRange &&
@@ -53,6 +61,8 @@ export class Segment {
       url: uri,
       streamLocalId: stream.id,
       index,
+      startTime: segmentReference.getStartTime(),
+      endTime: segmentReference.getEndTime(),
     });
   }
 

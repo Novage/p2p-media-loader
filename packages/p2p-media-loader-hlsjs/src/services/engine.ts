@@ -1,12 +1,14 @@
 import type Hls from "hls.js";
-import type { HlsConfig, Events } from "hls.js";
+import type { HlsConfig, Events, Fragment } from "hls.js";
 import { FragmentLoaderBase } from "./fragment-loader";
 import { SegmentManager } from "./segment-mananger";
 import Debug from "debug";
+import { Segment } from "./playlist";
 
 export class Engine {
   private readonly segmentManager: SegmentManager;
   private debugDestroying = Debug("hls:destroying");
+  private playback: Playback = new Playback();
 
   constructor() {
     this.segmentManager = new SegmentManager();
@@ -41,6 +43,27 @@ export class Engine {
       this.debugDestroying("Media attaching");
       this.destroy();
     });
+
+    hls.on("hlsFragChanged" as Events.FRAG_CHANGED, (event, data) =>
+      this.playback.fragChanged(data.frag)
+    );
+
+    hls.on("hlsMediaAttached" as Events.MEDIA_ATTACHED, (event, data) => {
+      data.media.addEventListener("pause", () => {
+        console.log("PAUSE");
+        this.playback.pause();
+      });
+
+      data.media.addEventListener("waiting", () => {
+        console.log("WAITING");
+        this.playback.pause();
+      });
+
+      data.media.addEventListener("playing", () => {
+        console.log("PLAYING");
+        this.playback.play();
+      });
+    });
   }
 
   destroy() {
@@ -61,5 +84,44 @@ export class Engine {
         return engine;
       }
     };
+  }
+}
+
+class Playback {
+  private lastPauseMoment?: number = 1;
+  private pauseDuration = 0;
+  private fragChangedMoment = 0;
+  segmentId?: string;
+
+  fragChanged(frag: Fragment) {
+    const now = performance.now();
+    const [start, end] = frag.byteRange;
+    this.segmentId = Segment.getSegmentLocalId(frag.url, { start, end });
+
+    this.fragChangedMoment = now;
+    this.pauseDuration = 0;
+    if (this.lastPauseMoment !== undefined) this.lastPauseMoment = now;
+  }
+
+  pause() {
+    if (this.lastPauseMoment !== undefined) return;
+    this.lastPauseMoment = performance.now();
+  }
+
+  play() {
+    if (this.lastPauseMoment !== undefined) {
+      const now = performance.now();
+      this.pauseDuration += now - this.lastPauseMoment;
+    }
+    this.lastPauseMoment = undefined;
+  }
+
+  getPosition() {
+    const now = performance.now();
+    const pauseDuration =
+      this.lastPauseMoment !== undefined
+        ? now - this.lastPauseMoment + this.pauseDuration
+        : this.pauseDuration;
+    return Math.max(now - this.fragChangedMoment - pauseDuration, 0);
   }
 }

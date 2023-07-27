@@ -6,6 +6,12 @@ export class SegmentManager {
   readonly streams: Map<number, Stream> = new Map();
   readonly urlStreamMap: Map<string, Stream> = new Map();
   readonly streamInfo: StreamInfo;
+  // timeLoadedSegmentMap: Map<number, Segment> = new Map();
+  loadedSegments: Segment[] = [];
+  playheadTime?: number;
+  prevLoadedSegment?: Segment;
+
+  private currentSegment?: Segment;
 
   constructor(streamInfo: StreamInfo) {
     this.streamInfo = streamInfo;
@@ -170,4 +176,60 @@ export class SegmentManager {
     this.streams.clear();
     this.urlStreamMap.clear();
   }
+
+  addLoadedSegment(segmentLocalId: string) {
+    const segment = this.getSegment(segmentLocalId);
+    if (!segment) return;
+
+    const prevSegmentEndTime = this.prevLoadedSegment?.endTime;
+    const { startTime } = segment;
+    // if (!this.timeLoadedSegmentMap.has(startTime)) {
+    //   if (prevSegmentEndTime !== startTime) {
+    //     this.timeLoadedSegmentMap.clear();
+    //     this.loadedSegments = [];
+    //   }
+    //   this.timeLoadedSegmentMap.set(segment.startTime, segment);
+    //   this.loadedSegments.push(segment);
+    // } else {
+    //   const index = this.loadedSegments.findIndex(
+    //     (s) => s.startTime === startTime
+    //   );
+    //   this.loadedSegments[index] = segment;
+    // }
+
+    if (prevSegmentEndTime !== startTime) this.loadedSegments = [];
+    this.loadedSegments.push(segment);
+  }
+
+  updatePlayheadTime(playheadTime: number) {
+    this.playheadTime = playheadTime;
+    if (
+      this.currentSegment &&
+      playheadTime >= this.currentSegment.startTime &&
+      playheadTime < this.currentSegment.endTime
+    ) {
+      return;
+    }
+
+    const start =
+    while () {
+      let mid = Math.floor((start + end) / 2);
+    }
+  }
 }
+
+function binarySearch(list: unknown[], condition: (segment: Segment) => boolean) {
+  let start = 0;
+  let end = list.length - 1;
+  while (start <= end) {
+    let mid = Math.floor((start + end) / 2);
+  }
+}
+
+// class Playback {
+//   private segment: Segment;
+//
+//   constructor(segment: Segment) {
+//     this.segment = segment;
+//   }
+// }
