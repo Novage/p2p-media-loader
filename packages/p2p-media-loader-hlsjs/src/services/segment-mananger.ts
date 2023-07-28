@@ -70,4 +70,8 @@ export class SegmentManager {
 
     segmentToRemoveIds.forEach((value) => playlist.segments.delete(value));
   }
+
+  destroy() {
+    this.playlists.clear();
+  }
 }

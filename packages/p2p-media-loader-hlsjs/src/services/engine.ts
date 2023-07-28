@@ -2,9 +2,11 @@ import type Hls from "hls.js";
 import type { HlsConfig, Events } from "hls.js";
 import { FragmentLoaderBase } from "./fragment-loader";
 import { SegmentManager } from "./segment-mananger";
+import Debug from "debug";
 
 export class Engine {
-  segmentManager: SegmentManager;
+  private readonly segmentManager: SegmentManager;
+  private debugDestroying = Debug("hls:destroying");
 
   constructor() {
     this.segmentManager = new SegmentManager();
@@ -16,7 +18,7 @@ export class Engine {
     };
   }
 
-  public initHlsJsEvents(hls: Hls) {
+  initHlsJsEvents(hls: Hls) {
     hls.on("hlsManifestLoaded" as Events.MANIFEST_LOADED, (event, data) => {
       this.segmentManager.processMasterManifest(data);
     });
@@ -31,6 +33,25 @@ export class Engine {
         this.segmentManager.updatePlaylist(data);
       }
     );
+
+    hls.on("hlsDestroying" as Events.DESTROYING, () => {
+      this.debugDestroying("Hls destroying");
+      this.destroy();
+    });
+
+    hls.on("hlsManifestLoading" as Events.MANIFEST_LOADING, () => {
+      this.debugDestroying("Manifest loading");
+      this.destroy();
+    });
+
+    hls.on("hlsMediaAttaching" as Events.MEDIA_ATTACHING, () => {
+      this.debugDestroying("Media attaching");
+      this.destroy();
+    });
+  }
+
+  destroy() {
+    this.segmentManager.destroy();
   }
 
   private createFragmentLoaderClass() {

@@ -51,6 +51,8 @@ function App() {
   const [url, setUrl] = useState<string>(localStorage.streamUrl);
   const shakaEngine = useRef<ShakaEngine>(new ShakaEngine(shakaLib));
   const hlsEngine = useRef<HlsJsEngine>(new HlsJsEngine());
+  const shakaInstance = useRef<shaka.Player>();
+  const hlsInstance = useRef<Hls>();
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -70,21 +72,8 @@ function App() {
       setUrl(streamUrl.live2);
     }
 
-    switch (playerType) {
-      case "hls-dplayer":
-        initHlsDplayer(url);
-        break;
-      case "hlsjs":
-        initHlsJsPlayer(url);
-        break;
-      case "shaka-dplayer":
-        initShakaDplayer(url);
-        break;
-      case "shaka-player":
-        initShakaPlayer(url);
-        break;
-    }
-  }, [playerType, url]);
+    createNewPlayer();
+  }, [playerType]);
 
   const setPlayerToWindow = (player: DPlayer | ShakaPlayer | Hls) => {
     (window as unknown as ExtendedWindow).videoPlayer = player;
@@ -110,6 +99,8 @@ function App() {
             });
             engine.initShakaPlayer(shakaPlayer);
             shakaPlayer.load(src).catch(onError);
+
+            shakaInstance.current = shakaPlayer;
           },
         },
       },
@@ -131,7 +122,7 @@ function App() {
     });
     engine.initShakaPlayer(player);
     player.load(url).catch(onError);
-
+    shakaInstance.current = player;
     setPlayerToWindow(player);
   };
 
@@ -142,8 +133,9 @@ function App() {
       ...engine.getConfig(),
     });
     engine.initHlsJsEvents(hls);
-    hls.loadSource(url);
     hls.attachMedia(videoRef.current);
+    hls.loadSource(url);
+    hlsInstance.current = hls;
     setPlayerToWindow(hls);
   };
 
@@ -162,6 +154,7 @@ function App() {
             engine.initHlsJsEvents(hls);
             hls.loadSource(video.src);
             hls.attachMedia(video);
+            hlsInstance.current = hls;
           },
         },
       },
@@ -184,7 +177,40 @@ function App() {
   const onVideoUrlChange = (url: string) => {
     localStorage.streamUrl = url;
     setUrl(url);
-    destroyAndWindowPlayer();
+  };
+
+  const createNewPlayer = () => {
+    if (!localStorage.videoUrl) {
+      localStorage.streamUrl = streamUrl.live2;
+      setUrl(streamUrl.live2);
+    }
+    switch (playerType) {
+      case "hls-dplayer":
+        initHlsDplayer(url);
+        break;
+      case "hlsjs":
+        initHlsJsPlayer(url);
+        break;
+      case "shaka-dplayer":
+        initShakaDplayer(url);
+        break;
+      case "shaka-player":
+        initShakaPlayer(url);
+        break;
+    }
+  };
+
+  const loadStreamWithExistingInstance = () => {
+    switch (playerType) {
+      case "hls-dplayer":
+      case "hlsjs":
+        hlsInstance.current?.loadSource(url);
+        break;
+      case "shaka-player":
+      case "shaka-dplayer":
+        shakaInstance.current?.load(url).catch(() => undefined);
+        break;
+    }
   };
 
   return (
@@ -218,6 +244,10 @@ function App() {
               );
             })}
           </select>
+          <button onClick={createNewPlayer}>Create new player</button>
+          <button onClick={loadStreamWithExistingInstance}>
+            Load stream with existing hls/shaka instance
+          </button>
         </div>
       </div>
       <div style={{ display: "flex", justifyContent: "center" }}>
