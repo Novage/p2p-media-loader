@@ -70,9 +70,8 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       const byteRange = getByteRange(context.rangeStart, context.rangeEnd);
       this.response = await this.fetchSegment(context.url, byteRange);
     } catch (error) {
-      if (!this.stats.aborted) {
-        return this.handleError(error as { code: number; text: string });
-      }
+      if (this.stats.aborted) return;
+      return this.handleError(error);
     }
     if (!this.response) return;
     const loadedBytes = this.response.data.byteLength;
@@ -111,14 +110,18 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       const byteRangeString = `bytes=${start}-${end}`;
       headers.set("Range", byteRangeString);
     }
-    this.stats.loading.start = performance.now();
     const response = await fetch(segmentUrl, {
       headers,
       signal: this.abortController.signal,
     });
-    this.stats.loading.first = performance.now();
+    if (!response.ok) {
+      throw new FetchError(
+        response.statusText ?? "Fetch, bad network response",
+        response.status,
+        response
+      );
+    }
     const data = await response.arrayBuffer();
-    this.stats.loading.end = performance.now();
     return {
       ok: response.ok,
       status: response.status,
@@ -127,8 +130,17 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     };
   }
 
-  private handleError(error: { code: number; text: string }) {
-    this.callbacks?.onError(error, this.context, undefined, this.stats);
+  private handleError(thrownError: unknown) {
+    const error = { code: 0, text: "" };
+    let details: object | null = null;
+    if (thrownError instanceof FetchError) {
+      error.code = thrownError.code;
+      error.text = thrownError.message;
+      details = thrownError.details;
+    } else if (thrownError instanceof Error) {
+      error.text = thrownError.message;
+    }
+    this.callbacks?.onError(error, this.context, details, this.stats);
   }
 
   private abortInternal() {
@@ -182,4 +194,15 @@ function getLoadingStat({
   const start = first - DEFAULT_DOWNLOAD_LATENCY;
 
   return { start, first, end: loadingEndTime };
+}
+
+class FetchError extends Error {
+  public code: number;
+  public details: object;
+
+  constructor(message: string, code: number, details: object) {
+    super(message);
+    this.code = code;
+    this.details = details;
+  }
 }
