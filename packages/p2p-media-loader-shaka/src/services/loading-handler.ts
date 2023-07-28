@@ -5,7 +5,7 @@ import Debug from "debug";
 import { Shaka } from "../types/types";
 
 interface LoadingHandlerInterface {
-  handleLoad: shaka.extern.SchemePlugin;
+  handleLoading: shaka.extern.SchemePlugin;
 }
 
 type LoadingHandlerParams = Parameters<shaka.extern.SchemePlugin>;
@@ -17,6 +17,7 @@ export class LoadingHandler implements LoadingHandlerInterface {
   private readonly segmentManager: SegmentManager;
   private readonly streamInfo: StreamInfo;
   private loadArgs!: LoadingHandlerParams;
+  private readonly abortController = new AbortController();
   private readonly debug = Debug("shaka:loading");
 
   constructor({
@@ -38,7 +39,7 @@ export class LoadingHandler implements LoadingHandlerInterface {
     return fetchPlugin.parse(...this.loadArgs);
   }
 
-  handleLoad(...args: LoadingHandlerParams): LoadingHandlerResult {
+  handleLoading(...args: LoadingHandlerParams): LoadingHandlerResult {
     this.loadArgs = args;
     const { RequestType } = this.shaka.net.NetworkingEngine;
     const [url, request, requestType] = args;
@@ -78,18 +79,9 @@ export class LoadingHandler implements LoadingHandlerInterface {
     this.debug(`Segment: ${segment?.index}`);
     if (!stream) return this.defaultLoad();
 
-    const promise = this.fetchSegment(segmentUrl, byteRangeString);
-    promise.then((response) => {
-      response.timeMs = getLoadingDurationBasedOnBitrate({
-        bitrate: 2749539,
-        bytesLoaded: response.data.byteLength,
-      });
-
-      return response;
-    });
     return new this.shaka.util.AbortableOperation(
-      promise,
-      async () => undefined
+      this.fetchSegment(segmentUrl, byteRangeString),
+      async () => this.abortController.abort()
     );
   }
 
@@ -102,6 +94,7 @@ export class LoadingHandler implements LoadingHandlerInterface {
     if (byteRangeString) headers.set("Range", byteRangeString);
     const response = await fetch(segmentUrl, {
       headers,
+      signal: this.abortController.signal,
     });
     const data = await response.arrayBuffer();
     const { status, url } = response;
@@ -112,6 +105,10 @@ export class LoadingHandler implements LoadingHandlerInterface {
       status,
       uri: url,
       originalUri: segmentUrl,
+      timeMs: getLoadingDurationBasedOnBitrate({
+        bitrate: 2749539,
+        bytesLoaded: data.byteLength,
+      }),
     };
   }
 }

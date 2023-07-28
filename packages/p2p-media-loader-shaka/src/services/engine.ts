@@ -16,17 +16,10 @@ export class Engine {
   private readonly segmentManager: SegmentManager = new SegmentManager(
     this.streamInfo
   );
-  private loadingHandler: LoadingHandler;
-  private debugLoading = Debug("shaka:segment-loading");
   private debugDestroying = Debug("shaka:destroying");
 
   constructor(shaka?: unknown) {
     this.shaka = (shaka as Shaka | undefined) ?? window.shaka;
-    this.loadingHandler = new LoadingHandler({
-      shaka: this.shaka,
-      streamInfo: this.streamInfo,
-      segmentManager: this.segmentManager,
-    });
   }
 
   initShakaPlayer(player: shaka.Player) {
@@ -78,9 +71,15 @@ export class Engine {
   }
 
   private initializeNetworkingEngine() {
-    const loadingHandler: shaka.extern.SchemePlugin = (...args) =>
-      this.loadingHandler.handleLoad(...args);
-    this.shaka.net.NetworkingEngine.registerScheme("http", loadingHandler);
-    this.shaka.net.NetworkingEngine.registerScheme("https", loadingHandler);
+    const handleLoading: shaka.extern.SchemePlugin = (...args) => {
+      const loadingHandler = new LoadingHandler({
+        shaka: this.shaka,
+        streamInfo: this.streamInfo,
+        segmentManager: this.segmentManager,
+      });
+      return loadingHandler.handleLoading(...args);
+    };
+    this.shaka.net.NetworkingEngine.registerScheme("http", handleLoading);
+    this.shaka.net.NetworkingEngine.registerScheme("https", handleLoading);
   }
 }
