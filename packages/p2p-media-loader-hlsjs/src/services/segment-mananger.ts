@@ -1,5 +1,9 @@
 import { Playlist, Segment } from "./playlist";
-import type { LevelLoadedData, ManifestLoadedData } from "hls.js";
+import type {
+  ManifestLoadedData,
+  LevelUpdatedData,
+  AudioTrackLoadedData,
+} from "hls.js";
 
 export class SegmentManager {
   playlists: Map<string, Playlist> = new Map();
@@ -16,7 +20,11 @@ export class SegmentManager {
       if (this.playlists.has(level.url)) return;
       this.playlists.set(
         level.url,
-        new Playlist({ type: "video", index, masterManifestUrl: url })
+        new Playlist({
+          type: "video",
+          index,
+          masterManifestUrl: url,
+        })
       );
     });
 
@@ -24,15 +32,21 @@ export class SegmentManager {
       if (this.playlists.has(track.url)) return;
       this.playlists.set(
         track.url,
-        new Playlist({ type: "audio", index, masterManifestUrl: url })
+        new Playlist({
+          type: "audio",
+          index,
+          masterManifestUrl: url,
+        })
       );
     });
   }
 
-  setPlaylist(data: LevelLoadedData) {
+  updatePlaylist(data: LevelUpdatedData | AudioTrackLoadedData) {
+    if (!data.details) return;
     const {
       details: { url, fragments, live },
     } = data;
+
     const playlist = this.playlists.get(url);
     if (!playlist) return;
 
