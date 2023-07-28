@@ -115,6 +115,7 @@ export class Stream {
   shakaStream: HookedStream;
   url?: string;
   firstMediaSequence?: number;
+  bitrate: number;
 
   constructor({
     localId,
@@ -123,6 +124,7 @@ export class Stream {
     type,
     url,
     shakaStream,
+    bitrate,
   }: {
     localId: number;
     manifestUrl: string;
@@ -130,12 +132,14 @@ export class Stream {
     type: StreamType;
     url?: string;
     shakaStream: shaka.extern.Stream;
+    bitrate: number;
   }) {
     this.localId = localId;
     this.type = type;
     this.id = `${manifestUrl}-${type}-V${order}`;
     this.url = url;
     this.shakaStream = shakaStream;
+    this.bitrate = bitrate;
   }
 
   getLastMediaSequence() {
