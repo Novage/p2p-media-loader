@@ -6,12 +6,8 @@ export class SegmentManager {
   readonly streams: Map<number, Stream> = new Map();
   readonly urlStreamMap: Map<string, Stream> = new Map();
   readonly streamInfo: StreamInfo;
-  // timeLoadedSegmentMap: Map<number, Segment> = new Map();
-  loadedSegments: Segment[] = [];
-  playheadTime?: number;
-  prevLoadedSegment?: Segment;
-
-  private currentSegment?: Segment;
+  readonly videoPlayback = new Playback();
+  readonly audioPlayback = new Playback();
 
   constructor(streamInfo: StreamInfo) {
     this.streamInfo = streamInfo;
@@ -179,57 +175,113 @@ export class SegmentManager {
 
   addLoadedSegment(segmentLocalId: string) {
     const segment = this.getSegment(segmentLocalId);
-    if (!segment) return;
+    const stream = this.getStreamBySegmentLocalId(segmentLocalId);
+    if (!stream || !segment) return;
 
-    const prevSegmentEndTime = this.prevLoadedSegment?.endTime;
-    const { startTime } = segment;
-    // if (!this.timeLoadedSegmentMap.has(startTime)) {
-    //   if (prevSegmentEndTime !== startTime) {
-    //     this.timeLoadedSegmentMap.clear();
-    //     this.loadedSegments = [];
-    //   }
-    //   this.timeLoadedSegmentMap.set(segment.startTime, segment);
-    //   this.loadedSegments.push(segment);
-    // } else {
-    //   const index = this.loadedSegments.findIndex(
-    //     (s) => s.startTime === startTime
-    //   );
-    //   this.loadedSegments[index] = segment;
-    // }
-
-    if (prevSegmentEndTime !== startTime) this.loadedSegments = [];
-    this.loadedSegments.push(segment);
+    if (stream.type === "video") this.videoPlayback.addLoadedSegment(segment);
+    else this.audioPlayback.addLoadedSegment(segment);
   }
 
   updatePlayheadTime(playheadTime: number) {
+    this.videoPlayback.setPlayheadTime(playheadTime);
+    this.audioPlayback.setPlayheadTime(playheadTime);
+  }
+}
+
+class Playback {
+  public playheadTime = 0;
+  private playheadSegmentIndex = 0;
+  public playheadSegment?: Segment;
+  private lastLoadedSegmentIndex = 0;
+  private readonly loadedSegmentsMap: Map<number, Segment> = new Map();
+  private readonly loadedSegments: Segment[] = [];
+
+  setPlayheadTime(playheadTime: number) {
     this.playheadTime = playheadTime;
+
+    if (!this.loadedSegmentsMap.size) return;
+    let nextPlayheadSegmentIndex = 0;
+    if (this.playheadSegment) {
+      if (
+        playheadTime >= this.playheadSegment.startTime &&
+        playheadTime < this.playheadSegment.endTime
+      ) {
+        return;
+      }
+      nextPlayheadSegmentIndex = this.playheadSegmentIndex + 1;
+    }
+
+    const nextSegment = this.loadedSegments[nextPlayheadSegmentIndex];
     if (
-      this.currentSegment &&
-      playheadTime >= this.currentSegment.startTime &&
-      playheadTime < this.currentSegment.endTime
+      nextSegment &&
+      playheadTime >= nextSegment.startTime &&
+      playheadTime < nextSegment.endTime
     ) {
+      this.playheadSegmentIndex = nextPlayheadSegmentIndex;
+      this.playheadSegment = nextSegment;
+    }
+
+    let left = 0;
+    let right = this.loadedSegments.length - 1;
+    while (left <= right) {
+      const mid = Math.floor((left + right) / 2);
+      const segment = this.loadedSegments[mid];
+      const { startTime, endTime } = segment;
+      if (playheadTime >= startTime && playheadTime < endTime) {
+        this.playheadSegmentIndex = mid;
+        this.playheadSegment = segment;
+        break;
+      } else if (playheadTime < startTime) {
+        right = mid - 1;
+      } else {
+        left = mid + 1;
+      }
+    }
+  }
+
+  addLoadedSegment(segment: Segment) {
+    const lastLoadedSegment = this.loadedSegments[this.lastLoadedSegmentIndex];
+    const sameTimeSegment = this.loadedSegmentsMap.get(segment.startTime);
+
+    const findInsertIndexByStartTime = (segmentStartTime: number) => {
+      let left = 0;
+      let right = this.loadedSegments.length - 1;
+      while (left <= right) {
+        const mid = Math.floor((left + right) / 2);
+        const segment = this.loadedSegments[mid];
+        const next = this.loadedSegments[mid + 1];
+        if (
+          segmentStartTime >= segment.endTime &&
+          (!next || segmentStartTime < next.startTime)
+        ) {
+          return mid;
+        } else if (segmentStartTime < segment.endTime) {
+          right = mid - 1;
+        } else {
+          left = mid + 1;
+        }
+      }
+      return -1;
+    };
+
+    if (!sameTimeSegment) {
+      if (
+        lastLoadedSegment &&
+        segment.startTime === lastLoadedSegment.endTime
+      ) {
+        this.lastLoadedSegmentIndex++;
+      } else {
+        this.lastLoadedSegmentIndex = findInsertIndexByStartTime(
+          segment.startTime
+        );
+      }
+      this.loadedSegments.splice(this.lastLoadedSegmentIndex, 0, segment);
+      this.loadedSegmentsMap.set(segment.startTime, segment);
       return;
     }
 
-    const start =
-    while () {
-      let mid = Math.floor((start + end) / 2);
-    }
+    this.lastLoadedSegmentIndex = this.loadedSegments.indexOf(sameTimeSegment);
+    this.loadedSegments[this.lastLoadedSegmentIndex] = segment;
+    this.loadedSegmentsMap.set(segment.startTime, segment);
   }
 }
-
-function binarySearch(list: unknown[], condition: (segment: Segment) => boolean) {
-  let start = 0;
-  let end = list.length - 1;
-  while (start <= end) {
-    let mid = Math.floor((start + end) / 2);
-  }
-}
-
-// class Playback {
-//   private segment: Segment;
-//
-//   constructor(segment: Segment) {
-//     this.segment = segment;
-//   }
-// }

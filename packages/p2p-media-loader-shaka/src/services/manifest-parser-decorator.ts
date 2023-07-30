@@ -33,7 +33,6 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       uri,
       playerInterface
     );
-    console.log(manifest);
 
     // const { presentationTimeline } = manifest;
     // setInterval(() => {

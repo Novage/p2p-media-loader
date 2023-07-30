@@ -37,22 +37,27 @@ export class Engine {
       this.destroy();
     });
 
-    // player.addEventListener("buffering", (event) => {
-    //   console.log(event);
-    // });
-
     player.addEventListener("loaded", () => {
       const video = player.getMediaElement();
       video?.addEventListener("timeupdate", (event) => {
-        console.log("current time: ", video?.currentTime);
-        // player.getPresentationStartTimeAsDate()?.valueOf();
-        // console.log(player.getPlayheadTimeAsDate()?.valueOf());
+        if (!video) return;
+        this.segmentManager.updatePlayheadTime(video.currentTime);
       });
     });
-  }
 
-  private getActiveStream() {
-    const variants = this.player.getVariantTracks();
+    // setInterval(() => {
+    //   console.log(
+    //     "playheadTime",
+    //     this.segmentManager.videoPlayback.playheadTime
+    //   );
+    //   console.log(
+    //     "segment",
+    //     this.segmentManager.videoPlayback.playheadSegment?.startTime,
+    //     this.segmentManager.videoPlayback.playheadSegment?.endTime,
+    //     this.segmentManager.videoPlayback.playheadSegment?.index
+    //   );
+    //   console.log("");
+    // }, 3000);
   }
 
   destroy() {
