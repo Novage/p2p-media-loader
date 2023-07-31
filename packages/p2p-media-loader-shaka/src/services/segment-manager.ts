@@ -64,28 +64,40 @@ export class SegmentManager {
     }
     if (!references) return;
 
+    let staleSegmentIds: string[];
     if (this.streamInfo.protocol === "hls") {
-      this.processHlsSegmentReferences(managerStream, references);
+      staleSegmentIds =
+        this.processHlsSegmentReferences(managerStream, references) ?? [];
     } else {
-      this.processDashSegmentReferences(managerStream, references);
+      staleSegmentIds = this.processDashSegmentReferences(
+        managerStream,
+        references
+      );
     }
-  }
 
-  updateHLSStreamByUrl(url: string) {
-    const stream = this.urlStreamMap.get(url);
-    if (!stream || !stream.shakaStream) return;
-    this.updateStream({ stream: stream.shakaStream });
-  }
+    const deleteStaleFromPlayback =
+      managerStream.type === "video"
+        ? (segment: Segment) => this.videoPlayback.deleteStaleSegment(segment)
+        : (segment: Segment) => this.audioPlayback.deleteStaleSegment(segment);
 
-  getSegment(segmentLocalId: string) {
-    const stream = this.getStreamBySegmentLocalId(segmentLocalId);
-    return stream?.segments.get(segmentLocalId);
-  }
-
-  getStreamBySegmentLocalId(segmentLocalId: string) {
-    for (const stream of this.streams.values()) {
-      if (stream.segments.has(segmentLocalId)) return stream;
+    for (const id of staleSegmentIds) {
+      const segment = managerStream.segments.get(id);
+      managerStream.segments.delete(id);
+      if (!segment) continue;
+      deleteStaleFromPlayback(segment);
     }
+
+    // console.log(
+    //   managerStream.localId,
+    //   managerStream.type,
+    //   [...managerStream.segments.values()].map((i) => {
+    //     return {
+    //       i: i.index,
+    //       start: i.startTime,
+    //       end: i.endTime,
+    //     };
+    //   })
+    // );
   }
 
   private processDashSegmentReferences(
@@ -94,8 +106,9 @@ export class SegmentManager {
   ) {
     const staleSegmentsIds = new Set(managerStream.segments.keys());
     const stream = managerStream.shakaStream;
-    for (const reference of segmentReferences) {
-      const index = reference.getStartTime();
+    const isLive = this.streamInfo.isLive;
+    for (const [i, reference] of segmentReferences.entries()) {
+      const index = !isLive ? i : reference.getStartTime();
 
       const segmentLocalId = Segment.getLocalIdFromSegmentReference(reference);
       if (!managerStream.segments.has(segmentLocalId)) {
@@ -109,19 +122,17 @@ export class SegmentManager {
       }
       staleSegmentsIds.delete(segmentLocalId);
     }
-
-    for (const id of staleSegmentsIds) managerStream.segments.delete(id);
+    return [...staleSegmentsIds];
   }
 
   private processHlsSegmentReferences(
     managerStream: Stream,
     segmentReferences: shaka.media.SegmentReference[]
   ) {
-    const segments = [...managerStream.segments.values()];
     const stream = managerStream.shakaStream;
     const lastMediaSequence = managerStream.getLastMediaSequence();
 
-    if (segments.length === 0) {
+    if (managerStream.segments.size === 0) {
       const firstMediaSequence =
         lastMediaSequence === undefined
           ? 0
@@ -137,6 +148,7 @@ export class SegmentManager {
       return;
     }
 
+    const segments = [...managerStream.segments.values()];
     let index = lastMediaSequence ?? 0;
     const startSize = managerStream.segments.size;
 
@@ -161,9 +173,28 @@ export class SegmentManager {
     newSegments.forEach((s) => managerStream.segments.set(s.localId, s));
 
     const deleteCount = managerStream.segments.size - startSize;
+    const staleSegmentIds: string[] = [];
     for (let i = 0; i < deleteCount; i++) {
-      const segment = segments[i];
-      managerStream.segments.delete(segment.localId);
+      staleSegmentIds.push(segments[i].localId);
+    }
+
+    return staleSegmentIds;
+  }
+
+  updateHLSStreamByUrl(url: string) {
+    const stream = this.urlStreamMap.get(url);
+    if (!stream || !stream.shakaStream) return;
+    this.updateStream({ stream: stream.shakaStream });
+  }
+
+  getSegment(segmentLocalId: string) {
+    const stream = this.getStreamBySegmentLocalId(segmentLocalId);
+    return stream?.segments.get(segmentLocalId);
+  }
+
+  getStreamBySegmentLocalId(segmentLocalId: string) {
+    for (const stream of this.streams.values()) {
+      if (stream.segments.has(segmentLocalId)) return stream;
     }
   }
 
@@ -179,56 +210,58 @@ export class SegmentManager {
     if (!stream || !segment) return;
 
     if (stream.type === "video") this.videoPlayback.addLoadedSegment(segment);
-    else this.audioPlayback.addLoadedSegment(segment);
+    // else this.audioPlayback.addLoadedSegment(segment);
   }
 
   updatePlayheadTime(playheadTime: number) {
     this.videoPlayback.setPlayheadTime(playheadTime);
-    this.audioPlayback.setPlayheadTime(playheadTime);
+    // this.audioPlayback.setPlayheadTime(playheadTime);
   }
 }
 
 class Playback {
   public playheadTime = 0;
-  private playheadSegmentIndex = 0;
   public playheadSegment?: Segment;
-  private lastLoadedSegmentIndex = 0;
   private readonly loadedSegmentsMap: Map<number, Segment> = new Map();
-  private readonly loadedSegments: Segment[] = [];
 
   setPlayheadTime(playheadTime: number) {
     this.playheadTime = playheadTime;
-
     if (!this.loadedSegmentsMap.size) return;
-    let nextPlayheadSegmentIndex = 0;
-    if (this.playheadSegment) {
-      if (
-        playheadTime >= this.playheadSegment.startTime &&
-        playheadTime < this.playheadSegment.endTime
-      ) {
-        return;
-      }
-      nextPlayheadSegmentIndex = this.playheadSegmentIndex + 1;
+
+    if (
+      this.playheadSegment &&
+      playheadTime >= this.playheadSegment.startTime &&
+      playheadTime < this.playheadSegment.endTime
+    ) {
+      return;
     }
 
-    const nextSegment = this.loadedSegments[nextPlayheadSegmentIndex];
+    const playheadSegmentIndex = this.playheadSegment?.index;
+    const nextSegment =
+      playheadSegmentIndex !== undefined &&
+      this.loadedSegmentsMap.get(playheadSegmentIndex + 1);
+
+    console.log(this.loadedSegmentsMap);
+
     if (
       nextSegment &&
       playheadTime >= nextSegment.startTime &&
       playheadTime < nextSegment.endTime
     ) {
-      this.playheadSegmentIndex = nextPlayheadSegmentIndex;
+      console.log("NEXT", nextSegment.index);
       this.playheadSegment = nextSegment;
+      return;
     }
 
+    const loadedSegments = [...this.loadedSegmentsMap.values()];
+
     let left = 0;
-    let right = this.loadedSegments.length - 1;
+    let right = loadedSegments.length - 1;
     while (left <= right) {
       const mid = Math.floor((left + right) / 2);
-      const segment = this.loadedSegments[mid];
+      const segment = loadedSegments[mid];
       const { startTime, endTime } = segment;
       if (playheadTime >= startTime && playheadTime < endTime) {
-        this.playheadSegmentIndex = mid;
         this.playheadSegment = segment;
         break;
       } else if (playheadTime < startTime) {
@@ -240,48 +273,10 @@ class Playback {
   }
 
   addLoadedSegment(segment: Segment) {
-    const lastLoadedSegment = this.loadedSegments[this.lastLoadedSegmentIndex];
-    const sameTimeSegment = this.loadedSegmentsMap.get(segment.startTime);
+    this.loadedSegmentsMap.set(segment.index, segment);
+  }
 
-    const findInsertIndexByStartTime = (segmentStartTime: number) => {
-      let left = 0;
-      let right = this.loadedSegments.length - 1;
-      while (left <= right) {
-        const mid = Math.floor((left + right) / 2);
-        const segment = this.loadedSegments[mid];
-        const next = this.loadedSegments[mid + 1];
-        if (
-          segmentStartTime >= segment.endTime &&
-          (!next || segmentStartTime < next.startTime)
-        ) {
-          return mid;
-        } else if (segmentStartTime < segment.endTime) {
-          right = mid - 1;
-        } else {
-          left = mid + 1;
-        }
-      }
-      return -1;
-    };
-
-    if (!sameTimeSegment) {
-      if (
-        lastLoadedSegment &&
-        segment.startTime === lastLoadedSegment.endTime
-      ) {
-        this.lastLoadedSegmentIndex++;
-      } else {
-        this.lastLoadedSegmentIndex = findInsertIndexByStartTime(
-          segment.startTime
-        );
-      }
-      this.loadedSegments.splice(this.lastLoadedSegmentIndex, 0, segment);
-      this.loadedSegmentsMap.set(segment.startTime, segment);
-      return;
-    }
-
-    this.lastLoadedSegmentIndex = this.loadedSegments.indexOf(sameTimeSegment);
-    this.loadedSegments[this.lastLoadedSegmentIndex] = segment;
-    this.loadedSegmentsMap.set(segment.startTime, segment);
+  deleteStaleSegment(segment: Segment) {
+    this.loadedSegmentsMap.delete(segment.index);
   }
 }

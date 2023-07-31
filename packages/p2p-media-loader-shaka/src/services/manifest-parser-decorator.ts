@@ -34,18 +34,6 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       playerInterface
     );
 
-    // const { presentationTimeline } = manifest;
-    // setInterval(() => {
-    //   console.log(
-    //     "getSegmentAvailabilityStart",
-    //     presentationTimeline.getSegmentAvailabilityStart()
-    //   );
-    //   console.log(
-    //     "getPresentationStartTime",
-    //     presentationTimeline.getPresentationStartTime()
-    //   );
-    //   console.log("");
-    // }, 2000);
     this.segmentManager.setManifestUrl(uri);
     if (this.isHLS) {
       const success = this.retrieveStreamMediaSequenceTimeMaps(

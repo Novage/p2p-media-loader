@@ -2,6 +2,7 @@ export type StreamProtocol = "hls" | "dash";
 
 export type StreamInfo = {
   protocol?: StreamProtocol;
+  isLive: boolean;
 };
 
 export type StreamType = "video" | "audio";

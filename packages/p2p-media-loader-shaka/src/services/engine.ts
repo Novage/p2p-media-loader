@@ -12,7 +12,7 @@ import { decorateMethod } from "./utils";
 export class Engine {
   private readonly shaka: Shaka;
   private player!: shaka.Player;
-  private readonly streamInfo: StreamInfo = {};
+  private readonly streamInfo: StreamInfo = { isLive: false };
   private readonly segmentManager: SegmentManager = new SegmentManager(
     this.streamInfo
   );
@@ -39,7 +39,8 @@ export class Engine {
 
     player.addEventListener("loaded", () => {
       const video = player.getMediaElement();
-      video?.addEventListener("timeupdate", (event) => {
+      video?.addEventListener("timeupdate", () => {
+        this.streamInfo.isLive = player.isLive();
         if (!video) return;
         this.segmentManager.updatePlayheadTime(video.currentTime);
       });
