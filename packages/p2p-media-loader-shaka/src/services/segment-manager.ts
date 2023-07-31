@@ -1,4 +1,5 @@
 import { Segment, Stream } from "./segment";
+import { Playback } from "./playback";
 import { HookedStream, StreamInfo, StreamType } from "../types/types";
 
 export class SegmentManager {
@@ -6,11 +7,20 @@ export class SegmentManager {
   readonly streams: Map<number, Stream> = new Map();
   readonly urlStreamMap: Map<string, Stream> = new Map();
   readonly streamInfo: StreamInfo;
-  readonly videoPlayback = new Playback();
-  readonly audioPlayback = new Playback();
+  videoPlayback!: Playback;
+  audioPlayback!: Playback;
+  private isDashLive = false;
 
   constructor(streamInfo: StreamInfo) {
     this.streamInfo = streamInfo;
+  }
+
+  loaded() {
+    const { isLive, protocol } = this.streamInfo;
+    const isDashLive = isLive && protocol === "dash";
+    this.videoPlayback = new Playback(isDashLive);
+    this.audioPlayback = new Playback(isDashLive);
+    this.isDashLive = isDashLive;
   }
 
   setManifestUrl(url: string) {
@@ -64,65 +74,45 @@ export class SegmentManager {
     }
     if (!references) return;
 
-    let staleSegmentIds: string[];
     if (this.streamInfo.protocol === "hls") {
-      staleSegmentIds =
-        this.processHlsSegmentReferences(managerStream, references) ?? [];
+      this.processHlsSegmentReferences(managerStream, references);
     } else {
-      staleSegmentIds = this.processDashSegmentReferences(
-        managerStream,
-        references
-      );
+      this.processDashSegmentReferences(managerStream, references);
     }
-
-    const deleteStaleFromPlayback =
-      managerStream.type === "video"
-        ? (segment: Segment) => this.videoPlayback.deleteStaleSegment(segment)
-        : (segment: Segment) => this.audioPlayback.deleteStaleSegment(segment);
-
-    for (const id of staleSegmentIds) {
-      const segment = managerStream.segments.get(id);
-      managerStream.segments.delete(id);
-      if (!segment) continue;
-      deleteStaleFromPlayback(segment);
-    }
-
-    // console.log(
-    //   managerStream.localId,
-    //   managerStream.type,
-    //   [...managerStream.segments.values()].map((i) => {
-    //     return {
-    //       i: i.index,
-    //       start: i.startTime,
-    //       end: i.endTime,
-    //     };
-    //   })
-    // );
   }
 
   private processDashSegmentReferences(
     managerStream: Stream,
     segmentReferences: shaka.media.SegmentReference[]
   ) {
-    const staleSegmentsIds = new Set(managerStream.segments.keys());
+    const staleSegmentIds = new Set(managerStream.segments.keys());
     const stream = managerStream.shakaStream;
     const isLive = this.streamInfo.isLive;
-    for (const [i, reference] of segmentReferences.entries()) {
-      const index = !isLive ? i : reference.getStartTime();
+    let firstSegmentStartTime: number | undefined;
+    for (const [index, reference] of segmentReferences.entries()) {
+      const segmentIndex = !isLive ? index : reference.getStartTime();
 
       const segmentLocalId = Segment.getLocalIdFromSegmentReference(reference);
       if (!managerStream.segments.has(segmentLocalId)) {
         const segment = Segment.create({
           stream,
           segmentReference: reference,
-          index,
+          index: segmentIndex,
           localId: segmentLocalId,
         });
         managerStream.segments.set(segment.localId, segment);
       }
-      staleSegmentsIds.delete(segmentLocalId);
+      if (index === 0 && this.isDashLive) {
+        firstSegmentStartTime = reference.getStartTime();
+      }
+      staleSegmentIds.delete(segmentLocalId);
     }
-    return [...staleSegmentsIds];
+
+    this.removeStaleSegments({
+      stream: managerStream,
+      staleSegmentIds: [...staleSegmentIds],
+      streamFirstSegmentStartTime: firstSegmentStartTime,
+    });
   }
 
   private processHlsSegmentReferences(
@@ -178,7 +168,35 @@ export class SegmentManager {
       staleSegmentIds.push(segments[i].localId);
     }
 
-    return staleSegmentIds;
+    this.removeStaleSegments({
+      stream: managerStream,
+      staleSegmentIds,
+    });
+  }
+
+  private removeStaleSegments({
+    stream,
+    staleSegmentIds,
+    streamFirstSegmentStartTime,
+  }: {
+    stream: Stream;
+    staleSegmentIds: string[];
+    streamFirstSegmentStartTime?: number;
+  }) {
+    const playback =
+      stream.type === "video" ? this.videoPlayback : this.audioPlayback;
+    const { isLive, protocol } = this.streamInfo;
+    const isDashLive = isLive && protocol === "dash";
+
+    for (const id of staleSegmentIds) {
+      const segment = stream.segments.get(id);
+      stream.segments.delete(id);
+      if (!segment) continue;
+      playback.removeStaleSegment(segment);
+    }
+    if (isDashLive && streamFirstSegmentStartTime !== undefined) {
+      playback.removeSegmentsBeforeTime(streamFirstSegmentStartTime);
+    }
   }
 
   updateHLSStreamByUrl(url: string) {
@@ -210,73 +228,11 @@ export class SegmentManager {
     if (!stream || !segment) return;
 
     if (stream.type === "video") this.videoPlayback.addLoadedSegment(segment);
-    // else this.audioPlayback.addLoadedSegment(segment);
+    else this.audioPlayback.addLoadedSegment(segment);
   }
 
   updatePlayheadTime(playheadTime: number) {
     this.videoPlayback.setPlayheadTime(playheadTime);
-    // this.audioPlayback.setPlayheadTime(playheadTime);
-  }
-}
-
-class Playback {
-  public playheadTime = 0;
-  public playheadSegment?: Segment;
-  private readonly loadedSegmentsMap: Map<number, Segment> = new Map();
-
-  setPlayheadTime(playheadTime: number) {
-    this.playheadTime = playheadTime;
-    if (!this.loadedSegmentsMap.size) return;
-
-    if (
-      this.playheadSegment &&
-      playheadTime >= this.playheadSegment.startTime &&
-      playheadTime < this.playheadSegment.endTime
-    ) {
-      return;
-    }
-
-    const playheadSegmentIndex = this.playheadSegment?.index;
-    const nextSegment =
-      playheadSegmentIndex !== undefined &&
-      this.loadedSegmentsMap.get(playheadSegmentIndex + 1);
-
-    console.log(this.loadedSegmentsMap);
-
-    if (
-      nextSegment &&
-      playheadTime >= nextSegment.startTime &&
-      playheadTime < nextSegment.endTime
-    ) {
-      console.log("NEXT", nextSegment.index);
-      this.playheadSegment = nextSegment;
-      return;
-    }
-
-    const loadedSegments = [...this.loadedSegmentsMap.values()];
-
-    let left = 0;
-    let right = loadedSegments.length - 1;
-    while (left <= right) {
-      const mid = Math.floor((left + right) / 2);
-      const segment = loadedSegments[mid];
-      const { startTime, endTime } = segment;
-      if (playheadTime >= startTime && playheadTime < endTime) {
-        this.playheadSegment = segment;
-        break;
-      } else if (playheadTime < startTime) {
-        right = mid - 1;
-      } else {
-        left = mid + 1;
-      }
-    }
-  }
-
-  addLoadedSegment(segment: Segment) {
-    this.loadedSegmentsMap.set(segment.index, segment);
-  }
-
-  deleteStaleSegment(segment: Segment) {
-    this.loadedSegmentsMap.delete(segment.index);
+    this.audioPlayback.setPlayheadTime(playheadTime);
   }
 }

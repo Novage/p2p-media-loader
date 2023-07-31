@@ -12,10 +12,8 @@ import { decorateMethod } from "./utils";
 export class Engine {
   private readonly shaka: Shaka;
   private player!: shaka.Player;
-  private readonly streamInfo: StreamInfo = { isLive: false };
-  private readonly segmentManager: SegmentManager = new SegmentManager(
-    this.streamInfo
-  );
+  readonly streamInfo: StreamInfo = { isLive: false };
+  readonly segmentManager: SegmentManager = new SegmentManager(this.streamInfo);
   private debugLoading = Debug("shaka:segment-loading");
   private debugDestroying = Debug("shaka:destroying");
 
@@ -38,27 +36,14 @@ export class Engine {
     });
 
     player.addEventListener("loaded", () => {
+      this.streamInfo.isLive = player.isLive();
+      this.segmentManager.loaded();
       const video = player.getMediaElement();
       video?.addEventListener("timeupdate", () => {
-        this.streamInfo.isLive = player.isLive();
         if (!video) return;
         this.segmentManager.updatePlayheadTime(video.currentTime);
       });
     });
-
-    // setInterval(() => {
-    //   console.log(
-    //     "playheadTime",
-    //     this.segmentManager.videoPlayback.playheadTime
-    //   );
-    //   console.log(
-    //     "segment",
-    //     this.segmentManager.videoPlayback.playheadSegment?.startTime,
-    //     this.segmentManager.videoPlayback.playheadSegment?.endTime,
-    //     this.segmentManager.videoPlayback.playheadSegment?.index
-    //   );
-    //   console.log("");
-    // }, 3000);
   }
 
   destroy() {
