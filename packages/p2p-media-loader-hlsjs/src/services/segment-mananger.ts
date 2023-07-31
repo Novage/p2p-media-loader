@@ -1,12 +1,14 @@
-import { Playlist, Segment } from "./playlist";
+import { Playlist, Segment, SegmentType } from "./playlist";
 import type {
   ManifestLoadedData,
   LevelUpdatedData,
   AudioTrackLoadedData,
 } from "hls.js";
+import { Fragment } from "hls.js";
 
 export class SegmentManager {
   playlists: Map<string, Playlist> = new Map();
+  playback: Playback = new Playback();
 
   getPlaylistBySegmentId(segmentId: string): Playlist | undefined {
     for (const playlist of this.playlists.values()) {
@@ -71,7 +73,33 @@ export class SegmentManager {
     segmentToRemoveIds.forEach((value) => playlist.segments.delete(value));
   }
 
+  setPlayhead(position: number, frag: Fragment) {
+    const [start, end] = frag.byteRange;
+    const segmentId = Segment.getSegmentLocalId(frag.url, { start, end });
+    const playlist = this.getPlaylistBySegmentId(segmentId);
+    const segment = playlist?.segments.get(segmentId);
+    if (!playlist || !segment) return;
+    this.playback.setPlayheadPosition(position, segment, playlist.type);
+  }
+
   destroy() {
     this.playlists.clear();
+  }
+}
+
+class Playback {
+  playheadPosition?: number;
+  videoSegment?: Segment;
+  audioSegment?: Segment;
+
+  setPlayheadPosition(
+    position: number,
+    segment: Segment,
+    playlistType: SegmentType
+  ) {
+    this.playheadPosition = position;
+    this.videoSegment = segment;
+    if (playlistType === "video") this.videoSegment = segment;
+    else this.audioSegment = segment;
   }
 }

@@ -1,4 +1,4 @@
-type SegmentType = "video" | "audio";
+export type SegmentType = "video" | "audio";
 
 export type ByteRange = { start: number; end: number };
 
