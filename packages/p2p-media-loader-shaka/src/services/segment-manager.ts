@@ -30,9 +30,11 @@ export class SegmentManager {
   setStream({
     stream,
     streamOrder = -1,
+    bitrate,
   }: {
     stream: HookedStream;
     streamOrder?: number;
+    bitrate: number;
   }) {
     if (!this.manifestUrl || this.streams.has(stream.id)) return;
 
@@ -43,6 +45,7 @@ export class SegmentManager {
       manifestUrl: this.manifestUrl,
       url: stream.streamUrl,
       shakaStream: stream,
+      bitrate,
     });
     this.streams.set(managerStream.localId, managerStream);
     if (this.streamInfo.protocol === "hls" && managerStream.url) {
@@ -60,7 +63,7 @@ export class SegmentManager {
     segmentReferences?: shaka.media.SegmentReference[];
   }) {
     let managerStream = this.streams.get(stream.id);
-    if (!managerStream) managerStream = this.setStream({ stream });
+    if (!managerStream) managerStream = this.setStream({ stream, bitrate: 0 });
     if (!managerStream) return;
 
     const { segmentIndex } = stream;
@@ -79,6 +82,12 @@ export class SegmentManager {
     } else {
       this.processDashSegmentReferences(managerStream, references);
     }
+  }
+
+  updateHlsStreamByUrl(url: string) {
+    const stream = this.urlStreamMap.get(url);
+    if (!stream || !stream.shakaStream) return;
+    this.updateStream({ stream: stream.shakaStream });
   }
 
   private processDashSegmentReferences(

@@ -18,7 +18,7 @@ type Player = (typeof players)[number];
 type ShakaPlayer = shaka.Player;
 type ExtendedWindow = Window & { videoPlayer?: { destroy?: () => void } };
 
-const videoUrl = {
+const streamUrl = {
   bigBunnyBuck: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
   byteRangeVideo:
     "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8",
@@ -48,7 +48,7 @@ function App() {
   const [playerType, setPlayerType] = useState<Player | undefined>(
     localStorage.player
   );
-  const [url, setUrl] = useState<string>(localStorage.videoUrl);
+  const [url, setUrl] = useState<string>(localStorage.streamUrl);
   const shakaEngine = useRef<ShakaEngine>(new ShakaEngine(shakaLib));
   const hlsEngine = useRef<HlsJsEngine>(new HlsJsEngine());
   const shakaInstance = useRef<shaka.Player>();
@@ -66,6 +66,10 @@ function App() {
     if (!localStorage.player) {
       localStorage.player = "hls-dplayer";
       setPlayerType("hls-dplayer");
+    }
+    if (!localStorage.streamUrl) {
+      localStorage.streamUrl = streamUrl.live2;
+      setUrl(streamUrl.live2);
     }
 
     createNewPlayer();
@@ -171,14 +175,14 @@ function App() {
   };
 
   const onVideoUrlChange = (url: string) => {
-    localStorage.videoUrl = url;
+    localStorage.streamUrl = url;
     setUrl(url);
   };
 
   const createNewPlayer = () => {
     if (!localStorage.videoUrl) {
-      localStorage.videoUrl = videoUrl.live2;
-      setUrl(videoUrl.live2);
+      localStorage.streamUrl = streamUrl.live2;
+      setUrl(streamUrl.live2);
     }
     switch (playerType) {
       case "hls-dplayer":
@@ -232,7 +236,7 @@ function App() {
             value={url}
             onChange={(event) => onVideoUrlChange(event.target.value)}
           >
-            {Object.entries(videoUrl).map(([name, url]) => {
+            {Object.entries(streamUrl).map(([name, url]) => {
               return (
                 <option key={name} value={url}>
                   {name}

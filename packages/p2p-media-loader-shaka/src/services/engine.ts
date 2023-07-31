@@ -6,15 +6,16 @@ import {
 import { SegmentManager } from "./segment-manager";
 import Debug from "debug";
 import { StreamInfo, StreamProtocol, Shaka } from "../types/types";
-import { getLoadingHandler } from "./loading-handler";
+import { LoadingHandler } from "./loading-handler";
 import { decorateMethod } from "./utils";
 
 export class Engine {
   private readonly shaka: Shaka;
   private player!: shaka.Player;
-  readonly streamInfo: StreamInfo = { isLive: false };
-  readonly segmentManager: SegmentManager = new SegmentManager(this.streamInfo);
-  private debugLoading = Debug("shaka:segment-loading");
+  private readonly streamInfo: StreamInfo = { isLive: false };
+  private readonly segmentManager: SegmentManager = new SegmentManager(
+    this.streamInfo
+  );
   private debugDestroying = Debug("shaka:destroying");
 
   constructor(shaka?: unknown) {
@@ -80,13 +81,15 @@ export class Engine {
   }
 
   private initializeNetworkingEngine() {
-    const loadingHandler = getLoadingHandler(
-      this.shaka,
-      this.segmentManager,
-      this.streamInfo,
-      this.debugLoading
-    );
-    this.shaka.net.NetworkingEngine.registerScheme("http", loadingHandler);
-    this.shaka.net.NetworkingEngine.registerScheme("https", loadingHandler);
+    const handleLoading: shaka.extern.SchemePlugin = (...args) => {
+      const loadingHandler = new LoadingHandler({
+        shaka: this.shaka,
+        streamInfo: this.streamInfo,
+        segmentManager: this.segmentManager,
+      });
+      return loadingHandler.handleLoading(...args);
+    };
+    this.shaka.net.NetworkingEngine.registerScheme("http", handleLoading);
+    this.shaka.net.NetworkingEngine.registerScheme("https", handleLoading);
   }
 }

@@ -25,9 +25,16 @@ export class Engine {
       this.segmentManager.processMasterManifest(data);
     });
 
-    hls.on("hlsLevelLoaded" as Events.LEVEL_LOADED, (event, data) => {
-      this.segmentManager.setPlaylist(data);
+    hls.on("hlsLevelUpdated" as Events.LEVEL_UPDATED, (event, data) => {
+      this.segmentManager.updatePlaylist(data);
     });
+
+    hls.on(
+      "hlsAudioTrackLoaded" as Events.AUDIO_TRACK_LOADED,
+      (event, data) => {
+        this.segmentManager.updatePlaylist(data);
+      }
+    );
 
     hls.on("hlsDestroying" as Events.DESTROYING, () => {
       this.debugDestroying("Hls destroying");
