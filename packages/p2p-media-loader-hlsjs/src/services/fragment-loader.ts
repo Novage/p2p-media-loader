@@ -58,8 +58,8 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     this.callbacks = callbacks;
     const stats = this.stats;
 
-    const playlist = this.identifyPlaylist(context);
-    if (!playlist) {
+    const segment = this.identifySegment(context);
+    if (!segment) {
       this.defaultLoader = this.createDefaultLoader();
       this.defaultLoader.stats = this.stats;
       this.defaultLoader?.load(context, config, callbacks);
@@ -69,6 +69,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     try {
       const byteRange = getByteRange(context.rangeStart, context.rangeEnd);
       this.response = await this.fetchSegment(context.url, byteRange);
+      this.segmentManager.addLoadedSegment(segment);
     } catch (error) {
       if (this.stats.aborted) return;
       return this.handleError(error);
@@ -86,20 +87,19 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     callbacks.onSuccess(this.response, this.stats, context, this.response);
   }
 
-  private identifyPlaylist(context: LoaderContext) {
+  private identifySegment(context: LoaderContext) {
     const { rangeStart: start, rangeEnd: end } = context;
     const segmentId = Segment.getSegmentLocalId(context.url, {
       start,
       end,
     });
-    const playlist = this.segmentManager.getPlaylistBySegmentId(segmentId);
+    const segment = this.segmentManager.getSegmentById(segmentId);
     this.debug(
       "downloaded segment from playlist\n",
-      `playlist v: ${playlist?.index}\n`,
       `segment: `,
-      playlist?.segments.get(segmentId)?.index
+      segment?.index
     );
-    return playlist;
+    return segment;
   }
 
   async fetchSegment(segmentUrl: string, byteRange?: ByteRange) {

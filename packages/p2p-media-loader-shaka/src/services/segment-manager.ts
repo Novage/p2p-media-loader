@@ -15,7 +15,7 @@ export class SegmentManager {
     this.streamInfo = streamInfo;
   }
 
-  loaded() {
+  initialized() {
     const { isLive, protocol } = this.streamInfo;
     const isDashLive = isLive && protocol === "dash";
     this.videoPlayback = new Playback(isDashLive);
@@ -233,10 +233,9 @@ export class SegmentManager {
 
   addLoadedSegment(segmentLocalId: string) {
     const segment = this.getSegment(segmentLocalId);
-    const stream = this.getStreamBySegmentLocalId(segmentLocalId);
-    if (!stream || !segment) return;
+    if (!segment) return;
 
-    if (stream.type === "video") this.videoPlayback.addLoadedSegment(segment);
+    if (segment.type === "video") this.videoPlayback.addLoadedSegment(segment);
     else this.audioPlayback.addLoadedSegment(segment);
   }
 

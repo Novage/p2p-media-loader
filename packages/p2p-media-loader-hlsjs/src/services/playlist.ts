@@ -30,20 +30,32 @@ export class Playlist {
 export class Segment {
   localId: string;
   index: number;
+  type: SegmentType;
+  startTime: number;
+  endTime: number;
 
   constructor({
     segmentUrl,
     index,
     byteRange,
     localId,
+    type,
+    endTime,
+    startTime,
   }: {
     segmentUrl: string;
     index: number;
     byteRange?: ByteRange;
     localId?: string;
+    type: SegmentType;
+    startTime: number;
+    endTime: number;
   }) {
     this.index = index;
     this.localId = localId ?? Segment.getSegmentLocalId(segmentUrl, byteRange);
+    this.type = type;
+    this.startTime = startTime;
+    this.endTime = endTime;
   }
 
   static getSegmentLocalId(

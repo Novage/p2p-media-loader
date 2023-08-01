@@ -54,6 +54,13 @@ export class Engine {
       if (!videoElement) return;
       this.segmentManager.setPlayhead(videoElement.currentTime, data.frag);
     });
+
+    hls.on("hlsMediaAttached" as Events.MEDIA_ATTACHED, (event, data) => {
+      const { media } = data;
+      media.addEventListener("timeupdate", () => {
+        this.segmentManager.setPlayhead(media.currentTime);
+      });
+    });
   }
 
   destroy() {

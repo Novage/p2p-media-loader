@@ -99,7 +99,6 @@ export class LoadingHandler implements LoadingHandlerInterface {
     });
     const data = await response.arrayBuffer();
     const { status, url } = response;
-
     this.segmentManager.addLoadedSegment(segmentId);
 
     return {

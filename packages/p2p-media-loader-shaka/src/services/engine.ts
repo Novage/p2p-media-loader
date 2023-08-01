@@ -38,7 +38,7 @@ export class Engine {
 
     player.addEventListener("loaded", () => {
       this.streamInfo.isLive = player.isLive();
-      this.segmentManager.loaded();
+      this.segmentManager.initialized();
       const video = player.getMediaElement();
       video?.addEventListener("timeupdate", () => {
         if (!video) return;
