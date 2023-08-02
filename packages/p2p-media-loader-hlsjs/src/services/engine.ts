@@ -1,7 +1,7 @@
 import type Hls from "hls.js";
 import type { HlsConfig, Events } from "hls.js";
 import { FragmentLoaderBase } from "./fragment-loader";
-import { SegmentManager } from "./segment-mananger";
+import { SegmentManager } from "./segment-manager";
 import Debug from "debug";
 
 export class Engine {

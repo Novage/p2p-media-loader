@@ -7,7 +7,7 @@ import type {
   LoaderContext,
   LoaderStats,
 } from "hls.js";
-import { SegmentManager } from "./segment-mananger";
+import { SegmentManager } from "./segment-manager";
 import { ByteRange, Segment } from "./playlist";
 import Debug from "debug";
 

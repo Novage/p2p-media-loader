@@ -1,5 +1,5 @@
 import { Segment, Stream } from "./segment";
-import { Playback } from "./playback";
+import { Playback } from "common";
 import { HookedStream, StreamInfo, StreamType } from "../types/types";
 
 export class SegmentManager {
@@ -30,11 +30,9 @@ export class SegmentManager {
   setStream({
     stream,
     streamOrder = -1,
-    bitrate,
   }: {
     stream: HookedStream;
     streamOrder?: number;
-    bitrate: number;
   }) {
     if (!this.manifestUrl || this.streams.has(stream.id)) return;
 
@@ -45,7 +43,6 @@ export class SegmentManager {
       manifestUrl: this.manifestUrl,
       url: stream.streamUrl,
       shakaStream: stream,
-      bitrate,
     });
     this.streams.set(managerStream.localId, managerStream);
     if (this.streamInfo.protocol === "hls" && managerStream.url) {
@@ -63,7 +60,7 @@ export class SegmentManager {
     segmentReferences?: shaka.media.SegmentReference[];
   }) {
     let managerStream = this.streams.get(stream.id);
-    if (!managerStream) managerStream = this.setStream({ stream, bitrate: 0 });
+    if (!managerStream) managerStream = this.setStream({ stream });
     if (!managerStream) return;
 
     const { segmentIndex } = stream;
@@ -96,10 +93,9 @@ export class SegmentManager {
   ) {
     const staleSegmentIds = new Set(managerStream.segments.keys());
     const stream = managerStream.shakaStream;
-    const isLive = this.streamInfo.isLive;
     let firstSegmentStartTime: number | undefined;
     for (const [index, reference] of segmentReferences.entries()) {
-      const segmentIndex = !isLive ? index : reference.getStartTime();
+      const segmentIndex = !this.isDashLive ? index : reference.getStartTime();
 
       const segmentLocalId = Segment.getLocalIdFromSegmentReference(reference);
       if (!managerStream.segments.has(segmentLocalId)) {
@@ -109,10 +105,8 @@ export class SegmentManager {
           index: segmentIndex,
           localId: segmentLocalId,
         });
+        if (index === 0) firstSegmentStartTime = segment.startTime;
         managerStream.segments.set(segment.localId, segment);
-      }
-      if (index === 0 && this.isDashLive) {
-        firstSegmentStartTime = reference.getStartTime();
       }
       staleSegmentIds.delete(segmentLocalId);
     }
@@ -120,7 +114,7 @@ export class SegmentManager {
     this.removeStaleSegments({
       stream: managerStream,
       staleSegmentIds: [...staleSegmentIds],
-      streamFirstSegmentStartTime: firstSegmentStartTime,
+      removeBeforeTime: firstSegmentStartTime,
     });
   }
 
@@ -186,16 +180,14 @@ export class SegmentManager {
   private removeStaleSegments({
     stream,
     staleSegmentIds,
-    streamFirstSegmentStartTime,
+    removeBeforeTime: time,
   }: {
     stream: Stream;
     staleSegmentIds: string[];
-    streamFirstSegmentStartTime?: number;
+    removeBeforeTime?: number;
   }) {
     const playback =
       stream.type === "video" ? this.videoPlayback : this.audioPlayback;
-    const { isLive, protocol } = this.streamInfo;
-    const isDashLive = isLive && protocol === "dash";
 
     for (const id of staleSegmentIds) {
       const segment = stream.segments.get(id);
@@ -203,15 +195,9 @@ export class SegmentManager {
       if (!segment) continue;
       playback.removeStaleSegment(segment);
     }
-    if (isDashLive && streamFirstSegmentStartTime !== undefined) {
-      playback.removeSegmentsBeforeTime(streamFirstSegmentStartTime);
+    if (time !== undefined && this.isDashLive) {
+      this.videoPlayback.removeBeforeTime(time);
     }
-  }
-
-  updateHLSStreamByUrl(url: string) {
-    const stream = this.urlStreamMap.get(url);
-    if (!stream || !stream.shakaStream) return;
-    this.updateStream({ stream: stream.shakaStream });
   }
 
   getSegment(segmentLocalId: string) {

@@ -66,15 +66,13 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
 
     const processStream = (
       stream: shaka.extern.Stream | null,
-      count: number,
-      bandwidth: number
+      count: number
     ) => {
       if (!stream || processedStreams.has(stream.id)) return false;
       if (this.isDash) this.hookSegmentIndex(stream);
       this.segmentManager.setStream({
         stream: stream as HookedStream,
         streamOrder: count,
-        bitrate: bandwidth,
       });
       if (stream.segmentIndex) {
         this.segmentManager.updateStream({ stream });
@@ -86,9 +84,9 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     let videoCount = 0;
     let audioCount = 0;
     for (const variant of variants) {
-      const { video, audio, bandwidth } = variant;
-      if (processStream(video, videoCount, bandwidth)) videoCount++;
-      if (processStream(audio, audioCount, bandwidth)) audioCount++;
+      const { video, audio } = variant;
+      if (processStream(video, videoCount)) videoCount++;
+      if (processStream(audio, audioCount)) audioCount++;
     }
   }
 
@@ -116,7 +114,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
 
         let references: shaka.media.SegmentReference[];
         try {
-          references = Array.from(segmentIndex);
+          references = [...segmentIndex];
           firstItemReference = references[0];
           lastItemReference = references[references.length - 1];
         } catch (err) {

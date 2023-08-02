@@ -41,7 +41,9 @@ const streamUrl = {
     "https://livesim.dashif.org/livesim/testpic_2s/Manifest.mpd",
   hlsAkamaiLive:
     "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8",
-  mss: "https://playready.directtaps.net/smoothstreaming/SSWSS720H264/SuperSpeedway_720.ism/Manifest",
+  dashLive:
+    "https://cdn-vos-ppp-01.vos360.video/Content/DASH_DASHCLEAR2/Live/channel(PPP-LL-2DASH)/master.mpd",
+  dash: "https://amssamples.streaming.mediaservices.windows.net/bb34a723-f69a-4231-afba-dc850f9e3da8/ChildOfThe90s.ism/manifest(format=mpd-time-csf)",
 };
 
 function App() {
