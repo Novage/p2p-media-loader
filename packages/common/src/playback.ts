@@ -4,10 +4,10 @@ type Segment = {
   index: number;
 };
 
-export class Playback {
+export class Playback<T extends Segment = Segment> {
   public playheadTime = 0;
-  public playheadSegment?: Segment;
-  private readonly loadedSegments: Map<number, Segment> = new Map();
+  public playheadSegment?: T;
+  private readonly loadedSegments: Map<number, T> = new Map();
   private readonly isDashLive: boolean;
 
   constructor(isDashLive = false) {
@@ -26,7 +26,7 @@ export class Playback {
       return;
     }
 
-    let nextSegment: Segment | undefined;
+    let nextSegment: T | undefined;
     if (this.playheadSegment) {
       if (this.isDashLive) {
         const { endTime } = this.playheadSegment;
@@ -52,7 +52,7 @@ export class Playback {
     if (segment) this.playheadSegment = segment;
   }
 
-  addLoadedSegment(segment: Segment) {
+  addLoadedSegment(segment: T) {
     const key = this.isDashLive ? segment.startTime : segment.index;
 
     this.loadedSegments.set(key, segment);
@@ -75,7 +75,7 @@ export class Playback {
     }
   }
 
-  removeStaleSegment(segment: Segment) {
+  removeStaleSegment(segment: T) {
     this.loadedSegments.delete(segment.index);
   }
 }

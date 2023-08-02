@@ -9,8 +9,8 @@ import { Fragment } from "hls.js";
 
 export class SegmentManager {
   playlists: Map<string, Playlist> = new Map();
-  videoPlayback: Playback = new Playback();
-  audioPlayback: Playback = new Playback();
+  videoPlayback: Playback<Segment> = new Playback();
+  audioPlayback: Playback<Segment> = new Playback();
 
   getPlaylistBySegmentId(segmentId: string): Playlist | undefined {
     for (const playlist of this.playlists.values()) {

@@ -7,8 +7,8 @@ export class SegmentManager {
   readonly streams: Map<number, Stream> = new Map();
   readonly urlStreamMap: Map<string, Stream> = new Map();
   readonly streamInfo: StreamInfo;
-  videoPlayback!: Playback;
-  audioPlayback!: Playback;
+  videoPlayback!: Playback<Segment>;
+  audioPlayback!: Playback<Segment>;
   private isDashLive = false;
 
   constructor(streamInfo: StreamInfo) {
