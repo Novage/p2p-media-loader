@@ -55,8 +55,9 @@ export class Playback<T extends Segment = Segment> {
   addLoadedSegment(segment: T) {
     const key = this.isDashLive ? segment.startTime : segment.index;
 
+    const hasKey = this.loadedSegments.has(key);
     this.loadedSegments.set(key, segment);
-    if (this.isDashLive) {
+    if (this.isDashLive && !hasKey) {
       const segments = [...this.loadedSegments];
       const [overlappingSegmentKey] =
         segments.find(([, s]) => isOverlappingSegment(segment, s)) ?? [];
