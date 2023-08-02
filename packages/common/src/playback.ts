@@ -87,12 +87,12 @@ function isOverlappingSegment(s1: Segment, s2: Segment): boolean {
 
   if (s1ET <= s2ST || s1ST >= s2ET) return false;
   const duration = s1ET - s1ST;
-  if (s1ST > s2ST && s1ST < s2ET) {
+  if (s1ST >= s2ST && s1ST < s2ET) {
     const overlappingPart = s2ET - s1ST;
     const rate = overlappingPart / duration;
     return rate > 0.8;
   }
-  if (s2ST > s1ST && s2ST < s1ET) {
+  if (s2ST >= s1ST && s2ST < s1ET) {
     const overlappingPart = s1ET - s2ST;
     const rate = overlappingPart / duration;
     return rate > 0.8;
