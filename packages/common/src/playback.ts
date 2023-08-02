@@ -1,4 +1,8 @@
-import { Segment } from "./segment";
+type Segment = {
+  startTime: number;
+  endTime: number;
+  index: number;
+};
 
 export class Playback {
   public playheadTime = 0;
@@ -6,7 +10,7 @@ export class Playback {
   private readonly loadedSegments: Map<number, Segment> = new Map();
   private readonly isDashLive: boolean;
 
-  constructor(isDashLive: boolean) {
+  constructor(isDashLive = false) {
     this.isDashLive = isDashLive;
   }
 
@@ -41,9 +45,7 @@ export class Playback {
       this.playheadSegment = nextSegment;
       return;
     }
-
     const loadedSegments = [...this.loadedSegments.values()];
-
     const segment = loadedSegments.find(
       (s) => playheadTime >= s.startTime && playheadTime < s.endTime
     );
@@ -51,18 +53,49 @@ export class Playback {
   }
 
   addLoadedSegment(segment: Segment) {
-    this.loadedSegments.set(segment.index, segment);
+    const key = this.isDashLive ? segment.startTime : segment.index;
+
+    this.loadedSegments.set(key, segment);
+    if (this.isDashLive) {
+      const segments = [...this.loadedSegments];
+      const [overlappingSegmentKey] =
+        segments.find(([, s]) => isOverlappingSegment(segment, s)) ?? [];
+      if (overlappingSegmentKey) {
+        this.loadedSegments.delete(overlappingSegmentKey);
+      }
+    }
   }
 
-  removeSegmentsBeforeTime(time: number) {
-    if (!this.isDashLive) return;
-    // in the case of dash+live key is startTime
-    for (const startTime of this.loadedSegments.keys()) {
-      if (startTime < time) this.loadedSegments.delete(startTime);
+  removeBeforeTime(time: number) {
+    const segments = [...this.loadedSegments];
+    for (const [key, segment] of segments) {
+      if (segment.startTime < time) {
+        this.loadedSegments.delete(key);
+      }
     }
   }
 
   removeStaleSegment(segment: Segment) {
     this.loadedSegments.delete(segment.index);
   }
+}
+
+function isOverlappingSegment(s1: Segment, s2: Segment): boolean {
+  const { startTime: s1ST, endTime: s1ET } = s1;
+  const { startTime: s2ST, endTime: s2ET } = s2;
+
+  if (s1ET <= s2ST || s1ST >= s2ET) return false;
+  const duration = s1ET - s1ST;
+  if (s1ST > s2ST && s1ST < s2ET) {
+    const overlappingPart = s2ET - s1ST;
+    const rate = overlappingPart / duration;
+    return rate > 0.8;
+  }
+  if (s2ST > s1ST && s2ST < s1ET) {
+    const overlappingPart = s1ET - s2ST;
+    const rate = overlappingPart / duration;
+    return rate > 0.8;
+  }
+
+  return false;
 }

@@ -4,7 +4,7 @@ import type {
   LevelUpdatedData,
   AudioTrackLoadedData,
 } from "hls.js";
-import { Playback } from "./playback";
+import { Playback } from "common";
 import { Fragment } from "hls.js";
 
 export class SegmentManager {

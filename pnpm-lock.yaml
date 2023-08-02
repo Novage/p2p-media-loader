@@ -82,10 +82,15 @@ importers:
         specifier: ^0.4.1
         version: 0.4.1(eslint@8.39.0)
 
+  packages/common: {}
+
   packages/p2p-media-loader-core: {}
 
   packages/p2p-media-loader-hlsjs:
     dependencies:
+      common:
+        specifier: workspace:*
+        version: link:../common
       hls.js:
         specifier: ^1.4.5
         version: 1.4.5
@@ -95,6 +100,9 @@ importers:
 
   packages/p2p-media-loader-shaka:
     dependencies:
+      common:
+        specifier: workspace:*
+        version: link:../common
       p2p-media-loader-core:
         specifier: workspace:*
         version: link:../p2p-media-loader-core
