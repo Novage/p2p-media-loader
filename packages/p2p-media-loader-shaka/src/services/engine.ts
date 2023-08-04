@@ -35,6 +35,19 @@ export class Engine {
       this.debugDestroying("Shaka player destroying");
       this.destroy();
     });
+
+    player.addEventListener("loaded", () => {
+      const mediaElement = player.getMediaElement();
+      if (!mediaElement) return;
+
+      mediaElement.addEventListener("timeupdate", () => {
+        console.log("playhead time: ", mediaElement.currentTime);
+      });
+
+      mediaElement.addEventListener("ratechange", () => {
+        console.log("playback rate: ", mediaElement.playbackRate);
+      });
+    });
   }
 
   destroy() {

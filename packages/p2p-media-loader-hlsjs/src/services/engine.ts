@@ -48,6 +48,17 @@ export class Engine {
       this.debugDestroying("Media attaching");
       this.destroy();
     });
+
+    hls.on("hlsMediaAttached" as Events.MEDIA_ATTACHED, (event, data) => {
+      const { media } = data;
+      media.addEventListener("timeupdate", () => {
+        console.log("playhead time: ", media.currentTime);
+      });
+
+      media.addEventListener("ratechange", () => {
+        console.log("playback rate: ", media.playbackRate);
+      });
+    });
   }
 
   destroy() {
