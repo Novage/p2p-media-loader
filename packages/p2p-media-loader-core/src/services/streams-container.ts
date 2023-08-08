@@ -28,17 +28,17 @@ export interface Stream<S extends Segment = Segment> {
 // };
 
 export class StreamsContainer<
-  Sg extends Segment = Segment,
-  St extends Stream<Sg> = Stream<Sg>
+  Sgm extends Segment = Segment,
+  Str extends Stream<Sgm> = Stream<Sgm>
 > {
-  private readonly streams: Map<string, St> = new Map();
+  private readonly streams: Map<string, Str> = new Map();
 
-  addPlaylist(playlistId: string, playlist: St) {
+  addPlaylist(playlistId: string, playlist: Str) {
     if (this.streams.has(playlistId)) return;
     this.streams.set(playlistId, playlist);
   }
 
-  getPlaylist(playlistId: string) {
+  getStream(playlistId: string) {
     return this.streams.get(playlistId);
   }
 

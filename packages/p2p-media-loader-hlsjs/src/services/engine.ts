@@ -57,10 +57,12 @@ export class Engine {
       const { media } = data;
       media.addEventListener("timeupdate", () => {
         console.log("playhead time: ", media.currentTime);
+        this.core.updatePlayback({ position: media.currentTime });
       });
 
       media.addEventListener("ratechange", () => {
         console.log("playback rate: ", media.playbackRate);
+        this.core.updatePlayback({ rate: media.playbackRate });
       });
     });
   }
