@@ -2,14 +2,18 @@ import type Hls from "hls.js";
 import type { HlsConfig, Events } from "hls.js";
 import { FragmentLoaderBase } from "./fragment-loader";
 import { SegmentManager } from "./segment-mananger";
+import { Core } from "p2p-media-loader-core";
+import { Stream, Segment } from "./playlist";
 import Debug from "debug";
 
 export class Engine {
+  private readonly core: Core<Segment, Stream>;
   private readonly segmentManager: SegmentManager;
   private debugDestroying = Debug("hls:destroying");
 
   constructor() {
-    this.segmentManager = new SegmentManager();
+    this.core = new Core();
+    this.segmentManager = new SegmentManager(this.core);
   }
 
   public getConfig(): Pick<HlsConfig, "fLoader"> {
@@ -62,17 +66,17 @@ export class Engine {
   }
 
   destroy() {
-    this.segmentManager.destroy();
+    this.core.destroy();
   }
 
   private createFragmentLoaderClass() {
-    const segmentManager = this.segmentManager;
+    const core = this.core;
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const engine = this;
 
     return class FragmentLoader extends FragmentLoaderBase {
       constructor(config: HlsConfig) {
-        super(config, segmentManager);
+        super(config, core);
       }
 
       static getEngine() {

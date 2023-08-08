@@ -7,9 +7,8 @@ import type {
   LoaderContext,
   LoaderStats,
 } from "hls.js";
-import { SegmentManager } from "./segment-mananger";
-import { ByteRange, Segment } from "./playlist";
-import Debug from "debug";
+import { Segment, Stream } from "./playlist";
+import { Core, FetchError } from "p2p-media-loader-core";
 
 const DEFAULT_DOWNLOAD_LATENCY = 10;
 
@@ -20,18 +19,17 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   stats: LoaderStats;
   createDefaultLoader: () => Loader<LoaderContext>;
   defaultLoader?: Loader<LoaderContext>;
-  segmentManager: SegmentManager;
+  core: Core<Segment, Stream>;
   response?: {
     status: number;
     ok: boolean;
     url: string;
     data: ArrayBuffer;
   };
-  abortController: AbortController = new AbortController();
-  private debug = Debug("hls:fragment-loading");
+  segmentId?: string;
 
-  constructor(config: HlsConfig, segmentManager: SegmentManager) {
-    this.segmentManager = segmentManager;
+  constructor(config: HlsConfig, core: Core<Segment, Stream>) {
+    this.core = core;
     this.createDefaultLoader = () => new config.loader(config);
     this.stats = {
       aborted: false,
@@ -58,8 +56,13 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     this.callbacks = callbacks;
     const stats = this.stats;
 
-    const playlist = this.identifyPlaylist(context);
-    if (!playlist) {
+    const { rangeStart: start, rangeEnd: end } = context;
+    this.segmentId = Segment.getSegmentLocalId(context.url, {
+      start,
+      end,
+    });
+
+    if (!this.core.hasSegment(this.segmentId)) {
       this.defaultLoader = this.createDefaultLoader();
       this.defaultLoader.stats = this.stats;
       this.defaultLoader?.load(context, config, callbacks);
@@ -67,8 +70,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     }
 
     try {
-      const byteRange = getByteRange(context.rangeStart, context.rangeEnd);
-      this.response = await this.fetchSegment(context.url, byteRange);
+      this.response = await this.core.loadSegment(this.segmentId);
     } catch (error) {
       if (this.stats.aborted) return;
       return this.handleError(error);
@@ -86,50 +88,6 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     callbacks.onSuccess(this.response, this.stats, context, this.response);
   }
 
-  private identifyPlaylist(context: LoaderContext) {
-    const { rangeStart: start, rangeEnd: end } = context;
-    const segmentId = Segment.getSegmentLocalId(context.url, {
-      start,
-      end,
-    });
-    const playlist = this.segmentManager.getPlaylistBySegmentId(segmentId);
-    this.debug(
-      "downloaded segment from playlist\n",
-      `playlist v: ${playlist?.index}\n`,
-      `segment: `,
-      playlist?.segments.get(segmentId)?.index
-    );
-    return playlist;
-  }
-
-  async fetchSegment(segmentUrl: string, byteRange?: ByteRange) {
-    const headers = new Headers();
-
-    if (byteRange) {
-      const { start, end } = byteRange;
-      const byteRangeString = `bytes=${start}-${end}`;
-      headers.set("Range", byteRangeString);
-    }
-    const response = await fetch(segmentUrl, {
-      headers,
-      signal: this.abortController.signal,
-    });
-    if (!response.ok) {
-      throw new FetchError(
-        response.statusText ?? "Fetch, bad network response",
-        response.status,
-        response
-      );
-    }
-    const data = await response.arrayBuffer();
-    return {
-      ok: response.ok,
-      status: response.status,
-      data,
-      url: response.url,
-    };
-  }
-
   private handleError(thrownError: unknown) {
     const error = { code: 0, text: "" };
     let details: object | null = null;
@@ -144,8 +102,8 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   }
 
   private abortInternal() {
-    if (!this.response?.ok) {
-      this.abortController.abort();
+    if (!this.response?.ok && this.segmentId) {
+      this.core.abortSegmentLoading(this.segmentId);
       this.stats.aborted = true;
     }
   }
@@ -170,15 +128,6 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   }
 }
 
-function getByteRange(
-  start: number | undefined,
-  end: number | undefined
-): ByteRange | undefined {
-  if (start !== undefined && end !== undefined && end > start) {
-    return { start, end: end - 1 };
-  }
-}
-
 function getLoadingStat({
   loadedBytes,
   targetBitrate,
@@ -194,15 +143,4 @@ function getLoadingStat({
   const start = first - DEFAULT_DOWNLOAD_LATENCY;
 
   return { start, first, end: loadingEndTime };
-}
-
-class FetchError extends Error {
-  public code: number;
-  public details: object;
-
-  constructor(message: string, code: number, details: object) {
-    super(message);
-    this.code = code;
-    this.details = details;
-  }
 }

@@ -1,44 +1,41 @@
-import { Playlist, Segment } from "./playlist";
+import { Stream, Segment } from "./playlist";
 import type {
   ManifestLoadedData,
   LevelUpdatedData,
   AudioTrackLoadedData,
 } from "hls.js";
+import { Core, StreamsContainer } from "p2p-media-loader-core";
 
 export class SegmentManager {
-  playlists: Map<string, Playlist> = new Map();
+  container: StreamsContainer<Segment, Stream>;
 
-  getPlaylistBySegmentId(segmentId: string): Playlist | undefined {
-    for (const playlist of this.playlists.values()) {
-      if (playlist.segments.has(segmentId)) return playlist;
-    }
+  constructor(core: Core<Segment, Stream>) {
+    this.container = core.container;
   }
 
   processMasterManifest(data: ManifestLoadedData) {
     const { levels, audioTracks, url } = data;
-    levels.forEach((level, index) => {
-      if (this.playlists.has(level.url)) return;
-      this.playlists.set(
+    levels.forEach((level, index) =>
+      this.container.addPlaylist(
         level.url,
-        new Playlist({
+        new Stream({
           type: "video",
           index,
           masterManifestUrl: url,
         })
-      );
-    });
+      )
+    );
 
-    audioTracks.forEach((track, index) => {
-      if (this.playlists.has(track.url)) return;
-      this.playlists.set(
+    audioTracks.forEach((track, index) =>
+      this.container.addPlaylist(
         track.url,
-        new Playlist({
+        new Stream({
           type: "audio",
           index,
           masterManifestUrl: url,
         })
-      );
-    });
+      )
+    );
   }
 
   updatePlaylist(data: LevelUpdatedData | AudioTrackLoadedData) {
@@ -47,7 +44,7 @@ export class SegmentManager {
       details: { url, fragments, live },
     } = data;
 
-    const playlist = this.playlists.get(url);
+    const playlist = this.container.getPlaylist(url);
     if (!playlist) return;
 
     const segmentToRemoveIds = new Set(playlist.segments.keys());
@@ -65,13 +62,9 @@ export class SegmentManager {
         index: live ? sn : index,
         ...(start && end ? { byteRange: { start, end } } : {}),
       });
-      playlist.segments.set(segment.localId, segment);
+      playlist.segments.set(segment.id, segment);
     });
 
     segmentToRemoveIds.forEach((value) => playlist.segments.delete(value));
-  }
-
-  destroy() {
-    this.playlists.clear();
   }
 }
