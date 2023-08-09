@@ -32,7 +32,7 @@ export class Loader {
       headers.set("Range", byteRangeString);
     }
     const requestContext = new RequestContext();
-    this.segmentRequestContext.set(segment.id, requestContext);
+    this.segmentRequestContext.set(segment.localId, requestContext);
     const response = await fetch(url, {
       headers,
       signal: requestContext.abortController.signal,

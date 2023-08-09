@@ -3,14 +3,14 @@ export type StreamType = "video" | "audio";
 type ByteRange = { start: number; end: number };
 
 export interface Segment {
-  id: string;
+  localId: string;
   index: number;
   url: string;
   byteRange?: ByteRange;
 }
 
 export interface Stream<S extends Segment = Segment> {
-  readonly id: string;
+  readonly localId: string;
   readonly globalId: string;
   readonly type: StreamType;
   readonly segments: Map<string, S>;

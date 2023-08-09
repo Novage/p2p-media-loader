@@ -11,7 +11,7 @@ function getUrlWithoutParameters(url: string) {
 }
 
 export class Stream implements CoreStream {
-  id: string;
+  localId: string;
   globalId: string;
   index: number;
   type: SegmentType;
@@ -21,24 +21,24 @@ export class Stream implements CoreStream {
     masterManifestUrl,
     index,
     type,
-    id,
+    localId,
   }: {
     masterManifestUrl: string;
     index: number;
     type: SegmentType;
-    id: string;
+    localId: string;
   }) {
     this.index = index;
     this.type = type;
     this.globalId = `${getUrlWithoutParameters(
       masterManifestUrl
     )}-${type}-V${index}`;
-    this.id = id;
+    this.localId = localId;
   }
 }
 
 export class Segment implements CoreSegment {
-  id: string;
+  localId: string;
   index: number;
   url: string;
   byteRange?: ByteRange;
@@ -47,15 +47,15 @@ export class Segment implements CoreSegment {
     segmentUrl,
     index,
     byteRange,
-    id,
+    localId,
   }: {
     segmentUrl: string;
     index: number;
     byteRange?: ByteRange;
-    id?: string;
+    localId?: string;
   }) {
     this.index = index;
-    this.id = id ?? Segment.getSegmentLocalId(segmentUrl, byteRange);
+    this.localId = localId ?? Segment.getSegmentLocalId(segmentUrl, byteRange);
     this.url = segmentUrl;
     this.byteRange = byteRange;
   }

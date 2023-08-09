@@ -15,12 +15,12 @@ export class Core<
     return this.container.hasSegment(segmentId);
   }
 
-  getStream(streamId: string): ReadonlyStream<Sgm> | undefined {
-    return this.container.getStream(streamId);
+  getStream(streamLocalId: string): ReadonlyStream<Sgm> | undefined {
+    return this.container.getStream(streamLocalId);
   }
 
   addStream(stream: Str) {
-    this.container.addStream(stream.id, stream);
+    this.container.addStream(stream.localId, stream);
   }
 
   updateStream(
@@ -36,7 +36,7 @@ export class Core<
     const stream = this.container.getStream(streamId);
     if (!stream) return;
 
-    addSegments.forEach((s) => stream.segments.set(s.id, s));
+    addSegments.forEach((s) => stream.segments.set(s.localId, s));
     removeSegmentIds.forEach((id) => stream.segments.delete(id));
   }
 

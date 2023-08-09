@@ -18,7 +18,7 @@ export class SegmentManager {
     levels.forEach((level, index) =>
       this.core.addStream(
         new Stream({
-          id: level.url,
+          localId: level.url,
           type: "video",
           index,
           masterManifestUrl: url,
@@ -29,7 +29,7 @@ export class SegmentManager {
     audioTracks.forEach((track, index) =>
       this.core.addStream(
         new Stream({
-          id: track.url,
+          localId: track.url,
           type: "audio",
           index,
           masterManifestUrl: url,
