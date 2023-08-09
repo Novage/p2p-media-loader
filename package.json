@@ -10,7 +10,8 @@
     "clean": "pnpm --filter './packages/**' run clean",
     "pack-packages": "pnpm --filter './packages/**' exec -- pnpm pack",
     "lint": "pnpm --recursive run lint",
-    "prettier": "pnpm --recursive run prettier"
+    "prettier": "pnpm --recursive run prettier",
+    "type-check": "pnpm --recursive run type-check"
   },
   "devDependencies": {
     "@types/debug": "^4.1.8",

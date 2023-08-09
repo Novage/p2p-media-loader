@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "prettier": "prettier --write ."
+    "prettier": "prettier --write .",
+    "type-check": "npx tsc --noEmit"
   },
   "dependencies": {
     "dplayer": "^1.27.1",
