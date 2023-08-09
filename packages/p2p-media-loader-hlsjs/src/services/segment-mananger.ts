@@ -48,7 +48,7 @@ export class SegmentManager {
     if (!playlist) return;
 
     const segmentToRemoveIds = new Set(playlist.segments.keys());
-    const addSegments: Segment[] = [];
+    const newSegments: Segment[] = [];
     fragments.forEach((fragment, index) => {
       const { url, byteRange, sn } = fragment;
       if (sn === "initSegment") return;
@@ -63,12 +63,9 @@ export class SegmentManager {
         index: live ? sn : index,
         ...(start && end ? { byteRange: { start, end } } : {}),
       });
-      addSegments.push(segment);
+      newSegments.push(segment);
     });
 
-    this.core.updateStream(url, {
-      addSegments,
-      removeSegmentIds: [...segmentToRemoveIds],
-    });
+    this.core.updateStream(url, newSegments, [...segmentToRemoveIds]);
   }
 }
