@@ -58,6 +58,8 @@ export class Segment implements CoreSegment {
     this.localId = localId ?? Segment.getSegmentLocalId(segmentUrl, byteRange);
     this.url = segmentUrl;
     this.byteRange = byteRange;
+
+    if (this.byteRange) this.byteRange.end--;
   }
 
   static getSegmentLocalId(
@@ -67,6 +69,6 @@ export class Segment implements CoreSegment {
     if (!byteRange || !byteRange.start || !byteRange.end) {
       return segmentRequestUrl;
     }
-    return `${segmentRequestUrl}|${byteRange.start}-${byteRange.end}`;
+    return `${segmentRequestUrl}|${byteRange.start}-${byteRange.end - 1}`;
   }
 }

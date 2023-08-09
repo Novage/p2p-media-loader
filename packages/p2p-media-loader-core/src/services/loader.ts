@@ -10,9 +10,13 @@ export class Loader {
   }
 
   async loadSegment(segmentId: string) {
-    const segment = this.container.getSegment(segmentId);
-    if (!segment) return;
+    const stream = this.container.getSteamBySegmentId(segmentId);
+    const segment = stream?.segments.get(segmentId);
+    if (!segment || !stream) return;
 
+    console.log("\nloading segment:");
+    console.log("Index: ", segment.index);
+    console.log("Stream: ", stream.globalId);
     return this.fetchSegment(segment);
   }
 
@@ -28,7 +32,7 @@ export class Loader {
 
     if (byteRange) {
       const { start, end } = byteRange;
-      const byteRangeString = `bytes=${start}-${end - 1}`;
+      const byteRangeString = `bytes=${start}-${end}`;
       headers.set("Range", byteRangeString);
     }
     const requestContext = new RequestContext();
