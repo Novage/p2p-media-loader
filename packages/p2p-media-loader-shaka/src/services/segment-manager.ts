@@ -18,11 +18,9 @@ export class SegmentManager {
   setStream({
     stream,
     streamOrder = -1,
-    bitrate,
   }: {
     stream: HookedStream;
     streamOrder?: number;
-    bitrate: number;
   }) {
     if (!this.manifestUrl || this.streams.has(stream.id)) return;
 
@@ -33,7 +31,6 @@ export class SegmentManager {
       manifestUrl: this.manifestUrl,
       url: stream.streamUrl,
       shakaStream: stream,
-      bitrate,
     });
     this.streams.set(managerStream.localId, managerStream);
     if (this.streamInfo.protocol === "hls" && managerStream.url) {
