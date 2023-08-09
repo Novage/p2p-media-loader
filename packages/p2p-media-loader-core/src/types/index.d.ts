@@ -3,10 +3,10 @@ export type StreamType = "video" | "audio";
 type ByteRange = { start: number; end: number };
 
 export interface Segment {
-  localId: string;
-  index: number;
-  url: string;
-  byteRange?: ByteRange;
+  readonly localId: string;
+  readonly index: number;
+  readonly url: string;
+  readonly byteRange?: ByteRange;
 }
 
 export interface Stream<S extends Segment = Segment> {
@@ -14,6 +14,7 @@ export interface Stream<S extends Segment = Segment> {
   readonly globalId: string;
   readonly type: StreamType;
   readonly segments: Map<string, S>;
+  readonly url?: string;
 }
 
 type ReadonlyMap<T extends Map<unknown, unknown>> = Omit<
@@ -21,9 +22,9 @@ type ReadonlyMap<T extends Map<unknown, unknown>> = Omit<
   "set" | "delete" | "clear"
 >;
 
-export type ReadonlyStream<S extends Segment = Segment> = Omit<
-  Stream<S>,
-  "segments"
-> & {
+export type ReadonlyStream<
+  Sgm extends Segment = Segment,
+  Str extends Stream<Sgm> = Stream<Sgm>
+> = Omit<Str, "segments"> & {
   segments: ReadonlyMap<Stream["segments"]>;
 };

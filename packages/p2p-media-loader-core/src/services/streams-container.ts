@@ -22,10 +22,8 @@ export class StreamsContainer<
     }
   }
 
-  getStreamBySegmentId(segmentId: string) {
-    for (const stream of this.streams.values()) {
-      if (stream.segments.has(segmentId)) return stream;
-    }
+  getStreamByUrl(url: string) {
+    return [...this.streams.values()].find((s) => s.url === url);
   }
 
   hasSegment(segmentId: string) {

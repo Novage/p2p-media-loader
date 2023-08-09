@@ -9,7 +9,7 @@ export class Loader {
     this.container = container;
   }
 
-  loadSegment(segmentId: string) {
+  async loadSegment(segmentId: string) {
     const segment = this.container.getSegment(segmentId);
     if (!segment) return;
 

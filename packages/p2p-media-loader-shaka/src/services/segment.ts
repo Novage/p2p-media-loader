@@ -1,11 +1,15 @@
 import { ByteRange, HookedStream, StreamType } from "../types/types";
+import {
+  Segment as CoreSegment,
+  Stream as CoreStream,
+} from "p2p-media-loader-core";
 
-export class Segment {
-  streamLocalId: number;
-  localId: string;
-  byteRange?: ByteRange;
-  url: string;
-  index: number;
+export class Segment implements CoreSegment {
+  readonly streamLocalId: number;
+  readonly localId: string;
+  readonly byteRange?: ByteRange;
+  readonly url: string;
+  readonly index: number;
 
   constructor({
     url,
@@ -107,13 +111,13 @@ export class Segment {
   }
 }
 
-export class Stream {
-  id: string;
-  localId: number;
-  type: StreamType;
-  segments: Map<string, Segment> = new Map();
-  shakaStream: HookedStream;
-  url?: string;
+export class Stream implements CoreStream {
+  readonly globalId: string;
+  readonly localId: string;
+  readonly type: StreamType;
+  readonly segments: Map<string, Segment> = new Map();
+  readonly shakaStream: HookedStream;
+  readonly url?: string;
   firstMediaSequence?: number;
 
   constructor({
@@ -124,7 +128,7 @@ export class Stream {
     url,
     shakaStream,
   }: {
-    localId: number;
+    localId: string;
     manifestUrl: string;
     order: number;
     type: StreamType;
@@ -133,7 +137,7 @@ export class Stream {
   }) {
     this.localId = localId;
     this.type = type;
-    this.id = `${manifestUrl}-${type}-V${order}`;
+    this.globalId = `${manifestUrl}-${type}-V${order}`;
     this.url = url;
     this.shakaStream = shakaStream;
   }

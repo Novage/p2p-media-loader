@@ -1,8 +1,8 @@
-import { Segment } from "./segment";
+import { Segment, Stream } from "./segment";
 import { SegmentManager } from "./segment-manager";
 import { StreamInfo } from "../types/types";
-import Debug from "debug";
 import { Shaka } from "../types/types";
+import { Core } from "p2p-media-loader-core";
 
 interface LoadingHandlerInterface {
   handleLoading: shaka.extern.SchemePlugin;
@@ -15,23 +15,25 @@ type LoadingHandlerResult = shaka.extern.IAbortableOperation<Response>;
 export class LoadingHandler implements LoadingHandlerInterface {
   private readonly shaka: Shaka;
   private readonly segmentManager: SegmentManager;
-  private readonly streamInfo: StreamInfo;
+  private readonly core: Core<Segment, Stream>;
+  readonly streamInfo: StreamInfo;
   private loadArgs!: LoadingHandlerParams;
-  private readonly abortController = new AbortController();
-  private readonly debug = Debug("shaka:loading");
 
   constructor({
     shaka,
     streamInfo,
+    core,
     segmentManager,
   }: {
     shaka: Shaka;
-    segmentManager: SegmentManager;
     streamInfo: StreamInfo;
+    core: Core<Segment, Stream>;
+    segmentManager: SegmentManager;
   }) {
     this.shaka = shaka;
-    this.segmentManager = segmentManager;
     this.streamInfo = streamInfo;
+    this.core = core;
+    this.segmentManager = segmentManager;
   }
 
   private defaultLoad() {
@@ -61,7 +63,7 @@ export class LoadingHandler implements LoadingHandlerInterface {
     streamUrl: string,
     loadingPromise: Promise<unknown>
   ) {
-    if (!this.segmentManager.urlStreamMap.has(streamUrl)) return;
+    if (!this.core.getStreamByUrl(streamUrl)) return;
     await loadingPromise;
     // Waiting for the playlist to be parsed
     setTimeout(() => this.segmentManager.updateHlsStreamByUrl(streamUrl), 0);
@@ -72,44 +74,28 @@ export class LoadingHandler implements LoadingHandlerInterface {
     byteRangeString: string
   ): LoadingHandlerResult {
     const segmentId = Segment.getLocalId(segmentUrl, byteRangeString);
-    const stream = this.segmentManager.getStreamBySegmentLocalId(segmentId);
-    const segment = stream?.segments.get(segmentId);
-    this.debug(`\n\nLoading segment with id: ${segmentId}`);
-    this.debug(`Stream id: ${stream?.id}`);
-    this.debug(`Segment: ${segment?.index}`);
-    if (!stream) return this.defaultLoad();
+    if (!this.core.hasSegment(segmentId)) return this.defaultLoad();
 
-    return new this.shaka.util.AbortableOperation(
-      this.fetchSegment(segmentUrl, byteRangeString),
-      async () => this.abortController.abort()
-    );
-  }
+    const loadSegment = async (): Promise<Response> => {
+      const response = await this.core.loadSegment(segmentId);
 
-  private async fetchSegment(
-    segmentUrl: string,
-    byteRangeString?: string
-  ): Promise<Response> {
-    const headers = new Headers();
-
-    if (byteRangeString) headers.set("Range", byteRangeString);
-    const response = await fetch(segmentUrl, {
-      headers,
-      signal: this.abortController.signal,
-    });
-    const data = await response.arrayBuffer();
-    const { status, url } = response;
-
-    return {
-      data,
-      headers: {},
-      status,
-      uri: url,
-      originalUri: segmentUrl,
-      timeMs: getLoadingDurationBasedOnBitrate({
-        bitrate: 2749539,
-        bytesLoaded: data.byteLength,
-      }),
+      const { data, status, url } = response!;
+      return {
+        data,
+        headers: {},
+        status,
+        uri: url,
+        originalUri: segmentUrl,
+        timeMs: getLoadingDurationBasedOnBitrate({
+          bitrate: 2749539,
+          bytesLoaded: data.byteLength,
+        }),
+      };
     };
+
+    return new this.shaka.util.AbortableOperation(loadSegment(), async () =>
+      this.core.abortSegmentLoading(segmentId)
+    );
   }
 }
 

@@ -1,54 +1,43 @@
 import { Segment, Stream } from "./segment";
 import { HookedStream, StreamInfo, StreamType } from "../types/types";
+import { Core, ReadonlyStream } from "p2p-media-loader-core";
 
 export class SegmentManager {
   private manifestUrl?: string;
-  readonly streams: Map<number, Stream> = new Map();
-  readonly urlStreamMap: Map<string, Stream> = new Map();
-  readonly streamInfo: StreamInfo;
+  private readonly streamInfo: StreamInfo;
+  private readonly core: Core<Segment, Stream>;
 
-  constructor(streamInfo: StreamInfo) {
+  constructor(streamInfo: StreamInfo, core: Core<Segment, Stream>) {
     this.streamInfo = streamInfo;
+    this.core = core;
   }
 
   setManifestUrl(url: string) {
     this.manifestUrl = url.split("?")[0];
   }
 
-  setStream({
-    stream,
-    streamOrder = -1,
-  }: {
-    stream: HookedStream;
-    streamOrder?: number;
-  }) {
-    if (!this.manifestUrl || this.streams.has(stream.id)) return;
+  setStream(stream: HookedStream, streamOrder = -1) {
+    if (!this.manifestUrl) return;
 
     const managerStream = new Stream({
-      localId: stream.id,
+      localId: stream.id.toString(),
       order: streamOrder,
       type: stream.type as StreamType,
       manifestUrl: this.manifestUrl,
       url: stream.streamUrl,
       shakaStream: stream,
     });
-    this.streams.set(managerStream.localId, managerStream);
-    if (this.streamInfo.protocol === "hls" && managerStream.url) {
-      this.urlStreamMap.set(managerStream.url, managerStream);
-    }
+    this.core.addStream(managerStream);
 
     return managerStream;
   }
 
-  updateStream({
-    stream,
-    segmentReferences,
-  }: {
-    stream: HookedStream;
-    segmentReferences?: shaka.media.SegmentReference[];
-  }) {
-    let managerStream = this.streams.get(stream.id);
-    if (!managerStream) managerStream = this.setStream({ stream, bitrate: 0 });
+  updateStream(
+    stream: HookedStream,
+    segmentReferences?: shaka.media.SegmentReference[]
+  ) {
+    let managerStream = this.core.getStream(stream.id.toString());
+    if (!managerStream) managerStream = this.setStream(stream);
     if (!managerStream) return;
 
     const { segmentIndex } = stream;
@@ -70,28 +59,18 @@ export class SegmentManager {
   }
 
   updateHlsStreamByUrl(url: string) {
-    const stream = this.urlStreamMap.get(url);
+    const stream = this.core.getStreamByUrl(url);
     if (!stream || !stream.shakaStream) return;
-    this.updateStream({ stream: stream.shakaStream });
-  }
-
-  getSegment(segmentLocalId: string) {
-    const stream = this.getStreamBySegmentLocalId(segmentLocalId);
-    return stream?.segments.get(segmentLocalId);
-  }
-
-  getStreamBySegmentLocalId(segmentLocalId: string) {
-    for (const stream of this.streams.values()) {
-      if (stream.segments.has(segmentLocalId)) return stream;
-    }
+    this.updateStream(stream.shakaStream);
   }
 
   private processDashSegmentReferences(
-    managerStream: Stream,
+    managerStream: ReadonlyStream<Segment, Stream>,
     segmentReferences: shaka.media.SegmentReference[]
   ) {
     const staleSegmentsIds = new Set(managerStream.segments.keys());
     const stream = managerStream.shakaStream;
+    const newSegments: Segment[] = [];
     for (const reference of segmentReferences) {
       const index = reference.getStartTime();
 
@@ -103,22 +82,25 @@ export class SegmentManager {
           index,
           localId: segmentLocalId,
         });
-        managerStream.segments.set(segment.localId, segment);
+        newSegments.push(segment);
       }
       staleSegmentsIds.delete(segmentLocalId);
     }
 
-    for (const id of staleSegmentsIds) managerStream.segments.delete(id);
+    this.core.updateStream(managerStream.localId, newSegments, [
+      ...staleSegmentsIds,
+    ]);
   }
 
   private processHlsSegmentReferences(
-    managerStream: Stream,
+    managerStream: ReadonlyStream<Segment, Stream>,
     segmentReferences: shaka.media.SegmentReference[]
   ) {
     const segments = [...managerStream.segments.values()];
     const stream = managerStream.shakaStream;
     const lastMediaSequence = managerStream.getLastMediaSequence();
 
+    const newSegments: Segment[] = [];
     if (segments.length === 0) {
       const firstMediaSequence =
         lastMediaSequence === undefined
@@ -130,15 +112,15 @@ export class SegmentManager {
           segmentReference: reference,
           index: firstMediaSequence + index,
         });
-        managerStream.segments.set(segment.localId, segment);
+        newSegments.push(segment);
       });
+      this.core.updateStream(managerStream.localId, newSegments);
       return;
     }
 
     let index = lastMediaSequence ?? 0;
     const startSize = managerStream.segments.size;
 
-    const newSegments: Segment[] = [];
     for (let i = segmentReferences.length - 1; i >= 0; i--) {
       const reference = segmentReferences[i];
       const localId = Segment.getLocalIdFromSegmentReference(reference);
@@ -156,18 +138,17 @@ export class SegmentManager {
       }
     }
     newSegments.reverse();
-    newSegments.forEach((s) => managerStream.segments.set(s.localId, s));
 
     const deleteCount = managerStream.segments.size - startSize;
+    const staleSegmentIds: string[] = [];
     for (let i = 0; i < deleteCount; i++) {
       const segment = segments[i];
-      managerStream.segments.delete(segment.localId);
+      staleSegmentIds.push(segment.localId);
     }
+    this.core.updateStream(managerStream.localId, newSegments, staleSegmentIds);
   }
 
   destroy() {
     this.manifestUrl = undefined;
-    this.streams.clear();
-    this.urlStreamMap.clear();
   }
 }

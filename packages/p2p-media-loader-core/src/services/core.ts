@@ -11,11 +11,15 @@ export class Core<
   private readonly loader: Loader = new Loader(this.container);
   private readonly playback: Playback = new Playback();
 
-  hasSegment(segmentId: string): boolean {
-    return this.container.hasSegment(segmentId);
+  hasSegment(segmentLocalId: string): boolean {
+    return this.container.hasSegment(segmentLocalId);
   }
 
-  getStream(streamLocalId: string): ReadonlyStream<Sgm> | undefined {
+  getStreamByUrl(streamUrl: string): ReadonlyStream<Sgm, Str> | undefined {
+    return this.container.getStreamByUrl(streamUrl);
+  }
+
+  getStream(streamLocalId: string): ReadonlyStream<Sgm, Str> | undefined {
     return this.container.getStream(streamLocalId);
   }
 
@@ -24,25 +28,20 @@ export class Core<
   }
 
   updateStream(
-    streamId: string,
-    {
-      addSegments = [],
-      removeSegmentIds = [],
-    }: {
-      addSegments?: Sgm[];
-      removeSegmentIds?: string[];
-    }
+    streamLocalId: string,
+    addSegments?: Sgm[],
+    removeSegmentIds?: string[]
   ): void {
-    const stream = this.container.getStream(streamId);
+    const stream = this.container.getStream(streamLocalId);
     if (!stream) return;
 
-    addSegments.forEach((s) => stream.segments.set(s.localId, s));
-    removeSegmentIds.forEach((id) => stream.segments.delete(id));
+    addSegments?.forEach((s) => stream.segments.set(s.localId, s));
+    removeSegmentIds?.forEach((id) => stream.segments.delete(id));
   }
 
   // TODO: response type
-  loadSegment(segmentId: string) {
-    return this.loader.loadSegment(segmentId);
+  loadSegment(segmentLocalId: string) {
+    return this.loader.loadSegment(segmentLocalId);
   }
 
   abortSegmentLoading(segmentId: string): void {

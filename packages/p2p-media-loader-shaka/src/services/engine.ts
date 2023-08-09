@@ -8,13 +8,17 @@ import Debug from "debug";
 import { StreamInfo, StreamProtocol, Shaka } from "../types/types";
 import { LoadingHandler } from "./loading-handler";
 import { decorateMethod } from "./utils";
+import { Core } from "p2p-media-loader-core";
+import { Segment, Stream } from "./segment";
 
 export class Engine {
   private readonly shaka: Shaka;
   private player!: shaka.Player;
   private readonly streamInfo: StreamInfo = {};
+  private readonly core: Core<Segment, Stream> = new Core();
   private readonly segmentManager: SegmentManager = new SegmentManager(
-    this.streamInfo
+    this.streamInfo,
+    this.core
   );
   private debugDestroying = Debug("shaka:destroying");
 
@@ -52,6 +56,7 @@ export class Engine {
 
   destroy() {
     this.segmentManager.destroy();
+    this.core.destroy();
   }
 
   private registerParsers() {
@@ -89,6 +94,7 @@ export class Engine {
         shaka: this.shaka,
         streamInfo: this.streamInfo,
         segmentManager: this.segmentManager,
+        core: this.core,
       });
       return loadingHandler.handleLoading(...args);
     };

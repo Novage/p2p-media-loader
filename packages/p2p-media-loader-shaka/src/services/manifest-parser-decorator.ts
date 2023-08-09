@@ -65,17 +65,12 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
 
     const processStream = (
       stream: shaka.extern.Stream | null,
-      count: number
+      order: number
     ) => {
       if (!stream || processedStreams.has(stream.id)) return false;
       if (this.isDash) this.hookSegmentIndex(stream);
-      this.segmentManager.setStream({
-        stream: stream as HookedStream,
-        streamOrder: count,
-      });
-      if (stream.segmentIndex) {
-        this.segmentManager.updateStream({ stream });
-      }
+      this.segmentManager.setStream(stream as HookedStream, order);
+      if (stream.segmentIndex) this.segmentManager.updateStream(stream);
       processedStreams.add(stream.id);
       return true;
     };
@@ -126,10 +121,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
           lastItemReference !== prevLastItemReference
         ) {
           // Segment index have been updated
-          this.segmentManager.updateStream({
-            stream,
-            segmentReferences: references,
-          });
+          this.segmentManager.updateStream(stream, references);
           this.debug(`Stream ${stream.id} is updated`);
           prevFirstItemReference = firstItemReference;
           prevLastItemReference = lastItemReference;
