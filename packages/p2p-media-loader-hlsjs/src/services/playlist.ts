@@ -12,6 +12,7 @@ function getUrlWithoutParameters(url: string) {
 
 export class Stream implements CoreStream {
   id: string;
+  globalId: string;
   index: number;
   type: SegmentType;
   segments: Map<string, Segment> = new Map();
@@ -20,14 +21,19 @@ export class Stream implements CoreStream {
     masterManifestUrl,
     index,
     type,
+    id,
   }: {
     masterManifestUrl: string;
     index: number;
     type: SegmentType;
+    id: string;
   }) {
     this.index = index;
     this.type = type;
-    this.id = `${getUrlWithoutParameters(masterManifestUrl)}-${type}-V${index}`;
+    this.globalId = `${getUrlWithoutParameters(
+      masterManifestUrl
+    )}-${type}-V${index}`;
+    this.id = id;
   }
 }
 

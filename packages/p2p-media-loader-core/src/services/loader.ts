@@ -1,4 +1,5 @@
-import { Segment, StreamsContainer } from "./streams-container";
+import { StreamsContainer } from "./streams-container";
+import { Segment } from "../types";
 
 export class Loader {
   container: StreamsContainer;

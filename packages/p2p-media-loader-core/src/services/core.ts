@@ -1,11 +1,13 @@
-import { Segment, Stream, StreamsContainer } from "./streams-container";
+import { StreamsContainer } from "./streams-container";
 import { Loader } from "./loader";
+import { Stream, Segment, ReadonlyStream } from "../types";
 
 export class Core<
   Sgm extends Segment = Segment,
   Str extends Stream<Sgm> = Stream<Sgm>
 > {
-  readonly container: StreamsContainer<Sgm, Str> = new StreamsContainer();
+  private readonly container: StreamsContainer<Sgm, Str> =
+    new StreamsContainer();
   private readonly loader: Loader = new Loader(this.container);
   private readonly playback: Playback = new Playback();
 
@@ -13,6 +15,32 @@ export class Core<
     return this.container.hasSegment(segmentId);
   }
 
+  getStream(streamId: string): ReadonlyStream<Sgm> | undefined {
+    return this.container.getStream(streamId);
+  }
+
+  addStream(stream: Str) {
+    this.container.addStream(stream.id, stream);
+  }
+
+  updateStream(
+    streamId: string,
+    {
+      addSegments = [],
+      removeSegmentIds = [],
+    }: {
+      addSegments?: Sgm[];
+      removeSegmentIds?: string[];
+    }
+  ): void {
+    const stream = this.container.getStream(streamId);
+    if (!stream) return;
+
+    addSegments.forEach((s) => stream.segments.set(s.id, s));
+    removeSegmentIds.forEach((id) => stream.segments.delete(id));
+  }
+
+  // TODO: response type
   loadSegment(segmentId: string) {
     return this.loader.loadSegment(segmentId);
   }

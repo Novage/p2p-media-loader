@@ -4,21 +4,21 @@ import type {
   LevelUpdatedData,
   AudioTrackLoadedData,
 } from "hls.js";
-import { Core, StreamsContainer } from "p2p-media-loader-core";
+import { Core } from "p2p-media-loader-core";
 
 export class SegmentManager {
-  container: StreamsContainer<Segment, Stream>;
+  core: Core<Segment, Stream>;
 
   constructor(core: Core<Segment, Stream>) {
-    this.container = core.container;
+    this.core = core;
   }
 
   processMasterManifest(data: ManifestLoadedData) {
     const { levels, audioTracks, url } = data;
     levels.forEach((level, index) =>
-      this.container.addPlaylist(
-        level.url,
+      this.core.addStream(
         new Stream({
+          id: level.url,
           type: "video",
           index,
           masterManifestUrl: url,
@@ -27,9 +27,9 @@ export class SegmentManager {
     );
 
     audioTracks.forEach((track, index) =>
-      this.container.addPlaylist(
-        track.url,
+      this.core.addStream(
         new Stream({
+          id: track.url,
           type: "audio",
           index,
           masterManifestUrl: url,
@@ -44,10 +44,11 @@ export class SegmentManager {
       details: { url, fragments, live },
     } = data;
 
-    const playlist = this.container.getPlaylist(url);
+    const playlist = this.core.getStream(url);
     if (!playlist) return;
 
     const segmentToRemoveIds = new Set(playlist.segments.keys());
+    const addSegments: Segment[] = [];
     fragments.forEach((fragment, index) => {
       const { url, byteRange, sn } = fragment;
       if (sn === "initSegment") return;
@@ -62,9 +63,12 @@ export class SegmentManager {
         index: live ? sn : index,
         ...(start && end ? { byteRange: { start, end } } : {}),
       });
-      playlist.segments.set(segment.id, segment);
+      addSegments.push(segment);
     });
 
-    segmentToRemoveIds.forEach((value) => playlist.segments.delete(value));
+    this.core.updateStream(url, {
+      addSegments,
+      removeSegmentIds: [...segmentToRemoveIds],
+    });
   }
 }
