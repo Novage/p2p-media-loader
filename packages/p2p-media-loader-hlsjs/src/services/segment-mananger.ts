@@ -1,40 +1,36 @@
-import { Stream, Segment } from "./playlist";
+import * as Utils from "./utils";
 import type {
   ManifestLoadedData,
   LevelUpdatedData,
   AudioTrackLoadedData,
 } from "hls.js";
-import { Core } from "p2p-media-loader-core";
+import { Core, Segment } from "p2p-media-loader-core";
 
 export class SegmentManager {
-  core: Core<Segment, Stream>;
+  core: Core;
 
-  constructor(core: Core<Segment, Stream>) {
+  constructor(core: Core) {
     this.core = core;
   }
 
   processMasterManifest(data: ManifestLoadedData) {
     const { levels, audioTracks, url } = data;
     levels.forEach((level, index) =>
-      this.core.addStream(
-        new Stream({
-          localId: level.url,
-          type: "video",
-          index,
-          masterManifestUrl: url,
-        })
-      )
+      this.core.addStream({
+        localId: level.url,
+        type: "video",
+        index,
+        segments: new Map(),
+      })
     );
 
     audioTracks.forEach((track, index) =>
-      this.core.addStream(
-        new Stream({
-          localId: track.url,
-          type: "audio",
-          index,
-          masterManifestUrl: url,
-        })
-      )
+      this.core.addStream({
+        localId: track.url,
+        type: "audio",
+        index,
+        segments: new Map(),
+      })
     );
   }
 
@@ -50,20 +46,24 @@ export class SegmentManager {
     const segmentToRemoveIds = new Set(playlist.segments.keys());
     const newSegments: Segment[] = [];
     fragments.forEach((fragment, index) => {
-      const { url, byteRange, sn } = fragment;
+      const { url: responseUrl, byteRange: fragByteRange, sn } = fragment;
       if (sn === "initSegment") return;
 
-      const [start, end] = byteRange;
-      const segmentLocalId = Segment.getSegmentLocalId(url, { start, end });
+      const [start, end] = fragByteRange;
+      const byteRange = Utils.getByteRange(
+        start,
+        end !== undefined ? end - 1 : undefined
+      );
+      const segmentLocalId = Utils.getSegmentLocalId(url, byteRange);
       segmentToRemoveIds.delete(segmentLocalId);
 
       if (playlist.segments.has(segmentLocalId)) return;
-      const segment = new Segment({
-        segmentUrl: url,
-        index: live ? sn : index,
-        ...(start && end ? { byteRange: { start, end } } : {}),
+      newSegments.push({
+        localId: segmentLocalId,
+        url: responseUrl,
+        globalId: live ? sn : index,
+        byteRange,
       });
-      newSegments.push(segment);
     });
 
     this.core.updateStream(url, newSegments, [...segmentToRemoveIds]);

@@ -4,15 +4,15 @@ type ByteRange = { start: number; end: number };
 
 export type Segment = {
   readonly localId: string;
-  readonly index: number;
+  readonly globalId: number;
   readonly url: string;
   readonly byteRange?: ByteRange;
 };
 
 export type Stream = {
   readonly localId: string;
-  readonly globalId: string;
   readonly type: StreamType;
+  readonly index: number;
   readonly segments: Map<string, S>;
   readonly url?: string;
 };

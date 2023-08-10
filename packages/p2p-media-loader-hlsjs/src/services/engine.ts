@@ -3,11 +3,10 @@ import type { HlsConfig, Events } from "hls.js";
 import { FragmentLoaderBase } from "./fragment-loader";
 import { SegmentManager } from "./segment-mananger";
 import { Core } from "p2p-media-loader-core";
-import { Stream, Segment } from "./playlist";
 import Debug from "debug";
 
 export class Engine {
-  private readonly core: Core<Segment, Stream>;
+  private readonly core: Core;
   private readonly segmentManager: SegmentManager;
   private debugDestroying = Debug("hls:destroying");
 

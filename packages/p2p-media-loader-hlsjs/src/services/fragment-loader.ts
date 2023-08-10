@@ -7,7 +7,7 @@ import type {
   LoaderContext,
   LoaderStats,
 } from "hls.js";
-import { Segment, Stream } from "./playlist";
+import * as Utils from "./utils";
 import { Core, FetchError } from "p2p-media-loader-core";
 
 const DEFAULT_DOWNLOAD_LATENCY = 10;
@@ -19,7 +19,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   stats: LoaderStats;
   createDefaultLoader: () => Loader<LoaderContext>;
   defaultLoader?: Loader<LoaderContext>;
-  core: Core<Segment, Stream>;
+  core: Core;
   response?: {
     status: number;
     ok: boolean;
@@ -28,7 +28,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   };
   segmentId?: string;
 
-  constructor(config: HlsConfig, core: Core<Segment, Stream>) {
+  constructor(config: HlsConfig, core: Core) {
     this.core = core;
     this.createDefaultLoader = () => new config.loader(config);
     this.stats = {
@@ -57,10 +57,11 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     const stats = this.stats;
 
     const { rangeStart: start, rangeEnd: end } = context;
-    this.segmentId = Segment.getSegmentLocalId(context.url, {
+    const byteRange = Utils.getByteRange(
       start,
-      end,
-    });
+      end !== undefined ? end - 1 : undefined
+    );
+    this.segmentId = Utils.getSegmentLocalId(context.url, byteRange);
 
     if (!this.core.hasSegment(this.segmentId)) {
       this.defaultLoader = this.createDefaultLoader();

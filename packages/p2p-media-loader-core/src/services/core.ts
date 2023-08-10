@@ -5,6 +5,7 @@ export class Core<TStream extends Stream = Stream> {
   private readonly streams: Map<string, TStream> = new Map();
   private readonly loader: Loader = new Loader(this.streams);
   private readonly playback: Playback = new Playback();
+  // TODO manifestUrl
 
   hasSegment(segmentLocalId: string): boolean {
     return this.streams.has(segmentLocalId);
