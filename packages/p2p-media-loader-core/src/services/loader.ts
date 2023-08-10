@@ -1,16 +1,15 @@
-import { StreamsContainer } from "./streams-container";
-import { Segment } from "../types";
+import { Segment, Stream } from "../types";
 
 export class Loader {
-  container: StreamsContainer;
+  streams: Map<string, Stream>;
   segmentRequestContext = new Map<string, RequestContext>();
 
-  constructor(container: StreamsContainer) {
-    this.container = container;
+  constructor(streams: Map<string, Stream>) {
+    this.streams = streams;
   }
 
   async loadSegment(segmentId: string) {
-    const stream = this.container.getSteamBySegmentId(segmentId);
+    const stream = this.streams.get(segmentId);
     const segment = stream?.segments.get(segmentId);
     if (!segment || !stream) return;
 

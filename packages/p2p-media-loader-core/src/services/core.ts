@@ -1,38 +1,34 @@
-import { StreamsContainer } from "./streams-container";
 import { Loader } from "./loader";
-import { Stream, Segment, ReadonlyStream } from "../types";
+import { Stream, ReadonlyStream, Segment } from "../types";
 
-export class Core<
-  Sgm extends Segment = Segment,
-  Str extends Stream<Sgm> = Stream<Sgm>
-> {
-  private readonly container: StreamsContainer<Sgm, Str> =
-    new StreamsContainer();
-  private readonly loader: Loader = new Loader(this.container);
+export class Core<TStream extends Stream = Stream> {
+  private readonly streams: Map<string, TStream> = new Map();
+  private readonly loader: Loader = new Loader(this.streams);
   private readonly playback: Playback = new Playback();
 
   hasSegment(segmentLocalId: string): boolean {
-    return this.container.hasSegment(segmentLocalId);
+    return this.streams.has(segmentLocalId);
   }
 
-  getStreamByUrl(streamUrl: string): ReadonlyStream<Sgm, Str> | undefined {
-    return this.container.getStreamByUrl(streamUrl);
+  getStreamByUrl(streamUrl: string): ReadonlyStream<TStream> | undefined {
+    return [...this.streams.values()].find((s) => s.url === streamUrl);
   }
 
-  getStream(streamLocalId: string): ReadonlyStream<Sgm, Str> | undefined {
-    return this.container.getStream(streamLocalId);
+  getStream(streamLocalId: string): ReadonlyStream<TStream> | undefined {
+    return this.streams.get(streamLocalId);
   }
 
-  addStream(stream: Str) {
-    this.container.addStream(stream.localId, stream);
+  addStream(stream: TStream): void {
+    if (this.streams.has(stream.localId)) return;
+    this.streams.set(stream.localId, stream);
   }
 
   updateStream(
     streamLocalId: string,
-    addSegments?: Sgm[],
+    addSegments?: Segment[],
     removeSegmentIds?: string[]
   ): void {
-    const stream = this.container.getStream(streamLocalId);
+    const stream = this.streams.get(streamLocalId);
     if (!stream) return;
 
     addSegments?.forEach((s) => stream.segments.set(s.localId, s));
@@ -60,7 +56,7 @@ export class Core<
   }
 
   destroy(): void {
-    this.container.clear();
+    this.streams.clear();
   }
 }
 
