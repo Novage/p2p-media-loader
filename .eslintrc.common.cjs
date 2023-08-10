@@ -16,6 +16,5 @@ module.exports = {
     "@typescript-eslint/prefer-nullish-coalescing": "error",
     "curly": ["warn", "multi-line", "consistent"],
     "spaced-comment": ["warn", "always", { "markers": ["/"] }],
-    "@typescript-eslint/no-non-null-assertion": 0
   }
 };
