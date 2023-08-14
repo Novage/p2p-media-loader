@@ -3,11 +3,11 @@ import { Segment, ReadonlyStream } from "p2p-media-loader-core";
 
 export function createSegment({
   segmentReference,
-  globalId,
+  externalId,
   localId,
 }: {
   segmentReference: shaka.media.SegmentReference;
-  globalId: number;
+  externalId: number;
   localId?: string;
 }): Segment {
   const { url, byteRange } = getSegmentInfoFromReference(segmentReference);
@@ -15,7 +15,7 @@ export function createSegment({
     localId: localId ?? getSegmentLocalId(url, byteRange),
     byteRange,
     url,
-    globalId,
+    externalId,
   };
 }
 

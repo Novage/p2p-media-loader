@@ -61,7 +61,7 @@ export class SegmentManager {
       newSegments.push({
         localId: segmentLocalId,
         url: responseUrl,
-        globalId: live ? sn : index,
+        externalId: live ? sn : index,
         byteRange,
       });
     });

@@ -4,7 +4,7 @@ type ByteRange = { start: number; end: number };
 
 export type Segment = {
   readonly localId: string;
-  readonly globalId: number;
+  readonly externalId: number;
   readonly url: string;
   readonly byteRange?: ByteRange;
 };

@@ -1,5 +1,5 @@
 import { Segment, Stream } from "../types";
-import { getStreamGlobalId } from "./utils";
+import { getStreamExternalId } from "./utils";
 
 export class Loader {
   private manifestResponseUrl?: string;
@@ -27,8 +27,11 @@ export class Loader {
     }
 
     console.log("\nloading segment:");
-    console.log("Index: ", segment.globalId);
-    const streamGlobalId = getStreamGlobalId(stream, this.manifestResponseUrl);
+    console.log("Index: ", segment.externalId);
+    const streamGlobalId = getStreamExternalId(
+      stream,
+      this.manifestResponseUrl
+    );
     console.log("Stream: ", streamGlobalId);
     return this.fetchSegment(segment);
   }

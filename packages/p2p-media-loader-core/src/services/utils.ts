@@ -1,6 +1,6 @@
 import { Stream } from "../types";
 
-export function getStreamGlobalId(
+export function getStreamExternalId(
   stream: Stream,
   manifestResponseUrl: string
 ): string {
