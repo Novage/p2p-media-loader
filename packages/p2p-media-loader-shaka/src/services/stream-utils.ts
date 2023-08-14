@@ -1,5 +1,5 @@
-import { Stream, ByteRange } from "../types/types";
-import { Segment, ReadonlyStream } from "p2p-media-loader-core";
+import { Stream } from "../types/types";
+import { Segment, ReadonlyStream, ByteRange } from "p2p-media-loader-core";
 
 export function createSegment({
   segmentReference,

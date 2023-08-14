@@ -1,6 +1,6 @@
 export type StreamType = "video" | "audio";
 
-type ByteRange = { start: number; end: number };
+export type ByteRange = { start: number; end: number };
 
 export type Segment = {
   readonly localId: string;
