@@ -20,7 +20,7 @@ export class SegmentManager {
       index,
       segments: new Map(),
     };
-    this.core.addStreamIfNoneExist(managerStream);
+    this.core.addStreamIfNoneExists(managerStream);
 
     return managerStream;
   }

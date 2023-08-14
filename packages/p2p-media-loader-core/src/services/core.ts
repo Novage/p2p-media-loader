@@ -24,7 +24,7 @@ export class Core<TStream extends Stream = Stream> {
     return this.streams.get(streamLocalId);
   }
 
-  addStreamIfNoneExist(stream: TStream): void {
+  addStreamIfNoneExists(stream: TStream): void {
     if (this.streams.has(stream.localId)) return;
     this.streams.set(stream.localId, stream);
   }
