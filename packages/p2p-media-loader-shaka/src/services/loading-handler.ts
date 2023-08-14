@@ -1,7 +1,7 @@
-import { Segment, Stream } from "./segment";
+import * as Utils from "./segment";
 import { SegmentManager } from "./segment-manager";
 import { StreamInfo } from "../types/types";
-import { Shaka } from "../types/types";
+import { Shaka, Stream } from "../types/types";
 import { Core } from "p2p-media-loader-core";
 
 interface LoadingHandlerInterface {
@@ -15,7 +15,7 @@ type LoadingHandlerResult = shaka.extern.IAbortableOperation<Response>;
 export class LoadingHandler implements LoadingHandlerInterface {
   private readonly shaka: Shaka;
   private readonly segmentManager: SegmentManager;
-  private readonly core: Core<Segment, Stream>;
+  private readonly core: Core<Stream>;
   readonly streamInfo: StreamInfo;
   private loadArgs!: LoadingHandlerParams;
 
@@ -27,7 +27,7 @@ export class LoadingHandler implements LoadingHandlerInterface {
   }: {
     shaka: Shaka;
     streamInfo: StreamInfo;
-    core: Core<Segment, Stream>;
+    core: Core<Stream>;
     segmentManager: SegmentManager;
   }) {
     this.shaka = shaka;
@@ -73,7 +73,7 @@ export class LoadingHandler implements LoadingHandlerInterface {
     segmentUrl: string,
     byteRangeString: string
   ): LoadingHandlerResult {
-    const segmentId = Segment.getLocalId(segmentUrl, byteRangeString);
+    const segmentId = Utils.getSegmentLocalId(segmentUrl, byteRangeString);
     if (!this.core.hasSegment(segmentId)) return this.defaultLoad();
 
     const loadSegment = async (): Promise<Response> => {

@@ -5,17 +5,16 @@ import {
 } from "./manifest-parser-decorator";
 import { SegmentManager } from "./segment-manager";
 import Debug from "debug";
-import { StreamInfo, StreamProtocol, Shaka } from "../types/types";
+import { StreamInfo, StreamProtocol, Shaka, Stream } from "../types/types";
 import { LoadingHandler } from "./loading-handler";
 import { decorateMethod } from "./utils";
 import { Core } from "p2p-media-loader-core";
-import { Segment, Stream } from "./segment";
 
 export class Engine {
   private readonly shaka: Shaka;
   private player!: shaka.Player;
   private readonly streamInfo: StreamInfo = {};
-  private readonly core: Core<Segment, Stream> = new Core();
+  private readonly core: Core<Stream> = new Core();
   private readonly segmentManager: SegmentManager = new SegmentManager(
     this.streamInfo,
     this.core
@@ -45,10 +44,12 @@ export class Engine {
       if (!mediaElement) return;
 
       mediaElement.addEventListener("timeupdate", () => {
+        // eslint-disable-next-line no-console
         console.log("playhead time: ", mediaElement.currentTime);
       });
 
       mediaElement.addEventListener("ratechange", () => {
+        // eslint-disable-next-line no-console
         console.log("playback rate: ", mediaElement.playbackRate);
       });
     });

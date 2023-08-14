@@ -1,13 +1,13 @@
-import { Segment, Stream } from "./segment";
-import { HookedStream, StreamInfo, StreamType } from "../types/types";
-import { Core, ReadonlyStream } from "p2p-media-loader-core";
+import * as Utils from "./segment";
+import { HookedStream, StreamInfo, StreamType, Stream } from "../types/types";
+import { Core, ReadonlyStream, Segment } from "p2p-media-loader-core";
 
 export class SegmentManager {
   private manifestUrl?: string;
   private readonly streamInfo: StreamInfo;
-  private readonly core: Core<Segment, Stream>;
+  private readonly core: Core<Stream>;
 
-  constructor(streamInfo: StreamInfo, core: Core<Segment, Stream>) {
+  constructor(streamInfo: StreamInfo, core: Core<Stream>) {
     this.streamInfo = streamInfo;
     this.core = core;
   }
@@ -16,17 +16,17 @@ export class SegmentManager {
     this.manifestUrl = url.split("?")[0];
   }
 
-  setStream(stream: HookedStream, streamOrder = -1) {
+  setStream(stream: HookedStream, index = -1) {
     if (!this.manifestUrl) return;
 
-    const managerStream = new Stream({
+    const managerStream: Stream = {
       localId: stream.id.toString(),
-      order: streamOrder,
       type: stream.type as StreamType,
-      manifestUrl: this.manifestUrl,
       url: stream.streamUrl,
       shakaStream: stream,
-    });
+      index,
+      segments: new Map(),
+    };
     this.core.addStream(managerStream);
 
     return managerStream;
@@ -65,21 +65,19 @@ export class SegmentManager {
   }
 
   private processDashSegmentReferences(
-    managerStream: ReadonlyStream<Segment, Stream>,
+    managerStream: ReadonlyStream<Stream>,
     segmentReferences: shaka.media.SegmentReference[]
   ) {
     const staleSegmentsIds = new Set(managerStream.segments.keys());
-    const stream = managerStream.shakaStream;
     const newSegments: Segment[] = [];
     for (const reference of segmentReferences) {
-      const index = reference.getStartTime();
+      const globalId = reference.getStartTime();
 
-      const segmentLocalId = Segment.getLocalIdFromSegmentReference(reference);
+      const segmentLocalId = Utils.getSegmentLocalIdFromReference(reference);
       if (!managerStream.segments.has(segmentLocalId)) {
-        const segment = Segment.create({
-          stream,
+        const segment = Utils.createSegment({
           segmentReference: reference,
-          index,
+          globalId,
           localId: segmentLocalId,
         });
         newSegments.push(segment);
@@ -93,24 +91,22 @@ export class SegmentManager {
   }
 
   private processHlsSegmentReferences(
-    managerStream: ReadonlyStream<Segment, Stream>,
+    managerStream: ReadonlyStream<Stream>,
     segmentReferences: shaka.media.SegmentReference[]
   ) {
     const segments = [...managerStream.segments.values()];
-    const stream = managerStream.shakaStream;
-    const lastMediaSequence = managerStream.getLastMediaSequence();
+    const lastMediaSequence = Utils.getStreamLastMediaSequence(managerStream);
 
     const newSegments: Segment[] = [];
     if (segments.length === 0) {
-      const firstMediaSequence =
+      const firstReferenceMediaSequence =
         lastMediaSequence === undefined
           ? 0
           : lastMediaSequence - segmentReferences.length + 1;
       segmentReferences.forEach((reference, index) => {
-        const segment = Segment.create({
-          stream,
+        const segment = Utils.createSegment({
           segmentReference: reference,
-          index: firstMediaSequence + index,
+          globalId: firstReferenceMediaSequence + index,
         });
         newSegments.push(segment);
       });
@@ -123,13 +119,12 @@ export class SegmentManager {
 
     for (let i = segmentReferences.length - 1; i >= 0; i--) {
       const reference = segmentReferences[i];
-      const localId = Segment.getLocalIdFromSegmentReference(reference);
+      const localId = Utils.getSegmentLocalIdFromReference(reference);
       if (!managerStream.segments.has(localId)) {
-        const segment = Segment.create({
+        const segment = Utils.createSegment({
           localId,
-          stream,
           segmentReference: reference,
-          index,
+          globalId: index,
         });
         newSegments.push(segment);
         index--;

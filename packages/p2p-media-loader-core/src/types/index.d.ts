@@ -13,7 +13,7 @@ export type Stream = {
   readonly localId: string;
   readonly type: StreamType;
   readonly index: number;
-  readonly segments: Map<string, S>;
+  readonly segments: Map<string, Segment>;
   readonly url?: string;
 };
 

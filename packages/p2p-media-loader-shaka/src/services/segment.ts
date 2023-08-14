@@ -1,158 +1,79 @@
-import { ByteRange, HookedStream, StreamType } from "../types/types";
-import {
-  Segment as CoreSegment,
-  Stream as CoreStream,
-} from "p2p-media-loader-core";
+import { Stream, ByteRange } from "../types/types";
+import { Segment, ReadonlyStream } from "p2p-media-loader-core";
 
-export class Segment implements CoreSegment {
-  readonly streamLocalId: number;
-  readonly localId: string;
-  readonly byteRange?: ByteRange;
-  readonly url: string;
-  readonly index: number;
-
-  constructor({
-    url,
-    localId,
-    streamLocalId,
-    index,
+export function createSegment({
+  segmentReference,
+  globalId,
+  localId,
+}: {
+  segmentReference: shaka.media.SegmentReference;
+  globalId: number;
+  localId?: string;
+}): Segment {
+  const { url, byteRange } = getSegmentInfoFromReference(segmentReference);
+  return {
+    localId: localId ?? getSegmentLocalId(url, byteRange),
     byteRange,
-  }: {
-    url: string;
-    localId?: string;
-    streamLocalId: number;
-    index: number;
-    byteRange?: ByteRange;
-  }) {
-    this.url = url;
-    this.streamLocalId = streamLocalId;
-    this.index = index;
-
-    if (
-      byteRange &&
-      byteRange.start !== undefined &&
-      byteRange.end !== undefined
-    ) {
-      this.byteRange = byteRange;
-    }
-    this.localId = localId ?? Segment.getLocalId(url, byteRange);
-  }
-
-  static create({
-    stream,
-    segmentReference,
-    index,
-    localId,
-  }: {
-    stream: shaka.extern.Stream;
-    segmentReference: shaka.media.SegmentReference;
-    index: number;
-    localId?: string;
-  }) {
-    const { uri, byteRange } =
-      Segment.getSegmentInfoFromReference(segmentReference);
-    return new Segment({
-      localId,
-      byteRange,
-      url: uri,
-      streamLocalId: stream.id,
-      index,
-    });
-  }
-
-  static getLocalIdFromSegmentReference(
-    segmentReference: shaka.media.SegmentReference
-  ) {
-    const { uri, byteRange } =
-      Segment.getSegmentInfoFromReference(segmentReference);
-    return Segment.getLocalId(uri, byteRange);
-  }
-
-  static getLocalId(url: string, byteRange?: ByteRange | string) {
-    if (!byteRange) return url;
-
-    let range: ByteRange | undefined;
-    if (typeof byteRange === "string") {
-      range = Segment.getByteRangeFromHeaderString(byteRange);
-    } else if (byteRange.start !== undefined && byteRange.end !== undefined) {
-      range = byteRange;
-    }
-    if (!range) return url;
-
-    const { start, end } = range;
-    if (length !== undefined) return `${url}|${start}-${end}`;
-    return url;
-  }
-
-  static getByteRangeFromHeaderString(
-    rangeStr: string | undefined
-  ): ByteRange | undefined {
-    if (rangeStr && rangeStr.includes("bytes=")) {
-      const range = rangeStr
-        .split("=")[1]
-        .split("-")
-        .map((i) => parseInt(i));
-      const [start, end] = range;
-      return { start, end };
-    }
-  }
-
-  static getSegmentInfoFromReference(
-    segmentReference: shaka.media.SegmentReference
-  ) {
-    const [uri] = segmentReference.getUris();
-    const start = segmentReference.getStartByte();
-    const end = segmentReference.getEndByte() ?? undefined;
-
-    return {
-      byteRange: end !== undefined ? { start, end } : undefined,
-      uri,
-    };
-  }
+    url,
+    globalId,
+  };
 }
 
-export class Stream implements CoreStream {
-  readonly globalId: string;
-  readonly localId: string;
-  readonly type: StreamType;
-  readonly segments: Map<string, Segment> = new Map();
-  readonly shakaStream: HookedStream;
-  readonly url?: string;
-  firstMediaSequence?: number;
+export function getSegmentLocalIdFromReference(
+  segmentReference: shaka.media.SegmentReference
+) {
+  const { url, byteRange } = getSegmentInfoFromReference(segmentReference);
+  return getSegmentLocalId(url, byteRange);
+}
 
-  constructor({
-    localId,
-    manifestUrl,
-    order,
-    type,
-    url,
-    shakaStream,
-  }: {
-    localId: string;
-    manifestUrl: string;
-    order: number;
-    type: StreamType;
-    url?: string;
-    shakaStream: shaka.extern.Stream;
-  }) {
-    this.localId = localId;
-    this.type = type;
-    this.globalId = `${manifestUrl}-${type}-V${order}`;
-    this.url = url;
-    this.shakaStream = shakaStream;
-  }
+export function getSegmentLocalId(url: string, byteRange?: ByteRange | string) {
+  if (!byteRange) return url;
 
-  getLastMediaSequence() {
-    const map =
-      this.shakaStream.mediaSequenceTimeMap ?? new Map<number, number>();
+  const range: ByteRange | undefined =
+    typeof byteRange === "string"
+      ? getByteRangeFromHeaderString(byteRange)
+      : byteRange;
 
-    let firstMediaSequence = this.firstMediaSequence;
-    if (firstMediaSequence !== undefined) {
-      return firstMediaSequence + map.size - 1;
-    } else if (map.size) {
-      firstMediaSequence = [...map.keys()][0];
-      this.firstMediaSequence = firstMediaSequence;
-      return firstMediaSequence + map.size - 1;
-    }
+  if (!range) return url;
+  return `${url}|${range.start}-${range.end}`;
+}
+
+export function getByteRangeFromHeaderString(
+  rangeStr: string | undefined
+): ByteRange | undefined {
+  if (!rangeStr || !rangeStr.includes("bytes=")) return undefined;
+
+  const range = rangeStr
+    .split("=")[1]
+    .split("-")
+    .map((i) => parseInt(i));
+  const [start, end] = range;
+  return { start, end };
+}
+
+export function getSegmentInfoFromReference(
+  segmentReference: shaka.media.SegmentReference
+) {
+  const uris = segmentReference.getUris();
+  const responseUrl = uris[1] ?? uris[0];
+  const start = segmentReference.getStartByte();
+  const end = segmentReference.getEndByte() ?? undefined;
+
+  return {
+    byteRange: end !== undefined ? { start, end } : undefined,
+    url: responseUrl,
+  };
+}
+
+export function getStreamLastMediaSequence(
+  stream: ReadonlyStream<Stream>
+): number | undefined {
+  const { shakaStream } = stream;
+  const map = shakaStream.mediaSequenceTimeMap;
+
+  if (map) {
+    const firstMediaSequence = map.keys().next().value as number | undefined;
+    if (firstMediaSequence === undefined) return;
+    return firstMediaSequence + map.size - 1;
   }
 }
