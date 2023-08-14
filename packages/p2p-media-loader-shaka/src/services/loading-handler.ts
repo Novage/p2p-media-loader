@@ -1,4 +1,4 @@
-import * as Utils from "./segment";
+import * as Utils from "./stream-utils";
 import { SegmentManager } from "./segment-manager";
 import { StreamInfo } from "../types/types";
 import { Shaka, Stream } from "../types/types";

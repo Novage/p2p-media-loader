@@ -1,12 +1,12 @@
-import * as Utils from "./segment";
+import * as Utils from "./stream-utils";
 import { HookedStream, StreamInfo, StreamType, Stream } from "../types/types";
 import { Core, ReadonlyStream, Segment } from "p2p-media-loader-core";
 
 export class SegmentManager {
-  private readonly streamInfo: StreamInfo;
+  private readonly streamInfo: Readonly<StreamInfo>;
   private readonly core: Core<Stream>;
 
-  constructor(streamInfo: StreamInfo, core: Core<Stream>) {
+  constructor(streamInfo: Readonly<StreamInfo>, core: Core<Stream>) {
     this.streamInfo = streamInfo;
     this.core = core;
   }
