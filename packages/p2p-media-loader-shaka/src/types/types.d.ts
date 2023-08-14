@@ -4,6 +4,7 @@ export type StreamProtocol = "hls" | "dash";
 
 export type StreamInfo = {
   protocol?: StreamProtocol;
+  manifestResponseUrl?: string;
 };
 
 export type StreamType = "video" | "audio";

@@ -16,24 +16,28 @@ export class LoadingHandler implements LoadingHandlerInterface {
   private readonly shaka: Shaka;
   private readonly segmentManager: SegmentManager;
   private readonly core: Core<Stream>;
-  readonly streamInfo: StreamInfo;
+  readonly streamInfo: Readonly<StreamInfo>;
   private loadArgs!: LoadingHandlerParams;
+  private readonly setManifestResponseUrl: (url: string) => void;
 
   constructor({
     shaka,
     streamInfo,
     core,
     segmentManager,
+    setManifestResponseUrl,
   }: {
     shaka: Shaka;
-    streamInfo: StreamInfo;
+    streamInfo: Readonly<StreamInfo>;
     core: Core<Stream>;
     segmentManager: SegmentManager;
+    setManifestResponseUrl: (url: string) => void;
   }) {
     this.shaka = shaka;
     this.streamInfo = streamInfo;
     this.core = core;
     this.segmentManager = segmentManager;
+    this.setManifestResponseUrl = setManifestResponseUrl;
   }
 
   private defaultLoad() {
@@ -50,23 +54,30 @@ export class LoadingHandler implements LoadingHandlerInterface {
     }
 
     const loading = this.defaultLoad();
-    if (
-      requestType === RequestType.MANIFEST &&
-      this.streamInfo.protocol === "hls"
-    ) {
-      void this.handleStreamLoading(url, loading.promise);
+    if (requestType === RequestType.MANIFEST) {
+      void this.handleManifestLoading(url, loading.promise);
     }
     return loading;
   }
 
-  private async handleStreamLoading(
+  private async handleManifestLoading(
     streamUrl: string,
-    loadingPromise: Promise<unknown>
+    loadingPromise: Promise<Response>
   ) {
-    if (!this.core.getStreamByUrl(streamUrl)) return;
-    await loadingPromise;
-    // Waiting for the playlist to be parsed
-    setTimeout(() => this.segmentManager.updateHlsStreamByUrl(streamUrl), 0);
+    if (
+      this.streamInfo.protocol === "hls" &&
+      !!this.core.getStreamByUrl(streamUrl)
+    ) {
+      // loading HLS playlist manifest
+      await loadingPromise;
+      // Waiting for the playlist to be parsed
+      setTimeout(() => this.segmentManager.updateHlsStreamByUrl(streamUrl), 0);
+    } else if (!this.streamInfo.manifestResponseUrl) {
+      // loading master manifest either HLS or DASH
+      const response = await loadingPromise;
+      const manifestResponseUrl = response.uri;
+      this.setManifestResponseUrl(manifestResponseUrl);
+    }
   }
 
   private handleSegmentLoading(
@@ -79,7 +90,7 @@ export class LoadingHandler implements LoadingHandlerInterface {
     const loadSegment = async (): Promise<Response> => {
       const response = await this.core.loadSegment(segmentId);
 
-      const { data, status, url } = response!;
+      const { data, status, url } = response;
       return {
         data,
         headers: {},

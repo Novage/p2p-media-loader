@@ -1,21 +1,35 @@
 import { Segment, Stream } from "../types";
+import { getStreamGlobalId } from "./utils";
 
 export class Loader {
-  streams: Map<string, Stream>;
-  segmentRequestContext = new Map<string, RequestContext>();
+  private manifestResponseUrl?: string;
+  private readonly streams: Map<string, Stream>;
+  private readonly segmentRequestContext = new Map<string, RequestContext>();
 
   constructor(streams: Map<string, Stream>) {
     this.streams = streams;
   }
 
+  setManifestResponseUrl(url: string) {
+    this.manifestResponseUrl = url;
+  }
+
   async loadSegment(segmentId: string) {
+    // TODO: maybe we should throw error?
+    if (!this.manifestResponseUrl) {
+      throw new Error("Manifest response url is undefined");
+    }
+
     const stream = this.streams.get(segmentId);
     const segment = stream?.segments.get(segmentId);
-    if (!segment || !stream) return;
+    if (!segment || !stream || !this.manifestResponseUrl) {
+      throw new Error(`Not found segment with id: ${segmentId}`);
+    }
 
     console.log("\nloading segment:");
-    console.log("Index: ", segment.index);
-    console.log("Stream: ", stream.globalId);
+    console.log("Index: ", segment.globalId);
+    const streamGlobalId = getStreamGlobalId(stream, this.manifestResponseUrl);
+    console.log("Stream: ", streamGlobalId);
     return this.fetchSegment(segment);
   }
 

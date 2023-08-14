@@ -44,25 +44,25 @@ export class Engine {
       if (!mediaElement) return;
 
       mediaElement.addEventListener("timeupdate", () => {
-        // eslint-disable-next-line no-console
         console.log("playhead time: ", mediaElement.currentTime);
       });
 
       mediaElement.addEventListener("ratechange", () => {
-        // eslint-disable-next-line no-console
         console.log("playback rate: ", mediaElement.playbackRate);
       });
     });
   }
 
   destroy() {
-    this.segmentManager.destroy();
+    this.streamInfo.protocol = undefined;
+    this.streamInfo.manifestResponseUrl = undefined;
     this.core.destroy();
   }
 
   private registerParsers() {
-    const setProtocol = (protocol: StreamProtocol) =>
-      (this.streamInfo.protocol = protocol);
+    const setProtocol = (protocol: StreamProtocol) => {
+      this.streamInfo.protocol = protocol;
+    };
     const hlsParserFactory = () =>
       new HlsManifestParser(this.shaka, this.segmentManager, setProtocol);
     const dashParserFactory = () =>
@@ -90,12 +90,17 @@ export class Engine {
   }
 
   private initializeNetworkingEngine() {
+    const setManifestResponseUrl = (responseUrl: string) => {
+      this.streamInfo.manifestResponseUrl = responseUrl;
+      this.core.setManifestResponseUrl(responseUrl);
+    };
     const handleLoading: shaka.extern.SchemePlugin = (...args) => {
       const loadingHandler = new LoadingHandler({
         shaka: this.shaka,
         streamInfo: this.streamInfo,
         segmentManager: this.segmentManager,
         core: this.core,
+        setManifestResponseUrl,
       });
       return loadingHandler.handleLoading(...args);
     };

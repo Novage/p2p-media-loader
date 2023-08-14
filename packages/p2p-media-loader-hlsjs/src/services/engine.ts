@@ -23,6 +23,12 @@ export class Engine {
 
   initHlsJsEvents(hls: Hls) {
     hls.on("hlsManifestLoaded" as Events.MANIFEST_LOADED, (event, data) => {
+      const { networkDetails } = data;
+      if (networkDetails instanceof XMLHttpRequest) {
+        this.core.setManifestResponseUrl(networkDetails.responseURL);
+      } else if (networkDetails instanceof Response) {
+        this.core.setManifestResponseUrl(networkDetails.url);
+      }
       this.segmentManager.processMasterManifest(data);
     });
 

@@ -5,7 +5,12 @@ export class Core<TStream extends Stream = Stream> {
   private readonly streams: Map<string, TStream> = new Map();
   private readonly loader: Loader = new Loader(this.streams);
   private readonly playback: Playback = new Playback();
-  // TODO manifestUrl
+  private manifestResponseUrl?: string;
+
+  setManifestResponseUrl(url: string): void {
+    this.manifestResponseUrl = url.split("?")[0];
+    this.loader.setManifestResponseUrl(this.manifestResponseUrl);
+  }
 
   hasSegment(segmentLocalId: string): boolean {
     return this.streams.has(segmentLocalId);
@@ -19,7 +24,7 @@ export class Core<TStream extends Stream = Stream> {
     return this.streams.get(streamLocalId);
   }
 
-  addStream(stream: TStream): void {
+  addStreamIfNoneExist(stream: TStream): void {
     if (this.streams.has(stream.localId)) return;
     this.streams.set(stream.localId, stream);
   }

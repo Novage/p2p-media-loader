@@ -3,7 +3,6 @@ import { HookedStream, StreamInfo, StreamType, Stream } from "../types/types";
 import { Core, ReadonlyStream, Segment } from "p2p-media-loader-core";
 
 export class SegmentManager {
-  private manifestUrl?: string;
   private readonly streamInfo: StreamInfo;
   private readonly core: Core<Stream>;
 
@@ -12,13 +11,7 @@ export class SegmentManager {
     this.core = core;
   }
 
-  setManifestUrl(url: string) {
-    this.manifestUrl = url.split("?")[0];
-  }
-
   setStream(stream: HookedStream, index = -1) {
-    if (!this.manifestUrl) return;
-
     const managerStream: Stream = {
       localId: stream.id.toString(),
       type: stream.type as StreamType,
@@ -27,7 +20,7 @@ export class SegmentManager {
       index,
       segments: new Map(),
     };
-    this.core.addStream(managerStream);
+    this.core.addStreamIfNoneExist(managerStream);
 
     return managerStream;
   }
@@ -141,9 +134,5 @@ export class SegmentManager {
       staleSegmentIds.push(segment.localId);
     }
     this.core.updateStream(managerStream.localId, newSegments, staleSegmentIds);
-  }
-
-  destroy() {
-    this.manifestUrl = undefined;
   }
 }
