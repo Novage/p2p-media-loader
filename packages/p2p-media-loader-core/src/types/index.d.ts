@@ -28,3 +28,16 @@ export type ReadonlyStream<TStream extends Stream> = Omit<
 > & {
   segments: ReadonlyMap<Stream["segments"]>;
 };
+
+export type SegmentResponse = {
+  data: ArrayBuffer;
+  url: string;
+  bandwidth: number;
+  status: number;
+  ok: boolean;
+};
+
+export type Playback = {
+  position: number;
+  rate: number;
+};

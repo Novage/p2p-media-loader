@@ -1,5 +1,6 @@
-import { Segment, Stream } from "../types";
+import { Segment, Stream, SegmentResponse } from "../types";
 import { getStreamExternalId } from "./utils";
+import { FetchError } from "./errors";
 
 export class Loader {
   private manifestResponseUrl?: string;
@@ -14,8 +15,31 @@ export class Loader {
     this.manifestResponseUrl = url;
   }
 
-  async loadSegment(segmentId: string) {
-    // TODO: maybe we should throw error?
+  async loadSegment(segmentId: string): Promise<SegmentResponse> {
+    const segment = this.identifySegment(segmentId);
+
+    const [response, duration] = await trackTime(() =>
+      this.fetchSegment(segment)
+    );
+    const { data, url, ok, status } = response;
+    const bits = data.byteLength * 8;
+
+    return {
+      url,
+      data,
+      bandwidth: bits / duration,
+      status,
+      ok,
+    };
+  }
+
+  abortSegment(segmentId: string) {
+    const requestContext = this.segmentRequestContext.get(segmentId);
+    if (!requestContext) return;
+    requestContext.abortController.abort();
+  }
+
+  private identifySegment(segmentId: string) {
     if (!this.manifestResponseUrl) {
       throw new Error("Manifest response url is undefined");
     }
@@ -33,13 +57,8 @@ export class Loader {
       this.manifestResponseUrl
     );
     console.log("Stream: ", streamGlobalId);
-    return this.fetchSegment(segment);
-  }
 
-  abortSegment(segmentId: string) {
-    const requestContext = this.segmentRequestContext.get(segmentId);
-    if (!requestContext) return;
-    requestContext.abortController.abort();
+    return segment;
   }
 
   private async fetchSegment(segment: Segment) {
@@ -51,7 +70,9 @@ export class Loader {
       const byteRangeString = `bytes=${start}-${end}`;
       headers.set("Range", byteRangeString);
     }
-    const requestContext = new RequestContext();
+    const requestContext: RequestContext = {
+      abortController: new AbortController(),
+    };
     this.segmentRequestContext.set(segment.localId, requestContext);
     const response = await fetch(url, {
       headers,
@@ -74,17 +95,16 @@ export class Loader {
   }
 }
 
-class RequestContext {
-  abortController = new AbortController();
-}
+type RequestContext = {
+  abortController: AbortController;
+};
 
-export class FetchError extends Error {
-  public code: number;
-  public details: object;
-
-  constructor(message: string, code: number, details: object) {
-    super(message);
-    this.code = code;
-    this.details = details;
-  }
+async function trackTime<T>(
+  action: () => T,
+  unit: "s" | "ms" = "s"
+): Promise<[Awaited<T>, number]> {
+  const start = performance.now();
+  const result = await action();
+  const duration = performance.now() - start;
+  return [result, unit === "s" ? duration / 1000 : duration];
 }

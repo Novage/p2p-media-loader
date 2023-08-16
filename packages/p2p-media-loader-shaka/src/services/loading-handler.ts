@@ -90,7 +90,7 @@ export class LoadingHandler implements LoadingHandlerInterface {
     const loadSegment = async (): Promise<Response> => {
       const response = await this.core.loadSegment(segmentId);
 
-      const { data, status, url } = response;
+      const { data, url, status, bandwidth } = response;
       return {
         data,
         headers: {},
@@ -98,7 +98,7 @@ export class LoadingHandler implements LoadingHandlerInterface {
         uri: url,
         originalUri: segmentUrl,
         timeMs: getLoadingDurationBasedOnBitrate({
-          bitrate: 2749539,
+          bitrate: bandwidth,
           bytesLoaded: data.byteLength,
         }),
       };

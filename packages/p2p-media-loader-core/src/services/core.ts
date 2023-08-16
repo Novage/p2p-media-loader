@@ -1,15 +1,19 @@
 import { Loader } from "./loader";
-import { Stream, ReadonlyStream, Segment } from "../types";
+import {
+  Stream,
+  ReadonlyStream,
+  Segment,
+  SegmentResponse,
+  Playback,
+} from "../types";
 
 export class Core<TStream extends Stream = Stream> {
   private readonly streams: Map<string, TStream> = new Map();
+  private readonly playback: Playback = { position: 0, rate: 1 };
   private readonly loader: Loader = new Loader(this.streams);
-  private readonly playback: Playback = new Playback();
-  private manifestResponseUrl?: string;
 
   setManifestResponseUrl(url: string): void {
-    this.manifestResponseUrl = url.split("?")[0];
-    this.loader.setManifestResponseUrl(this.manifestResponseUrl);
+    this.loader.setManifestResponseUrl(url.split("?")[0]);
   }
 
   hasSegment(segmentLocalId: string): boolean {
@@ -17,7 +21,9 @@ export class Core<TStream extends Stream = Stream> {
   }
 
   getStreamByUrl(streamUrl: string): ReadonlyStream<TStream> | undefined {
-    return [...this.streams.values()].find((s) => s.url === streamUrl);
+    for (const stream of this.streams.values()) {
+      if (stream.url === streamUrl) return stream;
+    }
   }
 
   getStream(streamLocalId: string): ReadonlyStream<TStream> | undefined {
@@ -41,8 +47,7 @@ export class Core<TStream extends Stream = Stream> {
     removeSegmentIds?.forEach((id) => stream.segments.delete(id));
   }
 
-  // TODO: response type
-  loadSegment(segmentLocalId: string) {
+  loadSegment(segmentLocalId: string): Promise<SegmentResponse> {
     return this.loader.loadSegment(segmentLocalId);
   }
 
@@ -64,9 +69,4 @@ export class Core<TStream extends Stream = Stream> {
   destroy(): void {
     this.streams.clear();
   }
-}
-
-class Playback {
-  position = 0;
-  rate = 1;
 }
