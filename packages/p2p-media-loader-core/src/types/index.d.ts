@@ -1,4 +1,4 @@
-export type StreamType = "video" | "audio";
+export type StreamType = "main" | "secondary";
 
 export type ByteRange = { start: number; end: number };
 

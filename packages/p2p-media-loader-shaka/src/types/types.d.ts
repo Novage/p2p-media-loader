@@ -7,8 +7,6 @@ export type StreamInfo = {
   manifestResponseUrl?: string;
 };
 
-export type StreamType = "video" | "audio";
-
 type HookedStream = shaka.extern.Stream & {
   streamUrl?: string;
   mediaSequenceTimeMap?: Map<number, number>;

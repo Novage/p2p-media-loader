@@ -15,10 +15,11 @@ export class SegmentManager {
 
   processMasterManifest(data: ManifestLoadedData) {
     const { levels, audioTracks } = data;
+    // in the case of audio only stream it is stored in levels
     levels.forEach((level, index) =>
       this.core.addStreamIfNoneExists({
         localId: level.url,
-        type: "video",
+        type: "main",
         index,
         segments: new Map(),
       })
@@ -27,7 +28,7 @@ export class SegmentManager {
     audioTracks.forEach((track, index) =>
       this.core.addStreamIfNoneExists({
         localId: track.url,
-        type: "audio",
+        type: "secondary",
         index,
         segments: new Map(),
       })

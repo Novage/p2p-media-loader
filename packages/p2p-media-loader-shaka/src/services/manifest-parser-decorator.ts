@@ -1,6 +1,7 @@
 import { SegmentManager } from "./segment-manager";
 import Debug from "debug";
 import { HookedStream, StreamProtocol, Shaka } from "../types/types";
+import { StreamType } from "p2p-media-loader-core";
 
 export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   private readonly originalManifestParser: shaka.extern.ManifestParser;
@@ -33,6 +34,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       uri,
       playerInterface
     );
+    debugger;
     if (this.isHLS) {
       const success = this.retrieveStreamMediaSequenceTimeMaps(
         manifest.variants
@@ -63,12 +65,12 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     const processedStreams = new Set<number>();
 
     const processStream = (
-      stream: shaka.extern.Stream | null,
+      stream: shaka.extern.Stream,
+      type: StreamType,
       order: number
     ) => {
-      if (!stream || processedStreams.has(stream.id)) return false;
       if (this.isDash) this.hookSegmentIndex(stream);
-      this.segmentManager.setStream(stream as HookedStream, order);
+      this.segmentManager.setStream(stream as HookedStream, type, order);
       if (stream.segmentIndex) this.segmentManager.updateStream(stream);
       processedStreams.add(stream.id);
       return true;
@@ -78,8 +80,13 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     let audioCount = 0;
     for (const variant of variants) {
       const { video, audio } = variant;
-      if (processStream(video, videoCount)) videoCount++;
-      if (processStream(audio, audioCount)) audioCount++;
+
+      if (video && !processedStreams.has(video.id)) {
+        processStream(video, "main", videoCount++);
+      }
+      if (audio && !processedStreams.has(audio.id)) {
+        processStream(audio, !video ? "secondary" : "main", audioCount++);
+      }
     }
   }
 
@@ -107,7 +114,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
 
         let references: shaka.media.SegmentReference[];
         try {
-          references = Array.from(segmentIndex);
+          references = [...segmentIndex];
           firstItemReference = references[0];
           lastItemReference = references[references.length - 1];
         } catch (err) {

@@ -6,4 +6,5 @@ export type {
   ReadonlyStream,
   ByteRange,
   SegmentResponse,
+  StreamType,
 } from "./types";

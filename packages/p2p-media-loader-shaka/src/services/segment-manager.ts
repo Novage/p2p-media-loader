@@ -1,6 +1,11 @@
 import * as Utils from "./stream-utils";
-import { HookedStream, StreamInfo, StreamType, Stream } from "../types/types";
-import { Core, ReadonlyStream, Segment } from "p2p-media-loader-core";
+import { HookedStream, StreamInfo, Stream } from "../types/types";
+import {
+  Core,
+  ReadonlyStream,
+  Segment,
+  StreamType,
+} from "p2p-media-loader-core";
 
 export class SegmentManager {
   private readonly streamInfo: Readonly<StreamInfo>;
@@ -11,10 +16,10 @@ export class SegmentManager {
     this.core = core;
   }
 
-  setStream(stream: HookedStream, index = -1) {
+  setStream(stream: HookedStream, type: StreamType, index = -1) {
     const managerStream: Stream = {
       localId: stream.id.toString(),
-      type: stream.type as StreamType,
+      type,
       url: stream.streamUrl,
       shakaStream: stream,
       index,
@@ -29,8 +34,7 @@ export class SegmentManager {
     stream: HookedStream,
     segmentReferences?: shaka.media.SegmentReference[]
   ) {
-    let managerStream = this.core.getStream(stream.id.toString());
-    if (!managerStream) managerStream = this.setStream(stream);
+    const managerStream = this.core.getStream(stream.id.toString());
     if (!managerStream) return;
 
     const { segmentIndex } = stream;
