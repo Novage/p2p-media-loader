@@ -46,7 +46,13 @@ export class SegmentManager {
     const segmentToRemoveIds = new Set(playlist.segments.keys());
     const newSegments: Segment[] = [];
     fragments.forEach((fragment, index) => {
-      const { url: responseUrl, byteRange: fragByteRange, sn } = fragment;
+      const {
+        url: responseUrl,
+        byteRange: fragByteRange,
+        sn,
+        start: startTime,
+        end: endTime,
+      } = fragment;
       if (sn === "initSegment") return;
 
       const [start, end] = fragByteRange;
@@ -63,6 +69,8 @@ export class SegmentManager {
         url: responseUrl,
         externalId: live ? sn : index,
         byteRange,
+        startTime,
+        endTime,
       });
     });
 

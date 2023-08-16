@@ -7,6 +7,8 @@ export type Segment = {
   readonly externalId: number;
   readonly url: string;
   readonly byteRange?: ByteRange;
+  readonly startTime: number;
+  readonly endTime: number;
 };
 
 export type Stream = {

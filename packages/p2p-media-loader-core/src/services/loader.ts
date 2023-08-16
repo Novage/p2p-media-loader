@@ -18,16 +18,17 @@ export class Loader {
   async loadSegment(segmentId: string): Promise<SegmentResponse> {
     const segment = this.identifySegment(segmentId);
 
-    const [response, duration] = await trackTime(() =>
+    const [response, loadingDurationMs] = await trackTime(() =>
       this.fetchSegment(segment)
     );
     const { data, url, ok, status } = response;
     const bits = data.byteLength * 8;
+    const bandwidth = (bits * 1000) / loadingDurationMs;
 
     return {
       url,
       data,
-      bandwidth: bits / duration,
+      bandwidth,
       status,
       ok,
     };
@@ -106,5 +107,5 @@ async function trackTime<T>(
   const start = performance.now();
   const result = await action();
   const duration = performance.now() - start;
-  return [result, unit === "s" ? duration / 1000 : duration];
+  return [result, unit === "ms" ? duration : duration / 1000];
 }

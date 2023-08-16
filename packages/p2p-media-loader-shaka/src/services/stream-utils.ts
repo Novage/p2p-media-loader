@@ -10,12 +10,14 @@ export function createSegment({
   externalId: number;
   localId?: string;
 }): Segment {
-  const { url, byteRange } = getSegmentInfoFromReference(segmentReference);
+  const { byteRange, url, startTime, endTime } =
+    getSegmentInfoFromReference(segmentReference);
   return {
     localId: localId ?? getSegmentLocalId(url, byteRange),
-    byteRange,
-    url,
     externalId,
+    url,
+    startTime,
+    endTime,
   };
 }
 
@@ -58,10 +60,14 @@ export function getSegmentInfoFromReference(
   const responseUrl = uris[1] ?? uris[0];
   const start = segmentReference.getStartByte();
   const end = segmentReference.getEndByte() ?? undefined;
+  const startTime = segmentReference.getStartTime();
+  const endTime = segmentReference.getStartTime();
 
   return {
     byteRange: end !== undefined ? { start, end } : undefined,
     url: responseUrl,
+    startTime,
+    endTime,
   };
 }
 

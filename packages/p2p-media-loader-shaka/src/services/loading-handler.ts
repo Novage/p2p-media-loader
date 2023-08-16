@@ -97,10 +97,7 @@ export class LoadingHandler implements LoadingHandlerInterface {
         status,
         uri: url,
         originalUri: segmentUrl,
-        timeMs: getLoadingDurationBasedOnBitrate({
-          bitrate: bandwidth,
-          bytesLoaded: data.byteLength,
-        }),
+        timeMs: getLoadingDurationBasedOnBandwidth(bandwidth, data.byteLength),
       };
     };
 
@@ -110,14 +107,10 @@ export class LoadingHandler implements LoadingHandlerInterface {
   }
 }
 
-function getLoadingDurationBasedOnBitrate({
-  bitrate,
-  bytesLoaded,
-}: {
-  bitrate: number;
-  bytesLoaded: number;
-}) {
-  const bites = bytesLoaded * 8;
-  const targetBandwidth = Math.round(bitrate * 1.1);
-  return Math.round(bites / targetBandwidth) * 1000;
+function getLoadingDurationBasedOnBandwidth(
+  bandwidth: number,
+  bytesLoaded: number
+) {
+  const bits = bytesLoaded * 8;
+  return Math.round(bits / bandwidth) * 1000;
 }
