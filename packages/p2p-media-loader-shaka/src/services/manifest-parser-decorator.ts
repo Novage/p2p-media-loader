@@ -34,7 +34,6 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       uri,
       playerInterface
     );
-    debugger;
     if (this.isHLS) {
       const success = this.retrieveStreamMediaSequenceTimeMaps(
         manifest.variants
