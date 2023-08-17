@@ -14,8 +14,8 @@ export class Engine {
   private readonly shaka: Shaka;
   private player!: shaka.Player;
   private readonly streamInfo: StreamInfo = {};
-  private readonly core: Core<Stream> = new Core();
-  private readonly segmentManager: SegmentManager = new SegmentManager(
+  private readonly core = new Core<Stream>();
+  private readonly segmentManager = new SegmentManager(
     this.streamInfo,
     this.core
   );

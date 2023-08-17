@@ -8,7 +8,7 @@ import {
 } from "../types";
 
 export class Core<TStream extends Stream = Stream> {
-  private readonly streams: Map<string, TStream> = new Map();
+  private readonly streams = new Map<string, TStream>();
   private readonly playback: Playback = { position: 0, rate: 1 };
   private readonly loader: Loader = new Loader(this.streams);
 
