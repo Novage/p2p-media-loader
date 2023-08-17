@@ -55,13 +55,7 @@ export class Core<TStream extends Stream = Stream> {
     return this.loader.abortSegment(segmentId);
   }
 
-  updatePlayback({
-    position,
-    rate,
-  }: {
-    rate?: number;
-    position?: number;
-  }): void {
+  updatePlayback({ position, rate }: Partial<Playback>): void {
     if (position !== undefined) this.playback.position = position;
     if (rate !== undefined) this.playback.rate = rate;
   }

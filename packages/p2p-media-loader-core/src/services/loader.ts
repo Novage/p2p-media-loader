@@ -18,12 +18,13 @@ export class Loader {
   async loadSegment(segmentId: string): Promise<SegmentResponse> {
     const segment = this.identifySegment(segmentId);
 
-    const [response, loadingDurationMs] = await trackTime(() =>
-      this.fetchSegment(segment)
+    const [response, loadingDuration] = await trackTime(
+      () => this.fetchSegment(segment),
+      "s"
     );
     const { data, url, ok, status } = response;
     const bits = data.byteLength * 8;
-    const bandwidth = (bits * 1000) / loadingDurationMs;
+    const bandwidth = bits / loadingDuration;
 
     return {
       url,
@@ -47,17 +48,17 @@ export class Loader {
 
     const stream = this.streams.get(segmentId);
     const segment = stream?.segments.get(segmentId);
-    if (!segment || !stream || !this.manifestResponseUrl) {
+    if (!segment || !stream) {
       throw new Error(`Not found segment with id: ${segmentId}`);
     }
 
     console.log("\nloading segment:");
     console.log("Index: ", segment.externalId);
-    const streamGlobalId = getStreamExternalId(
+    const streamEternalId = getStreamExternalId(
       stream,
       this.manifestResponseUrl
     );
-    console.log("Stream: ", streamGlobalId);
+    console.log("Stream: ", streamEternalId);
 
     return segment;
   }
