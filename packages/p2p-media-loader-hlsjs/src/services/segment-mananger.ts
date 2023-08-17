@@ -21,7 +21,6 @@ export class SegmentManager {
         localId: level.url,
         type: "main",
         index,
-        segments: new Map(),
       })
     );
 
@@ -30,7 +29,6 @@ export class SegmentManager {
         localId: track.url,
         type: "secondary",
         index,
-        segments: new Map(),
       })
     );
   }

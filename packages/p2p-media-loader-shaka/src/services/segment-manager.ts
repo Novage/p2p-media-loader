@@ -2,7 +2,7 @@ import * as Utils from "./stream-utils";
 import { HookedStream, StreamInfo, Stream } from "../types/types";
 import {
   Core,
-  ReadonlyStream,
+  SteamWithSegments,
   Segment,
   StreamType,
 } from "p2p-media-loader-core";
@@ -23,7 +23,6 @@ export class SegmentManager {
       url: stream.streamUrl,
       shakaStream: stream,
       index,
-      segments: new Map(),
     };
     this.core.addStreamIfNoneExists(managerStream);
 
@@ -62,7 +61,7 @@ export class SegmentManager {
   }
 
   private processDashSegmentReferences(
-    managerStream: ReadonlyStream<Stream>,
+    managerStream: SteamWithSegments<Stream>,
     segmentReferences: shaka.media.SegmentReference[]
   ) {
     const staleSegmentsIds = new Set(managerStream.segments.keys());
@@ -88,7 +87,7 @@ export class SegmentManager {
   }
 
   private processHlsSegmentReferences(
-    managerStream: ReadonlyStream<Stream>,
+    managerStream: SteamWithSegments<Stream>,
     segmentReferences: shaka.media.SegmentReference[]
   ) {
     const segments = [...managerStream.segments.values()];

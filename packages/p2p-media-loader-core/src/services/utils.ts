@@ -5,5 +5,5 @@ export function getStreamExternalId(
   manifestResponseUrl: string
 ): string {
   const { type, index } = stream;
-  return `${manifestResponseUrl}-${type}-v${index}`;
+  return `${manifestResponseUrl}-${type}-${index}`;
 }

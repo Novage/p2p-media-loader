@@ -1,14 +1,15 @@
 import { Loader } from "./loader";
 import {
   Stream,
-  ReadonlyStream,
+  StreamWithSegments,
   Segment,
   SegmentResponse,
   Playback,
+  ReadonlyStreamWithSegments,
 } from "../types";
 
 export class Core<TStream extends Stream = Stream> {
-  private readonly streams = new Map<string, TStream>();
+  private readonly streams = new Map<string, StreamWithSegments<TStream>>();
   private readonly playback: Playback = { position: 0, rate: 1 };
   private readonly loader: Loader = new Loader(this.streams);
 
@@ -20,19 +21,26 @@ export class Core<TStream extends Stream = Stream> {
     return this.streams.has(segmentLocalId);
   }
 
-  getStreamByUrl(streamUrl: string): ReadonlyStream<TStream> | undefined {
+  getStreamByUrl(
+    streamUrl: string
+  ): ReadonlyStreamWithSegments<TStream> | undefined {
     for (const stream of this.streams.values()) {
       if (stream.url === streamUrl) return stream;
     }
   }
 
-  getStream(streamLocalId: string): ReadonlyStream<TStream> | undefined {
+  getStream(
+    streamLocalId: string
+  ): ReadonlyStreamWithSegments<TStream> | undefined {
     return this.streams.get(streamLocalId);
   }
 
   addStreamIfNoneExists(stream: TStream): void {
     if (this.streams.has(stream.localId)) return;
-    this.streams.set(stream.localId, stream);
+    this.streams.set(stream.localId, {
+      ...stream,
+      segments: new Map(),
+    });
   }
 
   updateStream(

@@ -15,15 +15,15 @@ export type Stream = {
   readonly localId: string;
   readonly type: StreamType;
   readonly index: number;
-  readonly segments: Map<string, Segment>;
   readonly url?: string;
 };
 
-export type ReadonlyStream<TStream extends Stream> = Omit<
-  TStream,
-  "segments"
-> & {
-  segments: ReadonlyMap<string, Segment>;
+type StreamWithSegments<TStream extends Stream = Stream> = TStream & {
+  readonly segments: Map<string, Segment>;
+};
+
+export type ReadonlyStreamWithSegments<TStream extends Stream> = TStream & {
+  readonly segments: ReadonlyMap<string, Segment>;
 };
 
 export type SegmentResponse = {

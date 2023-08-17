@@ -3,7 +3,7 @@ export * as Error from "./services/errors";
 export type {
   Stream,
   Segment,
-  ReadonlyStream,
+  ReadonlyStreamWithSegments as SteamWithSegments,
   ByteRange,
   SegmentResponse,
   StreamType,

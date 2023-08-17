@@ -1,13 +1,13 @@
-import { Segment, Stream, SegmentResponse } from "../types";
+import { Segment, Stream, SegmentResponse, StreamWithSegments } from "../types";
 import { getStreamExternalId } from "./utils";
 import { FetchError } from "./errors";
 
 export class Loader {
   private manifestResponseUrl?: string;
-  private readonly streams: Map<string, Stream>;
+  private readonly streams: Map<string, StreamWithSegments>;
   private readonly segmentRequestContext = new Map<string, RequestContext>();
 
-  constructor(streams: Map<string, Stream>) {
+  constructor(streams: Map<string, StreamWithSegments>) {
     this.streams = streams;
   }
 

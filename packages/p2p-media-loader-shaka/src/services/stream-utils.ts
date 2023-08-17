@@ -1,5 +1,5 @@
 import { Stream } from "../types/types";
-import { Segment, ReadonlyStream, ByteRange } from "p2p-media-loader-core";
+import { Segment, SteamWithSegments, ByteRange } from "p2p-media-loader-core";
 
 export function createSegment({
   segmentReference,
@@ -72,7 +72,7 @@ export function getSegmentInfoFromReference(
 }
 
 export function getStreamLastMediaSequence(
-  stream: ReadonlyStream<Stream>
+  stream: SteamWithSegments<Stream>
 ): number | undefined {
   const { shakaStream } = stream;
   const map = shakaStream.mediaSequenceTimeMap;
