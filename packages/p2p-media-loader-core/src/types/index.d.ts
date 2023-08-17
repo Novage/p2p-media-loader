@@ -19,16 +19,11 @@ export type Stream = {
   readonly url?: string;
 };
 
-type ReadonlyMap<T extends Map<unknown, unknown>> = Omit<
-  T,
-  "set" | "delete" | "clear"
->;
-
 export type ReadonlyStream<TStream extends Stream> = Omit<
   TStream,
   "segments"
 > & {
-  segments: ReadonlyMap<Stream["segments"]>;
+  segments: ReadonlyMap<string, Segment>;
 };
 
 export type SegmentResponse = {
