@@ -16,28 +16,24 @@ export class LoadingHandler implements LoadingHandlerInterface {
   private readonly shaka: Shaka;
   private readonly segmentManager: SegmentManager;
   private readonly core: Core<Stream>;
-  readonly streamInfo: Readonly<StreamInfo>;
+  readonly streamInfo: StreamInfo;
   private loadArgs!: LoadingHandlerParams;
-  private readonly setManifestResponseUrl: (url: string) => void;
 
   constructor({
     shaka,
     streamInfo,
     core,
     segmentManager,
-    setManifestResponseUrl,
   }: {
     shaka: Shaka;
     streamInfo: Readonly<StreamInfo>;
     core: Core<Stream>;
     segmentManager: SegmentManager;
-    setManifestResponseUrl: (url: string) => void;
   }) {
     this.shaka = shaka;
     this.streamInfo = streamInfo;
     this.core = core;
     this.segmentManager = segmentManager;
-    this.setManifestResponseUrl = setManifestResponseUrl;
   }
 
   private defaultLoad() {
@@ -75,8 +71,7 @@ export class LoadingHandler implements LoadingHandlerInterface {
     } else if (!this.streamInfo.manifestResponseUrl) {
       // loading master manifest either HLS or DASH
       const response = await loadingPromise;
-      const manifestResponseUrl = response.uri;
-      this.setManifestResponseUrl(manifestResponseUrl);
+      this.setManifestResponseUrl(response.uri);
     }
   }
 
@@ -104,6 +99,11 @@ export class LoadingHandler implements LoadingHandlerInterface {
     return new this.shaka.util.AbortableOperation(loadSegment(), async () =>
       this.core.abortSegmentLoading(segmentId)
     );
+  }
+
+  private setManifestResponseUrl(responseUrl: string) {
+    this.streamInfo.manifestResponseUrl = responseUrl;
+    this.core.setManifestResponseUrl(responseUrl);
   }
 }
 

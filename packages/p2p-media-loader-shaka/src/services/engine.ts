@@ -90,17 +90,12 @@ export class Engine {
   }
 
   private initializeNetworkingEngine() {
-    const setManifestResponseUrl = (responseUrl: string) => {
-      this.streamInfo.manifestResponseUrl = responseUrl;
-      this.core.setManifestResponseUrl(responseUrl);
-    };
     const handleLoading: shaka.extern.SchemePlugin = (...args) => {
       const loadingHandler = new LoadingHandler({
         shaka: this.shaka,
         streamInfo: this.streamInfo,
         segmentManager: this.segmentManager,
         core: this.core,
-        setManifestResponseUrl,
       });
       return loadingHandler.handleLoading(...args);
     };
