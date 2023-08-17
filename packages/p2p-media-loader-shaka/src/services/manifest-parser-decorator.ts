@@ -2,6 +2,7 @@ import { SegmentManager } from "./segment-manager";
 import Debug from "debug";
 import { HookedStream, StreamProtocol, Shaka } from "../types/types";
 import { StreamType } from "p2p-media-loader-core";
+import * as Utils from "./stream-utils";
 
 export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   private readonly originalManifestParser: shaka.extern.ManifestParser;
@@ -70,7 +71,6 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     ) => {
       if (this.isDash) this.hookSegmentIndex(stream);
       this.segmentManager.setStream(stream as HookedStream, type, order);
-      if (stream.segmentIndex) this.segmentManager.updateStream(stream);
       processedStreams.add(stream.id);
       return true;
     };
@@ -126,8 +126,12 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
           lastItemReference !== prevLastItemReference
         ) {
           // Segment index have been updated
-          this.segmentManager.updateStream(stream, references);
-          this.debug(`Stream ${stream.id} is updated`);
+          const streamLocalId = Utils.getStreamLocalIdFromShakaStream(
+            stream,
+            this.isHLS
+          );
+          this.segmentManager.updateStreamSegments(streamLocalId, references);
+          this.debug(`Stream ${streamLocalId} is updated`);
           prevFirstItemReference = firstItemReference;
           prevLastItemReference = lastItemReference;
         }

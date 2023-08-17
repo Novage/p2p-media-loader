@@ -8,56 +8,52 @@ import {
 } from "p2p-media-loader-core";
 
 export class SegmentManager {
-  private readonly streamInfo: Readonly<StreamInfo>;
   private readonly core: Core<Stream>;
+  private readonly isHls: boolean;
 
   constructor(streamInfo: Readonly<StreamInfo>, core: Core<Stream>) {
-    this.streamInfo = streamInfo;
     this.core = core;
+    this.isHls = streamInfo.protocol === "hls";
   }
 
-  setStream(stream: HookedStream, type: StreamType, index = -1) {
-    const managerStream: Stream = {
-      localId: stream.id.toString(),
+  setStream(shakaStream: HookedStream, type: StreamType, index = -1) {
+    const localId = Utils.getStreamLocalIdFromShakaStream(
+      shakaStream,
+      this.isHls
+    );
+
+    this.core.addStreamIfNoneExists({
+      localId,
       type,
-      url: stream.streamUrl,
-      shakaStream: stream,
       index,
-    };
-    this.core.addStreamIfNoneExists(managerStream);
+      shakaStream,
+    });
 
-    return managerStream;
+    if (shakaStream.segmentIndex) this.updateStreamSegments(localId);
   }
 
-  updateStream(
-    stream: HookedStream,
+  updateStreamSegments(
+    streamLocalId: string,
     segmentReferences?: shaka.media.SegmentReference[]
   ) {
-    const managerStream = this.core.getStream(stream.id.toString());
-    if (!managerStream) return;
+    const stream = this.core.getStream(streamLocalId);
+    if (!stream) return;
 
-    const { segmentIndex } = stream;
-    let references = segmentReferences;
-    if (!references && segmentIndex) {
+    const { segmentIndex } = stream.shakaStream;
+    if (!segmentReferences && segmentIndex) {
       try {
-        references = [...segmentIndex];
+        return [...segmentIndex];
       } catch (err) {
         return;
       }
     }
-    if (!references) return;
+    if (!segmentReferences) return;
 
-    if (this.streamInfo.protocol === "hls") {
-      this.processHlsSegmentReferences(managerStream, references);
+    if (this.isHls) {
+      this.processHlsSegmentReferences(stream, segmentReferences);
     } else {
-      this.processDashSegmentReferences(managerStream, references);
+      this.processDashSegmentReferences(stream, segmentReferences);
     }
-  }
-
-  updateHlsStreamByUrl(url: string) {
-    const stream = this.core.getStreamByUrl(url);
-    if (!stream || !stream.shakaStream) return;
-    this.updateStream(stream.shakaStream);
   }
 
   private processDashSegmentReferences(

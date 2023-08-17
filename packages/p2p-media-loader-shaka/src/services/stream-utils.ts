@@ -1,4 +1,4 @@
-import { Stream } from "../types/types";
+import { HookedStream, Stream } from "../types/types";
 import { Segment, SteamWithSegments, ByteRange } from "p2p-media-loader-core";
 
 export function createSegment({
@@ -82,4 +82,18 @@ export function getStreamLastMediaSequence(
     if (firstMediaSequence === undefined) return;
     return firstMediaSequence + map.size - 1;
   }
+}
+
+export function getStreamLocalIdFromShakaStream(
+  stream: shaka.extern.Stream | HookedStream,
+  isHls: boolean
+): string {
+  if (isHls) {
+    const streamUrl = (stream as HookedStream).streamUrl;
+    if (!streamUrl) {
+      throw Error("Stream url must be set for HLS stream");
+    }
+    return streamUrl;
+  }
+  return stream.id.toString();
 }

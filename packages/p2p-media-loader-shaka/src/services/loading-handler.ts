@@ -62,12 +62,12 @@ export class LoadingHandler implements LoadingHandlerInterface {
   ) {
     if (
       this.streamInfo.protocol === "hls" &&
-      !!this.core.getStreamByUrl(streamUrl)
+      !!this.core.getStream(streamUrl)
     ) {
       // loading HLS playlist manifest
       await loadingPromise;
       // Waiting for the playlist to be parsed
-      setTimeout(() => this.segmentManager.updateHlsStreamByUrl(streamUrl), 0);
+      setTimeout(() => this.segmentManager.updateStreamSegments(streamUrl), 0);
     } else if (!this.streamInfo.manifestResponseUrl) {
       // loading master manifest either HLS or DASH
       const response = await loadingPromise;

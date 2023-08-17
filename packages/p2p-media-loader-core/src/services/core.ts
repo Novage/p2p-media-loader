@@ -5,7 +5,7 @@ import {
   Segment,
   SegmentResponse,
   Playback,
-  ReadonlyStreamWithSegments,
+  StreamWithReadonlySegments,
 } from "../types";
 
 export class Core<TStream extends Stream = Stream> {
@@ -21,17 +21,9 @@ export class Core<TStream extends Stream = Stream> {
     return this.streams.has(segmentLocalId);
   }
 
-  getStreamByUrl(
-    streamUrl: string
-  ): ReadonlyStreamWithSegments<TStream> | undefined {
-    for (const stream of this.streams.values()) {
-      if (stream.url === streamUrl) return stream;
-    }
-  }
-
   getStream(
     streamLocalId: string
-  ): ReadonlyStreamWithSegments<TStream> | undefined {
+  ): StreamWithReadonlySegments<TStream> | undefined {
     return this.streams.get(streamLocalId);
   }
 
