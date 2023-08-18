@@ -1,3 +1,3 @@
 export { Core } from "./core";
-export * as Error from "./errors";
+export * from "./errors";
 export type * from "./types";
