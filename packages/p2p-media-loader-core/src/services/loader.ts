@@ -1,4 +1,4 @@
-import { Segment, Stream, SegmentResponse, StreamWithSegments } from "../types";
+import { Segment, SegmentResponse, StreamWithSegments } from "../types";
 import { getStreamExternalId } from "./utils";
 import { FetchError } from "./errors";
 

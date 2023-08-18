@@ -17,12 +17,11 @@ export type Stream = {
   readonly index: number;
 };
 
-type StreamWithSegments<TStream extends Stream = Stream> = TStream & {
-  readonly segments: Map<string, Segment>;
-};
-
-export type StreamWithReadonlySegments<TStream extends Stream> = TStream & {
-  readonly segments: ReadonlyMap<string, Segment>;
+type StreamWithSegments<
+  TStream extends Stream = Stream,
+  TMap extends ReadonlyMap<string, Segment> = ReadonlyMap<string, Segment>
+> = TStream & {
+  readonly segments: TMap;
 };
 
 export type SegmentResponse = {

@@ -5,11 +5,13 @@ import {
   Segment,
   SegmentResponse,
   Playback,
-  StreamWithReadonlySegments,
 } from "../types";
 
 export class Core<TStream extends Stream = Stream> {
-  private readonly streams = new Map<string, StreamWithSegments<TStream>>();
+  private readonly streams = new Map<
+    string,
+    StreamWithSegments<TStream, Map<string, Segment>>
+  >();
   private readonly playback: Playback = { position: 0, rate: 1 };
   private readonly loader: Loader = new Loader(this.streams);
 
@@ -21,9 +23,7 @@ export class Core<TStream extends Stream = Stream> {
     return this.streams.has(segmentLocalId);
   }
 
-  getStream(
-    streamLocalId: string
-  ): StreamWithReadonlySegments<TStream> | undefined {
+  getStream(streamLocalId: string): StreamWithSegments<TStream> | undefined {
     return this.streams.get(streamLocalId);
   }
 
