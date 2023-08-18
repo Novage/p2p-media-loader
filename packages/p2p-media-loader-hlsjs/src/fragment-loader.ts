@@ -8,11 +8,7 @@ import type {
   LoaderStats,
 } from "hls.js";
 import * as Utils from "./utils";
-import {
-  Core,
-  Error as CoreError,
-  SegmentResponse,
-} from "p2p-media-loader-core";
+import { Core, FetchError, SegmentResponse } from "p2p-media-loader-core";
 
 const DEFAULT_DOWNLOAD_LATENCY = 10;
 
@@ -91,7 +87,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   private handleError(thrownError: unknown) {
     const error = { code: 0, text: "" };
     let details: object | null = null;
-    if (thrownError instanceof CoreError.FetchError) {
+    if (thrownError instanceof FetchError) {
       error.code = thrownError.code;
       error.text = thrownError.message;
       details = thrownError.details;
