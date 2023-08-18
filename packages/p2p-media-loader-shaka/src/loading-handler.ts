@@ -1,7 +1,7 @@
 import * as Utils from "./stream-utils";
 import { SegmentManager } from "./segment-manager";
-import { StreamInfo } from "../types/types";
-import { Shaka, Stream } from "../types/types";
+import { StreamInfo } from "./types";
+import { Shaka, Stream } from "./types";
 import { Core } from "p2p-media-loader-core";
 
 interface LoadingHandlerInterface {

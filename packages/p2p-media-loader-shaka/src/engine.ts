@@ -5,7 +5,7 @@ import {
 } from "./manifest-parser-decorator";
 import { SegmentManager } from "./segment-manager";
 import Debug from "debug";
-import { StreamInfo, StreamProtocol, Shaka, Stream } from "../types/types";
+import { StreamInfo, StreamProtocol, Shaka, Stream } from "./types";
 import { LoadingHandler } from "./loading-handler";
 import { decorateMethod } from "./utils";
 import { Core } from "p2p-media-loader-core";

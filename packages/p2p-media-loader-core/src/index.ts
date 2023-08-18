@@ -1,5 +1,5 @@
-export { Core } from "./services/core";
-export * as Error from "./services/errors";
+export { Core } from "./core";
+export * as Error from "./errors";
 export type {
   Stream,
   Segment,
@@ -7,4 +7,4 @@ export type {
   ByteRange,
   SegmentResponse,
   StreamType,
-} from "./types";
+} from "./external-types";

@@ -1,4 +1,4 @@
-import { Stream } from "../types";
+import { Stream } from "./index";
 
 export function getStreamExternalId(
   stream: Stream,

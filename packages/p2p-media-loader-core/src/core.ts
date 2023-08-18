@@ -5,7 +5,7 @@ import {
   Segment,
   SegmentResponse,
   Playback,
-} from "../types";
+} from "./external-types";
 
 export class Core<TStream extends Stream = Stream> {
   private readonly streams = new Map<

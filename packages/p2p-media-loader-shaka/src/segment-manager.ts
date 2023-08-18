@@ -1,5 +1,5 @@
 import * as Utils from "./stream-utils";
-import { HookedStream, StreamInfo, Stream } from "../types/types";
+import { HookedStream, StreamInfo, Stream } from "./types";
 import {
   Core,
   StreamWithSegments,

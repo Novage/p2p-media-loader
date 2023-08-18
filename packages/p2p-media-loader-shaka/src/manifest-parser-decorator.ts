@@ -1,6 +1,6 @@
 import { SegmentManager } from "./segment-manager";
 import Debug from "debug";
-import { HookedStream, StreamProtocol, Shaka } from "../types/types";
+import { HookedStream, StreamProtocol, Shaka } from "./types";
 import { StreamType } from "p2p-media-loader-core";
 import * as Utils from "./stream-utils";
 
