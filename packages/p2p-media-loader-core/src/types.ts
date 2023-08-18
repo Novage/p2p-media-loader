@@ -17,7 +17,7 @@ export type Stream = {
   readonly index: number;
 };
 
-type StreamWithSegments<
+export type StreamWithSegments<
   TStream extends Stream = Stream,
   TMap extends ReadonlyMap<string, Segment> = ReadonlyMap<string, Segment>
 > = TStream & {
@@ -30,9 +30,4 @@ export type SegmentResponse = {
   bandwidth: number;
   status: number;
   ok: boolean;
-};
-
-export type Playback = {
-  position: number;
-  rate: number;
 };

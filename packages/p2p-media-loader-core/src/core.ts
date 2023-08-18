@@ -1,11 +1,6 @@
 import { Loader } from "./loader";
-import {
-  Stream,
-  StreamWithSegments,
-  Segment,
-  SegmentResponse,
-  Playback,
-} from "./external-types";
+import { Stream, StreamWithSegments, Segment, SegmentResponse } from "./types";
+import { Playback } from "./internal-types";
 
 export class Core<TStream extends Stream = Stream> {
   private readonly streams = new Map<
