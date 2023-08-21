@@ -61,7 +61,7 @@ export function getSegmentInfoFromReference(
   const start = segmentReference.getStartByte();
   const end = segmentReference.getEndByte() ?? undefined;
   const startTime = segmentReference.getStartTime();
-  const endTime = segmentReference.getStartTime();
+  const endTime = segmentReference.getEndTime();
 
   return {
     byteRange: end !== undefined ? { start, end } : undefined,

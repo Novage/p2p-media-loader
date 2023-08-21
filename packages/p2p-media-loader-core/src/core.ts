@@ -1,6 +1,7 @@
 import { Loader } from "./loader";
 import { Stream, StreamWithSegments, Segment, SegmentResponse } from "./types";
 import { Playback } from "./internal-types";
+import * as Utils from "./utils";
 
 export class Core<TStream extends Stream = Stream> {
   private readonly streams = new Map<
@@ -15,7 +16,9 @@ export class Core<TStream extends Stream = Stream> {
   }
 
   hasSegment(segmentLocalId: string): boolean {
-    return this.streams.has(segmentLocalId);
+    const { segment } =
+      Utils.getSegmentFromStreamsMap(this.streams, segmentLocalId) ?? {};
+    return !!segment;
   }
 
   getStream(streamLocalId: string): StreamWithSegments<TStream> | undefined {
