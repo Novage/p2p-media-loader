@@ -24,7 +24,8 @@
     "preview": "vite preview",
     "prettier": "prettier --write .",
     "lint": "eslint . --ext .ts",
-    "clean": "rimraf lib dist build"
+    "clean": "rimraf lib dist build",
+    "type-check": "npx tsc --noEmit"
   },
   "dependencies": {
     "p2p-media-loader-core": "workspace:*",

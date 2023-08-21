@@ -1,6 +1,8 @@
 import { SegmentManager } from "./segment-manager";
 import Debug from "debug";
-import { HookedStream, StreamProtocol, Shaka } from "../types/types";
+import { HookedStream, StreamProtocol, Shaka } from "./types";
+import { StreamType } from "p2p-media-loader-core";
+import * as Utils from "./stream-utils";
 
 export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   private readonly originalManifestParser: shaka.extern.ManifestParser;
@@ -33,7 +35,6 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       uri,
       playerInterface
     );
-    this.segmentManager.setManifestUrl(uri);
     if (this.isHLS) {
       const success = this.retrieveStreamMediaSequenceTimeMaps(
         manifest.variants
@@ -64,20 +65,12 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     const processedStreams = new Set<number>();
 
     const processStream = (
-      stream: shaka.extern.Stream | null,
-      count: number,
-      bandwidth: number
+      stream: shaka.extern.Stream,
+      type: StreamType,
+      order: number
     ) => {
-      if (!stream || processedStreams.has(stream.id)) return false;
       if (this.isDash) this.hookSegmentIndex(stream);
-      this.segmentManager.setStream({
-        stream: stream as HookedStream,
-        streamOrder: count,
-        bitrate: bandwidth,
-      });
-      if (stream.segmentIndex) {
-        this.segmentManager.updateStream({ stream });
-      }
+      this.segmentManager.setStream(stream as HookedStream, type, order);
       processedStreams.add(stream.id);
       return true;
     };
@@ -85,9 +78,14 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     let videoCount = 0;
     let audioCount = 0;
     for (const variant of variants) {
-      const { video, audio, bandwidth } = variant;
-      if (processStream(video, videoCount, bandwidth)) videoCount++;
-      if (processStream(audio, audioCount, bandwidth)) audioCount++;
+      const { video, audio } = variant;
+
+      if (video && !processedStreams.has(video.id)) {
+        processStream(video, "main", videoCount++);
+      }
+      if (audio && !processedStreams.has(audio.id)) {
+        processStream(audio, !video ? "secondary" : "main", audioCount++);
+      }
     }
   }
 
@@ -115,7 +113,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
 
         let references: shaka.media.SegmentReference[];
         try {
-          references = Array.from(segmentIndex);
+          references = [...segmentIndex];
           firstItemReference = references[0];
           lastItemReference = references[references.length - 1];
         } catch (err) {
@@ -128,11 +126,12 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
           lastItemReference !== prevLastItemReference
         ) {
           // Segment index have been updated
-          this.segmentManager.updateStream({
+          const streamLocalId = Utils.getStreamLocalIdFromShakaStream(
             stream,
-            segmentReferences: references,
-          });
-          this.debug(`Stream ${stream.id} is updated`);
+            this.isHLS
+          );
+          this.segmentManager.updateStreamSegments(streamLocalId, references);
+          this.debug(`Stream ${streamLocalId} is updated`);
           prevFirstItemReference = firstItemReference;
           prevLastItemReference = lastItemReference;
         }

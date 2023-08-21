@@ -5,16 +5,19 @@ import {
 } from "./manifest-parser-decorator";
 import { SegmentManager } from "./segment-manager";
 import Debug from "debug";
-import { StreamInfo, StreamProtocol, Shaka } from "../types/types";
+import { StreamInfo, StreamProtocol, Shaka, Stream } from "./types";
 import { LoadingHandler } from "./loading-handler";
 import { decorateMethod } from "./utils";
+import { Core } from "p2p-media-loader-core";
 
 export class Engine {
   private readonly shaka: Shaka;
   private player!: shaka.Player;
   private readonly streamInfo: StreamInfo = {};
-  private readonly segmentManager: SegmentManager = new SegmentManager(
-    this.streamInfo
+  private readonly core = new Core<Stream>();
+  private readonly segmentManager = new SegmentManager(
+    this.streamInfo,
+    this.core
   );
   private debugDestroying = Debug("shaka:destroying");
 
@@ -51,12 +54,15 @@ export class Engine {
   }
 
   destroy() {
-    this.segmentManager.destroy();
+    this.streamInfo.protocol = undefined;
+    this.streamInfo.manifestResponseUrl = undefined;
+    this.core.destroy();
   }
 
   private registerParsers() {
-    const setProtocol = (protocol: StreamProtocol) =>
-      (this.streamInfo.protocol = protocol);
+    const setProtocol = (protocol: StreamProtocol) => {
+      this.streamInfo.protocol = protocol;
+    };
     const hlsParserFactory = () =>
       new HlsManifestParser(this.shaka, this.segmentManager, setProtocol);
     const dashParserFactory = () =>
@@ -89,6 +95,7 @@ export class Engine {
         shaka: this.shaka,
         streamInfo: this.streamInfo,
         segmentManager: this.segmentManager,
+        core: this.core,
       });
       return loadingHandler.handleLoading(...args);
     };
