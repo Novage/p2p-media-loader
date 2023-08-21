@@ -59,7 +59,7 @@ export class SegmentManager {
         start,
         end !== undefined ? end - 1 : undefined
       );
-      const segmentLocalId = Utils.getSegmentLocalId(url, byteRange);
+      const segmentLocalId = Utils.getSegmentLocalId(responseUrl, byteRange);
       segmentToRemoveIds.delete(segmentLocalId);
 
       if (playlist.segments.has(segmentLocalId)) return;
