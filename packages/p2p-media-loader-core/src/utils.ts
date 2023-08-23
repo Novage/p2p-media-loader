@@ -1,4 +1,4 @@
-import { Stream } from "./index";
+import { Segment, Stream, StreamWithSegments } from "./index";
 
 export function getStreamExternalId(
   stream: Stream,
@@ -6,4 +6,14 @@ export function getStreamExternalId(
 ): string {
   const { type, index } = stream;
   return `${manifestResponseUrl}-${type}-${index}`;
+}
+
+export function getSegmentFromStreamsMap(
+  streams: Map<string, StreamWithSegments>,
+  segmentId: string
+): { segment: Segment; stream: StreamWithSegments } | undefined {
+  for (const stream of streams.values()) {
+    const segment = stream.segments.get(segmentId);
+    if (segment) return { segment, stream };
+  }
 }

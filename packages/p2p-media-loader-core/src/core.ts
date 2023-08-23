@@ -2,12 +2,10 @@ import { Loader } from "./loader";
 import { Stream, StreamWithSegments, Segment, SegmentResponse } from "./types";
 import { Playback } from "./internal-types";
 import * as Utils from "./utils";
+import { LinkedMap } from "./linked-map";
 
 export class Core<TStream extends Stream = Stream> {
-  private readonly streams = new Map<
-    string,
-    StreamWithSegments<TStream, Map<string, Segment>>
-  >();
+  private readonly streams = new Map<string, StreamWithSegments<TStream>>();
   private readonly playback: Playback = { position: 0, rate: 1 };
   private readonly loader: Loader = new Loader(this.streams);
 
@@ -29,7 +27,7 @@ export class Core<TStream extends Stream = Stream> {
     if (this.streams.has(stream.localId)) return;
     this.streams.set(stream.localId, {
       ...stream,
-      segments: new Map(),
+      segments: new LinkedMap<string, Segment>(),
     });
   }
 
@@ -60,5 +58,21 @@ export class Core<TStream extends Stream = Stream> {
 
   destroy(): void {
     this.streams.clear();
+  }
+}
+
+class StreamContainer {
+  private readonly streams = new Map<string, StreamWithSegments>();
+
+  updateStream(
+    streamLocalId: string,
+    addSegments?: Segment[],
+    removeSegmentIds?: string[]
+  ): void {
+    const stream = this.streams.get(streamLocalId);
+    if (!stream) return;
+
+    addSegments?.forEach((s) => stream.segments.set(s.localId, s));
+    removeSegmentIds?.forEach((s) => stream.segments.delete(s));
   }
 }
