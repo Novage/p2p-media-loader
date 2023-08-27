@@ -2,6 +2,8 @@ import { Segment, SegmentResponse, StreamWithSegments } from "./index";
 import * as Utils from "./utils";
 import { LinkedMap } from "./linked-map";
 import { HttpLoader } from "./http-loader";
+import { Playback } from "./internal-types";
+import { LoadQueue } from "./load-queue";
 
 export class Loader {
   private manifestResponseUrl?: string;
@@ -10,10 +12,14 @@ export class Loader {
   private readonly secondaryQueue: LoadQueue;
   private readonly httpLoader = new HttpLoader();
 
-  constructor(streams: Map<string, StreamWithSegments>) {
+  constructor(
+    streams: Map<string, StreamWithSegments>,
+    mainQueue: LoadQueue,
+    secondaryQueue: LoadQueue
+  ) {
     this.streams = streams;
-    this.mainQueue = new LoadQueue(this.streams);
-    this.secondaryQueue = new LoadQueue(this.streams);
+    this.mainQueue = mainQueue;
+    this.secondaryQueue = secondaryQueue;
   }
 
   setManifestResponseUrl(url: string) {
@@ -82,107 +88,4 @@ async function trackTime<T>(
   const result = await action();
   const duration = performance.now() - start;
   return [result, unit === "ms" ? duration : duration / 1000];
-}
-
-class LoadQueue {
-  private queue = new LinkedMap<string, Segment>();
-  private readonly streams: Map<string, StreamWithSegments>;
-  private activeStream?: StreamWithSegments;
-  private lastReqByPlayer?: Segment;
-  private readonly isSegmentLoaded!: (segmentId: string) => boolean;
-
-  constructor(streams: Map<string, StreamWithSegments>) {
-    this.streams = streams;
-  }
-
-  reqSegment(segmentId: string) {
-    const { stream, segment: requestedSegment } =
-      Utils.getSegmentFromStreamsMap(this.streams, segmentId) ?? {};
-  }
-
-  requestByPlayer(segmentId: string) {
-    const { stream, segment: requestedSegment } =
-      Utils.getSegmentFromStreamsMap(this.streams, segmentId) ?? {};
-    if (!stream || !requestedSegment) return;
-
-    const prevReqByPlayer = this.lastReqByPlayer;
-    this.lastReqByPlayer = requestedSegment;
-    if (this.activeStream !== stream) {
-      this.activeStream = stream;
-      this.streamChanged(this.activeStream, requestedSegment);
-      return;
-    }
-    if (!prevReqByPlayer) return;
-
-    const next = this.activeStream?.segments.getNextTo(prevReqByPlayer.localId);
-    if (next === requestedSegment) return;
-
-    if (requestedSegment.startTime > prevReqByPlayer.startTime) {
-      this.movedForward(requestedSegment);
-    } else if (requestedSegment.startTime < prevReqByPlayer.startTime) {
-      this.movedBackward(this.activeStream, requestedSegment);
-    }
-  }
-
-  private streamChanged(
-    activeStream: StreamWithSegments,
-    requestedSegment: Segment
-  ) {
-    this.queue.clear();
-    const { localId: segmentId } = requestedSegment;
-
-    for (const segment of activeStream.segments.valuesFrom(segmentId)) {
-      if (!this.isSegmentLoaded(segmentId)) {
-        this.queue.addToEnd(segment.localId, segment);
-      }
-    }
-  }
-
-  private movedForward(requestedSegment: Segment) {
-    const { localId: segmentId } = requestedSegment;
-    for (const segment of this.queue.valuesBackwardsFrom(segmentId)) {
-      this.queue.delete(segment.localId);
-    }
-  }
-
-  private movedBackward(
-    activeStream: StreamWithSegments,
-    requestedSegment: Segment
-  ) {
-    const { segments } = activeStream;
-    const { localId: segmentId } = requestedSegment;
-    for (const segment of segments.valuesBackwardsFrom(segmentId)) {
-      if (!this.isSegmentLoaded(segment.localId)) {
-        this.queue.addToStart(segment.localId, segment);
-      }
-      if (segment.localId === segmentId) break;
-    }
-  }
-
-  removeLoadedSegment(segmentId: string) {
-    this.queue.delete(segmentId);
-  }
-
-  // refreshQueue() {
-  //   if (!this.activeStream) return;
-  //
-  //   for (const loadedSegmentId of this.loadedSegmentIds) {
-  //     if (!this.activeStream.segments.has(loadedSegmentId)) {
-  //       this.loadedSegmentIds.delete(loadedSegmentId);
-  //     }
-  //   }
-  //
-  //   const last = this.queue[this.queue.length - 1];
-  //   for (const segment of this.activeStream.segments.values()) {
-  //     if (!this.loadedSegmentIds.has(segment.localId)) this.queue.push(segment);
-  //   }
-  // }
-}
-
-class Request {
-  segment: Segment;
-
-  constructor(segment: Segment) {
-    this.segment = segment;
-  }
 }

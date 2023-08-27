@@ -36,7 +36,7 @@ export class LinkedMap<K, V extends object> {
     this.map.set(key, item);
   }
 
-  addToStart(key: K, value: V) {
+  addToStart(items: [K, V] | [K, V][]) {
     const item: LinkedObject<V> = { value };
     if (this._first) item.next = this._first;
     this._first = item;
@@ -62,16 +62,8 @@ export class LinkedMap<K, V extends object> {
     this.map.clear();
   }
 
-  *values(): Generator<V> {
-    let item = this._first;
-    while (item !== undefined) {
-      yield item.value;
-      item = item.next;
-    }
-  }
-
-  *valuesBackwardsFrom(key: K): Generator<V> {
-    let value = this.map.get(key);
+  *valuesBackwards(key?: K): Generator<V> {
+    let value = key ? this.map.get(key) : this._last;
     if (value === undefined) return;
     while (value?.value !== undefined) {
       yield value.value;
@@ -79,12 +71,18 @@ export class LinkedMap<K, V extends object> {
     }
   }
 
-  *valuesFrom(key: K): Generator<V> {
-    let value = this.map.get(key);
+  *values(key?: K): Generator<V> {
+    let value = key ? this.map.get(key) : this._first;
     if (value === undefined) return;
     while (value?.value !== undefined) {
       yield value.value;
       value = value.next;
+    }
+  }
+
+  forEach(callback: (item: V) => void) {
+    for (const item of this.values()) {
+      callback(item);
     }
   }
 

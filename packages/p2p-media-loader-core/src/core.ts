@@ -1,13 +1,23 @@
 import { Loader } from "./loader";
 import { Stream, StreamWithSegments, Segment, SegmentResponse } from "./types";
-import { Playback } from "./internal-types";
 import * as Utils from "./utils";
 import { LinkedMap } from "./linked-map";
+import { LoadQueue } from "./load-queue";
+import { Playback } from "./playback";
 
 export class Core<TStream extends Stream = Stream> {
   private readonly streams = new Map<string, StreamWithSegments<TStream>>();
-  private readonly playback: Playback = { position: 0, rate: 1 };
-  private readonly loader: Loader = new Loader(this.streams);
+  private readonly playback: Playback = new Playback({
+    highDemandBufferLength: 60,
+    lowDemandBufferLength: 600,
+  });
+  private readonly mainQueue = new LoadQueue(this.streams);
+  private readonly secondaryQueue: LoadQueue = new LoadQueue(this.streams);
+  private readonly loader: Loader = new Loader(
+    this.streams,
+    this.mainQueue,
+    this.secondaryQueue
+  );
 
   setManifestResponseUrl(url: string): void {
     this.loader.setManifestResponseUrl(url.split("?")[0]);
@@ -39,7 +49,7 @@ export class Core<TStream extends Stream = Stream> {
     const stream = this.streams.get(streamLocalId);
     if (!stream) return;
 
-    addSegments?.forEach((s) => stream.segments.set(s.localId, s));
+    addSegments?.forEach((s) => stream.segments.addToEnd(s.localId, s));
     removeSegmentIds?.forEach((id) => stream.segments.delete(id));
   }
 
@@ -52,27 +62,16 @@ export class Core<TStream extends Stream = Stream> {
   }
 
   updatePlayback({ position, rate }: Partial<Playback>): void {
+    if (position === undefined && rate === undefined) return;
+
     if (position !== undefined) this.playback.position = position;
     if (rate !== undefined) this.playback.rate = rate;
+
+    this.mainQueue.onPlaybackUpdate();
+    this.secondaryQueue.onPlaybackUpdate();
   }
 
   destroy(): void {
     this.streams.clear();
-  }
-}
-
-class StreamContainer {
-  private readonly streams = new Map<string, StreamWithSegments>();
-
-  updateStream(
-    streamLocalId: string,
-    addSegments?: Segment[],
-    removeSegmentIds?: string[]
-  ): void {
-    const stream = this.streams.get(streamLocalId);
-    if (!stream) return;
-
-    addSegments?.forEach((s) => stream.segments.set(s.localId, s));
-    removeSegmentIds?.forEach((s) => stream.segments.delete(s));
   }
 }
