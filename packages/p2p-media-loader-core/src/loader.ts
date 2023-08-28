@@ -1,26 +1,19 @@
-import { Segment, SegmentResponse, StreamWithSegments } from "./index";
+import { SegmentResponse, StreamWithSegments } from "./index";
 import * as Utils from "./utils";
-import { LinkedMap } from "./linked-map";
 import { HttpLoader } from "./http-loader";
-import { Playback } from "./internal-types";
 import { LoadQueue } from "./load-queue";
+import { SegmentsMemoryStorage } from "./segments-storage";
 
 export class Loader {
   private manifestResponseUrl?: string;
-  private readonly streams: Map<string, StreamWithSegments>;
-  private readonly mainQueue: LoadQueue;
-  private readonly secondaryQueue: LoadQueue;
   private readonly httpLoader = new HttpLoader();
 
   constructor(
-    streams: Map<string, StreamWithSegments>,
-    mainQueue: LoadQueue,
-    secondaryQueue: LoadQueue
-  ) {
-    this.streams = streams;
-    this.mainQueue = mainQueue;
-    this.secondaryQueue = secondaryQueue;
-  }
+    private readonly streams: Map<string, StreamWithSegments>,
+    private readonly mainQueue: LoadQueue,
+    private readonly secondaryQueue: LoadQueue,
+    private readonly segmentsMemoryStorage: SegmentsMemoryStorage
+  ) {}
 
   setManifestResponseUrl(url: string) {
     this.manifestResponseUrl = url;
@@ -31,12 +24,16 @@ export class Loader {
 
     const queue = stream.type === "main" ? this.mainQueue : this.secondaryQueue;
     queue.requestByPlayer(segment.localId);
+    const request = queue.getRequestById(segment.localId);
+
+    if (!request) {
+      throw new Error("No segment found");
+    }
 
     const [response, loadingDuration] = await trackTime(
-      () => this.httpLoader.load(segment),
+      () => this.httpLoader.load(request),
       "s"
     );
-    queue.removeLoadedSegment(segment.localId);
 
     const { data, url, ok, status } = response;
     const bits = data.byteLength * 8;
@@ -74,7 +71,9 @@ export class Loader {
       this.manifestResponseUrl
     );
     // console.log("Stream: ", streamEternalId);
-    console.log(this.mainQueue);
+    // console.log(this.mainQueue.highDemandQueue);
+    // // console.log(this.mainQueue.lowDemandQueue);
+    // console.log((this.mainQueue as any).playback);
 
     return { segment, stream };
   }

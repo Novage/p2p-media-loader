@@ -1,5 +1,5 @@
-import { Segment } from "./types";
 import { FetchError } from "./errors";
+import { SegmentRequest } from "./load-queue";
 
 type RequestContext = {
   abortController: AbortController;
@@ -8,8 +8,13 @@ type RequestContext = {
 export class HttpLoader {
   private readonly segmentRequestContext = new Map<string, RequestContext>();
 
-  async load(segment: Segment) {
+  async load(request: SegmentRequest) {
+    const { segment } = request;
+    request.setAbortHandler(() => {
+      this.abort(segment.localId);
+    });
     const headers = new Headers();
+
     const { url, byteRange } = segment;
 
     if (byteRange) {
@@ -32,6 +37,7 @@ export class HttpLoader {
         response
       );
     }
+    request.loaded();
     const data = await response.arrayBuffer();
     return {
       ok: response.ok,

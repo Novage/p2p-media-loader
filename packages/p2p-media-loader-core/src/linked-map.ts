@@ -1,20 +1,20 @@
-type LinkedObject<V extends object> = {
-  value: V;
-  prev?: LinkedObject<V>;
-  next?: LinkedObject<V>;
+type LinkedObject<K, V extends object> = {
+  item: [K, V];
+  prev?: LinkedObject<K, V>;
+  next?: LinkedObject<K, V>;
 };
 
 export class LinkedMap<K, V extends object> {
-  private readonly map = new Map<K, LinkedObject<V>>();
-  private _first?: LinkedObject<V>;
-  private _last?: LinkedObject<V>;
+  private readonly map = new Map<K, LinkedObject<K, V>>();
+  private _first?: LinkedObject<K, V>;
+  private _last?: LinkedObject<K, V>;
 
   get first() {
-    return this._first?.value;
+    return this._first?.item;
   }
 
   get last() {
-    return this._last?.value;
+    return this._last?.item;
   }
 
   get size() {
@@ -22,7 +22,7 @@ export class LinkedMap<K, V extends object> {
   }
 
   get(key: K): V | undefined {
-    return this.map.get(key)?.value;
+    return this.map.get(key)?.item[1];
   }
 
   has(key: K): boolean {
@@ -30,27 +30,42 @@ export class LinkedMap<K, V extends object> {
   }
 
   addToEnd(key: K, value: V) {
-    const item: LinkedObject<V> = { value };
-    if (this._last) item.prev = this._last;
+    const item: LinkedObject<K, V> = { item: [key, value] };
+    if (this._last) {
+      this._last.next = item;
+      item.prev = this._last;
+    }
     this._last = item;
+    if (!this._first) this._first = item;
     this.map.set(key, item);
   }
 
-  addToStart(items: [K, V] | [K, V][]) {
-    const item: LinkedObject<V> = { value };
-    if (this._first) item.next = this._first;
+  addToStart(key: K, value: V) {
+    const item: LinkedObject<K, V> = { item: [key, value] };
+    if (this._first) {
+      this._first.prev = item;
+      item.next = this._first;
+    }
     this._first = item;
+    if (!this._last) this._last = item;
     this.map.set(key, item);
+  }
+
+  addListToStart(items: [K, V][]) {
+    for (let i = items.length - 1; i >= 0; i--) {
+      const [key, value] = items[i];
+      this.addToStart(key, value);
+    }
   }
 
   delete(key: K) {
     if (!this.map.size) return;
-    const item = this.map.get(key);
-    if (!item) return;
+    const value = this.map.get(key);
+    if (!value) return;
 
-    const { next, prev } = item;
-    if (this._first?.value === item.value) this._first = next;
-    if (this._last?.value === item.value) this._last = prev;
+    const { next, prev } = value;
+    if (this._first?.item[0] === key) this._first = next;
+    if (this._last?.item[0] === key) this._last = prev;
     if (prev) prev.next = next;
     if (next) next.prev = prev;
     this.map.delete(key);
@@ -62,31 +77,40 @@ export class LinkedMap<K, V extends object> {
     this.map.clear();
   }
 
-  *valuesBackwards(key?: K): Generator<V> {
+  *valuesBackwards(key?: K): Generator<[K, V]> {
     let value = key ? this.map.get(key) : this._last;
     if (value === undefined) return;
-    while (value?.value !== undefined) {
-      yield value.value;
+    while (value?.item !== undefined) {
+      yield value.item;
       value = value.prev;
     }
   }
 
-  *values(key?: K): Generator<V> {
+  *entries(key?: K): Generator<[K, V]> {
     let value = key ? this.map.get(key) : this._first;
     if (value === undefined) return;
-    while (value?.value !== undefined) {
-      yield value.value;
+    while (value?.item !== undefined) {
+      yield value.item;
       value = value.next;
     }
   }
 
-  forEach(callback: (item: V) => void) {
-    for (const item of this.values()) {
-      callback(item);
+  *keys(): Generator<K> {
+    let value = this._first;
+    if (value === undefined) return;
+    while (value?.item !== undefined) {
+      yield value.item[0];
+      value = value.next;
     }
   }
 
-  getNextTo(key: K): V | undefined {
-    return this.map.get(key)?.next?.value;
+  forEach(callback: (item: [K, V]) => void) {
+    for (const value of this.entries()) {
+      callback(value);
+    }
+  }
+
+  getNextTo(key: K): [K, V] | undefined {
+    return this.map.get(key)?.next?.item;
   }
 }

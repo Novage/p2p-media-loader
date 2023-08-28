@@ -2,18 +2,37 @@ import { Segment, StreamWithSegments } from "./types";
 import { LinkedMap } from "./linked-map";
 import { Playback } from "./playback";
 import * as Utils from "./utils";
+import { SegmentsMemoryStorage } from "./segments-storage";
 
 export class LoadQueue {
-  private readonly streams: Map<string, StreamWithSegments>;
   private activeStream?: StreamWithSegments;
-  private readonly isSegmentLoaded!: (segmentId: string) => boolean;
   private readonly highDemandQueue = new LinkedMap<string, SegmentRequest>();
   private readonly lowDemandQueue = new LinkedMap<string, SegmentRequest>();
-  private readonly playback: Playback;
 
-  constructor(streams: Map<string, StreamWithSegments>, playback: Playback) {
-    this.streams = streams;
-    this.playback = playback;
+  constructor(
+    private readonly streams: Map<string, StreamWithSegments>,
+    private readonly playback: Playback,
+    private readonly segmentStorage: SegmentsMemoryStorage
+  ) {}
+
+  getRequestById(id: string) {
+    return this.highDemandQueue.get(id) ?? this.lowDemandQueue.get(id);
+  }
+
+  getNextForLoading() {
+    if (this.highDemandQueue.size) {
+      for (const [, request] of this.highDemandQueue.entries()) {
+        if (request.status === "not-started") return request;
+      }
+    }
+    if (this.lowDemandQueue.size) {
+      const randomIndex = getRandomInt(0, this.lowDemandQueue.size);
+      let i = 0;
+      for (const [, request] of this.lowDemandQueue.entries()) {
+        if (i === randomIndex) return request;
+        i++;
+      }
+    }
   }
 
   requestByPlayer(segmentId: string) {
@@ -29,52 +48,58 @@ export class LoadQueue {
     this.addRequests(requestedSegment);
   }
 
-  addRequests(requestedSegment: Segment) {
+  private addRequests(requestedSegment: Segment) {
     if (!this.activeStream) return;
 
-    const highDemandAddToStart: SegmentRequest[] = [];
-    const lowDemandAddToStart: SegmentRequest[] = [];
-    for (const segment of this.activeStream.segments.values(
+    const highDemandAddToStart: [string, SegmentRequest][] = [];
+    const lowDemandAddToStart: [string, SegmentRequest][] = [];
+    for (const [segmentId, segment] of this.activeStream.segments.entries(
       requestedSegment.localId
     )) {
       const status = this.getSegmentStatus(segment);
-
       if (
         status === "not-actual" ||
-        this.highDemandQueue.has(segment.localId) ||
-        this.lowDemandQueue.has(segment.localId)
+        this.highDemandQueue.has(segmentId) ||
+        this.lowDemandQueue.has(segmentId)
       ) {
         break;
       }
-      if (this.isSegmentLoaded(segment.localId)) continue;
+      if (this.isSegmentAlreadyLoaded(segmentId)) continue;
 
       const request = this.createSegmentRequest(segment);
       if (status === "high-demand") {
-        highDemandAddToStart.push(request);
+        highDemandAddToStart.push([segmentId, request]);
       } else if (status === "low-demand") {
-        lowDemandAddToStart.push(request);
+        lowDemandAddToStart.push([segmentId, request]);
       }
     }
+    this.highDemandQueue.addListToStart(highDemandAddToStart);
+    this.lowDemandQueue.addListToStart(lowDemandAddToStart);
 
-    const lowDemandLast = this.lowDemandQueue.last?.segment;
-    if (!lowDemandLast) return;
+    let queue: LinkedMap<string, SegmentRequest> | undefined;
+    if (this.lowDemandQueue.last) queue = this.lowDemandQueue;
+    else if (this.highDemandQueue.last) queue = this.highDemandQueue;
+    if (!queue) return;
 
-    for (const segment of this.activeStream.segments.values(
-      lowDemandLast.localId
+    for (const [segmentId, segment] of this.activeStream.segments.entries(
+      queue.last?.[0]
     )) {
       const status = this.getSegmentStatus(segment);
       if (status === "not-actual") break;
+      if (queue.has(segmentId) || this.isSegmentAlreadyLoaded(segmentId)) {
+        continue;
+      }
 
       const request = this.createSegmentRequest(segment);
-      this.lowDemandQueue.addToEnd(segment.localId, request);
+      queue.addToEnd(segmentId, request);
     }
   }
 
-  onPlaybackUpdate() {
+  removeNotInLoadTimeRange() {
     if (!this.activeStream) return;
 
-    // remove not actual values (if exist) from high demand queue start
-    for (const request of this.highDemandQueue.values()) {
+    // remove not actual requests (if exist) from high demand queue start
+    for (const [, request] of this.highDemandQueue.entries()) {
       const { segment } = request;
       const status = this.getSegmentStatus(segment);
       if (status === "high-demand") break;
@@ -83,8 +108,8 @@ export class LoadQueue {
       this.lowDemandQueue.delete(segment.localId);
     }
 
-    // remove not actual values (if exist) from low demand queue end
-    for (const request of this.lowDemandQueue.valuesBackwards()) {
+    // remove not actual requests (if exist) from low demand queue end
+    for (const [, request] of this.lowDemandQueue.valuesBackwards()) {
       const { segment } = request;
       const status = this.getSegmentStatus(segment);
       if (status === "low-demand") break;
@@ -93,8 +118,8 @@ export class LoadQueue {
       this.lowDemandQueue.delete(segment.localId);
     }
 
-    // move low demand values (if exist) from high demand queue
-    for (const request of this.highDemandQueue.valuesBackwards()) {
+    // move low demand requests (if exist) from high demand queue
+    for (const [, request] of this.highDemandQueue.valuesBackwards()) {
       const { segment } = request;
       const status = this.getSegmentStatus(segment);
       if (status === "high-demand") break;
@@ -105,8 +130,8 @@ export class LoadQueue {
       this.lowDemandQueue.delete(segment.localId);
     }
 
-    // move high demand values (if exist) from low demand queue
-    for (const request of this.lowDemandQueue.values()) {
+    // move high demand requests (if exist) from low demand queue
+    for (const [, request] of this.lowDemandQueue.entries()) {
       const { segment } = request;
       const status = this.getSegmentStatus(segment);
       if (status === "low-demand") break;
@@ -119,8 +144,8 @@ export class LoadQueue {
   }
 
   private abortAndClear() {
-    this.highDemandQueue.forEach((r) => r.abort());
-    this.lowDemandQueue.forEach((r) => r.abort());
+    this.highDemandQueue.forEach(([, r]) => r.abort());
+    this.lowDemandQueue.forEach(([, r]) => r.abort());
     this.highDemandQueue.clear();
     this.lowDemandQueue.clear();
   }
@@ -146,6 +171,10 @@ export class LoadQueue {
     return "not-actual";
   }
 
+  private isSegmentAlreadyLoaded(segmentId: string) {
+    return this.segmentStorage.hasSegment(segmentId);
+  }
+
   // refreshQueue() {
   //   if (!this.activeStream) return;
   //
@@ -162,14 +191,18 @@ export class LoadQueue {
   // }
 }
 
-class SegmentRequest {
+export class SegmentRequest {
   segment: Segment;
-  private status: "not-started" | "pending" | "completed" = "not-started";
+  private _status: "not-started" | "pending" | "completed" = "not-started";
   private abortHandler?: () => void;
   private loadedHandler?: () => void;
 
   constructor(segment: Segment) {
     this.segment = segment;
+  }
+
+  get status() {
+    return this._status;
   }
 
   setAbortHandler(handler: () => void) {
@@ -181,11 +214,15 @@ class SegmentRequest {
   }
 
   loaded() {
-    this.status = "completed";
+    this._status = "completed";
     this.loadedHandler?.();
   }
 
   abort() {
     this.abortHandler?.();
   }
+}
+
+function getRandomInt(min: number, max: number) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
 }

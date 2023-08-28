@@ -1,21 +1,24 @@
 export class Playback {
-  private _rate = 0;
+  private _rate = 1;
   private _position = 0;
   private readonly settings: {
     readonly highDemandBufferLength: number;
     readonly lowDemandBufferLength: number;
   };
-  private _highDemandMargin: number = 0;
-  private _lowDemandMargin: number = 0;
+  private _highDemandMargin = 0;
+  private _lowDemandMargin = 0;
 
   constructor(settings: {
     readonly highDemandBufferLength: number;
     readonly lowDemandBufferLength: number;
   }) {
     this.settings = settings;
+    this._highDemandMargin = this.getHighDemandMargin();
+    this._lowDemandMargin = this.getLowDemandMargin();
   }
 
   set position(value: number) {
+    if (value === this._position) return;
     this._position = value;
     this._highDemandMargin = this.getHighDemandMargin();
     this._lowDemandMargin = this.getLowDemandMargin();
@@ -26,6 +29,7 @@ export class Playback {
   }
 
   set rate(value: number) {
+    if (value === this._rate) return;
     this._rate = value;
     this._highDemandMargin = this.getHighDemandMargin();
     this._lowDemandMargin = this.getLowDemandMargin();
