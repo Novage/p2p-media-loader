@@ -2,35 +2,25 @@ import { Loader } from "./loader";
 import { Stream, StreamWithSegments, Segment, SegmentResponse } from "./types";
 import * as Utils from "./utils";
 import { LinkedMap } from "./linked-map";
-import { LoadQueue } from "./load-queue";
 import { Playback } from "./playback";
 import { SegmentsMemoryStorage } from "./segments-storage";
 
 export class Core<TStream extends Stream = Stream> {
   private readonly streams = new Map<string, StreamWithSegments<TStream>>();
-  private readonly playback: Playback = new Playback({
+  private readonly playback = new Playback({
     highDemandBufferLength: 15,
-    lowDemandBufferLength: 60,
+    httpDownloadBufferLength: 60,
+    p2pDownloadBufferLength: 80,
   });
   private readonly segmentStorage = new SegmentsMemoryStorage(this.playback, {
     cachedSegmentExpiration: 120,
     cachedSegmentsCount: 50,
   });
-  private readonly mainQueue = new LoadQueue(
+  private readonly loader = new Loader(
     this.streams,
+    this.segmentStorage,
     this.playback,
-    this.segmentStorage
-  );
-  private readonly secondaryQueue: LoadQueue = new LoadQueue(
-    this.streams,
-    this.playback,
-    this.segmentStorage
-  );
-  private readonly loader: Loader = new Loader(
-    this.streams,
-    this.mainQueue,
-    this.secondaryQueue,
-    this.segmentStorage
+    { simultaneousHttpDownloads: 3 }
   );
 
   setManifestResponseUrl(url: string): void {
@@ -65,10 +55,15 @@ export class Core<TStream extends Stream = Stream> {
 
     addSegments?.forEach((s) => stream.segments.addToEnd(s.localId, s));
     removeSegmentIds?.forEach((id) => stream.segments.delete(id));
+
+    const firstSegment = stream.segments.first?.[1];
+    if (firstSegment && firstSegment.startTime > this.playback.position) {
+      this.playback.position = firstSegment.startTime;
+    }
   }
 
   loadSegment(segmentLocalId: string): Promise<SegmentResponse> {
-    return this.loader.loadSegment(segmentLocalId);
+    return this.loader.requestSegmentByPlugin(segmentLocalId);
   }
 
   abortSegmentLoading(segmentId: string): void {
@@ -78,8 +73,6 @@ export class Core<TStream extends Stream = Stream> {
   updatePlayback(position: number, rate: number): void {
     this.playback.position = position;
     this.playback.rate = rate;
-    this.mainQueue.removeNotInLoadTimeRange();
-    this.secondaryQueue.removeNotInLoadTimeRange();
   }
 
   destroy(): void {

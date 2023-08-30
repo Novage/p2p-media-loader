@@ -1,20 +1,34 @@
 import { FetchError } from "./errors";
-import { SegmentRequest } from "./load-queue";
+import { Segment } from "./types";
 
-type RequestContext = {
+type Request = {
+  promise: Promise<{
+    ok: boolean;
+    status: number;
+    data: ArrayBuffer;
+    url: string;
+  }>;
   abortController: AbortController;
 };
 
 export class HttpLoader {
-  private readonly segmentRequestContext = new Map<string, RequestContext>();
+  private readonly requests = new Map<string, Request>();
 
-  async load(request: SegmentRequest) {
-    const { segment } = request;
-    request.setAbortHandler(() => {
-      this.abort(segment.localId);
-    });
+  async load(segment: Segment) {
+    const abortController = new AbortController();
+    const promise = this.fetch(segment, abortController);
+    const requestContext: Request = {
+      abortController,
+      promise,
+    };
+    this.requests.set(segment.localId, requestContext);
+    await promise;
+    this.requests.delete(segment.localId);
+    return promise;
+  }
+
+  private async fetch(segment: Segment, abortController: AbortController) {
     const headers = new Headers();
-
     const { url, byteRange } = segment;
 
     if (byteRange) {
@@ -22,13 +36,9 @@ export class HttpLoader {
       const byteRangeString = `bytes=${start}-${end}`;
       headers.set("Range", byteRangeString);
     }
-    const requestContext: RequestContext = {
-      abortController: new AbortController(),
-    };
-    this.segmentRequestContext.set(segment.localId, requestContext);
     const response = await fetch(url, {
       headers,
-      signal: requestContext.abortController.signal,
+      signal: abortController.signal,
     });
     if (!response.ok) {
       throw new FetchError(
@@ -37,7 +47,7 @@ export class HttpLoader {
         response
       );
     }
-    request.loaded();
+
     const data = await response.arrayBuffer();
     return {
       ok: response.ok,
@@ -48,6 +58,15 @@ export class HttpLoader {
   }
 
   abort(segmentId: string) {
-    this.segmentRequestContext.get(segmentId)?.abortController.abort();
+    this.requests.get(segmentId)?.abortController.abort();
+    this.requests.delete(segmentId);
+  }
+
+  getLoadingsAmount() {
+    return this.requests.size;
+  }
+
+  getRequest(segmentId: string) {
+    return this.requests.get(segmentId)?.promise;
   }
 }

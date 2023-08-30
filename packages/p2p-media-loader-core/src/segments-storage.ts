@@ -1,5 +1,6 @@
 import { Playback } from "./playback";
 import { Segment } from "./types";
+import * as Utils from "./utils";
 
 export class SegmentsMemoryStorage {
   private cache = new Map<
@@ -36,12 +37,8 @@ export class SegmentsMemoryStorage {
   }
 
   private isSegmentLocked(segment: Segment) {
-    const { position, lowDemandMargin } = this.playback;
-    const { startTime, endTime } = segment;
-    return !(
-      (startTime < position && endTime < position) ||
-      (startTime > lowDemandMargin && endTime > lowDemandMargin)
-    );
+    const statuses = Utils.getSegmentLoadStatuses(segment, this.playback);
+    return !!statuses;
   }
 
   async clean(): Promise<boolean> {
