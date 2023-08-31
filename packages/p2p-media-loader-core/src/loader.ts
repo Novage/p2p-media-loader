@@ -10,6 +10,7 @@ export class Loader {
   private readonly httpLoader = new HttpLoader();
   private readonly mainQueue: LoadQueue;
   private readonly secondaryQueue: LoadQueue;
+  private readonly pluginRequests = new Map<string, Request>();
 
   constructor(
     private readonly streams: Map<string, StreamWithSegments>,
@@ -20,7 +21,7 @@ export class Loader {
     this.mainQueue = new LoadQueue(this.playback, this.segmentStorage);
     this.secondaryQueue = new LoadQueue(this.playback, this.segmentStorage);
     this.playback.subscribeToUpdate(this.onPlaybackUpdate.bind(this));
-    setInterval(() => this.loadRandomSegmentThroughHttp(), 1000);
+    // setInterval(() => this.loadRandomSegmentThroughHttp(), 1000);
   }
 
   setManifestResponseUrl(url: string) {
@@ -28,31 +29,26 @@ export class Loader {
   }
 
   async requestSegmentByPlugin(segmentId: string): Promise<SegmentResponse> {
-    console.log("requested", segmentId);
     const { segment, stream } = this.identifySegment(segmentId);
 
     const queue = stream.type === "main" ? this.mainQueue : this.secondaryQueue;
+
     const { segmentsToAbortIds } = queue.update(segment, stream);
     this.abortSegments(segmentsToAbortIds);
     this.processQueues();
 
-    console.log("queue size: ", queue.length);
-    console.log("request size: ", this.httpLoader.getLoadingsAmount());
-    let data = this.segmentStorage.getSegment(segmentId);
-    if (!data) {
-      const request = this.httpLoader.getRequest(segmentId);
-      const response = await request;
-      if (!response) throw new Error("No data");
-      data = response.data;
+    const data = this.segmentStorage.getSegment(segmentId);
+    if (data) {
+      return {
+        url: segment.url,
+        data,
+        bandwidth: 999999999,
+        status: 200,
+        ok: true,
+      };
     }
-    console.log("loaded", segmentId);
-    return {
-      url: segment.url,
-      data,
-      bandwidth: 9999999,
-      status: 200,
-      ok: true,
-    };
+    const request = this.createPluginSegmentRequest(segment);
+    return request.promise;
   }
 
   private processQueues() {
@@ -74,6 +70,7 @@ export class Loader {
           void this.loadSegmentThroughHttp(segment, queue);
         }
       }
+      break;
     }
   }
 
@@ -122,9 +119,17 @@ export class Loader {
     queue.markSegmentAsLoading(segment.localId, "http");
     const response = await this.httpLoader.load(segment);
     this.segmentStorage.storeSegment(segment, response.data);
+    const request = this.pluginRequests.get(segment.localId);
+    if (request) {
+      request.onSuccess({
+        bandwidth: 9999999999,
+        data: response.data,
+        ok: response.ok,
+        status: response.status,
+        url: response.url,
+      });
+    }
     queue.removeLoadedSegment(segment.localId);
-
-    console.log("queue cleared", queue.length);
   }
 
   private async loadRandomSegmentThroughHttp() {
@@ -155,7 +160,6 @@ export class Loader {
   }
 
   private onPlaybackUpdate() {
-    console.log("playback update");
     const { segmentsToAbortIds: mainIds } =
       this.mainQueue.clearNotInLoadRangeSegments();
     const { segmentsToAbortIds: secondaryIds } =
@@ -163,6 +167,7 @@ export class Loader {
 
     this.abortSegments(mainIds);
     this.abortSegments(secondaryIds);
+    this.processQueues();
   }
 
   abortSegment(segmentId: string) {
@@ -172,7 +177,29 @@ export class Loader {
   private abortSegments(segmentIds: string[]) {
     segmentIds.forEach((id) => this.abortSegment(id));
   }
+
+  private createPluginSegmentRequest(segment: Segment) {
+    let onSuccess: Request["onSuccess"];
+    const promise = new Promise<SegmentResponse>((resolve, reject) => {
+      onSuccess = resolve;
+    });
+    const request: Request = {
+      promise,
+      onSuccess: (res: SegmentResponse) => {
+        console.log("success");
+        onSuccess(res)!;
+      },
+    };
+
+    this.pluginRequests.set(segment.localId, request);
+    return request;
+  }
 }
+
+type Request = {
+  promise: Promise<SegmentResponse>;
+  onSuccess: (response: SegmentResponse) => void;
+};
 
 async function trackTime<T>(
   action: () => T,
