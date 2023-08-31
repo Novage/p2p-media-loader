@@ -1,26 +1,34 @@
 import { Segment, StreamWithSegments } from "./types";
 import { LinkedMap } from "./linked-map";
-import { Playback } from "./playback";
-import * as Utils from "./utils";
-import { SegmentsMemoryStorage } from "./segments-storage";
 import { SegmentLoadStatus } from "./internal-types";
 
-export type QueueItem = {
+export type LoadQueueItem = {
   segment: Segment;
   statuses: Set<SegmentLoadStatus>;
 };
 
 export class LoadQueue {
-  private readonly queue = new LinkedMap<string, QueueItem>();
+  private readonly queue = new LinkedMap<string, LoadQueueItem>();
   private activeStream?: StreamWithSegments;
   private isSegmentLoaded?: (segmentId: string) => boolean;
   private lastRequestedSegment?: Segment;
-  private prevPosition?: number;
-  private prevRate?: number;
+  private position = 0;
+  private rate = 1;
   private segmentDuration = 0;
-  private updateHandler?: () => void;
+  private updateHandlers: ((removedSegmentIds: string[]) => void)[] = [];
+  private highDemandBufferMargin!: number;
+  private httpBufferMargin!: number;
+  private p2pBufferMargin!: number;
 
-  constructor(private readonly playback: Playback) {}
+  constructor(
+    private readonly settings: {
+      highDemandBufferLength: number;
+      httpBufferLength: number;
+      p2pBufferLength: number;
+    }
+  ) {
+    this.updateBufferMargins();
+  }
 
   updateOnStreamChange(segment: Segment, stream: StreamWithSegments) {
     const segmentsToAbortIds: string[] = [];
@@ -34,23 +42,32 @@ export class LoadQueue {
   }
 
   playbackUpdate(position: number, rate: number) {
-    const isRateChanged = this.prevRate === undefined || rate !== this.prevRate;
+    const isRateChanged = this.rate === undefined || rate !== this.rate;
     const isPositionSignificantlyChanged =
-      this.prevPosition === undefined ||
-      Math.abs(position - this.prevPosition) / this.segmentDuration < 0.8;
-    if (!isRateChanged && !isPositionSignificantlyChanged) {
-      return;
+      this.position === undefined ||
+      Math.abs(position - this.position) / this.segmentDuration < 0.8;
+    if (!isRateChanged && !isPositionSignificantlyChanged) return;
+    if (isRateChanged) this.rate = rate;
+    if (isPositionSignificantlyChanged) this.position = position;
+    this.updateBufferMargins();
+
+    const { removedSegmentIds, statusChangedSegmentIds } =
+      this.clearNotActualSegmentsUpdateStatuses();
+    const newSegmentIds = this.addNewSegmentsToQueue();
+
+    if (
+      removedSegmentIds.length ||
+      statusChangedSegmentIds.length ||
+      newSegmentIds?.length
+    ) {
+      this.updateHandlers.forEach((handler) => handler(removedSegmentIds));
     }
-    if (isRateChanged) this.prevRate = rate;
-    if (isPositionSignificantlyChanged) this.prevPosition = position;
-    this.clearNotActualSegmentsUpdateStatuses();
-    this.addNewSegmentsToQueue();
   }
 
-  addNewSegmentsToQueue() {
+  private addNewSegmentsToQueue() {
     if (!this.activeStream || !this.lastRequestedSegment) return;
 
-    let newQueueSegmentsCount = 0;
+    const newSegmentIds: string[] = [];
     let prevSegmentId: string | undefined;
     for (const [segmentId, segment] of this.activeStream.segments.entries(
       this.lastRequestedSegment.localId
@@ -60,42 +77,86 @@ export class LoadQueue {
         prevSegmentId = segmentId;
         continue;
       }
-      const statuses = Utils.getSegmentLoadStatuses(segment, this.playback);
+      const statuses = this.getSegmentStatuses(segment);
       if (!statuses) break;
 
       const info = { segment, statuses };
       if (prevSegmentId) this.queue.addAfter(prevSegmentId, segmentId, info);
       else this.queue.addToStart(segmentId, info);
-      newQueueSegmentsCount++;
+      newSegmentIds.push(segmentId);
       prevSegmentId = segmentId;
     }
 
-    return newQueueSegmentsCount;
+    return newSegmentIds;
   }
 
   private clearNotActualSegmentsUpdateStatuses() {
-    const notActualSegments: string[] = [];
-    for (const [segmentId, segmentInfo] of this.queue.entries()) {
-      const statuses = Utils.getSegmentLoadStatuses(
-        segmentInfo.segment,
-        this.playback
-      );
+    const removedSegmentIds: string[] = [];
+    const statusChangedSegmentIds: string[] = [];
+    for (const [segmentId, item] of this.queue.entries()) {
+      const statuses = this.getSegmentStatuses(item.segment);
       if (!statuses) {
-        notActualSegments.push(segmentId);
+        removedSegmentIds.push(segmentId);
         this.queue.delete(segmentId);
-      } else {
-        segmentInfo.statuses = statuses;
+      } else if (areSetsEqual(item.statuses, statuses)) {
+        item.statuses = statuses;
+        statusChangedSegmentIds.push(segmentId);
       }
     }
+    return { removedSegmentIds, statusChangedSegmentIds };
+  }
+
+  private updateBufferMargins() {
+    if (this.position === undefined || this.rate === undefined) return;
+    const { highDemandBufferLength, p2pBufferLength, httpBufferLength } =
+      this.settings;
+
+    this.highDemandBufferMargin =
+      this.position + highDemandBufferLength * this.rate;
+    this.httpBufferMargin = this.position + httpBufferLength * this.rate;
+    this.p2pBufferMargin = this.position + p2pBufferLength * this.rate;
+  }
+
+  private getSegmentStatuses(segment: Segment) {
+    const {
+      highDemandBufferMargin,
+      httpBufferMargin,
+      p2pBufferMargin,
+      position,
+    } = this;
+    const { startTime } = segment;
+    const statuses = new Set<SegmentLoadStatus>();
+    if (startTime >= position && startTime < highDemandBufferMargin) {
+      statuses.add("high-demand");
+    }
+    if (startTime >= position && startTime < httpBufferMargin) {
+      statuses.add("http-downloadable");
+    }
+    if (startTime >= position && startTime < p2pBufferMargin) {
+      statuses.add("p2p-downloadable");
+    }
+    if (statuses.size) return statuses;
   }
 
   removeLoadedSegment(segmentId: string) {
     this.queue.delete(segmentId);
   }
 
+  subscribeToUpdate(handler: () => void) {
+    this.updateHandlers.push(handler);
+  }
+
   get length() {
     return this.queue.size;
   }
+}
+
+function areSetsEqual<T>(set1: Set<T>, set2: Set<T>): boolean {
+  if (set1.size !== set2.size) return false;
+  for (const item of set1) {
+    if (!set2.has(item)) return false;
+  }
+  return true;
 }
 
 function getRandomInt(min: number, max: number) {

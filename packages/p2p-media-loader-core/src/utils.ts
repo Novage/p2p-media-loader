@@ -19,23 +19,3 @@ export function getSegmentFromStreamsMap(
     if (segment) return { segment, stream };
   }
 }
-
-export function getSegmentLoadStatuses(
-  segment: Segment,
-  playback: Playback
-): Set<SegmentLoadStatus> | undefined {
-  const { position, highDemandMargin, httpDownloadMargin, p2pDownloadMargin } =
-    playback;
-  const { startTime } = segment;
-  const statuses = new Set<SegmentLoadStatus>();
-  if (startTime >= position && startTime < highDemandMargin) {
-    statuses.add("high-demand");
-  }
-  if (startTime >= position && startTime < httpDownloadMargin) {
-    statuses.add("http-downloadable");
-  }
-  if (startTime >= position && startTime < p2pDownloadMargin) {
-    statuses.add("p2p-downloadable");
-  }
-  if (statuses.size) return statuses;
-}
