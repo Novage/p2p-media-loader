@@ -33,7 +33,7 @@ export class Loader {
 
     const queue = stream.type === "main" ? this.mainQueue : this.secondaryQueue;
 
-    const { segmentsToAbortIds } = queue.update(segment, stream);
+    const { segmentsToAbortIds } = queue.updateOnStreamChange(segment, stream);
     this.abortSegments(segmentsToAbortIds);
     this.processQueues();
 
@@ -66,7 +66,6 @@ export class Loader {
         const lastItem = queue.getLastHttpLoadingItemAfter(segment.localId);
         if (lastItem) {
           this.httpLoader.abort(lastItem.segment.localId);
-          queue.markSegmentAsNotLoading(lastItem.segment.localId);
           void this.loadSegmentThroughHttp(segment, queue);
         }
       }
@@ -116,7 +115,6 @@ export class Loader {
   }
 
   private async loadSegmentThroughHttp(segment: Segment, queue: LoadQueue) {
-    queue.markSegmentAsLoading(segment.localId, "http");
     const response = await this.httpLoader.load(segment);
     this.segmentStorage.storeSegment(segment, response.data);
     const request = this.pluginRequests.get(segment.localId);

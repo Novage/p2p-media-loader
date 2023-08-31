@@ -8,68 +8,54 @@ import { SegmentLoadStatus } from "./internal-types";
 export type QueueItem = {
   segment: Segment;
   statuses: Set<SegmentLoadStatus>;
-  isLoading?: boolean;
-  loadingType?: "http" | "p2p";
 };
 
 export class LoadQueue {
   private readonly queue = new LinkedMap<string, QueueItem>();
   private activeStream?: StreamWithSegments;
+  private isSegmentLoaded?: (segmentId: string) => boolean;
+  private lastRequestedSegment?: Segment;
+  private prevPosition?: number;
+  private prevRate?: number;
+  private segmentDuration = 0;
+  private updateHandler?: () => void;
 
-  constructor(
-    private readonly playback: Playback,
-    private readonly segmentStorage: SegmentsMemoryStorage
-  ) {}
+  constructor(private readonly playback: Playback) {}
 
-  *getSegmentsToLoad() {
-    for (const [segmentId, segmentInfo] of this.queue.entries()) {
-      if (this.queue.get(segmentId)?.isLoading) continue;
-      yield segmentInfo;
-    }
-  }
-
-  getRandomHttpLoadableSegment() {
-    const notLoadingSegments = this.queue.filter(
-      ([, { isLoading, statuses }]) =>
-        !isLoading && statuses.has("http-downloadable")
-    );
-    if (!notLoadingSegments.length) return undefined;
-    const randomIndex = getRandomInt(0, notLoadingSegments.length - 1);
-    return notLoadingSegments[randomIndex][1];
-  }
-
-  getLastHttpLoadingItemAfter(segmentId: string) {
-    for (const [itemSegmentId, item] of this.queue.entriesBackwards()) {
-      if (itemSegmentId === segmentId) break;
-      if (item.isLoading && item.loadingType === "http") {
-        return item;
-      }
-    }
-  }
-
-  update(segment: Segment, stream: StreamWithSegments) {
+  updateOnStreamChange(segment: Segment, stream: StreamWithSegments) {
     const segmentsToAbortIds: string[] = [];
     if (this.activeStream !== stream) {
       this.activeStream = stream;
-      this.queue.forEach(([segmentId, { isLoading }]) => {
-        if (isLoading) segmentsToAbortIds.push(segmentId);
-      });
+      this.queue.forEach(([segmentId]) => segmentsToAbortIds.push(segmentId));
       this.queue.clear();
     }
-
-    this.addNewSegmentsToQueue(segment);
-
-    return { segmentsToAbortIds };
+    this.lastRequestedSegment = segment;
+    this.addNewSegmentsToQueue();
   }
 
-  addNewSegmentsToQueue(requestedSegment: Segment) {
-    if (!this.activeStream) return;
+  playbackUpdate(position: number, rate: number) {
+    const isRateChanged = this.prevRate === undefined || rate !== this.prevRate;
+    const isPositionSignificantlyChanged =
+      this.prevPosition === undefined ||
+      Math.abs(position - this.prevPosition) / this.segmentDuration < 0.8;
+    if (!isRateChanged && !isPositionSignificantlyChanged) {
+      return;
+    }
+    if (isRateChanged) this.prevRate = rate;
+    if (isPositionSignificantlyChanged) this.prevPosition = position;
+    this.clearNotActualSegmentsUpdateStatuses();
+    this.addNewSegmentsToQueue();
+  }
 
+  addNewSegmentsToQueue() {
+    if (!this.activeStream || !this.lastRequestedSegment) return;
+
+    let newQueueSegmentsCount = 0;
     let prevSegmentId: string | undefined;
     for (const [segmentId, segment] of this.activeStream.segments.entries(
-      requestedSegment.localId
+      this.lastRequestedSegment.localId
     )) {
-      if (this.segmentStorage.hasSegment(segmentId)) continue;
+      if (this.isSegmentLoaded?.(segmentId)) continue;
       if (this.queue.has(segmentId)) {
         prevSegmentId = segmentId;
         continue;
@@ -80,43 +66,27 @@ export class LoadQueue {
       const info = { segment, statuses };
       if (prevSegmentId) this.queue.addAfter(prevSegmentId, segmentId, info);
       else this.queue.addToStart(segmentId, info);
+      newQueueSegmentsCount++;
       prevSegmentId = segmentId;
     }
+
+    return newQueueSegmentsCount;
   }
 
-  clearNotInLoadRangeSegments() {
-    const segmentsToAbortIds: string[] = [];
+  private clearNotActualSegmentsUpdateStatuses() {
+    const notActualSegments: string[] = [];
     for (const [segmentId, segmentInfo] of this.queue.entries()) {
       const statuses = Utils.getSegmentLoadStatuses(
         segmentInfo.segment,
         this.playback
       );
       if (!statuses) {
-        segmentsToAbortIds.push(segmentId);
+        notActualSegments.push(segmentId);
         this.queue.delete(segmentId);
       } else {
         segmentInfo.statuses = statuses;
       }
     }
-
-    segmentsToAbortIds.forEach((id) => this.queue.delete(id));
-    return { segmentsToAbortIds };
-  }
-
-  markSegmentAsLoading(segmentId: string, loadingType: "http" | "p2p") {
-    const segmentInfo = this.queue.get(segmentId);
-    if (!segmentInfo) return;
-
-    segmentInfo.isLoading = true;
-    segmentInfo.loadingType = loadingType;
-  }
-
-  markSegmentAsNotLoading(segmentId: string) {
-    const segmentInfo = this.queue.get(segmentId);
-    if (!segmentInfo) return;
-
-    delete segmentInfo.isLoading;
-    delete segmentInfo.loadingType;
   }
 
   removeLoadedSegment(segmentId: string) {
