@@ -1,27 +1,23 @@
 import { Loader } from "./loader";
 import { Stream, StreamWithSegments, Segment, SegmentResponse } from "./types";
+import { Playback } from "./internal-types";
 import * as Utils from "./utils";
 import { LinkedMap } from "./linked-map";
-import { Playback } from "./playback";
 import { SegmentsMemoryStorage } from "./segments-storage";
 
 export class Core<TStream extends Stream = Stream> {
   private readonly streams = new Map<string, StreamWithSegments<TStream>>();
-  private readonly playback = new Playback({
-    highDemandBufferLength: 15,
-    httpDownloadBufferLength: 60,
-    p2pDownloadBufferLength: 80,
-  });
+  private readonly playback: Playback = { position: 0, rate: 1 };
   private readonly segmentStorage = new SegmentsMemoryStorage(this.playback, {
     cachedSegmentExpiration: 120,
     cachedSegmentsCount: 50,
   });
-  private readonly loader = new Loader(
-    this.streams,
-    this.segmentStorage,
-    this.playback,
-    { simultaneousHttpDownloads: 3 }
-  );
+  private readonly loader = new Loader(this.streams, this.segmentStorage, {
+    simultaneousHttpDownloads: 3,
+    highDemandBufferLength: 20,
+    httpBufferLength: 60,
+    p2pBufferLength: 60,
+  });
 
   setManifestResponseUrl(url: string): void {
     this.loader.setManifestResponseUrl(url.split("?")[0]);
@@ -59,11 +55,12 @@ export class Core<TStream extends Stream = Stream> {
     const firstSegment = stream.segments.first?.[1];
     if (firstSegment && firstSegment.startTime > this.playback.position) {
       this.playback.position = firstSegment.startTime;
+      this.loader.onPlaybackUpdate(this.playback);
     }
   }
 
   loadSegment(segmentLocalId: string): Promise<SegmentResponse> {
-    return this.loader.requestSegmentByPlugin(segmentLocalId);
+    return this.loader.loadSegment(segmentLocalId);
   }
 
   abortSegmentLoading(segmentId: string): void {
@@ -73,6 +70,7 @@ export class Core<TStream extends Stream = Stream> {
   updatePlayback(position: number, rate: number): void {
     this.playback.position = position;
     this.playback.rate = rate;
+    this.loader.onPlaybackUpdate(this.playback);
   }
 
   destroy(): void {

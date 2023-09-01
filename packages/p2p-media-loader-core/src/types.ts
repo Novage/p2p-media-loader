@@ -33,8 +33,5 @@ export type StreamWithSegments<
 
 export type SegmentResponse = {
   data: ArrayBuffer;
-  url: string;
   bandwidth: number;
-  status: number;
-  ok: boolean;
 };

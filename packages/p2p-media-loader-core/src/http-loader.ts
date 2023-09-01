@@ -2,12 +2,7 @@ import { FetchError } from "./errors";
 import { Segment } from "./types";
 
 type Request = {
-  promise: Promise<{
-    ok: boolean;
-    status: number;
-    data: ArrayBuffer;
-    url: string;
-  }>;
+  promise: Promise<ArrayBuffer>;
   abortController: AbortController;
 };
 
@@ -48,13 +43,11 @@ export class HttpLoader {
       );
     }
 
-    const data = await response.arrayBuffer();
-    return {
-      ok: response.ok,
-      status: response.status,
-      data,
-      url: response.url,
-    };
+    return response.arrayBuffer();
+  }
+
+  isLoading(segmentId: string) {
+    return this.requests.has(segmentId);
   }
 
   abort(segmentId: string) {

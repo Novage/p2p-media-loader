@@ -14,7 +14,7 @@ export class LoadQueue {
   private lastRequestedSegment?: Segment;
   private position = 0;
   private rate = 1;
-  private segmentDuration = 0;
+  private segmentDuration?: number;
   private updateHandlers: ((removedSegmentIds: string[]) => void)[] = [];
   private highDemandBufferMargin!: number;
   private httpBufferMargin!: number;
@@ -30,7 +30,19 @@ export class LoadQueue {
     this.updateBufferMargins();
   }
 
-  updateOnStreamChange(segment: Segment, stream: StreamWithSegments) {
+  *items() {
+    for (const [, item] of this.queue.entries()) {
+      yield item;
+    }
+  }
+
+  *itemsBackwards() {
+    for (const [, item] of this.queue.entriesBackwards()) {
+      yield item;
+    }
+  }
+
+  updateIfStreamChanged(segment: Segment, stream: StreamWithSegments) {
     const segmentsToAbortIds: string[] = [];
     if (this.activeStream !== stream) {
       this.activeStream = stream;
@@ -42,10 +54,11 @@ export class LoadQueue {
   }
 
   playbackUpdate(position: number, rate: number) {
+    const avgSegmentDuration = this.getAvgSegmentDuration();
     const isRateChanged = this.rate === undefined || rate !== this.rate;
     const isPositionSignificantlyChanged =
       this.position === undefined ||
-      Math.abs(position - this.position) / this.segmentDuration < 0.8;
+      Math.abs(position - this.position) / avgSegmentDuration > 0.5;
     if (!isRateChanged && !isPositionSignificantlyChanged) return;
     if (isRateChanged) this.rate = rate;
     if (isPositionSignificantlyChanged) this.position = position;
@@ -142,8 +155,22 @@ export class LoadQueue {
     this.queue.delete(segmentId);
   }
 
-  subscribeToUpdate(handler: () => void) {
+  subscribeToUpdate(handler: (removedSegmentIds: string[]) => void) {
     this.updateHandlers.push(handler);
+  }
+
+  setIsSegmentLoadedPredicate(predicate: (segmentId: string) => boolean) {
+    this.isSegmentLoaded = predicate;
+  }
+
+  private getAvgSegmentDuration() {
+    if (this.segmentDuration) return this.segmentDuration;
+    let sum = 0;
+    this.queue.forEach(
+      ([, { segment }]) => (sum += segment.endTime - segment.startTime)
+    );
+    this.segmentDuration = sum / this.queue.size;
+    return this.segmentDuration;
   }
 
   get length() {
