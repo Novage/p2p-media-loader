@@ -1,76 +1,9 @@
 import { Segment, SegmentResponse, StreamWithSegments } from "./index";
-import * as Utils from "./utils";
 import { HttpLoader } from "./http-loader";
 import { LoadQueue } from "./load-queue";
 import { SegmentsMemoryStorage } from "./segments-storage";
-import { Playback } from "./internal-types";
 
 export class Loader {
-  private manifestResponseUrl?: string;
-  private readonly mainStreamLoader: StreamLoader;
-  private readonly secondaryStreamLoader: StreamLoader;
-
-  constructor(
-    private readonly streams: Map<string, StreamWithSegments>,
-    private readonly segmentStorage: SegmentsMemoryStorage,
-    private readonly settings: {
-      simultaneousHttpDownloads: number;
-      highDemandBufferLength: number;
-      httpBufferLength: number;
-      p2pBufferLength: number;
-    }
-  ) {
-    this.mainStreamLoader = new StreamLoader(
-      this.segmentStorage,
-      this.settings
-    );
-    this.secondaryStreamLoader = new StreamLoader(
-      this.segmentStorage,
-      this.settings
-    );
-  }
-
-  setManifestResponseUrl(url: string) {
-    this.manifestResponseUrl = url;
-  }
-
-  async loadSegment(segmentId: string): Promise<SegmentResponse> {
-    const { segment, stream } = this.identifySegment(segmentId);
-
-    const loader =
-      stream.type === "main"
-        ? this.mainStreamLoader
-        : this.secondaryStreamLoader;
-    return loader.loadSegment(segment, stream);
-  }
-
-  private identifySegment(segmentId: string) {
-    if (!this.manifestResponseUrl) {
-      throw new Error("Manifest response url is undefined");
-    }
-
-    const { stream, segment } =
-      Utils.getSegmentFromStreamsMap(this.streams, segmentId) ?? {};
-    if (!segment || !stream) {
-      throw new Error(`Not found segment with id: ${segmentId}`);
-    }
-
-    return { segment, stream };
-  }
-
-  onPlaybackUpdate(playback: Playback) {
-    const { position, rate } = playback;
-    this.mainStreamLoader.onPlaybackUpdate(position, rate);
-    this.secondaryStreamLoader.onPlaybackUpdate(position, rate);
-  }
-
-  abortSegment(segmentId: string) {
-    this.mainStreamLoader.abortSegment(segmentId);
-    this.secondaryStreamLoader.abortSegment(segmentId);
-  }
-}
-
-class StreamLoader {
   private readonly queue: LoadQueue;
   private readonly httpLoader = new HttpLoader();
   private readonly pluginRequests = new Map<string, Request>();

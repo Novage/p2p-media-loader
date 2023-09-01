@@ -6,21 +6,30 @@ import { LinkedMap } from "./linked-map";
 import { SegmentsMemoryStorage } from "./segments-storage";
 
 export class Core<TStream extends Stream = Stream> {
+  private manifestResponseUrl?: string;
   private readonly streams = new Map<string, StreamWithSegments<TStream>>();
   private readonly playback: Playback = { position: 0, rate: 1 };
   private readonly segmentStorage = new SegmentsMemoryStorage(this.playback, {
     cachedSegmentExpiration: 120,
     cachedSegmentsCount: 50,
   });
-  private readonly loader = new Loader(this.streams, this.segmentStorage, {
+  private readonly settings = {
     simultaneousHttpDownloads: 3,
     highDemandBufferLength: 20,
     httpBufferLength: 60,
     p2pBufferLength: 60,
-  });
+  };
+  private readonly mainStreamLoader = new Loader(
+    this.segmentStorage,
+    this.settings
+  );
+  private readonly secondaryStreamLoader = new Loader(
+    this.segmentStorage,
+    this.settings
+  );
 
   setManifestResponseUrl(url: string): void {
-    this.loader.setManifestResponseUrl(url.split("?")[0]);
+    this.manifestResponseUrl = url.split("?")[0];
   }
 
   hasSegment(segmentLocalId: string): boolean {
@@ -55,25 +64,52 @@ export class Core<TStream extends Stream = Stream> {
     const firstSegment = stream.segments.first?.[1];
     if (firstSegment && firstSegment.startTime > this.playback.position) {
       this.playback.position = firstSegment.startTime;
-      this.loader.onPlaybackUpdate(this.playback);
+      this.onPlaybackUpdate(this.playback);
     }
   }
 
   loadSegment(segmentLocalId: string): Promise<SegmentResponse> {
-    return this.loader.loadSegment(segmentLocalId);
+    const { segment, stream } = this.identifySegment(segmentLocalId);
+
+    const loader =
+      stream.type === "main"
+        ? this.mainStreamLoader
+        : this.secondaryStreamLoader;
+    return loader.loadSegment(segment, stream);
   }
 
   abortSegmentLoading(segmentId: string): void {
-    return this.loader.abortSegment(segmentId);
+    this.mainStreamLoader.abortSegment(segmentId);
+    this.secondaryStreamLoader.abortSegment(segmentId);
   }
 
   updatePlayback(position: number, rate: number): void {
     this.playback.position = position;
     this.playback.rate = rate;
-    this.loader.onPlaybackUpdate(this.playback);
+    this.onPlaybackUpdate(this.playback);
   }
 
   destroy(): void {
     this.streams.clear();
+  }
+
+  private identifySegment(segmentId: string) {
+    if (!this.manifestResponseUrl) {
+      throw new Error("Manifest response url is undefined");
+    }
+
+    const { stream, segment } =
+      Utils.getSegmentFromStreamsMap(this.streams, segmentId) ?? {};
+    if (!segment || !stream) {
+      throw new Error(`Not found segment with id: ${segmentId}`);
+    }
+
+    return { segment, stream };
+  }
+
+  private onPlaybackUpdate(playback: Playback) {
+    const { position, rate } = playback;
+    this.mainStreamLoader.onPlaybackUpdate(position, rate);
+    this.secondaryStreamLoader.onPlaybackUpdate(position, rate);
   }
 }
