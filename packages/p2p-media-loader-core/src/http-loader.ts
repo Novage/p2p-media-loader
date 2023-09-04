@@ -62,4 +62,11 @@ export class HttpLoader {
   getRequest(segmentId: string) {
     return this.requests.get(segmentId)?.promise;
   }
+
+  abortAll() {
+    for (const request of this.requests.values()) {
+      request.abortController.abort();
+    }
+    this.requests.clear();
+  }
 }

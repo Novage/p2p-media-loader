@@ -161,6 +161,14 @@ export class LoadQueue {
   get activeStream() {
     return this._activeStream;
   }
+
+  clear() {
+    this.queue.clear();
+    this._activeStream = undefined;
+    this.lastRequestedSegment = undefined;
+    this.segmentDuration = undefined;
+    this.prevUpdatePosition = undefined;
+  }
 }
 
 function areSetsEqual<T>(set1: Set<T>, set2: Set<T>): boolean {

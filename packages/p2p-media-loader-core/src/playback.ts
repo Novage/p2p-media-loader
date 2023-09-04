@@ -57,4 +57,12 @@ export class Playback {
       p2p: this._p2pMargin ?? 0,
     };
   }
+
+  clear() {
+    this._rate = 1;
+    this._position = undefined;
+    this._highDemandMargin = undefined;
+    this._httpMargin = undefined;
+    this._p2pMargin = undefined;
+  }
 }

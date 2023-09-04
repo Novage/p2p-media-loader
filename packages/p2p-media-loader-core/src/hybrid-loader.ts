@@ -11,6 +11,7 @@ export class HybridLoader {
   private readonly httpLoader = new HttpLoader();
   private readonly pluginRequests = new Map<string, Request>();
   private readonly segmentStorage: SegmentsMemoryStorage;
+  private storageCleanUpIntervalId?: number;
   private readonly playback: Playback;
 
   constructor(private readonly settings: Settings) {
@@ -26,6 +27,11 @@ export class HybridLoader {
         Utils.getSegmentLoadStatuses(segment, this.playback)
       );
     });
+
+    this.storageCleanUpIntervalId = setInterval(
+      () => this.segmentStorage.clear(),
+      1000
+    );
   }
 
   async loadSegment(
@@ -36,7 +42,7 @@ export class HybridLoader {
       this.playback.position = segment.startTime;
     }
     this.queue.updateIfStreamChanged(segment, stream);
-    const storageData = this.segmentStorage.getSegment(segment.localId);
+    const storageData = await this.segmentStorage.getSegment(segment.localId);
     if (storageData) {
       return {
         data: storageData,
@@ -71,7 +77,7 @@ export class HybridLoader {
 
   private async loadSegmentThroughHttp(segment: Segment) {
     const data = await this.httpLoader.load(segment);
-    this.segmentStorage.storeSegment(segment, data);
+    void this.segmentStorage.storeSegment(segment, data);
     this.queue.removeLoadedSegment(segment.localId);
     const request = this.pluginRequests.get(segment.localId);
     if (request) {
@@ -130,6 +136,19 @@ export class HybridLoader {
 
     this.pluginRequests.set(segment.localId, request);
     return request;
+  }
+
+  clear() {
+    this.queue.clear();
+    clearInterval(this.storageCleanUpIntervalId);
+    this.storageCleanUpIntervalId = undefined;
+    void this.segmentStorage.clear();
+    this.httpLoader.abortAll();
+    for (const request of this.pluginRequests.values()) {
+      request.onError("Aborted");
+    }
+    this.pluginRequests.clear();
+    this.playback.clear();
   }
 }
 

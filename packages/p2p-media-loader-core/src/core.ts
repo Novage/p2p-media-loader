@@ -87,6 +87,10 @@ export class Core<TStream extends Stream = Stream> {
 
   destroy(): void {
     this.streams.clear();
+    this.position = 0;
+    this.mainStreamLoader.clear();
+    this.secondaryStreamLoader.clear();
+    this.manifestResponseUrl = undefined;
   }
 
   private identifySegment(segmentId: string) {

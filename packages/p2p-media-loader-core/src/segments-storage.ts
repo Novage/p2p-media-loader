@@ -18,7 +18,7 @@ export class SegmentsMemoryStorage {
     this.isSegmentLockedPredicate = predicate;
   }
 
-  storeSegment(segment: Segment, data: ArrayBuffer) {
+  async storeSegment(segment: Segment, data: ArrayBuffer) {
     this.cache.set(segment.localId, {
       segment,
       data,
@@ -26,7 +26,7 @@ export class SegmentsMemoryStorage {
     });
   }
 
-  getSegment(segmentId: string): ArrayBuffer | undefined {
+  async getSegment(segmentId: string): Promise<ArrayBuffer | undefined> {
     const cacheItem = this.cache.get(segmentId);
     if (cacheItem === undefined) return undefined;
 
@@ -38,7 +38,7 @@ export class SegmentsMemoryStorage {
     return this.cache.has(segmentId);
   }
 
-  async clean(): Promise<boolean> {
+  async clear(): Promise<boolean> {
     const segmentsToDelete: string[] = [];
     const remainingSegments: {
       lastAccessed: number;
@@ -50,7 +50,9 @@ export class SegmentsMemoryStorage {
 
     for (const [segmentId, { lastAccessed, segment }] of this.cache.entries()) {
       if (now - lastAccessed > this.settings.cachedSegmentExpiration) {
-        segmentsToDelete.push(segmentId);
+        if (!this.isSegmentLockedPredicate?.(segment)) {
+          segmentsToDelete.push(segmentId);
+        }
       } else {
         remainingSegments.push({ segment, lastAccessed });
       }
@@ -63,7 +65,7 @@ export class SegmentsMemoryStorage {
       remainingSegments.sort((a, b) => a.lastAccessed - b.lastAccessed);
 
       for (const cachedSegment of remainingSegments) {
-        if (this.isSegmentLockedPredicate?.(cachedSegment.segment)) {
+        if (!this.isSegmentLockedPredicate?.(cachedSegment.segment)) {
           segmentsToDelete.push(cachedSegment.segment.localId);
           countOverhead--;
           if (countOverhead === 0) break;
