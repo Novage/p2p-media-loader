@@ -1,4 +1,4 @@
-import { HybridLoader } from "./loader";
+import { HybridLoader } from "./hybrid-loader";
 import {
   Stream,
   StreamWithSegments,
