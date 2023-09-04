@@ -1,6 +1,8 @@
 import { Segment, StreamWithSegments } from "./types";
 import { LinkedMap } from "./linked-map";
 import { SegmentLoadStatus } from "./internal-types";
+import * as Utils from "./utils";
+import { Playback } from "./playback";
 
 export type LoadQueueItem = {
   segment: Segment;
@@ -9,26 +11,14 @@ export type LoadQueueItem = {
 
 export class LoadQueue {
   private readonly queue = new LinkedMap<string, LoadQueueItem>();
-  private activeStream?: StreamWithSegments;
+  private _activeStream?: StreamWithSegments;
   private isSegmentLoaded?: (segmentId: string) => boolean;
   private lastRequestedSegment?: Segment;
-  private position = 0;
-  private rate = 1;
   private segmentDuration?: number;
-  private updateHandlers: ((removedSegmentIds: string[]) => void)[] = [];
-  private highDemandBufferMargin!: number;
-  private httpBufferMargin!: number;
-  private p2pBufferMargin!: number;
+  private updateHandlers: ((removedSegmentIds?: string[]) => void)[] = [];
+  private prevUpdatePosition?: number;
 
-  constructor(
-    private readonly settings: {
-      highDemandBufferLength: number;
-      httpBufferLength: number;
-      p2pBufferLength: number;
-    }
-  ) {
-    this.updateBufferMargins();
-  }
+  constructor(private readonly playback: Playback) {}
 
   *items() {
     for (const [, item] of this.queue.entries()) {
@@ -44,25 +34,30 @@ export class LoadQueue {
 
   updateIfStreamChanged(segment: Segment, stream: StreamWithSegments) {
     const segmentsToAbortIds: string[] = [];
-    if (this.activeStream !== stream) {
-      this.activeStream = stream;
+    if (this._activeStream !== stream) {
+      this._activeStream = stream;
       this.queue.forEach(([segmentId]) => segmentsToAbortIds.push(segmentId));
       this.queue.clear();
     }
     this.lastRequestedSegment = segment;
-    this.addNewSegmentsToQueue();
+    const newSegments = this.addNewSegmentsToQueue();
+
+    if (newSegments?.length) {
+      this.updateHandlers.forEach((handler) => handler());
+    }
   }
 
-  playbackUpdate(position: number, rate: number) {
+  playbackUpdate() {
+    const { position, rate } = this.playback;
     const avgSegmentDuration = this.getAvgSegmentDuration();
-    const isRateChanged = this.rate === undefined || rate !== this.rate;
+    const isRateChanged =
+      this.playback.rate === undefined || rate !== this.playback.rate;
     const isPositionSignificantlyChanged =
-      this.position === undefined ||
-      Math.abs(position - this.position) / avgSegmentDuration > 0.5;
+      this.prevUpdatePosition === undefined ||
+      Math.abs(position - this.prevUpdatePosition) / avgSegmentDuration >= 0.5;
+
     if (!isRateChanged && !isPositionSignificantlyChanged) return;
-    if (isRateChanged) this.rate = rate;
-    if (isPositionSignificantlyChanged) this.position = position;
-    this.updateBufferMargins();
+    this.prevUpdatePosition = this.playback.position;
 
     const { removedSegmentIds, statusChangedSegmentIds } =
       this.clearNotActualSegmentsUpdateStatuses();
@@ -82,6 +77,15 @@ export class LoadQueue {
 
     const newSegmentIds: string[] = [];
     let prevSegmentId: string | undefined;
+
+    const nextToLastRequested = this.activeStream.segments.getNextTo(
+      this.lastRequestedSegment.localId
+    )?.[1];
+    const nextSegmentStatuses =
+      nextToLastRequested &&
+      Utils.getSegmentLoadStatuses(nextToLastRequested, this.playback);
+
+    let i = 0;
     for (const [segmentId, segment] of this.activeStream.segments.entries(
       this.lastRequestedSegment.localId
     )) {
@@ -90,14 +94,20 @@ export class LoadQueue {
         prevSegmentId = segmentId;
         continue;
       }
-      const statuses = this.getSegmentStatuses(segment);
-      if (!statuses) break;
+      const statuses = Utils.getSegmentLoadStatuses(segment, this.playback);
+      if (!statuses && !(i === 0 && nextSegmentStatuses)) {
+        break;
+      }
 
-      const info = { segment, statuses };
-      if (prevSegmentId) this.queue.addAfter(prevSegmentId, segmentId, info);
-      else this.queue.addToStart(segmentId, info);
+      const item: LoadQueueItem = {
+        segment,
+        statuses: statuses ?? new Set(["high-demand"]),
+      };
+      if (prevSegmentId) this.queue.addAfter(prevSegmentId, segmentId, item);
+      else this.queue.addToStart(segmentId, item);
       newSegmentIds.push(segmentId);
       prevSegmentId = segmentId;
+      i++;
     }
 
     return newSegmentIds;
@@ -107,11 +117,15 @@ export class LoadQueue {
     const removedSegmentIds: string[] = [];
     const statusChangedSegmentIds: string[] = [];
     for (const [segmentId, item] of this.queue.entries()) {
-      const statuses = this.getSegmentStatuses(item.segment);
+      const statuses = Utils.getSegmentLoadStatuses(
+        item.segment,
+        this.playback
+      );
+
       if (!statuses) {
         removedSegmentIds.push(segmentId);
         this.queue.delete(segmentId);
-      } else if (areSetsEqual(item.statuses, statuses)) {
+      } else if (!areSetsEqual(item.statuses, statuses)) {
         item.statuses = statuses;
         statusChangedSegmentIds.push(segmentId);
       }
@@ -119,43 +133,11 @@ export class LoadQueue {
     return { removedSegmentIds, statusChangedSegmentIds };
   }
 
-  private updateBufferMargins() {
-    if (this.position === undefined || this.rate === undefined) return;
-    const { highDemandBufferLength, p2pBufferLength, httpBufferLength } =
-      this.settings;
-
-    this.highDemandBufferMargin =
-      this.position + highDemandBufferLength * this.rate;
-    this.httpBufferMargin = this.position + httpBufferLength * this.rate;
-    this.p2pBufferMargin = this.position + p2pBufferLength * this.rate;
-  }
-
-  private getSegmentStatuses(segment: Segment) {
-    const {
-      highDemandBufferMargin,
-      httpBufferMargin,
-      p2pBufferMargin,
-      position,
-    } = this;
-    const { startTime } = segment;
-    const statuses = new Set<SegmentLoadStatus>();
-    if (startTime >= position && startTime < highDemandBufferMargin) {
-      statuses.add("high-demand");
-    }
-    if (startTime >= position && startTime < httpBufferMargin) {
-      statuses.add("http-downloadable");
-    }
-    if (startTime >= position && startTime < p2pBufferMargin) {
-      statuses.add("p2p-downloadable");
-    }
-    if (statuses.size) return statuses;
-  }
-
   removeLoadedSegment(segmentId: string) {
     this.queue.delete(segmentId);
   }
 
-  subscribeToUpdate(handler: (removedSegmentIds: string[]) => void) {
+  subscribeToUpdate(handler: (removedSegmentIds?: string[]) => void) {
     this.updateHandlers.push(handler);
   }
 
@@ -176,12 +158,19 @@ export class LoadQueue {
   get length() {
     return this.queue.size;
   }
+
+  get activeStream() {
+    return this._activeStream;
+  }
 }
 
 function areSetsEqual<T>(set1: Set<T>, set2: Set<T>): boolean {
   if (set1.size !== set2.size) return false;
   for (const item of set1) {
     if (!set2.has(item)) return false;
+  }
+  for (const item of set2) {
+    if (!set1.has(item)) return false;
   }
   return true;
 }

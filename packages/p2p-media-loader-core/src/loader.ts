@@ -2,24 +2,30 @@ import { Segment, SegmentResponse, StreamWithSegments } from "./index";
 import { HttpLoader } from "./http-loader";
 import { LoadQueue } from "./load-queue";
 import { SegmentsMemoryStorage } from "./segments-storage";
+import { Settings } from "./types";
+import { Playback } from "./playback";
+import * as Utils from "./utils";
 
-export class Loader {
+export class HybridLoader {
   private readonly queue: LoadQueue;
   private readonly httpLoader = new HttpLoader();
   private readonly pluginRequests = new Map<string, Request>();
+  private readonly segmentStorage: SegmentsMemoryStorage;
+  private readonly playback: Playback;
 
-  constructor(
-    private readonly segmentStorage: SegmentsMemoryStorage,
-    private readonly settings: {
-      highDemandBufferLength: number;
-      httpBufferLength: number;
-      p2pBufferLength: number;
-      simultaneousHttpDownloads: number;
-    }
-  ) {
-    this.queue = new LoadQueue(this.settings);
-    this.queue.subscribeToUpdate(this.onQueueChanged.bind(this));
+  constructor(private readonly settings: Settings) {
+    this.segmentStorage = new SegmentsMemoryStorage(this.settings);
+    this.playback = new Playback(this.settings);
+    this.queue = new LoadQueue(this.playback);
+    this.queue.subscribeToUpdate(this.onQueueUpdated.bind(this));
     this.queue.setIsSegmentLoadedPredicate(this.isSegmentLoaded.bind(this));
+    this.segmentStorage.setIsSegmentLockedPredicate((segment) => {
+      const stream = this.queue.activeStream;
+      return !!(
+        stream?.segments.has(segment.localId) &&
+        Utils.getSegmentLoadStatuses(segment, this.playback)
+      );
+    });
   }
 
   async loadSegment(
@@ -31,7 +37,7 @@ export class Loader {
     if (storageData) {
       return {
         data: storageData,
-        bandwidth: 99999999,
+        bandwidth: 9999999999,
       };
     }
     const request = this.createPluginSegmentRequest(segment);
@@ -44,8 +50,8 @@ export class Loader {
 
   private processQueue() {
     const { simultaneousHttpDownloads } = this.settings;
-
     for (const { segment, statuses } of this.queue.items()) {
+      if (this.httpLoader.isLoading(segment.localId)) continue;
       if (statuses.has("high-demand")) {
         if (this.httpLoader.getLoadingsAmount() < simultaneousHttpDownloads) {
           void this.loadSegmentThroughHttp(segment);
@@ -63,6 +69,7 @@ export class Loader {
   private async loadSegmentThroughHttp(segment: Segment) {
     const data = await this.httpLoader.load(segment);
     this.segmentStorage.storeSegment(segment, data);
+    this.queue.removeLoadedSegment(segment.localId);
     const request = this.pluginRequests.get(segment.localId);
     if (request) {
       request.onSuccess({
@@ -70,7 +77,7 @@ export class Loader {
         data,
       });
     }
-    this.queue.removeLoadedSegment(segment.localId);
+    this.pluginRequests.delete(segment.localId);
   }
 
   private abortLastHttpLoadingAfter(segmentId: string) {
@@ -83,12 +90,19 @@ export class Loader {
     }
   }
 
-  onPlaybackUpdate(position: number, rate: number) {
-    this.queue.playbackUpdate(position, rate);
+  updatePlayback(position: number, rate?: number) {
+    this.playback.position = position;
+    if (rate !== undefined) this.playback.rate = rate;
+    this.queue.playbackUpdate();
   }
 
-  private onQueueChanged(removedSegmentIds: string[]) {
-    removedSegmentIds.forEach((id) => this.httpLoader.abort(id));
+  private onQueueUpdated(removedSegmentIds?: string[]) {
+    removedSegmentIds?.forEach((id) => {
+      this.httpLoader.abort(id);
+      const request = this.pluginRequests.get(id);
+      if (request) request.onError("aborted");
+      this.pluginRequests.delete(id);
+    });
     this.processQueue();
   }
 
@@ -105,7 +119,9 @@ export class Loader {
     });
     const request: Request = {
       responsePromise,
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       onSuccess: onSuccess!,
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       onError: onError!,
     };
 

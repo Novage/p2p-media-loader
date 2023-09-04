@@ -1,20 +1,22 @@
-import { Playback } from "./playback";
 import { Segment } from "./types";
-import * as Utils from "./utils";
 
 export class SegmentsMemoryStorage {
   private cache = new Map<
     string,
     { segment: Segment; data: ArrayBuffer; lastAccessed: number }
   >();
+  private isSegmentLockedPredicate?: (segment: Segment) => boolean;
 
   constructor(
-    private readonly playback: Playback,
     private settings: {
       cachedSegmentExpiration: number;
       cachedSegmentsCount: number;
     }
   ) {}
+
+  setIsSegmentLockedPredicate(predicate: (segment: Segment) => boolean) {
+    this.isSegmentLockedPredicate = predicate;
+  }
 
   storeSegment(segment: Segment, data: ArrayBuffer) {
     this.cache.set(segment.localId, {
@@ -34,11 +36,6 @@ export class SegmentsMemoryStorage {
 
   hasSegment(segmentId: string) {
     return this.cache.has(segmentId);
-  }
-
-  private isSegmentLocked(segment: Segment) {
-    const statuses = Utils.getSegmentLoadStatuses(segment, this.playback);
-    return !!statuses;
   }
 
   async clean(): Promise<boolean> {
@@ -66,7 +63,7 @@ export class SegmentsMemoryStorage {
       remainingSegments.sort((a, b) => a.lastAccessed - b.lastAccessed);
 
       for (const cachedSegment of remainingSegments) {
-        if (this.isSegmentLocked(cachedSegment.segment)) {
+        if (this.isSegmentLockedPredicate?.(cachedSegment.segment)) {
           segmentsToDelete.push(cachedSegment.segment.localId);
           countOverhead--;
           if (countOverhead === 0) break;

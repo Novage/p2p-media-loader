@@ -35,3 +35,12 @@ export type SegmentResponse = {
   data: ArrayBuffer;
   bandwidth: number;
 };
+
+export type Settings = {
+  highDemandBufferLength: number;
+  httpBufferLength: number;
+  p2pBufferLength: number;
+  simultaneousHttpDownloads: number;
+  cachedSegmentExpiration: number;
+  cachedSegmentsCount: number;
+};

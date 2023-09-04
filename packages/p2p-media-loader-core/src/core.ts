@@ -1,32 +1,28 @@
-import { Loader } from "./loader";
-import { Stream, StreamWithSegments, Segment, SegmentResponse } from "./types";
-import { Playback } from "./internal-types";
+import { HybridLoader } from "./loader";
+import {
+  Stream,
+  StreamWithSegments,
+  Segment,
+  SegmentResponse,
+  Settings,
+} from "./types";
 import * as Utils from "./utils";
 import { LinkedMap } from "./linked-map";
-import { SegmentsMemoryStorage } from "./segments-storage";
 
 export class Core<TStream extends Stream = Stream> {
   private manifestResponseUrl?: string;
   private readonly streams = new Map<string, StreamWithSegments<TStream>>();
-  private readonly playback: Playback = { position: 0, rate: 1 };
-  private readonly segmentStorage = new SegmentsMemoryStorage(this.playback, {
-    cachedSegmentExpiration: 120,
-    cachedSegmentsCount: 50,
-  });
-  private readonly settings = {
+  private readonly settings: Settings = {
     simultaneousHttpDownloads: 3,
     highDemandBufferLength: 20,
     httpBufferLength: 60,
     p2pBufferLength: 60,
+    cachedSegmentExpiration: 120,
+    cachedSegmentsCount: 50,
   };
-  private readonly mainStreamLoader = new Loader(
-    this.segmentStorage,
-    this.settings
-  );
-  private readonly secondaryStreamLoader = new Loader(
-    this.segmentStorage,
-    this.settings
-  );
+  private position = 0;
+  private readonly mainStreamLoader = new HybridLoader(this.settings);
+  private readonly secondaryStreamLoader = new HybridLoader(this.settings);
 
   setManifestResponseUrl(url: string): void {
     this.manifestResponseUrl = url.split("?")[0];
@@ -62,9 +58,10 @@ export class Core<TStream extends Stream = Stream> {
     removeSegmentIds?.forEach((id) => stream.segments.delete(id));
 
     const firstSegment = stream.segments.first?.[1];
-    if (firstSegment && firstSegment.startTime > this.playback.position) {
-      this.playback.position = firstSegment.startTime;
-      this.onPlaybackUpdate(this.playback);
+    if (firstSegment && firstSegment.startTime > this.position) {
+      this.position = firstSegment.startTime;
+      this.mainStreamLoader.updatePlayback(firstSegment.startTime);
+      this.secondaryStreamLoader.updatePlayback(firstSegment.startTime);
     }
   }
 
@@ -84,9 +81,8 @@ export class Core<TStream extends Stream = Stream> {
   }
 
   updatePlayback(position: number, rate: number): void {
-    this.playback.position = position;
-    this.playback.rate = rate;
-    this.onPlaybackUpdate(this.playback);
+    this.mainStreamLoader.updatePlayback(position, rate);
+    this.secondaryStreamLoader.updatePlayback(position, rate);
   }
 
   destroy(): void {
@@ -105,11 +101,5 @@ export class Core<TStream extends Stream = Stream> {
     }
 
     return { segment, stream };
-  }
-
-  private onPlaybackUpdate(playback: Playback) {
-    const { position, rate } = playback;
-    this.mainStreamLoader.onPlaybackUpdate(position, rate);
-    this.secondaryStreamLoader.onPlaybackUpdate(position, rate);
   }
 }
