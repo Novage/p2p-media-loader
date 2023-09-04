@@ -1,9 +1,9 @@
 export class Playback {
-  private _position = 0;
+  private _position?: number;
   private _rate = 1;
-  private _highDemandMargin = 0;
-  private _httpMargin = 0;
-  private _p2pMargin = 0;
+  private _highDemandMargin?: number;
+  private _httpMargin?: number;
+  private _p2pMargin?: number;
 
   constructor(
     private readonly settings: {
@@ -15,6 +15,10 @@ export class Playback {
     this.updateMargins();
   }
 
+  isInitialized() {
+    return this._position !== undefined;
+  }
+
   set position(value: number) {
     if (this._position === value) return;
     this._position = value;
@@ -22,7 +26,7 @@ export class Playback {
   }
 
   get position() {
-    return this._position;
+    return this._position ?? 0;
   }
 
   set rate(value: number) {
@@ -32,7 +36,7 @@ export class Playback {
   }
 
   get rate() {
-    return this._rate;
+    return this._rate ?? 0;
   }
 
   private updateMargins() {
@@ -48,9 +52,9 @@ export class Playback {
 
   get margins() {
     return {
-      highDemand: this._highDemandMargin,
-      http: this._httpMargin,
-      p2p: this._p2pMargin,
+      highDemand: this._highDemandMargin ?? 0,
+      http: this._httpMargin ?? 0,
+      p2p: this._p2pMargin ?? 0,
     };
   }
 }

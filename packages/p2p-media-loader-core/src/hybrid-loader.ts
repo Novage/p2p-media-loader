@@ -32,6 +32,9 @@ export class HybridLoader {
     segment: Segment,
     stream: StreamWithSegments
   ): Promise<SegmentResponse> {
+    if (!this.playback.isInitialized()) {
+      this.playback.position = segment.startTime;
+    }
     this.queue.updateIfStreamChanged(segment, stream);
     const storageData = this.segmentStorage.getSegment(segment.localId);
     if (storageData) {

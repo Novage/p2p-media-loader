@@ -109,7 +109,6 @@ export class LoadQueue {
       prevSegmentId = segmentId;
       i++;
     }
-
     return newSegmentIds;
   }
 
