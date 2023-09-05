@@ -45,7 +45,7 @@ export class HybridLoader {
     if (!this.playback.isInitialized()) {
       this.playback.position = segment.startTime;
     }
-    this.queue.updateIfStreamChanged(segment, stream);
+    this.queue.updateOnSegmentRequest(segment, stream);
     const storageData = await this.segmentStorage.getSegment(segment.localId);
     if (storageData) {
       return {
@@ -107,7 +107,7 @@ export class HybridLoader {
   updatePlayback(position: number, rate?: number) {
     this.playback.position = position;
     if (rate !== undefined) this.playback.rate = rate;
-    this.queue.playbackUpdate();
+    this.queue.updateOnPlaybackChange();
   }
 
   private onQueueUpdated(removedSegmentIds?: string[]) {

@@ -51,13 +51,6 @@ export class LinkedMap<K, V extends object> {
     this.map.set(key, item);
   }
 
-  addListToStart(items: [K, V][]) {
-    for (let i = items.length - 1; i >= 0; i--) {
-      const [key, value] = items[i];
-      this.addToStart(key, value);
-    }
-  }
-
   addAfter(prevKey: K, key: K, value: V) {
     const prev = this.map.get(prevKey);
     if (!prev) return;
@@ -132,14 +125,6 @@ export class LinkedMap<K, V extends object> {
     for (const value of this.entries()) {
       callback(value);
     }
-  }
-
-  filter(callback: (item: [K, V]) => boolean) {
-    const list: [K, V][] = [];
-    for (const value of this.entries()) {
-      if (callback(value)) list.push(value);
-    }
-    return list;
   }
 
   getNextTo(key: K): [K, V] | undefined {

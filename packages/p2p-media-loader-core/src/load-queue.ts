@@ -32,7 +32,7 @@ export class LoadQueue {
     }
   }
 
-  updateIfStreamChanged(segment: Segment, stream: StreamWithSegments) {
+  updateOnSegmentRequest(segment: Segment, stream: StreamWithSegments) {
     const segmentsToAbortIds: string[] = [];
     if (this._activeStream !== stream) {
       this._activeStream = stream;
@@ -40,53 +40,55 @@ export class LoadQueue {
       this.queue.clear();
     }
     this.lastRequestedSegment = segment;
-    const newSegments = this.addNewSegmentsToQueue();
+    const addedSegments = this.addActualSegmentsToQueue();
 
-    if (newSegments?.length) {
+    if (addedSegments?.length) {
       this.updateHandlers.forEach((handler) => handler());
     }
   }
 
-  playbackUpdate() {
+  updateOnPlaybackChange() {
     const { position, rate } = this.playback;
     const avgSegmentDuration = this.getAvgSegmentDuration();
     const isRateChanged =
       this.playback.rate === undefined || rate !== this.playback.rate;
     const isPositionSignificantlyChanged =
       this.prevUpdatePosition === undefined ||
-      Math.abs(position - this.prevUpdatePosition) / avgSegmentDuration >= 0.5;
+      Math.abs(position - this.prevUpdatePosition) / avgSegmentDuration >= 0.45;
 
     if (!isRateChanged && !isPositionSignificantlyChanged) return;
-    this.prevUpdatePosition = this.playback.position;
+    this.prevUpdatePosition = position;
 
     const { removedSegmentIds, statusChangedSegmentIds } =
-      this.clearNotActualSegmentsUpdateStatuses();
-    const newSegmentIds = this.addNewSegmentsToQueue();
+      this.removeNotActualSegmentsAndUpdateStatuses();
+    const addedSegments = this.addActualSegmentsToQueue();
 
     if (
       removedSegmentIds.length ||
       statusChangedSegmentIds.length ||
-      newSegmentIds?.length
+      addedSegments?.length
     ) {
       this.updateHandlers.forEach((handler) => handler(removedSegmentIds));
     }
   }
 
-  private addNewSegmentsToQueue() {
-    if (!this.activeStream || !this.lastRequestedSegment) return;
+  private addActualSegmentsToQueue() {
+    if (!this._activeStream || !this.lastRequestedSegment) return;
 
     const newSegmentIds: string[] = [];
     let prevSegmentId: string | undefined;
 
-    const nextToLastRequested = this.activeStream.segments.getNextTo(
+    const nextToLastRequested = this._activeStream.segments.getNextTo(
       this.lastRequestedSegment.localId
     )?.[1];
+    // it's needed when the segment requested by the plugin
+    // (lastRequestedSegment) ends before current playhead position
     const nextSegmentStatuses =
       nextToLastRequested &&
       Utils.getSegmentLoadStatuses(nextToLastRequested, this.playback);
 
     let i = 0;
-    for (const [segmentId, segment] of this.activeStream.segments.entries(
+    for (const [segmentId, segment] of this._activeStream.segments.entries(
       this.lastRequestedSegment.localId
     )) {
       if (this.isSegmentLoaded?.(segmentId)) continue;
@@ -112,7 +114,7 @@ export class LoadQueue {
     return newSegmentIds;
   }
 
-  private clearNotActualSegmentsUpdateStatuses() {
+  private removeNotActualSegmentsAndUpdateStatuses() {
     const removedSegmentIds: string[] = [];
     const statusChangedSegmentIds: string[] = [];
     for (const [segmentId, item] of this.queue.entries()) {
@@ -175,9 +177,6 @@ function areSetsEqual<T>(set1: Set<T>, set2: Set<T>): boolean {
   if (set1.size !== set2.size) return false;
   for (const item of set1) {
     if (!set2.has(item)) return false;
-  }
-  for (const item of set2) {
-    if (!set1.has(item)) return false;
   }
   return true;
 }
