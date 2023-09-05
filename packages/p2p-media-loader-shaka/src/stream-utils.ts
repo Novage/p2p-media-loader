@@ -1,5 +1,9 @@
 import { HookedStream, Stream } from "./types";
-import { Segment, StreamWithSegments, ByteRange } from "p2p-media-loader-core";
+import {
+  Segment,
+  StreamWithReadonlySegments,
+  ByteRange,
+} from "p2p-media-loader-core";
 
 export function createSegment({
   segmentReference,
@@ -72,7 +76,7 @@ export function getSegmentInfoFromReference(
 }
 
 export function getStreamLastMediaSequence(
-  stream: StreamWithSegments<Stream>
+  stream: StreamWithReadonlySegments<Stream>
 ): number | undefined {
   const { shakaStream } = stream;
   const map = shakaStream.mediaSequenceTimeMap;

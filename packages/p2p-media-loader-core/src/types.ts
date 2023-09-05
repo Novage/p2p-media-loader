@@ -21,7 +21,7 @@ export type Stream = {
 
 export type ReadonlyLinkedMap<K, V extends object> = Pick<
   LinkedMap<K, V>,
-  "has" | "keys"
+  "has" | "keys" | "values" | "size"
 >;
 
 export type StreamWithSegments<
@@ -30,6 +30,9 @@ export type StreamWithSegments<
 > = TStream & {
   readonly segments: TMap;
 };
+
+export type StreamWithReadonlySegments<TStream extends Stream = Stream> =
+  StreamWithSegments<TStream, ReadonlyLinkedMap<string, Segment>>;
 
 export type SegmentResponse = {
   data: ArrayBuffer;
