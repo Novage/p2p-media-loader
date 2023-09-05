@@ -8,21 +8,29 @@ import {
 } from "./types";
 import * as Utils from "./utils";
 import { LinkedMap } from "./linked-map";
+import { BandwidthApproximator } from "./bandwidth-approximator";
 
 export class Core<TStream extends Stream = Stream> {
   private manifestResponseUrl?: string;
   private readonly streams = new Map<string, StreamWithSegments<TStream>>();
   private readonly settings: Settings = {
     simultaneousHttpDownloads: 3,
-    highDemandBufferLength: 20,
+    highDemandBufferLength: 25,
     httpBufferLength: 60,
     p2pBufferLength: 60,
     cachedSegmentExpiration: 120,
     cachedSegmentsCount: 50,
   };
   private position = 0;
-  private readonly mainStreamLoader = new HybridLoader(this.settings);
-  private readonly secondaryStreamLoader = new HybridLoader(this.settings);
+  private readonly bandwidthApproximator = new BandwidthApproximator();
+  private readonly mainStreamLoader = new HybridLoader(
+    this.settings,
+    this.bandwidthApproximator
+  );
+  private readonly secondaryStreamLoader = new HybridLoader(
+    this.settings,
+    this.bandwidthApproximator
+  );
 
   setManifestResponseUrl(url: string): void {
     this.manifestResponseUrl = url.split("?")[0];

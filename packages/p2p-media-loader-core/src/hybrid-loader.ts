@@ -5,6 +5,7 @@ import { SegmentsMemoryStorage } from "./segments-storage";
 import { Settings } from "./types";
 import { Playback } from "./playback";
 import * as Utils from "./utils";
+import { BandwidthApproximator } from "./bandwidth-approximator";
 
 export class HybridLoader {
   private readonly queue: LoadQueue;
@@ -14,7 +15,10 @@ export class HybridLoader {
   private storageCleanUpIntervalId?: number;
   private readonly playback: Playback;
 
-  constructor(private readonly settings: Settings) {
+  constructor(
+    private readonly settings: Settings,
+    private readonly bandwidthApproximator: BandwidthApproximator
+  ) {
     this.segmentStorage = new SegmentsMemoryStorage(this.settings);
     this.playback = new Playback(this.settings);
     this.queue = new LoadQueue(this.playback);
@@ -46,7 +50,7 @@ export class HybridLoader {
     if (storageData) {
       return {
         data: storageData,
-        bandwidth: 9999999999,
+        bandwidth: this.bandwidthApproximator.getBandwidth(),
       };
     }
     const request = this.createPluginSegmentRequest(segment);
@@ -77,12 +81,13 @@ export class HybridLoader {
 
   private async loadSegmentThroughHttp(segment: Segment) {
     const data = await this.httpLoader.load(segment);
+    this.bandwidthApproximator.addBytes(data.byteLength);
     void this.segmentStorage.storeSegment(segment, data);
     this.queue.removeLoadedSegment(segment.localId);
     const request = this.pluginRequests.get(segment.localId);
     if (request) {
       request.onSuccess({
-        bandwidth: 9999999999,
+        bandwidth: this.bandwidthApproximator.getBandwidth(),
         data,
       });
     }
