@@ -103,8 +103,8 @@ export class LinkedMap<K, V extends object> {
     }
   }
 
-  *values() {
-    let value = this._first;
+  *values(key?: K) {
+    let value = key ? this.map.get(key) : this._first;
     if (value === undefined) return;
     while (value?.item !== undefined) {
       yield value.item[1];

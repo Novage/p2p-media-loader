@@ -59,6 +59,10 @@ export class HttpLoader {
     return this.requests.size;
   }
 
+  getLoadingSegmentIds() {
+    return this.requests.keys();
+  }
+
   getRequest(segmentId: string) {
     return this.requests.get(segmentId)?.promise;
   }
