@@ -64,13 +64,6 @@ export class Core<TStream extends Stream = Stream> {
 
     addSegments?.forEach((s) => stream.segments.addToEnd(s.localId, s));
     removeSegmentIds?.forEach((id) => stream.segments.delete(id));
-
-    const firstSegment = stream.segments.first?.[1];
-    if (firstSegment && firstSegment.startTime > this.position) {
-      this.position = firstSegment.startTime;
-      this.mainStreamLoader.updatePlayback(firstSegment.startTime);
-      this.secondaryStreamLoader.updatePlayback(firstSegment.startTime);
-    }
   }
 
   loadSegment(segmentLocalId: string): Promise<SegmentResponse> {
@@ -91,6 +84,8 @@ export class Core<TStream extends Stream = Stream> {
   updatePlayback(position: number, rate: number): void {
     this.mainStreamLoader.updatePlayback(position, rate);
     this.secondaryStreamLoader.updatePlayback(position, rate);
+
+    // TODO: update playback position when the live stream is updated
   }
 
   destroy(): void {

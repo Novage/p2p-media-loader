@@ -11,7 +11,7 @@ export class HybridLoader {
   private readonly pluginRequests = new Map<string, Request>();
   private readonly segmentStorage: SegmentsMemoryStorage;
   private storageCleanUpIntervalId?: number;
-  private readonly playback: Playback = { position: 0, rate: 1 };
+  private playback?: Playback;
   private activeStream?: Readonly<StreamWithSegments>;
   private lastRequestedSegment?: Readonly<Segment>;
   private segmentAvgLength?: number;
@@ -22,7 +22,9 @@ export class HybridLoader {
   ) {
     this.segmentStorage = new SegmentsMemoryStorage(this.settings);
     this.segmentStorage.setIsSegmentLockedPredicate((segment) => {
-      if (!this.activeStream?.segments.has(segment.localId)) return false;
+      if (!this.playback || !this.activeStream?.segments.has(segment.localId)) {
+        return false;
+      }
       const bufferRanges = Utils.getLoadBufferRanges(
         this.playback,
         this.settings
@@ -49,6 +51,9 @@ export class HybridLoader {
     segment: Readonly<Segment>,
     stream: Readonly<StreamWithSegments>
   ): Promise<SegmentResponse> {
+    if (!this.playback) {
+      this.playback = { position: segment.startTime, rate: 1 };
+    }
     if (stream !== this.activeStream) this.computeSegmentAvgLength(stream);
     this.activeStream = stream;
     this.lastRequestedSegment = segment;
@@ -66,7 +71,9 @@ export class HybridLoader {
   }
 
   private processQueue() {
-    if (!this.activeStream || !this.lastRequestedSegment) return;
+    if (!this.activeStream || !this.lastRequestedSegment || !this.playback) {
+      return;
+    }
 
     const { queue, queueSegmentIds } = Utils.generateQueue({
       segment: this.lastRequestedSegment,
@@ -76,8 +83,17 @@ export class HybridLoader {
       settings: this.settings,
     });
 
+    const bufferRanges = Utils.getLoadBufferRanges(
+      this.playback,
+      this.settings
+    );
     for (const segmentId of this.getLoadingSegmentIds()) {
-      if (!queueSegmentIds.has(segmentId)) {
+      const segment = this.activeStream.segments.get(segmentId);
+      if (
+        !queueSegmentIds.has(segmentId) &&
+        !this.pluginRequests.has(segmentId) &&
+        !(segment && Utils.isSegmentActual(segment, bufferRanges))
+      ) {
         this.abortSegment(segmentId);
       }
     }
@@ -112,7 +128,13 @@ export class HybridLoader {
   }
 
   private async loadSegmentThroughHttp(segment: Segment) {
-    const data = await this.httpLoader.load(segment);
+    let data: ArrayBuffer | undefined;
+    try {
+      data = await this.httpLoader.load(segment);
+    } catch (err) {
+      // TODO: handle abort
+    }
+    if (!data) return;
     this.bandwidthApproximator.addBytes(data.byteLength);
     void this.segmentStorage.storeSegment(segment, data);
     const request = this.pluginRequests.get(segment.localId);
@@ -130,14 +152,15 @@ export class HybridLoader {
       const { segment } = queue[i];
       if (segment.localId === segmentId) break;
       if (this.httpLoader.isLoading(segment.localId)) {
-        this.httpLoader.abort(segment.localId);
+        this.abortSegment(segment.localId);
         break;
       }
     }
   }
 
   updatePlayback(position: number, rate?: number) {
-    const isRateChanged = rate !== undefined && this.playback.rate !== rate;
+    if (!this.playback) return;
+    const isRateChanged = rate && this.playback.rate !== rate;
     const isPositionSignificantlyChanged =
       this.segmentAvgLength === undefined ||
       Math.abs(position - this.playback.position) / this.segmentAvgLength >=
@@ -178,7 +201,7 @@ export class HybridLoader {
       request.onError("Aborted");
     }
     this.pluginRequests.clear();
-    // TODO: clear playback
+    this.playback = undefined;
   }
 }
 
