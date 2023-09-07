@@ -11,9 +11,9 @@ export class HybridLoader {
   private readonly pluginRequests = new Map<string, Request>();
   private readonly segmentStorage: SegmentsMemoryStorage;
   private storageCleanUpIntervalId?: number;
-  private playback?: Playback;
   private activeStream?: Readonly<StreamWithSegments>;
   private lastRequestedSegment?: Readonly<Segment>;
+  private playback?: Playback;
   private segmentAvgLength?: number;
 
   constructor(
@@ -38,15 +38,6 @@ export class HybridLoader {
     );
   }
 
-  private computeSegmentAvgLength(stream: StreamWithSegments) {
-    if (!stream.segments.size) return;
-    let sum = 0;
-    for (const segment of stream.segments.values()) {
-      sum += segment.endTime - segment.startTime;
-    }
-    this.segmentAvgLength = sum / stream.segments.size;
-  }
-
   async loadSegment(
     segment: Readonly<Segment>,
     stream: Readonly<StreamWithSegments>
@@ -54,8 +45,10 @@ export class HybridLoader {
     if (!this.playback) {
       this.playback = { position: segment.startTime, rate: 1 };
     }
-    if (stream !== this.activeStream) this.computeSegmentAvgLength(stream);
-    this.activeStream = stream;
+    if (stream !== this.activeStream) {
+      this.segmentAvgLength = computeSegmentAvgLength(stream);
+      this.activeStream = stream;
+    }
     this.lastRequestedSegment = segment;
     this.processQueue();
 
@@ -79,8 +72,8 @@ export class HybridLoader {
       segment: this.lastRequestedSegment,
       stream: this.activeStream,
       playback: this.playback,
-      segmentStorage: this.segmentStorage,
       settings: this.settings,
+      isSegmentLoaded: (segmentId) => this.segmentStorage.has(segmentId),
     });
 
     const bufferRanges = Utils.getLoadBufferRanges(
@@ -210,3 +203,12 @@ type Request = {
   onSuccess: (response: SegmentResponse) => void;
   onError: (reason?: unknown) => void;
 };
+
+function computeSegmentAvgLength(stream: StreamWithSegments) {
+  if (!stream.segments.size) return;
+  let sum = 0;
+  for (const segment of stream.segments.values()) {
+    sum += segment.endTime - segment.startTime;
+  }
+  return sum / stream.segments.size;
+}

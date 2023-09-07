@@ -6,7 +6,6 @@ import {
   QueueItem,
   NumberRange,
 } from "./internal-types";
-import { SegmentsMemoryStorage } from "./segments-storage";
 
 export function getStreamExternalId(
   stream: Stream,
@@ -31,12 +30,12 @@ export function generateQueue({
   stream,
   playback,
   settings,
-  segmentStorage,
+  isSegmentLoaded,
 }: {
   stream: Readonly<StreamWithSegments>;
   segment: Readonly<Segment>;
   playback: Readonly<Playback>;
-  segmentStorage: Readonly<SegmentsMemoryStorage>;
+  isSegmentLoaded: (segmentId: string) => boolean;
   settings: Pick<
     Settings,
     "highDemandBufferLength" | "httpBufferLength" | "p2pBufferLength"
@@ -58,7 +57,7 @@ export function generateQueue({
   for (const segment of stream.segments.values(requestedSegmentId)) {
     const statuses = getSegmentLoadStatuses(segment, bufferRanges);
     if (!statuses && !(i === 0 && isNextSegmentHighDemand)) break;
-    if (segmentStorage.has(segment.localId)) continue;
+    if (isSegmentLoaded(segment.localId)) continue;
 
     queueSegmentIds.add(segment.localId);
     queue.push({ segment, statuses: statuses ?? new Set(["high-demand"]) });
