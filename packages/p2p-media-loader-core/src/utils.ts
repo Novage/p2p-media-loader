@@ -1,6 +1,11 @@
-import { Segment, Stream, StreamWithSegments } from "./index";
-import { SegmentLoadStatus } from "./internal-types";
-import { Playback } from "./playback";
+import { Segment, Settings, Stream, StreamWithSegments } from "./index";
+import {
+  SegmentLoadStatus,
+  Playback,
+  LoadBufferRanges,
+  QueueItem,
+  NumberRange,
+} from "./internal-types";
 
 export function getStreamExternalId(
   stream: Stream,
@@ -20,32 +25,111 @@ export function getSegmentFromStreamsMap(
   }
 }
 
-export function getSegmentLoadStatuses(segment: Segment, playback: Playback) {
-  const { position } = playback;
-  const { highDemand, http, p2p } = playback.margins;
+export function generateQueue({
+  segment,
+  stream,
+  playback,
+  settings,
+  isSegmentLoaded,
+}: {
+  stream: Readonly<StreamWithSegments>;
+  segment: Readonly<Segment>;
+  playback: Readonly<Playback>;
+  isSegmentLoaded: (segmentId: string) => boolean;
+  settings: Pick<
+    Settings,
+    "highDemandBufferLength" | "httpBufferLength" | "p2pBufferLength"
+  >;
+}) {
+  const bufferRanges = getLoadBufferRanges(playback, settings);
+  const { localId: requestedSegmentId } = segment;
+
+  const queue: QueueItem[] = [];
+  const queueSegmentIds = new Set<string>();
+
+  const nextSegment = stream.segments.getNextTo(segment.localId)?.[1];
+  const isNextSegmentHighDemand = !!(
+    nextSegment &&
+    getSegmentLoadStatuses(nextSegment, bufferRanges)?.has("high-demand")
+  );
+
+  let i = 0;
+  for (const segment of stream.segments.values(requestedSegmentId)) {
+    const statuses = getSegmentLoadStatuses(segment, bufferRanges);
+    if (!statuses && !(i === 0 && isNextSegmentHighDemand)) break;
+    if (isSegmentLoaded(segment.localId)) continue;
+
+    queueSegmentIds.add(segment.localId);
+    queue.push({ segment, statuses: statuses ?? new Set(["high-demand"]) });
+    i++;
+  }
+
+  return { queue, queueSegmentIds };
+}
+
+export function getLoadBufferRanges(
+  playback: Readonly<Playback>,
+  settings: Pick<
+    Settings,
+    "highDemandBufferLength" | "httpBufferLength" | "p2pBufferLength"
+  >
+): LoadBufferRanges {
+  const { position, rate } = playback;
+  const { highDemandBufferLength, httpBufferLength, p2pBufferLength } =
+    settings;
+
+  const getRange = (position: number, rate: number, bufferLength: number) => {
+    return {
+      from: position,
+      to: position + rate * bufferLength,
+    };
+  };
+  return {
+    highDemand: getRange(position, rate, highDemandBufferLength),
+    http: getRange(position, rate, httpBufferLength),
+    p2p: getRange(position, rate, p2pBufferLength),
+  };
+}
+
+export function getSegmentLoadStatuses(
+  segment: Readonly<Segment>,
+  loadBufferRanges: LoadBufferRanges
+): Set<SegmentLoadStatus> | undefined {
+  const { highDemand, http, p2p } = loadBufferRanges;
   const { startTime, endTime } = segment;
 
   const statuses = new Set<SegmentLoadStatus>();
-  const isValueBetween = (value: number, from: number, to: number) =>
-    value >= from && value < to;
+  const isValueInRange = (value: number, range: NumberRange) =>
+    value >= range.from && value < range.to;
 
   if (
-    isValueBetween(startTime, position, highDemand) ||
-    isValueBetween(endTime, position, highDemand)
+    isValueInRange(startTime, highDemand) ||
+    isValueInRange(endTime, highDemand)
   ) {
     statuses.add("high-demand");
   }
-  if (
-    isValueBetween(startTime, position, http) ||
-    isValueBetween(endTime, position, http)
-  ) {
+  if (isValueInRange(startTime, http) || isValueInRange(endTime, http)) {
     statuses.add("http-downloadable");
   }
-  if (
-    isValueBetween(startTime, position, p2p) ||
-    isValueBetween(endTime, position, p2p)
-  ) {
+  if (isValueInRange(startTime, p2p) || isValueInRange(endTime, p2p)) {
     statuses.add("p2p-downloadable");
   }
   if (statuses.size) return statuses;
+}
+
+export function isSegmentActual(
+  segment: Readonly<Segment>,
+  bufferRanges: LoadBufferRanges
+) {
+  const { startTime, endTime } = segment;
+  const { highDemand, p2p, http } = bufferRanges;
+
+  const isInRange = (value: number) => {
+    return (
+      value > highDemand.from &&
+      (value < highDemand.to || value < http.to || value < p2p.to)
+    );
+  };
+
+  return isInRange(startTime) || isInRange(endTime);
 }

@@ -34,7 +34,7 @@ export class SegmentsMemoryStorage {
     return cacheItem.data;
   }
 
-  hasSegment(segmentId: string) {
+  has(segmentId: string) {
     return this.cache.has(segmentId);
   }
 
