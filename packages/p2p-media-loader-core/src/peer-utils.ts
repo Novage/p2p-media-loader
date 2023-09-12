@@ -1,7 +1,7 @@
 import { JsonSegmentMap, PeerCommand } from "./internal-types";
 import * as TypeGuard from "./type-guards";
 import * as Util from "./utils";
-import { PeerSegmentStatus } from "./peer";
+import { PeerSegmentStatus } from "./enums";
 import * as RIPEMD160 from "ripemd160";
 
 export function generatePeerId(): string {

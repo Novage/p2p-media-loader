@@ -1,5 +1,6 @@
 import { PeerCandidate } from "bittorrent-tracker";
-import { PeerCommandType, PeerCommand } from "./internal-types";
+import { PeerCommand } from "./internal-types";
+import { PeerSegmentStatus, PeerCommandType } from "./enums";
 import * as PeerUtil from "./peer-utils";
 
 export class Peer {
@@ -61,9 +62,4 @@ export class Peer {
         break;
     }
   }
-}
-
-export enum PeerSegmentStatus {
-  Loaded,
-  LoadingByHttp,
 }
