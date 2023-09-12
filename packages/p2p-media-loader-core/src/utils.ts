@@ -15,6 +15,13 @@ export function getStreamExternalId(
   return `${manifestResponseUrl}-${type}-${index}`;
 }
 
+export function getSegmentFullExternalId(
+  externalStreamId: string,
+  externalSegmentId: string
+) {
+  return `${externalStreamId}|${externalSegmentId}`;
+}
+
 export function getSegmentFromStreamsMap(
   streams: Map<string, StreamWithSegments>,
   segmentId: string

@@ -22,3 +22,27 @@ export type LoadBufferRanges = {
 };
 
 export type QueueItem = { segment: Segment; statuses: Set<SegmentLoadStatus> };
+
+export enum PeerCommandType {
+  SegmentMap,
+  SegmentRequest,
+}
+
+export type BasePeerCommand<T extends PeerCommandType = PeerCommandType> = {
+  c: T;
+};
+
+export type PeerSegmentCommand =
+  BasePeerCommand<PeerCommandType.SegmentRequest> & {
+    i: string;
+  };
+
+// {[streamId]: [segmentIds[]; segmentStatuses[]]}
+export type JsonSegmentMap = { [key: string]: [string[], number[]] };
+
+export type PeerSegmentMapCommand =
+  BasePeerCommand<PeerCommandType.SegmentMap> & {
+    m: JsonSegmentMap;
+  };
+
+export type PeerCommand = PeerSegmentCommand | PeerSegmentMapCommand;
