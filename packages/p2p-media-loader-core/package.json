@@ -26,5 +26,12 @@
     "lint": "eslint . --ext .ts",
     "clean": "rimraf lib dist build",
     "type-check": "npx tsc --noEmit"
+  },
+  "dependencies": {
+    "bittorrent-tracker": "^10.0.12",
+    "ripemd160": "^2.0.2"
+  },
+  "devDependencies": {
+    "@types/ripemd160": "^2.0.0"
   }
 }
