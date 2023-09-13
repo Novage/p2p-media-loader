@@ -1,14 +1,15 @@
 import { Segment, SegmentResponse, StreamWithSegments } from "./index";
-import { HttpLoader } from "./http-loader";
+import { HttpLoader, loadSegmentHttp } from "./http-loader";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import { Settings } from "./types";
 import { BandwidthApproximator } from "./bandwidth-approximator";
 import { Playback, QueueItem } from "./internal-types";
+import { RequestContainer } from "./request";
 import * as Utils from "./utils";
 
 export class HybridLoader {
   private readonly httpLoader = new HttpLoader();
-  private readonly pluginRequests = new Map<string, Request>();
+  private readonly requests = new RequestContainer();
   private readonly segmentStorage: SegmentsMemoryStorage;
   private storageCleanUpIntervalId?: number;
   private activeStream?: Readonly<StreamWithSegments>;
@@ -127,23 +128,24 @@ export class HybridLoader {
   }
 
   private async loadSegmentThroughHttp(segment: Segment) {
+    const request = loadSegmentHttp(segment);
     let data: ArrayBuffer | undefined;
     try {
-      data = await this.httpLoader.load(segment);
+      data = loadSegmentHttp();
     } catch (err) {
       // TODO: handle abort
     }
-    if (!data) return;
-    this.bandwidthApproximator.addBytes(data.byteLength);
-    void this.segmentStorage.storeSegment(segment, data);
-    const request = this.pluginRequests.get(segment.localId);
-    if (request) {
-      request.onSuccess({
-        bandwidth: this.bandwidthApproximator.getBandwidth(),
-        data,
-      });
-    }
-    this.pluginRequests.delete(segment.localId);
+    // if (!data) return;
+    // this.bandwidthApproximator.addBytes(data.byteLength);
+    // void this.segmentStorage.storeSegment(segment, data);
+    // const request = this.pluginRequests.get(segment.localId);
+    // if (request) {
+    //   request.onSuccess({
+    //     bandwidth: this.bandwidthApproximator.getBandwidth(),
+    //     data,
+    //   });
+    // }
+    // this.pluginRequests.delete(segment.localId);
   }
 
   private abortLastHttpLoadingAfter(queue: QueueItem[], segmentId: string) {
@@ -170,13 +172,13 @@ export class HybridLoader {
   }
 
   private createPluginSegmentRequest(segment: Segment) {
-    let onSuccess: Request["onSuccess"];
-    let onError: Request["onError"];
+    let onSuccess: PlayerRequest["onSuccess"];
+    let onError: PlayerRequest["onError"];
     const responsePromise = new Promise<SegmentResponse>((resolve, reject) => {
       onSuccess = resolve;
       onError = reject;
     });
-    const request: Request = {
+    const request: PlayerRequest = {
       responsePromise,
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       onSuccess: onSuccess!,
@@ -200,9 +202,3 @@ export class HybridLoader {
     this.playback = undefined;
   }
 }
-
-type Request = {
-  responsePromise: Promise<SegmentResponse>;
-  onSuccess: (response: SegmentResponse) => void;
-  onError: (reason?: unknown) => void;
-};
