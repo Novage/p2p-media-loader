@@ -21,7 +21,6 @@ export class Core<TStream extends Stream = Stream> {
     cachedSegmentExpiration: 120,
     cachedSegmentsCount: 50,
   };
-  private position = 0;
   private readonly bandwidthApproximator = new BandwidthApproximator();
   private readonly mainStreamLoader = new HybridLoader(
     this.settings,
@@ -90,7 +89,6 @@ export class Core<TStream extends Stream = Stream> {
 
   destroy(): void {
     this.streams.clear();
-    this.position = 0;
     this.mainStreamLoader.clear();
     this.secondaryStreamLoader.clear();
     this.manifestResponseUrl = undefined;
