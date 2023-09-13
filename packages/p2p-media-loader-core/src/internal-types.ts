@@ -1,4 +1,5 @@
 import { Segment } from "./types";
+import { PeerCommandType } from "./enums";
 
 export type Playback = {
   position: number;
@@ -22,11 +23,6 @@ export type LoadBufferRanges = {
 };
 
 export type QueueItem = { segment: Segment; statuses: Set<SegmentLoadStatus> };
-
-export enum PeerCommandType {
-  SegmentMap,
-  SegmentRequest,
-}
 
 export type BasePeerCommand<T extends PeerCommandType = PeerCommandType> = {
   c: T;

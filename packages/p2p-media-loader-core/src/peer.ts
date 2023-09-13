@@ -6,7 +6,7 @@ import * as PeerUtil from "./peer-utils";
 export class Peer {
   readonly id: string;
   private readonly candidates = new Set<PeerCandidate>();
-  private connectedCandidate?: PeerCandidate;
+  private connection?: PeerCandidate;
   private segments = new Map<string, PeerSegmentStatus>();
 
   constructor(candidate: PeerCandidate) {
@@ -22,14 +22,14 @@ export class Peer {
   }
 
   private onCandidateConnect(candidate: PeerCandidate) {
-    if (this.connectedCandidate) {
+    if (this.connection) {
       candidate.destroy();
       return;
     }
-    this.connectedCandidate = candidate;
+    this.connection = candidate;
 
     for (const candidate of this.candidates) {
-      if (candidate !== this.connectedCandidate) {
+      if (candidate !== this.connection) {
         candidate.destroy();
         this.candidates.delete(candidate);
       }
@@ -37,7 +37,7 @@ export class Peer {
   }
 
   private onCandidateClose(candidate: PeerCandidate) {
-    if (this.connectedCandidate !== candidate) {
+    if (this.connection !== candidate) {
       this.candidates.delete(candidate);
       return;
     }
@@ -61,5 +61,10 @@ export class Peer {
       case PeerCommandType.SegmentRequest:
         break;
     }
+  }
+
+  private sendCommand(command: PeerCommand) {
+    if (!this.connection) return;
+    this.connection.send(JSON.stringify(command));
   }
 }

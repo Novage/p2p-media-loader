@@ -49,11 +49,8 @@ export class P2PLoader {
   private onTrackerUpdate: TrackerEventHandler<"update"> = (data) => {};
   private onTrackerPeerConnect: TrackerEventHandler<"peer"> = (candidate) => {
     const peer = this.peers.get(candidate.id);
-    if (peer) {
-      peer.addCandidate(candidate);
-      return;
-    }
-    this.peers.set(candidate.id, new Peer(candidate));
+    if (peer) peer.addCandidate(candidate);
+    else this.peers.set(candidate.id, new Peer(candidate));
   };
   private onTrackerWarning: TrackerEventHandler<"warning"> = (warning) => {};
   private onTrackerError: TrackerEventHandler<"error"> = (error) => {};
