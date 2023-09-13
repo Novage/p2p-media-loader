@@ -185,10 +185,10 @@ export class HybridLoader {
     return request;
   }
 
-  clear() {
+  destroy() {
     clearInterval(this.storageCleanUpIntervalId);
     this.storageCleanUpIntervalId = undefined;
-    void this.segmentStorage.clear();
+    void this.segmentStorage.destroy();
     this.httpLoader.abortAll();
     for (const request of this.pluginRequests.values()) {
       request.onError("Aborted");
