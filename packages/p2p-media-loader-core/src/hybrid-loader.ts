@@ -14,7 +14,7 @@ export class HybridLoader {
   private activeStream?: Readonly<StreamWithSegments>;
   private lastRequestedSegment?: Readonly<Segment>;
   private playback?: Playback;
-  private segmentAvgLength?: number;
+  private lastQueueProcessingTimeStamp?: number;
 
   constructor(
     private readonly settings: Settings,
@@ -45,10 +45,7 @@ export class HybridLoader {
     if (!this.playback) {
       this.playback = { position: segment.startTime, rate: 1 };
     }
-    if (stream !== this.activeStream) {
-      this.segmentAvgLength = computeSegmentAvgLength(stream);
-      this.activeStream = stream;
-    }
+    if (stream !== this.activeStream) this.activeStream = stream;
     this.lastRequestedSegment = segment;
     this.processQueue();
 
@@ -63,10 +60,19 @@ export class HybridLoader {
     return request.responsePromise;
   }
 
-  private processQueue() {
+  private processQueue(force = true) {
     if (!this.activeStream || !this.lastRequestedSegment || !this.playback) {
       return;
     }
+    const now = performance.now();
+    if (
+      !force &&
+      this.lastQueueProcessingTimeStamp !== undefined &&
+      now - this.lastQueueProcessingTimeStamp >= 950
+    ) {
+      return;
+    }
+    this.lastQueueProcessingTimeStamp = now;
 
     const { queue, queueSegmentIds } = Utils.generateQueue({
       segment: this.lastRequestedSegment,
@@ -151,19 +157,16 @@ export class HybridLoader {
     }
   }
 
-  updatePlayback(position: number, rate?: number) {
+  updatePlayback(position: number, rate: number) {
     if (!this.playback) return;
-    const isRateChanged = rate && this.playback.rate !== rate;
-    const isPositionSignificantlyChanged =
-      this.segmentAvgLength === undefined ||
-      Math.abs(position - this.playback.position) / this.segmentAvgLength >=
-        0.45;
+    const isRateChanged = this.playback.rate !== rate;
+    const isPositionChanged = this.playback.position !== position;
 
-    if (!isRateChanged && !isPositionSignificantlyChanged) return;
+    if (!isRateChanged && !isPositionChanged) return;
 
-    if (isPositionSignificantlyChanged) this.playback.position = position;
+    if (isPositionChanged) this.playback.position = position;
     if (isRateChanged) this.playback.rate = rate;
-    this.processQueue();
+    this.processQueue(false);
   }
 
   private createPluginSegmentRequest(segment: Segment) {
@@ -185,10 +188,10 @@ export class HybridLoader {
     return request;
   }
 
-  clear() {
+  destroy() {
     clearInterval(this.storageCleanUpIntervalId);
     this.storageCleanUpIntervalId = undefined;
-    void this.segmentStorage.clear();
+    void this.segmentStorage.destroy();
     this.httpLoader.abortAll();
     for (const request of this.pluginRequests.values()) {
       request.onError("Aborted");
@@ -203,12 +206,3 @@ type Request = {
   onSuccess: (response: SegmentResponse) => void;
   onError: (reason?: unknown) => void;
 };
-
-function computeSegmentAvgLength(stream: StreamWithSegments) {
-  if (!stream.segments.size) return;
-  let sum = 0;
-  for (const segment of stream.segments.values()) {
-    sum += segment.endTime - segment.startTime;
-  }
-  return sum / stream.segments.size;
-}

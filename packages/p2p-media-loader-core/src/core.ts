@@ -21,16 +21,12 @@ export class Core<TStream extends Stream = Stream> {
     cachedSegmentExpiration: 120,
     cachedSegmentsCount: 50,
   };
-  private position = 0;
   private readonly bandwidthApproximator = new BandwidthApproximator();
   private readonly mainStreamLoader = new HybridLoader(
     this.settings,
     this.bandwidthApproximator
   );
-  private readonly secondaryStreamLoader = new HybridLoader(
-    this.settings,
-    this.bandwidthApproximator
-  );
+  private secondaryStreamLoader?: HybridLoader;
 
   setManifestResponseUrl(url: string): void {
     this.manifestResponseUrl = url.split("?")[0];
@@ -69,30 +65,32 @@ export class Core<TStream extends Stream = Stream> {
   loadSegment(segmentLocalId: string): Promise<SegmentResponse> {
     const { segment, stream } = this.identifySegment(segmentLocalId);
 
-    const loader =
-      stream.type === "main"
-        ? this.mainStreamLoader
-        : this.secondaryStreamLoader;
+    let loader: HybridLoader;
+    if (stream.type === "main") {
+      loader = this.mainStreamLoader;
+    } else {
+      this.secondaryStreamLoader =
+        this.secondaryStreamLoader ??
+        new HybridLoader(this.settings, this.bandwidthApproximator);
+      loader = this.secondaryStreamLoader;
+    }
     return loader.loadSegment(segment, stream);
   }
 
   abortSegmentLoading(segmentId: string): void {
     this.mainStreamLoader.abortSegment(segmentId);
-    this.secondaryStreamLoader.abortSegment(segmentId);
+    this.secondaryStreamLoader?.abortSegment(segmentId);
   }
 
   updatePlayback(position: number, rate: number): void {
     this.mainStreamLoader.updatePlayback(position, rate);
-    this.secondaryStreamLoader.updatePlayback(position, rate);
-
-    // TODO: update playback position when the live stream is updated
+    this.secondaryStreamLoader?.updatePlayback(position, rate);
   }
 
   destroy(): void {
     this.streams.clear();
-    this.position = 0;
-    this.mainStreamLoader.clear();
-    this.secondaryStreamLoader.clear();
+    this.mainStreamLoader.destroy();
+    this.secondaryStreamLoader?.destroy();
     this.manifestResponseUrl = undefined;
   }
 
