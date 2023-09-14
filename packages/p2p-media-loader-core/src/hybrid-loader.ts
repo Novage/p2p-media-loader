@@ -1,5 +1,5 @@
 import { Segment, SegmentResponse, StreamWithSegments } from "./index";
-import { HttpLoader, loadSegmentHttp } from "./http-loader";
+import { loadSegmentHttp } from "./http-loader";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import { Settings } from "./types";
 import { BandwidthApproximator } from "./bandwidth-approximator";
@@ -8,7 +8,6 @@ import { RequestContainer } from "./request";
 import * as Utils from "./utils";
 
 export class HybridLoader {
-  private readonly httpLoader = new HttpLoader();
   private readonly requests = new RequestContainer();
   private readonly segmentStorage: SegmentsMemoryStorage;
   private storageCleanUpIntervalId?: number;
@@ -33,7 +32,7 @@ export class HybridLoader {
       return Utils.isSegmentActual(segment, bufferRanges);
     });
 
-    this.storageCleanUpIntervalId = setInterval(
+    this.storageCleanUpIntervalId = window.setInterval(
       () => this.segmentStorage.clear(),
       1000
     );
@@ -57,8 +56,7 @@ export class HybridLoader {
         bandwidth: this.bandwidthApproximator.getBandwidth(),
       };
     }
-    const request = this.createPluginSegmentRequest(segment);
-    return request.responsePromise;
+    return this.createPluginSegmentRequest(segment);
   }
 
   private processQueue(force = true) {
@@ -83,31 +81,20 @@ export class HybridLoader {
       isSegmentLoaded: (segmentId) => this.segmentStorage.has(segmentId),
     });
 
-    const bufferRanges = Utils.getLoadBufferRanges(
-      this.playback,
-      this.settings
+    this.requests.abortNotRequestedByEngine((segmentId) =>
+      queueSegmentIds.has(segmentId)
     );
-    for (const segmentId of this.getLoadingSegmentIds()) {
-      const segment = this.activeStream.segments.get(segmentId);
-      if (
-        !queueSegmentIds.has(segmentId) &&
-        !this.pluginRequests.has(segmentId) &&
-        !(segment && Utils.isSegmentActual(segment, bufferRanges))
-      ) {
-        this.abortSegment(segmentId);
-      }
-    }
 
     const { simultaneousHttpDownloads } = this.settings;
     for (const { segment, statuses } of queue) {
-      if (this.httpLoader.isLoading(segment.localId)) continue;
+      if (this.requests.isHttpRequested(segment.localId)) continue;
       if (statuses.has("high-demand")) {
-        if (this.httpLoader.getLoadingsAmount() < simultaneousHttpDownloads) {
+        if (this.requests.countHttpRequests() < simultaneousHttpDownloads) {
           void this.loadSegmentThroughHttp(segment);
           continue;
         }
         this.abortLastHttpLoadingAfter(queue, segment.localId);
-        if (this.httpLoader.getLoadingsAmount() < simultaneousHttpDownloads) {
+        if (this.requests.countHttpRequests() < simultaneousHttpDownloads) {
           void this.loadSegmentThroughHttp(segment);
         }
       }
@@ -115,44 +102,32 @@ export class HybridLoader {
     }
   }
 
-  getLoadingSegmentIds() {
-    return this.httpLoader.getLoadingSegmentIds();
-  }
-
   abortSegment(segmentId: string) {
-    this.httpLoader.abort(segmentId);
-    const request = this.pluginRequests.get(segmentId);
-    if (!request) return;
-    request.onError("Abort");
-    this.pluginRequests.delete(segmentId);
+    this.requests.abort(segmentId);
   }
 
   private async loadSegmentThroughHttp(segment: Segment) {
     const request = loadSegmentHttp(segment);
+    this.requests.addHybridLoaderRequest(segment, request);
     let data: ArrayBuffer | undefined;
     try {
-      data = loadSegmentHttp();
+      data = await request.promise;
     } catch (err) {
       // TODO: handle abort
     }
-    // if (!data) return;
-    // this.bandwidthApproximator.addBytes(data.byteLength);
-    // void this.segmentStorage.storeSegment(segment, data);
-    // const request = this.pluginRequests.get(segment.localId);
-    // if (request) {
-    //   request.onSuccess({
-    //     bandwidth: this.bandwidthApproximator.getBandwidth(),
-    //     data,
-    //   });
-    // }
-    // this.pluginRequests.delete(segment.localId);
+    if (!data) return;
+    this.bandwidthApproximator.addBytes(data.byteLength);
+    void this.segmentStorage.storeSegment(segment, data);
+    this.requests.resolveEngineRequest(segment.localId, {
+      data,
+      bandwidth: this.bandwidthApproximator.getBandwidth(),
+    });
   }
 
   private abortLastHttpLoadingAfter(queue: QueueItem[], segmentId: string) {
-    for (let i = queue.length - 1; i >= 0; i--) {
-      const { segment } = queue[i];
+    for (const { segment } of arrayBackwards(queue)) {
       if (segment.localId === segmentId) break;
-      if (this.httpLoader.isLoading(segment.localId)) {
+      if (this.requests.isHttpRequested(segment.localId)) {
         this.abortSegment(segment.localId);
         break;
       }
@@ -172,33 +147,39 @@ export class HybridLoader {
   }
 
   private createPluginSegmentRequest(segment: Segment) {
-    let onSuccess: PlayerRequest["onSuccess"];
-    let onError: PlayerRequest["onError"];
-    const responsePromise = new Promise<SegmentResponse>((resolve, reject) => {
-      onSuccess = resolve;
-      onError = reject;
-    });
-    const request: PlayerRequest = {
-      responsePromise,
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      onSuccess: onSuccess!,
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      onError: onError!,
-    };
-
-    this.pluginRequests.set(segment.localId, request);
-    return request;
+    const request = getControlledPromise<SegmentResponse>();
+    this.requests.addPlayerRequest(segment, request);
+    return request.promise;
   }
 
   destroy() {
     clearInterval(this.storageCleanUpIntervalId);
     this.storageCleanUpIntervalId = undefined;
     void this.segmentStorage.destroy();
-    this.httpLoader.abortAll();
-    for (const request of this.pluginRequests.values()) {
-      request.onError("Aborted");
-    }
-    this.pluginRequests.clear();
+    this.requests.destroy();
     this.playback = undefined;
+  }
+}
+
+function getControlledPromise<T>() {
+  let onSuccess: (value: T) => void;
+  let onError: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolve, reject) => {
+    onSuccess = resolve;
+    onError = reject;
+  });
+
+  return {
+    promise,
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    onSuccess: onSuccess!,
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    onError: onError!,
+  };
+}
+
+function* arrayBackwards<T>(arr: T[]) {
+  for (let i = arr.length - 1; i >= 0; i--) {
+    yield arr[i];
   }
 }
