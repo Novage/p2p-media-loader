@@ -1,3 +1,5 @@
+import { LinkedMap } from "./linked-map";
+
 export type StreamType = "main" | "secondary";
 
 export type ByteRange = { start: number; end: number };
@@ -17,17 +19,31 @@ export type Stream = {
   readonly index: number;
 };
 
+export type ReadonlyLinkedMap<K, V extends object> = Pick<
+  LinkedMap<K, V>,
+  "has" | "keys" | "values" | "size"
+>;
+
 export type StreamWithSegments<
   TStream extends Stream = Stream,
-  TMap extends ReadonlyMap<string, Segment> = ReadonlyMap<string, Segment>
+  TMap extends ReadonlyLinkedMap<string, Segment> = LinkedMap<string, Segment>
 > = TStream & {
   readonly segments: TMap;
 };
 
+export type StreamWithReadonlySegments<TStream extends Stream = Stream> =
+  StreamWithSegments<TStream, ReadonlyLinkedMap<string, Segment>>;
+
 export type SegmentResponse = {
   data: ArrayBuffer;
-  url: string;
   bandwidth: number;
-  status: number;
-  ok: boolean;
+};
+
+export type Settings = {
+  highDemandBufferLength: number;
+  httpBufferLength: number;
+  p2pBufferLength: number;
+  simultaneousHttpDownloads: number;
+  cachedSegmentExpiration: number;
+  cachedSegmentsCount: number;
 };

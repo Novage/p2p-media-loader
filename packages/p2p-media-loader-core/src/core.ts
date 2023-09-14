@@ -1,21 +1,41 @@
-import { Loader } from "./loader";
-import { Stream, StreamWithSegments, Segment, SegmentResponse } from "./types";
-import { Playback } from "./internal-types";
+import { HybridLoader } from "./hybrid-loader";
+import {
+  Stream,
+  StreamWithSegments,
+  Segment,
+  SegmentResponse,
+  Settings,
+} from "./types";
+import * as Utils from "./utils";
+import { LinkedMap } from "./linked-map";
+import { BandwidthApproximator } from "./bandwidth-approximator";
 
 export class Core<TStream extends Stream = Stream> {
-  private readonly streams = new Map<
-    string,
-    StreamWithSegments<TStream, Map<string, Segment>>
-  >();
-  private readonly playback: Playback = { position: 0, rate: 1 };
-  private readonly loader: Loader = new Loader(this.streams);
+  private manifestResponseUrl?: string;
+  private readonly streams = new Map<string, StreamWithSegments<TStream>>();
+  private readonly settings: Settings = {
+    simultaneousHttpDownloads: 3,
+    highDemandBufferLength: 25,
+    httpBufferLength: 60,
+    p2pBufferLength: 60,
+    cachedSegmentExpiration: 120,
+    cachedSegmentsCount: 50,
+  };
+  private readonly bandwidthApproximator = new BandwidthApproximator();
+  private readonly mainStreamLoader = new HybridLoader(
+    this.settings,
+    this.bandwidthApproximator
+  );
+  private secondaryStreamLoader?: HybridLoader;
 
   setManifestResponseUrl(url: string): void {
-    this.loader.setManifestResponseUrl(url.split("?")[0]);
+    this.manifestResponseUrl = url.split("?")[0];
   }
 
   hasSegment(segmentLocalId: string): boolean {
-    return this.streams.has(segmentLocalId);
+    const { segment } =
+      Utils.getSegmentFromStreamsMap(this.streams, segmentLocalId) ?? {};
+    return !!segment;
   }
 
   getStream(streamLocalId: string): StreamWithSegments<TStream> | undefined {
@@ -26,7 +46,7 @@ export class Core<TStream extends Stream = Stream> {
     if (this.streams.has(stream.localId)) return;
     this.streams.set(stream.localId, {
       ...stream,
-      segments: new Map(),
+      segments: new LinkedMap<string, Segment>(),
     });
   }
 
@@ -38,24 +58,53 @@ export class Core<TStream extends Stream = Stream> {
     const stream = this.streams.get(streamLocalId);
     if (!stream) return;
 
-    addSegments?.forEach((s) => stream.segments.set(s.localId, s));
+    addSegments?.forEach((s) => stream.segments.addToEnd(s.localId, s));
     removeSegmentIds?.forEach((id) => stream.segments.delete(id));
   }
 
   loadSegment(segmentLocalId: string): Promise<SegmentResponse> {
-    return this.loader.loadSegment(segmentLocalId);
+    const { segment, stream } = this.identifySegment(segmentLocalId);
+
+    let loader: HybridLoader;
+    if (stream.type === "main") {
+      loader = this.mainStreamLoader;
+    } else {
+      this.secondaryStreamLoader =
+        this.secondaryStreamLoader ??
+        new HybridLoader(this.settings, this.bandwidthApproximator);
+      loader = this.secondaryStreamLoader;
+    }
+    return loader.loadSegment(segment, stream);
   }
 
   abortSegmentLoading(segmentId: string): void {
-    return this.loader.abortSegment(segmentId);
+    this.mainStreamLoader.abortSegment(segmentId);
+    this.secondaryStreamLoader?.abortSegment(segmentId);
   }
 
-  updatePlayback({ position, rate }: Partial<Playback>): void {
-    if (position !== undefined) this.playback.position = position;
-    if (rate !== undefined) this.playback.rate = rate;
+  updatePlayback(position: number, rate: number): void {
+    this.mainStreamLoader.updatePlayback(position, rate);
+    this.secondaryStreamLoader?.updatePlayback(position, rate);
   }
 
   destroy(): void {
     this.streams.clear();
+    this.mainStreamLoader.destroy();
+    this.secondaryStreamLoader?.destroy();
+    this.manifestResponseUrl = undefined;
+  }
+
+  private identifySegment(segmentId: string) {
+    if (!this.manifestResponseUrl) {
+      throw new Error("Manifest response url is undefined");
+    }
+
+    const { stream, segment } =
+      Utils.getSegmentFromStreamsMap(this.streams, segmentId) ?? {};
+    if (!segment || !stream) {
+      throw new Error(`Not found segment with id: ${segmentId}`);
+    }
+
+    return { segment, stream };
   }
 }

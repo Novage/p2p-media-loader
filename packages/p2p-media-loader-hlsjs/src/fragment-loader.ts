@@ -81,7 +81,12 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     });
     stats.total = stats.loaded = loadedBytes;
 
-    callbacks.onSuccess(this.response, this.stats, context, this.response);
+    callbacks.onSuccess(
+      { data: this.response.data, url: context.url },
+      this.stats,
+      context,
+      this.response
+    );
   }
 
   private handleError(thrownError: unknown) {
@@ -98,7 +103,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   }
 
   private abortInternal() {
-    if (!this.response?.ok && this.segmentId) {
+    if (!this.response && this.segmentId) {
       this.core.abortSegmentLoading(this.segmentId);
       this.stats.aborted = true;
     }

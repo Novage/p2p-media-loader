@@ -61,13 +61,18 @@ export class Engine {
     hls.on("hlsMediaAttached" as Events.MEDIA_ATTACHED, (event, data) => {
       const { media } = data;
       media.addEventListener("timeupdate", () => {
-        console.log("playhead time: ", media.currentTime);
-        this.core.updatePlayback({ position: media.currentTime });
+        // console.log("playhead time: ", media.currentTime);
+        this.core.updatePlayback(media.currentTime, media.playbackRate);
+      });
+
+      media.addEventListener("seeking", () => {
+        // console.log("playhead time: ", media.currentTime);
+        this.core.updatePlayback(media.currentTime, media.playbackRate);
       });
 
       media.addEventListener("ratechange", () => {
-        console.log("playback rate: ", media.playbackRate);
-        this.core.updatePlayback({ rate: media.playbackRate });
+        // console.log("playback rate: ", media.playbackRate);
+        this.core.updatePlayback(media.currentTime, media.playbackRate);
       });
     });
   }

@@ -39,8 +39,6 @@ const streamUrl = {
     "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/level_4.m3u8",
   dashLiveWithSeparateVideoAudio:
     "https://livesim.dashif.org/livesim/testpic_2s/Manifest.mpd",
-  hlsAkamaiLive:
-    "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8",
   mss: "https://playready.directtaps.net/smoothstreaming/SSWSS720H264/SuperSpeedway_720.ism/Manifest",
   audioOnly:
     "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/a1/prog_index.m3u8",

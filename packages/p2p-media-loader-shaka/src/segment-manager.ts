@@ -2,24 +2,24 @@ import * as Utils from "./stream-utils";
 import { HookedStream, StreamInfo, Stream } from "./types";
 import {
   Core,
-  StreamWithSegments,
+  StreamWithReadonlySegments,
   Segment,
   StreamType,
 } from "p2p-media-loader-core";
 
 export class SegmentManager {
   private readonly core: Core<Stream>;
-  private readonly isHls: boolean;
+  private streamInfo: Readonly<StreamInfo>;
 
   constructor(streamInfo: Readonly<StreamInfo>, core: Core<Stream>) {
     this.core = core;
-    this.isHls = streamInfo.protocol === "hls";
+    this.streamInfo = streamInfo;
   }
 
   setStream(shakaStream: HookedStream, type: StreamType, index = -1) {
     const localId = Utils.getStreamLocalIdFromShakaStream(
       shakaStream,
-      this.isHls
+      this.streamInfo.protocol === "hls"
     );
 
     this.core.addStreamIfNoneExists({
@@ -42,14 +42,14 @@ export class SegmentManager {
     const { segmentIndex } = stream.shakaStream;
     if (!segmentReferences && segmentIndex) {
       try {
-        return [...segmentIndex];
+        segmentReferences = [...segmentIndex];
       } catch (err) {
         return;
       }
     }
     if (!segmentReferences) return;
 
-    if (this.isHls) {
+    if (this.streamInfo.protocol === "hls") {
       this.processHlsSegmentReferences(stream, segmentReferences);
     } else {
       this.processDashSegmentReferences(stream, segmentReferences);
@@ -57,7 +57,7 @@ export class SegmentManager {
   }
 
   private processDashSegmentReferences(
-    managerStream: StreamWithSegments<Stream>,
+    managerStream: StreamWithReadonlySegments<Stream>,
     segmentReferences: shaka.media.SegmentReference[]
   ) {
     const staleSegmentsIds = new Set(managerStream.segments.keys());
@@ -83,7 +83,7 @@ export class SegmentManager {
   }
 
   private processHlsSegmentReferences(
-    managerStream: StreamWithSegments<Stream>,
+    managerStream: StreamWithReadonlySegments<Stream>,
     segmentReferences: shaka.media.SegmentReference[]
   ) {
     const segments = [...managerStream.segments.values()];

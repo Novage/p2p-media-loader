@@ -40,15 +40,19 @@ export class Engine {
     });
 
     player.addEventListener("loaded", () => {
-      const mediaElement = player.getMediaElement();
-      if (!mediaElement) return;
+      const media = player.getMediaElement();
+      if (!media) return;
 
-      mediaElement.addEventListener("timeupdate", () => {
-        console.log("playhead time: ", mediaElement.currentTime);
+      media.addEventListener("timeupdate", () => {
+        this.core.updatePlayback(media.currentTime, media.playbackRate);
       });
 
-      mediaElement.addEventListener("ratechange", () => {
-        console.log("playback rate: ", mediaElement.playbackRate);
+      media.addEventListener("ratechange", () => {
+        this.core.updatePlayback(media.currentTime, media.playbackRate);
+      });
+
+      media.addEventListener("seeking", () => {
+        this.core.updatePlayback(media.currentTime, media.playbackRate);
       });
     });
   }
