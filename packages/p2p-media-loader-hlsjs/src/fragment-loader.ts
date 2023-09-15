@@ -8,7 +8,12 @@ import type {
   LoaderStats,
 } from "hls.js";
 import * as Utils from "./utils";
-import { Core, FetchError, SegmentResponse } from "p2p-media-loader-core";
+import {
+  AbortError,
+  Core,
+  FetchError,
+  SegmentResponse,
+} from "p2p-media-loader-core";
 
 const DEFAULT_DOWNLOAD_LATENCY = 10;
 
@@ -68,7 +73,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     try {
       this.response = await this.core.loadSegment(this.segmentId);
     } catch (error) {
-      if (this.stats.aborted) return;
+      if (this.stats.aborted && error instanceof AbortError) return;
       return this.handleError(error);
     }
     if (!this.response) return;

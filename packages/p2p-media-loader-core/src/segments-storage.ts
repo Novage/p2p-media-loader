@@ -26,7 +26,7 @@ export class SegmentsMemoryStorage {
     });
   }
 
-  async getSegment(segmentId: string): Promise<ArrayBuffer | undefined> {
+  async getSegmentData(segmentId: string): Promise<ArrayBuffer | undefined> {
     const cacheItem = this.cache.get(segmentId);
     if (cacheItem === undefined) return undefined;
 
@@ -34,8 +34,8 @@ export class SegmentsMemoryStorage {
     return cacheItem.data;
   }
 
-  has(segmentId: string) {
-    return this.cache.has(segmentId);
+  async getStoredSegmentIds() {
+    return new Set<string>([...this.cache.keys()]);
   }
 
   async clear(): Promise<boolean> {

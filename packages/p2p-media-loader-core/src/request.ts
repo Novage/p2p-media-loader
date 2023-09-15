@@ -1,4 +1,5 @@
 import { Segment, SegmentResponse } from "./types";
+import { AbortError } from "./errors";
 
 type EngineRequest = {
   promise: Promise<SegmentResponse>;
@@ -27,16 +28,10 @@ type Request = {
   engineRequest?: Readonly<EngineRequest>;
 };
 
-function isHybridLoaderRequest(
-  request: HybridLoaderRequest | EngineRequest
-): request is HybridLoaderRequest {
-  return !!(request as HybridLoaderRequest).type;
-}
-
 export class RequestContainer {
   private readonly requests = new Map<string, Request>();
 
-  addHybridLoaderRequest(segment: Segment, loaderRequest: HybridLoaderRequest) {
+  addLoaderRequest(segment: Segment, loaderRequest: HybridLoaderRequest) {
     const segmentId = segment.localId;
     const existingRequest = this.requests.get(segmentId);
     if (existingRequest) {
@@ -47,21 +42,29 @@ export class RequestContainer {
         loaderRequest,
       });
     }
-    loaderRequest.promise.finally(() => this.requests.delete(segmentId));
+    loaderRequest.promise.finally(() => {
+      const request = this.requests.get(segmentId);
+      delete request?.loaderRequest;
+      if (request) this.clearRequest(request);
+    });
   }
 
-  addPlayerRequest(segment: Segment, engineRequest: EngineRequest) {
+  addEngineRequest(segment: Segment, engineRequest: EngineRequest) {
     const segmentId = segment.localId;
-    const existingRequest = this.requests.get(segmentId);
-    if (existingRequest) {
-      existingRequest.engineRequest = engineRequest;
+    const requestItem = this.requests.get(segmentId);
+    if (requestItem) {
+      requestItem.engineRequest = engineRequest;
     } else {
       this.requests.set(segmentId, {
         segment,
         engineRequest,
       });
     }
-    engineRequest.promise.finally(() => this.requests.delete(segmentId));
+    engineRequest.promise.finally(() => {
+      const request = this.requests.get(segmentId);
+      delete request?.engineRequest;
+      if (request) this.clearRequest(request);
+    });
   }
 
   get(segmentId: string) {
@@ -99,15 +102,27 @@ export class RequestContainer {
     return count;
   }
 
-  abort(segmentId: string) {
+  abortEngineRequest(segmentId: string) {
     const request = this.requests.get(segmentId);
     if (!request) return;
 
-    request.engineRequest?.onError(new Error("Aborted"));
+    request.engineRequest?.onError(new AbortError());
+  }
+
+  abortLoaderRequest(segmentId: string) {
+    const request = this.requests.get(segmentId);
+    if (!request) return;
+
     request.loaderRequest?.abort();
   }
 
-  abortNotRequestedByEngine(isLocked: (segmentId: string) => boolean) {
+  private clearRequest(request: Request): void {
+    if (!request.engineRequest && !request.loaderRequest) {
+      this.requests.delete(request.segment.localId);
+    }
+  }
+
+  abortAllNotRequestedByEngine(isLocked: (segmentId: string) => boolean) {
     for (const {
       loaderRequest,
       engineRequest,

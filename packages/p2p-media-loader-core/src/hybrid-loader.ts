@@ -1,11 +1,12 @@
 import { Segment, SegmentResponse, StreamWithSegments } from "./index";
-import { loadSegmentHttp } from "./http-loader";
+import { loadSegmentThroughHttp } from "./http-loader";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import { Settings } from "./types";
 import { BandwidthApproximator } from "./bandwidth-approximator";
 import { Playback, QueueItem } from "./internal-types";
 import { RequestContainer } from "./request";
 import * as Utils from "./utils";
+import { AbortError, FetchError } from "./errors";
 
 export class HybridLoader {
   private readonly requests = new RequestContainer();
@@ -38,7 +39,7 @@ export class HybridLoader {
     );
   }
 
-  async loadSegment(
+  async loadSegmentByEngine(
     segment: Readonly<Segment>,
     stream: Readonly<StreamWithSegments>
   ): Promise<SegmentResponse> {
@@ -47,19 +48,23 @@ export class HybridLoader {
     }
     if (stream !== this.activeStream) this.activeStream = stream;
     this.lastRequestedSegment = segment;
-    this.processQueue();
+    void this.processQueue();
 
-    const storageData = await this.segmentStorage.getSegment(segment.localId);
+    const storageData = await this.segmentStorage.getSegmentData(
+      segment.localId
+    );
     if (storageData) {
       return {
         data: storageData,
         bandwidth: this.bandwidthApproximator.getBandwidth(),
       };
     }
-    return this.createPluginSegmentRequest(segment);
+    const request = getControlledPromise<SegmentResponse>();
+    this.requests.addEngineRequest(segment, request);
+    return request.promise;
   }
 
-  private processQueue(force = true) {
+  private async processQueue(force = true) {
     if (!this.activeStream || !this.lastRequestedSegment || !this.playback) {
       return;
     }
@@ -73,15 +78,16 @@ export class HybridLoader {
     }
     this.lastQueueProcessingTimeStamp = now;
 
+    const storedSegmentIds = await this.segmentStorage.getStoredSegmentIds();
     const { queue, queueSegmentIds } = Utils.generateQueue({
       segment: this.lastRequestedSegment,
       stream: this.activeStream,
       playback: this.playback,
       settings: this.settings,
-      isSegmentLoaded: (segmentId) => this.segmentStorage.has(segmentId),
+      isSegmentLoaded: (segmentId) => storedSegmentIds.has(segmentId),
     });
 
-    this.requests.abortNotRequestedByEngine((segmentId) =>
+    this.requests.abortAllNotRequestedByEngine((segmentId) =>
       queueSegmentIds.has(segmentId)
     );
 
@@ -102,18 +108,20 @@ export class HybridLoader {
     }
   }
 
-  abortSegment(segmentId: string) {
-    this.requests.abort(segmentId);
+  abortSegmentByEngine(segmentId: string) {
+    this.requests.abortEngineRequest(segmentId);
   }
 
   private async loadSegmentThroughHttp(segment: Segment) {
-    const request = loadSegmentHttp(segment);
-    this.requests.addHybridLoaderRequest(segment, request);
     let data: ArrayBuffer | undefined;
     try {
-      data = await request.promise;
+      const httpRequest = loadSegmentThroughHttp(segment);
+      this.requests.addLoaderRequest(segment, httpRequest);
+      data = await httpRequest.promise;
     } catch (err) {
-      // TODO: handle abort
+      if (err instanceof FetchError) {
+        // TODO: handle error
+      }
     }
     if (!data) return;
     this.bandwidthApproximator.addBytes(data.byteLength);
@@ -125,10 +133,12 @@ export class HybridLoader {
   }
 
   private abortLastHttpLoadingAfter(queue: QueueItem[], segmentId: string) {
-    for (const { segment } of arrayBackwards(queue)) {
-      if (segment.localId === segmentId) break;
-      if (this.requests.isHttpRequested(segment.localId)) {
-        this.abortSegment(segment.localId);
+    for (const {
+      segment: { localId: queueSegmentId },
+    } of arrayBackwards(queue)) {
+      if (queueSegmentId === segmentId) break;
+      if (this.requests.isHttpRequested(queueSegmentId)) {
+        this.requests.abortLoaderRequest(queueSegmentId);
         break;
       }
     }
@@ -143,13 +153,7 @@ export class HybridLoader {
 
     if (isPositionChanged) this.playback.position = position;
     if (isRateChanged) this.playback.rate = rate;
-    this.processQueue(false);
-  }
-
-  private createPluginSegmentRequest(segment: Segment) {
-    const request = getControlledPromise<SegmentResponse>();
-    this.requests.addPlayerRequest(segment, request);
-    return request.promise;
+    void this.processQueue(false);
   }
 
   destroy() {

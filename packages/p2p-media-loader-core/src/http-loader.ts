@@ -1,8 +1,10 @@
-import { FetchError } from "./errors";
+import { AbortError, FetchError } from "./errors";
 import { Segment } from "./types";
 import { HttpRequest } from "./request";
 
-export function loadSegmentHttp(segment: Segment): Readonly<HttpRequest> {
+export function loadSegmentThroughHttp(
+  segment: Segment
+): Readonly<HttpRequest> {
   const { promise, abortController } = fetchSegment(segment);
   return {
     type: "http",
@@ -13,7 +15,7 @@ export function loadSegmentHttp(segment: Segment): Readonly<HttpRequest> {
 
 function fetchSegment(segment: Segment) {
   const headers = new Headers();
-  const { url, byteRange } = segment;
+  const { url, byteRange, localId: segmentId } = segment;
 
   if (byteRange) {
     const { start, end } = byteRange;
@@ -25,17 +27,22 @@ function fetchSegment(segment: Segment) {
   const promise = fetch(url, {
     headers,
     signal: abortController.signal,
-  }).then((response) => {
-    if (!response.ok) {
+  })
+    .then((response) => {
+      if (response.ok) return response.arrayBuffer();
+
       throw new FetchError(
-        response.statusText ?? "Fetch, bad network response",
+        response.statusText ?? `Network response was not for ${segmentId}`,
         response.status,
         response
       );
-    }
-
-    return response.arrayBuffer();
-  });
+    })
+    .catch((error) => {
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new AbortError(`Segment fetch was aborted ${segmentId}`);
+      }
+      throw error;
+    });
 
   return { promise, abortController };
 }
