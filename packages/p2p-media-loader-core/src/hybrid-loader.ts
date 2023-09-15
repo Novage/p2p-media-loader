@@ -17,6 +17,7 @@ export class HybridLoader {
   private lastQueueProcessingTimeStamp?: number;
 
   constructor(
+    private readonly segments: Map<string, StreamWithSegments>,
     private readonly settings: Settings,
     private readonly bandwidthApproximator: BandwidthApproximator
   ) {
@@ -32,7 +33,7 @@ export class HybridLoader {
       return Utils.isSegmentActual(segment, bufferRanges);
     });
 
-    this.storageCleanUpIntervalId = setInterval(
+    this.storageCleanUpIntervalId = window.setInterval(
       () => this.segmentStorage.clear(),
       1000
     );

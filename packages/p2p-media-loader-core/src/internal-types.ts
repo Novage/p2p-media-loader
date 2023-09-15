@@ -28,7 +28,7 @@ export type BasePeerCommand<T extends PeerCommandType = PeerCommandType> = {
   c: T;
 };
 
-export type PeerSegmentCommand =
+export type PeerSegmentRequestCommand =
   BasePeerCommand<PeerCommandType.SegmentRequest> & {
     i: string;
   };
@@ -41,4 +41,4 @@ export type PeerSegmentMapCommand =
     m: JsonSegmentMap;
   };
 
-export type PeerCommand = PeerSegmentCommand | PeerSegmentMapCommand;
+export type PeerCommand = PeerSegmentRequestCommand | PeerSegmentMapCommand;

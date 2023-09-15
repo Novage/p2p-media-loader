@@ -1,6 +1,6 @@
 import { PeerCandidate } from "bittorrent-tracker";
-import { PeerCommand } from "./internal-types";
-import { PeerSegmentStatus, PeerCommandType } from "./enums";
+import { PeerCommand, PeerSegmentRequestCommand } from "./internal-types";
+import { PeerCommandType, PeerSegmentStatus } from "./enums";
 import * as PeerUtil from "./peer-utils";
 
 export class Peer {
@@ -22,24 +22,12 @@ export class Peer {
   }
 
   private onCandidateConnect(candidate: PeerCandidate) {
-    if (this.connection) {
-      candidate.destroy();
-      return;
-    }
     this.connection = candidate;
-
-    for (const candidate of this.candidates) {
-      if (candidate !== this.connection) {
-        candidate.destroy();
-        this.candidates.delete(candidate);
-      }
-    }
   }
 
   private onCandidateClose(candidate: PeerCandidate) {
-    if (this.connection !== candidate) {
-      this.candidates.delete(candidate);
-      return;
+    if (this.connection === candidate) {
+      this.connection = undefined;
     }
   }
 
@@ -66,5 +54,13 @@ export class Peer {
   private sendCommand(command: PeerCommand) {
     if (!this.connection) return;
     this.connection.send(JSON.stringify(command));
+  }
+
+  requestSegment(segmentExternalId: string) {
+    const command: PeerSegmentRequestCommand = {
+      c: PeerCommandType.SegmentRequest,
+      i: segmentExternalId,
+    };
+    this.sendCommand(command);
   }
 }

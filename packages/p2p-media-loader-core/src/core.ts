@@ -23,6 +23,7 @@ export class Core<TStream extends Stream = Stream> {
   };
   private readonly bandwidthApproximator = new BandwidthApproximator();
   private readonly mainStreamLoader = new HybridLoader(
+    this.streams,
     this.settings,
     this.bandwidthApproximator
   );
@@ -71,7 +72,11 @@ export class Core<TStream extends Stream = Stream> {
     } else {
       this.secondaryStreamLoader =
         this.secondaryStreamLoader ??
-        new HybridLoader(this.settings, this.bandwidthApproximator);
+        new HybridLoader(
+          this.streams,
+          this.settings,
+          this.bandwidthApproximator
+        );
       loader = this.secondaryStreamLoader;
     }
     return loader.loadSegment(segment, stream);

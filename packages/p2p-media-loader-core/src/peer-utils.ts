@@ -3,6 +3,7 @@ import * as TypeGuard from "./type-guards";
 import * as Util from "./utils";
 import { PeerSegmentStatus } from "./enums";
 import * as RIPEMD160 from "ripemd160";
+import { Segment } from "./types";
 
 export function generatePeerId(): string {
   const PEER_ID_SYMBOLS =
@@ -54,4 +55,14 @@ export function getSegmentsFromPeerSegmentMapCommand(
     }
   }
   return segmentStatusMap;
+}
+
+export function getJsonSegmentsMapForCommand(
+  storedSegments: Map<string, { streamId: string; segment }>
+): JsonSegmentMap {
+  const jsonMap: JsonSegmentMap = {};
+
+  for (const segment of storedSegments.values()) {
+    const { externalId } = segment;
+  }
 }
