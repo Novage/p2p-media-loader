@@ -2,22 +2,30 @@ import { PeerCandidate } from "bittorrent-tracker";
 import {
   JsonSegmentAnnouncementMap,
   PeerCommand,
-  PeerSegmentRequestCommand,
   PeerSegmentAnnouncementCommand,
+  PeerSegmentCommand,
+  PeerSendSegmentCommand,
 } from "./internal-types";
 import { PeerCommandType, PeerSegmentStatus } from "./enums";
 import * as PeerUtil from "./peer-utils";
 
+const webRtcMaxMessageSize: number = 64 * 1024 - 1;
+
+type PeerEventHandlers = {
+  onPeerConnected: (peer: Peer) => void;
+  onSegmentRequested: (peer: Peer, segmentId: string) => void;
+};
+
 export class Peer {
   readonly id: string;
-  private readonly streamExternalId: string;
   private readonly candidates = new Set<PeerCandidate>();
   private connection?: PeerCandidate;
+  private readonly eventHandlers: PeerEventHandlers;
   private segments = new Map<string, PeerSegmentStatus>();
 
-  constructor(streamExternalId: string, candidate: PeerCandidate) {
-    this.streamExternalId = streamExternalId;
+  constructor(candidate: PeerCandidate, eventHandlers: PeerEventHandlers) {
     this.id = candidate.id;
+    this.eventHandlers = eventHandlers;
     this.addCandidate(candidate);
   }
 
@@ -34,6 +42,7 @@ export class Peer {
 
   private onCandidateConnect(candidate: PeerCandidate) {
     this.connection = candidate;
+    this.eventHandlers.onPeerConnected(this);
   }
 
   private onCandidateClose(candidate: PeerCandidate) {
@@ -56,6 +65,7 @@ export class Peer {
         break;
 
       case PeerCommandType.SegmentRequest:
+        this.eventHandlers.onSegmentRequested(this, command.i);
         break;
     }
   }
@@ -66,7 +76,7 @@ export class Peer {
   }
 
   requestSegment(segmentExternalId: string) {
-    const command: PeerSegmentRequestCommand = {
+    const command: PeerSegmentCommand = {
       c: PeerCommandType.SegmentRequest,
       i: segmentExternalId,
     };
@@ -77,6 +87,39 @@ export class Peer {
     const command: PeerSegmentAnnouncementCommand = {
       c: PeerCommandType.SegmentsAnnouncement,
       m: map,
+    };
+    this.sendCommand(command);
+  }
+
+  sendSegmentData(segmentExternalId: string, data: ArrayBuffer) {
+    if (!this.connection) return;
+    const command: PeerSendSegmentCommand = {
+      c: PeerCommandType.SegmentData,
+      i: segmentExternalId,
+      s: data.byteLength,
+    };
+
+    this.sendCommand(command);
+
+    let bytesLeft = data.byteLength;
+    while (bytesLeft > 0) {
+      const bytesToSend =
+        bytesLeft >= webRtcMaxMessageSize ? webRtcMaxMessageSize : bytesLeft;
+      const buffer = Buffer.from(
+        data,
+        data.byteLength - bytesLeft,
+        bytesToSend
+      );
+
+      this.connection.send(buffer);
+      bytesLeft -= bytesToSend;
+    }
+  }
+
+  sendSegmentAbsent(segmentExternalId: string) {
+    const command: PeerSegmentCommand = {
+      c: PeerCommandType.SegmentAbsent,
+      i: segmentExternalId,
     };
     this.sendCommand(command);
   }

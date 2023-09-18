@@ -6,6 +6,7 @@ export class SegmentsMemoryStorage {
     { segment: Segment; data: ArrayBuffer; lastAccessed: number }
   >();
   private isSegmentLockedPredicate?: (segment: Segment) => boolean;
+  private onUpdateSubscriptions: (() => void)[] = [];
 
   constructor(
     private settings: {
@@ -18,12 +19,17 @@ export class SegmentsMemoryStorage {
     this.isSegmentLockedPredicate = predicate;
   }
 
+  subscribeOnUpdate(callback: () => void) {
+    this.onUpdateSubscriptions.push(callback);
+  }
+
   async storeSegment(segment: Segment, data: ArrayBuffer) {
     this.cache.set(segment.localId, {
       segment,
       data,
       lastAccessed: performance.now(),
     });
+    this.onUpdateSubscriptions.forEach((c) => c());
   }
 
   async getSegment(segmentId: string): Promise<ArrayBuffer | undefined> {
@@ -78,10 +84,14 @@ export class SegmentsMemoryStorage {
     }
 
     segmentsToDelete.forEach((id) => this.cache.delete(id));
+    if (segmentsToDelete.length) {
+      this.onUpdateSubscriptions.forEach((c) => c());
+    }
     return segmentsToDelete.length > 0;
   }
 
   public async destroy() {
     this.cache.clear();
+    this.onUpdateSubscriptions = [];
   }
 }

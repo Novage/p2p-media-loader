@@ -45,6 +45,15 @@ export class HybridLoader {
     this.streamManifestUrl = url;
   }
 
+  private createP2PLoader(stream: StreamWithSegments) {
+    if (!this.streamManifestUrl) return;
+    this.p2pLoader = new P2PLoader(
+      this.streamManifestUrl,
+      stream,
+      this.segmentStorage
+    );
+  }
+
   async loadSegment(
     segment: Readonly<Segment>,
     stream: Readonly<StreamWithSegments>
@@ -54,14 +63,7 @@ export class HybridLoader {
     }
     if (stream !== this.activeStream) {
       this.activeStream = stream;
-      if (this.streamManifestUrl) {
-        const streamExternalId = Utils.getStreamExternalId(
-          stream,
-          this.streamManifestUrl
-        );
-        this.p2pLoader = new P2PLoader(streamExternalId);
-        void this.updateSegmentsLoadingState();
-      }
+      this.createP2PLoader(stream);
     }
     this.lastRequestedSegment = segment;
     void this.processQueue();
@@ -154,7 +156,6 @@ export class HybridLoader {
     if (!data) return;
     this.bandwidthApproximator.addBytes(data.byteLength);
     void this.segmentStorage.storeSegment(segment, data);
-    void this.updateSegmentsLoadingState();
     const request = this.pluginRequests.get(segment.localId);
     if (request) {
       request.onSuccess({
@@ -205,23 +206,6 @@ export class HybridLoader {
 
     this.pluginRequests.set(segment.localId, request);
     return request;
-  }
-
-  private async updateSegmentsLoadingState() {
-    if (!this.streamManifestUrl || !this.activeStream || !this.p2pLoader) {
-      return;
-    }
-    const storedSegmentIds = await this.segmentStorage.getStoredSegmentIds();
-    const loaded: Segment[] = [];
-
-    for (const id of storedSegmentIds) {
-      const segment = this.activeStream.segments.get(id);
-      if (!segment) continue;
-
-      loaded.push(segment);
-    }
-
-    void this.p2pLoader.updateSegmentsLoadingState(loaded, []);
   }
 
   destroy() {
