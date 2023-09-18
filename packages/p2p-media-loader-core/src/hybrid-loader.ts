@@ -1,5 +1,6 @@
 import { Segment, SegmentResponse, StreamWithSegments } from "./index";
 import { HttpLoader } from "./http-loader";
+import { P2PLoader } from "./p2p-loader";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import { Settings } from "./types";
 import { BandwidthApproximator } from "./bandwidth-approximator";
@@ -7,7 +8,9 @@ import { Playback, QueueItem } from "./internal-types";
 import * as Utils from "./utils";
 
 export class HybridLoader {
+  private streamManifestUrl?: string;
   private readonly httpLoader = new HttpLoader();
+  private p2pLoader?: P2PLoader;
   private readonly pluginRequests = new Map<string, Request>();
   private readonly segmentStorage: SegmentsMemoryStorage;
   private storageCleanUpIntervalId?: number;
@@ -17,7 +20,6 @@ export class HybridLoader {
   private lastQueueProcessingTimeStamp?: number;
 
   constructor(
-    private readonly segments: Map<string, StreamWithSegments>,
     private readonly settings: Settings,
     private readonly bandwidthApproximator: BandwidthApproximator
   ) {
@@ -39,6 +41,10 @@ export class HybridLoader {
     );
   }
 
+  setStreamManifestUrl(url: string) {
+    this.streamManifestUrl = url;
+  }
+
   async loadSegment(
     segment: Readonly<Segment>,
     stream: Readonly<StreamWithSegments>
@@ -46,7 +52,19 @@ export class HybridLoader {
     if (!this.playback) {
       this.playback = { position: segment.startTime, rate: 1 };
     }
-    if (stream !== this.activeStream) this.activeStream = stream;
+    if (stream !== this.activeStream) {
+      this.activeStream = stream;
+      if (this.streamManifestUrl) {
+        const streamExternalId = Utils.getStreamExternalId(
+          stream,
+          this.streamManifestUrl
+        );
+        this.p2pLoader = new P2PLoader(
+          streamExternalId,
+          this.getLoadedAndLoadingSegments.bind(this)
+        );
+      }
+    }
     this.lastRequestedSegment = segment;
     this.processQueue();
 
@@ -61,7 +79,7 @@ export class HybridLoader {
     return request.responsePromise;
   }
 
-  private processQueue(force = true) {
+  private async processQueue(force = true) {
     if (!this.activeStream || !this.lastRequestedSegment || !this.playback) {
       return;
     }
@@ -75,12 +93,13 @@ export class HybridLoader {
     }
     this.lastQueueProcessingTimeStamp = now;
 
+    const storedSegmentIds = await this.segmentStorage.getStoredSegmentIds();
     const { queue, queueSegmentIds } = Utils.generateQueue({
       segment: this.lastRequestedSegment,
       stream: this.activeStream,
       playback: this.playback,
       settings: this.settings,
-      isSegmentLoaded: (segmentId) => this.segmentStorage.has(segmentId),
+      isSegmentLoaded: (segmentId) => storedSegmentIds.has(segmentId),
     });
 
     const bufferRanges = Utils.getLoadBufferRanges(
@@ -187,6 +206,21 @@ export class HybridLoader {
 
     this.pluginRequests.set(segment.localId, request);
     return request;
+  }
+
+  private async getLoadedAndLoadingSegments() {
+    if (!this.streamManifestUrl || !this.activeStream) return;
+    const storedSegmentIds = await this.segmentStorage.getStoredSegmentIds();
+    const loaded: Segment[] = [];
+
+    for (const id of storedSegmentIds) {
+      const segment = this.activeStream.segments.get(id);
+      if (!segment) continue;
+
+      loaded.push(segment);
+    }
+
+    return { loaded, httpLoading: [] };
   }
 
   destroy() {

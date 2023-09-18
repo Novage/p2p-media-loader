@@ -50,19 +50,35 @@ export function getSegmentsFromPeerSegmentMapCommand(
     for (let i = 0; i < segmentIds.length; i++) {
       const segmentId = segmentIds[i];
       const segmentStatus = statuses[i];
-      const segmentFullId = Util.getSegmentFullExternalId(streamId, segmentId);
+      const segmentFullId = Util.getSegmentFullExternalId(
+        streamId,
+        segmentId.toString()
+      );
       segmentStatusMap.set(segmentFullId, segmentStatus);
     }
   }
   return segmentStatusMap;
 }
 
-export function getJsonSegmentsMapForCommand(
-  storedSegments: Map<string, { streamId: string; segment }>
+export function getJsonSegmentsMapForPeerCommand(
+  streamExternalId: string,
+  storedSegments: Segment[],
+  loadingByHttpSegments: Segment[]
 ): JsonSegmentMap {
-  const jsonMap: JsonSegmentMap = {};
+  const segmentIds: number[] = [];
+  const segmentStatuses: PeerSegmentStatus[] = [];
 
-  for (const segment of storedSegments.values()) {
-    const { externalId } = segment;
+  for (const segment of storedSegments) {
+    segmentIds.push(segment.externalId);
+    segmentStatuses.push(PeerSegmentStatus.Loaded);
   }
+
+  for (const segment of loadingByHttpSegments) {
+    segmentIds.push(segment.externalId);
+    segmentStatuses.push(PeerSegmentStatus.LoadingByHttp);
+  }
+
+  return {
+    [streamExternalId]: [segmentIds, segmentStatuses],
+  };
 }

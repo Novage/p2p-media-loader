@@ -22,8 +22,7 @@ export class Core<TStream extends Stream = Stream> {
     cachedSegmentsCount: 50,
   };
   private readonly bandwidthApproximator = new BandwidthApproximator();
-  private readonly mainStreamLoader = new HybridLoader(
-    this.streams,
+  private readonly mainStreamLoader: HybridLoader = new HybridLoader(
     this.settings,
     this.bandwidthApproximator
   );
@@ -31,6 +30,8 @@ export class Core<TStream extends Stream = Stream> {
 
   setManifestResponseUrl(url: string): void {
     this.manifestResponseUrl = url.split("?")[0];
+    this.mainStreamLoader.setStreamManifestUrl(this.manifestResponseUrl);
+    this.secondaryStreamLoader?.setStreamManifestUrl(this.manifestResponseUrl);
   }
 
   hasSegment(segmentLocalId: string): boolean {
@@ -72,11 +73,7 @@ export class Core<TStream extends Stream = Stream> {
     } else {
       this.secondaryStreamLoader =
         this.secondaryStreamLoader ??
-        new HybridLoader(
-          this.streams,
-          this.settings,
-          this.bandwidthApproximator
-        );
+        new HybridLoader(this.settings, this.bandwidthApproximator);
       loader = this.secondaryStreamLoader;
     }
     return loader.loadSegment(segment, stream);

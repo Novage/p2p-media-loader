@@ -34,7 +34,7 @@ export type PeerSegmentRequestCommand =
   };
 
 // {[streamId]: [segmentIds[]; segmentStatuses[]]}
-export type JsonSegmentMap = { [key: string]: [string[], number[]] };
+export type JsonSegmentMap = { [key: string]: [number[], number[]] };
 
 export type PeerSegmentMapCommand =
   BasePeerCommand<PeerCommandType.SegmentMap> & {

@@ -34,8 +34,12 @@ export class SegmentsMemoryStorage {
     return cacheItem.data;
   }
 
-  has(segmentId: string) {
-    return this.cache.has(segmentId);
+  async getStoredSegmentIds() {
+    const segmentIds = new Set<string>();
+    for (const segmentId of this.cache.keys()) {
+      segmentIds.add(segmentId);
+    }
+    return segmentIds;
   }
 
   async clear(): Promise<boolean> {

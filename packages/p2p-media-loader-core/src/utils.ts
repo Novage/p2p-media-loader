@@ -8,7 +8,7 @@ import {
 } from "./internal-types";
 
 export function getStreamExternalId(
-  stream: Stream,
+  stream: Readonly<Stream>,
   manifestResponseUrl: string
 ): string {
   const { type, index } = stream;

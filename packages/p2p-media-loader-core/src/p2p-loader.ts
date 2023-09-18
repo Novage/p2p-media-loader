@@ -2,20 +2,28 @@ import TrackerClient, { TrackerEventHandler } from "bittorrent-tracker";
 import * as RIPEMD160 from "ripemd160";
 import { Peer } from "./peer";
 import * as PeerUtil from "./peer-utils";
+import { Segment } from "./types";
+import { JsonSegmentMap } from "./internal-types";
 
 export class P2PLoader {
-  private streamId?: string;
   private streamHash?: string;
   private peerHash?: string;
   private trackerClient?: TrackerClient;
   private readonly peers = new Map<string, Peer>();
+  private segmentsMap?: JsonSegmentMap;
 
-  setStreamId(streamId: string) {
-    if (this.streamId === streamId) return;
-
-    this.streamId = streamId;
+  constructor(
+    private readonly streamExternalId: string,
+    private readonly getLoadedSegments: () => Promise<
+      | {
+          loaded: Segment[];
+          httpLoading: Segment[];
+        }
+      | undefined
+    >
+  ) {
     const peerId = PeerUtil.generatePeerId();
-    this.streamHash = getHash(streamId);
+    this.streamHash = getHash(this.streamExternalId);
     this.peerHash = getHash(peerId);
 
     this.trackerClient = new TrackerClient({
@@ -54,6 +62,16 @@ export class P2PLoader {
   };
   private onTrackerWarning: TrackerEventHandler<"warning"> = (warning) => {};
   private onTrackerError: TrackerEventHandler<"error"> = (error) => {};
+
+  private async updateSegmentMap() {
+    const { loaded = [], httpLoading = [] } =
+      (await this.getLoadedSegments()) ?? {};
+    this.segmentsMap = PeerUtil.getJsonSegmentsMapForPeerCommand(
+      this.streamExternalId,
+      loaded,
+      httpLoading
+    );
+  }
 }
 
 function getHash(data: string) {
