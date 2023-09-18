@@ -1,4 +1,4 @@
-import { JsonSegmentMap, PeerCommand } from "./internal-types";
+import { JsonSegmentAnnouncementMap, PeerCommand } from "./internal-types";
 import * as TypeGuard from "./type-guards";
 import * as Util from "./utils";
 import { PeerSegmentStatus } from "./enums";
@@ -43,7 +43,7 @@ export function getPeerCommandFromArrayBuffer(
 }
 
 export function getSegmentsFromPeerAnnouncementMap(
-  map: JsonSegmentMap
+  map: JsonSegmentAnnouncementMap
 ): Map<string, PeerSegmentStatus> {
   const segmentStatusMap = new Map<string, PeerSegmentStatus>();
   for (const [streamId, [segmentIds, statuses]] of Object.entries(map)) {
@@ -64,7 +64,7 @@ export function getJsonSegmentsAnnouncementMap(
   streamExternalId: string,
   storedSegments: Segment[],
   loadingByHttpSegments: Segment[]
-): JsonSegmentMap {
+): JsonSegmentAnnouncementMap {
   const segmentIds: number[] = [];
   const segmentStatuses: PeerSegmentStatus[] = [];
 

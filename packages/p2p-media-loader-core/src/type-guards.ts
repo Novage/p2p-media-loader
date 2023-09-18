@@ -1,20 +1,25 @@
 import {
-  PeerSegmentCommand,
+  PeerSegmentRequestCommand,
   PeerCommand,
-  PeerCommandType,
-  PeerSegmentMapCommand,
+  PeerSegmentAnnouncementCommand,
 } from "./internal-types";
+import { PeerCommandType } from "./enums";
 
 export function isPeerSegmentCommand(
   command: object
-): command is PeerSegmentCommand {
-  return (command as PeerSegmentCommand).c === PeerCommandType.SegmentRequest;
+): command is PeerSegmentRequestCommand {
+  return (
+    (command as PeerSegmentRequestCommand).c === PeerCommandType.SegmentRequest
+  );
 }
 
 export function isPeerSegmentMapCommand(
   command: object
-): command is PeerSegmentMapCommand {
-  return (command as PeerSegmentMapCommand).c === PeerCommandType.SegmentMap;
+): command is PeerSegmentAnnouncementCommand {
+  return (
+    (command as PeerSegmentAnnouncementCommand).c ===
+    PeerCommandType.SegmentsAnnouncement
+  );
 }
 
 export function isPeerCommand(command: object): command is PeerCommand {
