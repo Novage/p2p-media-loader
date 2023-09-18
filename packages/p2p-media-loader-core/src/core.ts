@@ -15,9 +15,9 @@ export class Core<TStream extends Stream = Stream> {
   private readonly streams = new Map<string, StreamWithSegments<TStream>>();
   private readonly settings: Settings = {
     simultaneousHttpDownloads: 3,
-    highDemandBufferLength: 25,
-    httpBufferLength: 60,
-    p2pBufferLength: 60,
+    highDemandTimeWindow: 25,
+    httpDownloadTimeWindow: 60,
+    p2pDownloadTimeWindow: 60,
     cachedSegmentExpiration: 120,
     cachedSegmentsCount: 50,
   };
@@ -76,12 +76,12 @@ export class Core<TStream extends Stream = Stream> {
         new HybridLoader(this.settings, this.bandwidthApproximator);
       loader = this.secondaryStreamLoader;
     }
-    return loader.loadSegment(segment, stream);
+    return loader.loadSegmentByEngine(segment, stream);
   }
 
   abortSegmentLoading(segmentId: string): void {
-    this.mainStreamLoader.abortSegment(segmentId);
-    this.secondaryStreamLoader?.abortSegment(segmentId);
+    this.mainStreamLoader.abortSegmentByEngine(segmentId);
+    this.secondaryStreamLoader?.abortSegmentByEngine(segmentId);
   }
 
   updatePlayback(position: number, rate: number): void {

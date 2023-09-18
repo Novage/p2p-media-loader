@@ -32,7 +32,7 @@ export class SegmentsMemoryStorage {
     this.onUpdateSubscriptions.forEach((c) => c());
   }
 
-  async getSegment(segmentId: string): Promise<ArrayBuffer | undefined> {
+  async getSegmentData(segmentId: string): Promise<ArrayBuffer | undefined> {
     const cacheItem = this.cache.get(segmentId);
     if (cacheItem === undefined) return undefined;
 

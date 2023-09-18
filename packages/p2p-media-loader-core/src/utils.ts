@@ -45,7 +45,7 @@ export function generateQueue({
   isSegmentLoaded: (segmentId: string) => boolean;
   settings: Pick<
     Settings,
-    "highDemandBufferLength" | "httpBufferLength" | "p2pBufferLength"
+    "highDemandTimeWindow" | "httpDownloadTimeWindow" | "p2pDownloadTimeWindow"
   >;
 }) {
   const bufferRanges = getLoadBufferRanges(playback, settings);
@@ -78,12 +78,15 @@ export function getLoadBufferRanges(
   playback: Readonly<Playback>,
   settings: Pick<
     Settings,
-    "highDemandBufferLength" | "httpBufferLength" | "p2pBufferLength"
+    "highDemandTimeWindow" | "httpDownloadTimeWindow" | "p2pDownloadTimeWindow"
   >
 ): LoadBufferRanges {
   const { position, rate } = playback;
-  const { highDemandBufferLength, httpBufferLength, p2pBufferLength } =
-    settings;
+  const {
+    highDemandTimeWindow,
+    httpDownloadTimeWindow,
+    p2pDownloadTimeWindow,
+  } = settings;
 
   const getRange = (position: number, rate: number, bufferLength: number) => {
     return {
@@ -92,9 +95,9 @@ export function getLoadBufferRanges(
     };
   };
   return {
-    highDemand: getRange(position, rate, highDemandBufferLength),
-    http: getRange(position, rate, httpBufferLength),
-    p2p: getRange(position, rate, p2pBufferLength),
+    highDemand: getRange(position, rate, highDemandTimeWindow),
+    http: getRange(position, rate, httpDownloadTimeWindow),
+    p2p: getRange(position, rate, p2pDownloadTimeWindow),
   };
 }
 

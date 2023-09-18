@@ -1,17 +1,18 @@
 import { Segment, SegmentResponse, StreamWithSegments } from "./index";
-import { HttpLoader } from "./http-loader";
+import { loadSegmentThroughHttp } from "./http-loader";
 import { P2PLoader } from "./p2p-loader";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import { Settings } from "./types";
 import { BandwidthApproximator } from "./bandwidth-approximator";
 import { Playback, QueueItem } from "./internal-types";
+import { RequestContainer } from "./request";
 import * as Utils from "./utils";
+import { AbortError, FetchError } from "./errors";
 
 export class HybridLoader {
   private streamManifestUrl?: string;
-  private readonly httpLoader = new HttpLoader();
+  private readonly requests = new RequestContainer();
   private p2pLoader?: P2PLoader;
-  private readonly pluginRequests = new Map<string, Request>();
   private readonly segmentStorage: SegmentsMemoryStorage;
   private storageCleanUpIntervalId?: number;
   private activeStream?: Readonly<StreamWithSegments>;
@@ -54,7 +55,7 @@ export class HybridLoader {
     );
   }
 
-  async loadSegment(
+  async loadSegmentByEngine(
     segment: Readonly<Segment>,
     stream: Readonly<StreamWithSegments>
   ): Promise<SegmentResponse> {
@@ -68,15 +69,18 @@ export class HybridLoader {
     this.lastRequestedSegment = segment;
     void this.processQueue();
 
-    const storageData = await this.segmentStorage.getSegment(segment.localId);
+    const storageData = await this.segmentStorage.getSegmentData(
+      segment.localId
+    );
     if (storageData) {
       return {
         data: storageData,
         bandwidth: this.bandwidthApproximator.getBandwidth(),
       };
     }
-    const request = this.createPluginSegmentRequest(segment);
-    return request.responsePromise;
+    const request = getControlledPromise<SegmentResponse>();
+    this.requests.addEngineRequest(segment, request);
+    return request.promise;
   }
 
   private async processQueue(force = true) {
@@ -102,31 +106,20 @@ export class HybridLoader {
       isSegmentLoaded: (segmentId) => storedSegmentIds.has(segmentId),
     });
 
-    const bufferRanges = Utils.getLoadBufferRanges(
-      this.playback,
-      this.settings
+    this.requests.abortAllNotRequestedByEngine((segmentId) =>
+      queueSegmentIds.has(segmentId)
     );
-    for (const segmentId of this.getLoadingSegmentIds()) {
-      const segment = this.activeStream.segments.get(segmentId);
-      if (
-        !queueSegmentIds.has(segmentId) &&
-        !this.pluginRequests.has(segmentId) &&
-        !(segment && Utils.isSegmentActual(segment, bufferRanges))
-      ) {
-        this.abortSegment(segmentId);
-      }
-    }
 
     const { simultaneousHttpDownloads } = this.settings;
     for (const { segment, statuses } of queue) {
-      if (this.httpLoader.isLoading(segment.localId)) continue;
+      if (this.requests.isHttpRequested(segment.localId)) continue;
       if (statuses.has("high-demand")) {
-        if (this.httpLoader.getLoadingsAmount() < simultaneousHttpDownloads) {
+        if (this.requests.countHttpRequests() < simultaneousHttpDownloads) {
           void this.loadSegmentThroughHttp(segment);
           continue;
         }
         this.abortLastHttpLoadingAfter(queue, segment.localId);
-        if (this.httpLoader.getLoadingsAmount() < simultaneousHttpDownloads) {
+        if (this.requests.countHttpRequests() < simultaneousHttpDownloads) {
           void this.loadSegmentThroughHttp(segment);
         }
       }
@@ -134,44 +127,37 @@ export class HybridLoader {
     }
   }
 
-  getLoadingSegmentIds() {
-    return this.httpLoader.getLoadingSegmentIds();
-  }
-
-  abortSegment(segmentId: string) {
-    this.httpLoader.abort(segmentId);
-    const request = this.pluginRequests.get(segmentId);
-    if (!request) return;
-    request.onError("Abort");
-    this.pluginRequests.delete(segmentId);
+  abortSegmentByEngine(segmentId: string) {
+    this.requests.abortEngineRequest(segmentId);
   }
 
   private async loadSegmentThroughHttp(segment: Segment) {
     let data: ArrayBuffer | undefined;
     try {
-      data = await this.httpLoader.load(segment);
+      const httpRequest = loadSegmentThroughHttp(segment);
+      this.requests.addLoaderRequest(segment, httpRequest);
+      data = await httpRequest.promise;
     } catch (err) {
-      // TODO: handle abort
+      if (err instanceof FetchError) {
+        // TODO: handle error
+      }
     }
     if (!data) return;
     this.bandwidthApproximator.addBytes(data.byteLength);
     void this.segmentStorage.storeSegment(segment, data);
-    const request = this.pluginRequests.get(segment.localId);
-    if (request) {
-      request.onSuccess({
-        bandwidth: this.bandwidthApproximator.getBandwidth(),
-        data,
-      });
-    }
-    this.pluginRequests.delete(segment.localId);
+    this.requests.resolveEngineRequest(segment.localId, {
+      data,
+      bandwidth: this.bandwidthApproximator.getBandwidth(),
+    });
   }
 
   private abortLastHttpLoadingAfter(queue: QueueItem[], segmentId: string) {
-    for (let i = queue.length - 1; i >= 0; i--) {
-      const { segment } = queue[i];
-      if (segment.localId === segmentId) break;
-      if (this.httpLoader.isLoading(segment.localId)) {
-        this.abortSegment(segment.localId);
+    for (const {
+      segment: { localId: queueSegmentId },
+    } of arrayBackwards(queue)) {
+      if (queueSegmentId === segmentId) break;
+      if (this.requests.isHttpRequested(queueSegmentId)) {
+        this.requests.abortLoaderRequest(queueSegmentId);
         break;
       }
     }
@@ -189,40 +175,34 @@ export class HybridLoader {
     void this.processQueue(false);
   }
 
-  private createPluginSegmentRequest(segment: Segment) {
-    let onSuccess: Request["onSuccess"];
-    let onError: Request["onError"];
-    const responsePromise = new Promise<SegmentResponse>((resolve, reject) => {
-      onSuccess = resolve;
-      onError = reject;
-    });
-    const request: Request = {
-      responsePromise,
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      onSuccess: onSuccess!,
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      onError: onError!,
-    };
-
-    this.pluginRequests.set(segment.localId, request);
-    return request;
-  }
-
   destroy() {
     clearInterval(this.storageCleanUpIntervalId);
     this.storageCleanUpIntervalId = undefined;
     void this.segmentStorage.destroy();
-    this.httpLoader.abortAll();
-    for (const request of this.pluginRequests.values()) {
-      request.onError("Aborted");
-    }
-    this.pluginRequests.clear();
+    this.requests.destroy();
     this.playback = undefined;
   }
 }
 
-type Request = {
-  responsePromise: Promise<SegmentResponse>;
-  onSuccess: (response: SegmentResponse) => void;
-  onError: (reason?: unknown) => void;
-};
+function getControlledPromise<T>() {
+  let onSuccess: (value: T) => void;
+  let onError: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolve, reject) => {
+    onSuccess = resolve;
+    onError = reject;
+  });
+
+  return {
+    promise,
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    onSuccess: onSuccess!,
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    onError: onError!,
+  };
+}
+
+function* arrayBackwards<T>(arr: T[]) {
+  for (let i = arr.length - 1; i >= 0; i--) {
+    yield arr[i];
+  }
+}
