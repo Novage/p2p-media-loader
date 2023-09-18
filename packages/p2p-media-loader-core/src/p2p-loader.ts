@@ -6,6 +6,7 @@ import { Segment, StreamWithSegments } from "./types";
 import { JsonSegmentAnnouncementMap } from "./internal-types";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import * as Utils from "./utils";
+import { PeerSegmentStatus } from "./enums";
 
 export class P2PLoader {
   private readonly streamExternalId: string;
@@ -51,6 +52,27 @@ export class P2PLoader {
     trackerClient.on("error", (error) => {});
   }
 
+  async downloadSegment(segment: Segment): Promise<ArrayBuffer | false> {
+    const segmentExternalId = segment.externalId.toString();
+    const peerWithSegment: Peer[] = [];
+
+    for (const peer of this.peers.values()) {
+      if (
+        !peer.downloadingSegment &&
+        peer.getSegmentStatus(segmentExternalId) === PeerSegmentStatus.Loaded
+      ) {
+        peerWithSegment.push(peer);
+      }
+    }
+
+    if (peerWithSegment.length === 0) return false;
+
+    const peer =
+      peerWithSegment[Math.floor(Math.random() * peerWithSegment.length)];
+    const request = peer.downloadSegment(segment);
+    return request.promise;
+  }
+
   private createPeer(candidate: PeerCandidate) {
     const peer = new Peer(candidate, {
       onPeerConnected: this.onPeerConnected.bind(this),
@@ -83,7 +105,9 @@ export class P2PLoader {
   }
 
   private async onSegmentRequested(peer: Peer, segmentExternalId: string) {
-    const segmentData = await this.segmentStorage.getSegment(segmentExternalId);
+    const segmentData = await this.segmentStorage.getSegmentData(
+      segmentExternalId
+    );
     if (segmentData) peer.sendSegmentData(segmentExternalId, segmentData);
     else peer.sendSegmentAbsent(segmentExternalId);
   }

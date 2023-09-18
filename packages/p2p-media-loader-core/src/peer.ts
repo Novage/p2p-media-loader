@@ -8,6 +8,10 @@ import {
 } from "./internal-types";
 import { PeerCommandType, PeerSegmentStatus } from "./enums";
 import * as PeerUtil from "./peer-utils";
+import { P2PRequest } from "./request";
+import { Segment } from "./types";
+import * as Utils from "./utils";
+import { AbortError } from "./errors";
 
 const webRtcMaxMessageSize: number = 64 * 1024 - 1;
 
@@ -22,6 +26,11 @@ export class Peer {
   private connection?: PeerCandidate;
   private readonly eventHandlers: PeerEventHandlers;
   private segments = new Map<string, PeerSegmentStatus>();
+  private request?: {
+    segment: Segment;
+    p2pRequest: P2PRequest;
+    onSuccess: (data: ArrayBuffer) => void;
+  };
 
   constructor(candidate: PeerCandidate, eventHandlers: PeerEventHandlers) {
     this.id = candidate.id;
@@ -31,6 +40,14 @@ export class Peer {
 
   get isConnected() {
     return !!this.connection;
+  }
+
+  get downloadingSegment(): Segment | undefined {
+    return this.request?.segment;
+  }
+
+  getSegmentStatus(segmentExternalId: string): PeerSegmentStatus | undefined {
+    return this.segments.get(segmentExternalId);
   }
 
   addCandidate(candidate: PeerCandidate) {
@@ -75,12 +92,29 @@ export class Peer {
     this.connection.send(JSON.stringify(command));
   }
 
-  requestSegment(segmentExternalId: string) {
+  downloadSegment(segment: Segment) {
+    const { externalId } = segment;
     const command: PeerSegmentCommand = {
       c: PeerCommandType.SegmentRequest,
-      i: segmentExternalId,
+      i: externalId.toString(),
+    };
+    const { promise, onSuccess, onError } =
+      Utils.getControlledPromise<ArrayBuffer>();
+    this.request = {
+      segment,
+      p2pRequest: {
+        type: "p2p",
+        promise,
+        abort: () => {
+          onError(new AbortError());
+          this.request = undefined;
+        },
+      },
+      onSuccess,
     };
     this.sendCommand(command);
+
+    return this.request.p2pRequest;
   }
 
   sendSegmentsAnnouncement(map: JsonSegmentAnnouncementMap) {

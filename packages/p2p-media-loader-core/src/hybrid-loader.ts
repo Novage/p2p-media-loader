@@ -7,7 +7,7 @@ import { BandwidthApproximator } from "./bandwidth-approximator";
 import { Playback, QueueItem } from "./internal-types";
 import { RequestContainer } from "./request";
 import * as Utils from "./utils";
-import { AbortError, FetchError } from "./errors";
+import { FetchError } from "./errors";
 
 export class HybridLoader {
   private streamManifestUrl?: string;
@@ -78,7 +78,7 @@ export class HybridLoader {
         bandwidth: this.bandwidthApproximator.getBandwidth(),
       };
     }
-    const request = getControlledPromise<SegmentResponse>();
+    const request = Utils.getControlledPromise<SegmentResponse>();
     this.requests.addEngineRequest(segment, request);
     return request.promise;
   }
@@ -182,23 +182,6 @@ export class HybridLoader {
     this.requests.destroy();
     this.playback = undefined;
   }
-}
-
-function getControlledPromise<T>() {
-  let onSuccess: (value: T) => void;
-  let onError: (reason?: unknown) => void;
-  const promise = new Promise<T>((resolve, reject) => {
-    onSuccess = resolve;
-    onError = reject;
-  });
-
-  return {
-    promise,
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    onSuccess: onSuccess!,
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    onError: onError!,
-  };
 }
 
 function* arrayBackwards<T>(arr: T[]) {

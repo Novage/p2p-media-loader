@@ -143,3 +143,20 @@ export function isSegmentActual(
 
   return isInRange(startTime) || isInRange(endTime);
 }
+
+export function getControlledPromise<T>() {
+  let onSuccess: (value: T) => void;
+  let onError: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolve, reject) => {
+    onSuccess = resolve;
+    onError = reject;
+  });
+
+  return {
+    promise,
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    onSuccess: onSuccess!,
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    onError: onError!,
+  };
+}

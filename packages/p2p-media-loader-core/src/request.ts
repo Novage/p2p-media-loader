@@ -16,7 +16,7 @@ export type HttpRequest = RequestBase & {
   type: "http";
 };
 
-type P2PRequest = RequestBase & {
+export type P2PRequest = RequestBase & {
   type: "p2p";
 };
 
