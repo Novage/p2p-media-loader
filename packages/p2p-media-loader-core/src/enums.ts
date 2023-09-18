@@ -1,5 +1,5 @@
 export enum PeerCommandType {
-  SegmentMap,
+  SegmentsAnnouncement,
   SegmentRequest,
 }
 

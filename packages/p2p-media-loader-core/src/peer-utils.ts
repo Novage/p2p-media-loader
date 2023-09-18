@@ -42,7 +42,7 @@ export function getPeerCommandFromArrayBuffer(
   }
 }
 
-export function getSegmentsFromPeerSegmentMapCommand(
+export function getSegmentsFromPeerAnnouncementMap(
   map: JsonSegmentMap
 ): Map<string, PeerSegmentStatus> {
   const segmentStatusMap = new Map<string, PeerSegmentStatus>();
@@ -60,7 +60,7 @@ export function getSegmentsFromPeerSegmentMapCommand(
   return segmentStatusMap;
 }
 
-export function getJsonSegmentsMapForPeerCommand(
+export function getJsonSegmentsAnnouncementMap(
   streamExternalId: string,
   storedSegments: Segment[],
   loadingByHttpSegments: Segment[]

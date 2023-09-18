@@ -1,17 +1,28 @@
 import { PeerCandidate } from "bittorrent-tracker";
-import { PeerCommand, PeerSegmentRequestCommand } from "./internal-types";
+import {
+  JsonSegmentAnnouncementMap,
+  PeerCommand,
+  PeerSegmentRequestCommand,
+  PeerSegmentAnnouncementCommand,
+} from "./internal-types";
 import { PeerCommandType, PeerSegmentStatus } from "./enums";
 import * as PeerUtil from "./peer-utils";
 
 export class Peer {
   readonly id: string;
+  private readonly streamExternalId: string;
   private readonly candidates = new Set<PeerCandidate>();
   private connection?: PeerCandidate;
   private segments = new Map<string, PeerSegmentStatus>();
 
-  constructor(candidate: PeerCandidate) {
+  constructor(streamExternalId: string, candidate: PeerCandidate) {
+    this.streamExternalId = streamExternalId;
     this.id = candidate.id;
     this.addCandidate(candidate);
+  }
+
+  get isConnected() {
+    return !!this.connection;
   }
 
   addCandidate(candidate: PeerCandidate) {
@@ -40,10 +51,8 @@ export class Peer {
 
   private handleCommand(command: PeerCommand) {
     switch (command.c) {
-      case PeerCommandType.SegmentMap:
-        this.segments = PeerUtil.getSegmentsFromPeerSegmentMapCommand(
-          command.m
-        );
+      case PeerCommandType.SegmentsAnnouncement:
+        this.segments = PeerUtil.getSegmentsFromPeerAnnouncementMap(command.m);
         break;
 
       case PeerCommandType.SegmentRequest:
@@ -60,6 +69,14 @@ export class Peer {
     const command: PeerSegmentRequestCommand = {
       c: PeerCommandType.SegmentRequest,
       i: segmentExternalId,
+    };
+    this.sendCommand(command);
+  }
+
+  sendSegmentsAnnouncement(map: JsonSegmentAnnouncementMap) {
+    const command: PeerSegmentAnnouncementCommand = {
+      c: PeerCommandType.SegmentsAnnouncement,
+      m: map,
     };
     this.sendCommand(command);
   }
