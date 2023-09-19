@@ -11,7 +11,12 @@ import * as PeerUtil from "./peer-utils";
 import { P2PRequest } from "./request";
 import { Segment } from "./types";
 import * as Utils from "./utils";
-import { AbortError } from "./errors";
+import {
+  RequestAbortError,
+  RequestTimeoutError,
+  ResponseBytesMismatchError,
+  PeerSegmentAbsentError,
+} from "./errors";
 
 // TODO: add to settings
 const webRtcMaxMessageSize: number = 64 * 1024 - 1;
@@ -26,7 +31,7 @@ type PeerRequest = {
   segment: Segment;
   p2pRequest: P2PRequest;
   resolve: (data: ArrayBuffer) => void;
-  reject: (reason: unknown) => void;
+  reject: (reason?: unknown) => void;
   bytesDownloaded: number;
   chunks: ArrayBuffer[];
   segmentByteLength?: number;
@@ -96,7 +101,7 @@ export class Peer {
 
       case PeerCommandType.SegmentAbsent:
         if (this.request?.segment.externalId.toString() === command.i) {
-          this.terminateSegmentRequest();
+          this.cancelSegmentRequest(new PeerSegmentAbsentError());
           this.segments.delete(command.i);
         }
         break;
@@ -133,34 +138,40 @@ export class Peer {
       segment,
       resolve,
       reject,
-      responseTimeoutId: this.setResponseTimeout(),
+      responseTimeoutId: this.setRequestTimeout(),
       bytesDownloaded: 0,
       chunks: [],
       p2pRequest: {
         type: "p2p",
         promise,
-        abort: () => {
-          reject(new AbortError());
-          this.request = undefined;
-        },
+        abort: () => this.cancelSegmentRequest(new RequestAbortError()),
       },
     };
   }
 
-  private setResponseTimeout(): number {
-    return window.setTimeout(() => {
-      if (!this.request) return;
-      this.cancelSegmentRequest();
-    }, p2pSegmentDownloadTimeout);
+  private setRequestTimeout(): number {
+    return window.setTimeout(
+      () => this.cancelSegmentRequest(new RequestTimeoutError()),
+      p2pSegmentDownloadTimeout
+    );
   }
 
-  private cancelSegmentRequest() {
+  private cancelSegmentRequest(
+    reason:
+      | RequestAbortError
+      | RequestTimeoutError
+      | PeerSegmentAbsentError
+      | ResponseBytesMismatchError
+  ) {
     if (!this.request) return;
-    this.sendCommand({
-      c: PeerCommandType.CancelSegmentRequest,
-      i: this.request.segment.externalId.toString(),
-    });
-    this.terminateSegmentRequest();
+    if (!(reason instanceof PeerSegmentAbsentError)) {
+      this.sendCommand({
+        c: PeerCommandType.CancelSegmentRequest,
+        i: this.request.segment.externalId.toString(),
+      });
+    }
+    this.request.reject(reason);
+    this.clearRequest();
   }
 
   sendSegmentsAnnouncement(map: JsonSegmentAnnouncementMap) {
@@ -211,21 +222,18 @@ export class Peer {
     if (request.bytesDownloaded === request.segmentByteLength) {
       const segmentData = joinChunks(request.chunks);
       this.approveRequest(segmentData);
-    } else if (request.bytesDownloaded > request.segmentByteLength) {
-      this.cancelSegmentRequest();
+    } else if (request.bytesDownloaded > (request.segmentByteLength ?? 0)) {
+      this.cancelSegmentRequest(new ResponseBytesMismatchError());
     }
   }
 
   private approveRequest(data: ArrayBuffer) {
-    if (!this.request) return;
-    clearTimeout(this.request.responseTimeoutId);
-    this.request.resolve(data);
-    this.request = undefined;
+    this.request?.resolve(data);
+    this.clearRequest();
   }
 
-  private terminateSegmentRequest() {
-    if (!this.request) return;
-    clearTimeout(this.request.responseTimeoutId);
+  private clearRequest() {
+    clearTimeout(this.request?.responseTimeoutId);
     this.request = undefined;
   }
 }
