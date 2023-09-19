@@ -145,18 +145,18 @@ export function isSegmentActual(
 }
 
 export function getControlledPromise<T>() {
-  let onSuccess: (value: T) => void;
-  let onError: (reason?: unknown) => void;
-  const promise = new Promise<T>((resolve, reject) => {
-    onSuccess = resolve;
-    onError = reject;
+  let resolve: (value: T) => void;
+  let reject: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
   });
 
   return {
     promise,
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    onSuccess: onSuccess!,
+    resolve: resolve!,
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    onError: onError!,
+    reject: reject!,
   };
 }

@@ -13,7 +13,9 @@ import { Segment } from "./types";
 import * as Utils from "./utils";
 import { AbortError } from "./errors";
 
+// TODO: add to settings
 const webRtcMaxMessageSize: number = 64 * 1024 - 1;
+const p2pSegmentDownloadTimeout = 1000;
 
 type PeerEventHandlers = {
   onPeerConnected: (peer: Peer) => void;
@@ -23,9 +25,12 @@ type PeerEventHandlers = {
 type PeerRequest = {
   segment: Segment;
   p2pRequest: P2PRequest;
-  onSuccess: (data: ArrayBuffer) => void;
+  resolve: (data: ArrayBuffer) => void;
+  reject: (reason: unknown) => void;
   bytesDownloaded: number;
-  pieces: ArrayBuffer[];
+  chunks: ArrayBuffer[];
+  segmentByteLength?: number;
+  responseTimeoutId: number;
 };
 
 export class Peer {
@@ -35,6 +40,7 @@ export class Peer {
   private readonly eventHandlers: PeerEventHandlers;
   private segments = new Map<string, PeerSegmentStatus>();
   private request?: PeerRequest;
+  private isSendingData = false;
 
   constructor(candidate: PeerCandidate, eventHandlers: PeerEventHandlers) {
     this.id = candidate.id;
@@ -43,8 +49,13 @@ export class Peer {
   }
 
   addCandidate(candidate: PeerCandidate) {
-    candidate.on("connect", () => this.onCandidateConnect(candidate));
-    candidate.on("close", () => this.onCandidateClose(candidate));
+    candidate.on("connect", () => {
+      this.connection = candidate;
+      this.eventHandlers.onPeerConnected(this);
+    });
+    candidate.on("close", () => {
+      if (this.connection === candidate) this.connection = undefined;
+    });
     candidate.on("data", () => this.onReceiveData.bind(this));
     this.candidates.add(candidate);
   }
@@ -61,23 +72,13 @@ export class Peer {
     return this.segments.get(segmentExternalId);
   }
 
-  private onCandidateConnect(candidate: PeerCandidate) {
-    this.connection = candidate;
-    this.eventHandlers.onPeerConnected(this);
-  }
-
-  private onCandidateClose(candidate: PeerCandidate) {
-    if (this.connection === candidate) this.connection = undefined;
-  }
-
   private onReceiveData(data: ArrayBuffer) {
     const command = PeerUtil.getPeerCommandFromArrayBuffer(data);
-    if (!command) return;
+    if (!command) {
+      this.receiveSegmentChuck(data);
+      return;
+    }
 
-    this.handleCommand(command);
-  }
-
-  private handleCommand(command: PeerCommand) {
     switch (command.c) {
       case PeerCommandType.SegmentsAnnouncement:
         this.segments = PeerUtil.getSegmentsFromPeerAnnouncementMap(command.m);
@@ -88,6 +89,20 @@ export class Peer {
         break;
 
       case PeerCommandType.SegmentData:
+        if (this.request?.segment.externalId.toString() === command.i) {
+          this.request.segmentByteLength = command.s;
+        }
+        break;
+
+      case PeerCommandType.SegmentAbsent:
+        if (this.request?.segment.externalId.toString() === command.i) {
+          this.terminateSegmentRequest();
+          this.segments.delete(command.i);
+        }
+        break;
+
+      case PeerCommandType.CancelSegmentRequest:
+        this.stopSendSegmentData();
         break;
     }
   }
@@ -106,25 +121,46 @@ export class Peer {
       c: PeerCommandType.SegmentRequest,
       i: externalId.toString(),
     };
-    const { promise, onSuccess, onError } =
+    this.sendCommand(command);
+    this.request = this.createPeerRequest(segment);
+    return this.request.p2pRequest;
+  }
+
+  private createPeerRequest(segment: Segment): PeerRequest {
+    const { promise, resolve, reject } =
       Utils.getControlledPromise<ArrayBuffer>();
-    this.request = {
+    return {
       segment,
-      onSuccess,
+      resolve,
+      reject,
+      responseTimeoutId: this.setResponseTimeout(),
       bytesDownloaded: 0,
-      pieces: [],
+      chunks: [],
       p2pRequest: {
         type: "p2p",
         promise,
         abort: () => {
-          onError(new AbortError());
+          reject(new AbortError());
           this.request = undefined;
         },
       },
     };
-    this.sendCommand(command);
+  }
 
-    return this.request.p2pRequest;
+  private setResponseTimeout(): number {
+    return window.setTimeout(() => {
+      if (!this.request) return;
+      this.cancelSegmentRequest();
+    }, p2pSegmentDownloadTimeout);
+  }
+
+  private cancelSegmentRequest() {
+    if (!this.request) return;
+    this.sendCommand({
+      c: PeerCommandType.CancelSegmentRequest,
+      i: this.request.segment.externalId.toString(),
+    });
+    this.terminateSegmentRequest();
   }
 
   sendSegmentsAnnouncement(map: JsonSegmentAnnouncementMap) {
@@ -142,22 +178,19 @@ export class Peer {
       i: segmentExternalId,
       s: data.byteLength,
     };
-
     this.sendCommand(command);
 
-    let bytesLeft = data.byteLength;
-    while (bytesLeft > 0) {
-      const bytesToSend =
-        bytesLeft >= webRtcMaxMessageSize ? webRtcMaxMessageSize : bytesLeft;
-      const buffer = Buffer.from(
-        data,
-        data.byteLength - bytesLeft,
-        bytesToSend
-      );
-
-      this.connection.send(buffer);
-      bytesLeft -= bytesToSend;
+    this.isSendingData = true;
+    const sendChuck = async (data: ArrayBuffer) => this.connection?.send(data);
+    for (const chuck of getBufferChunks(data, webRtcMaxMessageSize)) {
+      if (!this.isSendingData) break;
+      void sendChuck(chuck);
     }
+    this.isSendingData = false;
+  }
+
+  stopSendSegmentData() {
+    this.isSendingData = false;
   }
 
   sendSegmentAbsent(segmentExternalId: string) {
@@ -167,4 +200,57 @@ export class Peer {
     };
     this.sendCommand(command);
   }
+
+  private receiveSegmentChuck(chuck: ArrayBuffer): void {
+    const { request } = this;
+    if (!request) return;
+
+    request.bytesDownloaded += chuck.byteLength;
+    request.chunks.push(chuck);
+
+    if (request.bytesDownloaded === request.segmentByteLength) {
+      const segmentData = joinChunks(request.chunks);
+      this.approveRequest(segmentData);
+    } else if (request.bytesDownloaded > request.segmentByteLength) {
+      this.cancelSegmentRequest();
+    }
+  }
+
+  private approveRequest(data: ArrayBuffer) {
+    if (!this.request) return;
+    clearTimeout(this.request.responseTimeoutId);
+    this.request.resolve(data);
+    this.request = undefined;
+  }
+
+  private terminateSegmentRequest() {
+    if (!this.request) return;
+    clearTimeout(this.request.responseTimeoutId);
+    this.request = undefined;
+  }
+}
+
+function* getBufferChunks(
+  data: ArrayBuffer,
+  maxChuckSize: number
+): Generator<ArrayBuffer> {
+  let bytesLeft = data.byteLength;
+  while (bytesLeft > 0) {
+    const bytesToSend = bytesLeft >= maxChuckSize ? maxChuckSize : bytesLeft;
+    const buffer = Buffer.from(data, data.byteLength - bytesLeft, bytesToSend);
+    bytesLeft -= bytesToSend;
+    yield buffer;
+  }
+}
+
+function joinChunks(chunks: ArrayBuffer[]): ArrayBuffer {
+  const bytesSum = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+  const buffer = new Uint8Array(bytesSum);
+  let offset = 0;
+  for (const chunk of chunks) {
+    buffer.set(new Uint8Array(chunk), offset);
+    offset += chunk.byteLength;
+  }
+
+  return buffer;
 }

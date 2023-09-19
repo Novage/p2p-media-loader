@@ -3,6 +3,7 @@ export enum PeerCommandType {
   SegmentRequest,
   SegmentData,
   SegmentAbsent,
+  CancelSegmentRequest,
 }
 
 export enum PeerSegmentStatus {

@@ -34,7 +34,9 @@ export type JsonSegmentAnnouncementMap = {
 };
 
 export type PeerSegmentCommand = BasePeerCommand<
-  PeerCommandType.SegmentRequest | PeerCommandType.SegmentAbsent
+  | PeerCommandType.SegmentRequest
+  | PeerCommandType.SegmentAbsent
+  | PeerCommandType.CancelSegmentRequest
 > & {
   i: string;
 };
