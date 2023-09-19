@@ -45,7 +45,7 @@ export class RequestContainer {
     loaderRequest.promise.finally(() => {
       const request = this.requests.get(segmentId);
       delete request?.loaderRequest;
-      if (request) this.clearRequest(request);
+      if (request) this.clearRequestItem(request);
     });
   }
 
@@ -63,7 +63,7 @@ export class RequestContainer {
     engineRequest.promise.finally(() => {
       const request = this.requests.get(segmentId);
       delete request?.engineRequest;
-      if (request) this.clearRequest(request);
+      if (request) this.clearRequestItem(request);
     });
   }
 
@@ -113,10 +113,13 @@ export class RequestContainer {
     const request = this.requests.get(segmentId);
     if (!request) return;
 
-    request.loaderRequest?.abort();
+    if (request.loaderRequest) {
+      request.loaderRequest.abort();
+      request.engineRequest?.onError(new AbortError());
+    }
   }
 
-  private clearRequest(request: Request): void {
+  private clearRequestItem(request: Request): void {
     if (!request.engineRequest && !request.loaderRequest) {
       this.requests.delete(request.segment.localId);
     }

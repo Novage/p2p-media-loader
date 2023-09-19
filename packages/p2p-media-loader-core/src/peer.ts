@@ -20,22 +20,33 @@ type PeerEventHandlers = {
   onSegmentRequested: (peer: Peer, segmentId: string) => void;
 };
 
+type PeerRequest = {
+  segment: Segment;
+  p2pRequest: P2PRequest;
+  onSuccess: (data: ArrayBuffer) => void;
+  bytesDownloaded: number;
+  pieces: ArrayBuffer[];
+};
+
 export class Peer {
   readonly id: string;
   private readonly candidates = new Set<PeerCandidate>();
   private connection?: PeerCandidate;
   private readonly eventHandlers: PeerEventHandlers;
   private segments = new Map<string, PeerSegmentStatus>();
-  private request?: {
-    segment: Segment;
-    p2pRequest: P2PRequest;
-    onSuccess: (data: ArrayBuffer) => void;
-  };
+  private request?: PeerRequest;
 
   constructor(candidate: PeerCandidate, eventHandlers: PeerEventHandlers) {
     this.id = candidate.id;
     this.eventHandlers = eventHandlers;
     this.addCandidate(candidate);
+  }
+
+  addCandidate(candidate: PeerCandidate) {
+    candidate.on("connect", () => this.onCandidateConnect(candidate));
+    candidate.on("close", () => this.onCandidateClose(candidate));
+    candidate.on("data", () => this.onReceiveData.bind(this));
+    this.candidates.add(candidate);
   }
 
   get isConnected() {
@@ -50,22 +61,13 @@ export class Peer {
     return this.segments.get(segmentExternalId);
   }
 
-  addCandidate(candidate: PeerCandidate) {
-    candidate.on("connect", () => this.onCandidateConnect(candidate));
-    candidate.on("close", () => this.onCandidateClose(candidate));
-    candidate.on("data", () => this.onReceiveData.bind(this));
-    this.candidates.add(candidate);
-  }
-
   private onCandidateConnect(candidate: PeerCandidate) {
     this.connection = candidate;
     this.eventHandlers.onPeerConnected(this);
   }
 
   private onCandidateClose(candidate: PeerCandidate) {
-    if (this.connection === candidate) {
-      this.connection = undefined;
-    }
+    if (this.connection === candidate) this.connection = undefined;
   }
 
   private onReceiveData(data: ArrayBuffer) {
@@ -84,6 +86,9 @@ export class Peer {
       case PeerCommandType.SegmentRequest:
         this.eventHandlers.onSegmentRequested(this, command.i);
         break;
+
+      case PeerCommandType.SegmentData:
+        break;
     }
   }
 
@@ -92,7 +97,10 @@ export class Peer {
     this.connection.send(JSON.stringify(command));
   }
 
-  downloadSegment(segment: Segment) {
+  requestSegment(segment: Segment) {
+    if (this.request) {
+      throw new Error("Segment already is downloading");
+    }
     const { externalId } = segment;
     const command: PeerSegmentCommand = {
       c: PeerCommandType.SegmentRequest,
@@ -102,6 +110,9 @@ export class Peer {
       Utils.getControlledPromise<ArrayBuffer>();
     this.request = {
       segment,
+      onSuccess,
+      bytesDownloaded: 0,
+      pieces: [],
       p2pRequest: {
         type: "p2p",
         promise,
@@ -110,7 +121,6 @@ export class Peer {
           this.request = undefined;
         },
       },
-      onSuccess,
     };
     this.sendCommand(command);
 

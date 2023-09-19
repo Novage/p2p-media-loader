@@ -51,6 +51,7 @@ export class HybridLoader {
     this.p2pLoader = new P2PLoader(
       this.streamManifestUrl,
       stream,
+      this.requests,
       this.segmentStorage
     );
   }
@@ -142,7 +143,16 @@ export class HybridLoader {
         // TODO: handle error
       }
     }
-    if (!data) return;
+    if (data) this.handleSegmentLoaded(segment, data);
+  }
+
+  private async loadThroughP2P(segment: Segment) {
+    if (!this.p2pLoader) return;
+    const data = await this.p2pLoader.downloadSegment(segment);
+    if (data) this.handleSegmentLoaded(segment, data);
+  }
+
+  private handleSegmentLoaded(segment: Segment, data: ArrayBuffer) {
     this.bandwidthApproximator.addBytes(data.byteLength);
     void this.segmentStorage.storeSegment(segment, data);
     this.requests.resolveEngineRequest(segment.localId, {

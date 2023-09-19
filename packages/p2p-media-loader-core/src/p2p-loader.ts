@@ -7,6 +7,7 @@ import { JsonSegmentAnnouncementMap } from "./internal-types";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import * as Utils from "./utils";
 import { PeerSegmentStatus } from "./enums";
+import { RequestContainer } from "./request";
 
 export class P2PLoader {
   private readonly streamExternalId: string;
@@ -19,6 +20,7 @@ export class P2PLoader {
   constructor(
     private streamManifestUrl: string,
     private readonly stream: StreamWithSegments,
+    private readonly requests: RequestContainer,
     private readonly segmentStorage: SegmentsMemoryStorage
   ) {
     const peerId = PeerUtil.generatePeerId();
@@ -52,7 +54,7 @@ export class P2PLoader {
     trackerClient.on("error", (error) => {});
   }
 
-  async downloadSegment(segment: Segment): Promise<ArrayBuffer | false> {
+  async downloadSegment(segment: Segment): Promise<ArrayBuffer | undefined> {
     const segmentExternalId = segment.externalId.toString();
     const peerWithSegment: Peer[] = [];
 
@@ -65,11 +67,12 @@ export class P2PLoader {
       }
     }
 
-    if (peerWithSegment.length === 0) return false;
+    if (peerWithSegment.length === 0) return undefined;
 
     const peer =
       peerWithSegment[Math.floor(Math.random() * peerWithSegment.length)];
-    const request = peer.downloadSegment(segment);
+    const request = peer.requestSegment(segment);
+    this.requests.addLoaderRequest(segment, request);
     return request.promise;
   }
 
@@ -84,6 +87,7 @@ export class P2PLoader {
   private async onSegmentStorageUpdate() {
     const storedSegmentIds = await this.segmentStorage.getStoredSegmentIds();
     const loaded: Segment[] = [];
+    const httpLoading: Segment[] = [];
 
     for (const id of storedSegmentIds) {
       const segment = this.stream.segments.get(id);
@@ -92,10 +96,18 @@ export class P2PLoader {
       loaded.push(segment);
     }
 
+    for (const request of this.requests.values()) {
+      if (request.loaderRequest?.type !== "http") continue;
+      const segment = this.stream.segments.get(request.segment.localId);
+      if (!segment) continue;
+
+      httpLoading.push(segment);
+    }
+
     this.announcementMap = PeerUtil.getJsonSegmentsAnnouncementMap(
       this.streamExternalId,
       loaded,
-      []
+      httpLoading
     );
     this.broadcastSegmentAnnouncement();
   }
