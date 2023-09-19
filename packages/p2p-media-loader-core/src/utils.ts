@@ -1,6 +1,6 @@
 import { Segment, Settings, Stream, StreamWithSegments } from "./index";
 import {
-  SegmentLoadStatus,
+  QueueStatuses,
   Playback,
   LoadBufferRanges,
   QueueItem,
@@ -47,7 +47,7 @@ export function generateQueue({
     Settings,
     "highDemandTimeWindow" | "httpDownloadTimeWindow" | "p2pDownloadTimeWindow"
   >;
-}) {
+}): { queue: QueueItem[]; queueSegmentIds: Set<string> } {
   const bufferRanges = getLoadBufferRanges(playback, settings);
   const { localId: requestedSegmentId } = segment;
 
@@ -57,7 +57,7 @@ export function generateQueue({
   const nextSegment = stream.segments.getNextTo(segment.localId)?.[1];
   const isNextSegmentHighDemand = !!(
     nextSegment &&
-    getSegmentLoadStatuses(nextSegment, bufferRanges)?.has("high-demand")
+    getSegmentLoadStatuses(nextSegment, bufferRanges).isHighDemand
   );
 
   let i = 0;
@@ -67,7 +67,8 @@ export function generateQueue({
     if (isSegmentLoaded(segment.localId)) continue;
 
     queueSegmentIds.add(segment.localId);
-    queue.push({ segment, statuses: statuses ?? new Set(["high-demand"]) });
+    statuses.isHighDemand = true;
+    queue.push({ segment, statuses });
     i++;
   }
 
@@ -104,27 +105,22 @@ export function getLoadBufferRanges(
 export function getSegmentLoadStatuses(
   segment: Readonly<Segment>,
   loadBufferRanges: LoadBufferRanges
-): Set<SegmentLoadStatus> | undefined {
+): QueueStatuses {
   const { highDemand, http, p2p } = loadBufferRanges;
   const { startTime, endTime } = segment;
 
-  const statuses = new Set<SegmentLoadStatus>();
   const isValueInRange = (value: number, range: NumberRange) =>
     value >= range.from && value < range.to;
 
-  if (
-    isValueInRange(startTime, highDemand) ||
-    isValueInRange(endTime, highDemand)
-  ) {
-    statuses.add("high-demand");
-  }
-  if (isValueInRange(startTime, http) || isValueInRange(endTime, http)) {
-    statuses.add("http-downloadable");
-  }
-  if (isValueInRange(startTime, p2p) || isValueInRange(endTime, p2p)) {
-    statuses.add("p2p-downloadable");
-  }
-  if (statuses.size) return statuses;
+  return {
+    isHighDemand:
+      isValueInRange(startTime, highDemand) ||
+      isValueInRange(endTime, highDemand),
+    isHttpDownloadable:
+      isValueInRange(startTime, http) || isValueInRange(endTime, http),
+    isP2PDownloadable:
+      isValueInRange(startTime, p2p) || isValueInRange(endTime, p2p),
+  };
 }
 
 export function isSegmentActual(

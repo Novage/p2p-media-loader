@@ -6,11 +6,6 @@ export type Playback = {
   rate: number;
 };
 
-export type SegmentLoadStatus =
-  | "high-demand"
-  | "http-downloadable"
-  | "p2p-downloadable";
-
 export type NumberRange = {
   from: number;
   to: number;
@@ -22,7 +17,13 @@ export type LoadBufferRanges = {
   p2p: NumberRange;
 };
 
-export type QueueItem = { segment: Segment; statuses: Set<SegmentLoadStatus> };
+export type QueueStatuses = {
+  isHighDemand: boolean;
+  isHttpDownloadable: boolean;
+  isP2PDownloadable: boolean;
+};
+
+export type QueueItem = { segment: Segment; statuses: QueueStatuses };
 
 export type BasePeerCommand<T extends PeerCommandType = PeerCommandType> = {
   c: T;

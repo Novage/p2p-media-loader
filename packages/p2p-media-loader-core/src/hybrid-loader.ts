@@ -114,7 +114,7 @@ export class HybridLoader {
     const { simultaneousHttpDownloads } = this.settings;
     for (const { segment, statuses } of queue) {
       if (this.requests.isHttpRequested(segment.localId)) continue;
-      if (statuses.has("high-demand")) {
+      if (statuses.isHighDemand) {
         if (this.requests.countHttpRequests() < simultaneousHttpDownloads) {
           void this.loadSegmentThroughHttp(segment);
           continue;

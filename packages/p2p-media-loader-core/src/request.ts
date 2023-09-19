@@ -1,5 +1,5 @@
 import { Segment, SegmentResponse } from "./types";
-import { AbortError } from "./errors";
+import { RequestAbortError } from "./errors";
 
 type EngineRequest = {
   promise: Promise<SegmentResponse>;
@@ -106,7 +106,7 @@ export class RequestContainer {
     const request = this.requests.get(segmentId);
     if (!request) return;
 
-    request.engineRequest?.onError(new AbortError());
+    request.engineRequest?.onError(new RequestAbortError());
   }
 
   abortLoaderRequest(segmentId: string) {
@@ -115,7 +115,7 @@ export class RequestContainer {
 
     if (request.loaderRequest) {
       request.loaderRequest.abort();
-      request.engineRequest?.onError(new AbortError());
+      request.engineRequest?.onError(new RequestAbortError());
     }
   }
 
