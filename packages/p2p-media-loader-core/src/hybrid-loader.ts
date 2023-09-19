@@ -1,5 +1,5 @@
 import { Segment, SegmentResponse, StreamWithSegments } from "./index";
-import { loadSegmentThroughHttp } from "./http-loader";
+import { getHttpSegmentRequest } from "./http-loader";
 import { P2PLoader } from "./p2p-loader";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import { Settings } from "./types";
@@ -135,7 +135,7 @@ export class HybridLoader {
   private async loadSegmentThroughHttp(segment: Segment) {
     let data: ArrayBuffer | undefined;
     try {
-      const httpRequest = loadSegmentThroughHttp(segment);
+      const httpRequest = getHttpSegmentRequest(segment);
       this.requests.addLoaderRequest(segment, httpRequest);
       data = await httpRequest.promise;
     } catch (err) {

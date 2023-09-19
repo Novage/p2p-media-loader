@@ -2,10 +2,8 @@ import { RequestAbortError, FetchError } from "./errors";
 import { Segment } from "./types";
 import { HttpRequest } from "./request";
 
-export function loadSegmentThroughHttp(
-  segment: Segment
-): Readonly<HttpRequest> {
-  const { promise, abortController } = fetchSegment(segment);
+export function getHttpSegmentRequest(segment: Segment): Readonly<HttpRequest> {
+  const { promise, abortController } = fetchSegmentData(segment);
   return {
     type: "http",
     promise,
@@ -13,7 +11,7 @@ export function loadSegmentThroughHttp(
   };
 }
 
-function fetchSegment(segment: Segment) {
+function fetchSegmentData(segment: Segment) {
   const headers = new Headers();
   const { url, byteRange, localId: segmentId } = segment;
 
@@ -26,7 +24,7 @@ function fetchSegment(segment: Segment) {
 
   const loadSegmentData = async () => {
     try {
-      const response = await fetch(url, {
+      const response = await window.fetch(url, {
         headers,
         signal: abortController.signal,
       });
