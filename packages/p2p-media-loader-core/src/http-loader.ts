@@ -1,4 +1,4 @@
-import { AbortError, FetchError } from "./errors";
+import { RequestAbortError, FetchError } from "./errors";
 import { Segment } from "./types";
 import { HttpRequest } from "./request";
 
@@ -24,25 +24,26 @@ function fetchSegment(segment: Segment) {
   }
   const abortController = new AbortController();
 
-  const promise = fetch(url, {
-    headers,
-    signal: abortController.signal,
-  })
-    .then((response) => {
-      if (response.ok) return response.arrayBuffer();
+  const loadSegmentData = async () => {
+    try {
+      const response = await fetch(url, {
+        headers,
+        signal: abortController.signal,
+      });
 
+      if (response.ok) return response.arrayBuffer();
       throw new FetchError(
         response.statusText ?? `Network response was not for ${segmentId}`,
         response.status,
         response
       );
-    })
-    .catch((error) => {
+    } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
-        throw new AbortError(`Segment fetch was aborted ${segmentId}`);
+        throw new RequestAbortError(`Segment fetch was aborted ${segmentId}`);
       }
       throw error;
-    });
+    }
+  };
 
-  return { promise, abortController };
+  return { promise: loadSegmentData(), abortController };
 }
