@@ -56,7 +56,8 @@ export class HybridLoader {
     );
   }
 
-  async loadSegmentByEngine(
+  // api method for engines
+  async loadSegment(
     segment: Readonly<Segment>,
     stream: Readonly<StreamWithSegments>
   ): Promise<SegmentResponse> {
@@ -128,7 +129,8 @@ export class HybridLoader {
     }
   }
 
-  abortSegmentByEngine(segmentId: string) {
+  // api method for engines
+  abortSegment(segmentId: string) {
     this.requests.abortEngineRequest(segmentId);
   }
 

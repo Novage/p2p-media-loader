@@ -76,12 +76,12 @@ export class Core<TStream extends Stream = Stream> {
         new HybridLoader(this.settings, this.bandwidthApproximator);
       loader = this.secondaryStreamLoader;
     }
-    return loader.loadSegmentByEngine(segment, stream);
+    return loader.loadSegment(segment, stream);
   }
 
   abortSegmentLoading(segmentId: string): void {
-    this.mainStreamLoader.abortSegmentByEngine(segmentId);
-    this.secondaryStreamLoader?.abortSegmentByEngine(segmentId);
+    this.mainStreamLoader.abortSegment(segmentId);
+    this.secondaryStreamLoader?.abortSegment(segmentId);
   }
 
   updatePlayback(position: number, rate: number): void {
