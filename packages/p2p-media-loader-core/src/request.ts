@@ -6,9 +6,17 @@ export type EngineCallbacks = {
   onError: (reason?: unknown) => void;
 };
 
+export type LoadProgress = {
+  percent: number;
+  loadedBytes: number;
+  totalLength: number;
+};
+
 type RequestBase = {
   promise: Promise<ArrayBuffer>;
   abort: () => void;
+  progress?: Readonly<LoadProgress>;
+  startTimestamp: number;
 };
 
 export type HttpRequest = RequestBase & {
