@@ -31,7 +31,7 @@ export type BasePeerCommand<T extends PeerCommandType = PeerCommandType> = {
 
 // {[streamId]: [segmentIds[]; segmentStatuses[]]}
 export type JsonSegmentAnnouncementMap = {
-  [key: string]: [number[], number[]];
+  [key: string]: [string[], number[]];
 };
 
 export type PeerSegmentCommand = BasePeerCommand<

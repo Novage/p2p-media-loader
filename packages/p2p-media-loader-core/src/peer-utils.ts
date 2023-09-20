@@ -65,20 +65,20 @@ export function getJsonSegmentsAnnouncementMap(
   storedSegments: Segment[],
   loadingByHttpSegments: Segment[]
 ): JsonSegmentAnnouncementMap {
-  const segmentIds: number[] = [];
+  const segmentExternalIds: string[] = [];
   const segmentStatuses: PeerSegmentStatus[] = [];
 
   for (const segment of storedSegments) {
-    segmentIds.push(segment.externalId);
+    segmentExternalIds.push(segment.externalId);
     segmentStatuses.push(PeerSegmentStatus.Loaded);
   }
 
   for (const segment of loadingByHttpSegments) {
-    segmentIds.push(segment.externalId);
+    segmentExternalIds.push(segment.externalId);
     segmentStatuses.push(PeerSegmentStatus.LoadingByHttp);
   }
 
   return {
-    [streamExternalId]: [segmentIds, segmentStatuses],
+    [streamExternalId]: [segmentExternalIds, segmentStatuses],
   };
 }

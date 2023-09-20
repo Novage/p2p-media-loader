@@ -61,21 +61,21 @@ function fetchSegmentData(segment: Segment) {
 function monitorFetchProgress(
   response: Response
 ): Readonly<LoadProgress> | undefined {
-  const totalLengthString = response.headers.get("Content-Length");
-  if (totalLengthString === null || !response.body) return;
+  const totalBytesString = response.headers.get("Content-Length");
+  if (totalBytesString === null || !response.body) return;
 
-  const totalLength = +totalLengthString;
+  const totalBytes = +totalBytesString;
   const progress: LoadProgress = {
     percent: 0,
     loadedBytes: 0,
-    totalLength,
+    totalBytes,
   };
   const reader = response.body.getReader();
 
   const monitor = async () => {
     for await (const chunk of readStream(reader)) {
       progress.loadedBytes += chunk.length;
-      progress.percent = (progress.loadedBytes / totalLength) * 100;
+      progress.percent = (progress.loadedBytes / totalBytes) * 100;
     }
   };
   void monitor();

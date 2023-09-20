@@ -44,13 +44,16 @@ export class P2PLoader {
 
   private subscribeOnTrackerEvents(trackerClient: TrackerClient) {
     // TODO: tracker event handlers
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
     trackerClient.on("update", () => {});
     trackerClient.on("peer", (candidate) => {
       const peer = this.peers.get(candidate.id);
       if (peer) peer.addCandidate(candidate);
       else this.createPeer(candidate);
     });
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
     trackerClient.on("warning", (warning) => {});
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
     trackerClient.on("error", (error) => {});
   }
 
