@@ -32,9 +32,7 @@ type PeerRequest = {
   p2pRequest: P2PRequest;
   resolve: (data: ArrayBuffer) => void;
   reject: (reason?: unknown) => void;
-  bytesDownloaded: number;
   chunks: ArrayBuffer[];
-  segmentByteLength?: number;
   responseTimeoutId: number;
 };
 
@@ -95,7 +93,11 @@ export class Peer {
 
       case PeerCommandType.SegmentData:
         if (this.request?.segment.externalId.toString() === command.i) {
-          this.request.segmentByteLength = command.s;
+          this.request.p2pRequest.progress = {
+            percent: 0,
+            loadedBytes: 0,
+            totalBytes: command.s,
+          };
         }
         break;
 
@@ -139,10 +141,10 @@ export class Peer {
       resolve,
       reject,
       responseTimeoutId: this.setRequestTimeout(),
-      bytesDownloaded: 0,
       chunks: [],
       p2pRequest: {
         type: "p2p",
+        startTimestamp: performance.now(),
         promise,
         abort: () => this.cancelSegmentRequest(new RequestAbortError()),
       },
@@ -213,16 +215,19 @@ export class Peer {
   }
 
   private receiveSegmentChuck(chuck: ArrayBuffer): void {
+    // TODO: check can be chunk received before peer command answer
     const { request } = this;
-    if (!request) return;
+    const progress = request?.p2pRequest?.progress;
+    if (!request || !progress) return;
 
-    request.bytesDownloaded += chuck.byteLength;
+    progress.loadedBytes += chuck.byteLength;
+    progress.percent = (progress.loadedBytes / progress.loadedBytes) * 100;
     request.chunks.push(chuck);
 
-    if (request.bytesDownloaded === request.segmentByteLength) {
+    if (progress.loadedBytes === progress.totalBytes) {
       const segmentData = joinChunks(request.chunks);
       this.approveRequest(segmentData);
-    } else if (request.bytesDownloaded > (request.segmentByteLength ?? 0)) {
+    } else if (progress.loadedBytes > progress.totalBytes) {
       this.cancelSegmentRequest(new ResponseBytesMismatchError());
     }
   }

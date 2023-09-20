@@ -85,7 +85,7 @@ export class P2PLoader {
   }
 
   private async onSegmentStorageUpdate() {
-    const storedSegmentIds = await this.segmentStorage.getStoredSegmentIds();
+    const { storedSegmentIds } = this.segmentStorage;
     const loaded: Segment[] = [];
     const httpLoading: Segment[] = [];
 

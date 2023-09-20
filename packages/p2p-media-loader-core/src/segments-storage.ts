@@ -53,6 +53,10 @@ export class SegmentsMemoryStorage {
     return this.cachedSegmentIds.has(segmentExternalId);
   }
 
+  get storedSegmentIds(): ReadonlySet<string> {
+    return this.cachedSegmentIds;
+  }
+
   async clear(): Promise<boolean> {
     const segmentsToDelete: string[] = [];
     const remainingSegments: {

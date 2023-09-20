@@ -9,13 +9,13 @@ export type EngineCallbacks = {
 export type LoadProgress = {
   percent: number;
   loadedBytes: number;
-  totalLength: number;
+  totalBytes: number;
 };
 
 type RequestBase = {
   promise: Promise<ArrayBuffer>;
   abort: () => void;
-  progress?: Readonly<LoadProgress>;
+  progress?: LoadProgress;
   startTimestamp: number;
 };
 
