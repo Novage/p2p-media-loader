@@ -114,38 +114,24 @@ function getLoadingDurationBasedOnBandwidth(
   return Math.round(bits / bandwidth) * 1000;
 }
 
-function getControlledPromise<T>() {
-  let resolve: (value: T) => void;
-  let reject: (reason?: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-
-  return {
-    promise,
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    resolve: resolve!,
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    reject: reject!,
-  };
-}
-
 function getSegmentRequest(): {
   callbacks: EngineCallbacks;
   request: Promise<SegmentResponse>;
 } {
-  const {
-    promise: request,
-    resolve: onSuccess,
-    reject: onError,
-  } = getControlledPromise<SegmentResponse>();
+  let onSuccess: (value: SegmentResponse) => void;
+  let onError: (reason?: unknown) => void;
+  const request = new Promise<SegmentResponse>((resolve, reject) => {
+    onSuccess = resolve;
+    onError = reject;
+  });
 
   return {
     request,
     callbacks: {
-      onSuccess,
-      onError,
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      onSuccess: onSuccess!,
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      onError: onError!,
     },
   };
 }
