@@ -17,16 +17,11 @@ export class Core<TStream extends Stream = Stream> {
     cachedSegmentsCount: 50,
   };
   private readonly bandwidthApproximator = new BandwidthApproximator();
-  private readonly mainStreamLoader: HybridLoader = new HybridLoader(
-    this.settings,
-    this.bandwidthApproximator
-  );
+  private mainStreamLoader?: HybridLoader;
   private secondaryStreamLoader?: HybridLoader;
 
   setManifestResponseUrl(url: string): void {
     this.manifestResponseUrl = url.split("?")[0];
-    this.mainStreamLoader.setStreamManifestUrl(this.manifestResponseUrl);
-    this.secondaryStreamLoader?.setStreamManifestUrl(this.manifestResponseUrl);
   }
 
   hasSegment(segmentLocalId: string): boolean {
@@ -61,32 +56,23 @@ export class Core<TStream extends Stream = Stream> {
 
   loadSegment(segmentLocalId: string, callbacks: EngineCallbacks) {
     const { segment, stream } = this.identifySegment(segmentLocalId);
-
-    let loader: HybridLoader;
-    if (stream.type === "main") {
-      loader = this.mainStreamLoader;
-    } else {
-      this.secondaryStreamLoader =
-        this.secondaryStreamLoader ??
-        new HybridLoader(this.settings, this.bandwidthApproximator);
-      loader = this.secondaryStreamLoader;
-    }
+    const loader = this.getStreamHybridLoader(segment, stream);
     void loader.loadSegment(segment, stream, callbacks);
   }
 
   abortSegmentLoading(segmentId: string): void {
-    this.mainStreamLoader.abortSegment(segmentId);
+    this.mainStreamLoader?.abortSegment(segmentId);
     this.secondaryStreamLoader?.abortSegment(segmentId);
   }
 
   updatePlayback(position: number, rate: number): void {
-    this.mainStreamLoader.updatePlayback(position, rate);
+    this.mainStreamLoader?.updatePlayback(position, rate);
     this.secondaryStreamLoader?.updatePlayback(position, rate);
   }
 
   destroy(): void {
     this.streams.clear();
-    this.mainStreamLoader.destroy();
+    this.mainStreamLoader?.destroy();
     this.secondaryStreamLoader?.destroy();
     this.manifestResponseUrl = undefined;
   }
@@ -103,5 +89,27 @@ export class Core<TStream extends Stream = Stream> {
     }
 
     return { segment, stream };
+  }
+
+  private getStreamHybridLoader(segment: Segment, stream: StreamWithSegments) {
+    if (!this.manifestResponseUrl) {
+      throw new Error("Manifest response url is not defined");
+    }
+    const streamTypeLoaderKeyMap = {
+      main: "mainStreamLoader",
+      secondary: "secondaryStreamLoader",
+    } as const;
+    const { type } = stream;
+    const loaderKey = streamTypeLoaderKeyMap[type];
+
+    return (this[loaderKey] =
+      this[loaderKey] ??
+      new HybridLoader(
+        this.manifestResponseUrl,
+        segment,
+        stream,
+        this.settings,
+        this.bandwidthApproximator
+      ));
   }
 }

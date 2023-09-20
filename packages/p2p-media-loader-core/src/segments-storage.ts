@@ -5,6 +5,7 @@ export class SegmentsMemoryStorage {
     string,
     { segment: Segment; data: ArrayBuffer; lastAccessed: number }
   >();
+  private readonly cachedSegmentIds = new Set<string>();
   private isSegmentLockedPredicate?: (segment: Segment) => boolean;
   private onUpdateSubscriptions: (() => void)[] = [];
 
@@ -15,6 +16,10 @@ export class SegmentsMemoryStorage {
     }
   ) {}
 
+  async initialize(masterManifestUrl: string) {
+    // empty
+  }
+
   setIsSegmentLockedPredicate(predicate: (segment: Segment) => boolean) {
     this.isSegmentLockedPredicate = predicate;
   }
@@ -24,28 +29,28 @@ export class SegmentsMemoryStorage {
   }
 
   async storeSegment(segment: Segment, data: ArrayBuffer) {
-    this.cache.set(segment.localId, {
+    const id = segment.externalId;
+    this.cache.set(id, {
       segment,
       data,
       lastAccessed: performance.now(),
     });
+    this.cachedSegmentIds.add(id);
     this.onUpdateSubscriptions.forEach((c) => c());
   }
 
-  async getSegmentData(segmentId: string): Promise<ArrayBuffer | undefined> {
-    const cacheItem = this.cache.get(segmentId);
+  async getSegmentData(
+    segmentExternalId: string
+  ): Promise<ArrayBuffer | undefined> {
+    const cacheItem = this.cache.get(segmentExternalId);
     if (cacheItem === undefined) return undefined;
 
     cacheItem.lastAccessed = performance.now();
     return cacheItem.data;
   }
 
-  async getStoredSegmentIds() {
-    const segmentIds = new Set<string>();
-    for (const segmentId of this.cache.keys()) {
-      segmentIds.add(segmentId);
-    }
-    return segmentIds;
+  hasSegment(segmentExternalId: string): boolean {
+    return this.cachedSegmentIds.has(segmentExternalId);
   }
 
   async clear(): Promise<boolean> {
@@ -58,10 +63,13 @@ export class SegmentsMemoryStorage {
     // Delete old segments
     const now = performance.now();
 
-    for (const [segmentId, { lastAccessed, segment }] of this.cache.entries()) {
+    for (const [
+      segmentExternalId,
+      { lastAccessed, segment },
+    ] of this.cache.entries()) {
       if (now - lastAccessed > this.settings.cachedSegmentExpiration) {
         if (!this.isSegmentLockedPredicate?.(segment)) {
-          segmentsToDelete.push(segmentId);
+          segmentsToDelete.push(segmentExternalId);
         }
       } else {
         remainingSegments.push({ segment, lastAccessed });
@@ -76,14 +84,17 @@ export class SegmentsMemoryStorage {
 
       for (const cachedSegment of remainingSegments) {
         if (!this.isSegmentLockedPredicate?.(cachedSegment.segment)) {
-          segmentsToDelete.push(cachedSegment.segment.localId);
+          segmentsToDelete.push(cachedSegment.segment.externalId);
           countOverhead--;
           if (countOverhead === 0) break;
         }
       }
     }
 
-    segmentsToDelete.forEach((id) => this.cache.delete(id));
+    segmentsToDelete.forEach((id) => {
+      this.cache.delete(id);
+      this.cachedSegmentIds.delete(id);
+    });
     if (segmentsToDelete.length) {
       this.onUpdateSubscriptions.forEach((c) => c());
     }

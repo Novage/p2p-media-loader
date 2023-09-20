@@ -27,11 +27,15 @@ type Request = {
   engineCallbacks?: Readonly<EngineCallbacks>;
 };
 
+function getRequestItemId(segment: Segment) {
+  return segment.localId;
+}
+
 export class RequestContainer {
   private readonly requests = new Map<string, Request>();
 
   addLoaderRequest(segment: Segment, loaderRequest: HybridLoaderRequest) {
-    const segmentId = segment.localId;
+    const segmentId = getRequestItemId(segment);
     const existingRequest = this.requests.get(segmentId);
     if (existingRequest) {
       existingRequest.loaderRequest = loaderRequest;
@@ -41,13 +45,13 @@ export class RequestContainer {
         loaderRequest,
       });
     }
-    loaderRequest.promise.finally(() =>
+    loaderRequest.promise.then(() =>
       this.clearRequestItem(segmentId, "loader")
     );
   }
 
   addEngineCallbacks(segment: Segment, engineCallbacks: EngineCallbacks) {
-    const segmentId = segment.localId;
+    const segmentId = getRequestItemId(segment);
     const requestItem = this.requests.get(segmentId);
     if (requestItem) {
       requestItem.engineCallbacks = engineCallbacks;
@@ -125,7 +129,8 @@ export class RequestContainer {
     if (type === "engine") delete requestItem.engineCallbacks;
     if (type === "loader") delete requestItem.loaderRequest;
     if (!requestItem.engineCallbacks && !requestItem.loaderRequest) {
-      this.requests.delete(requestItem.segment.localId);
+      const segmentId = getRequestItemId(requestItem.segment);
+      this.requests.delete(segmentId);
     }
   }
 
@@ -136,7 +141,8 @@ export class RequestContainer {
       segment,
     } of this.requests.values()) {
       if (!engineCallbacks) continue;
-      if (!isLocked(segment.localId) && loaderRequest) loaderRequest.abort();
+      const segmentId = getRequestItemId(segment);
+      if (!isLocked(segmentId) && loaderRequest) loaderRequest.abort();
     }
   }
 

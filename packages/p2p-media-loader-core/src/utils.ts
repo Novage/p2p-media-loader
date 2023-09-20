@@ -42,7 +42,7 @@ export function generateQueue({
   stream: Readonly<StreamWithSegments>;
   segment: Readonly<Segment>;
   playback: Readonly<Playback>;
-  isSegmentLoaded: (segmentId: string) => boolean;
+  isSegmentLoaded: (segmentExternalId: string) => boolean;
   settings: Pick<
     Settings,
     "highDemandTimeWindow" | "httpDownloadTimeWindow" | "p2pDownloadTimeWindow"
@@ -64,7 +64,7 @@ export function generateQueue({
   for (const segment of stream.segments.values(requestedSegmentId)) {
     const statuses = getSegmentLoadStatuses(segment, bufferRanges);
     if (!statuses && !(i === 0 && isNextSegmentHighDemand)) break;
-    if (isSegmentLoaded(segment.localId)) continue;
+    if (isSegmentLoaded(segment.externalId)) continue;
 
     queueSegmentIds.add(segment.localId);
     statuses.isHighDemand = true;

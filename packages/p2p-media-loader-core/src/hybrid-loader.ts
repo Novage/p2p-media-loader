@@ -10,23 +10,28 @@ import * as Utils from "./utils";
 import { FetchError } from "./errors";
 
 export class HybridLoader {
-  private streamManifestUrl?: string;
   private readonly requests = new RequestContainer();
   private p2pLoader?: P2PLoader;
   private readonly segmentStorage: SegmentsMemoryStorage;
   private storageCleanUpIntervalId?: number;
-  private activeStream?: Readonly<StreamWithSegments>;
-  private lastRequestedSegment?: Readonly<Segment>;
-  private playback?: Playback;
+  private activeStream: Readonly<StreamWithSegments>;
+  private lastRequestedSegment: Readonly<Segment>;
+  private readonly playback: Playback;
   private lastQueueProcessingTimeStamp?: number;
 
   constructor(
+    private streamManifestUrl: string,
+    requestedSegment: Segment,
+    requestedStream: Readonly<StreamWithSegments>,
     private readonly settings: Settings,
     private readonly bandwidthApproximator: BandwidthApproximator
   ) {
+    this.lastRequestedSegment = requestedSegment;
+    this.activeStream = requestedStream;
+    this.playback = { position: requestedSegment.startTime, rate: 1 };
     this.segmentStorage = new SegmentsMemoryStorage(this.settings);
     this.segmentStorage.setIsSegmentLockedPredicate((segment) => {
-      if (!this.playback || !this.activeStream?.segments.has(segment.localId)) {
+      if (!this.activeStream.segments.has(segment.localId)) {
         return false;
       }
       const bufferRanges = Utils.getLoadBufferRanges(
@@ -42,12 +47,7 @@ export class HybridLoader {
     );
   }
 
-  setStreamManifestUrl(url: string) {
-    this.streamManifestUrl = url;
-  }
-
   private createP2PLoader(stream: StreamWithSegments) {
-    if (!this.streamManifestUrl) return;
     this.p2pLoader = new P2PLoader(
       this.streamManifestUrl,
       stream,
@@ -62,9 +62,6 @@ export class HybridLoader {
     stream: Readonly<StreamWithSegments>,
     callbacks: EngineCallbacks
   ) {
-    if (!this.playback) {
-      this.playback = { position: segment.startTime, rate: 1 };
-    }
     if (stream !== this.activeStream) {
       this.activeStream = stream;
       this.createP2PLoader(stream);
@@ -85,9 +82,6 @@ export class HybridLoader {
   }
 
   private async processQueue(force = true) {
-    if (!this.activeStream || !this.lastRequestedSegment || !this.playback) {
-      return;
-    }
     const now = performance.now();
     if (
       !force &&
@@ -98,13 +92,12 @@ export class HybridLoader {
     }
     this.lastQueueProcessingTimeStamp = now;
 
-    const storedSegmentIds = await this.segmentStorage.getStoredSegmentIds();
     const { queue, queueSegmentIds } = Utils.generateQueue({
       segment: this.lastRequestedSegment,
       stream: this.activeStream,
       playback: this.playback,
       settings: this.settings,
-      isSegmentLoaded: (segmentId) => storedSegmentIds.has(segmentId),
+      isSegmentLoaded: (segmentId) => this.segmentStorage.hasSegment(segmentId),
     });
 
     this.requests.abortAllNotRequestedByEngine((segmentId) =>
@@ -175,7 +168,6 @@ export class HybridLoader {
   }
 
   updatePlayback(position: number, rate: number) {
-    if (!this.playback) return;
     const isRateChanged = this.playback.rate !== rate;
     const isPositionChanged = this.playback.position !== position;
 
@@ -191,7 +183,6 @@ export class HybridLoader {
     this.storageCleanUpIntervalId = undefined;
     void this.segmentStorage.destroy();
     this.requests.destroy();
-    this.playback = undefined;
   }
 }
 

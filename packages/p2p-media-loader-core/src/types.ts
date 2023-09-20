@@ -8,7 +8,7 @@ export type ByteRange = { start: number; end: number };
 
 export type Segment = {
   readonly localId: string;
-  readonly externalId: number;
+  readonly externalId: string;
   readonly url: string;
   readonly byteRange?: ByteRange;
   readonly startTime: number;
