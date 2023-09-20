@@ -1,5 +1,7 @@
 import { LinkedMap } from "./linked-map";
 
+export type { EngineCallbacks } from "./request";
+
 export type StreamType = "main" | "secondary";
 
 export type ByteRange = { start: number; end: number };
@@ -40,9 +42,9 @@ export type SegmentResponse = {
 };
 
 export type Settings = {
-  highDemandBufferLength: number;
-  httpBufferLength: number;
-  p2pBufferLength: number;
+  highDemandTimeWindow: number;
+  httpDownloadTimeWindow: number;
+  p2pDownloadTimeWindow: number;
   simultaneousHttpDownloads: number;
   cachedSegmentExpiration: number;
   cachedSegmentsCount: number;

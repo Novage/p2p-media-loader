@@ -1,23 +1,18 @@
 import { HybridLoader } from "./hybrid-loader";
-import {
-  Stream,
-  StreamWithSegments,
-  Segment,
-  SegmentResponse,
-  Settings,
-} from "./types";
+import { Stream, StreamWithSegments, Segment, Settings } from "./types";
 import * as Utils from "./utils";
 import { LinkedMap } from "./linked-map";
 import { BandwidthApproximator } from "./bandwidth-approximator";
+import { EngineCallbacks } from "./request";
 
 export class Core<TStream extends Stream = Stream> {
   private manifestResponseUrl?: string;
   private readonly streams = new Map<string, StreamWithSegments<TStream>>();
   private readonly settings: Settings = {
     simultaneousHttpDownloads: 3,
-    highDemandBufferLength: 25,
-    httpBufferLength: 60,
-    p2pBufferLength: 60,
+    highDemandTimeWindow: 25,
+    httpDownloadTimeWindow: 60,
+    p2pDownloadTimeWindow: 60,
     cachedSegmentExpiration: 120,
     cachedSegmentsCount: 50,
   };
@@ -64,7 +59,7 @@ export class Core<TStream extends Stream = Stream> {
     removeSegmentIds?.forEach((id) => stream.segments.delete(id));
   }
 
-  loadSegment(segmentLocalId: string): Promise<SegmentResponse> {
+  loadSegment(segmentLocalId: string, callbacks: EngineCallbacks) {
     const { segment, stream } = this.identifySegment(segmentLocalId);
 
     let loader: HybridLoader;
@@ -76,7 +71,7 @@ export class Core<TStream extends Stream = Stream> {
         new HybridLoader(this.settings, this.bandwidthApproximator);
       loader = this.secondaryStreamLoader;
     }
-    return loader.loadSegment(segment, stream);
+    void loader.loadSegment(segment, stream, callbacks);
   }
 
   abortSegmentLoading(segmentId: string): void {

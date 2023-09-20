@@ -6,6 +6,8 @@ import { Segment, StreamWithSegments } from "./types";
 import { JsonSegmentAnnouncementMap } from "./internal-types";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import * as Utils from "./utils";
+import { PeerSegmentStatus } from "./enums";
+import { RequestContainer } from "./request";
 
 export class P2PLoader {
   private readonly streamExternalId: string;
@@ -18,6 +20,7 @@ export class P2PLoader {
   constructor(
     private streamManifestUrl: string,
     private readonly stream: StreamWithSegments,
+    private readonly requests: RequestContainer,
     private readonly segmentStorage: SegmentsMemoryStorage
   ) {
     const peerId = PeerUtil.generatePeerId();
@@ -51,6 +54,28 @@ export class P2PLoader {
     trackerClient.on("error", (error) => {});
   }
 
+  async downloadSegment(segment: Segment): Promise<ArrayBuffer | undefined> {
+    const segmentExternalId = segment.externalId.toString();
+    const peerWithSegment: Peer[] = [];
+
+    for (const peer of this.peers.values()) {
+      if (
+        !peer.downloadingSegment &&
+        peer.getSegmentStatus(segmentExternalId) === PeerSegmentStatus.Loaded
+      ) {
+        peerWithSegment.push(peer);
+      }
+    }
+
+    if (peerWithSegment.length === 0) return undefined;
+
+    const peer =
+      peerWithSegment[Math.floor(Math.random() * peerWithSegment.length)];
+    const request = peer.requestSegment(segment);
+    this.requests.addLoaderRequest(segment, request);
+    return request.promise;
+  }
+
   private createPeer(candidate: PeerCandidate) {
     const peer = new Peer(candidate, {
       onPeerConnected: this.onPeerConnected.bind(this),
@@ -62,6 +87,7 @@ export class P2PLoader {
   private async onSegmentStorageUpdate() {
     const storedSegmentIds = await this.segmentStorage.getStoredSegmentIds();
     const loaded: Segment[] = [];
+    const httpLoading: Segment[] = [];
 
     for (const id of storedSegmentIds) {
       const segment = this.stream.segments.get(id);
@@ -70,10 +96,18 @@ export class P2PLoader {
       loaded.push(segment);
     }
 
+    for (const request of this.requests.values()) {
+      if (request.loaderRequest?.type !== "http") continue;
+      const segment = this.stream.segments.get(request.segment.localId);
+      if (!segment) continue;
+
+      httpLoading.push(segment);
+    }
+
     this.announcementMap = PeerUtil.getJsonSegmentsAnnouncementMap(
       this.streamExternalId,
       loaded,
-      []
+      httpLoading
     );
     this.broadcastSegmentAnnouncement();
   }
@@ -83,7 +117,9 @@ export class P2PLoader {
   }
 
   private async onSegmentRequested(peer: Peer, segmentExternalId: string) {
-    const segmentData = await this.segmentStorage.getSegment(segmentExternalId);
+    const segmentData = await this.segmentStorage.getSegmentData(
+      segmentExternalId
+    );
     if (segmentData) peer.sendSegmentData(segmentExternalId, segmentData);
     else peer.sendSegmentAbsent(segmentExternalId);
   }

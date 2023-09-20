@@ -8,3 +8,27 @@ export class FetchError extends Error {
     this.details = details;
   }
 }
+
+export class RequestAbortError extends Error {
+  constructor(message = "AbortError") {
+    super(message);
+  }
+}
+
+export class RequestTimeoutError extends Error {
+  constructor(message = "TimeoutError") {
+    super(message);
+  }
+}
+
+export class ResponseBytesMismatchError extends Error {
+  constructor(message = "ResponseBytesMismatch") {
+    super(message);
+  }
+}
+
+export class PeerSegmentAbsentError extends Error {
+  constructor(message = "PeerSegmentAbsent") {
+    super(message);
+  }
+}

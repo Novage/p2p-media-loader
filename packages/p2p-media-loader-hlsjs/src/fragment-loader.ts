@@ -8,7 +8,13 @@ import type {
   LoaderStats,
 } from "hls.js";
 import * as Utils from "./utils";
-import { Core, FetchError, SegmentResponse } from "p2p-media-loader-core";
+import {
+  RequestAbortError,
+  Core,
+  FetchError,
+  SegmentResponse,
+  EngineCallbacks,
+} from "p2p-media-loader-core";
 
 const DEFAULT_DOWNLOAD_LATENCY = 10;
 
@@ -66,9 +72,11 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     }
 
     try {
-      this.response = await this.core.loadSegment(this.segmentId);
+      const { request, callbacks } = getSegmentRequest();
+      this.core.loadSegment(this.segmentId, callbacks);
+      this.response = await request;
     } catch (error) {
-      if (this.stats.aborted) return;
+      if (this.stats.aborted && error instanceof RequestAbortError) return;
       return this.handleError(error);
     }
     if (!this.response) return;
@@ -144,4 +152,40 @@ function getLoadingStat({
   const start = first - DEFAULT_DOWNLOAD_LATENCY;
 
   return { start, first, end: loadingEndTime };
+}
+
+function getControlledPromise<T>() {
+  let resolve: (value: T) => void;
+  let reject: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+
+  return {
+    promise,
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    resolve: resolve!,
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    reject: reject!,
+  };
+}
+
+function getSegmentRequest(): {
+  callbacks: EngineCallbacks;
+  request: Promise<SegmentResponse>;
+} {
+  const {
+    promise: request,
+    resolve: onSuccess,
+    reject: onError,
+  } = getControlledPromise<SegmentResponse>();
+
+  return {
+    request,
+    callbacks: {
+      onSuccess,
+      onError,
+    },
+  };
 }

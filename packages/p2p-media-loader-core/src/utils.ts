@@ -1,6 +1,6 @@
 import { Segment, Settings, Stream, StreamWithSegments } from "./index";
 import {
-  SegmentLoadStatus,
+  QueueStatuses,
   Playback,
   LoadBufferRanges,
   QueueItem,
@@ -45,9 +45,9 @@ export function generateQueue({
   isSegmentLoaded: (segmentId: string) => boolean;
   settings: Pick<
     Settings,
-    "highDemandBufferLength" | "httpBufferLength" | "p2pBufferLength"
+    "highDemandTimeWindow" | "httpDownloadTimeWindow" | "p2pDownloadTimeWindow"
   >;
-}) {
+}): { queue: QueueItem[]; queueSegmentIds: Set<string> } {
   const bufferRanges = getLoadBufferRanges(playback, settings);
   const { localId: requestedSegmentId } = segment;
 
@@ -57,7 +57,7 @@ export function generateQueue({
   const nextSegment = stream.segments.getNextTo(segment.localId)?.[1];
   const isNextSegmentHighDemand = !!(
     nextSegment &&
-    getSegmentLoadStatuses(nextSegment, bufferRanges)?.has("high-demand")
+    getSegmentLoadStatuses(nextSegment, bufferRanges).isHighDemand
   );
 
   let i = 0;
@@ -67,7 +67,8 @@ export function generateQueue({
     if (isSegmentLoaded(segment.localId)) continue;
 
     queueSegmentIds.add(segment.localId);
-    queue.push({ segment, statuses: statuses ?? new Set(["high-demand"]) });
+    statuses.isHighDemand = true;
+    queue.push({ segment, statuses });
     i++;
   }
 
@@ -78,12 +79,15 @@ export function getLoadBufferRanges(
   playback: Readonly<Playback>,
   settings: Pick<
     Settings,
-    "highDemandBufferLength" | "httpBufferLength" | "p2pBufferLength"
+    "highDemandTimeWindow" | "httpDownloadTimeWindow" | "p2pDownloadTimeWindow"
   >
 ): LoadBufferRanges {
   const { position, rate } = playback;
-  const { highDemandBufferLength, httpBufferLength, p2pBufferLength } =
-    settings;
+  const {
+    highDemandTimeWindow,
+    httpDownloadTimeWindow,
+    p2pDownloadTimeWindow,
+  } = settings;
 
   const getRange = (position: number, rate: number, bufferLength: number) => {
     return {
@@ -92,36 +96,31 @@ export function getLoadBufferRanges(
     };
   };
   return {
-    highDemand: getRange(position, rate, highDemandBufferLength),
-    http: getRange(position, rate, httpBufferLength),
-    p2p: getRange(position, rate, p2pBufferLength),
+    highDemand: getRange(position, rate, highDemandTimeWindow),
+    http: getRange(position, rate, httpDownloadTimeWindow),
+    p2p: getRange(position, rate, p2pDownloadTimeWindow),
   };
 }
 
 export function getSegmentLoadStatuses(
   segment: Readonly<Segment>,
   loadBufferRanges: LoadBufferRanges
-): Set<SegmentLoadStatus> | undefined {
+): QueueStatuses {
   const { highDemand, http, p2p } = loadBufferRanges;
   const { startTime, endTime } = segment;
 
-  const statuses = new Set<SegmentLoadStatus>();
   const isValueInRange = (value: number, range: NumberRange) =>
     value >= range.from && value < range.to;
 
-  if (
-    isValueInRange(startTime, highDemand) ||
-    isValueInRange(endTime, highDemand)
-  ) {
-    statuses.add("high-demand");
-  }
-  if (isValueInRange(startTime, http) || isValueInRange(endTime, http)) {
-    statuses.add("http-downloadable");
-  }
-  if (isValueInRange(startTime, p2p) || isValueInRange(endTime, p2p)) {
-    statuses.add("p2p-downloadable");
-  }
-  if (statuses.size) return statuses;
+  return {
+    isHighDemand:
+      isValueInRange(startTime, highDemand) ||
+      isValueInRange(endTime, highDemand),
+    isHttpDownloadable:
+      isValueInRange(startTime, http) || isValueInRange(endTime, http),
+    isP2PDownloadable:
+      isValueInRange(startTime, p2p) || isValueInRange(endTime, p2p),
+  };
 }
 
 export function isSegmentActual(
@@ -139,4 +138,21 @@ export function isSegmentActual(
   };
 
   return isInRange(startTime) || isInRange(endTime);
+}
+
+export function getControlledPromise<T>() {
+  let resolve: (value: T) => void;
+  let reject: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+
+  return {
+    promise,
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    resolve: resolve!,
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    reject: reject!,
+  };
 }
