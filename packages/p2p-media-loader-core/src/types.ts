@@ -1,5 +1,7 @@
 import { LinkedMap } from "./linked-map";
 
+export type { EngineCallbacks } from "./request";
+
 export type StreamType = "main" | "secondary";
 
 export type ByteRange = { start: number; end: number };

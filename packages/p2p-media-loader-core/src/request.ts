@@ -1,8 +1,7 @@
 import { Segment, SegmentResponse } from "./types";
 import { RequestAbortError } from "./errors";
 
-type EngineRequest = {
-  promise: Promise<SegmentResponse>;
+export type EngineCallbacks = {
   onSuccess: (response: SegmentResponse) => void;
   onError: (reason?: unknown) => void;
 };
@@ -25,7 +24,7 @@ type HybridLoaderRequest = HttpRequest | P2PRequest;
 type Request = {
   segment: Readonly<Segment>;
   loaderRequest?: Readonly<HybridLoaderRequest>;
-  engineRequest?: Readonly<EngineRequest>;
+  engineCallbacks?: Readonly<EngineCallbacks>;
 };
 
 export class RequestContainer {
@@ -42,29 +41,26 @@ export class RequestContainer {
         loaderRequest,
       });
     }
-    loaderRequest.promise.finally(() => {
-      const request = this.requests.get(segmentId);
-      delete request?.loaderRequest;
-      if (request) this.clearRequestItem(request);
-    });
+    loaderRequest.promise.finally(() =>
+      this.clearRequestItem(segmentId, "loader")
+    );
   }
 
-  addEngineRequest(segment: Segment, engineRequest: EngineRequest) {
+  addEngineCallbacks(segment: Segment, engineCallbacks: EngineCallbacks) {
     const segmentId = segment.localId;
     const requestItem = this.requests.get(segmentId);
     if (requestItem) {
-      requestItem.engineRequest = engineRequest;
+      requestItem.engineCallbacks = engineCallbacks;
     } else {
+      engineCallbacks.onSuccess = (response) => {
+        this.clearRequestItem(segmentId, "engine");
+        return response;
+      };
       this.requests.set(segmentId, {
         segment,
-        engineRequest,
+        engineCallbacks,
       });
     }
-    engineRequest.promise.finally(() => {
-      const request = this.requests.get(segmentId);
-      delete request?.engineRequest;
-      if (request) this.clearRequestItem(request);
-    });
   }
 
   get(segmentId: string) {
@@ -82,11 +78,11 @@ export class RequestContainer {
   }
 
   resolveEngineRequest(segmentId: string, response: SegmentResponse) {
-    this.requests.get(segmentId)?.engineRequest?.onSuccess(response);
+    this.requests.get(segmentId)?.engineCallbacks?.onSuccess(response);
   }
 
   isRequestedByEngine(segmentId: string): boolean {
-    return !!this.requests.get(segmentId)?.engineRequest;
+    return !!this.requests.get(segmentId)?.engineCallbacks;
   }
 
   isHttpRequested(segmentId: string): boolean {
@@ -106,7 +102,7 @@ export class RequestContainer {
     const request = this.requests.get(segmentId);
     if (!request) return;
 
-    request.engineRequest?.onError(new RequestAbortError());
+    request.engineCallbacks?.onError(new RequestAbortError());
   }
 
   abortLoaderRequest(segmentId: string) {
@@ -115,23 +111,31 @@ export class RequestContainer {
 
     if (request.loaderRequest) {
       request.loaderRequest.abort();
-      request.engineRequest?.onError(new RequestAbortError());
+      request.engineCallbacks?.onError(new RequestAbortError());
     }
   }
 
-  private clearRequestItem(request: Request): void {
-    if (!request.engineRequest && !request.loaderRequest) {
-      this.requests.delete(request.segment.localId);
+  private clearRequestItem(
+    requestItemId: string,
+    type: "loader" | "engine"
+  ): void {
+    const requestItem = this.requests.get(requestItemId);
+    if (!requestItem) return;
+
+    if (type === "engine") delete requestItem.engineCallbacks;
+    if (type === "loader") delete requestItem.loaderRequest;
+    if (!requestItem.engineCallbacks && !requestItem.loaderRequest) {
+      this.requests.delete(requestItem.segment.localId);
     }
   }
 
   abortAllNotRequestedByEngine(isLocked: (segmentId: string) => boolean) {
     for (const {
       loaderRequest,
-      engineRequest,
+      engineCallbacks,
       segment,
     } of this.requests.values()) {
-      if (!engineRequest) continue;
+      if (!engineCallbacks) continue;
       if (!isLocked(segment.localId) && loaderRequest) loaderRequest.abort();
     }
   }
@@ -139,7 +143,7 @@ export class RequestContainer {
   destroy() {
     for (const request of this.requests.values()) {
       request.loaderRequest?.abort();
-      request.engineRequest?.onError();
+      request.engineCallbacks?.onError();
     }
     this.requests.clear();
   }

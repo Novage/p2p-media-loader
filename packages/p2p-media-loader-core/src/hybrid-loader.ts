@@ -1,11 +1,11 @@
-import { Segment, SegmentResponse, StreamWithSegments } from "./index";
+import { Segment, StreamWithSegments } from "./index";
 import { getHttpSegmentRequest } from "./http-loader";
 import { P2PLoader } from "./p2p-loader";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import { Settings } from "./types";
 import { BandwidthApproximator } from "./bandwidth-approximator";
 import { Playback, QueueItem } from "./internal-types";
-import { RequestContainer } from "./request";
+import { RequestContainer, EngineCallbacks } from "./request";
 import * as Utils from "./utils";
 import { FetchError } from "./errors";
 
@@ -59,8 +59,9 @@ export class HybridLoader {
   // api method for engines
   async loadSegment(
     segment: Readonly<Segment>,
-    stream: Readonly<StreamWithSegments>
-  ): Promise<SegmentResponse> {
+    stream: Readonly<StreamWithSegments>,
+    callbacks: EngineCallbacks
+  ) {
     if (!this.playback) {
       this.playback = { position: segment.startTime, rate: 1 };
     }
@@ -75,14 +76,12 @@ export class HybridLoader {
       segment.localId
     );
     if (storageData) {
-      return {
+      callbacks.onSuccess({
         data: storageData,
         bandwidth: this.bandwidthApproximator.getBandwidth(),
-      };
+      });
     }
-    const request = Utils.getControlledPromise<SegmentResponse>();
-    this.requests.addEngineRequest(segment, request);
-    return request.promise;
+    this.requests.addEngineCallbacks(segment, callbacks);
   }
 
   private async processQueue(force = true) {

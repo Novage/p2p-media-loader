@@ -2,7 +2,7 @@ import * as Utils from "./stream-utils";
 import { SegmentManager } from "./segment-manager";
 import { StreamInfo } from "./types";
 import { Shaka, Stream } from "./types";
-import { Core } from "p2p-media-loader-core";
+import { Core, EngineCallbacks, SegmentResponse } from "p2p-media-loader-core";
 
 interface LoadingHandlerInterface {
   handleLoading: shaka.extern.SchemePlugin;
@@ -83,9 +83,9 @@ export class LoadingHandler implements LoadingHandlerInterface {
     if (!this.core.hasSegment(segmentId)) return this.defaultLoad();
 
     const loadSegment = async (): Promise<Response> => {
-      const response = await this.core.loadSegment(segmentId);
-
-      const { data, bandwidth } = response;
+      const { request, callbacks } = getSegmentRequest();
+      this.core.loadSegment(segmentId, callbacks);
+      const { data, bandwidth } = await request;
       return {
         data,
         headers: {},
@@ -112,4 +112,40 @@ function getLoadingDurationBasedOnBandwidth(
 ) {
   const bits = bytesLoaded * 8;
   return Math.round(bits / bandwidth) * 1000;
+}
+
+function getControlledPromise<T>() {
+  let resolve: (value: T) => void;
+  let reject: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+
+  return {
+    promise,
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    resolve: resolve!,
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    reject: reject!,
+  };
+}
+
+function getSegmentRequest(): {
+  callbacks: EngineCallbacks;
+  request: Promise<SegmentResponse>;
+} {
+  const {
+    promise: request,
+    resolve: onSuccess,
+    reject: onError,
+  } = getControlledPromise<SegmentResponse>();
+
+  return {
+    request,
+    callbacks: {
+      onSuccess,
+      onError,
+    },
+  };
 }
