@@ -84,7 +84,7 @@ export class LoadingHandler implements LoadingHandlerInterface {
 
     const loadSegment = async (): Promise<Response> => {
       const { request, callbacks } = getSegmentRequest();
-      this.core.loadSegment(segmentId, callbacks);
+      await this.core.loadSegment(segmentId, callbacks);
       const { data, bandwidth } = await request;
       return {
         data,

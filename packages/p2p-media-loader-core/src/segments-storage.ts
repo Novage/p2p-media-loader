@@ -6,8 +6,11 @@ export class SegmentsMemoryStorage {
     { segment: Segment; data: ArrayBuffer; lastAccessed: number }
   >();
   private readonly cachedSegmentIds = new Set<string>();
-  private isSegmentLockedPredicate?: (segment: Segment) => boolean;
+  private readonly isSegmentLockedPredicates: ((
+    segment: Segment
+  ) => boolean)[] = [];
   private onUpdateSubscriptions: (() => void)[] = [];
+  private _isInitialized = false;
 
   constructor(
     private settings: {
@@ -17,11 +20,19 @@ export class SegmentsMemoryStorage {
   ) {}
 
   async initialize(masterManifestUrl: string) {
-    // empty
+    this._isInitialized = true;
   }
 
-  setIsSegmentLockedPredicate(predicate: (segment: Segment) => boolean) {
-    this.isSegmentLockedPredicate = predicate;
+  get isInitialized(): boolean {
+    return this._isInitialized;
+  }
+
+  addIsSegmentLockedPredicate(predicate: (segment: Segment) => boolean) {
+    this.isSegmentLockedPredicates.push(predicate);
+  }
+
+  private isSegmentLocked(segment: Segment) {
+    return this.isSegmentLockedPredicates.some((p) => p(segment));
   }
 
   subscribeOnUpdate(callback: () => void) {
@@ -72,7 +83,7 @@ export class SegmentsMemoryStorage {
       { lastAccessed, segment },
     ] of this.cache.entries()) {
       if (now - lastAccessed > this.settings.cachedSegmentExpiration) {
-        if (!this.isSegmentLockedPredicate?.(segment)) {
+        if (!this.isSegmentLocked(segment)) {
           segmentsToDelete.push(segmentExternalId);
         }
       } else {
@@ -87,7 +98,7 @@ export class SegmentsMemoryStorage {
       remainingSegments.sort((a, b) => a.lastAccessed - b.lastAccessed);
 
       for (const cachedSegment of remainingSegments) {
-        if (!this.isSegmentLockedPredicate?.(cachedSegment.segment)) {
+        if (!this.isSegmentLocked(cachedSegment.segment)) {
           segmentsToDelete.push(cachedSegment.segment.externalId);
           countOverhead--;
           if (countOverhead === 0) break;
@@ -108,5 +119,6 @@ export class SegmentsMemoryStorage {
   public async destroy() {
     this.cache.clear();
     this.onUpdateSubscriptions = [];
+    this._isInitialized = false;
   }
 }

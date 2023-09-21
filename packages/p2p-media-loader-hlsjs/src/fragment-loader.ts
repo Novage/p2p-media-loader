@@ -94,7 +94,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       this.handleError(error);
     };
 
-    this.core.loadSegment(this.segmentId, { onSuccess, onError });
+    void this.core.loadSegment(this.segmentId, { onSuccess, onError });
   }
 
   private handleError(thrownError: unknown) {

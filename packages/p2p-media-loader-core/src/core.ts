@@ -4,6 +4,7 @@ import * as Utils from "./utils";
 import { LinkedMap } from "./linked-map";
 import { BandwidthApproximator } from "./bandwidth-approximator";
 import { EngineCallbacks } from "./request";
+import { SegmentsMemoryStorage } from "./segments-storage";
 
 export class Core<TStream extends Stream = Stream> {
   private manifestResponseUrl?: string;
@@ -17,6 +18,7 @@ export class Core<TStream extends Stream = Stream> {
     cachedSegmentsCount: 50,
   };
   private readonly bandwidthApproximator = new BandwidthApproximator();
+  private readonly segmentStorage = new SegmentsMemoryStorage(this.settings);
   private mainStreamLoader?: HybridLoader;
   private secondaryStreamLoader?: HybridLoader;
 
@@ -54,7 +56,13 @@ export class Core<TStream extends Stream = Stream> {
     removeSegmentIds?.forEach((id) => stream.segments.delete(id));
   }
 
-  loadSegment(segmentLocalId: string, callbacks: EngineCallbacks) {
+  async loadSegment(segmentLocalId: string, callbacks: EngineCallbacks) {
+    if (!this.manifestResponseUrl) {
+      throw new Error("Manifest response url is not defined");
+    }
+    if (!this.segmentStorage.isInitialized) {
+      await this.segmentStorage.initialize(this.manifestResponseUrl);
+    }
     const { segment, stream } = this.identifySegment(segmentLocalId);
     const loader = this.getStreamHybridLoader(segment, stream);
     void loader.loadSegment(segment, stream, callbacks);
@@ -95,6 +103,19 @@ export class Core<TStream extends Stream = Stream> {
     if (!this.manifestResponseUrl) {
       throw new Error("Manifest response url is not defined");
     }
+    const createNewHybridLoader = (manifestResponseUrl: string) => {
+      if (!this.segmentStorage.isInitialized) {
+        throw new Error("Segment storage is not initialized");
+      }
+      return new HybridLoader(
+        manifestResponseUrl,
+        segment,
+        stream,
+        this.settings,
+        this.bandwidthApproximator,
+        this.segmentStorage
+      );
+    };
     const streamTypeLoaderKeyMap = {
       main: "mainStreamLoader",
       secondary: "secondaryStreamLoader",
@@ -103,13 +124,6 @@ export class Core<TStream extends Stream = Stream> {
     const loaderKey = streamTypeLoaderKeyMap[type];
 
     return (this[loaderKey] =
-      this[loaderKey] ??
-      new HybridLoader(
-        this.manifestResponseUrl,
-        segment,
-        stream,
-        this.settings,
-        this.bandwidthApproximator
-      ));
+      this[loaderKey] ?? createNewHybridLoader(this.manifestResponseUrl));
   }
 }

@@ -12,7 +12,6 @@ import { FetchError } from "./errors";
 export class HybridLoader {
   private readonly requests = new RequestContainer();
   private p2pLoader?: P2PLoader;
-  private readonly segmentStorage: SegmentsMemoryStorage;
   private storageCleanUpIntervalId?: number;
   private activeStream: Readonly<StreamWithSegments>;
   private lastRequestedSegment: Readonly<Segment>;
@@ -24,13 +23,17 @@ export class HybridLoader {
     requestedSegment: Segment,
     requestedStream: Readonly<StreamWithSegments>,
     private readonly settings: Settings,
-    private readonly bandwidthApproximator: BandwidthApproximator
+    private readonly bandwidthApproximator: BandwidthApproximator,
+    private readonly segmentStorage: SegmentsMemoryStorage
   ) {
     this.lastRequestedSegment = requestedSegment;
     this.activeStream = requestedStream;
     this.playback = { position: requestedSegment.startTime, rate: 1 };
-    this.segmentStorage = new SegmentsMemoryStorage(this.settings);
-    this.segmentStorage.setIsSegmentLockedPredicate((segment) => {
+
+    if (!this.segmentStorage.isInitialized) {
+      throw new Error("Segment storage is not initialized.");
+    }
+    this.segmentStorage.addIsSegmentLockedPredicate((segment) => {
       if (!this.activeStream.segments.has(segment.localId)) {
         return false;
       }
@@ -41,6 +44,7 @@ export class HybridLoader {
       return Utils.isSegmentActual(segment, bufferRanges);
     });
 
+    // TODO: move cleanup somewhere
     this.storageCleanUpIntervalId = window.setInterval(
       () => this.segmentStorage.clear(),
       1000
