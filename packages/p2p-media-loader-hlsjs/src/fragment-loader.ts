@@ -71,30 +71,30 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       return;
     }
 
-    try {
-      const { request, callbacks } = getSegmentRequest();
-      this.core.loadSegment(this.segmentId, callbacks);
-      this.response = await request;
-    } catch (error) {
+    const onSuccess = (response: SegmentResponse) => {
+      this.response = response;
+      const loadedBytes = this.response.data.byteLength;
+      stats.loading = getLoadingStat({
+        targetBitrate: this.response.bandwidth,
+        loadingEndTime: performance.now(),
+        loadedBytes,
+      });
+      stats.total = stats.loaded = loadedBytes;
+
+      callbacks.onSuccess(
+        { data: this.response.data, url: context.url },
+        this.stats,
+        context,
+        this.response
+      );
+    };
+
+    const onError = (error: unknown) => {
       if (this.stats.aborted && error instanceof RequestAbortError) return;
-      return this.handleError(error);
-    }
-    if (!this.response) return;
-    const loadedBytes = this.response.data.byteLength;
+      this.handleError(error);
+    };
 
-    stats.loading = getLoadingStat({
-      targetBitrate: this.response.bandwidth,
-      loadingEndTime: performance.now(),
-      loadedBytes,
-    });
-    stats.total = stats.loaded = loadedBytes;
-
-    callbacks.onSuccess(
-      { data: this.response.data, url: context.url },
-      this.stats,
-      context,
-      this.response
-    );
+    this.core.loadSegment(this.segmentId, { onSuccess, onError });
   }
 
   private handleError(thrownError: unknown) {
@@ -152,26 +152,4 @@ function getLoadingStat({
   const start = first - DEFAULT_DOWNLOAD_LATENCY;
 
   return { start, first, end: loadingEndTime };
-}
-
-function getSegmentRequest(): {
-  callbacks: EngineCallbacks;
-  request: Promise<SegmentResponse>;
-} {
-  let onSuccess: (value: SegmentResponse) => void;
-  let onError: (reason?: unknown) => void;
-  const request = new Promise<SegmentResponse>((resolve, reject) => {
-    onSuccess = resolve;
-    onError = reject;
-  });
-
-  return {
-    request,
-    callbacks: {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      onSuccess: onSuccess!,
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      onError: onError!,
-    },
-  };
 }
