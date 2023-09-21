@@ -50,4 +50,5 @@ export type Settings = {
   cachedSegmentsCount: number;
   webRtcMaxMessageSize: number;
   p2pSegmentDownloadTimeout: number;
+  storageCleanupInterval: number;
 };

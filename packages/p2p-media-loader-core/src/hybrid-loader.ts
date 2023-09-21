@@ -43,12 +43,6 @@ export class HybridLoader {
       );
       return Utils.isSegmentActual(segment, bufferRanges);
     });
-
-    // TODO: move cleanup somewhere
-    this.storageCleanUpIntervalId = window.setInterval(
-      () => this.segmentStorage.clear(),
-      1000
-    );
   }
 
   private createP2PLoader(stream: StreamWithSegments) {
@@ -56,7 +50,8 @@ export class HybridLoader {
       this.streamManifestUrl,
       stream,
       this.requests,
-      this.segmentStorage
+      this.segmentStorage,
+      this.settings
     );
   }
 

@@ -1,4 +1,9 @@
-import { Segment } from "./types";
+import { Segment, Settings } from "./types";
+
+type StorageSettings = Pick<
+  Settings,
+  "cachedSegmentExpiration" | "cachedSegmentsCount" | "storageCleanupInterval"
+>;
 
 export class SegmentsMemoryStorage {
   private cache = new Map<
@@ -11,16 +16,13 @@ export class SegmentsMemoryStorage {
   ) => boolean)[] = [];
   private onUpdateSubscriptions: (() => void)[] = [];
   private _isInitialized = false;
+  private cleanupIntervalId?: number;
 
-  constructor(
-    private settings: {
-      cachedSegmentExpiration: number;
-      cachedSegmentsCount: number;
-    }
-  ) {}
+  constructor(private settings: StorageSettings) {}
 
   async initialize(masterManifestUrl: string) {
     this._isInitialized = true;
+    this.cleanupIntervalId = window.setInterval(() => this.clear(), 1000);
   }
 
   get isInitialized(): boolean {
@@ -68,7 +70,7 @@ export class SegmentsMemoryStorage {
     return this.cachedSegmentIds;
   }
 
-  async clear(): Promise<boolean> {
+  private async clear(): Promise<boolean> {
     const segmentsToDelete: string[] = [];
     const remainingSegments: {
       lastAccessed: number;
@@ -120,5 +122,6 @@ export class SegmentsMemoryStorage {
     this.cache.clear();
     this.onUpdateSubscriptions = [];
     this._isInitialized = false;
+    clearInterval(this.cleanupIntervalId);
   }
 }
