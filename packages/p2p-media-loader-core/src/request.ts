@@ -142,7 +142,7 @@ export class RequestContainer {
     }
   }
 
-  abortAllNotRequestedByEngine(isLocked: (segmentId: string) => boolean) {
+  abortAllNotRequestedByEngine(isLocked?: (segmentId: string) => boolean) {
     for (const {
       loaderRequest,
       engineCallbacks,
@@ -150,7 +150,9 @@ export class RequestContainer {
     } of this.requests.values()) {
       if (!engineCallbacks) continue;
       const segmentId = getRequestItemId(segment);
-      if (!isLocked(segmentId) && loaderRequest) loaderRequest.abort();
+      if ((!isLocked || !isLocked(segmentId)) && loaderRequest) {
+        loaderRequest.abort();
+      }
     }
   }
 

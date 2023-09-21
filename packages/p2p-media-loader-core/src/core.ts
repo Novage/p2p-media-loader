@@ -16,6 +16,8 @@ export class Core<TStream extends Stream = Stream> {
     p2pDownloadTimeWindow: 60,
     cachedSegmentExpiration: 120,
     cachedSegmentsCount: 50,
+    webRtcMaxMessageSize: 64 * 1024 - 1,
+    p2pSegmentDownloadTimeout: 1000,
   };
   private readonly bandwidthApproximator = new BandwidthApproximator();
   private readonly segmentStorage = new SegmentsMemoryStorage(this.settings);

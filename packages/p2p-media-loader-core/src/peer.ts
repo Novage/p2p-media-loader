@@ -9,7 +9,7 @@ import {
 import { PeerCommandType, PeerSegmentStatus } from "./enums";
 import * as PeerUtil from "./peer-utils";
 import { P2PRequest } from "./request";
-import { Segment } from "./types";
+import { Segment, Settings } from "./types";
 import * as Utils from "./utils";
 import {
   RequestAbortError,
@@ -17,10 +17,6 @@ import {
   ResponseBytesMismatchError,
   PeerSegmentAbsentError,
 } from "./errors";
-
-// TODO: add to settings
-const webRtcMaxMessageSize: number = 64 * 1024 - 1;
-const p2pSegmentDownloadTimeout = 1000;
 
 type PeerEventHandlers = {
   onPeerConnected: (peer: Peer) => void;
@@ -36,16 +32,24 @@ type PeerRequest = {
   responseTimeoutId: number;
 };
 
+type PeerSettings = Pick<
+  Settings,
+  "p2pSegmentDownloadTimeout" | "webRtcMaxMessageSize"
+>;
+
 export class Peer {
   readonly id: string;
   private readonly candidates = new Set<PeerCandidate>();
   private connection?: PeerCandidate;
-  private readonly eventHandlers: PeerEventHandlers;
   private segments = new Map<string, PeerSegmentStatus>();
   private request?: PeerRequest;
   private isSendingData = false;
 
-  constructor(candidate: PeerCandidate, eventHandlers: PeerEventHandlers) {
+  constructor(
+    candidate: PeerCandidate,
+    private readonly eventHandlers: PeerEventHandlers,
+    private readonly settings: PeerSettings
+  ) {
     this.id = candidate.id;
     this.eventHandlers = eventHandlers;
     this.addCandidate(candidate);
@@ -154,7 +158,7 @@ export class Peer {
   private setRequestTimeout(): number {
     return window.setTimeout(
       () => this.cancelSegmentRequest(new RequestTimeoutError()),
-      p2pSegmentDownloadTimeout
+      this.settings.p2pSegmentDownloadTimeout
     );
   }
 
@@ -195,7 +199,10 @@ export class Peer {
 
     this.isSendingData = true;
     const sendChuck = async (data: ArrayBuffer) => this.connection?.send(data);
-    for (const chuck of getBufferChunks(data, webRtcMaxMessageSize)) {
+    for (const chuck of getBufferChunks(
+      data,
+      this.settings.webRtcMaxMessageSize
+    )) {
       if (!this.isSendingData) break;
       void sendChuck(chuck);
     }

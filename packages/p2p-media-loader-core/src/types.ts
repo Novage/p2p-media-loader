@@ -48,4 +48,6 @@ export type Settings = {
   simultaneousHttpDownloads: number;
   cachedSegmentExpiration: number;
   cachedSegmentsCount: number;
+  webRtcMaxMessageSize: number;
+  p2pSegmentDownloadTimeout: number;
 };

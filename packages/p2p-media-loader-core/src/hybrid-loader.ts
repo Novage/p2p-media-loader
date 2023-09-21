@@ -85,7 +85,7 @@ export class HybridLoader {
     this.requests.addEngineCallbacks(segment, callbacks);
   }
 
-  private async processQueue(force = true) {
+  private processQueue(force = true) {
     const now = performance.now();
     if (
       !force &&
@@ -141,22 +141,23 @@ export class HybridLoader {
         // TODO: handle error
       }
     }
-    if (data) this.handleSegmentLoaded(segment, data);
+    if (data) this.onSegmentLoaded(segment, data);
   }
 
   private async loadThroughP2P(segment: Segment) {
     if (!this.p2pLoader) return;
     const data = await this.p2pLoader.downloadSegment(segment);
-    if (data) this.handleSegmentLoaded(segment, data);
+    if (data) this.onSegmentLoaded(segment, data);
   }
 
-  private handleSegmentLoaded(segment: Segment, data: ArrayBuffer) {
+  private onSegmentLoaded(segment: Segment, data: ArrayBuffer) {
     this.bandwidthApproximator.addBytes(data.byteLength);
     void this.segmentStorage.storeSegment(segment, data);
     this.requests.resolveEngineRequest(segment.localId, {
       data,
       bandwidth: this.bandwidthApproximator.getBandwidth(),
     });
+    this.processQueue();
   }
 
   private abortLastHttpLoadingAfter(queue: QueueItem[], segmentId: string) {

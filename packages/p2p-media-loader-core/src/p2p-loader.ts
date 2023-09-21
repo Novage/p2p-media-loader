@@ -2,7 +2,7 @@ import TrackerClient, { PeerCandidate } from "bittorrent-tracker";
 import * as RIPEMD160 from "ripemd160";
 import { Peer } from "./peer";
 import * as PeerUtil from "./peer-utils";
-import { Segment, StreamWithSegments } from "./types";
+import { Segment, Settings, StreamWithSegments } from "./types";
 import { JsonSegmentAnnouncementMap } from "./internal-types";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import * as Utils from "./utils";
@@ -21,7 +21,8 @@ export class P2PLoader {
     private streamManifestUrl: string,
     private readonly stream: StreamWithSegments,
     private readonly requests: RequestContainer,
-    private readonly segmentStorage: SegmentsMemoryStorage
+    private readonly segmentStorage: SegmentsMemoryStorage,
+    private readonly settings: Settings
   ) {
     const peerId = PeerUtil.generatePeerId();
     this.streamExternalId = Utils.getStreamExternalId(
@@ -80,10 +81,14 @@ export class P2PLoader {
   }
 
   private createPeer(candidate: PeerCandidate) {
-    const peer = new Peer(candidate, {
-      onPeerConnected: this.onPeerConnected.bind(this),
-      onSegmentRequested: this.onSegmentRequested.bind(this),
-    });
+    const peer = new Peer(
+      candidate,
+      {
+        onPeerConnected: this.onPeerConnected.bind(this),
+        onSegmentRequested: this.onSegmentRequested.bind(this),
+      },
+      this.settings
+    );
     this.peers.set(candidate.id, peer);
   }
 
