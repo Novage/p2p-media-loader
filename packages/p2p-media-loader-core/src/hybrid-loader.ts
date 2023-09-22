@@ -11,7 +11,7 @@ import { FetchError } from "./errors";
 
 export class HybridLoader {
   private readonly requests = new RequestContainer();
-  private p2pLoader?: P2PLoader;
+  private readonly p2pLoaders: P2PLoadersContainer;
   private storageCleanUpIntervalId?: number;
   private activeStream: Readonly<StreamWithSegments>;
   private lastRequestedSegment: Readonly<Segment>;
@@ -43,12 +43,9 @@ export class HybridLoader {
       );
       return Utils.isSegmentActual(segment, bufferRanges);
     });
-  }
-
-  private createP2PLoader(stream: StreamWithSegments) {
-    this.p2pLoader = new P2PLoader(
+    this.p2pLoaders = new P2PLoadersContainer(
       this.streamManifestUrl,
-      stream,
+      requestedStream,
       this.requests,
       this.segmentStorage,
       this.settings
@@ -61,9 +58,9 @@ export class HybridLoader {
     stream: Readonly<StreamWithSegments>,
     callbacks: EngineCallbacks
   ) {
-    if (stream !== this.activeStream) {
+    if (this.activeStream !== stream) {
       this.activeStream = stream;
-      this.createP2PLoader(stream);
+      this.p2pLoaders.changeActiveLoader(stream);
     }
     this.lastRequestedSegment = segment;
     void this.processQueue();
@@ -140,8 +137,8 @@ export class HybridLoader {
   }
 
   private async loadThroughP2P(segment: Segment) {
-    if (!this.p2pLoader) return;
-    const data = await this.p2pLoader.downloadSegment(segment);
+    const p2pLoader = this.p2pLoaders.activeLoader;
+    const data = await p2pLoader.downloadSegment(segment);
     if (data) this.onSegmentLoaded(segment, data);
   }
 
@@ -189,5 +186,45 @@ export class HybridLoader {
 function* arrayBackwards<T>(arr: T[]) {
   for (let i = arr.length - 1; i >= 0; i--) {
     yield arr[i];
+  }
+}
+
+class P2PLoadersContainer {
+  private readonly loaders = new Map<string, P2PLoader>();
+  private _activeLoader: P2PLoader;
+
+  constructor(
+    private readonly streamManifestUrl: string,
+    stream: StreamWithSegments,
+    private readonly requests: RequestContainer,
+    private readonly segmentStorage: SegmentsMemoryStorage,
+    private readonly settings: Settings
+  ) {
+    this._activeLoader = this.createLoader(stream);
+  }
+
+  createLoader(stream: StreamWithSegments) {
+    if (this.loaders.has(stream.localId)) {
+      throw new Error("Loader for this stream already exists");
+    }
+    this._activeLoader = new P2PLoader(
+      this.streamManifestUrl,
+      stream,
+      this.requests,
+      this.segmentStorage,
+      this.settings
+    );
+    this.loaders.set(stream.localId, this._activeLoader);
+    return this._activeLoader;
+  }
+
+  changeActiveLoader(stream: StreamWithSegments) {
+    const existingLoader = this.loaders.get(stream.localId);
+    if (existingLoader) this._activeLoader = existingLoader;
+    else this.createLoader(stream);
+  }
+
+  get activeLoader() {
+    return this._activeLoader;
   }
 }
