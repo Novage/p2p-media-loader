@@ -137,49 +137,6 @@ export class Peer {
     return this.request.p2pRequest;
   }
 
-  private createPeerRequest(segment: Segment): PeerRequest {
-    const { promise, resolve, reject } =
-      Utils.getControlledPromise<ArrayBuffer>();
-    return {
-      segment,
-      resolve,
-      reject,
-      responseTimeoutId: this.setRequestTimeout(),
-      chunks: [],
-      p2pRequest: {
-        type: "p2p",
-        startTimestamp: performance.now(),
-        promise,
-        abort: () => this.cancelSegmentRequest(new RequestAbortError()),
-      },
-    };
-  }
-
-  private setRequestTimeout(): number {
-    return window.setTimeout(
-      () => this.cancelSegmentRequest(new RequestTimeoutError()),
-      this.settings.p2pSegmentDownloadTimeout
-    );
-  }
-
-  private cancelSegmentRequest(
-    reason:
-      | RequestAbortError
-      | RequestTimeoutError
-      | PeerSegmentAbsentError
-      | ResponseBytesMismatchError
-  ) {
-    if (!this.request) return;
-    if (!(reason instanceof PeerSegmentAbsentError)) {
-      this.sendCommand({
-        c: PeerCommandType.CancelSegmentRequest,
-        i: this.request.segment.externalId.toString(),
-      });
-    }
-    this.request.reject(reason);
-    this.clearRequest();
-  }
-
   sendSegmentsAnnouncement(map: JsonSegmentAnnouncementMap) {
     const command: PeerSegmentAnnouncementCommand = {
       c: PeerCommandType.SegmentsAnnouncement,
@@ -221,6 +178,24 @@ export class Peer {
     this.sendCommand(command);
   }
 
+  private createPeerRequest(segment: Segment): PeerRequest {
+    const { promise, resolve, reject } =
+      Utils.getControlledPromise<ArrayBuffer>();
+    return {
+      segment,
+      resolve,
+      reject,
+      responseTimeoutId: this.setRequestTimeout(),
+      chunks: [],
+      p2pRequest: {
+        type: "p2p",
+        startTimestamp: performance.now(),
+        promise,
+        abort: () => this.cancelSegmentRequest(new RequestAbortError()),
+      },
+    };
+  }
+
   private receiveSegmentChuck(chuck: ArrayBuffer): void {
     // TODO: check can be chunk received before peer command answer
     const { request } = this;
@@ -244,9 +219,41 @@ export class Peer {
     this.clearRequest();
   }
 
+  private cancelSegmentRequest(
+    reason:
+      | RequestAbortError
+      | RequestTimeoutError
+      | PeerSegmentAbsentError
+      | ResponseBytesMismatchError
+  ) {
+    if (!this.request) return;
+    if (!(reason instanceof PeerSegmentAbsentError)) {
+      this.sendCommand({
+        c: PeerCommandType.CancelSegmentRequest,
+        i: this.request.segment.externalId.toString(),
+      });
+    }
+    this.request.reject(reason);
+    this.clearRequest();
+  }
+
+  private setRequestTimeout(): number {
+    return window.setTimeout(
+      () => this.cancelSegmentRequest(new RequestTimeoutError()),
+      this.settings.p2pSegmentDownloadTimeout
+    );
+  }
+
   private clearRequest() {
     clearTimeout(this.request?.responseTimeoutId);
     this.request = undefined;
+  }
+
+  destroy() {
+    // TODO: error for peer destroyed
+    this.cancelSegmentRequest();
+    this.connection?.destroy();
+    this.candidates.clear();
   }
 }
 

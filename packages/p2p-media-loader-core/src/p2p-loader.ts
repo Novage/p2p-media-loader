@@ -138,6 +138,14 @@ export class P2PLoader {
       peer.sendSegmentsAnnouncement(this.announcementMap);
     }
   }
+
+  destroy() {
+    for (const peer of this.peers.values()) {
+      peer.destroy();
+    }
+    this.peers.clear();
+    this.trackerClient.destroy();
+  }
 }
 
 function getHash(data: string) {

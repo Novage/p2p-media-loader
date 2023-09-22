@@ -180,6 +180,7 @@ export class HybridLoader {
     this.storageCleanUpIntervalId = undefined;
     void this.segmentStorage.destroy();
     this.requests.destroy();
+    this.p2pLoaders.destroy();
   }
 }
 
@@ -226,5 +227,11 @@ class P2PLoadersContainer {
 
   get activeLoader() {
     return this._activeLoader;
+  }
+
+  destroy() {
+    for (const loader of this.loaders.values()) {
+      loader.destroy();
+    }
   }
 }
