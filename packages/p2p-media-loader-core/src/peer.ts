@@ -96,7 +96,7 @@ export class Peer {
         break;
 
       case PeerCommandType.SegmentData:
-        if (this.request?.segment.externalId.toString() === command.i) {
+        if (this.request?.segment.externalId === command.i) {
           this.request.p2pRequest.progress = {
             percent: 0,
             loadedBytes: 0,
@@ -106,7 +106,7 @@ export class Peer {
         break;
 
       case PeerCommandType.SegmentAbsent:
-        if (this.request?.segment.externalId.toString() === command.i) {
+        if (this.request?.segment.externalId === command.i) {
           this.cancelSegmentRequest(new PeerSegmentAbsentError());
           this.segments.delete(command.i);
         }
@@ -130,7 +130,7 @@ export class Peer {
     const { externalId } = segment;
     const command: PeerSegmentCommand = {
       c: PeerCommandType.SegmentRequest,
-      i: externalId.toString(),
+      i: externalId,
     };
     this.sendCommand(command);
     this.request = this.createPeerRequest(segment);
@@ -230,7 +230,7 @@ export class Peer {
     if (!(reason instanceof PeerSegmentAbsentError)) {
       this.sendCommand({
         c: PeerCommandType.CancelSegmentRequest,
-        i: this.request.segment.externalId.toString(),
+        i: this.request.segment.externalId,
       });
     }
     this.request.reject(reason);

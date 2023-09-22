@@ -50,10 +50,7 @@ export function getSegmentsFromPeerAnnouncementMap(
     for (let i = 0; i < segmentIds.length; i++) {
       const segmentId = segmentIds[i];
       const segmentStatus = statuses[i];
-      const segmentFullId = Util.getSegmentFullExternalId(
-        streamId,
-        segmentId.toString()
-      );
+      const segmentFullId = Util.getSegmentFullExternalId(streamId, segmentId);
       segmentStatusMap.set(segmentFullId, segmentStatus);
     }
   }

@@ -59,7 +59,7 @@ export class P2PLoader {
   }
 
   async downloadSegment(segment: Segment): Promise<ArrayBuffer | undefined> {
-    const segmentExternalId = segment.externalId.toString();
+    const segmentExternalId = segment.externalId;
     const peerWithSegment: Peer[] = [];
 
     for (const peer of this.peers.values()) {
