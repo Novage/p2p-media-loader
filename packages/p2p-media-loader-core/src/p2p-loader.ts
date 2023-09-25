@@ -60,6 +60,18 @@ export class P2PLoader {
     trackerClient.on("error", (error) => {});
   }
 
+  private createPeer(candidate: PeerCandidate) {
+    const peer = new Peer(
+      candidate,
+      {
+        onPeerConnected: this.onPeerConnected.bind(this),
+        onSegmentRequested: this.onSegmentRequested.bind(this),
+      },
+      this.settings
+    );
+    this.peers.set(candidate.id, peer);
+  }
+
   async downloadSegment(segment: Segment): Promise<ArrayBuffer | undefined> {
     const segmentExternalId = segment.externalId;
     const peerWithSegment: Peer[] = [];
@@ -80,18 +92,6 @@ export class P2PLoader {
     const request = peer.requestSegment(segment);
     this.requests.addLoaderRequest(segment, request);
     return request.promise;
-  }
-
-  private createPeer(candidate: PeerCandidate) {
-    const peer = new Peer(
-      candidate,
-      {
-        onPeerConnected: this.onPeerConnected.bind(this),
-        onSegmentRequested: this.onSegmentRequested.bind(this),
-      },
-      this.settings
-    );
-    this.peers.set(candidate.id, peer);
   }
 
   private updateSegmentAnnouncement() {

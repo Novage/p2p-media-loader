@@ -11,12 +11,7 @@ import * as PeerUtil from "./peer-utils";
 import { P2PRequest } from "./request";
 import { Segment, Settings } from "./types";
 import * as Utils from "./utils";
-import {
-  RequestAbortError,
-  RequestTimeoutError,
-  ResponseBytesMismatchError,
-  PeerSegmentAbsentError,
-} from "./errors";
+import { PeerRequestError } from "./errors";
 
 type PeerEventHandlers = {
   onPeerConnected: (peer: Peer) => void;
@@ -27,7 +22,7 @@ type PeerRequest = {
   segment: Segment;
   p2pRequest: P2PRequest;
   resolve: (data: ArrayBuffer) => void;
-  reject: (reason?: unknown) => void;
+  reject: (error: PeerRequestError) => void;
   chunks: ArrayBuffer[];
   responseTimeoutId: number;
 };
@@ -60,10 +55,15 @@ export class Peer {
       this.connection = candidate;
       this.eventHandlers.onPeerConnected(this);
     });
-    candidate.on("close", () => {
-      if (this.connection === candidate) this.connection = undefined;
-    });
     candidate.on("data", () => this.onReceiveData.bind(this));
+    candidate.on("close", () => {
+      if (this.connection === candidate) {
+        this.connection = undefined;
+        this.cancelSegmentRequest("peer-closed");
+      }
+    });
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    candidate.on("error", () => {});
     this.candidates.add(candidate);
   }
 
@@ -107,7 +107,7 @@ export class Peer {
 
       case PeerCommandType.SegmentAbsent:
         if (this.request?.segment.externalId === command.i) {
-          this.cancelSegmentRequest(new PeerSegmentAbsentError());
+          this.cancelSegmentRequest("segment-absent");
           this.segments.delete(command.i);
         }
         break;
@@ -189,9 +189,10 @@ export class Peer {
       chunks: [],
       p2pRequest: {
         type: "p2p",
+
         startTimestamp: performance.now(),
         promise,
-        abort: () => this.cancelSegmentRequest(new RequestAbortError()),
+        abort: () => this.cancelSegmentRequest("abort"),
       },
     };
   }
@@ -211,7 +212,7 @@ export class Peer {
       const segmentData = joinChunks(request.chunks);
       this.approveRequest(segmentData);
     } else if (progress.loadedBytes > progress.totalBytes) {
-      this.cancelSegmentRequest(new ResponseBytesMismatchError());
+      this.cancelSegmentRequest("response-bytes-mismatch");
     }
   }
 
@@ -220,27 +221,22 @@ export class Peer {
     this.clearRequest();
   }
 
-  private cancelSegmentRequest(
-    reason:
-      | RequestAbortError
-      | RequestTimeoutError
-      | PeerSegmentAbsentError
-      | ResponseBytesMismatchError
-  ) {
+  private cancelSegmentRequest(type: PeerRequestError["type"]) {
+    const error = new PeerRequestError(type);
     if (!this.request) return;
-    if (!(reason instanceof PeerSegmentAbsentError)) {
+    if (!["segment-absent", "peer-closed"].includes(type)) {
       this.sendCommand({
         c: PeerCommandType.CancelSegmentRequest,
         i: this.request.segment.externalId,
       });
     }
-    this.request.reject(reason);
+    this.request.reject(error);
     this.clearRequest();
   }
 
   private setRequestTimeout(): number {
     return window.setTimeout(
-      () => this.cancelSegmentRequest(new RequestTimeoutError()),
+      () => this.cancelSegmentRequest("request-timeout"),
       this.settings.p2pSegmentDownloadTimeout
     );
   }
@@ -251,8 +247,7 @@ export class Peer {
   }
 
   destroy() {
-    // TODO: error for peer destroyed
-    this.cancelSegmentRequest();
+    this.cancelSegmentRequest("destroy");
     this.connection?.destroy();
     this.candidates.clear();
   }

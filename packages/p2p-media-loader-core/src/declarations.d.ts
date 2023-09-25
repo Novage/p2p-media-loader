@@ -32,7 +32,7 @@ declare module "bittorrent-tracker" {
     ? (error: unknown) => void
     : never;
 
-  type PeerEvent = "connect" | "data" | "close";
+  type PeerEvent = "connect" | "data" | "close" | "error";
 
   export type PeerCandidateEventHandler<E extends PeerEvent> =
     E extends "connect"
@@ -41,6 +41,8 @@ declare module "bittorrent-tracker" {
       ? (data: ArrayBuffer) => void
       : E extends "close"
       ? () => void
+      : E extends "error"
+      ? (error?: unknown) => void
       : never;
 
   export type PeerCandidate = {
