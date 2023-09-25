@@ -34,8 +34,10 @@ function fetchSegmentData(segment: Segment) {
       });
 
       if (response.ok) {
-        progress = monitorFetchProgress(response);
-        return response.arrayBuffer();
+        const result = getDataPromiseAndMonitorProgress(response);
+        if (!result) return response.arrayBuffer();
+        progress = result.progress;
+        return result.dataPromise;
       }
       throw new FetchError(
         response.statusText ?? `Network response was not for ${segmentId}`,
@@ -58,9 +60,12 @@ function fetchSegmentData(segment: Segment) {
   };
 }
 
-function monitorFetchProgress(
-  response: Response
-): Readonly<LoadProgress> | undefined {
+function getDataPromiseAndMonitorProgress(response: Response):
+  | {
+      progress: LoadProgress;
+      dataPromise: Promise<ArrayBuffer>;
+    }
+  | undefined {
   const totalBytesString = response.headers.get("Content-Length");
   if (totalBytesString === null || !response.body) return;
 
@@ -72,14 +77,26 @@ function monitorFetchProgress(
   };
   const reader = response.body.getReader();
 
-  const monitor = async () => {
+  const getDataPromise = async () => {
+    const chunks: Uint8Array[] = [];
     for await (const chunk of readStream(reader)) {
+      chunks.push(chunk);
       progress.loadedBytes += chunk.length;
       progress.percent = (progress.loadedBytes / totalBytes) * 100;
     }
+
+    const resultBuffer = new ArrayBuffer(progress.loadedBytes);
+    const view = new Uint8Array(resultBuffer);
+
+    let offset = 0;
+    for (const chunk of chunks) {
+      view.set(chunk, offset);
+      offset += chunk.length;
+    }
+
+    return resultBuffer;
   };
-  void monitor();
-  return progress;
+  return { progress, dataPromise: getDataPromise() };
 }
 
 async function* readStream(
