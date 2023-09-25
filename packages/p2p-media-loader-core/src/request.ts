@@ -10,6 +10,7 @@ export type LoadProgress = {
   percent: number;
   loadedBytes: number;
   totalBytes: number;
+  lastLoadedChunkTimestamp?: number;
 };
 
 type RequestBase = {
@@ -27,7 +28,7 @@ export type P2PRequest = RequestBase & {
   type: "p2p";
 };
 
-type HybridLoaderRequest = HttpRequest | P2PRequest;
+export type HybridLoaderRequest = HttpRequest | P2PRequest;
 
 type Request = {
   segment: Readonly<Segment>;
@@ -41,6 +42,26 @@ function getRequestItemId(segment: Segment) {
 
 export class RequestContainer {
   private readonly requests = new Map<string, Request>();
+  private _httpRequestsCount = 0;
+  private _p2pRequestsCount = 0;
+
+  get httpRequestsCount() {
+    return this._httpRequestsCount;
+  }
+
+  get p2pRequestsCount() {
+    return this._p2pRequestsCount;
+  }
+
+  private increaseRequestCounters(requestType: "http" | "p2p") {
+    if (requestType === "http") this._httpRequestsCount++;
+    else this._p2pRequestsCount++;
+  }
+
+  private decreaseRequestCounters(requestType: "http" | "p2p") {
+    if (requestType === "http") this._httpRequestsCount--;
+    else this._p2pRequestsCount--;
+  }
 
   addLoaderRequest(segment: Segment, loaderRequest: HybridLoaderRequest) {
     const segmentId = getRequestItemId(segment);
@@ -53,6 +74,7 @@ export class RequestContainer {
         loaderRequest,
       });
     }
+    this.increaseRequestCounters(loaderRequest.type);
     loaderRequest.promise.then(() =>
       this.clearRequestItem(segmentId, "loader")
     );
@@ -101,15 +123,6 @@ export class RequestContainer {
     return this.requests.get(segmentId)?.loaderRequest?.type === "http";
   }
 
-  countHttpRequests(): number {
-    let count = 0;
-    for (const request of this.requests.values()) {
-      if (request.loaderRequest?.type === "http") count++;
-    }
-
-    return count;
-  }
-
   abortEngineRequest(segmentId: string) {
     const request = this.requests.get(segmentId);
     if (!request) return;
@@ -135,7 +148,10 @@ export class RequestContainer {
     if (!requestItem) return;
 
     if (type === "engine") delete requestItem.engineCallbacks;
-    if (type === "loader") delete requestItem.loaderRequest;
+    if (type === "loader" && requestItem.loaderRequest) {
+      this.decreaseRequestCounters(requestItem.loaderRequest.type);
+      delete requestItem.loaderRequest;
+    }
     if (!requestItem.engineCallbacks && !requestItem.loaderRequest) {
       const segmentId = getRequestItemId(requestItem.segment);
       this.requests.delete(segmentId);

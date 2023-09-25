@@ -35,7 +35,6 @@ function fetchSegmentData(segment: Segment) {
 
       if (response.ok) {
         const result = getDataPromiseAndMonitorProgress(response);
-        if (!result) return response.arrayBuffer();
         progress = result.progress;
         return result.dataPromise;
       }
@@ -60,14 +59,14 @@ function fetchSegmentData(segment: Segment) {
   };
 }
 
-function getDataPromiseAndMonitorProgress(response: Response):
-  | {
-      progress: LoadProgress;
-      dataPromise: Promise<ArrayBuffer>;
-    }
-  | undefined {
+function getDataPromiseAndMonitorProgress(response: Response): {
+  progress?: LoadProgress;
+  dataPromise: Promise<ArrayBuffer>;
+} {
   const totalBytesString = response.headers.get("Content-Length");
-  if (totalBytesString === null || !response.body) return;
+  if (totalBytesString === null || !response.body) {
+    return { dataPromise: response.arrayBuffer() };
+  }
 
   const totalBytes = +totalBytesString;
   const progress: LoadProgress = {
@@ -83,6 +82,7 @@ function getDataPromiseAndMonitorProgress(response: Response):
       chunks.push(chunk);
       progress.loadedBytes += chunk.length;
       progress.percent = (progress.loadedBytes / totalBytes) * 100;
+      progress.lastLoadedChunkTimestamp = performance.now();
     }
 
     const resultBuffer = new ArrayBuffer(progress.loadedBytes);

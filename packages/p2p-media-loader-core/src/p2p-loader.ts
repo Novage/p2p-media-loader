@@ -3,7 +3,7 @@ import * as RIPEMD160 from "ripemd160";
 import { Peer } from "./peer";
 import * as PeerUtil from "./peer-utils";
 import { Segment, Settings, StreamWithSegments } from "./types";
-import { JsonSegmentAnnouncementMap } from "./internal-types";
+import { JsonSegmentAnnouncement } from "./internal-types";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import * as Utils from "./utils";
 import { PeerSegmentStatus } from "./enums";
@@ -15,7 +15,7 @@ export class P2PLoader {
   private readonly peerHash: string;
   private readonly trackerClient: TrackerClient;
   private readonly peers = new Map<string, Peer>();
-  private announcementMap: JsonSegmentAnnouncementMap = {};
+  private announcement: JsonSegmentAnnouncement = { i: [], s: 0 };
 
   constructor(
     private streamManifestUrl: string,
@@ -37,9 +37,11 @@ export class P2PLoader {
       peerHash: this.peerHash,
     });
     this.subscribeOnTrackerEvents(this.trackerClient);
-    this.segmentStorage.subscribeOnUpdate(
-      this.onSegmentStorageUpdate.bind(this)
-    );
+    this.segmentStorage.subscribeOnUpdate(() => {
+      this.updateSegmentAnnouncement();
+      this.broadcastSegmentAnnouncement();
+    });
+    this.updateSegmentAnnouncement();
     this.trackerClient.start();
   }
 
@@ -92,36 +94,27 @@ export class P2PLoader {
     this.peers.set(candidate.id, peer);
   }
 
-  private async onSegmentStorageUpdate() {
+  private updateSegmentAnnouncement() {
     const { storedSegmentIds } = this.segmentStorage;
-    const loaded: Segment[] = [];
-    const httpLoading: Segment[] = [];
-
-    for (const id of storedSegmentIds) {
-      const segment = this.stream.segments.get(id);
-      if (!segment) continue;
-
-      loaded.push(segment);
-    }
+    const loaded: string[] = [...storedSegmentIds];
+    const httpLoading: string[] = [];
 
     for (const request of this.requests.values()) {
       if (request.loaderRequest?.type !== "http") continue;
       const segment = this.stream.segments.get(request.segment.localId);
       if (!segment) continue;
 
-      httpLoading.push(segment);
+      httpLoading.push(segment.externalId);
     }
 
-    this.announcementMap = PeerUtil.getJsonSegmentsAnnouncementMap(
-      this.streamExternalId,
+    this.announcement = PeerUtil.getJsonSegmentsAnnouncement(
       loaded,
       httpLoading
     );
-    this.broadcastSegmentAnnouncement();
   }
 
   private onPeerConnected(peer: Peer) {
-    peer.sendSegmentsAnnouncement(this.announcementMap);
+    peer.sendSegmentsAnnouncement(this.announcement);
   }
 
   private async onSegmentRequested(peer: Peer, segmentExternalId: string) {
@@ -135,7 +128,7 @@ export class P2PLoader {
   private broadcastSegmentAnnouncement() {
     for (const peer of this.peers.values()) {
       if (!peer.isConnected) continue;
-      peer.sendSegmentsAnnouncement(this.announcementMap);
+      peer.sendSegmentsAnnouncement(this.announcement);
     }
   }
 

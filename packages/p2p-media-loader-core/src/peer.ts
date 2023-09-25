@@ -1,6 +1,6 @@
 import { PeerCandidate } from "bittorrent-tracker";
 import {
-  JsonSegmentAnnouncementMap,
+  JsonSegmentAnnouncement,
   PeerCommand,
   PeerSegmentAnnouncementCommand,
   PeerSegmentCommand,
@@ -88,7 +88,7 @@ export class Peer {
 
     switch (command.c) {
       case PeerCommandType.SegmentsAnnouncement:
-        this.segments = PeerUtil.getSegmentsFromPeerAnnouncementMap(command.m);
+        this.segments = PeerUtil.getSegmentsFromPeerAnnouncement(command.a);
         break;
 
       case PeerCommandType.SegmentRequest:
@@ -137,10 +137,10 @@ export class Peer {
     return this.request.p2pRequest;
   }
 
-  sendSegmentsAnnouncement(map: JsonSegmentAnnouncementMap) {
+  sendSegmentsAnnouncement(announcement: JsonSegmentAnnouncement) {
     const command: PeerSegmentAnnouncementCommand = {
       c: PeerCommandType.SegmentsAnnouncement,
-      m: map,
+      a: announcement,
     };
     this.sendCommand(command);
   }
@@ -204,6 +204,7 @@ export class Peer {
 
     progress.loadedBytes += chuck.byteLength;
     progress.percent = (progress.loadedBytes / progress.loadedBytes) * 100;
+    progress.lastLoadedChunkTimestamp = performance.now();
     request.chunks.push(chuck);
 
     if (progress.loadedBytes === progress.totalBytes) {

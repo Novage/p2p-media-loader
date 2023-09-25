@@ -1,9 +1,7 @@
-import { JsonSegmentAnnouncementMap, PeerCommand } from "./internal-types";
+import { JsonSegmentAnnouncement, PeerCommand } from "./internal-types";
 import * as TypeGuard from "./type-guards";
-import * as Util from "./utils";
 import { PeerSegmentStatus } from "./enums";
 import * as RIPEMD160 from "ripemd160";
-import { Segment } from "./types";
 
 export function generatePeerId(): string {
   const PEER_ID_SYMBOLS =
@@ -42,40 +40,32 @@ export function getPeerCommandFromArrayBuffer(
   }
 }
 
-export function getSegmentsFromPeerAnnouncementMap(
-  map: JsonSegmentAnnouncementMap
+export function getSegmentsFromPeerAnnouncement(
+  announcement: JsonSegmentAnnouncement
 ): Map<string, PeerSegmentStatus> {
   const segmentStatusMap = new Map<string, PeerSegmentStatus>();
-  for (const [streamId, [segmentIds, statuses]] of Object.entries(map)) {
-    for (let i = 0; i < segmentIds.length; i++) {
-      const segmentId = segmentIds[i];
-      const segmentStatus = statuses[i];
-      const segmentFullId = Util.getSegmentFullExternalId(streamId, segmentId);
-      segmentStatusMap.set(segmentFullId, segmentStatus);
+  const separator = announcement.s;
+  for (const [index, segmentExternalId] of announcement.i.entries()) {
+    if (index < separator) {
+      segmentStatusMap.set(segmentExternalId, PeerSegmentStatus.Loaded);
+    } else {
+      segmentStatusMap.set(segmentExternalId, PeerSegmentStatus.LoadingByHttp);
     }
   }
   return segmentStatusMap;
 }
 
-export function getJsonSegmentsAnnouncementMap(
-  streamExternalId: string,
-  storedSegments: Segment[],
-  loadingByHttpSegments: Segment[]
-): JsonSegmentAnnouncementMap {
-  const segmentExternalIds: string[] = [];
-  const segmentStatuses: PeerSegmentStatus[] = [];
-
-  for (const segment of storedSegments) {
-    segmentExternalIds.push(segment.externalId);
-    segmentStatuses.push(PeerSegmentStatus.Loaded);
-  }
-
-  for (const segment of loadingByHttpSegments) {
-    segmentExternalIds.push(segment.externalId);
-    segmentStatuses.push(PeerSegmentStatus.LoadingByHttp);
-  }
-
+export function getJsonSegmentsAnnouncement(
+  storedSegmentExternalIds: string[],
+  loadingByHttpSegmentExternalIds: string[]
+): JsonSegmentAnnouncement {
+  const segmentIds = [
+    ...storedSegmentExternalIds,
+    ...loadingByHttpSegmentExternalIds,
+  ];
+  const segmentStatusSeparator = storedSegmentExternalIds.length;
   return {
-    [streamExternalId]: [segmentExternalIds, segmentStatuses],
+    i: segmentIds,
+    s: segmentStatusSeparator,
   };
 }
