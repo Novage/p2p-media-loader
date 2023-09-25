@@ -46,6 +46,7 @@ export type Settings = {
   httpDownloadTimeWindow: number;
   p2pDownloadTimeWindow: number;
   simultaneousHttpDownloads: number;
+  simultaneousP2PDownloads: number;
   cachedSegmentExpiration: number;
   cachedSegmentsCount: number;
   webRtcMaxMessageSize: number;
