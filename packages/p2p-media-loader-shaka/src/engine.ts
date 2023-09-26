@@ -44,7 +44,7 @@ export class Engine {
       networkingEngine.p2pml = p2pml;
       networkingEngine.registerRequestFilter((requestType, request) => {
         (request as HookedRequest).p2pml = p2pml;
-      }).p2pml = this;
+      });
     }
 
     this.initializeNetworkingEngine();
