@@ -10,7 +10,6 @@ export class SegmentsMemoryStorage {
     string,
     { segment: Segment; data: ArrayBuffer; lastAccessed: number }
   >();
-  private readonly cachedSegmentIds = new Set<string>();
   private readonly isSegmentLockedPredicates: ((
     segment: Segment
   ) => boolean)[] = [];
@@ -48,7 +47,6 @@ export class SegmentsMemoryStorage {
       data,
       lastAccessed: performance.now(),
     });
-    this.cachedSegmentIds.add(id);
     this.onUpdateSubscriptions.forEach((c) => c());
   }
 
@@ -63,11 +61,11 @@ export class SegmentsMemoryStorage {
   }
 
   hasSegment(segmentExternalId: string): boolean {
-    return this.cachedSegmentIds.has(segmentExternalId);
+    return this.cache.has(segmentExternalId);
   }
 
-  get storedSegmentIds(): ReadonlySet<string> {
-    return this.cachedSegmentIds;
+  get storedSegmentIds() {
+    return this.cache.keys();
   }
 
   private async clear(): Promise<boolean> {
@@ -108,10 +106,7 @@ export class SegmentsMemoryStorage {
       }
     }
 
-    segmentsToDelete.forEach((id) => {
-      this.cache.delete(id);
-      this.cachedSegmentIds.delete(id);
-    });
+    segmentsToDelete.forEach((id) => this.cache.delete(id));
     if (segmentsToDelete.length) {
       this.onUpdateSubscriptions.forEach((c) => c());
     }
