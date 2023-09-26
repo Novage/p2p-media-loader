@@ -42,25 +42,19 @@ function getRequestItemId(segment: Segment) {
 
 export class RequestContainer {
   private readonly requests = new Map<string, Request>();
-  private _httpRequestsCount = 0;
-  private _p2pRequestsCount = 0;
 
   get httpRequestsCount() {
-    return this._httpRequestsCount;
+    let count = 0;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    for (const request of this.httpRequests()) count++;
+    return count;
   }
 
   get p2pRequestsCount() {
-    return this._p2pRequestsCount;
-  }
-
-  private increaseRequestCounters(requestType: "http" | "p2p") {
-    if (requestType === "http") this._httpRequestsCount++;
-    else this._p2pRequestsCount++;
-  }
-
-  private decreaseRequestCounters(requestType: "http" | "p2p") {
-    if (requestType === "http") this._httpRequestsCount--;
-    else this._p2pRequestsCount--;
+    let count = 0;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    for (const request of this.p2pRequests()) count++;
+    return count;
   }
 
   addLoaderRequest(segment: Segment, loaderRequest: HybridLoaderRequest) {
@@ -74,7 +68,6 @@ export class RequestContainer {
         loaderRequest,
       });
     }
-    this.increaseRequestCounters(loaderRequest.type);
     loaderRequest.promise.then(() =>
       this.clearRequestItem(segmentId, "loader")
     );
@@ -111,6 +104,12 @@ export class RequestContainer {
     }
   }
 
+  *p2pRequests(): Generator<Request, void> {
+    for (const request of this.requests.values()) {
+      if (request.loaderRequest?.type === "p2p") yield request;
+    }
+  }
+
   resolveEngineRequest(segmentId: string, response: SegmentResponse) {
     this.requests.get(segmentId)?.engineCallbacks?.onSuccess(response);
   }
@@ -121,6 +120,10 @@ export class RequestContainer {
 
   isHttpRequested(segmentId: string): boolean {
     return this.requests.get(segmentId)?.loaderRequest?.type === "http";
+  }
+
+  isP2PRequested(segmentId: string): boolean {
+    return this.requests.get(segmentId)?.loaderRequest?.type === "p2p";
   }
 
   abortEngineRequest(segmentId: string) {
@@ -149,7 +152,6 @@ export class RequestContainer {
 
     if (type === "engine") delete requestItem.engineCallbacks;
     if (type === "loader" && requestItem.loaderRequest) {
-      this.decreaseRequestCounters(requestItem.loaderRequest.type);
       delete requestItem.loaderRequest;
     }
     if (!requestItem.engineCallbacks && !requestItem.loaderRequest) {

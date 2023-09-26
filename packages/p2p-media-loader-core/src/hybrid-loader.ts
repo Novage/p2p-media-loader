@@ -130,6 +130,16 @@ export class HybridLoader {
           void this.loadThroughHttp(segment);
           continue;
         }
+
+        if (this.requests.p2pRequestsCount < simultaneousP2PDownloads) {
+          void this.loadThroughP2P(segment);
+        }
+
+        this.abortLastP2PLoadingAfter(queue, segment.localId);
+        if (this.requests.p2pRequestsCount < simultaneousHttpDownloads) {
+          void this.loadThroughHttp(segment);
+          continue;
+        }
       }
       if (statuses.isP2PDownloadable) {
         if (this.requests.p2pRequestsCount < simultaneousP2PDownloads) {
@@ -181,6 +191,18 @@ export class HybridLoader {
     } of arrayBackwards(queue)) {
       if (queueSegmentId === segmentId) break;
       if (this.requests.isHttpRequested(queueSegmentId)) {
+        this.requests.abortLoaderRequest(queueSegmentId);
+        break;
+      }
+    }
+  }
+
+  private abortLastP2PLoadingAfter(queue: QueueItem[], segmentId: string) {
+    for (const {
+      segment: { localId: queueSegmentId },
+    } of arrayBackwards(queue)) {
+      if (queueSegmentId === segmentId) break;
+      if (this.requests.isP2PRequested(queueSegmentId)) {
         this.requests.abortLoaderRequest(queueSegmentId);
         break;
       }
