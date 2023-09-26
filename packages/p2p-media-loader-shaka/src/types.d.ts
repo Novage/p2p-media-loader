@@ -1,4 +1,5 @@
-import type { Stream as CoreStream } from "p2p-media-loader-core";
+import type { Stream as CoreStream, Core } from "p2p-media-loader-core";
+import { SegmentManager } from "./segment-manager";
 
 export type StreamProtocol = "hls" | "dash";
 
@@ -17,3 +18,18 @@ export type Stream = CoreStream & {
 };
 
 export type Shaka = typeof window.shaka;
+
+type P2PMLShakaData = {
+  core: Core<Stream>;
+  shaka: Shaka;
+  streamInfo: StreamInfo;
+  segmentManager: SegmentManager;
+};
+
+export type HookedRequest = shaka.extern.Request & {
+  p2pml?: P2PMLShakaData;
+};
+
+export type HookedNetworkingEngine = shaka.net.NetworkingEngine & {
+  p2pml?: P2PMLShakaData;
+};

@@ -13,28 +13,14 @@ type Response = shaka.extern.Response;
 type LoadingHandlerResult = shaka.extern.IAbortableOperation<Response>;
 
 export class LoadingHandler implements LoadingHandlerInterface {
-  private readonly shaka: Shaka;
-  private readonly segmentManager: SegmentManager;
-  private readonly core: Core<Stream>;
-  readonly streamInfo: StreamInfo;
   private loadArgs!: LoadingHandlerParams;
 
-  constructor({
-    shaka,
-    streamInfo,
-    core,
-    segmentManager,
-  }: {
-    shaka: Shaka;
-    streamInfo: Readonly<StreamInfo>;
-    core: Core<Stream>;
-    segmentManager: SegmentManager;
-  }) {
-    this.shaka = shaka;
-    this.streamInfo = streamInfo;
-    this.core = core;
-    this.segmentManager = segmentManager;
-  }
+  constructor(
+    private readonly shaka: Shaka,
+    private readonly core: Core<Stream>,
+    readonly streamInfo: StreamInfo,
+    private readonly segmentManager: SegmentManager
+  ) {}
 
   private defaultLoad() {
     const fetchPlugin = this.shaka.net.HttpFetchPlugin;
