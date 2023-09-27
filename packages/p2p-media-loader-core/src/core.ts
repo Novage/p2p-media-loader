@@ -19,10 +19,10 @@ export class Core<TStream extends Stream = Stream> {
     cachedSegmentsCount: 50,
     webRtcMaxMessageSize: 64 * 1024 - 1,
     p2pSegmentDownloadTimeout: 1000,
-    storageCleanupInterval: 1000,
+    storageCleanupInterval: 5000,
   };
   private readonly bandwidthApproximator = new BandwidthApproximator();
-  private readonly segmentStorage = new SegmentsMemoryStorage(this.settings);
+  private segmentStorage?: SegmentsMemoryStorage;
   private mainStreamLoader?: HybridLoader;
   private secondaryStreamLoader?: HybridLoader;
 
@@ -64,8 +64,12 @@ export class Core<TStream extends Stream = Stream> {
     if (!this.manifestResponseUrl) {
       throw new Error("Manifest response url is not defined");
     }
-    if (!this.segmentStorage.isInitialized) {
-      await this.segmentStorage.initialize(this.manifestResponseUrl);
+    if (!this.segmentStorage) {
+      this.segmentStorage = new SegmentsMemoryStorage(
+        this.manifestResponseUrl,
+        this.settings
+      );
+      await this.segmentStorage.initialize();
     }
     const { segment, stream } = this.identifySegment(segmentLocalId);
     const loader = this.getStreamHybridLoader(segment, stream);
@@ -108,7 +112,7 @@ export class Core<TStream extends Stream = Stream> {
       throw new Error("Manifest response url is not defined");
     }
     const createNewHybridLoader = (manifestResponseUrl: string) => {
-      if (!this.segmentStorage.isInitialized) {
+      if (!this.segmentStorage?.isInitialized) {
         throw new Error("Segment storage is not initialized");
       }
       return new HybridLoader(

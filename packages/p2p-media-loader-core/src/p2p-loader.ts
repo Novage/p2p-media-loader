@@ -26,8 +26,8 @@ export class P2PLoader {
   ) {
     const peerId = PeerUtil.generatePeerId();
     this.streamExternalId = Utils.getStreamExternalId(
-      this.stream,
-      this.streamManifestUrl
+      this.streamManifestUrl,
+      this.stream
     );
     this.streamHash = getHash(this.streamExternalId);
     this.peerHash = getHash(peerId);
@@ -37,10 +37,7 @@ export class P2PLoader {
       peerHash: this.peerHash,
     });
     this.subscribeOnTrackerEvents(this.trackerClient);
-    this.segmentStorage.subscribeOnUpdate(() => {
-      this.updateSegmentAnnouncement();
-      this.broadcastSegmentAnnouncement();
-    });
+    this.segmentStorage.subscribeOnUpdate(this.stream, this.onStorageUpdate);
     this.updateSegmentAnnouncement();
     this.trackerClient.start();
   }
@@ -95,8 +92,8 @@ export class P2PLoader {
   }
 
   private updateSegmentAnnouncement() {
-    const { storedSegmentIds } = this.segmentStorage;
-    const loaded: string[] = [...storedSegmentIds];
+    const loaded: string[] =
+      this.segmentStorage.getStoredSegmentExternalIdsOfStream(this.stream);
     const httpLoading: string[] = [];
 
     for (const request of this.requests.values()) {
@@ -117,8 +114,14 @@ export class P2PLoader {
     peer.sendSegmentsAnnouncement(this.announcement);
   }
 
+  private onStorageUpdate = () => {
+    this.updateSegmentAnnouncement();
+    this.broadcastSegmentAnnouncement();
+  };
+
   private async onSegmentRequested(peer: Peer, segmentExternalId: string) {
     const segmentData = await this.segmentStorage.getSegmentData(
+      this.stream,
       segmentExternalId
     );
     if (segmentData) peer.sendSegmentData(segmentExternalId, segmentData);
@@ -133,6 +136,10 @@ export class P2PLoader {
   }
 
   destroy() {
+    this.segmentStorage.unsubscribeFromUpdate(
+      this.stream,
+      this.onStorageUpdate
+    );
     for (const peer of this.peers.values()) {
       peer.destroy();
     }
