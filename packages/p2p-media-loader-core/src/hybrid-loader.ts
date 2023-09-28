@@ -238,9 +238,15 @@ function* arrayBackwards<T>(arr: T[]) {
   }
 }
 
+type P2PLoaderContainerItem = {
+  streamId: string;
+  loader: P2PLoader;
+  destroyTimeoutId?: number;
+};
+
 class P2PLoadersContainer {
-  private readonly loaders = new Map<string, P2PLoader>();
-  private _activeLoader: P2PLoader;
+  private readonly loaders = new Map<string, P2PLoaderContainerItem>();
+  private _activeLoaderItem: P2PLoaderContainerItem;
 
   constructor(
     private readonly streamManifestUrl: string,
@@ -249,40 +255,55 @@ class P2PLoadersContainer {
     private readonly segmentStorage: SegmentsMemoryStorage,
     private readonly settings: Settings
   ) {
-    this._activeLoader = this.createLoader(stream);
+    this._activeLoaderItem = this.createLoaderItem(stream);
   }
 
-  createLoader(stream: StreamWithSegments) {
+  createLoaderItem(stream: StreamWithSegments) {
     if (this.loaders.has(stream.localId)) {
       throw new Error("Loader for this stream already exists");
     }
-    this._activeLoader = new P2PLoader(
+    const loader = new P2PLoader(
       this.streamManifestUrl,
       stream,
       this.requests,
       this.segmentStorage,
       this.settings
     );
-    this.loaders.set(stream.localId, this._activeLoader);
-    return this._activeLoader;
+    const item = { loader, streamId: stream.localId };
+    this.loaders.set(stream.localId, item);
+    this._activeLoaderItem = item;
+    return item;
   }
 
   changeActiveLoader(stream: StreamWithSegments) {
-    const existingLoader = this.loaders.get(stream.localId);
-    if (existingLoader) this._activeLoader = existingLoader;
-    else this.createLoader(stream);
+    const loaderItem = this.loaders.get(stream.localId);
+    const prevActive = this._activeLoaderItem;
+    if (loaderItem) {
+      this._activeLoaderItem = loaderItem;
+      clearTimeout(loaderItem.destroyTimeoutId);
+    } else {
+      this.createLoaderItem(stream);
+    }
+    this.setLoaderDestroyTimeout(prevActive);
   }
 
-  // TODO: add stale loaders destroying
+  private setLoaderDestroyTimeout(item: P2PLoaderContainerItem) {
+    item.destroyTimeoutId = window.setTimeout(() => {
+      item.loader.destroy();
+      this.loaders.delete(item.streamId);
+    }, this.settings.p2pLoaderDestroyTimeout);
+  }
 
   get activeLoader() {
-    return this._activeLoader;
+    return this._activeLoaderItem.loader;
   }
 
   destroy() {
-    for (const loader of this.loaders.values()) {
+    for (const { loader, destroyTimeoutId } of this.loaders.values()) {
       loader.destroy();
+      clearTimeout(destroyTimeoutId);
     }
+    this.loaders.clear();
   }
 }
 
