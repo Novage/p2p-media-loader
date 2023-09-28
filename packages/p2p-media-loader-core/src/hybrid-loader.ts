@@ -17,6 +17,7 @@ export class HybridLoader {
   private lastRequestedSegment: Readonly<Segment>;
   private readonly playback: Playback;
   private lastQueueProcessingTimeStamp?: number;
+  private readonly segmentAvgDuration: number;
 
   constructor(
     private streamManifestUrl: string,
@@ -29,6 +30,7 @@ export class HybridLoader {
     this.lastRequestedSegment = requestedSegment;
     this.activeStream = requestedStream;
     this.playback = { position: requestedSegment.startTime, rate: 1 };
+    this.segmentAvgDuration = getSegmentAvgDuration(requestedStream);
 
     if (!this.segmentStorage.isInitialized) {
       throw new Error("Segment storage is not initialized.");
@@ -215,9 +217,13 @@ export class HybridLoader {
 
     if (!isRateChanged && !isPositionChanged) return;
 
+    const isPositionSignificantlyChanged =
+      Math.abs(position - this.playback.position) / this.segmentAvgDuration >
+      0.5;
+
     if (isPositionChanged) this.playback.position = position;
     if (isRateChanged) this.playback.rate = rate;
-    void this.processQueue(false);
+    void this.processQueue(isPositionSignificantlyChanged);
   }
 
   destroy() {
@@ -320,3 +326,15 @@ class P2PLoadersContainer {
 //   const timeFromLastDownload = now - progress.lastLoadedChunkTimestamp;
 //   return predictedRemainingTimeFromLastDownload - timeFromLastDownload;
 // }
+
+function getSegmentAvgDuration(stream: StreamWithSegments) {
+  const { segments } = stream;
+  let sumDuration = 0;
+  const size = segments.size;
+  for (const segment of segments.values()) {
+    const duration = segment.endTime - segment.startTime;
+    sumDuration += duration;
+  }
+
+  return sumDuration / size;
+}
