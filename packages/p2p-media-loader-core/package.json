@@ -28,7 +28,7 @@
     "type-check": "npx tsc --noEmit"
   },
   "dependencies": {
-    "bittorrent-tracker": "^10.0.12",
+    "bittorrent-tracker": "^9.19.0",
     "ripemd160": "^2.0.2"
   },
   "devDependencies": {
