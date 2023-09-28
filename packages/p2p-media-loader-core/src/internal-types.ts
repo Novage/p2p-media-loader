@@ -17,13 +17,13 @@ export type LoadBufferRanges = {
   p2p: NumberRange;
 };
 
-export type QueueStatuses = {
+export type QueueItemStatuses = {
   isHighDemand: boolean;
   isHttpDownloadable: boolean;
   isP2PDownloadable: boolean;
 };
 
-export type QueueItem = { segment: Segment; statuses: QueueStatuses };
+export type QueueItem = { segment: Segment; statuses: QueueItemStatuses };
 
 export type BasePeerCommand<T extends PeerCommandType = PeerCommandType> = {
   c: T;

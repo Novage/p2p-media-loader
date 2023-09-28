@@ -1,36 +1,11 @@
-import { Segment, Settings, Stream, StreamWithSegments } from "./index";
+import { Segment, Settings, StreamWithSegments } from "../types";
 import {
-  QueueStatuses,
-  Playback,
   LoadBufferRanges,
-  QueueItem,
   NumberRange,
-} from "./internal-types";
-
-export function getStreamExternalId(
-  manifestResponseUrl: string,
-  stream: Readonly<Stream>
-): string {
-  const { type, index } = stream;
-  return `${manifestResponseUrl}-${type}-${index}`;
-}
-
-export function getSegmentFullExternalId(
-  externalStreamId: string,
-  externalSegmentId: string
-) {
-  return `${externalStreamId}|${externalSegmentId}`;
-}
-
-export function getSegmentFromStreamsMap(
-  streams: Map<string, StreamWithSegments>,
-  segmentId: string
-): { segment: Segment; stream: StreamWithSegments } | undefined {
-  for (const stream of streams.values()) {
-    const segment = stream.segments.get(segmentId);
-    if (segment) return { segment, stream };
-  }
-}
+  Playback,
+  QueueItem,
+  QueueItemStatuses,
+} from "../internal-types";
 
 export function generateQueue({
   segment,
@@ -63,11 +38,14 @@ export function generateQueue({
   let i = 0;
   for (const segment of stream.segments.values(requestedSegmentId)) {
     const statuses = getSegmentLoadStatuses(segment, bufferRanges);
-    if (!statuses && !(i === 0 && isNextSegmentHighDemand)) break;
+    const isNotActual = isNotActualStatuses(statuses);
+    if (isNotActual && !(i === 0 && isNextSegmentHighDemand)) {
+      break;
+    }
     if (isSegmentLoaded(segment)) continue;
 
     queueSegmentIds.add(segment.localId);
-    statuses.isHighDemand = true;
+    if (isNotActual) statuses.isHighDemand = true;
     queue.push({ segment, statuses });
     i++;
   }
@@ -105,7 +83,7 @@ export function getLoadBufferRanges(
 export function getSegmentLoadStatuses(
   segment: Readonly<Segment>,
   loadBufferRanges: LoadBufferRanges
-): QueueStatuses {
+): QueueItemStatuses {
   const { highDemand, http, p2p } = loadBufferRanges;
   const { startTime, endTime } = segment;
 
@@ -123,6 +101,11 @@ export function getSegmentLoadStatuses(
   };
 }
 
+function isNotActualStatuses(statuses: QueueItemStatuses) {
+  const { isHighDemand, isHttpDownloadable, isP2PDownloadable } = statuses;
+  return !isHighDemand && !isHttpDownloadable && !isP2PDownloadable;
+}
+
 export function isSegmentActual(
   segment: Readonly<Segment>,
   bufferRanges: LoadBufferRanges
@@ -138,21 +121,4 @@ export function isSegmentActual(
   };
 
   return isInRange(startTime) || isInRange(endTime);
-}
-
-export function getControlledPromise<T>() {
-  let resolve: (value: T) => void;
-  let reject: (reason?: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-
-  return {
-    promise,
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    resolve: resolve!,
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    reject: reject!,
-  };
 }

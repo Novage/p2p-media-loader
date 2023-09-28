@@ -1,11 +1,11 @@
 import TrackerClient, { PeerCandidate } from "bittorrent-tracker";
 import * as RIPEMD160 from "ripemd160";
 import { Peer } from "./peer";
-import * as PeerUtil from "./peer-utils";
+import * as PeerUtil from "./utils/peer-utils";
 import { Segment, Settings, StreamWithSegments } from "./types";
 import { JsonSegmentAnnouncement } from "./internal-types";
 import { SegmentsMemoryStorage } from "./segments-storage";
-import * as Utils from "./utils";
+import * as Utils from "./utils/utils";
 import { PeerSegmentStatus } from "./enums";
 import { RequestContainer } from "./request";
 

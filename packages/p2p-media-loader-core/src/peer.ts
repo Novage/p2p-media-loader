@@ -7,10 +7,10 @@ import {
   PeerSendSegmentCommand,
 } from "./internal-types";
 import { PeerCommandType, PeerSegmentStatus } from "./enums";
-import * as PeerUtil from "./peer-utils";
+import * as PeerUtil from "./utils/peer-utils";
 import { P2PRequest } from "./request";
 import { Segment, Settings } from "./types";
-import * as Utils from "./utils";
+import * as Utils from "./utils/utils";
 import { PeerRequestError } from "./errors";
 
 type PeerEventHandlers = {

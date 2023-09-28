@@ -6,7 +6,7 @@ import { Settings } from "./types";
 import { BandwidthApproximator } from "./bandwidth-approximator";
 import { Playback, QueueItem } from "./internal-types";
 import { RequestContainer, EngineCallbacks } from "./request";
-import * as Utils from "./utils";
+import * as QueueUtils from "./utils/queue-utils";
 import { FetchError } from "./errors";
 
 export class HybridLoader {
@@ -37,11 +37,11 @@ export class HybridLoader {
       if (!this.activeStream.segments.has(segment.localId)) {
         return false;
       }
-      const bufferRanges = Utils.getLoadBufferRanges(
+      const bufferRanges = QueueUtils.getLoadBufferRanges(
         this.playback,
         this.settings
       );
-      return Utils.isSegmentActual(segment, bufferRanges);
+      return QueueUtils.isSegmentActual(segment, bufferRanges);
     });
     this.p2pLoaders = new P2PLoadersContainer(
       this.streamManifestUrl,
@@ -90,7 +90,7 @@ export class HybridLoader {
     this.lastQueueProcessingTimeStamp = now;
 
     const stream = this.activeStream;
-    const { queue, queueSegmentIds } = Utils.generateQueue({
+    const { queue, queueSegmentIds } = QueueUtils.generateQueue({
       segment: this.lastRequestedSegment,
       stream,
       playback: this.playback,

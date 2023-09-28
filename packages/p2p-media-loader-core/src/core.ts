@@ -1,6 +1,6 @@
 import { HybridLoader } from "./hybrid-loader";
 import { Stream, StreamWithSegments, Segment, Settings } from "./types";
-import * as Utils from "./utils";
+import * as Utils from "./utils/utils";
 import { LinkedMap } from "./linked-map";
 import { BandwidthApproximator } from "./bandwidth-approximator";
 import { EngineCallbacks } from "./request";
