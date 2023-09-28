@@ -13,7 +13,6 @@ import {
   Core,
   FetchError,
   SegmentResponse,
-  EngineCallbacks,
 } from "p2p-media-loader-core";
 
 const DEFAULT_DOWNLOAD_LATENCY = 10;
@@ -112,8 +111,8 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
 
   private abortInternal() {
     if (!this.response && this.segmentId) {
-      this.core.abortSegmentLoading(this.segmentId);
       this.stats.aborted = true;
+      this.core.abortSegmentLoading(this.segmentId);
     }
   }
 
@@ -130,7 +129,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     if (this.defaultLoader) {
       this.defaultLoader.destroy();
     } else {
-      this.abortInternal();
+      if (!this.stats.aborted) this.abortInternal();
       this.callbacks = null;
       this.config = null;
     }

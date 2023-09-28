@@ -1,6 +1,7 @@
 import { Segment, SegmentResponse } from "./types";
 import { RequestAbortError } from "./errors";
 import { Subscriptions } from "./segments-storage";
+import Debug from "debug";
 
 export type EngineCallbacks = {
   onSuccess: (response: SegmentResponse) => void;
@@ -44,6 +45,11 @@ function getRequestItemId(segment: Segment) {
 export class RequestContainer {
   private readonly requests = new Map<string, Request>();
   private readonly onHttpRequestsHandlers = new Subscriptions();
+  private readonly debug = Debug("core:request-container");
+
+  get totalCount() {
+    return this.requests.size;
+  }
 
   get httpRequestsCount() {
     let count = 0;
@@ -73,6 +79,7 @@ export class RequestContainer {
     if (loaderRequest.type === "http") {
       this.onHttpRequestsHandlers.fire();
     }
+    this.debug(`add loader request: ${loaderRequest.type}`);
     loaderRequest.promise.then(() =>
       this.clearRequestItem(segmentId, "loader")
     );
@@ -81,22 +88,22 @@ export class RequestContainer {
   addEngineCallbacks(segment: Segment, engineCallbacks: EngineCallbacks) {
     const segmentId = getRequestItemId(segment);
     const requestItem = this.requests.get(segmentId);
+
+    const { onSuccess } = engineCallbacks;
+    engineCallbacks.onSuccess = (response) => {
+      this.clearRequestItem(segmentId, "engine");
+      return onSuccess(response);
+    };
+
     if (requestItem) {
       requestItem.engineCallbacks = engineCallbacks;
     } else {
-      engineCallbacks.onSuccess = (response) => {
-        this.clearRequestItem(segmentId, "engine");
-        return response;
-      };
       this.requests.set(segmentId, {
         segment,
         engineCallbacks,
       });
     }
-  }
-
-  get(segmentId: string) {
-    return this.requests.get(segmentId);
+    this.debug(`add engine request`);
   }
 
   values() {
@@ -115,8 +122,9 @@ export class RequestContainer {
     }
   }
 
-  resolveEngineRequest(segmentId: string, response: SegmentResponse) {
-    this.requests.get(segmentId)?.engineCallbacks?.onSuccess(response);
+  resolveEngineRequest(segment: Segment, response: SegmentResponse) {
+    const id = getRequestItemId(segment);
+    this.requests.get(id)?.engineCallbacks?.onSuccess(response);
   }
 
   isRequestedByEngine(segmentId: string): boolean {
@@ -136,16 +144,11 @@ export class RequestContainer {
     if (!request) return;
 
     request.engineCallbacks?.onError(new RequestAbortError());
+    request.loaderRequest?.abort();
   }
 
   abortLoaderRequest(segmentId: string) {
-    const request = this.requests.get(segmentId);
-    if (!request) return;
-
-    if (request.loaderRequest) {
-      request.loaderRequest.abort();
-      request.engineCallbacks?.onError(new RequestAbortError());
-    }
+    this.requests.get(segmentId)?.loaderRequest?.abort();
   }
 
   private clearRequestItem(
@@ -165,17 +168,15 @@ export class RequestContainer {
     }
   }
 
-  abortAllNotRequestedByEngine(isLocked?: (segmentId: string) => boolean) {
+  abortAllNotRequestedByEngine(isLocked?: (segment: Segment) => boolean) {
+    const isSegmentLocked = isLocked ? isLocked : () => false;
     for (const {
       loaderRequest,
       engineCallbacks,
       segment,
     } of this.requests.values()) {
-      if (!engineCallbacks) continue;
-      const segmentId = getRequestItemId(segment);
-      if ((!isLocked || !isLocked(segmentId)) && loaderRequest) {
-        loaderRequest.abort();
-      }
+      if (engineCallbacks || !loaderRequest) continue;
+      if (!isSegmentLocked(segment)) loaderRequest.abort();
     }
   }
 

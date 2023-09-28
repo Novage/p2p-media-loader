@@ -34,9 +34,7 @@ export class HybridLoader {
       throw new Error("Segment storage is not initialized.");
     }
     this.segmentStorage.addIsSegmentLockedPredicate((segment) => {
-      if (!this.activeStream.segments.has(segment.localId)) {
-        return false;
-      }
+      if (!this.activeStream.segments.has(segment.localId)) return false;
       const bufferRanges = QueueUtils.getLoadBufferRanges(
         this.playback,
         this.settings
@@ -63,19 +61,18 @@ export class HybridLoader {
       this.p2pLoaders.changeActiveLoader(stream);
     }
     this.lastRequestedSegment = segment;
+    this.requests.addEngineCallbacks(segment, callbacks);
     void this.processQueue();
 
-    const storageData = await this.segmentStorage.getSegmentData(
-      stream,
-      segment
-    );
-    if (storageData) {
-      callbacks.onSuccess({
-        data: storageData,
-        bandwidth: this.bandwidthApproximator.getBandwidth(),
-      });
+    if (this.segmentStorage.hasSegment(segment, stream)) {
+      const data = await this.segmentStorage.getSegmentData(stream, segment);
+      if (data) {
+        this.requests.resolveEngineRequest(segment, {
+          data,
+          bandwidth: this.bandwidthApproximator.getBandwidth(),
+        });
+      }
     }
-    this.requests.addEngineCallbacks(segment, callbacks);
   }
 
   private processQueue(force = true) {
@@ -83,7 +80,7 @@ export class HybridLoader {
     if (
       !force &&
       this.lastQueueProcessingTimeStamp !== undefined &&
-      now - this.lastQueueProcessingTimeStamp >= 950
+      now - this.lastQueueProcessingTimeStamp <= 950
     ) {
       return;
     }
@@ -99,8 +96,8 @@ export class HybridLoader {
         this.segmentStorage.hasSegment(segment, stream),
     });
 
-    this.requests.abortAllNotRequestedByEngine((segmentId) =>
-      queueSegmentIds.has(segmentId)
+    this.requests.abortAllNotRequestedByEngine((segment) =>
+      queueSegmentIds.has(segment.localId)
     );
 
     const { simultaneousHttpDownloads, simultaneousP2PDownloads } =
@@ -164,12 +161,12 @@ export class HybridLoader {
       const httpRequest = getHttpSegmentRequest(segment);
       this.requests.addLoaderRequest(segment, httpRequest);
       data = await httpRequest.promise;
+      if (data) this.onSegmentLoaded(stream, segment, data);
     } catch (err) {
       if (err instanceof FetchError) {
         // TODO: handle error
       }
     }
-    if (data) this.onSegmentLoaded(stream, segment, data);
   }
 
   private async loadThroughP2P(stream: Stream, segment: Segment) {
@@ -181,7 +178,7 @@ export class HybridLoader {
   private onSegmentLoaded(stream: Stream, segment: Segment, data: ArrayBuffer) {
     this.bandwidthApproximator.addBytes(data.byteLength);
     void this.segmentStorage.storeSegment(stream, segment, data);
-    this.requests.resolveEngineRequest(segment.localId, {
+    this.requests.resolveEngineRequest(segment, {
       data,
       bandwidth: this.bandwidthApproximator.getBandwidth(),
     });
