@@ -17,11 +17,17 @@ function getStorageItemId(stream: Stream, segment: Segment | string) {
   return `${streamExternalId}|${segmentExternalId}`;
 }
 
-class Subscriptions<T extends (...args: unknown[]) => void> {
+export class Subscriptions<
+  T extends (...args: unknown[]) => void = () => void
+> {
   private readonly list: Set<T>;
 
-  constructor(handlers: T | T[]) {
-    this.list = new Set<T>(Array.isArray(handlers) ? handlers : [handlers]);
+  constructor(handlers?: T | T[]) {
+    if (handlers) {
+      this.list = new Set<T>(Array.isArray(handlers) ? handlers : [handlers]);
+    } else {
+      this.list = new Set<T>();
+    }
   }
 
   add(handler: T) {
@@ -57,7 +63,7 @@ export class SegmentsMemoryStorage {
   private readonly isSegmentLockedPredicates: ((
     segment: Segment
   ) => boolean)[] = [];
-  private onUpdateSubscriptions = new Map<string, Subscriptions<() => void>>();
+  private onUpdateHandlers = new Map<string, Subscriptions<() => void>>();
 
   constructor(
     private readonly masterManifestUrl: string,
@@ -171,9 +177,9 @@ export class SegmentsMemoryStorage {
 
   subscribeOnUpdate(stream: Stream, handler: () => void) {
     const streamId = getStreamShortExternalId(stream);
-    const handlers = this.onUpdateSubscriptions.get(streamId);
+    const handlers = this.onUpdateHandlers.get(streamId);
     if (!handlers) {
-      this.onUpdateSubscriptions.set(streamId, new Subscriptions(handler));
+      this.onUpdateHandlers.set(streamId, new Subscriptions(handler));
     } else {
       handlers.add(handler);
     }
@@ -181,20 +187,20 @@ export class SegmentsMemoryStorage {
 
   unsubscribeFromUpdate(stream: Stream, handler: () => void) {
     const streamId = getStreamShortExternalId(stream);
-    const handlers = this.onUpdateSubscriptions.get(streamId);
+    const handlers = this.onUpdateHandlers.get(streamId);
     if (handlers) {
       handlers.remove(handler);
-      if (handlers.isEmpty) this.onUpdateSubscriptions.delete(streamId);
+      if (handlers.isEmpty) this.onUpdateHandlers.delete(streamId);
     }
   }
 
   private fireOnUpdateSubscriptions(streamId: string) {
-    this.onUpdateSubscriptions.get(streamId)?.fire();
+    this.onUpdateHandlers.get(streamId)?.fire();
   }
 
   public async destroy() {
     this.cache.clear();
-    this.onUpdateSubscriptions.clear();
+    this.onUpdateHandlers.clear();
     this._isInitialized = false;
     clearInterval(this.cleanupIntervalId);
   }

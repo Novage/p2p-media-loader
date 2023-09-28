@@ -37,7 +37,13 @@ export class P2PLoader {
       peerHash: this.peerHash,
     });
     this.subscribeOnTrackerEvents(this.trackerClient);
-    this.segmentStorage.subscribeOnUpdate(this.stream, this.onStorageUpdate);
+    this.segmentStorage.subscribeOnUpdate(
+      this.stream,
+      this.updateAndBroadcastAnnouncement
+    );
+    this.requests.subscribeOnHttpRequestsUpdate(
+      this.updateAndBroadcastAnnouncement
+    );
     this.updateSegmentAnnouncement();
     this.trackerClient.start();
   }
@@ -114,7 +120,7 @@ export class P2PLoader {
     peer.sendSegmentsAnnouncement(this.announcement);
   }
 
-  private onStorageUpdate = () => {
+  private updateAndBroadcastAnnouncement = () => {
     this.updateSegmentAnnouncement();
     this.broadcastSegmentAnnouncement();
   };
@@ -138,7 +144,10 @@ export class P2PLoader {
   destroy() {
     this.segmentStorage.unsubscribeFromUpdate(
       this.stream,
-      this.onStorageUpdate
+      this.updateAndBroadcastAnnouncement
+    );
+    this.requests.unsubscribeFromHttpRequestsUpdate(
+      this.updateAndBroadcastAnnouncement
     );
     for (const peer of this.peers.values()) {
       peer.destroy();

@@ -52,4 +52,5 @@ export type Settings = {
   webRtcMaxMessageSize: number;
   p2pSegmentDownloadTimeout: number;
   storageCleanupInterval: number;
+  p2pLoaderDestroyTimeout: number;
 };

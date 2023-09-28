@@ -1,5 +1,6 @@
 import { Segment, SegmentResponse } from "./types";
 import { RequestAbortError } from "./errors";
+import { Subscriptions } from "./segments-storage";
 
 export type EngineCallbacks = {
   onSuccess: (response: SegmentResponse) => void;
@@ -42,6 +43,7 @@ function getRequestItemId(segment: Segment) {
 
 export class RequestContainer {
   private readonly requests = new Map<string, Request>();
+  private readonly onHttpRequestsHandlers = new Subscriptions();
 
   get httpRequestsCount() {
     let count = 0;
@@ -67,6 +69,9 @@ export class RequestContainer {
         segment,
         loaderRequest,
       });
+    }
+    if (loaderRequest.type === "http") {
+      this.onHttpRequestsHandlers.fire();
     }
     loaderRequest.promise.then(() =>
       this.clearRequestItem(segmentId, "loader")
@@ -172,6 +177,14 @@ export class RequestContainer {
         loaderRequest.abort();
       }
     }
+  }
+
+  subscribeOnHttpRequestsUpdate(handler: () => void) {
+    this.onHttpRequestsHandlers.add(handler);
+  }
+
+  unsubscribeFromHttpRequestsUpdate(handler: () => void) {
+    this.onHttpRequestsHandlers.remove(handler);
   }
 
   destroy() {
