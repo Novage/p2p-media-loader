@@ -82,7 +82,7 @@ export class Peer {
   private onReceiveData(data: ArrayBuffer) {
     const command = PeerUtil.getPeerCommandFromArrayBuffer(data);
     if (!command) {
-      this.receiveSegmentChuck(data);
+      this.receiveSegmentChunk(data);
       return;
     }
 
@@ -155,13 +155,13 @@ export class Peer {
     this.sendCommand(command);
 
     this.isSendingData = true;
-    const sendChuck = async (data: ArrayBuffer) => this.connection?.send(data);
-    for (const chuck of getBufferChunks(
+    const sendChunk = async (data: ArrayBuffer) => this.connection?.send(data);
+    for (const chunk of getBufferChunks(
       data,
       this.settings.webRtcMaxMessageSize
     )) {
       if (!this.isSendingData) break;
-      void sendChuck(chuck);
+      void sendChunk(chunk);
     }
     this.isSendingData = false;
   }
@@ -197,16 +197,16 @@ export class Peer {
     };
   }
 
-  private receiveSegmentChuck(chuck: ArrayBuffer): void {
+  private receiveSegmentChunk(chunk: ArrayBuffer): void {
     // TODO: check can be chunk received before peer command answer
     const { request } = this;
     const progress = request?.p2pRequest?.progress;
     if (!request || !progress) return;
 
-    progress.loadedBytes += chuck.byteLength;
+    progress.loadedBytes += chunk.byteLength;
     progress.percent = (progress.loadedBytes / progress.loadedBytes) * 100;
     progress.lastLoadedChunkTimestamp = performance.now();
-    request.chunks.push(chuck);
+    request.chunks.push(chunk);
 
     if (progress.loadedBytes === progress.totalBytes) {
       const segmentData = joinChunks(request.chunks);
@@ -255,11 +255,11 @@ export class Peer {
 
 function* getBufferChunks(
   data: ArrayBuffer,
-  maxChuckSize: number
+  maxChunkSize: number
 ): Generator<ArrayBuffer> {
   let bytesLeft = data.byteLength;
   while (bytesLeft > 0) {
-    const bytesToSend = bytesLeft >= maxChuckSize ? maxChuckSize : bytesLeft;
+    const bytesToSend = bytesLeft >= maxChunkSize ? maxChunkSize : bytesLeft;
     const buffer = Buffer.from(data, data.byteLength - bytesLeft, bytesToSend);
     bytesLeft -= bytesToSend;
     yield buffer;

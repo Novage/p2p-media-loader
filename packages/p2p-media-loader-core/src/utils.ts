@@ -8,8 +8,8 @@ import {
 } from "./internal-types";
 
 export function getStreamExternalId(
-  stream: Readonly<Stream>,
-  manifestResponseUrl: string
+  manifestResponseUrl: string,
+  stream: Readonly<Stream>
 ): string {
   const { type, index } = stream;
   return `${manifestResponseUrl}-${type}-${index}`;
@@ -42,7 +42,7 @@ export function generateQueue({
   stream: Readonly<StreamWithSegments>;
   segment: Readonly<Segment>;
   playback: Readonly<Playback>;
-  isSegmentLoaded: (segmentExternalId: string) => boolean;
+  isSegmentLoaded: (segment: Segment) => boolean;
   settings: Pick<
     Settings,
     "highDemandTimeWindow" | "httpDownloadTimeWindow" | "p2pDownloadTimeWindow"
@@ -64,7 +64,7 @@ export function generateQueue({
   for (const segment of stream.segments.values(requestedSegmentId)) {
     const statuses = getSegmentLoadStatuses(segment, bufferRanges);
     if (!statuses && !(i === 0 && isNextSegmentHighDemand)) break;
-    if (isSegmentLoaded(segment.externalId)) continue;
+    if (isSegmentLoaded(segment)) continue;
 
     queueSegmentIds.add(segment.localId);
     statuses.isHighDemand = true;
