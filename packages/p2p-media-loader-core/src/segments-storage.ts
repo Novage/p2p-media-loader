@@ -10,11 +10,9 @@ function getStreamShortExternalId(stream: Readonly<Stream>) {
   return `${type}-${index}`;
 }
 
-function getStorageItemId(stream: Stream, segment: Segment | string) {
-  const segmentExternalId =
-    typeof segment === "string" ? segment : segment.externalId;
-  const streamExternalId = getStreamShortExternalId(stream);
-  return `${streamExternalId}|${segmentExternalId}`;
+function getStorageItemId(segment: Segment) {
+  const streamExternalId = getStreamShortExternalId(segment.stream);
+  return `${streamExternalId}|${segment.externalId}`;
 }
 
 export class Subscriptions<
@@ -50,7 +48,6 @@ export class Subscriptions<
 }
 
 type StorageItem = {
-  streamId: string;
   segment: Segment;
   data: ArrayBuffer;
   lastAccessed: number;
@@ -63,7 +60,7 @@ export class SegmentsMemoryStorage {
   private readonly isSegmentLockedPredicates: ((
     segment: Segment
   ) => boolean)[] = [];
-  private onUpdateHandlers = new Map<string, Subscriptions<() => void>>();
+  private onUpdateHandlers = new Map<string, Subscriptions>();
 
   constructor(
     private readonly masterManifestUrl: string,
@@ -90,11 +87,10 @@ export class SegmentsMemoryStorage {
     return this.isSegmentLockedPredicates.some((p) => p(segment));
   }
 
-  async storeSegment(stream: Stream, segment: Segment, data: ArrayBuffer) {
-    const id = getStorageItemId(stream, segment);
-    const streamId = getStreamShortExternalId(stream);
+  async storeSegment(segment: Segment, data: ArrayBuffer) {
+    const id = getStorageItemId(segment);
+    const streamId = getStreamShortExternalId(segment.stream);
     this.cache.set(id, {
-      streamId,
       segment,
       data,
       lastAccessed: performance.now(),
@@ -102,11 +98,8 @@ export class SegmentsMemoryStorage {
     this.fireOnUpdateSubscriptions(streamId);
   }
 
-  async getSegmentData(
-    stream: Stream,
-    segment: Segment | string
-  ): Promise<ArrayBuffer | undefined> {
-    const itemId = getStorageItemId(stream, segment);
+  async getSegmentData(segment: Segment): Promise<ArrayBuffer | undefined> {
+    const itemId = getStorageItemId(segment);
     const cacheItem = this.cache.get(itemId);
     if (cacheItem === undefined) return undefined;
 
@@ -114,15 +107,16 @@ export class SegmentsMemoryStorage {
     return cacheItem.data;
   }
 
-  hasSegment(segment: Segment, stream: Stream): boolean {
-    const id = getStorageItemId(stream, segment);
+  hasSegment(segment: Segment): boolean {
+    const id = getStorageItemId(segment);
     return this.cache.has(id);
   }
 
   getStoredSegmentExternalIdsOfStream(stream: Stream) {
     const streamId = getStreamShortExternalId(stream);
     const externalIds: string[] = [];
-    for (const { streamId: itemStreamId, segment } of this.cache.values()) {
+    for (const { segment } of this.cache.values()) {
+      const itemStreamId = getStreamShortExternalId(segment.stream);
       if (itemStreamId === streamId) externalIds.push(segment.externalId);
     }
     return externalIds;
@@ -138,9 +132,10 @@ export class SegmentsMemoryStorage {
 
     for (const entry of this.cache.entries()) {
       const [itemId, item] = entry;
-      const { lastAccessed, segment, streamId } = item;
+      const { lastAccessed, segment } = item;
       if (now - lastAccessed > this.settings.cachedSegmentExpiration) {
         if (!this.isSegmentLocked(segment)) {
+          const streamId = getStreamShortExternalId(segment.stream);
           itemsToDelete.push(itemId);
           streamIdsOfChangedItems.add(streamId);
         }
@@ -155,8 +150,9 @@ export class SegmentsMemoryStorage {
     if (countOverhead > 0) {
       remainingItems.sort(([, a], [, b]) => a.lastAccessed - b.lastAccessed);
 
-      for (const [itemId, { segment, streamId }] of remainingItems) {
+      for (const [itemId, { segment }] of remainingItems) {
         if (!this.isSegmentLocked(segment)) {
+          const streamId = getStreamShortExternalId(segment.stream);
           itemsToDelete.push(itemId);
           streamIdsOfChangedItems.add(streamId);
           countOverhead--;

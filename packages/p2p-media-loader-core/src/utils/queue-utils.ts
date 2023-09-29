@@ -1,4 +1,4 @@
-import { Segment, Settings, StreamWithSegments } from "../types";
+import { Segment, Settings } from "../types";
 import {
   LoadBufferRanges,
   NumberRange,
@@ -9,12 +9,10 @@ import {
 
 export function generateQueue({
   segment,
-  stream,
   playback,
   settings,
   isSegmentLoaded,
 }: {
-  stream: Readonly<StreamWithSegments>;
   segment: Readonly<Segment>;
   playback: Readonly<Playback>;
   isSegmentLoaded: (segment: Segment) => boolean;
@@ -24,7 +22,7 @@ export function generateQueue({
   >;
 }): { queue: QueueItem[]; queueSegmentIds: Set<string> } {
   const bufferRanges = getLoadBufferRanges(playback, settings);
-  const { localId: requestedSegmentId } = segment;
+  const { localId: requestedSegmentId, stream } = segment;
 
   const queue: QueueItem[] = [];
   const queueSegmentIds = new Set<string>();

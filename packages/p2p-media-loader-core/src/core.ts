@@ -1,5 +1,11 @@
 import { HybridLoader } from "./hybrid-loader";
-import { Stream, StreamWithSegments, Segment, Settings } from "./types";
+import {
+  Stream,
+  StreamWithSegments,
+  Segment,
+  Settings,
+  SegmentBase,
+} from "./types";
 import * as Utils from "./utils/utils";
 import { LinkedMap } from "./linked-map";
 import { BandwidthApproximator } from "./bandwidth-approximator";
@@ -32,8 +38,10 @@ export class Core<TStream extends Stream = Stream> {
   }
 
   hasSegment(segmentLocalId: string): boolean {
-    const { segment } =
-      Utils.getSegmentFromStreamsMap(this.streams, segmentLocalId) ?? {};
+    const segment = Utils.getSegmentFromStreamsMap(
+      this.streams,
+      segmentLocalId
+    );
     return !!segment;
   }
 
@@ -51,13 +59,16 @@ export class Core<TStream extends Stream = Stream> {
 
   updateStream(
     streamLocalId: string,
-    addSegments?: Segment[],
+    addSegments?: SegmentBase[],
     removeSegmentIds?: string[]
   ): void {
     const stream = this.streams.get(streamLocalId);
     if (!stream) return;
 
-    addSegments?.forEach((s) => stream.segments.addToEnd(s.localId, s));
+    addSegments?.forEach((s) => {
+      const segment = { ...s, stream };
+      stream.segments.addToEnd(segment.localId, segment);
+    });
     removeSegmentIds?.forEach((id) => stream.segments.delete(id));
   }
 
@@ -72,9 +83,9 @@ export class Core<TStream extends Stream = Stream> {
       );
       await this.segmentStorage.initialize();
     }
-    const { segment, stream } = this.identifySegment(segmentLocalId);
-    const loader = this.getStreamHybridLoader(segment, stream);
-    void loader.loadSegment(segment, stream, callbacks);
+    const segment = this.identifySegment(segmentLocalId);
+    const loader = this.getStreamHybridLoader(segment);
+    void loader.loadSegment(segment, callbacks);
   }
 
   abortSegmentLoading(segmentId: string): void {
@@ -94,21 +105,20 @@ export class Core<TStream extends Stream = Stream> {
     this.manifestResponseUrl = undefined;
   }
 
-  private identifySegment(segmentId: string) {
+  private identifySegment(segmentId: string): Segment {
     if (!this.manifestResponseUrl) {
       throw new Error("Manifest response url is undefined");
     }
 
-    const { stream, segment } =
-      Utils.getSegmentFromStreamsMap(this.streams, segmentId) ?? {};
-    if (!segment || !stream) {
+    const segment = Utils.getSegmentFromStreamsMap(this.streams, segmentId);
+    if (!segment) {
       throw new Error(`Not found segment with id: ${segmentId}`);
     }
 
-    return { segment, stream };
+    return segment;
   }
 
-  private getStreamHybridLoader(segment: Segment, stream: StreamWithSegments) {
+  private getStreamHybridLoader(segment: Segment) {
     if (!this.manifestResponseUrl) {
       throw new Error("Manifest response url is not defined");
     }
@@ -119,7 +129,6 @@ export class Core<TStream extends Stream = Stream> {
       return new HybridLoader(
         manifestResponseUrl,
         segment,
-        stream,
         this.settings,
         this.bandwidthApproximator,
         this.segmentStorage
@@ -129,7 +138,7 @@ export class Core<TStream extends Stream = Stream> {
       main: "mainStreamLoader",
       secondary: "secondaryStreamLoader",
     } as const;
-    const { type } = stream;
+    const { type } = segment.stream;
     const loaderKey = streamTypeLoaderKeyMap[type];
 
     return (this[loaderKey] =

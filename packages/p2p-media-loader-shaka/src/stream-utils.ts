@@ -1,6 +1,6 @@
 import { HookedStream, Stream } from "./types";
 import {
-  Segment,
+  SegmentBase,
   StreamWithReadonlySegments,
   ByteRange,
 } from "p2p-media-loader-core";
@@ -11,9 +11,9 @@ export function createSegment({
   localId,
 }: {
   segmentReference: shaka.media.SegmentReference;
-  externalId: number;
+  externalId: string;
   localId?: string;
-}): Segment {
+}): SegmentBase {
   const { byteRange, url, startTime, endTime } =
     getSegmentInfoFromReference(segmentReference);
   return {

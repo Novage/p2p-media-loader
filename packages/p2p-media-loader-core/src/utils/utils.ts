@@ -18,10 +18,19 @@ export function getSegmentFullExternalId(
 export function getSegmentFromStreamsMap(
   streams: Map<string, StreamWithSegments>,
   segmentId: string
-): { segment: Segment; stream: StreamWithSegments } | undefined {
+): Segment | undefined {
   for (const stream of streams.values()) {
     const segment = stream.segments.get(segmentId);
-    if (segment) return { segment, stream };
+    if (segment) return segment;
+  }
+}
+
+export function getSegmentFromStreamByExternalId(
+  stream: StreamWithSegments,
+  segmentExternalId: string
+): Segment | undefined {
+  for (const segment of stream.segments.values()) {
+    if (segment.externalId === segmentExternalId) return segment;
   }
 }
 

@@ -6,13 +6,17 @@ export type StreamType = "main" | "secondary";
 
 export type ByteRange = { start: number; end: number };
 
-export type Segment = {
+export type SegmentBase = {
   readonly localId: string;
   readonly externalId: string;
   readonly url: string;
   readonly byteRange?: ByteRange;
   readonly startTime: number;
   readonly endTime: number;
+};
+
+export type Segment = SegmentBase & {
+  readonly stream: StreamWithSegments;
 };
 
 export type Stream = {
@@ -28,13 +32,16 @@ export type ReadonlyLinkedMap<K, V extends object> = Pick<
 
 export type StreamWithSegments<
   TStream extends Stream = Stream,
-  TMap extends ReadonlyLinkedMap<string, Segment> = LinkedMap<string, Segment>
+  TMap extends ReadonlyLinkedMap<string, SegmentBase> = LinkedMap<
+    string,
+    Segment
+  >
 > = TStream & {
   readonly segments: TMap;
 };
 
 export type StreamWithReadonlySegments<TStream extends Stream = Stream> =
-  StreamWithSegments<TStream, ReadonlyLinkedMap<string, Segment>>;
+  StreamWithSegments<TStream, ReadonlyLinkedMap<string, SegmentBase>>;
 
 export type SegmentResponse = {
   data: ArrayBuffer;

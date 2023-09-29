@@ -1,4 +1,4 @@
-import { Segment, Stream, StreamWithSegments } from "./index";
+import { Segment, StreamWithSegments } from "./index";
 import { getHttpSegmentRequest } from "./http-loader";
 import { P2PLoader } from "./p2p-loader";
 import { SegmentsMemoryStorage } from "./segments-storage";
@@ -13,7 +13,6 @@ export class HybridLoader {
   private readonly requests = new RequestContainer();
   private readonly p2pLoaders: P2PLoadersContainer;
   private storageCleanUpIntervalId?: number;
-  private activeStream: Readonly<StreamWithSegments>;
   private lastRequestedSegment: Readonly<Segment>;
   private readonly playback: Playback;
   private lastQueueProcessingTimeStamp?: number;
@@ -22,21 +21,20 @@ export class HybridLoader {
   constructor(
     private streamManifestUrl: string,
     requestedSegment: Segment,
-    requestedStream: Readonly<StreamWithSegments>,
     private readonly settings: Settings,
     private readonly bandwidthApproximator: BandwidthApproximator,
     private readonly segmentStorage: SegmentsMemoryStorage
   ) {
     this.lastRequestedSegment = requestedSegment;
-    this.activeStream = requestedStream;
+    const activeStream = requestedSegment.stream;
     this.playback = { position: requestedSegment.startTime, rate: 1 };
-    this.segmentAvgDuration = getSegmentAvgDuration(requestedStream);
+    this.segmentAvgDuration = getSegmentAvgDuration(activeStream);
 
     if (!this.segmentStorage.isInitialized) {
       throw new Error("Segment storage is not initialized.");
     }
     this.segmentStorage.addIsSegmentLockedPredicate((segment) => {
-      if (!this.activeStream.segments.has(segment.localId)) return false;
+      if (segment.stream !== activeStream) return false;
       const bufferRanges = QueueUtils.getLoadBufferRanges(
         this.playback,
         this.settings
@@ -45,7 +43,7 @@ export class HybridLoader {
     });
     this.p2pLoaders = new P2PLoadersContainer(
       this.streamManifestUrl,
-      requestedStream,
+      requestedSegment.stream,
       this.requests,
       this.segmentStorage,
       this.settings
@@ -53,21 +51,17 @@ export class HybridLoader {
   }
 
   // api method for engines
-  async loadSegment(
-    segment: Readonly<Segment>,
-    stream: Readonly<StreamWithSegments>,
-    callbacks: EngineCallbacks
-  ) {
-    if (this.activeStream !== stream) {
-      this.activeStream = stream;
+  async loadSegment(segment: Readonly<Segment>, callbacks: EngineCallbacks) {
+    const { stream } = segment;
+    if (stream !== this.lastRequestedSegment.stream) {
       this.p2pLoaders.changeActiveLoader(stream);
     }
     this.lastRequestedSegment = segment;
     this.requests.addEngineCallbacks(segment, callbacks);
     void this.processQueue();
 
-    if (this.segmentStorage.hasSegment(segment, stream)) {
-      const data = await this.segmentStorage.getSegmentData(stream, segment);
+    if (this.segmentStorage.hasSegment(segment)) {
+      const data = await this.segmentStorage.getSegmentData(segment);
       if (data) {
         this.requests.resolveEngineRequest(segment, {
           data,
@@ -88,14 +82,11 @@ export class HybridLoader {
     }
     this.lastQueueProcessingTimeStamp = now;
 
-    const stream = this.activeStream;
     const { queue, queueSegmentIds } = QueueUtils.generateQueue({
       segment: this.lastRequestedSegment,
-      stream,
       playback: this.playback,
       settings: this.settings,
-      isSegmentLoaded: (segment) =>
-        this.segmentStorage.hasSegment(segment, stream),
+      isSegmentLoaded: (segment) => this.segmentStorage.hasSegment(segment),
     });
 
     this.requests.abortAllNotRequestedByEngine((segment) =>
@@ -123,13 +114,13 @@ export class HybridLoader {
         //   }
         // }
         if (this.requests.httpRequestsCount < simultaneousHttpDownloads) {
-          void this.loadThroughHttp(stream, segment);
+          void this.loadThroughHttp(segment);
           continue;
         }
 
         this.abortLastHttpLoadingAfter(queue, segment.localId);
         if (this.requests.httpRequestsCount < simultaneousHttpDownloads) {
-          void this.loadThroughHttp(stream, segment);
+          void this.loadThroughHttp(segment);
           continue;
         }
 
@@ -145,7 +136,7 @@ export class HybridLoader {
       }
       if (statuses.isP2PDownloadable) {
         if (this.requests.p2pRequestsCount < simultaneousP2PDownloads) {
-          void this.loadThroughP2P(stream, segment);
+          void this.loadThroughP2P(segment);
         }
       }
       break;
@@ -157,13 +148,13 @@ export class HybridLoader {
     this.requests.abortEngineRequest(segmentId);
   }
 
-  private async loadThroughHttp(stream: Stream, segment: Segment) {
+  private async loadThroughHttp(segment: Segment) {
     let data: ArrayBuffer | undefined;
     try {
       const httpRequest = getHttpSegmentRequest(segment);
       this.requests.addLoaderRequest(segment, httpRequest);
       data = await httpRequest.promise;
-      if (data) this.onSegmentLoaded(stream, segment, data);
+      if (data) this.onSegmentLoaded(segment, data);
     } catch (err) {
       if (err instanceof FetchError) {
         // TODO: handle error
@@ -171,15 +162,15 @@ export class HybridLoader {
     }
   }
 
-  private async loadThroughP2P(stream: Stream, segment: Segment) {
+  private async loadThroughP2P(segment: Segment) {
     const p2pLoader = this.p2pLoaders.activeLoader;
     const data = await p2pLoader.downloadSegment(segment);
-    if (data) this.onSegmentLoaded(stream, segment, data);
+    if (data) this.onSegmentLoaded(segment, data);
   }
 
-  private onSegmentLoaded(stream: Stream, segment: Segment, data: ArrayBuffer) {
+  private onSegmentLoaded(segment: Segment, data: ArrayBuffer) {
     this.bandwidthApproximator.addBytes(data.byteLength);
-    void this.segmentStorage.storeSegment(stream, segment, data);
+    void this.segmentStorage.storeSegment(segment, data);
     this.requests.resolveEngineRequest(segment, {
       data,
       bandwidth: this.bandwidthApproximator.getBandwidth(),
