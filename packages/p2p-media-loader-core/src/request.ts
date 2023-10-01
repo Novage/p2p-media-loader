@@ -76,13 +76,15 @@ export class RequestContainer {
         loaderRequest,
       });
     }
-    if (loaderRequest.type === "http") {
-      this.onHttpRequestsHandlers.fire();
-    }
     this.debug(`add loader request: ${loaderRequest.type}`);
-    loaderRequest.promise.then(() =>
-      this.clearRequestItem(segmentId, "loader")
-    );
+
+    const clearRequestItem = () => this.clearRequestItem(segmentId, "loader");
+    loaderRequest.promise
+      .then(() => clearRequestItem())
+      .catch((err) => {
+        if (err instanceof RequestAbortError) clearRequestItem();
+      });
+    if (loaderRequest.type === "http") this.onHttpRequestsHandlers.fire();
   }
 
   addEngineCallbacks(segment: Segment, engineCallbacks: EngineCallbacks) {

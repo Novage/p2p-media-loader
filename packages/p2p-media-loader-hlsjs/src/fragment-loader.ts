@@ -89,7 +89,10 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     };
 
     const onError = (error: unknown) => {
-      if (this.stats.aborted && error instanceof RequestAbortError) return;
+      if (error instanceof RequestAbortError) {
+        if (this.stats.aborted) return;
+        this.callbacks?.onAbort?.(this.stats, this.context, {});
+      }
       this.handleError(error);
     };
 

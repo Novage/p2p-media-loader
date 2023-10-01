@@ -84,6 +84,12 @@ export class Core<TStream extends Stream = Stream> {
       await this.segmentStorage.initialize();
     }
     const segment = this.identifySegment(segmentLocalId);
+    console.log(
+      "segment: ",
+      `${segment.stream.index}-${segment.externalId}`,
+      segment.startTime,
+      segment.endTime
+    );
     const loader = this.getStreamHybridLoader(segment);
     void loader.loadSegment(segment, callbacks);
   }

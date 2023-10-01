@@ -8,12 +8,12 @@ import {
 } from "../internal-types";
 
 export function generateQueue({
-  segment,
+  lastRequestedSegment,
   playback,
   settings,
   isSegmentLoaded,
 }: {
-  segment: Readonly<Segment>;
+  lastRequestedSegment: Readonly<Segment>;
   playback: Readonly<Playback>;
   isSegmentLoaded: (segment: Segment) => boolean;
   settings: Pick<
@@ -22,12 +22,14 @@ export function generateQueue({
   >;
 }): { queue: QueueItem[]; queueSegmentIds: Set<string> } {
   const bufferRanges = getLoadBufferRanges(playback, settings);
-  const { localId: requestedSegmentId, stream } = segment;
+  const { localId: requestedSegmentId, stream } = lastRequestedSegment;
 
   const queue: QueueItem[] = [];
   const queueSegmentIds = new Set<string>();
 
-  const nextSegment = stream.segments.getNextTo(segment.localId)?.[1];
+  const nextSegment = stream.segments.getNextTo(
+    lastRequestedSegment.localId
+  )?.[1];
   const isNextSegmentHighDemand = !!(
     nextSegment &&
     getSegmentLoadStatuses(nextSegment, bufferRanges).isHighDemand
