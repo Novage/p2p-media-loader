@@ -31,8 +31,8 @@ export type BasePeerCommand<T extends PeerCommandType = PeerCommandType> = {
 
 // {i: segmentExternalId[]; s: segment status separator position in ids array}
 export type JsonSegmentAnnouncement = {
-  i: string[];
-  s: number;
+  i: string;
+  s?: number;
 };
 
 export type PeerSegmentCommand = BasePeerCommand<

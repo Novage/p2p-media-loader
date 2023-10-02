@@ -15,7 +15,7 @@ export class P2PLoader {
   private readonly peerHash: string;
   private readonly trackerClient: TrackerClient;
   private readonly peers = new Map<string, Peer>();
-  private announcement: JsonSegmentAnnouncement = { i: [], s: 0 };
+  private announcement: JsonSegmentAnnouncement = { i: "" };
 
   constructor(
     private streamManifestUrl: string,
@@ -102,8 +102,7 @@ export class P2PLoader {
       this.segmentStorage.getStoredSegmentExternalIdsOfStream(this.stream);
     const httpLoading: string[] = [];
 
-    for (const request of this.requests.values()) {
-      if (request.loaderRequest?.type !== "http") continue;
+    for (const request of this.requests.httpRequests()) {
       const segment = this.stream.segments.get(request.segment.localId);
       if (!segment) continue;
 

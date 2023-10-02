@@ -45,7 +45,11 @@ export function getSegmentsFromPeerAnnouncement(
 ): Map<string, PeerSegmentStatus> {
   const segmentStatusMap = new Map<string, PeerSegmentStatus>();
   const separator = announcement.s;
-  for (const [index, segmentExternalId] of announcement.i.entries()) {
+  const ids = announcement.i.split("|");
+  if (!separator) {
+    return new Map(ids.map((id) => [id, PeerSegmentStatus.Loaded]));
+  }
+  for (const [index, segmentExternalId] of ids.entries()) {
     if (index < separator) {
       segmentStatusMap.set(segmentExternalId, PeerSegmentStatus.Loaded);
     } else {
@@ -59,13 +63,14 @@ export function getJsonSegmentsAnnouncement(
   storedSegmentExternalIds: string[],
   loadingByHttpSegmentExternalIds: string[]
 ): JsonSegmentAnnouncement {
-  const segmentIds = [
-    ...storedSegmentExternalIds,
-    ...loadingByHttpSegmentExternalIds,
-  ];
-  const segmentStatusSeparator = storedSegmentExternalIds.length;
-  return {
-    i: segmentIds,
-    s: segmentStatusSeparator,
-  };
+  let segmentsListing = storedSegmentExternalIds.join("|");
+  if (loadingByHttpSegmentExternalIds.length) {
+    if (segmentsListing) segmentsListing += "|";
+    segmentsListing += loadingByHttpSegmentExternalIds.join("|");
+  }
+  const announcement: JsonSegmentAnnouncement = { i: segmentsListing };
+  if (loadingByHttpSegmentExternalIds.length) {
+    announcement.s = storedSegmentExternalIds.length;
+  }
+  return announcement;
 }

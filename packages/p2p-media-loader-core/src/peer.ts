@@ -55,7 +55,7 @@ export class Peer {
       this.connection = candidate;
       this.eventHandlers.onPeerConnected(this);
     });
-    candidate.on("data", () => this.onReceiveData.bind(this));
+    candidate.on("data", this.onReceiveData.bind(this));
     candidate.on("close", () => {
       if (this.connection === candidate) {
         this.connection = undefined;
