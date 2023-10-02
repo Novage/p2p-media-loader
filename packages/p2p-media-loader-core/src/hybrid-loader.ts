@@ -17,6 +17,7 @@ export class HybridLoader {
   private readonly playback: Playback;
   private lastQueueProcessingTimeStamp?: number;
   private readonly segmentAvgDuration: number;
+  private readonly randomHttpDownloadInterval: number;
 
   constructor(
     private streamManifestUrl: string,
@@ -47,6 +48,11 @@ export class HybridLoader {
       this.requests,
       this.segmentStorage,
       this.settings
+    );
+
+    this.randomHttpDownloadInterval = window.setInterval(
+      () => this.loadRandomThroughHttp(),
+      1000
     );
   }
 
@@ -86,7 +92,7 @@ export class HybridLoader {
       lastRequestedSegment: this.lastRequestedSegment,
       playback: this.playback,
       settings: this.settings,
-      isSegmentLoaded: (segment) => this.segmentStorage.hasSegment(segment),
+      skipSegment: (segment) => this.segmentStorage.hasSegment(segment),
     });
 
     this.requests.abortAllNotRequestedByEngine((segment) =>
@@ -95,17 +101,6 @@ export class HybridLoader {
 
     const { simultaneousHttpDownloads, simultaneousP2PDownloads } =
       this.settings;
-
-    for (const request of this.requests.engineRequests()) {
-      const { segment, loaderRequest } = request;
-      if (
-        !queueSegmentIds.has(segment.localId) &&
-        !loaderRequest &&
-        segment.startTime < this.lastRequestedSegment.startTime
-      ) {
-        request.engineCallbacks.onError(new RequestAbortError());
-      }
-    }
 
     for (const { segment, statuses } of queue) {
       // const timeToPlayback = getTimeToSegmentPlayback(segment, this.playback);
@@ -130,27 +125,27 @@ export class HybridLoader {
           continue;
         }
 
-        // this.abortLastHttpLoadingAfter(queue, segment.localId);
-        // if (this.requests.httpRequestsCount < simultaneousHttpDownloads) {
-        //   void this.loadThroughHttp(segment);
-        //   continue;
-        // }
-        //
-        // if (this.requests.p2pRequestsCount < simultaneousP2PDownloads) {
-        //   void this.loadThroughP2P(segment);
-        // }
-        //
-        // this.abortLastP2PLoadingAfter(queue, segment.localId);
-        // if (this.requests.p2pRequestsCount < simultaneousHttpDownloads) {
-        //   void this.loadThroughHttp(segment);
-        //   continue;
-        // }
+        this.abortLastHttpLoadingAfter(queue, segment.localId);
+        if (this.requests.httpRequestsCount < simultaneousHttpDownloads) {
+          void this.loadThroughHttp(segment);
+          continue;
+        }
+
+        if (this.requests.p2pRequestsCount < simultaneousP2PDownloads) {
+          void this.loadThroughP2P(segment);
+        }
+
+        this.abortLastP2PLoadingAfter(queue, segment.localId);
+        if (this.requests.p2pRequestsCount < simultaneousHttpDownloads) {
+          void this.loadThroughHttp(segment);
+          continue;
+        }
       }
-      // if (statuses.isP2PDownloadable) {
-      //   if (this.requests.p2pRequestsCount < simultaneousP2PDownloads) {
-      //     void this.loadThroughP2P(segment);
-      //   }
-      // }
+      if (statuses.isP2PDownloadable) {
+        if (this.requests.p2pRequestsCount < simultaneousP2PDownloads) {
+          void this.loadThroughP2P(segment);
+        }
+      }
       break;
     }
   }
@@ -180,6 +175,25 @@ export class HybridLoader {
     if (data) this.onSegmentLoaded(segment, data);
   }
 
+  private loadRandomThroughHttp() {
+    const { simultaneousHttpDownloads } = this.settings;
+    if (this.requests.httpRequestsCount >= simultaneousHttpDownloads) return;
+    const { queue } = QueueUtils.generateQueue({
+      lastRequestedSegment: this.lastRequestedSegment,
+      playback: this.playback,
+      settings: this.settings,
+      skipSegment: (segment, statuses) =>
+        !statuses.isHttpDownloadable ||
+        this.segmentStorage.hasSegment(segment) ||
+        this.requests.isHybridLoaderRequested(segment),
+    });
+    if (!queue.length) return;
+
+    const { segment } = queue[Math.floor(Math.random() * queue.length)];
+    // console.log("load random: ", getSegmentStringId(segment));
+    void this.loadThroughHttp(segment);
+  }
+
   private onSegmentLoaded(segment: Segment, data: ArrayBuffer) {
     this.bandwidthApproximator.addBytes(data.byteLength);
     void this.segmentStorage.storeSegment(segment, data);
@@ -191,24 +205,20 @@ export class HybridLoader {
   }
 
   private abortLastHttpLoadingAfter(queue: QueueItem[], segmentId: string) {
-    for (const {
-      segment: { localId: queueSegmentId },
-    } of arrayBackwards(queue)) {
-      if (queueSegmentId === segmentId) break;
-      if (this.requests.isHttpRequested(queueSegmentId)) {
-        this.requests.abortLoaderRequest(queueSegmentId);
+    for (const { segment } of arrayBackwards(queue)) {
+      if (segment.localId === segmentId) break;
+      if (this.requests.isHttpRequested(segment)) {
+        this.requests.abortLoaderRequest(segment);
         break;
       }
     }
   }
 
   private abortLastP2PLoadingAfter(queue: QueueItem[], segmentId: string) {
-    for (const {
-      segment: { localId: queueSegmentId },
-    } of arrayBackwards(queue)) {
-      if (queueSegmentId === segmentId) break;
-      if (this.requests.isP2PRequested(queueSegmentId)) {
-        this.requests.abortLoaderRequest(queueSegmentId);
+    for (const { segment } of arrayBackwards(queue)) {
+      if (segment.localId === segmentId) break;
+      if (this.requests.isP2PRequested(segment)) {
+        this.requests.abortLoaderRequest(segment);
         break;
       }
     }
@@ -231,6 +241,7 @@ export class HybridLoader {
 
   destroy() {
     clearInterval(this.storageCleanUpIntervalId);
+    clearInterval(this.randomHttpDownloadInterval);
     this.storageCleanUpIntervalId = undefined;
     void this.segmentStorage.destroy();
     this.requests.destroy();
@@ -340,4 +351,10 @@ function getSegmentAvgDuration(stream: StreamWithSegments) {
   }
 
   return sumDuration / size;
+}
+
+function getSegmentStringId(segment: Segment) {
+  const { index } = segment.stream;
+  const { externalId } = segment;
+  return `${index}-${externalId}`;
 }

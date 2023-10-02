@@ -150,12 +150,19 @@ export class RequestContainer {
     return !!this.requests.get(segmentId)?.engineCallbacks;
   }
 
-  isHttpRequested(segmentId: string): boolean {
-    return this.requests.get(segmentId)?.loaderRequest?.type === "http";
+  isHttpRequested(segment: Segment): boolean {
+    const id = getRequestItemId(segment);
+    return this.requests.get(id)?.loaderRequest?.type === "http";
   }
 
-  isP2PRequested(segmentId: string): boolean {
-    return this.requests.get(segmentId)?.loaderRequest?.type === "p2p";
+  isP2PRequested(segment: Segment): boolean {
+    const id = getRequestItemId(segment);
+    return this.requests.get(id)?.loaderRequest?.type === "p2p";
+  }
+
+  isHybridLoaderRequested(segment: Segment): boolean {
+    const id = getRequestItemId(segment);
+    return !!this.requests.get(id)?.loaderRequest;
   }
 
   abortEngineRequest(segmentId: string) {
@@ -166,8 +173,9 @@ export class RequestContainer {
     request.loaderRequest?.abort();
   }
 
-  abortLoaderRequest(segmentId: string) {
-    this.requests.get(segmentId)?.loaderRequest?.abort();
+  abortLoaderRequest(segment: Segment) {
+    const id = getRequestItemId(segment);
+    this.requests.get(id)?.loaderRequest?.abort();
   }
 
   private clearRequestItem(

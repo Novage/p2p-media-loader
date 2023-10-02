@@ -11,11 +11,11 @@ export function generateQueue({
   lastRequestedSegment,
   playback,
   settings,
-  isSegmentLoaded,
+  skipSegment,
 }: {
   lastRequestedSegment: Readonly<Segment>;
   playback: Readonly<Playback>;
-  isSegmentLoaded: (segment: Segment) => boolean;
+  skipSegment: (segment: Segment, statuses: QueueItemStatuses) => boolean;
   settings: Pick<
     Settings,
     "highDemandTimeWindow" | "httpDownloadTimeWindow" | "p2pDownloadTimeWindow"
@@ -42,7 +42,7 @@ export function generateQueue({
     if (isNotActual && !(i === 0 && isNextSegmentHighDemand)) {
       break;
     }
-    if (isSegmentLoaded(segment)) continue;
+    if (skipSegment(segment, statuses)) continue;
 
     queueSegmentIds.add(segment.localId);
     if (isNotActual) statuses.isHighDemand = true;
