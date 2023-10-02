@@ -1,4 +1,4 @@
-import { Segment, StreamWithSegments } from "./index";
+import { RequestAbortError, Segment, StreamWithSegments } from "./index";
 import { getHttpSegmentRequest } from "./http-loader";
 import { P2PLoader } from "./p2p-loader";
 import { SegmentsMemoryStorage } from "./segments-storage";
@@ -95,6 +95,18 @@ export class HybridLoader {
 
     const { simultaneousHttpDownloads, simultaneousP2PDownloads } =
       this.settings;
+
+    for (const request of this.requests.engineRequests()) {
+      const { segment, loaderRequest } = request;
+      if (
+        !queueSegmentIds.has(segment.localId) &&
+        !loaderRequest &&
+        segment.startTime < this.lastRequestedSegment.startTime
+      ) {
+        request.engineCallbacks.onError(new RequestAbortError());
+      }
+    }
+
     for (const { segment, statuses } of queue) {
       // const timeToPlayback = getTimeToSegmentPlayback(segment, this.playback);
       if (statuses.isHighDemand) {
@@ -141,17 +153,6 @@ export class HybridLoader {
       // }
       break;
     }
-
-    console.log(
-      [...this.requests.values()].map((req) => {
-        const { loaderRequest, engineCallbacks, segment } = req;
-        const { stream } = segment;
-
-        return `${stream.index}-${segment.externalId}-l${
-          loaderRequest ? 1 : 0
-        }-e${engineCallbacks ? 1 : 0}`;
-      })
-    );
   }
 
   // api method for engines
@@ -225,10 +226,6 @@ export class HybridLoader {
 
     if (isPositionChanged) this.playback.position = position;
     if (isRateChanged) this.playback.rate = rate;
-
-    if (isPositionSignificantlyChanged) {
-      console.log("\nposition: ", position);
-    }
     void this.processQueue(isPositionSignificantlyChanged);
   }
 

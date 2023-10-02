@@ -3,6 +3,8 @@ import { RequestAbortError } from "./errors";
 import { Subscriptions } from "./segments-storage";
 import Debug from "debug";
 
+type SetRequired<T, K extends keyof T> = Omit<T, K> & Required<Pick<T, K>>;
+
 export type EngineCallbacks = {
   onSuccess: (response: SegmentResponse) => void;
   onError: (reason?: unknown) => void;
@@ -37,6 +39,8 @@ type Request = {
   loaderRequest?: Readonly<HybridLoaderRequest>;
   engineCallbacks?: Readonly<EngineCallbacks>;
 };
+
+type RequestWithEngineCallbacks = SetRequired<Request, "engineCallbacks">;
 
 function getRequestItemId(segment: Segment) {
   return segment.localId;
@@ -91,10 +95,17 @@ export class RequestContainer {
     const segmentId = getRequestItemId(segment);
     const requestItem = this.requests.get(segmentId);
 
-    const { onSuccess } = engineCallbacks;
+    const { onSuccess, onError } = engineCallbacks;
     engineCallbacks.onSuccess = (response) => {
       this.clearRequestItem(segmentId, "engine");
       return onSuccess(response);
+    };
+
+    engineCallbacks.onError = (error) => {
+      if (error instanceof RequestAbortError) {
+        this.clearRequestItem(segmentId, "engine");
+      }
+      return onError(error);
     };
 
     if (requestItem) {
@@ -121,6 +132,12 @@ export class RequestContainer {
   *p2pRequests(): Generator<Request, void> {
     for (const request of this.requests.values()) {
       if (request.loaderRequest?.type === "p2p") yield request;
+    }
+  }
+
+  *engineRequests(): Generator<RequestWithEngineCallbacks, void> {
+    for (const request of this.requests.values()) {
+      if (request.engineCallbacks) yield request as RequestWithEngineCallbacks;
     }
   }
 

@@ -159,6 +159,7 @@ function App() {
         },
       },
     });
+    player.play();
     setPlayerToWindow(player);
   };
 
