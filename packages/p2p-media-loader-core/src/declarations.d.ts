@@ -53,6 +53,7 @@ declare module "bittorrent-tracker" {
       handler: PeerCandidateEventHandler<E>
     ): void;
     send(data: string | ArrayBuffer | Blob): void;
+    write(data: string | ArrayBuffer | Blob): void;
     destroy(): void;
   };
 }

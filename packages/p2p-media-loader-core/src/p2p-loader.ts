@@ -29,6 +29,7 @@ export class P2PLoader {
       this.streamManifestUrl,
       this.stream
     );
+    console.log("\ncreate tracker client", this.streamExternalId);
     this.streamHash = getHash(this.streamExternalId);
     this.peerHash = getHash(peerId);
 
@@ -76,13 +77,12 @@ export class P2PLoader {
   }
 
   async downloadSegment(segment: Segment): Promise<ArrayBuffer | undefined> {
-    const segmentExternalId = segment.externalId;
     const peerWithSegment: Peer[] = [];
 
     for (const peer of this.peers.values()) {
       if (
         !peer.downloadingSegment &&
-        peer.getSegmentStatus(segmentExternalId) === PeerSegmentStatus.Loaded
+        peer.getSegmentStatus(segment) === PeerSegmentStatus.Loaded
       ) {
         peerWithSegment.push(peer);
       }
@@ -93,8 +93,17 @@ export class P2PLoader {
     const peer =
       peerWithSegment[Math.floor(Math.random() * peerWithSegment.length)];
     const request = peer.requestSegment(segment);
+    const idStr = `${segment.stream.index}-${segment.externalId}`;
+    console.log(`=> p2p requested: ${idStr}`);
     this.requests.addLoaderRequest(segment, request);
     return request.promise;
+  }
+
+  isLoadingOrLoadedBySomeone(segment: Segment): boolean {
+    for (const peer of this.peers.values()) {
+      if (peer.getSegmentStatus(segment)) return true;
+    }
+    return false;
   }
 
   private updateSegmentAnnouncement() {

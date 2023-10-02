@@ -1,5 +1,5 @@
 import { Segment, SegmentResponse } from "./types";
-import { RequestAbortError } from "./errors";
+import { RequestAbortError, FetchError } from "./errors";
 import { Subscriptions } from "./segments-storage";
 import Debug from "debug";
 
@@ -87,6 +87,8 @@ export class RequestContainer {
       .then(() => clearRequestItem())
       .catch((err) => {
         if (err instanceof RequestAbortError) clearRequestItem();
+        if (err instanceof FetchError) {
+        }
       });
     if (loaderRequest.type === "http") this.onHttpRequestsHandlers.fire();
   }

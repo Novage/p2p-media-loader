@@ -16,17 +16,17 @@ export class Core<TStream extends Stream = Stream> {
   private manifestResponseUrl?: string;
   private readonly streams = new Map<string, StreamWithSegments<TStream>>();
   private readonly settings: Settings = {
-    simultaneousHttpDownloads: 3,
+    simultaneousHttpDownloads: 2,
     simultaneousP2PDownloads: 3,
     highDemandTimeWindow: 30,
     httpDownloadTimeWindow: 60,
     p2pDownloadTimeWindow: 60,
-    cachedSegmentExpiration: 120,
+    cachedSegmentExpiration: 120 * 1000,
     cachedSegmentsCount: 50,
     webRtcMaxMessageSize: 64 * 1024 - 1,
-    p2pSegmentDownloadTimeout: 1000,
+    p2pSegmentDownloadTimeout: 5000,
     storageCleanupInterval: 5000,
-    p2pLoaderDestroyTimeout: 30000,
+    p2pLoaderDestroyTimeout: 30 * 1000,
   };
   private readonly bandwidthApproximator = new BandwidthApproximator();
   private segmentStorage?: SegmentsMemoryStorage;
@@ -70,6 +70,8 @@ export class Core<TStream extends Stream = Stream> {
       stream.segments.addToEnd(segment.localId, segment);
     });
     removeSegmentIds?.forEach((id) => stream.segments.delete(id));
+    this.mainStreamLoader?.updateStream(stream);
+    this.secondaryStreamLoader?.updateStream(stream);
   }
 
   async loadSegment(segmentLocalId: string, callbacks: EngineCallbacks) {

@@ -52,6 +52,7 @@ export class Peer {
 
   addCandidate(candidate: PeerCandidate) {
     candidate.on("connect", () => {
+      console.log("\nconnected with peer", this.connection === candidate);
       this.connection = candidate;
       this.eventHandlers.onPeerConnected(this);
     });
@@ -75,8 +76,9 @@ export class Peer {
     return this.request?.segment;
   }
 
-  getSegmentStatus(segmentExternalId: string): PeerSegmentStatus | undefined {
-    return this.segments.get(segmentExternalId);
+  getSegmentStatus(segment: Segment): PeerSegmentStatus | undefined {
+    const { externalId } = segment;
+    return this.segments.get(externalId);
   }
 
   private onReceiveData(data: ArrayBuffer) {
@@ -120,7 +122,7 @@ export class Peer {
 
   private sendCommand(command: PeerCommand) {
     if (!this.connection) return;
-    this.connection.send(JSON.stringify(command));
+    this.connection.write(JSON.stringify(command));
   }
 
   requestSegment(segment: Segment) {
@@ -155,7 +157,7 @@ export class Peer {
     this.sendCommand(command);
 
     this.isSendingData = true;
-    const sendChunk = async (data: ArrayBuffer) => this.connection?.send(data);
+    const sendChunk = async (data: ArrayBuffer) => this.connection?.write(data);
     for (const chunk of getBufferChunks(
       data,
       this.settings.webRtcMaxMessageSize
