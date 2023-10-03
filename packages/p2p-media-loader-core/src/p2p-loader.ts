@@ -29,9 +29,10 @@ export class P2PLoader {
       this.streamManifestUrl,
       this.stream
     );
-    console.log("\ncreate tracker client", this.streamExternalId);
     this.streamHash = getHash(this.streamExternalId);
     this.peerHash = getHash(peerId);
+    console.log("\ncreate tracker client", this.streamExternalId);
+    console.log("PEER ID: " + this.peerHash);
 
     this.trackerClient = createTrackerClient({
       streamHash: this.streamHash,
@@ -54,6 +55,7 @@ export class P2PLoader {
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     trackerClient.on("update", () => {});
     trackerClient.on("peer", (candidate) => {
+      console.log("Peer found: ", candidate);
       const peer = this.peers.get(candidate.id);
       if (peer) peer.addCandidate(candidate);
       else this.createPeer(candidate);
@@ -61,7 +63,9 @@ export class P2PLoader {
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     trackerClient.on("warning", (warning) => {});
     // eslint-disable-next-line @typescript-eslint/no-empty-function
-    trackerClient.on("error", (error) => {});
+    trackerClient.on("error", (error) => {
+      console.log("TRACKER ERROR", error);
+    });
   }
 
   private createPeer(candidate: PeerCandidate) {

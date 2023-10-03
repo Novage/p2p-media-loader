@@ -150,6 +150,7 @@ function App() {
           customHls: (video: HTMLVideoElement) => {
             const hls = new Hls({
               ...engine.getConfig(),
+              liveSyncDurationCount: 7,
             });
             engine.initHlsJsEvents(hls);
             hls.loadSource(video.src);
@@ -181,10 +182,6 @@ function App() {
   };
 
   const createNewPlayer = () => {
-    if (!localStorage.videoUrl) {
-      localStorage.streamUrl = streamUrl.live2;
-      setUrl(streamUrl.live2);
-    }
     switch (playerType) {
       case "hls-dplayer":
         initHlsDplayer(url);

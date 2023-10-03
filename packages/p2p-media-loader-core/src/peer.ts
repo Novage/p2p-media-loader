@@ -64,7 +64,9 @@ export class Peer {
       }
     });
     // eslint-disable-next-line @typescript-eslint/no-empty-function
-    candidate.on("error", () => {});
+    candidate.on("error", (error) => {
+      console.log("PEER ERROR:", error);
+    });
     this.candidates.add(candidate);
   }
 
