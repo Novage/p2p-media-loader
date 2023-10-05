@@ -1,7 +1,7 @@
 import { Segment, StreamWithSegments } from "./index";
 import { getHttpSegmentRequest } from "./http-loader";
 import { SegmentsMemoryStorage } from "./segments-storage";
-import { Settings } from "./types";
+import { Settings, CoreEventHandlers } from "./types";
 import { BandwidthApproximator } from "./bandwidth-approximator";
 import { Playback, QueueItem } from "./internal-types";
 import { RequestContainer, EngineCallbacks } from "./request";
@@ -27,7 +27,8 @@ export class HybridLoader {
     requestedSegment: Segment,
     private readonly settings: Settings,
     private readonly bandwidthApproximator: BandwidthApproximator,
-    private readonly segmentStorage: SegmentsMemoryStorage
+    private readonly segmentStorage: SegmentsMemoryStorage,
+    private readonly eventHandlers?: Pick<CoreEventHandlers, "onDataLoaded">
   ) {
     this.lastRequestedSegment = requestedSegment;
     const activeStream = requestedSegment.stream;
@@ -205,7 +206,7 @@ export class HybridLoader {
       data = await httpRequest.promise;
 
       this.logger.loader(`http responses: ${segment.externalId}`);
-      if (data) this.onSegmentLoaded(segment, data);
+      if (data) this.onSegmentLoaded(segment, data, "http");
     } catch (err) {
       if (err instanceof FetchError) {
         // TODO: handle error
@@ -222,7 +223,7 @@ export class HybridLoader {
       const data = await p2pLoader.downloadSegment(segment);
       if (data) {
         this.logger.loader(`p2p loaded: ${segmentString} | ${statusesStr}`);
-        this.onSegmentLoaded(segment, data);
+        this.onSegmentLoaded(segment, data, "p2p");
       }
     } catch (error) {
       console.log("");
@@ -233,8 +234,14 @@ export class HybridLoader {
 
   private loadRandomThroughHttp() {
     const { simultaneousHttpDownloads } = this.settings;
-    if (this.requests.httpRequestsCount >= simultaneousHttpDownloads) return;
     const p2pLoader = this.p2pLoaders.activeLoader;
+    const connectedPeersAmount = p2pLoader.connectedPeersAmount;
+    if (
+      this.requests.httpRequestsCount >= simultaneousHttpDownloads ||
+      !connectedPeersAmount
+    ) {
+      return;
+    }
     const { queue } = QueueUtils.generateQueue({
       lastRequestedSegment: this.lastRequestedSegment,
       playback: this.playback,
@@ -246,8 +253,8 @@ export class HybridLoader {
         p2pLoader.isLoadingOrLoadedBySomeone(segment),
     });
     if (!queue.length) return;
-    const peersAmount = p2pLoader.connectedPeersAmount + 1;
-    const probability = Math.min(queue.length / peersAmount, 1);
+    const peersAmount = connectedPeersAmount + 1;
+    const probability = Math.min(queue.length / peersAmount, 1) / 2;
     const shouldLoad = Math.random() < probability;
 
     if (!shouldLoad) return;
@@ -259,13 +266,19 @@ export class HybridLoader {
     );
   }
 
-  private onSegmentLoaded(segment: Segment, data: ArrayBuffer) {
+  private onSegmentLoaded(
+    segment: Segment,
+    data: ArrayBuffer,
+    type: "http" | "p2p"
+  ) {
+    const byteLength = data.byteLength;
     this.bandwidthApproximator.addBytes(data.byteLength);
     void this.segmentStorage.storeSegment(segment, data);
     this.requests.resolveEngineRequest(segment, {
       data,
       bandwidth: this.bandwidthApproximator.getBandwidth(),
     });
+    this.eventHandlers?.onDataLoaded?.(byteLength, type);
     this.processQueue();
   }
 

@@ -87,8 +87,6 @@ export class RequestContainer {
       .then(() => clearRequestItem())
       .catch((err) => {
         if (err instanceof RequestAbortError) clearRequestItem();
-        if (err instanceof FetchError) {
-        }
       });
     if (loaderRequest.type === "http") this.onHttpRequestsHandlers.fire();
   }

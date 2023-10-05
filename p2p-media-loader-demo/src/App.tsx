@@ -49,12 +49,35 @@ function App() {
     localStorage.player
   );
   const [url, setUrl] = useState<string>(localStorage.streamUrl);
-  const shakaEngine = useRef<ShakaEngine>(new ShakaEngine(shakaLib));
-  const hlsEngine = useRef<HlsJsEngine>(new HlsJsEngine());
   const shakaInstance = useRef<shaka.Player>();
   const hlsInstance = useRef<Hls>();
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const shakaEngine = useRef<ShakaEngine>(new ShakaEngine(shakaLib));
+  const statIntervalId = useRef<number>();
+
+  const [httpLoaded, setHttpLoaded] = useState<number>(0);
+  const [p2pLoaded, setP2PLoaded] = useState<number>(0);
+  const [globHttpLoaded, setGlobHttpLoaded] = useState<number>(0);
+  const [globP2PLoaded, setGlobP2PLoaded] = useState<number>(0);
+
+  const hlsEngine = useRef<HlsJsEngine>(
+    new HlsJsEngine({
+      onDataLoaded: (byteLength, type) => {
+        if (type === "http") {
+          setHttpLoaded((prev) => prev + byteLength / Math.pow(1024, 2));
+        } else if (type === "p2p") {
+          setP2PLoaded((prev) => prev + byteLength / Math.pow(1024, 2));
+        }
+        const add = (prop: "httpLoaded" | "p2pLoaded") => {
+          const value = +localStorage[prop];
+          localStorage[prop] = value + byteLength;
+        };
+        if (type === "http") add("httpLoaded");
+        else if (type === "p2p") add("p2pLoaded");
+      },
+    })
+  );
 
   useEffect(() => {
     if (
@@ -182,6 +205,8 @@ function App() {
   };
 
   const createNewPlayer = () => {
+    localStorage.httpLoaded = 0;
+    localStorage.p2pLoaded = 0;
     switch (playerType) {
       case "hls-dplayer":
         initHlsDplayer(url);
@@ -196,6 +221,14 @@ function App() {
         initShakaPlayer(url);
         break;
     }
+
+    statIntervalId.current = window.setInterval(() => {
+      const httpLoaded = +localStorage.httpLoaded;
+      const p2pLoaded = +localStorage.p2pLoaded;
+      if (!httpLoaded && !p2pLoaded) return;
+      setGlobHttpLoaded(httpLoaded / Math.pow(1024, 2));
+      setGlobP2PLoaded(p2pLoaded / Math.pow(1024, 2));
+    }, 2000);
   };
 
   const loadStreamWithExistingInstance = () => {
@@ -212,54 +245,85 @@ function App() {
   };
 
   return (
-    <div style={{ textAlign: "center", width: 1000, margin: "auto" }}>
-      <div style={{ marginBottom: 20 }}>
-        <h1>This is Demo</h1>
-        <div style={{ textAlign: "start" }}>
-          <select
-            value={playerType}
-            onChange={(event) =>
-              onPlayerTypeChange(event.target.value as Player)
-            }
-          >
-            {players.map((player) => {
-              return (
-                <option key={player} value={player}>
-                  {player}
-                </option>
-              );
-            })}
-          </select>
-          <select
-            value={url}
-            onChange={(event) => onVideoUrlChange(event.target.value)}
-          >
-            {Object.entries(streamUrl).map(([name, url]) => {
-              return (
-                <option key={name} value={url}>
-                  {name}
-                </option>
-              );
-            })}
-          </select>
-          <button onClick={createNewPlayer}>Create new player</button>
-          <button onClick={loadStreamWithExistingInstance}>
-            Load stream with existing hls/shaka instance
-          </button>
+    <div>
+      <div style={{ textAlign: "center", width: 1000, margin: "auto" }}>
+        <div style={{ marginBottom: 20 }}>
+          <h1>This is Demo</h1>
+          <div style={{ textAlign: "start" }}>
+            <select
+              value={playerType}
+              onChange={(event) =>
+                onPlayerTypeChange(event.target.value as Player)
+              }
+            >
+              {players.map((player) => {
+                return (
+                  <option key={player} value={player}>
+                    {player}
+                  </option>
+                );
+              })}
+            </select>
+            <select
+              value={url}
+              onChange={(event) => onVideoUrlChange(event.target.value)}
+            >
+              {Object.entries(streamUrl).map(([name, url]) => {
+                return (
+                  <option key={name} value={url}>
+                    {name}
+                  </option>
+                );
+              })}
+            </select>
+            <button onClick={createNewPlayer}>Create new player</button>
+            <button onClick={loadStreamWithExistingInstance}>
+              Load stream with existing hls/shaka instance
+            </button>
+          </div>
+        </div>
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <div
+            ref={containerRef}
+            id="player-container"
+            style={{ width: 1000 }}
+          ></div>
+        </div>
+        {!!playerType && ["hlsjs", "shaka-player"].includes(playerType) && (
+          <video ref={videoRef} controls muted style={{ width: 800 }} />
+        )}
+        <div style={{ textAlign: "left" }}>
+          <h4>Local stat</h4>
+          <div>
+            Http loaded: {httpLoaded.toFixed(2)} MB;{" "}
+            {getPercent(httpLoaded, p2pLoaded)}%
+          </div>
+          <div>
+            P2P loaded: {p2pLoaded.toFixed(2)} MB;{" "}
+            {getPercent(p2pLoaded, httpLoaded)}%
+          </div>
+        </div>
+
+        <div style={{ textAlign: "left" }}>
+          <h4>Global stat</h4>
+          <div>
+            Http global loaded: {globHttpLoaded.toFixed(2)} MB;{" "}
+            {getPercent(globHttpLoaded, globP2PLoaded)}%
+          </div>
+          <div>
+            P2P loaded: {globP2PLoaded.toFixed(2)} MB;{" "}
+            {getPercent(globP2PLoaded, globHttpLoaded)}%
+          </div>
         </div>
       </div>
-      <div style={{ display: "flex", justifyContent: "center" }}>
-        <div
-          ref={containerRef}
-          id="player-container"
-          style={{ width: 1000 }}
-        ></div>
-      </div>
-      {!!playerType && ["hlsjs", "shaka-player"].includes(playerType) && (
-        <video ref={videoRef} controls muted style={{ width: 800 }} />
-      )}
     </div>
   );
+}
+
+function getPercent(a: number, b: number) {
+  if (a === 0 && b === 0) return "0";
+  if (b === 0) return "100";
+  return ((a / (a + b)) * 100).toFixed(2);
 }
 
 export default App;

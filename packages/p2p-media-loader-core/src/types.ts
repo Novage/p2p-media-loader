@@ -61,3 +61,7 @@ export type Settings = {
   storageCleanupInterval: number;
   p2pLoaderDestroyTimeout: number;
 };
+
+export type CoreEventHandlers = {
+  onDataLoaded?: (byteLength: number, type: "http" | "p2p") => void;
+};

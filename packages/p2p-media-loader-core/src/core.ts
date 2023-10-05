@@ -5,6 +5,7 @@ import {
   Segment,
   Settings,
   SegmentBase,
+  CoreEventHandlers,
 } from "./types";
 import * as Utils from "./utils/utils";
 import { LinkedMap } from "./linked-map";
@@ -18,7 +19,7 @@ export class Core<TStream extends Stream = Stream> {
   private readonly settings: Settings = {
     simultaneousHttpDownloads: 2,
     simultaneousP2PDownloads: 3,
-    highDemandTimeWindow: 30,
+    highDemandTimeWindow: 10,
     httpDownloadTimeWindow: 60,
     p2pDownloadTimeWindow: 60,
     cachedSegmentExpiration: 120 * 1000,
@@ -32,6 +33,8 @@ export class Core<TStream extends Stream = Stream> {
   private segmentStorage?: SegmentsMemoryStorage;
   private mainStreamLoader?: HybridLoader;
   private secondaryStreamLoader?: HybridLoader;
+
+  constructor(private readonly eventHandlers?: CoreEventHandlers) {}
 
   setManifestResponseUrl(url: string): void {
     this.manifestResponseUrl = url.split("?")[0];
@@ -135,7 +138,8 @@ export class Core<TStream extends Stream = Stream> {
         segment,
         this.settings,
         this.bandwidthApproximator,
-        this.segmentStorage
+        this.segmentStorage,
+        this.eventHandlers
       );
     };
     const streamTypeLoaderKeyMap = {

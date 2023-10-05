@@ -2,7 +2,7 @@ import type Hls from "hls.js";
 import type { HlsConfig, Events } from "hls.js";
 import { FragmentLoaderBase } from "./fragment-loader";
 import { SegmentManager } from "./segment-mananger";
-import { Core } from "p2p-media-loader-core";
+import { Core, CoreEventHandlers } from "p2p-media-loader-core";
 import Debug from "debug";
 
 export class Engine {
@@ -10,8 +10,8 @@ export class Engine {
   private readonly segmentManager: SegmentManager;
   private debugDestroying = Debug("hls:destroying");
 
-  constructor() {
-    this.core = new Core();
+  constructor(eventHandlers?: CoreEventHandlers) {
+    this.core = new Core(eventHandlers);
     this.segmentManager = new SegmentManager(this.core);
   }
 
