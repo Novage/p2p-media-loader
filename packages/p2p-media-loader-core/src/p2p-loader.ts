@@ -57,7 +57,7 @@ export class P2PLoader {
   private subscribeOnTrackerEvents(trackerClient: TrackerClient) {
     // TODO: tracker event handlers
     // eslint-disable-next-line @typescript-eslint/no-empty-function
-    trackerClient.on("update", () => {});
+    trackerClient.on("update", (data) => {});
     trackerClient.on("peer", (candidate) => {
       const peer = this.peers.get(candidate.id);
       if (peer) peer.addCandidate(candidate);
@@ -80,8 +80,12 @@ export class P2PLoader {
   }
 
   private createPeer(candidate: PeerCandidate) {
+    const peerLocalId = `${LoggerUtils.getStreamString(this.stream)}-${
+      this.peers.size + 1
+    }`;
+    this.logger(`create new peer: ${peerLocalId}`);
     const peer = new Peer(
-      `${LoggerUtils.getStreamString(this.stream)}-${this.peers.size + 1}`,
+      peerLocalId,
       candidate,
       {
         onPeerConnected: this.onPeerConnected.bind(this),
@@ -90,7 +94,6 @@ export class P2PLoader {
       this.settings
     );
     this.peers.set(candidate.id, peer);
-    this.logger(`create new peer: ${peer.localId}`);
   }
 
   async downloadSegment(segment: Segment): Promise<ArrayBuffer | undefined> {
@@ -120,6 +123,14 @@ export class P2PLoader {
       if (peer.getSegmentStatus(segment)) return true;
     }
     return false;
+  }
+
+  get connectedPeersAmount() {
+    let count = 0;
+    for (const peer of this.peers.values()) {
+      if (peer.isConnected) count++;
+    }
+    return count;
   }
 
   private updateSegmentAnnouncement() {
@@ -203,7 +214,7 @@ function createTrackerClient({
     peerId: peerHash,
     port: 6881,
     announce: [
-      "wss://tracker.novage.com.ua",
+      // "wss://tracker.novage.com.ua",
       "wss://tracker.openwebtorrent.com",
     ],
     rtcConfig: {

@@ -73,6 +73,7 @@ export class SegmentManager {
       });
     });
 
+    if (!newSegments.length && !segmentToRemoveIds.size) return;
     this.core.updateStream(url, newSegments, [...segmentToRemoveIds]);
   }
 }

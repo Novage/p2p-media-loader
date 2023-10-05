@@ -59,8 +59,8 @@ export class HybridLoader {
     };
 
     this.randomHttpDownloadInterval = window.setInterval(
-      () => this.loadRandomThroughHttp(),
-      1000
+      this.loadRandomThroughHttp.bind(this),
+      1500
     );
   }
 
@@ -195,10 +195,11 @@ export class HybridLoader {
     try {
       const httpRequest = getHttpSegmentRequest(segment);
 
-      const loadType = isRandom ? " random" : "";
-      this.logger.loader(
-        `http${loadType} request: ${LoggerUtils.getQueueItemString(item)}`
-      );
+      if (!isRandom) {
+        this.logger.loader(
+          `http request: ${LoggerUtils.getQueueItemString(item)}`
+        );
+      }
 
       this.requests.addLoaderRequest(segment, httpRequest);
       data = await httpRequest.promise;
@@ -245,9 +246,17 @@ export class HybridLoader {
         p2pLoader.isLoadingOrLoadedBySomeone(segment),
     });
     if (!queue.length) return;
+    const peersAmount = p2pLoader.connectedPeersAmount + 1;
+    const probability = Math.min(queue.length / peersAmount, 1);
+    const shouldLoad = Math.random() < probability;
 
+    if (!shouldLoad) return;
     const item = queue[Math.floor(Math.random() * queue.length)];
     void this.loadThroughHttp(item, true);
+
+    this.logger.loader(
+      `http random request: ${LoggerUtils.getQueueItemString(item)}`
+    );
   }
 
   private onSegmentLoaded(segment: Segment, data: ArrayBuffer) {
