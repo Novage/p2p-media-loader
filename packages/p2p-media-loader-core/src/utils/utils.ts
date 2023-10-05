@@ -1,4 +1,5 @@
 import { Segment, Stream, StreamWithSegments } from "../index";
+import { QueueItem, QueueItemStatuses } from "../internal-types";
 
 export function getStreamExternalId(
   manifestResponseUrl: string,

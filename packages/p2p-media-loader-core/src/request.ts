@@ -167,8 +167,9 @@ export class RequestContainer {
     return !!this.requests.get(id)?.loaderRequest;
   }
 
-  abortEngineRequest(segmentId: string) {
-    const request = this.requests.get(segmentId);
+  abortEngineRequest(segment: Segment) {
+    const id = getRequestItemId(segment);
+    const request = this.requests.get(id);
     if (!request) return;
 
     request.engineCallbacks?.onError(new RequestAbortError());

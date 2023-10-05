@@ -6,8 +6,10 @@ import { Segment, Settings, StreamWithSegments } from "./types";
 import { JsonSegmentAnnouncement } from "./internal-types";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import * as Utils from "./utils/utils";
+import * as LoggerUtils from "./utils/logger";
 import { PeerSegmentStatus } from "./enums";
 import { RequestContainer } from "./request";
+import debug from "debug";
 
 export class P2PLoader {
   private readonly streamExternalId: string;
@@ -16,6 +18,7 @@ export class P2PLoader {
   private readonly trackerClient: TrackerClient;
   private readonly peers = new Map<string, Peer>();
   private announcement: JsonSegmentAnnouncement = { i: "" };
+  private readonly logger = debug("core:p2p-manager");
 
   constructor(
     private streamManifestUrl: string,
@@ -31,13 +34,14 @@ export class P2PLoader {
     );
     this.streamHash = getHash(this.streamExternalId);
     this.peerHash = getHash(peerId);
-    console.log("\ncreate tracker client", this.streamExternalId);
-    console.log("PEER ID: " + this.peerHash);
 
     this.trackerClient = createTrackerClient({
       streamHash: this.streamHash,
       peerHash: this.peerHash,
     });
+    this.logger(
+      `create tracker client: ${LoggerUtils.getStreamString(stream)}`
+    );
     this.subscribeOnTrackerEvents(this.trackerClient);
     this.segmentStorage.subscribeOnUpdate(
       this.stream,
@@ -55,21 +59,29 @@ export class P2PLoader {
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     trackerClient.on("update", () => {});
     trackerClient.on("peer", (candidate) => {
-      console.log("Peer found: ", candidate);
       const peer = this.peers.get(candidate.id);
       if (peer) peer.addCandidate(candidate);
       else this.createPeer(candidate);
     });
     // eslint-disable-next-line @typescript-eslint/no-empty-function
-    trackerClient.on("warning", (warning) => {});
+    trackerClient.on("warning", (warning) => {
+      this.logger(
+        `tracker warning (${LoggerUtils.getStreamString(
+          this.stream
+        )}: ${warning})`
+      );
+    });
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     trackerClient.on("error", (error) => {
-      console.log("TRACKER ERROR", error);
+      this.logger(
+        `tracker error (${LoggerUtils.getStreamString(this.stream)}: ${error})`
+      );
     });
   }
 
   private createPeer(candidate: PeerCandidate) {
     const peer = new Peer(
+      `${LoggerUtils.getStreamString(this.stream)}-${this.peers.size + 1}`,
       candidate,
       {
         onPeerConnected: this.onPeerConnected.bind(this),
@@ -78,6 +90,7 @@ export class P2PLoader {
       this.settings
     );
     this.peers.set(candidate.id, peer);
+    this.logger(`create new peer: ${peer.localId}`);
   }
 
   async downloadSegment(segment: Segment): Promise<ArrayBuffer | undefined> {
@@ -97,8 +110,7 @@ export class P2PLoader {
     const peer =
       peerWithSegment[Math.floor(Math.random() * peerWithSegment.length)];
     const request = peer.requestSegment(segment);
-    const idStr = `${segment.stream.index}-${segment.externalId}`;
-    console.log(`=> p2p requested: ${idStr}`);
+    this.logger(`p2p request ${segment.externalId}`);
     this.requests.addLoaderRequest(segment, request);
     return request.promise;
   }
@@ -129,6 +141,7 @@ export class P2PLoader {
   }
 
   private onPeerConnected(peer: Peer) {
+    this.logger(`connected with peer: ${peer.localId}`);
     peer.sendSegmentsAnnouncement(this.announcement);
   }
 
@@ -156,6 +169,9 @@ export class P2PLoader {
   }
 
   destroy() {
+    this.logger(
+      `destroy tracker client: ${LoggerUtils.getStreamString(this.stream)}`
+    );
     this.segmentStorage.unsubscribeFromUpdate(
       this.stream,
       this.updateAndBroadcastAnnouncement

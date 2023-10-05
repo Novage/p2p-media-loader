@@ -92,8 +92,9 @@ export class Core<TStream extends Stream = Stream> {
 
   abortSegmentLoading(segmentId: string): void {
     const segment = this.identifySegment(segmentId);
-    this.mainStreamLoader?.abortSegment(segmentId);
-    this.secondaryStreamLoader?.abortSegment(segmentId);
+    const streamType = segment.stream.type;
+    if (streamType === "main") this.mainStreamLoader?.abortSegment(segment);
+    else this.secondaryStreamLoader?.abortSegment(segment);
   }
 
   updatePlayback(position: number, rate: number): void {

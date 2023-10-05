@@ -1,13 +1,15 @@
 import { Segment, StreamWithSegments } from "./index";
 import { getHttpSegmentRequest } from "./http-loader";
-import { P2PLoader } from "./p2p-loader";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import { Settings } from "./types";
 import { BandwidthApproximator } from "./bandwidth-approximator";
-import { Playback, QueueItem, QueueItemStatuses } from "./internal-types";
+import { Playback, QueueItem } from "./internal-types";
 import { RequestContainer, EngineCallbacks } from "./request";
 import * as QueueUtils from "./utils/queue-utils";
+import * as LoggerUtils from "./utils/logger";
 import { FetchError } from "./errors";
+import { P2PLoadersContainer } from "./p2p-loaders-container";
+import debug from "debug";
 
 export class HybridLoader {
   private readonly requests = new RequestContainer();
@@ -18,6 +20,7 @@ export class HybridLoader {
   private lastQueueProcessingTimeStamp?: number;
   private readonly segmentAvgDuration: number;
   private readonly randomHttpDownloadInterval: number;
+  private readonly logger: { engine: debug.Debugger; loader: debug.Debugger };
 
   constructor(
     private streamManifestUrl: string,
@@ -50,6 +53,11 @@ export class HybridLoader {
       this.settings
     );
 
+    this.logger = {
+      loader: debug(`core:${activeStream.type}-hybrid-loader`),
+      engine: debug(`core:${activeStream.type}-hybrid-loader-engine`),
+    };
+
     this.randomHttpDownloadInterval = window.setInterval(
       () => this.loadRandomThroughHttp(),
       1000
@@ -58,9 +66,12 @@ export class HybridLoader {
 
   // api method for engines
   async loadSegment(segment: Readonly<Segment>, callbacks: EngineCallbacks) {
-    console.log("REQUESTED: ", getSegmentStringId(segment));
+    this.logger.engine(`requests: ${LoggerUtils.getSegmentString(segment)}`);
     const { stream } = segment;
     if (stream !== this.lastRequestedSegment.stream) {
+      this.logger.loader(
+        `STREAM CHANGED ${LoggerUtils.getStreamString(stream)}`
+      );
       this.p2pLoaders.changeActiveLoader(stream);
     }
     this.lastRequestedSegment = segment;
@@ -173,20 +184,26 @@ export class HybridLoader {
   }
 
   // api method for engines
-  abortSegment(segmentId: string) {
-    this.requests.abortEngineRequest(segmentId);
+  abortSegment(segment: Segment) {
+    this.logger.engine("abort: ", LoggerUtils.getSegmentString(segment));
+    this.requests.abortEngineRequest(segment);
   }
 
-  private async loadThroughHttp(item: QueueItem) {
-    const { segment, statuses } = item;
+  private async loadThroughHttp(item: QueueItem, isRandom = false) {
+    const { segment } = item;
     let data: ArrayBuffer | undefined;
     try {
-      const idStr = getSegmentStringId(segment);
-      console.log(`http requested: ${idStr} - ${getStatusesString(statuses)}`);
       const httpRequest = getHttpSegmentRequest(segment);
+
+      const loadType = isRandom ? " random" : "";
+      this.logger.loader(
+        `http${loadType} request: ${LoggerUtils.getQueueItemString(item)}`
+      );
+
       this.requests.addLoaderRequest(segment, httpRequest);
       data = await httpRequest.promise;
-      console.log(`=> http loaded: ${idStr}`);
+
+      this.logger.loader(`http responses: ${segment.externalId}`);
       if (data) this.onSegmentLoaded(segment, data);
     } catch (err) {
       if (err instanceof FetchError) {
@@ -198,11 +215,12 @@ export class HybridLoader {
   private async loadThroughP2P(item: QueueItem) {
     const { segment, statuses } = item;
     const p2pLoader = this.p2pLoaders.activeLoader;
-    const idStr = getSegmentStringId(segment);
     try {
+      const segmentString = LoggerUtils.getSegmentString(segment);
+      const statusesStr = LoggerUtils.getStatusesString(statuses);
       const data = await p2pLoader.downloadSegment(segment);
       if (data) {
-        console.log(`=> p2p loaded: ${idStr}, ${data?.byteLength}`);
+        this.logger.loader(`p2p loaded: ${segmentString} | ${statusesStr}`);
         this.onSegmentLoaded(segment, data);
       }
     } catch (error) {
@@ -229,9 +247,7 @@ export class HybridLoader {
     if (!queue.length) return;
 
     const item = queue[Math.floor(Math.random() * queue.length)];
-    console.log("HTTP RANDOM");
-    // console.log("load random: ", getSegmentStringId(segment));
-    void this.loadThroughHttp(item);
+    void this.loadThroughHttp(item, true);
   }
 
   private onSegmentLoaded(segment: Segment, data: ArrayBuffer) {
@@ -249,7 +265,10 @@ export class HybridLoader {
       if (itemSegment.localId === segment.localId) break;
       if (this.requests.isHttpRequested(segment)) {
         this.requests.abortLoaderRequest(segment);
-        console.log("aborted http: ", getSegmentStringId(segment));
+        this.logger.loader(
+          "http aborted: ",
+          LoggerUtils.getSegmentString(segment)
+        );
         break;
       }
     }
@@ -260,7 +279,10 @@ export class HybridLoader {
       if (itemSegment.localId === segment.localId) break;
       if (this.requests.isP2PRequested(segment)) {
         this.requests.abortLoaderRequest(segment);
-        console.log("aborted p2p: ", getSegmentStringId(segment));
+        this.logger.loader(
+          "p2p aborted: ",
+          LoggerUtils.getSegmentString(segment)
+        );
         break;
       }
     }
@@ -278,16 +300,15 @@ export class HybridLoader {
 
     if (isPositionChanged) this.playback.position = position;
     if (isRateChanged) this.playback.rate = rate;
-
     if (isPositionSignificantlyChanged) {
-      console.log("\nposition: ", position);
+      this.logger.engine("position significantly changed");
     }
     void this.processQueue(isPositionSignificantlyChanged);
   }
 
   updateStream(stream: StreamWithSegments) {
     if (stream !== this.lastRequestedSegment.stream) return;
-    console.log("STREAM UPDATED");
+    this.logger.engine(`update stream: ${LoggerUtils.getStreamString(stream)}`);
     this.processQueue();
   }
 
@@ -298,82 +319,14 @@ export class HybridLoader {
     void this.segmentStorage.destroy();
     this.requests.destroy();
     this.p2pLoaders.destroy();
+    this.logger.loader.destroy();
+    this.logger.engine.destroy();
   }
 }
 
 function* arrayBackwards<T>(arr: T[]) {
   for (let i = arr.length - 1; i >= 0; i--) {
     yield arr[i];
-  }
-}
-
-type P2PLoaderContainerItem = {
-  streamId: string;
-  loader: P2PLoader;
-  destroyTimeoutId?: number;
-};
-
-class P2PLoadersContainer {
-  private readonly loaders = new Map<string, P2PLoaderContainerItem>();
-  private _activeLoaderItem: P2PLoaderContainerItem;
-
-  constructor(
-    private readonly streamManifestUrl: string,
-    stream: StreamWithSegments,
-    private readonly requests: RequestContainer,
-    private readonly segmentStorage: SegmentsMemoryStorage,
-    private readonly settings: Settings
-  ) {
-    this._activeLoaderItem = this.createLoaderItem(stream);
-  }
-
-  createLoaderItem(stream: StreamWithSegments) {
-    if (this.loaders.has(stream.localId)) {
-      throw new Error("Loader for this stream already exists");
-    }
-    const loader = new P2PLoader(
-      this.streamManifestUrl,
-      stream,
-      this.requests,
-      this.segmentStorage,
-      this.settings
-    );
-    const item = { loader, streamId: stream.localId };
-    this.loaders.set(stream.localId, item);
-    this._activeLoaderItem = item;
-    return item;
-  }
-
-  changeActiveLoader(stream: StreamWithSegments) {
-    const loaderItem = this.loaders.get(stream.localId);
-    const prevActive = this._activeLoaderItem;
-    if (loaderItem) {
-      this._activeLoaderItem = loaderItem;
-      clearTimeout(loaderItem.destroyTimeoutId);
-    } else {
-      this.createLoaderItem(stream);
-    }
-    this.setLoaderDestroyTimeout(prevActive);
-  }
-
-  private setLoaderDestroyTimeout(item: P2PLoaderContainerItem) {
-    item.destroyTimeoutId = window.setTimeout(() => {
-      item.loader.destroy();
-      this.loaders.delete(item.streamId);
-      console.log("loader destroyed");
-    }, this.settings.p2pLoaderDestroyTimeout);
-  }
-
-  get activeLoader() {
-    return this._activeLoaderItem.loader;
-  }
-
-  destroy() {
-    for (const { loader, destroyTimeoutId } of this.loaders.values()) {
-      loader.destroy();
-      clearTimeout(destroyTimeoutId);
-    }
-    this.loaders.clear();
   }
 }
 
@@ -404,10 +357,4 @@ function getSegmentAvgDuration(stream: StreamWithSegments) {
   }
 
   return sumDuration / size;
-}
-
-function getSegmentStringId(segment: Segment) {
-  const { index } = segment.stream;
-  const { externalId } = segment;
-  return `${index}-${externalId}`;
 }

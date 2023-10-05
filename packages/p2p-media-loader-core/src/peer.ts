@@ -41,6 +41,7 @@ export class Peer {
   private isSendingData = false;
 
   constructor(
+    readonly localId: string,
     candidate: PeerCandidate,
     private readonly eventHandlers: PeerEventHandlers,
     private readonly settings: PeerSettings
@@ -52,9 +53,10 @@ export class Peer {
 
   addCandidate(candidate: PeerCandidate) {
     candidate.on("connect", () => {
-      console.log("\nconnected with peer", this.connection === candidate);
-      this.connection = candidate;
-      this.eventHandlers.onPeerConnected(this);
+      if (candidate !== this.connection) {
+        this.connection = candidate;
+        this.eventHandlers.onPeerConnected(this);
+      }
     });
     candidate.on("data", this.onReceiveData.bind(this));
     candidate.on("close", () => {
