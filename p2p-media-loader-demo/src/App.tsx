@@ -64,14 +64,11 @@ function App() {
   const hlsEngine = useRef<HlsJsEngine>(
     new HlsJsEngine({
       onDataLoaded: (byteLength, type) => {
-        if (type === "http") {
-          setHttpLoaded((prev) => prev + byteLength / Math.pow(1024, 2));
-        } else if (type === "p2p") {
-          setP2PLoaded((prev) => prev + byteLength / Math.pow(1024, 2));
-        }
+        const MBytes = getMBFromBytes(byteLength);
+        if (type === "http") setHttpLoaded((prev) => prev + MBytes);
+        else if (type === "p2p") setP2PLoaded((prev) => prev + MBytes);
         const add = (prop: "httpLoaded" | "p2pLoaded") => {
-          const value = +localStorage[prop];
-          localStorage[prop] = value + byteLength;
+          localStorage[prop] = +localStorage[prop] + MBytes;
         };
         if (type === "http") add("httpLoaded");
         else if (type === "p2p") add("p2pLoaded");
@@ -223,11 +220,8 @@ function App() {
     }
 
     statIntervalId.current = window.setInterval(() => {
-      const httpLoaded = +localStorage.httpLoaded;
-      const p2pLoaded = +localStorage.p2pLoaded;
-      if (!httpLoaded && !p2pLoaded) return;
-      setGlobHttpLoaded(httpLoaded / Math.pow(1024, 2));
-      setGlobP2PLoaded(p2pLoaded / Math.pow(1024, 2));
+      setGlobHttpLoaded(+localStorage.httpLoaded);
+      setGlobP2PLoaded(+localStorage.p2pLoaded);
     }, 2000);
   };
 
@@ -245,8 +239,8 @@ function App() {
   };
 
   return (
-    <div>
-      <div style={{ textAlign: "center", width: 1000, margin: "auto" }}>
+    <div style={{ width: 1000, margin: "auto" }}>
+      <div style={{ textAlign: "center" }}>
         <div style={{ marginBottom: 20 }}>
           <h1>This is Demo</h1>
           <div style={{ textAlign: "start" }}>
@@ -292,29 +286,37 @@ function App() {
         {!!playerType && ["hlsjs", "shaka-player"].includes(playerType) && (
           <video ref={videoRef} controls muted style={{ width: 800 }} />
         )}
-        <div style={{ textAlign: "left" }}>
-          <h4>Local stat</h4>
-          <div>
-            Http loaded: {httpLoaded.toFixed(2)} MB;{" "}
-            {getPercent(httpLoaded, p2pLoaded)}%
-          </div>
-          <div>
-            P2P loaded: {p2pLoaded.toFixed(2)} MB;{" "}
-            {getPercent(p2pLoaded, httpLoaded)}%
-          </div>
-        </div>
+        <LoadStat title="Local stat" http={httpLoaded} p2p={p2pLoaded} />
+        <LoadStat
+          title="Global stat"
+          http={globHttpLoaded}
+          p2p={globP2PLoaded}
+        />
+      </div>
+    </div>
+  );
+}
 
-        <div style={{ textAlign: "left" }}>
-          <h4>Global stat</h4>
-          <div>
-            Http global loaded: {globHttpLoaded.toFixed(2)} MB;{" "}
-            {getPercent(globHttpLoaded, globP2PLoaded)}%
-          </div>
-          <div>
-            P2P loaded: {globP2PLoaded.toFixed(2)} MB;{" "}
-            {getPercent(globP2PLoaded, globHttpLoaded)}%
-          </div>
-        </div>
+export default App;
+
+function LoadStat({
+  http,
+  p2p,
+  title,
+}: {
+  http: number;
+  p2p: number;
+  title: string;
+}) {
+  const sum = http + p2p;
+  return (
+    <div style={{ textAlign: "left" }}>
+      <h4 style={{ marginBottom: 10 }}>{title}</h4>
+      <div>
+        Http loaded: {http.toFixed(2)} MB; {getPercent(http, sum)}%
+      </div>
+      <div>
+        P2P loaded: {p2p.toFixed(2)} MB; {getPercent(p2p, sum)}%
       </div>
     </div>
   );
@@ -323,7 +325,13 @@ function App() {
 function getPercent(a: number, b: number) {
   if (a === 0 && b === 0) return "0";
   if (b === 0) return "100";
-  return ((a / (a + b)) * 100).toFixed(2);
+  return ((a / b) * 100).toFixed(2);
 }
 
-export default App;
+function round(value: number, digitsAfterComma = 2) {
+  return Math.round(value * Math.pow(10, digitsAfterComma)) / 100;
+}
+
+function getMBFromBytes(bytes: number) {
+  return round(bytes / Math.pow(1024, 2));
+}
