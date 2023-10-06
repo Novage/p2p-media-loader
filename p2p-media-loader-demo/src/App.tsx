@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Engine as HlsJsEngine } from "p2p-media-loader-hlsjs";
 import { Engine as ShakaEngine } from "p2p-media-loader-shaka";
 import Hls from "hls.js";
 import DPlayer from "dplayer";
 import shakaLib from "shaka-player";
 import muxjs from "mux.js";
+import debug from "debug";
 
 window.muxjs = muxjs;
 
@@ -54,24 +55,33 @@ function App() {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const shakaEngine = useRef<ShakaEngine>(new ShakaEngine(shakaLib));
-  const statIntervalId = useRef<number>();
 
   const [httpLoaded, setHttpLoaded] = useState<number>(0);
   const [p2pLoaded, setP2PLoaded] = useState<number>(0);
-  const [globHttpLoaded, setGlobHttpLoaded] = useState<number>(0);
-  const [globP2PLoaded, setGlobP2PLoaded] = useState<number>(0);
+  const [httpLoadedGlob, setHttpLoadedGlob] = useLocalStorageItem<number>(
+    "httpLoaded",
+    0,
+    (v) => v.toString(),
+    (v) => (v !== null ? +v : 0)
+  );
+  const [p2pLoadedGlob, setP2PLoadedGlob] = useLocalStorageItem<number>(
+    "p2pLoaded",
+    0,
+    (v) => v.toString(),
+    (v) => (v !== null ? +v : 0)
+  );
 
   const hlsEngine = useRef<HlsJsEngine>(
     new HlsJsEngine({
       onDataLoaded: (byteLength, type) => {
         const MBytes = getMBFromBytes(byteLength);
-        if (type === "http") setHttpLoaded((prev) => prev + MBytes);
-        else if (type === "p2p") setP2PLoaded((prev) => prev + MBytes);
-        const add = (prop: "httpLoaded" | "p2pLoaded") => {
-          localStorage[prop] = +localStorage[prop] + MBytes;
-        };
-        if (type === "http") add("httpLoaded");
-        else if (type === "p2p") add("p2pLoaded");
+        if (type === "http") {
+          setHttpLoaded((prev) => round(prev + MBytes));
+          setHttpLoadedGlob((prev) => round(prev + MBytes));
+        } else if (type === "p2p") {
+          setP2PLoaded((prev) => round(prev + MBytes));
+          setP2PLoadedGlob((prev) => round(prev + MBytes));
+        }
       },
     })
   );
@@ -202,8 +212,8 @@ function App() {
   };
 
   const createNewPlayer = () => {
-    localStorage.httpLoaded = 0;
-    localStorage.p2pLoaded = 0;
+    setHttpLoadedGlob(0);
+    setP2PLoadedGlob(0);
     switch (playerType) {
       case "hls-dplayer":
         initHlsDplayer(url);
@@ -218,11 +228,6 @@ function App() {
         initShakaPlayer(url);
         break;
     }
-
-    statIntervalId.current = window.setInterval(() => {
-      setGlobHttpLoaded(+localStorage.httpLoaded);
-      setGlobP2PLoaded(+localStorage.p2pLoaded);
-    }, 2000);
   };
 
   const loadStreamWithExistingInstance = () => {
@@ -286,12 +291,15 @@ function App() {
         {!!playerType && ["hlsjs", "shaka-player"].includes(playerType) && (
           <video ref={videoRef} controls muted style={{ width: 800 }} />
         )}
+      </div>
+      <div style={{ textAlign: "left" }}>
         <LoadStat title="Local stat" http={httpLoaded} p2p={p2pLoaded} />
         <LoadStat
           title="Global stat"
-          http={globHttpLoaded}
-          p2p={globP2PLoaded}
+          http={httpLoadedGlob}
+          p2p={p2pLoadedGlob}
         />
+        <LoggersSelect />
       </div>
     </div>
   );
@@ -322,6 +330,47 @@ function LoadStat({
   );
 }
 
+function LoggersSelect() {
+  const [activeLoggers, setActiveLoggers] = useLocalStorageItem<string[]>(
+    "debug",
+    [],
+    (list) => {
+      setTimeout(() => debug.enable(localStorage.debug), 0);
+      if (list.length === 0) return null;
+      return list.join(",");
+    },
+    (storageItem) => {
+      setTimeout(() => debug.enable(localStorage.debug), 0);
+      if (!storageItem) return [];
+      return storageItem.split(",");
+    }
+  );
+
+  const onChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setActiveLoggers(
+      Array.from(event.target.selectedOptions, (option) => option.value)
+    );
+  };
+
+  return (
+    <div>
+      <h4 style={{ marginBottom: 10 }}>Loggers: </h4>
+      <select
+        value={activeLoggers}
+        onChange={onChange}
+        multiple
+        style={{ width: 300, height: 150 }}
+      >
+        {loggers.map((logger) => (
+          <option key={logger} value={logger}>
+            {logger}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function getPercent(a: number, b: number) {
   if (a === 0 && b === 0) return "0";
   if (b === 0) return "100";
@@ -335,3 +384,51 @@ function round(value: number, digitsAfterComma = 2) {
 function getMBFromBytes(bytes: number) {
   return round(bytes / Math.pow(1024, 2));
 }
+
+function useLocalStorageItem<T>(
+  prop: string,
+  initValue: T,
+  valueToStorageItem: (value: T) => string | null,
+  storageItemToValue: (storageItem: string | null) => T
+): [T, React.Dispatch<React.SetStateAction<T>>] {
+  const [value, setValue] = useState<T>(
+    storageItemToValue(localStorage[prop]) ?? initValue
+  );
+  const setValueExternal = useCallback((value: T | ((prev: T) => T)) => {
+    setValue(value);
+    if (typeof value === "function") {
+      const prev = storageItemToValue(localStorage.getItem(prop));
+      const next = (value as (prev: T) => T)(prev);
+      const result = valueToStorageItem(next);
+      if (result !== null) localStorage.setItem(prop, result);
+      else localStorage.removeItem(prop);
+    } else {
+      const result = valueToStorageItem(value);
+      if (result !== null) localStorage.setItem(prop, result);
+      else localStorage.removeItem(prop);
+    }
+  }, []);
+  const eventHandler = useCallback((event: StorageEvent) => {
+    if (event.key !== prop) return;
+    const value = event.newValue;
+    setValue(storageItemToValue(value));
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("storage", eventHandler);
+    return () => {
+      window.removeEventListener("storage", eventHandler);
+    };
+  }, []);
+
+  return [value, setValueExternal];
+}
+
+const loggers = [
+  "core:hybrid-loader-main",
+  "core:hybrid-loader-main-engine",
+  "core:hybrid-loader-secondary",
+  "core:hybrid-loader-secondary-engine",
+  "core:p2p-manager",
+  "core:p2p-loaders-container",
+] as const;

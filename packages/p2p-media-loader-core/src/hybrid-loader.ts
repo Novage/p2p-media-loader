@@ -55,8 +55,8 @@ export class HybridLoader {
     );
 
     this.logger = {
-      loader: debug(`core:${activeStream.type}-hybrid-loader`),
-      engine: debug(`core:${activeStream.type}-hybrid-loader-engine`),
+      loader: debug(`core:hybrid-loader-${activeStream.type}`),
+      engine: debug(`core:hybrid-loader-${activeStream.type}-engine`),
     };
 
     this.randomHttpDownloadInterval = window.setInterval(
