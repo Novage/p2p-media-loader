@@ -19,7 +19,7 @@ export class HybridLoader {
   private readonly playback: Playback;
   private lastQueueProcessingTimeStamp?: number;
   private readonly segmentAvgDuration: number;
-  private readonly randomHttpDownloadInterval: number;
+  private randomHttpDownloadInterval!: number;
   private readonly logger: { engine: debug.Debugger; loader: debug.Debugger };
 
   constructor(
@@ -54,15 +54,25 @@ export class HybridLoader {
       this.settings
     );
 
-    this.logger = {
-      loader: debug(`core:hybrid-loader-${activeStream.type}`),
-      engine: debug(`core:hybrid-loader-${activeStream.type}-engine`),
-    };
+    const loader = debug(`core:hybrid-loader-${activeStream.type}`);
+    const engine = debug(`core:hybrid-loader-${activeStream.type}-engine`);
+    loader.color = "coral";
+    engine.color = "orange";
+    this.logger = { loader, engine };
 
-    this.randomHttpDownloadInterval = window.setInterval(
-      this.loadRandomThroughHttp.bind(this),
-      1500
-    );
+    // this.randomHttpDownloadInterval = window.setInterval(
+    //   this.loadRandomThroughHttp.bind(this),
+    //   1500
+    // );
+    this.setIntervalLoading();
+  }
+
+  private setIntervalLoading() {
+    const randomTimeout = (Math.random() * 2 + 1) * 1000;
+    this.randomHttpDownloadInterval = window.setTimeout(() => {
+      this.loadRandomThroughHttp();
+      this.setIntervalLoading();
+    }, randomTimeout);
   }
 
   // api method for engines
@@ -254,7 +264,7 @@ export class HybridLoader {
     });
     if (!queue.length) return;
     const peersAmount = connectedPeersAmount + 1;
-    const probability = Math.min(queue.length / peersAmount, 1) / 2;
+    const probability = Math.min(queue.length / peersAmount, 1);
     const shouldLoad = Math.random() < probability;
 
     if (!shouldLoad) return;

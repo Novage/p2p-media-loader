@@ -15,6 +15,7 @@ import { PeerRequestError } from "./errors";
 
 type PeerEventHandlers = {
   onPeerConnected: (peer: Peer) => void;
+  onPeerClosed: (peer: Peer) => void;
   onSegmentRequested: (peer: Peer, segmentId: string) => void;
 };
 
@@ -63,6 +64,7 @@ export class Peer {
       if (this.connection === candidate) {
         this.connection = undefined;
         this.cancelSegmentRequest("peer-closed");
+        this.eventHandlers.onPeerClosed(this);
       }
     });
     // eslint-disable-next-line @typescript-eslint/no-empty-function

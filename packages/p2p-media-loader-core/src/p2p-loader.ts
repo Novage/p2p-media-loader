@@ -89,6 +89,7 @@ export class P2PLoader {
       candidate,
       {
         onPeerConnected: this.onPeerConnected.bind(this),
+        onPeerClosed: this.onPeerClosed.bind(this),
         onSegmentRequested: this.onSegmentRequested.bind(this),
       },
       this.settings
@@ -154,6 +155,11 @@ export class P2PLoader {
   private onPeerConnected(peer: Peer) {
     this.logger(`connected with peer: ${peer.localId}`);
     peer.sendSegmentsAnnouncement(this.announcement);
+  }
+
+  private onPeerClosed(peer: Peer) {
+    this.logger(`peer closed: ${peer.localId}`);
+    this.peers.delete(peer.id);
   }
 
   private updateAndBroadcastAnnouncement = () => {
