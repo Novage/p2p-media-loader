@@ -1,4 +1,4 @@
-import { PeerCandidate } from "bittorrent-tracker";
+import { PeerConnection } from "bittorrent-tracker";
 import {
   JsonSegmentAnnouncement,
   PeerCommand,
@@ -35,43 +35,43 @@ type PeerSettings = Pick<
 
 export class Peer {
   readonly id: string;
-  private readonly candidates = new Set<PeerCandidate>();
-  private connection?: PeerCandidate;
+  private connection?: PeerConnection;
   private segments = new Map<string, PeerSegmentStatus>();
   private request?: PeerRequest;
   private isSendingData = false;
 
   constructor(
     readonly localId: string,
-    candidate: PeerCandidate,
+    connection: PeerConnection,
     private readonly eventHandlers: PeerEventHandlers,
     private readonly settings: PeerSettings
   ) {
-    this.id = candidate.id;
+    this.id = connection.id;
     this.eventHandlers = eventHandlers;
-    this.addCandidate(candidate);
+    this.setConnection(connection);
   }
 
-  addCandidate(candidate: PeerCandidate) {
-    candidate.on("connect", () => {
-      if (candidate !== this.connection) {
-        this.connection = candidate;
+  setConnection(connection: PeerConnection) {
+    connection.on("connect", () => {
+      if (!this.connection) {
+        this.connection = connection;
         this.eventHandlers.onPeerConnected(this);
+      } else {
+        connection.destroy();
       }
     });
-    candidate.on("data", this.onReceiveData.bind(this));
-    candidate.on("close", () => {
-      if (this.connection === candidate) {
+    connection.on("data", this.onReceiveData.bind(this));
+    connection.on("close", () => {
+      if (this.connection === connection) {
         this.connection = undefined;
         this.cancelSegmentRequest("peer-closed");
         this.eventHandlers.onPeerClosed(this);
       }
     });
     // eslint-disable-next-line @typescript-eslint/no-empty-function
-    candidate.on("error", (error) => {
+    connection.on("error", (error) => {
       console.log("PEER ERROR:", error);
     });
-    this.candidates.add(candidate);
   }
 
   get isConnected() {
@@ -163,13 +163,12 @@ export class Peer {
     this.sendCommand(command);
 
     this.isSendingData = true;
-    const sendChunk = async (data: ArrayBuffer) => this.connection?.write(data);
     for (const chunk of getBufferChunks(
       data,
       this.settings.webRtcMaxMessageSize
     )) {
       if (!this.isSendingData) break;
-      void sendChunk(chunk);
+      this.connection?.write(chunk);
     }
     this.isSendingData = false;
   }
@@ -257,20 +256,20 @@ export class Peer {
   destroy() {
     this.cancelSegmentRequest("destroy");
     this.connection?.destroy();
-    this.candidates.clear();
   }
 }
 
 function* getBufferChunks(
   data: ArrayBuffer,
   maxChunkSize: number
-): Generator<ArrayBuffer> {
+): Generator<Buffer> {
   let bytesLeft = data.byteLength;
   while (bytesLeft > 0) {
     const bytesToSend = bytesLeft >= maxChunkSize ? maxChunkSize : bytesLeft;
-    const buffer = Buffer.from(data, data.byteLength - bytesLeft, bytesToSend);
+    const from = data.byteLength - bytesLeft;
+    const buffer = data.slice(from, from + bytesToSend);
     bytesLeft -= bytesToSend;
-    yield buffer;
+    yield Buffer.from(buffer);
   }
 }
 

@@ -1,4 +1,4 @@
-import TrackerClient, { PeerCandidate } from "bittorrent-tracker";
+import TrackerClient, { PeerConnection } from "bittorrent-tracker";
 import * as RIPEMD160 from "ripemd160";
 import { Peer } from "./peer";
 import * as PeerUtil from "./utils/peer-utils";
@@ -58,10 +58,10 @@ export class P2PLoader {
     // TODO: tracker event handlers
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     trackerClient.on("update", (data) => {});
-    trackerClient.on("peer", (candidate) => {
-      const peer = this.peers.get(candidate.id);
-      if (peer) peer.addCandidate(candidate);
-      else this.createPeer(candidate);
+    trackerClient.on("peer", (peerConnection) => {
+      const peer = this.peers.get(peerConnection.id);
+      if (peer) peer.setConnection(peerConnection);
+      else this.createPeer(peerConnection);
     });
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     trackerClient.on("warning", (warning) => {
@@ -79,14 +79,14 @@ export class P2PLoader {
     });
   }
 
-  private createPeer(candidate: PeerCandidate) {
+  private createPeer(connection: PeerConnection) {
     const peerLocalId = `${LoggerUtils.getStreamString(this.stream)}-${
       this.peers.size + 1
     }`;
     this.logger(`create new peer: ${peerLocalId}`);
     const peer = new Peer(
       peerLocalId,
-      candidate,
+      connection,
       {
         onPeerConnected: this.onPeerConnected.bind(this),
         onPeerClosed: this.onPeerClosed.bind(this),
@@ -94,7 +94,7 @@ export class P2PLoader {
       },
       this.settings
     );
-    this.peers.set(candidate.id, peer);
+    this.peers.set(connection.id, peer);
   }
 
   async downloadSegment(segment: Segment): Promise<ArrayBuffer | undefined> {

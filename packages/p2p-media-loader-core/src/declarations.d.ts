@@ -25,7 +25,7 @@ declare module "bittorrent-tracker" {
   export type TrackerEventHandler<E extends TrackerEvent> = E extends "update"
     ? (data: object) => void
     : E extends "peer"
-    ? (peer: PeerCandidate) => void
+    ? (peer: PeerConnection) => void
     : E extends "warning"
     ? (warning: unknown) => void
     : E extends "error"
@@ -34,7 +34,7 @@ declare module "bittorrent-tracker" {
 
   type PeerEvent = "connect" | "data" | "close" | "error";
 
-  export type PeerCandidateEventHandler<E extends PeerEvent> =
+  export type PeerConnectionEventHandler<E extends PeerEvent> =
     E extends "connect"
       ? () => void
       : E extends "data"
@@ -45,12 +45,12 @@ declare module "bittorrent-tracker" {
       ? (error?: unknown) => void
       : never;
 
-  export type PeerCandidate = {
+  export type PeerConnection = {
     id: string;
     initiator: boolean;
     on<E extends PeerEvent>(
       event: E,
-      handler: PeerCandidateEventHandler<E>
+      handler: PeerConnectionEventHandler<E>
     ): void;
     send(data: string | ArrayBuffer | Blob): void;
     write(data: string | ArrayBuffer | Blob): void;
