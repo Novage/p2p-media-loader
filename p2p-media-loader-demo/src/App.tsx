@@ -430,5 +430,6 @@ const loggers = [
   "core:hybrid-loader-secondary",
   "core:hybrid-loader-secondary-engine",
   "core:p2p-manager",
+  "core:peer",
   "core:p2p-loaders-container",
 ] as const;

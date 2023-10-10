@@ -12,6 +12,7 @@ import { P2PRequest } from "./request";
 import { Segment, Settings } from "./types";
 import * as Utils from "./utils/utils";
 import { PeerRequestError } from "./errors";
+import debug from "debug";
 
 type PeerEventHandlers = {
   onPeerConnected: (peer: Peer) => void;
@@ -39,14 +40,14 @@ export class Peer {
   private segments = new Map<string, PeerSegmentStatus>();
   private request?: PeerRequest;
   private isSendingData = false;
+  private readonly logger = debug("core:peer");
 
   constructor(
-    readonly localId: string,
     connection: PeerConnection,
     private readonly eventHandlers: PeerEventHandlers,
     private readonly settings: PeerSettings
   ) {
-    this.id = connection.id;
+    this.id = hexToUtf8(connection.id);
     this.eventHandlers = eventHandlers;
     this.setConnection(connection);
   }
@@ -56,6 +57,7 @@ export class Peer {
       if (!this.connection) {
         this.connection = connection;
         this.eventHandlers.onPeerConnected(this);
+        this.logger(`connected with peer: ${this.id}`);
       } else {
         connection.destroy();
       }
@@ -65,12 +67,13 @@ export class Peer {
       if (this.connection === connection) {
         this.connection = undefined;
         this.cancelSegmentRequest("peer-closed");
+        this.logger(`connection with peer closed: ${this.id}`);
         this.eventHandlers.onPeerClosed(this);
       }
     });
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     connection.on("error", (error) => {
-      console.log("PEER ERROR:", error);
+      this.logger(`peer error: ${this.id} ${error}`);
     });
   }
 
@@ -283,4 +286,14 @@ function joinChunks(chunks: ArrayBuffer[]): ArrayBuffer {
   }
 
   return buffer;
+}
+
+function hexToUtf8(hexString: string) {
+  const bytes = new Uint8Array(hexString.length / 2);
+
+  for (let i = 0; i < hexString.length; i += 2) {
+    bytes[i / 2] = parseInt(hexString.slice(i, i + 2), 16);
+  }
+  const decoder = new TextDecoder();
+  return decoder.decode(bytes);
 }

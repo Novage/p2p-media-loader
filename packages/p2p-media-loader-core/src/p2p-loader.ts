@@ -1,5 +1,4 @@
 import TrackerClient, { PeerConnection } from "bittorrent-tracker";
-import * as RIPEMD160 from "ripemd160";
 import { Peer } from "./peer";
 import * as PeerUtil from "./utils/peer-utils";
 import { Segment, Settings, StreamWithSegments } from "./types";
@@ -13,8 +12,7 @@ import debug from "debug";
 
 export class P2PLoader {
   private readonly streamExternalId: string;
-  private readonly streamHash: string;
-  private readonly peerHash: string;
+  private readonly peerId: string;
   private readonly trackerClient: TrackerClient;
   private readonly peers = new Map<string, Peer>();
   private announcement: JsonSegmentAnnouncement = { i: "" };
@@ -27,20 +25,20 @@ export class P2PLoader {
     private readonly segmentStorage: SegmentsMemoryStorage,
     private readonly settings: Settings
   ) {
-    const peerId = PeerUtil.generatePeerId();
+    this.peerId = PeerUtil.generatePeerId();
     this.streamExternalId = Utils.getStreamExternalId(
       this.streamManifestUrl,
       this.stream
     );
-    this.streamHash = getHash(this.streamExternalId);
-    this.peerHash = getHash(peerId);
 
     this.trackerClient = createTrackerClient({
-      streamHash: this.streamHash,
-      peerHash: this.peerHash,
+      streamHash: Buffer.from(this.streamExternalId, "utf-8"),
+      peerHash: Buffer.from(this.peerId, "utf-8"),
     });
     this.logger(
-      `create tracker client: ${LoggerUtils.getStreamString(stream)}`
+      `create tracker client: ${LoggerUtils.getStreamString(stream)}; ${
+        this.peerId
+      }`
     );
     this.subscribeOnTrackerEvents(this.trackerClient);
     this.segmentStorage.subscribeOnUpdate(
@@ -80,12 +78,7 @@ export class P2PLoader {
   }
 
   private createPeer(connection: PeerConnection) {
-    const peerLocalId = `${LoggerUtils.getStreamString(this.stream)}-${
-      this.peers.size + 1
-    }`;
-    this.logger(`create new peer: ${peerLocalId}`);
     const peer = new Peer(
-      peerLocalId,
       connection,
       {
         onPeerConnected: this.onPeerConnected.bind(this),
@@ -94,6 +87,7 @@ export class P2PLoader {
       },
       this.settings
     );
+    this.logger(`create new peer: ${peer.id}`);
     this.peers.set(connection.id, peer);
   }
 
@@ -153,12 +147,12 @@ export class P2PLoader {
   }
 
   private onPeerConnected(peer: Peer) {
-    this.logger(`connected with peer: ${peer.localId}`);
+    this.logger(`connected with peer: ${peer.id}`);
     peer.sendSegmentsAnnouncement(this.announcement);
   }
 
   private onPeerClosed(peer: Peer) {
-    this.logger(`peer closed: ${peer.localId}`);
+    this.logger(`peer closed: ${peer.id}`);
     this.peers.delete(peer.id);
   }
 
@@ -204,16 +198,12 @@ export class P2PLoader {
   }
 }
 
-function getHash(data: string) {
-  return new RIPEMD160().update(data).digest("hex");
-}
-
 function createTrackerClient({
   streamHash,
   peerHash,
 }: {
-  streamHash: string;
-  peerHash: string;
+  streamHash: Buffer;
+  peerHash: Buffer;
 }) {
   return new TrackerClient({
     infoHash: streamHash,

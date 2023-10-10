@@ -1,8 +1,8 @@
 declare module "bittorrent-tracker" {
   export default class Client {
     constructor(options: {
-      infoHash: string | ArrayBuffer;
-      peerId: string | ArrayBuffer;
+      infoHash: string | Buffer;
+      peerId: string | Buffer;
       announce: string[];
       port: number;
       rtcConfig?: RTCConfiguration;
@@ -52,8 +52,8 @@ declare module "bittorrent-tracker" {
       event: E,
       handler: PeerConnectionEventHandler<E>
     ): void;
-    send(data: string | ArrayBuffer | Blob): void;
-    write(data: string | ArrayBuffer | Blob): void;
+    send(data: string | Blob | Buffer): void;
+    write(data: string | Blob | Buffer): void;
     destroy(): void;
   };
 }

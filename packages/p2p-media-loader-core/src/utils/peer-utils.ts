@@ -1,22 +1,23 @@
 import { JsonSegmentAnnouncement, PeerCommand } from "../internal-types";
 import * as TypeGuard from "../type-guards";
 import { PeerSegmentStatus } from "../enums";
-import * as RIPEMD160 from "ripemd160";
 
 export function generatePeerId(): string {
+  // Base64 characters
   const PEER_ID_SYMBOLS =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   const PEER_ID_LENGTH = 20;
 
-  let peerId = "";
+  let peerId = "PEER:";
+  const randomCharsAmount = PEER_ID_LENGTH - peerId.length;
 
-  for (let i = 0; i < PEER_ID_LENGTH - peerId.length; i++) {
+  for (let i = 0; i < randomCharsAmount; i++) {
     peerId += PEER_ID_SYMBOLS.charAt(
       Math.floor(Math.random() * PEER_ID_SYMBOLS.length)
     );
   }
 
-  return new RIPEMD160().update(peerId).digest("hex");
+  return peerId;
 }
 
 export function getPeerCommandFromArrayBuffer(
