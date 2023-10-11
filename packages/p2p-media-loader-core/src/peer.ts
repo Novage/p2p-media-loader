@@ -265,14 +265,14 @@ export class Peer {
 function* getBufferChunks(
   data: ArrayBuffer,
   maxChunkSize: number
-): Generator<Buffer> {
+): Generator<ArrayBuffer> {
   let bytesLeft = data.byteLength;
   while (bytesLeft > 0) {
     const bytesToSend = bytesLeft >= maxChunkSize ? maxChunkSize : bytesLeft;
     const from = data.byteLength - bytesLeft;
     const buffer = data.slice(from, from + bytesToSend);
     bytesLeft -= bytesToSend;
-    yield Buffer.from(buffer);
+    yield buffer;
   }
 }
 

@@ -32,8 +32,8 @@ export class P2PLoader {
     );
 
     this.trackerClient = createTrackerClient({
-      streamHash: Buffer.from(this.streamExternalId, "utf-8"),
-      peerHash: Buffer.from(this.peerId, "utf-8"),
+      streamHash: utf8ToHex(this.streamExternalId),
+      peerHash: utf8ToHex(this.peerId),
     });
     this.logger(
       `create tracker client: ${LoggerUtils.getStreamString(stream)}; ${
@@ -202,8 +202,8 @@ function createTrackerClient({
   streamHash,
   peerHash,
 }: {
-  streamHash: Buffer;
-  peerHash: Buffer;
+  streamHash: string;
+  peerHash: string;
 }) {
   return new TrackerClient({
     infoHash: streamHash,
@@ -224,4 +224,13 @@ function createTrackerClient({
       ],
     },
   });
+}
+
+function utf8ToHex(utf8String: string) {
+  let result = "";
+  for (let i = 0; i < utf8String.length; i++) {
+    result += utf8String.charCodeAt(i).toString(16);
+  }
+
+  return result;
 }
