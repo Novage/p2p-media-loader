@@ -28,6 +28,6 @@
     "type-check": "npx tsc --noEmit"
   },
   "dependencies": {
-    "bittorrent-tracker": "^9.19.0"
+    "bittorrent-tracker": "10.0.12"
   }
 }
