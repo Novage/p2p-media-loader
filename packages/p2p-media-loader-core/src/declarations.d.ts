@@ -42,7 +42,7 @@ declare module "bittorrent-tracker" {
       : E extends "close"
       ? () => void
       : E extends "error"
-      ? (error?: unknown) => void
+      ? (error: { code: string }) => void
       : never;
 
   export type PeerConnection = {

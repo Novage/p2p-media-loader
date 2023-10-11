@@ -4,7 +4,11 @@ import { SegmentsMemoryStorage } from "./segments-storage";
 import { Settings, CoreEventHandlers } from "./types";
 import { BandwidthApproximator } from "./bandwidth-approximator";
 import { Playback, QueueItem } from "./internal-types";
-import { RequestContainer, EngineCallbacks } from "./request";
+import {
+  RequestContainer,
+  EngineCallbacks,
+  HybridLoaderRequest,
+} from "./request";
 import * as QueueUtils from "./utils/queue-utils";
 import * as LoggerUtils from "./utils/logger";
 import { FetchError } from "./errors";
@@ -60,10 +64,6 @@ export class HybridLoader {
     engine.color = "orange";
     this.logger = { loader, engine };
 
-    // this.randomHttpDownloadInterval = window.setInterval(
-    //   this.loadRandomThroughHttp.bind(this),
-    //   1500
-    // );
     this.setIntervalLoading();
   }
 
@@ -80,7 +80,7 @@ export class HybridLoader {
     this.logger.engine(`requests: ${LoggerUtils.getSegmentString(segment)}`);
     const { stream } = segment;
     if (stream !== this.lastRequestedSegment.stream) {
-      this.logger.loader(
+      this.logger.engine(
         `STREAM CHANGED ${LoggerUtils.getStreamString(stream)}`
       );
       this.p2pLoaders.changeActiveLoader(stream);
@@ -127,23 +127,27 @@ export class HybridLoader {
 
     for (const item of queue) {
       const { statuses, segment } = item;
-      // const timeToPlayback = getTimeToSegmentPlayback(segment, this.playback);
+      const request = this.requests.get(segment);
+      const timeToPlayback = getTimeToSegmentPlayback(segment, this.playback);
+
       if (statuses.isHighDemand) {
-        if (this.requests.isHttpRequested(segment)) continue;
-        // const request = this.requests.get(segment.localId);
-        // if (request?.loaderRequest?.type === "p2p") {
-        //   const remainingDownloadTime = getPredictedRemainingDownloadTime(
-        //     request.loaderRequest
-        //   );
-        //   if (
-        //     remainingDownloadTime === undefined ||
-        //     remainingDownloadTime > timeToPlayback
-        //   ) {
-        //     request.loaderRequest.abort();
-        //   } else {
-        //     continue;
-        //   }
-        // }
+        if (request?.type === "http") continue;
+        console.log("timeToPlayback", timeToPlayback);
+        console.log(this.bandwidthApproximator.getBandwidth() / 1024 ** 2);
+
+        if (request?.type === "p2p") {
+          const remainingDownloadTime =
+            getPredictedRemainingDownloadTime(request);
+          console.log("remainingDownloadTime", remainingDownloadTime);
+          if (
+            remainingDownloadTime === undefined ||
+            remainingDownloadTime > timeToPlayback
+          ) {
+            request.abort();
+          } else {
+            continue;
+          }
+        }
         if (this.requests.httpRequestsCount < simultaneousHttpDownloads) {
           void this.loadThroughHttp(item);
           continue;
@@ -225,16 +229,10 @@ export class HybridLoader {
   }
 
   private async loadThroughP2P(item: QueueItem) {
-    const { segment, statuses } = item;
     const p2pLoader = this.p2pLoaders.activeLoader;
     try {
-      const segmentString = LoggerUtils.getSegmentString(segment);
-      const statusesStr = LoggerUtils.getStatusesString(statuses);
-      const data = await p2pLoader.downloadSegment(segment);
-      if (data) {
-        this.logger.loader(`p2p loaded: ${segmentString} | ${statusesStr}`);
-        this.onSegmentLoaded(segment, data, "p2p");
-      }
+      const data = await p2pLoader.downloadSegment(item);
+      if (data) this.onSegmentLoaded(item.segment, data, "p2p");
     } catch (error) {
       console.log("");
       console.log(JSON.stringify(error));
@@ -362,22 +360,25 @@ function* arrayBackwards<T>(arr: T[]) {
   }
 }
 
-// function getTimeToSegmentPlayback(segment: Segment, playback: Playback) {
-//   return Math.max(segment.startTime - playback.position, 0) / playback.rate;
-// }
-//
-// function getPredictedRemainingDownloadTime(request: HybridLoaderRequest) {
-//   const { startTimestamp, progress } = request;
-//   if (!progress || progress.percent === 0) return undefined;
-//   const now = performance.now();
-//   const bandwidth =
-//     progress.percent / (progress.lastLoadedChunkTimestamp - startTimestamp);
-//   const remainingDownloadPercent = 100 - progress.percent;
-//   const predictedRemainingTimeFromLastDownload =
-//     remainingDownloadPercent / bandwidth;
-//   const timeFromLastDownload = now - progress.lastLoadedChunkTimestamp;
-//   return predictedRemainingTimeFromLastDownload - timeFromLastDownload;
-// }
+function getTimeToSegmentPlayback(segment: Segment, playback: Playback) {
+  return Math.max(segment.startTime - playback.position, 0) / playback.rate;
+}
+
+function getPredictedRemainingDownloadTime(request: HybridLoaderRequest) {
+  const { startTimestamp, progress } = request;
+  if (!progress || progress.lastLoadedChunkTimestamp === undefined) {
+    return undefined;
+  }
+
+  const now = performance.now();
+  const bandwidth =
+    progress.percent / (progress.lastLoadedChunkTimestamp - startTimestamp);
+  const remainingDownloadPercent = 100 - progress.percent;
+  const predictedRemainingTimeFromLastDownload =
+    remainingDownloadPercent / bandwidth;
+  const timeFromLastDownload = now - progress.lastLoadedChunkTimestamp;
+  return (predictedRemainingTimeFromLastDownload - timeFromLastDownload) / 1000;
+}
 
 function getSegmentAvgDuration(stream: StreamWithSegments) {
   const { segments } = stream;

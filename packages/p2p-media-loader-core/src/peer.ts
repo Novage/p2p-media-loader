@@ -64,16 +64,17 @@ export class Peer {
     });
     connection.on("data", this.onReceiveData.bind(this));
     connection.on("close", () => {
-      if (this.connection === connection) {
-        this.connection = undefined;
-        this.cancelSegmentRequest("peer-closed");
-        this.logger(`connection with peer closed: ${this.id}`);
+      this.connection = undefined;
+      this.cancelSegmentRequest("peer-closed");
+      this.logger(`connection with peer closed: ${this.id}`);
+      this.eventHandlers.onPeerClosed(this);
+    });
+    connection.on("error", (error) => {
+      if (error.code === "ERR_DATA_CHANNEL") {
+        this.logger(`peer error: ${this.id} ${error.code}`);
+        this.destroy();
         this.eventHandlers.onPeerClosed(this);
       }
-    });
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
-    connection.on("error", (error) => {
-      this.logger(`peer error: ${this.id} ${error}`);
     });
   }
 
@@ -131,7 +132,7 @@ export class Peer {
 
   private sendCommand(command: PeerCommand) {
     if (!this.connection) return;
-    this.connection.write(JSON.stringify(command));
+    this.connection.send(JSON.stringify(command));
   }
 
   requestSegment(segment: Segment) {
@@ -158,6 +159,7 @@ export class Peer {
 
   sendSegmentData(segmentExternalId: string, data: ArrayBuffer) {
     if (!this.connection) return;
+    this.logger(`send segment ${segmentExternalId} to peer ${this.id}`);
     const command: PeerSendSegmentCommand = {
       c: PeerCommandType.SegmentData,
       i: segmentExternalId,
@@ -171,12 +173,13 @@ export class Peer {
       this.settings.webRtcMaxMessageSize
     )) {
       if (!this.isSendingData) break;
-      this.connection?.write(chunk);
+      this.connection?.send(chunk);
     }
     this.isSendingData = false;
   }
 
   stopSendSegmentData() {
+    // TODO: revise sending cancellation
     this.isSendingData = false;
   }
 
@@ -199,7 +202,6 @@ export class Peer {
       chunks: [],
       p2pRequest: {
         type: "p2p",
-
         startTimestamp: performance.now(),
         promise,
         abort: () => this.cancelSegmentRequest("abort"),
@@ -208,7 +210,6 @@ export class Peer {
   }
 
   private receiveSegmentChunk(chunk: ArrayBuffer): void {
-    // TODO: check can be chunk received before peer command answer
     const { request } = this;
     const progress = request?.p2pRequest?.progress;
     if (!request || !progress) return;
@@ -232,6 +233,9 @@ export class Peer {
   }
 
   private cancelSegmentRequest(type: PeerRequestError["type"]) {
+    this.logger(
+      `cancel segment ${this.request?.segment.externalId} request (${type})`
+    );
     const error = new PeerRequestError(type);
     if (!this.request) return;
     if (!["segment-absent", "peer-closed"].includes(type)) {

@@ -2,7 +2,7 @@ import TrackerClient, { PeerConnection } from "bittorrent-tracker";
 import { Peer } from "./peer";
 import * as PeerUtil from "./utils/peer-utils";
 import { Segment, Settings, StreamWithSegments } from "./types";
-import { JsonSegmentAnnouncement } from "./internal-types";
+import { JsonSegmentAnnouncement, QueueItem } from "./internal-types";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import * as Utils from "./utils/utils";
 import * as LoggerUtils from "./utils/logger";
@@ -61,7 +61,6 @@ export class P2PLoader {
       if (peer) peer.setConnection(peerConnection);
       else this.createPeer(peerConnection);
     });
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
     trackerClient.on("warning", (warning) => {
       this.logger(
         `tracker warning (${LoggerUtils.getStreamString(
@@ -69,7 +68,6 @@ export class P2PLoader {
         )}: ${warning})`
       );
     });
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
     trackerClient.on("error", (error) => {
       this.logger(
         `tracker error (${LoggerUtils.getStreamString(this.stream)}: ${error})`
@@ -91,8 +89,9 @@ export class P2PLoader {
     this.peers.set(connection.id, peer);
   }
 
-  async downloadSegment(segment: Segment): Promise<ArrayBuffer | undefined> {
+  async downloadSegment(item: QueueItem): Promise<ArrayBuffer | undefined> {
     const peerWithSegment: Peer[] = [];
+    const { segment, statuses } = item;
 
     for (const peer of this.peers.values()) {
       if (
@@ -108,9 +107,15 @@ export class P2PLoader {
     const peer =
       peerWithSegment[Math.floor(Math.random() * peerWithSegment.length)];
     const request = peer.requestSegment(segment);
-    this.logger(`p2p request ${segment.externalId}`);
+    this.logger(
+      `p2p request ${segment.externalId} | ${LoggerUtils.getStatusesString(
+        statuses
+      )}`
+    );
+    const data = await request.promise;
     this.requests.addLoaderRequest(segment, request);
-    return request.promise;
+    this.logger(`p2p loaded: ${segment.externalId}`);
+    return data;
   }
 
   isLoadingOrLoadedBySomeone(segment: Segment): boolean {

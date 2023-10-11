@@ -69,6 +69,11 @@ export class RequestContainer {
     return count;
   }
 
+  get(segment: Segment) {
+    const id = getRequestItemId(segment);
+    return this.requests.get(id)?.loaderRequest;
+  }
+
   addLoaderRequest(segment: Segment, loaderRequest: HybridLoaderRequest) {
     const segmentId = getRequestItemId(segment);
     const existingRequest = this.requests.get(segmentId);
