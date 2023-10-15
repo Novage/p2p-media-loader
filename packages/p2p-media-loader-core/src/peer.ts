@@ -109,11 +109,9 @@ export class Peer {
 
       case PeerCommandType.SegmentData:
         if (this.request?.segment.externalId === command.i) {
-          this.request.p2pRequest.progress = {
-            percent: 0,
-            loadedBytes: 0,
-            totalBytes: command.s,
-          };
+          const { progress } = this.request.p2pRequest;
+          progress.totalBytes = command.s;
+          progress.canBeTracked = true;
         }
         break;
 
@@ -202,7 +200,13 @@ export class Peer {
       chunks: [],
       p2pRequest: {
         type: "p2p",
-        startTimestamp: performance.now(),
+        progress: {
+          canBeTracked: false,
+          totalBytes: 0,
+          loadedBytes: 0,
+          percent: 0,
+          startTimestamp: performance.now(),
+        },
         promise,
         abort: () => this.cancelSegmentRequest("abort"),
       },

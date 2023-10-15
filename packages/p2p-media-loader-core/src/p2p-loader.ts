@@ -107,15 +107,17 @@ export class P2PLoader {
     const peer =
       peerWithSegment[Math.floor(Math.random() * peerWithSegment.length)];
     const request = peer.requestSegment(segment);
+    this.requests.addLoaderRequest(segment, request);
     this.logger(
       `p2p request ${segment.externalId} | ${LoggerUtils.getStatusesString(
         statuses
       )}`
     );
-    const data = await request.promise;
-    this.requests.addLoaderRequest(segment, request);
-    this.logger(`p2p loaded: ${segment.externalId}`);
-    return data;
+    request.promise.then(() => {
+      this.logger(`p2p loaded: ${segment.externalId}`);
+    });
+
+    return request.promise;
   }
 
   isLoadingOrLoadedBySomeone(segment: Segment): boolean {

@@ -130,10 +130,9 @@ export class HybridLoader {
       const request = this.requests.get(segment);
       const timeToPlayback = getTimeToSegmentPlayback(segment, this.playback);
 
+      // console.log(this.bandwidthApp.getAverageBandwidth() / 1024 ** 2);
       if (statuses.isHighDemand) {
         if (request?.type === "http") continue;
-        console.log("timeToPlayback", timeToPlayback);
-        console.log(this.bandwidthApproximator.getBandwidth() / 1024 ** 2);
 
         if (request?.type === "p2p") {
           const remainingDownloadTime =
@@ -217,10 +216,11 @@ export class HybridLoader {
       }
 
       this.requests.addLoaderRequest(segment, httpRequest);
+      this.bandwidthApproximator.addLoading(httpRequest.progress);
       data = await httpRequest.promise;
-
+      if (!data) return;
       this.logger.loader(`http responses: ${segment.externalId}`);
-      if (data) this.onSegmentLoaded(segment, data, "http");
+      this.onSegmentLoaded(segment, data, "http");
     } catch (err) {
       if (err instanceof FetchError) {
         // TODO: handle error
@@ -280,8 +280,12 @@ export class HybridLoader {
     type: "http" | "p2p"
   ) {
     const byteLength = data.byteLength;
-    this.bandwidthApproximator.addBytes(data.byteLength);
+    console.log(
+      "approx: ",
+      this.bandwidthApproximator.getBandwidth() / 1024 ** 2
+    );
     void this.segmentStorage.storeSegment(segment, data);
+
     this.requests.resolveEngineRequest(segment, {
       data,
       bandwidth: this.bandwidthApproximator.getBandwidth(),
@@ -365,14 +369,15 @@ function getTimeToSegmentPlayback(segment: Segment, playback: Playback) {
 }
 
 function getPredictedRemainingDownloadTime(request: HybridLoaderRequest) {
-  const { startTimestamp, progress } = request;
+  const { progress } = request;
   if (!progress || progress.lastLoadedChunkTimestamp === undefined) {
     return undefined;
   }
 
   const now = performance.now();
   const bandwidth =
-    progress.percent / (progress.lastLoadedChunkTimestamp - startTimestamp);
+    progress.percent /
+    (progress.lastLoadedChunkTimestamp - progress.startTimestamp);
   const remainingDownloadPercent = 100 - progress.percent;
   const predictedRemainingTimeFromLastDownload =
     remainingDownloadPercent / bandwidth;

@@ -1,15 +1,14 @@
 import { RequestAbortError, FetchError } from "./errors";
 import { Segment } from "./types";
 import { HttpRequest, LoadProgress } from "./request";
+import * as process from "process";
 
 export function getHttpSegmentRequest(segment: Segment): Readonly<HttpRequest> {
-  const { promise, abortController, progress, startTimestamp } =
-    fetchSegmentData(segment);
+  const { promise, abortController, progress } = fetchSegmentData(segment);
   return {
     type: "http",
     promise,
     progress,
-    startTimestamp,
     abort: () => abortController.abort(),
   };
 }
@@ -25,7 +24,13 @@ function fetchSegmentData(segment: Segment) {
   }
   const abortController = new AbortController();
 
-  let progress: LoadProgress | undefined;
+  const progress: LoadProgress = {
+    canBeTracked: false,
+    totalBytes: 0,
+    loadedBytes: 0,
+    percent: 0,
+    startTimestamp: performance.now(),
+  };
   const loadSegmentData = async () => {
     try {
       const response = await window.fetch(url, {
@@ -34,12 +39,10 @@ function fetchSegmentData(segment: Segment) {
       });
 
       if (response.ok) {
-        const result = getDataPromiseAndMonitorProgress(response);
-        progress = result.progress;
+        const data = await getDataPromiseAndMonitorProgress(response, progress);
         // Don't return dataPromise immediately
         // should await it for catch correct working
-        const resultData = await result.dataPromise;
-        return resultData;
+        return data;
       }
       throw new FetchError(
         response.statusText ?? `Network response was not for ${segmentId}`,
@@ -58,48 +61,54 @@ function fetchSegmentData(segment: Segment) {
     promise: loadSegmentData(),
     abortController,
     progress,
-    startTimestamp: performance.now(),
   };
 }
 
-function getDataPromiseAndMonitorProgress(response: Response): {
-  progress?: LoadProgress;
-  dataPromise: Promise<ArrayBuffer>;
-} {
+async function getDataPromiseAndMonitorProgress(
+  response: Response,
+  progress: LoadProgress
+): Promise<ArrayBuffer> {
   const totalBytesString = response.headers.get("Content-Length");
-  if (totalBytesString === null || !response.body) {
-    return { dataPromise: response.arrayBuffer() };
+  if (!response.body) {
+    return response.arrayBuffer().then((data) => {
+      progress.loadedBytes = data.byteLength;
+      progress.totalBytes = data.byteLength;
+      progress.lastLoadedChunkTimestamp = performance.now();
+      progress.percent = 100;
+      return data;
+    });
   }
 
-  const totalBytes = +totalBytesString;
-  const progress: LoadProgress = {
-    percent: 0,
-    loadedBytes: 0,
-    totalBytes,
-  };
+  if (totalBytesString) {
+    progress.totalBytes = +totalBytesString;
+    progress.canBeTracked = true;
+  }
+
   const reader = response.body.getReader();
 
-  const getDataPromise = async () => {
-    const chunks: Uint8Array[] = [];
-    for await (const chunk of readStream(reader)) {
-      chunks.push(chunk);
-      progress.loadedBytes += chunk.length;
-      progress.percent = (progress.loadedBytes / totalBytes) * 100;
-      progress.lastLoadedChunkTimestamp = performance.now();
+  const chunks: Uint8Array[] = [];
+  for await (const chunk of readStream(reader)) {
+    chunks.push(chunk);
+    progress.loadedBytes += chunk.length;
+    progress.lastLoadedChunkTimestamp = performance.now();
+    if (progress.canBeTracked) {
+      progress.percent = (progress.loadedBytes / progress.totalBytes) * 100;
     }
+  }
 
-    const resultBuffer = new ArrayBuffer(progress.loadedBytes);
-    const view = new Uint8Array(resultBuffer);
+  if (!progress.canBeTracked) {
+    progress.totalBytes = progress.loadedBytes;
+    progress.percent = 100;
+  }
+  const resultBuffer = new ArrayBuffer(progress.loadedBytes);
+  const view = new Uint8Array(resultBuffer);
 
-    let offset = 0;
-    for (const chunk of chunks) {
-      view.set(chunk, offset);
-      offset += chunk.length;
-    }
-
-    return resultBuffer;
-  };
-  return { progress, dataPromise: getDataPromise() };
+  let offset = 0;
+  for (const chunk of chunks) {
+    view.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return resultBuffer;
 }
 
 async function* readStream(

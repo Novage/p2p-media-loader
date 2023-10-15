@@ -11,17 +11,18 @@ export type EngineCallbacks = {
 };
 
 export type LoadProgress = {
+  startTimestamp: number;
+  lastLoadedChunkTimestamp?: number;
   percent: number;
   loadedBytes: number;
   totalBytes: number;
-  lastLoadedChunkTimestamp?: number;
+  canBeTracked: boolean;
 };
 
 type RequestBase = {
   promise: Promise<ArrayBuffer>;
   abort: () => void;
-  progress?: LoadProgress;
-  startTimestamp: number;
+  progress: LoadProgress;
 };
 
 export type HttpRequest = RequestBase & {
