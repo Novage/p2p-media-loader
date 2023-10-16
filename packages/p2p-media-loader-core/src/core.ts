@@ -19,7 +19,7 @@ export class Core<TStream extends Stream = Stream> {
   private readonly settings: Settings = {
     simultaneousHttpDownloads: 2,
     simultaneousP2PDownloads: 3,
-    highDemandTimeWindow: 10,
+    highDemandTimeWindow: 15,
     httpDownloadTimeWindow: 60,
     p2pDownloadTimeWindow: 60,
     cachedSegmentExpiration: 120 * 1000,

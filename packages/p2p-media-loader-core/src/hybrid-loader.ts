@@ -2,8 +2,11 @@ import { Segment, StreamWithSegments } from "./index";
 import { getHttpSegmentRequest } from "./http-loader";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import { Settings, CoreEventHandlers } from "./types";
-import { BandwidthApproximator } from "./bandwidth-approximator";
-import { Playback, QueueItem } from "./internal-types";
+import {
+  BandwidthApproximator,
+  BandwidthApproximator1,
+} from "./bandwidth-approximator";
+import { Playback, QueueItem, QueueItemStatuses } from "./internal-types";
 import {
   RequestContainer,
   EngineCallbacks,
@@ -25,6 +28,8 @@ export class HybridLoader {
   private readonly segmentAvgDuration: number;
   private randomHttpDownloadInterval!: number;
   private readonly logger: { engine: debug.Debugger; loader: debug.Debugger };
+  private readonly approximator = new BandwidthApproximator1();
+  private readonly levelBandwidth = { value: 0, refreshCount: 0 };
 
   constructor(
     private streamManifestUrl: string,
@@ -84,6 +89,7 @@ export class HybridLoader {
         `STREAM CHANGED ${LoggerUtils.getStreamString(stream)}`
       );
       this.p2pLoaders.changeActiveLoader(stream);
+      this.refreshLevelBandwidth(true);
     }
     this.lastRequestedSegment = segment;
     this.requests.addEngineCallbacks(segment, callbacks);
@@ -94,7 +100,7 @@ export class HybridLoader {
       if (data) {
         this.requests.resolveEngineRequest(segment, {
           data,
-          bandwidth: this.bandwidthApproximator.getBandwidth(),
+          bandwidth: this.levelBandwidth.value,
         });
       }
     }
@@ -204,7 +210,7 @@ export class HybridLoader {
   }
 
   private async loadThroughHttp(item: QueueItem, isRandom = false) {
-    const { segment } = item;
+    const { segment, statuses } = item;
     let data: ArrayBuffer | undefined;
     try {
       const httpRequest = getHttpSegmentRequest(segment);
@@ -220,7 +226,7 @@ export class HybridLoader {
       data = await httpRequest.promise;
       if (!data) return;
       this.logger.loader(`http responses: ${segment.externalId}`);
-      this.onSegmentLoaded(segment, data, "http");
+      this.onSegmentLoaded(item, "http", data);
     } catch (err) {
       if (err instanceof FetchError) {
         // TODO: handle error
@@ -232,7 +238,7 @@ export class HybridLoader {
     const p2pLoader = this.p2pLoaders.activeLoader;
     try {
       const data = await p2pLoader.downloadSegment(item);
-      if (data) this.onSegmentLoaded(item.segment, data, "p2p");
+      if (data) this.onSegmentLoaded(item, "p2p", data);
     } catch (error) {
       console.log("");
       console.log(JSON.stringify(error));
@@ -275,21 +281,30 @@ export class HybridLoader {
   }
 
   private onSegmentLoaded(
-    segment: Segment,
-    data: ArrayBuffer,
-    type: "http" | "p2p"
+    queueItem: QueueItem,
+    type: "http" | "p2p",
+    data: ArrayBuffer
   ) {
+    const { segment, statuses } = queueItem;
     const byteLength = data.byteLength;
     console.log(
-      "approx: ",
+      "mine: ",
       this.bandwidthApproximator.getBandwidth() / 1024 ** 2
     );
+    if (type === "http" && statuses.isHighDemand) {
+      this.refreshLevelBandwidth(true);
+    }
+    this.approximator.addBytes(data.byteLength);
     void this.segmentStorage.storeSegment(segment, data);
 
-    this.requests.resolveEngineRequest(segment, {
-      data,
-      bandwidth: this.bandwidthApproximator.getBandwidth(),
-    });
+    console.log("is high demand: ", statuses.isHighDemand);
+    const bandwidth = statuses.isHighDemand
+      ? this.bandwidthApproximator.getBandwidth()
+      : this.levelBandwidth.value;
+
+    console.log("BAND: ", bandwidth / 1024 ** 2);
+
+    this.requests.resolveEngineRequest(segment, { data, bandwidth });
     this.eventHandlers?.onDataLoaded?.(byteLength, type);
     this.processQueue();
   }
@@ -319,6 +334,15 @@ export class HybridLoader {
         );
         break;
       }
+    }
+  }
+
+  private refreshLevelBandwidth(levelChanged = false) {
+    if (levelChanged) this.levelBandwidth.refreshCount = 0;
+    if (this.levelBandwidth.refreshCount < 3) {
+      const currentBandwidth = this.bandwidthApproximator.getBandwidth();
+      this.levelBandwidth.value = currentBandwidth ?? 0;
+      this.levelBandwidth.refreshCount++;
     }
   }
 

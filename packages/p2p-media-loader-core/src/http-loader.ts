@@ -1,7 +1,6 @@
 import { RequestAbortError, FetchError } from "./errors";
 import { Segment } from "./types";
 import { HttpRequest, LoadProgress } from "./request";
-import * as process from "process";
 
 export function getHttpSegmentRequest(segment: Segment): Readonly<HttpRequest> {
   const { promise, abortController, progress } = fetchSegmentData(segment);

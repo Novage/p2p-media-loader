@@ -30,6 +30,11 @@ export class Engine {
         this.core.setManifestResponseUrl(networkDetails.url);
       }
       this.segmentManager.processMasterManifest(data);
+
+      console.log(
+        "LEVELS: ",
+        data.levels.map((i) => (i.bitrate / 1024 ** 2).toFixed(3))
+      );
     });
 
     hls.on("hlsLevelUpdated" as Events.LEVEL_UPDATED, (event, data) => {
@@ -74,6 +79,10 @@ export class Engine {
         // console.log("playback rate: ", media.playbackRate);
         this.core.updatePlayback(media.currentTime, media.playbackRate);
       });
+    });
+
+    hls.on("hlsLevelSwitching" as Events.LEVEL_SWITCHING, (event, data) => {
+      console.log("BITRATE: ", (data.bitrate / 1024 ** 2).toFixed(3));
     });
   }
 
