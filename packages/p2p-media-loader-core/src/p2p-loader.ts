@@ -16,7 +16,7 @@ export class P2PLoader {
   private readonly trackerClient: TrackerClient;
   private readonly peers = new Map<string, Peer>();
   private announcement: JsonSegmentAnnouncement = { i: "" };
-  private readonly logger = debug("core:p2p-manager");
+  private readonly logger = debug("core:p2p-loader");
 
   constructor(
     private streamManifestUrl: string,
