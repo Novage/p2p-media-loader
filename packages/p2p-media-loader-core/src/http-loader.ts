@@ -85,6 +85,7 @@ async function getDataPromiseAndMonitorProgress(
 
   const reader = response.body.getReader();
 
+  progress.startTimestamp = performance.now();
   const chunks: Uint8Array[] = [];
   for await (const chunk of readStream(reader)) {
     chunks.push(chunk);

@@ -2,11 +2,8 @@ import { Segment, StreamWithSegments } from "./index";
 import { getHttpSegmentRequest } from "./http-loader";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import { Settings, CoreEventHandlers } from "./types";
-import {
-  BandwidthApproximator,
-  BandwidthApproximator1,
-} from "./bandwidth-approximator";
-import { Playback, QueueItem, QueueItemStatuses } from "./internal-types";
+import { BandwidthApproximator } from "./bandwidth-approximator";
+import { Playback, QueueItem } from "./internal-types";
 import {
   RequestContainer,
   EngineCallbacks,
@@ -28,7 +25,6 @@ export class HybridLoader {
   private readonly segmentAvgDuration: number;
   private randomHttpDownloadInterval!: number;
   private readonly logger: { engine: debug.Debugger; loader: debug.Debugger };
-  private readonly approximator = new BandwidthApproximator1();
   private readonly levelBandwidth = { value: 0, refreshCount: 0 };
 
   constructor(
@@ -136,14 +132,12 @@ export class HybridLoader {
       const request = this.requests.get(segment);
       const timeToPlayback = getTimeToSegmentPlayback(segment, this.playback);
 
-      // console.log(this.bandwidthApp.getAverageBandwidth() / 1024 ** 2);
       if (statuses.isHighDemand) {
         if (request?.type === "http") continue;
 
         if (request?.type === "p2p") {
           const remainingDownloadTime =
             getPredictedRemainingDownloadTime(request);
-          console.log("remainingDownloadTime", remainingDownloadTime);
           if (
             remainingDownloadTime === undefined ||
             remainingDownloadTime > timeToPlayback
@@ -191,16 +185,6 @@ export class HybridLoader {
       }
       break;
     }
-
-    // console.log(
-    //   [...this.requests.values()].map((req) => {
-    //     const { loaderRequest, engineCallbacks, segment } = req;
-    //
-    //     return `${getSegmentStringId(segment)}-l${loaderRequest ? 1 : 0}-e${
-    //       engineCallbacks ? 1 : 0
-    //     }`;
-    //   })
-    // );
   }
 
   // api method for engines
@@ -210,7 +194,7 @@ export class HybridLoader {
   }
 
   private async loadThroughHttp(item: QueueItem, isRandom = false) {
-    const { segment, statuses } = item;
+    const { segment } = item;
     let data: ArrayBuffer | undefined;
     try {
       const httpRequest = getHttpSegmentRequest(segment);
@@ -240,9 +224,7 @@ export class HybridLoader {
       const data = await p2pLoader.downloadSegment(item);
       if (data) this.onSegmentLoaded(item, "p2p", data);
     } catch (error) {
-      console.log("");
       console.log(JSON.stringify(error));
-      console.log("");
     }
   }
 
@@ -287,22 +269,14 @@ export class HybridLoader {
   ) {
     const { segment, statuses } = queueItem;
     const byteLength = data.byteLength;
-    console.log(
-      "mine: ",
-      this.bandwidthApproximator.getBandwidth() / 1024 ** 2
-    );
     if (type === "http" && statuses.isHighDemand) {
       this.refreshLevelBandwidth(true);
     }
-    this.approximator.addBytes(data.byteLength);
     void this.segmentStorage.storeSegment(segment, data);
 
-    console.log("is high demand: ", statuses.isHighDemand);
     const bandwidth = statuses.isHighDemand
       ? this.bandwidthApproximator.getBandwidth()
       : this.levelBandwidth.value;
-
-    console.log("BAND: ", bandwidth / 1024 ** 2);
 
     this.requests.resolveEngineRequest(segment, { data, bandwidth });
     this.eventHandlers?.onDataLoaded?.(byteLength, type);

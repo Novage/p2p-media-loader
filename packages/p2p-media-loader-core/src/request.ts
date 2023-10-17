@@ -1,5 +1,5 @@
 import { Segment, SegmentResponse } from "./types";
-import { RequestAbortError, FetchError } from "./errors";
+import { RequestAbortError } from "./errors";
 import { Subscriptions } from "./segments-storage";
 import Debug from "debug";
 

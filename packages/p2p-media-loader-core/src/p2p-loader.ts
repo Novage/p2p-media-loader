@@ -53,7 +53,6 @@ export class P2PLoader {
   }
 
   private subscribeOnTrackerEvents(trackerClient: TrackerClient) {
-    // TODO: tracker event handlers
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     trackerClient.on("update", (data) => {});
     trackerClient.on("peer", (peerConnection) => {
