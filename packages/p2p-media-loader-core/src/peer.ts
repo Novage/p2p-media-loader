@@ -37,10 +37,16 @@ type PeerSettings = Pick<
 export class Peer {
   readonly id: string;
   private connection?: PeerConnection;
+  private connections = new Set<PeerConnection>();
   private segments = new Map<string, PeerSegmentStatus>();
   private request?: PeerRequest;
-  private isSendingData = false;
   private readonly logger = debug("core:peer");
+  private readonly bandwidthMeasurer = new BandwidthMeasurer();
+  private uploadingPromise?: {
+    promise: Promise<void>;
+    resolve: () => void;
+    reject: () => void;
+  };
 
   constructor(
     connection: PeerConnection,
@@ -53,23 +59,30 @@ export class Peer {
   }
 
   setConnection(connection: PeerConnection) {
+    if (this.connection && connection !== this.connection) connection.destroy();
+
     connection.on("connect", () => {
-      if (!this.connection) {
-        this.connection = connection;
-        this.eventHandlers.onPeerConnected(this);
-        this.logger(`connected with peer: ${this.id}`);
-      } else {
-        connection.destroy();
+      this.connection = connection;
+      for (const item of this.connections) {
+        if (item !== connection) {
+          this.connections.delete(item);
+          item.destroy();
+        }
       }
+      this.eventHandlers.onPeerConnected(this);
+      this.logger(`connected with peer: ${this.id}`);
     });
     connection.on("data", this.onReceiveData.bind(this));
     connection.on("close", () => {
+      if (connection !== this.connection) return;
       this.connection = undefined;
       this.cancelSegmentRequest("peer-closed");
       this.logger(`connection with peer closed: ${this.id}`);
+      this.destroy();
       this.eventHandlers.onPeerClosed(this);
     });
     connection.on("error", (error) => {
+      if (connection !== this.connection) return;
       if (error.code === "ERR_DATA_CHANNEL") {
         this.logger(`peer error: ${this.id} ${error.code}`);
         this.destroy();
@@ -84,6 +97,10 @@ export class Peer {
 
   get downloadingSegment(): Segment | undefined {
     return this.request?.segment;
+  }
+
+  get bandwidth(): number | undefined {
+    return this.bandwidthMeasurer.getBandwidth();
   }
 
   getSegmentStatus(segment: Segment): PeerSegmentStatus | undefined {
@@ -123,7 +140,7 @@ export class Peer {
         break;
 
       case PeerCommandType.CancelSegmentRequest:
-        this.stopSendSegmentData();
+        this.stopUploadingSegmentData();
         break;
     }
   }
@@ -148,6 +165,7 @@ export class Peer {
   }
 
   sendSegmentsAnnouncement(announcement: JsonSegmentAnnouncement) {
+    if (!announcement.i) return;
     const command: PeerSegmentAnnouncementCommand = {
       c: PeerCommandType.SegmentsAnnouncement,
       a: announcement,
@@ -155,9 +173,9 @@ export class Peer {
     this.sendCommand(command);
   }
 
-  sendSegmentData(segmentExternalId: string, data: ArrayBuffer) {
+  async sendSegmentData(segmentExternalId: string, data: ArrayBuffer) {
     if (!this.connection) return;
-    this.logger(`send segment ${segmentExternalId} to peer ${this.id}`);
+    this.logger(`send segment ${segmentExternalId} to ${this.id}`);
     const command: PeerSendSegmentCommand = {
       c: PeerCommandType.SegmentData,
       i: segmentExternalId,
@@ -165,20 +183,40 @@ export class Peer {
     };
     this.sendCommand(command);
 
-    this.isSendingData = true;
-    for (const chunk of getBufferChunks(
-      data,
-      this.settings.webRtcMaxMessageSize
-    )) {
-      if (!this.isSendingData) break;
-      this.connection?.send(chunk);
+    const chunks = getBufferChunks(data, this.settings.webRtcMaxMessageSize);
+
+    const connection = this.connection;
+    const channel = connection._channel;
+    this.uploadingPromise = Utils.getControlledPromise<void>();
+    const sendChunk = () => {
+      while (channel.bufferedAmount <= channel.bufferedAmountLowThreshold) {
+        if (!this.uploadingPromise) break;
+        const chunk = chunks.next().value;
+        if (!chunk) {
+          this.uploadingPromise.resolve();
+          break;
+        }
+        connection.send(chunk);
+      }
+    };
+    this.connection._channel.addEventListener("bufferedamountlow", sendChunk);
+    sendChunk();
+    try {
+      await this.uploadingPromise?.promise;
+      this.logger(`segment ${segmentExternalId} has been sent to ${this.id}`);
+      this.uploadingPromise = undefined;
+    } catch (err) {
+      // ignore
+    } finally {
+      this.connection._channel.removeEventListener(
+        "bufferedamountlow",
+        sendChunk
+      );
     }
-    this.isSendingData = false;
   }
 
-  stopSendSegmentData() {
-    // TODO: revise sending cancellation
-    this.isSendingData = false;
+  stopUploadingSegmentData() {
+    this.uploadingPromise?.reject();
   }
 
   sendSegmentAbsent(segmentExternalId: string) {
@@ -225,6 +263,10 @@ export class Peer {
 
     if (progress.loadedBytes === progress.totalBytes) {
       const segmentData = joinChunks(request.chunks);
+      const { lastLoadedChunkTimestamp, startTimestamp, loadedBytes } =
+        progress;
+      const loadingDuration = lastLoadedChunkTimestamp - startTimestamp;
+      this.bandwidthMeasurer.addMeasurement(loadedBytes, loadingDuration);
       this.approveRequest(segmentData);
     } else if (progress.loadedBytes > progress.totalBytes) {
       this.cancelSegmentRequest("response-bytes-mismatch");
@@ -237,11 +279,11 @@ export class Peer {
   }
 
   private cancelSegmentRequest(type: PeerRequestError["type"]) {
+    if (!this.request) return;
     this.logger(
-      `cancel segment ${this.request?.segment.externalId} request (${type})`
+      `cancel segment request ${this.request?.segment.externalId} (${type})`
     );
     const error = new PeerRequestError(type);
-    if (!this.request) return;
     if (!["segment-absent", "peer-closed"].includes(type)) {
       this.sendCommand({
         c: PeerCommandType.CancelSegmentRequest,
@@ -267,6 +309,28 @@ export class Peer {
   destroy() {
     this.cancelSegmentRequest("destroy");
     this.connection?.destroy();
+    this.connection = undefined;
+  }
+}
+
+const SMOOTHING_COEF = 0.5;
+
+class BandwidthMeasurer {
+  private bandwidth?: number;
+
+  addMeasurement(bytes: number, loadingDurationMs: number) {
+    const bits = bytes * 8;
+    const currentBandwidth = (bits * 1000) / loadingDurationMs;
+
+    this.bandwidth =
+      this.bandwidth !== undefined
+        ? currentBandwidth * SMOOTHING_COEF +
+          (1 - SMOOTHING_COEF) * this.bandwidth
+        : currentBandwidth;
+  }
+
+  getBandwidth() {
+    return this.bandwidth;
   }
 }
 

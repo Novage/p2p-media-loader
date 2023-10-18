@@ -130,12 +130,15 @@ export class HybridLoader {
     for (const item of queue) {
       const { statuses, segment } = item;
       const request = this.requests.get(segment);
-      const timeToPlayback = getTimeToSegmentPlayback(segment, this.playback);
 
       if (statuses.isHighDemand) {
         if (request?.type === "http") continue;
 
         if (request?.type === "p2p") {
+          const timeToPlayback = getTimeToSegmentPlayback(
+            segment,
+            this.playback
+          );
           const remainingDownloadTime =
             getPredictedRemainingDownloadTime(request);
           if (
@@ -172,7 +175,7 @@ export class HybridLoader {
         break;
       }
       if (statuses.isP2PDownloadable) {
-        if (this.requests.isP2PRequested(segment)) continue;
+        if (request) continue;
         if (this.requests.p2pRequestsCount < simultaneousP2PDownloads) {
           void this.loadThroughP2P(item);
           continue;
@@ -213,7 +216,7 @@ export class HybridLoader {
       this.onSegmentLoaded(item, "http", data);
     } catch (err) {
       if (err instanceof FetchError) {
-        // TODO: handle error
+        this.processQueue();
       }
     }
   }
@@ -224,7 +227,7 @@ export class HybridLoader {
       const data = await p2pLoader.downloadSegment(item);
       if (data) this.onSegmentLoaded(item, "p2p", data);
     } catch (error) {
-      console.log(JSON.stringify(error));
+      this.processQueue();
     }
   }
 

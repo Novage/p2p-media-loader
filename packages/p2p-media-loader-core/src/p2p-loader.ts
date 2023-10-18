@@ -56,6 +56,7 @@ export class P2PLoader {
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     trackerClient.on("update", (data) => {});
     trackerClient.on("peer", (peerConnection) => {
+      console.log(peerConnection);
       const peer = this.peers.get(peerConnection.id);
       if (peer) peer.setConnection(peerConnection);
       else this.createPeer(peerConnection);
@@ -89,22 +90,32 @@ export class P2PLoader {
   }
 
   async downloadSegment(item: QueueItem): Promise<ArrayBuffer | undefined> {
-    const peerWithSegment: Peer[] = [];
     const { segment, statuses } = item;
+    const untestedPeers: Peer[] = [];
+    let fastestPeer: Peer | undefined;
+    let fastedPeerBandwidth = 0;
 
     for (const peer of this.peers.values()) {
       if (
         !peer.downloadingSegment &&
         peer.getSegmentStatus(segment) === PeerSegmentStatus.Loaded
       ) {
-        peerWithSegment.push(peer);
+        const { bandwidth } = peer;
+        if (bandwidth === undefined) {
+          untestedPeers.push(peer);
+        } else if (bandwidth > fastedPeerBandwidth) {
+          fastedPeerBandwidth = bandwidth;
+          fastestPeer = peer;
+        }
       }
     }
 
-    if (peerWithSegment.length === 0) return undefined;
+    const peer = untestedPeers.length
+      ? getRandomItem(untestedPeers)
+      : fastestPeer;
 
-    const peer =
-      peerWithSegment[Math.floor(Math.random() * peerWithSegment.length)];
+    if (!peer) return;
+
     const request = peer.requestSegment(segment);
     this.requests.addLoaderRequest(segment, request);
     this.logger(
@@ -174,7 +185,7 @@ export class P2PLoader {
     );
     const segmentData =
       segment && (await this.segmentStorage.getSegmentData(segment));
-    if (segmentData) peer.sendSegmentData(segmentExternalId, segmentData);
+    if (segmentData) void peer.sendSegmentData(segmentExternalId, segmentData);
     else peer.sendSegmentAbsent(segmentExternalId);
   }
 
@@ -239,4 +250,8 @@ function utf8ToHex(utf8String: string) {
   }
 
   return result;
+}
+
+function getRandomItem<T>(items: T[]): T {
+  return items[Math.floor(Math.random() * items.length)];
 }
