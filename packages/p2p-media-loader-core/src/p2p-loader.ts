@@ -9,6 +9,7 @@ import * as LoggerUtils from "./utils/logger";
 import { PeerSegmentStatus } from "./enums";
 import { RequestContainer } from "./request";
 import debug from "debug";
+import { windows } from "rimraf";
 
 export class P2PLoader {
   private readonly streamExternalId: string;
@@ -17,6 +18,7 @@ export class P2PLoader {
   private readonly peers = new Map<string, Peer>();
   private announcement: JsonSegmentAnnouncement = { i: "" };
   private readonly logger = debug("core:p2p-loader");
+  private broadcastAnnouncementTaskId?: number;
 
   constructor(
     private streamManifestUrl: string,
@@ -174,8 +176,14 @@ export class P2PLoader {
   }
 
   private updateAndBroadcastAnnouncement = () => {
-    this.updateSegmentAnnouncement();
-    this.broadcastSegmentAnnouncement();
+    if (this.broadcastAnnouncementTaskId) return;
+
+    // for only execution for macrotask
+    this.broadcastAnnouncementTaskId = window.setTimeout(() => {
+      this.updateSegmentAnnouncement();
+      this.broadcastSegmentAnnouncement();
+      this.broadcastAnnouncementTaskId = undefined;
+    }, 0);
   };
 
   private async onSegmentRequested(peer: Peer, segmentExternalId: string) {
@@ -190,6 +198,7 @@ export class P2PLoader {
   }
 
   private broadcastSegmentAnnouncement() {
+    console.log("BROADCAST ANNOUNCEMENT");
     for (const peer of this.peers.values()) {
       if (!peer.isConnected) continue;
       peer.sendSegmentsAnnouncement(this.announcement);
@@ -212,6 +221,7 @@ export class P2PLoader {
     }
     this.peers.clear();
     this.trackerClient.destroy();
+    clearTimeout(this.broadcastAnnouncementTaskId);
   }
 }
 
