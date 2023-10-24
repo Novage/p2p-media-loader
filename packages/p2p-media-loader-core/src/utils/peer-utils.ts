@@ -1,10 +1,25 @@
 import { JsonSegmentAnnouncement, PeerCommand } from "../internal-types";
 import * as TypeGuard from "../type-guards";
 import { PeerSegmentStatus } from "../enums";
+import RIPEMD160 from "ripemd160";
+
+export function getStreamHash(string: string): string {
+  const HASH_SYMBOLS =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const symbolsCount = HASH_SYMBOLS.length;
+  const bytes = new RIPEMD160().update(string).digest();
+  let hash = "";
+
+  for (const byte of bytes) {
+    hash += HASH_SYMBOLS[byte % symbolsCount];
+  }
+
+  return hash;
+}
 
 export function generatePeerId(): string {
   // Base64 characters
-  const PEER_ID_SYMBOLS =
+  const HASH_SYMBOLS =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   const PEER_ID_LENGTH = 20;
 
@@ -12,8 +27,8 @@ export function generatePeerId(): string {
   const randomCharsAmount = PEER_ID_LENGTH - peerId.length;
 
   for (let i = 0; i < randomCharsAmount; i++) {
-    peerId += PEER_ID_SYMBOLS.charAt(
-      Math.floor(Math.random() * PEER_ID_SYMBOLS.length)
+    peerId += HASH_SYMBOLS.charAt(
+      Math.floor(Math.random() * HASH_SYMBOLS.length)
     );
   }
 

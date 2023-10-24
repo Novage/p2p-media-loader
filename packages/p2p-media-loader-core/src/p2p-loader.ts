@@ -9,10 +9,10 @@ import * as LoggerUtils from "./utils/logger";
 import { PeerSegmentStatus } from "./enums";
 import { RequestContainer } from "./request";
 import debug from "debug";
-import { windows } from "rimraf";
 
 export class P2PLoader {
   private readonly streamExternalId: string;
+  private readonly streamHash: string;
   private readonly peerId: string;
   private readonly trackerClient: TrackerClient;
   private readonly peers = new Map<string, Peer>();
@@ -32,9 +32,10 @@ export class P2PLoader {
       this.streamManifestUrl,
       this.stream
     );
+    this.streamHash = PeerUtil.getStreamHash(this.streamManifestUrl);
 
     this.trackerClient = createTrackerClient({
-      streamHash: utf8ToHex(this.streamExternalId),
+      streamHash: utf8ToHex(this.streamHash),
       peerHash: utf8ToHex(this.peerId),
     });
     this.logger(
@@ -58,7 +59,6 @@ export class P2PLoader {
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     trackerClient.on("update", (data) => {});
     trackerClient.on("peer", (peerConnection) => {
-      console.log(peerConnection);
       const peer = this.peers.get(peerConnection.id);
       if (peer) peer.setConnection(peerConnection);
       else this.createPeer(peerConnection);
@@ -198,7 +198,6 @@ export class P2PLoader {
   }
 
   private broadcastSegmentAnnouncement() {
-    console.log("BROADCAST ANNOUNCEMENT");
     for (const peer of this.peers.values()) {
       if (!peer.isConnected) continue;
       peer.sendSegmentsAnnouncement(this.announcement);
