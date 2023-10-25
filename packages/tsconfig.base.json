@@ -5,7 +5,7 @@
     "module": "ESNext",
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
-    "moduleResolution": "Node",
+    "moduleResolution": "Bundler",
     "allowImportingTsExtensions": false,
     "resolveJsonModule": false,
     "isolatedModules": true,
@@ -20,6 +20,7 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
-    "composite": true
-  }
+    "composite": true,
+    "allowSyntheticDefaultImports": true
+  },
 }

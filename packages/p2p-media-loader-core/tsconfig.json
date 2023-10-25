@@ -4,7 +4,6 @@
     "outDir": "lib",
     "rootDir": "src",
     "tsBuildInfoFile": "./build/.tsbuildinfo",
-    "allowSyntheticDefaultImports": true
   },
   "include": ["src/**/*"]
 }
