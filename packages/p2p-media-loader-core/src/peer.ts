@@ -11,8 +11,21 @@ import * as PeerUtil from "./utils/peer-utils";
 import { P2PRequest } from "./request";
 import { Segment, Settings } from "./types";
 import * as Utils from "./utils/utils";
-import { PeerRequestError } from "./errors";
 import debug from "debug";
+
+export class PeerRequestError extends Error {
+  constructor(
+    readonly type:
+      | "abort"
+      | "request-timeout"
+      | "response-bytes-mismatch"
+      | "segment-absent"
+      | "peer-closed"
+      | "destroy"
+  ) {
+    super();
+  }
+}
 
 type PeerEventHandlers = {
   onPeerConnected: (peer: Peer) => void;

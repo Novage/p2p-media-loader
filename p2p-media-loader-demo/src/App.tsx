@@ -73,7 +73,7 @@ function App() {
 
   const hlsEngine = useRef<HlsJsEngine>(
     new HlsJsEngine({
-      onDataLoaded: (byteLength, type) => {
+      onSegmentLoaded: (byteLength, type) => {
         const MBytes = getMBFromBytes(byteLength);
         if (type === "http") {
           setHttpLoaded((prev) => round(prev + MBytes));

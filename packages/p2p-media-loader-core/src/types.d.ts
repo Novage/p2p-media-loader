@@ -63,5 +63,5 @@ export type Settings = {
 };
 
 export type CoreEventHandlers = {
-  onDataLoaded?: (byteLength: number, type: "http" | "p2p") => void;
+  onSegmentLoaded?: (byteLength: number, type: "http" | "p2p") => void;
 };

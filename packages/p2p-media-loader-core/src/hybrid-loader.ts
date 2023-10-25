@@ -33,7 +33,7 @@ export class HybridLoader {
     private readonly settings: Settings,
     private readonly bandwidthApproximator: BandwidthApproximator,
     private readonly segmentStorage: SegmentsMemoryStorage,
-    private readonly eventHandlers?: Pick<CoreEventHandlers, "onDataLoaded">
+    private readonly eventHandlers?: Pick<CoreEventHandlers, "onSegmentLoaded">
   ) {
     this.lastRequestedSegment = requestedSegment;
     const activeStream = requestedSegment.stream;
@@ -282,7 +282,7 @@ export class HybridLoader {
       : this.levelBandwidth.value;
 
     this.requests.resolveEngineRequest(segment, { data, bandwidth });
-    this.eventHandlers?.onDataLoaded?.(byteLength, type);
+    this.eventHandlers?.onSegmentLoaded?.(byteLength, type);
     this.processQueue();
   }
 

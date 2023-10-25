@@ -14,17 +14,3 @@ export class RequestAbortError extends Error {
     super(message);
   }
 }
-
-export class PeerRequestError extends Error {
-  constructor(
-    readonly type:
-      | "abort"
-      | "request-timeout"
-      | "response-bytes-mismatch"
-      | "segment-absent"
-      | "peer-closed"
-      | "destroy"
-  ) {
-    super();
-  }
-}
