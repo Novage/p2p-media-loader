@@ -43,6 +43,8 @@ const streamUrl = {
   mss: "https://playready.directtaps.net/smoothstreaming/SSWSS720H264/SuperSpeedway_720.ism/Manifest",
   audioOnly:
     "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/a1/prog_index.m3u8",
+  dash1:
+    "http://dash.akamaized.net/dash264/TestCases/1a/qualcomm/1/MultiRate.mpd",
 };
 
 function App() {
@@ -54,8 +56,6 @@ function App() {
   const hlsInstance = useRef<Hls>();
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const shakaEngine = useRef<ShakaEngine>(new ShakaEngine(shakaLib));
-
   const [httpLoaded, setHttpLoaded] = useState<number>(0);
   const [p2pLoaded, setP2PLoaded] = useState<number>(0);
   const [httpLoadedGlob, setHttpLoadedGlob] = useLocalStorageItem<number>(
@@ -71,20 +71,27 @@ function App() {
     (v) => (v !== null ? +v : 0)
   );
 
-  const hlsEngine = useRef<HlsJsEngine>(
-    new HlsJsEngine({
-      onSegmentLoaded: (byteLength, type) => {
-        const MBytes = getMBFromBytes(byteLength);
-        if (type === "http") {
-          setHttpLoaded((prev) => round(prev + MBytes));
-          setHttpLoadedGlob((prev) => round(prev + MBytes));
-        } else if (type === "p2p") {
-          setP2PLoaded((prev) => round(prev + MBytes));
-          setP2PLoadedGlob((prev) => round(prev + MBytes));
-        }
-      },
-    })
-  );
+  const hlsEngine = useRef<HlsJsEngine>();
+  const shakaEngine = useRef<ShakaEngine>();
+
+  const onSegmentLoaded = (byteLength: number, type: "http" | "p2p") => {
+    const MBytes = getMBFromBytes(byteLength);
+    if (type === "http") {
+      setHttpLoaded((prev) => round(prev + MBytes));
+      setHttpLoadedGlob((prev) => round(prev + MBytes));
+    } else if (type === "p2p") {
+      setP2PLoaded((prev) => round(prev + MBytes));
+      setP2PLoadedGlob((prev) => round(prev + MBytes));
+    }
+  };
+
+  if (!hlsEngine.current) {
+    hlsEngine.current = new HlsJsEngine({ onSegmentLoaded });
+  }
+
+  if (!shakaEngine.current) {
+    shakaEngine.current = new ShakaEngine(shakaLib, { onSegmentLoaded });
+  }
 
   useEffect(() => {
     if (
@@ -110,7 +117,8 @@ function App() {
   };
 
   const initShakaDplayer = (url: string) => {
-    const engine = shakaEngine.current;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const engine = shakaEngine.current!;
     const player = new DPlayer({
       container: containerRef.current,
       video: {
@@ -140,7 +148,8 @@ function App() {
 
   const initShakaPlayer = (url: string) => {
     if (!videoRef.current) return;
-    const engine = shakaEngine.current;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const engine = shakaEngine.current!;
 
     const player = new shakaLib.Player(videoRef.current);
     const onError = (error: { code: unknown }) => {
@@ -158,7 +167,8 @@ function App() {
 
   const initHlsJsPlayer = (url: string) => {
     if (!videoRef.current) return;
-    const engine = hlsEngine.current;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const engine = hlsEngine.current!;
     const hls = new Hls({
       ...engine.getConfig(),
     });
@@ -170,7 +180,8 @@ function App() {
   };
 
   const initHlsDplayer = (url: string) => {
-    const engine = hlsEngine.current;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const engine = hlsEngine.current!;
     const player = new DPlayer({
       container: containerRef.current,
       video: {
