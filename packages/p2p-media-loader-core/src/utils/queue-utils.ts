@@ -27,27 +27,17 @@ export function generateQueue({
   const queue: QueueItem[] = [];
   const queueSegmentIds = new Set<string>();
 
-  const nextSegment = stream.segments.getNextTo(
-    lastRequestedSegment.localId
-  )?.[1];
-  const isNextSegmentHighDemand = !!(
-    nextSegment &&
-    getSegmentLoadStatuses(nextSegment, bufferRanges).isHighDemand
-  );
-
   let i = 0;
   for (const segment of stream.segments.values(requestedSegmentId)) {
     const statuses = getSegmentLoadStatuses(segment, bufferRanges);
     const isNotActual = isNotActualStatuses(statuses);
-    if (isNotActual && !(i === 0 && isNextSegmentHighDemand)) {
-      break;
-    }
+    if (isNotActual && i !== 0) break;
+    i++;
     if (skipSegment(segment, statuses)) continue;
 
-    queueSegmentIds.add(segment.localId);
     if (isNotActual) statuses.isHighDemand = true;
     queue.push({ segment, statuses });
-    i++;
+    queueSegmentIds.add(segment.localId);
   }
 
   return { queue, queueSegmentIds };

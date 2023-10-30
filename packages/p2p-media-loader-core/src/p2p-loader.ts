@@ -32,7 +32,10 @@ export class P2PLoader {
       this.streamManifestUrl,
       this.stream
     );
-    this.streamHash = PeerUtil.getStreamHash(this.streamManifestUrl);
+    this.streamHash = PeerUtil.getStreamHash(
+      this.streamManifestUrl,
+      this.stream
+    );
 
     this.trackerClient = createTrackerClient({
       streamHash: utf8ToHex(this.streamHash),

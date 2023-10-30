@@ -84,7 +84,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
         processStream(video, "main", videoCount++);
       }
       if (audio && !processedStreams.has(audio.id)) {
-        processStream(audio, !video ? "secondary" : "main", audioCount++);
+        processStream(audio, !video ? "main" : "secondary", audioCount++);
       }
     }
   }

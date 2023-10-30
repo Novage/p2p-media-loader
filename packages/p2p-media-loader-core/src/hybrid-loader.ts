@@ -88,18 +88,21 @@ export class HybridLoader {
       this.refreshLevelBandwidth(true);
     }
     this.lastRequestedSegment = segment;
-    this.requests.addEngineCallbacks(segment, callbacks);
-    this.processQueue();
 
     if (this.segmentStorage.hasSegment(segment)) {
+      // TODO: error handling
       const data = await this.segmentStorage.getSegmentData(segment);
       if (data) {
-        this.requests.resolveEngineRequest(segment, {
+        callbacks.onSuccess({
           data,
           bandwidth: this.levelBandwidth.value,
         });
       }
+    } else {
+      this.requests.addEngineCallbacks(segment, callbacks);
     }
+
+    this.processQueue();
   }
 
   private processQueue(force = true) {
@@ -107,7 +110,7 @@ export class HybridLoader {
     if (
       !force &&
       this.lastQueueProcessingTimeStamp !== undefined &&
-      now - this.lastQueueProcessingTimeStamp <= 950
+      now - this.lastQueueProcessingTimeStamp <= 1000
     ) {
       return;
     }
@@ -334,7 +337,7 @@ export class HybridLoader {
       0.5;
 
     if (isPositionChanged) this.playback.position = position;
-    if (isRateChanged) this.playback.rate = rate;
+    if (isRateChanged && rate !== 0) this.playback.rate = rate;
     if (isPositionSignificantlyChanged) {
       this.logger.engine("position significantly changed");
     }

@@ -2,12 +2,19 @@ import { JsonSegmentAnnouncement, PeerCommand } from "../internal-types";
 import * as TypeGuard from "../type-guards";
 import { PeerSegmentStatus } from "../enums";
 import RIPEMD160 from "ripemd160";
+import { Stream } from "../types";
 
-export function getStreamHash(string: string): string {
+export function getStreamHash(
+  masterManifestUrl: string,
+  stream: Stream
+): string {
+  const { type } = stream;
+  const versionPrefix = "V2:";
+  const urlWithPrefix = versionPrefix + masterManifestUrl + type;
   const HASH_SYMBOLS =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   const symbolsCount = HASH_SYMBOLS.length;
-  const bytes = new RIPEMD160().update(string).digest();
+  const bytes = new RIPEMD160().update(urlWithPrefix).digest();
   let hash = "";
 
   for (const byte of bytes) {
