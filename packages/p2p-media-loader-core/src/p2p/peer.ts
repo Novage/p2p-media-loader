@@ -5,12 +5,12 @@ import {
   PeerSegmentAnnouncementCommand,
   PeerSegmentCommand,
   PeerSendSegmentCommand,
-} from "./internal-types";
-import { PeerCommandType, PeerSegmentStatus } from "./enums";
-import * as PeerUtil from "./utils/peer-utils";
-import { P2PRequest } from "./request";
-import { Segment, Settings } from "./types";
-import * as Utils from "./utils/utils";
+} from "../internal-types";
+import { PeerCommandType, PeerSegmentStatus } from "../enums";
+import * as PeerUtil from "../utils/peer";
+import { P2PRequest } from "../request";
+import { Segment, Settings } from "../types";
+import * as Utils from "../utils/utils";
 import debug from "debug";
 
 export class PeerRequestError extends Error {

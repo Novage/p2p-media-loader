@@ -1,13 +1,13 @@
 import TrackerClient, { PeerConnection } from "bittorrent-tracker";
 import { Peer } from "./peer";
-import * as PeerUtil from "./utils/peer-utils";
-import { Segment, Settings, StreamWithSegments } from "./types";
-import { QueueItem } from "./internal-types";
-import { SegmentsMemoryStorage } from "./segments-storage";
-import * as Utils from "./utils/utils";
-import * as LoggerUtils from "./utils/logger";
-import { PeerSegmentStatus } from "./enums";
-import { RequestContainer } from "./request";
+import * as PeerUtil from "../utils/peer";
+import { Segment, Settings, StreamWithSegments } from "../types";
+import { QueueItem } from "../internal-types";
+import { SegmentsMemoryStorage } from "../segments-storage";
+import * as Utils from "../utils/utils";
+import * as LoggerUtils from "../utils/logger";
+import { PeerSegmentStatus } from "../enums";
+import { RequestContainer } from "../request";
 import debug from "debug";
 
 export class P2PLoader {

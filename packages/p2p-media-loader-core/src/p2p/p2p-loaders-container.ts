@@ -1,9 +1,9 @@
 import { P2PLoader } from "./p2p-loader";
 import debug from "debug";
-import { Settings, Stream, StreamWithSegments } from "./index";
-import { RequestContainer } from "./request";
-import { SegmentsMemoryStorage } from "./segments-storage";
-import * as LoggerUtils from "./utils/logger";
+import { Settings, Stream, StreamWithSegments } from "../index";
+import { RequestContainer } from "../request";
+import { SegmentsMemoryStorage } from "../segments-storage";
+import * as LoggerUtils from "../utils/logger";
 
 type P2PLoaderContainerItem = {
   stream: Stream;
