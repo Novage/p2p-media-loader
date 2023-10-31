@@ -27,11 +27,19 @@ export function generateQueue({
   const queue: QueueItem[] = [];
   const queueSegmentIds = new Set<string>();
 
+  const { segments } = stream;
+  const isNextNotActual = (segmentId: string) => {
+    const next = segments.getNextTo(segmentId)?.[1];
+    if (!next) return true;
+    const statuses = getSegmentLoadStatuses(next, bufferRanges);
+    return isNotActualStatuses(statuses);
+  };
+
   let i = 0;
-  for (const segment of stream.segments.values(requestedSegmentId)) {
+  for (const segment of segments.values(requestedSegmentId)) {
     const statuses = getSegmentLoadStatuses(segment, bufferRanges);
     const isNotActual = isNotActualStatuses(statuses);
-    if (isNotActual && i !== 0) break;
+    if (isNotActual && (i !== 0 || isNextNotActual(requestedSegmentId))) break;
     i++;
     if (skipSegment(segment, statuses)) continue;
 
