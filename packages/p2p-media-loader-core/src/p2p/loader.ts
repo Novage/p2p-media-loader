@@ -7,7 +7,7 @@ import { SegmentsMemoryStorage } from "../segments-storage";
 import * as Utils from "../utils/utils";
 import * as LoggerUtils from "../utils/logger";
 import { PeerSegmentStatus } from "../enums";
-import { RequestContainer } from "../request-container";
+import { RequestsContainer } from "../request-container";
 import debug from "debug";
 
 export class P2PLoader {
@@ -16,12 +16,12 @@ export class P2PLoader {
   private readonly trackerClient: TrackerClient;
   private readonly peers = new Map<string, Peer>();
   private readonly logger = debug("core:p2p-loader");
-  private broadcastAnnouncementTaskId?: number;
+  private isAnnounceMicrotaskCreated = false;
 
   constructor(
     private streamManifestUrl: string,
     private readonly stream: StreamWithSegments,
-    private readonly requests: RequestContainer,
+    private readonly requests: RequestsContainer,
     private readonly segmentStorage: SegmentsMemoryStorage,
     private readonly settings: Settings
   ) {
@@ -168,17 +168,17 @@ export class P2PLoader {
   }
 
   private broadcastAnnouncement = () => {
-    if (this.broadcastAnnouncementTaskId) return;
+    if (this.isAnnounceMicrotaskCreated) return;
 
-    // for only execution for macrotask
-    this.broadcastAnnouncementTaskId = window.setTimeout(() => {
+    this.isAnnounceMicrotaskCreated = true;
+    queueMicrotask(() => {
       const announcement = this.getSegmentsAnnouncement();
       for (const peer of this.peers.values()) {
         if (!peer.isConnected) continue;
         peer.sendSegmentsAnnouncement(announcement);
       }
-      this.broadcastAnnouncementTaskId = undefined;
-    }, 0);
+      this.isAnnounceMicrotaskCreated = false;
+    });
   };
 
   private async onSegmentRequested(peer: Peer, segmentExternalId: string) {
@@ -206,7 +206,6 @@ export class P2PLoader {
     }
     this.peers.clear();
     this.trackerClient.destroy();
-    clearTimeout(this.broadcastAnnouncementTaskId);
   }
 }
 

@@ -1,4 +1,4 @@
-import { Segment, SegmentResponse } from "./types";
+import { Segment, SegmentResponse, StreamType } from "./types";
 import { RequestAbortError } from "./errors";
 import { Subscriptions } from "./segments-storage";
 import Debug from "debug";
@@ -43,10 +43,15 @@ function getRequestItemId(segment: Segment) {
   return segment.localId;
 }
 
-export class RequestContainer {
+export class RequestsContainer {
   private readonly requests = new Map<string, Request>();
   private readonly onHttpRequestsHandlers = new Subscriptions();
-  private readonly debug = Debug("core:request-container");
+  private readonly logger: Debug.Debugger;
+
+  constructor(streamType: StreamType) {
+    this.logger = Debug(`core:requests-container-${streamType}`);
+    this.logger.color = "LightSeaGreen";
+  }
 
   get httpRequestsCount() {
     let count = 0;
@@ -78,7 +83,9 @@ export class RequestContainer {
         loaderRequest,
       });
     }
-    this.debug(`add loader request: ${loaderRequest.type}`);
+    this.logger(
+      `add loader request: ${loaderRequest.type} ${segment.externalId}`
+    );
 
     const clearRequestItem = () => this.clearRequestItem(segmentId, "loader");
     loaderRequest.promise
@@ -114,7 +121,7 @@ export class RequestContainer {
         engineCallbacks,
       });
     }
-    this.debug(`add engine request`);
+    this.logger(`add engine request ${segment.externalId}`);
   }
 
   values() {
@@ -173,13 +180,25 @@ export class RequestContainer {
   ): void {
     const requestItem = this.requests.get(requestItemId);
     if (!requestItem) return;
+    const { segment, loaderRequest } = requestItem;
+    const segmentExternalId = segment.externalId;
 
-    if (type === "engine") delete requestItem.engineCallbacks;
-    if (type === "loader" && requestItem.loaderRequest) {
+    if (type === "engine") {
+      this.logger(`remove engine callbacks: ${segmentExternalId}`);
+      delete requestItem.engineCallbacks;
+    }
+    if (type === "loader" && loaderRequest) {
+      this.logger(
+        `remove loader request: ${loaderRequest.type} ${segmentExternalId}`
+      );
+      if (loaderRequest.type === "http") {
+        this.onHttpRequestsHandlers.fire();
+      }
       delete requestItem.loaderRequest;
     }
     if (!requestItem.engineCallbacks && !requestItem.loaderRequest) {
-      const segmentId = getRequestItemId(requestItem.segment);
+      this.logger(`remove request item ${segmentExternalId}`);
+      const segmentId = getRequestItemId(segment);
       this.requests.delete(segmentId);
     }
   }

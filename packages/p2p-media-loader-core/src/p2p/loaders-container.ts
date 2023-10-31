@@ -1,7 +1,7 @@
 import { P2PLoader } from "./loader";
 import debug from "debug";
 import { Settings, Stream, StreamWithSegments } from "../index";
-import { RequestContainer } from "../request-container";
+import { RequestsContainer } from "../request-container";
 import { SegmentsMemoryStorage } from "../segments-storage";
 import * as LoggerUtils from "../utils/logger";
 
@@ -20,7 +20,7 @@ export class P2PLoadersContainer {
   constructor(
     private readonly streamManifestUrl: string,
     stream: StreamWithSegments,
-    private readonly requests: RequestContainer,
+    private readonly requests: RequestsContainer,
     private readonly segmentStorage: SegmentsMemoryStorage,
     private readonly settings: Settings
   ) {

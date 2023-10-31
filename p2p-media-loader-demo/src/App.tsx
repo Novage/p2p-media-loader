@@ -303,14 +303,18 @@ function App() {
           <video ref={videoRef} controls muted style={{ width: 800 }} />
         )}
       </div>
-      <div style={{ textAlign: "left" }}>
-        <LoadStat title="Local stat" http={httpLoaded} p2p={p2pLoaded} />
-        <LoadStat
-          title="Global stat"
-          http={httpLoadedGlob}
-          p2p={p2pLoadedGlob}
-        />
-        <LoggersSelect />
+      <div style={{ display: "flex" }}>
+        <div>
+          <LoadStat title="Local stat" http={httpLoaded} p2p={p2pLoaded} />
+          <LoadStat
+            title="Global stat"
+            http={httpLoadedGlob}
+            p2p={p2pLoadedGlob}
+          />
+        </div>
+        <div style={{ marginLeft: 50 }}>
+          <LoggersSelect />
+        </div>
       </div>
     </div>
   );
@@ -370,7 +374,7 @@ function LoggersSelect() {
         value={activeLoggers}
         onChange={onChange}
         multiple
-        style={{ width: 300, height: 150 }}
+        style={{ width: 300, height: 200 }}
       >
         {loggers.map((logger) => (
           <option key={logger} value={logger}>
@@ -443,4 +447,7 @@ const loggers = [
   "core:p2p-loader",
   "core:peer",
   "core:p2p-loaders-container",
+  "core:requests-container-main",
+  "core:requests-container-secondary",
+  "core:segment-memory-storage",
 ] as const;

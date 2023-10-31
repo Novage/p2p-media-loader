@@ -5,7 +5,7 @@ import { Settings, CoreEventHandlers } from "./types";
 import { BandwidthApproximator } from "./bandwidth-approximator";
 import { Playback, QueueItem } from "./internal-types";
 import {
-  RequestContainer,
+  RequestsContainer,
   EngineCallbacks,
   HybridLoaderRequest,
 } from "./request-container";
@@ -16,7 +16,7 @@ import { P2PLoadersContainer } from "./p2p/loaders-container";
 import debug from "debug";
 
 export class HybridLoader {
-  private readonly requests = new RequestContainer();
+  private readonly requests: RequestsContainer;
   private readonly p2pLoaders: P2PLoadersContainer;
   private storageCleanUpIntervalId?: number;
   private lastRequestedSegment: Readonly<Segment>;
@@ -39,6 +39,7 @@ export class HybridLoader {
     const activeStream = requestedSegment.stream;
     this.playback = { position: requestedSegment.startTime, rate: 1 };
     this.segmentAvgDuration = getSegmentAvgDuration(activeStream);
+    this.requests = new RequestsContainer(requestedSegment.stream.type);
 
     if (!this.segmentStorage.isInitialized) {
       throw new Error("Segment storage is not initialized.");
@@ -82,7 +83,7 @@ export class HybridLoader {
     const { stream } = segment;
     if (stream !== this.lastRequestedSegment.stream) {
       this.logger.engine(
-        `STREAM CHANGED ${LoggerUtils.getStreamString(stream)}`
+        `stream changed to ${LoggerUtils.getStreamString(stream)}`
       );
       this.p2pLoaders.changeCurrentLoader(stream);
       this.refreshLevelBandwidth(true);
@@ -272,7 +273,7 @@ export class HybridLoader {
 
   private onSegmentLoaded(
     queueItem: QueueItem,
-    type: "http" | "p2p",
+    type: HybridLoaderRequest["type"],
     data: ArrayBuffer
   ) {
     const { segment, statuses } = queueItem;

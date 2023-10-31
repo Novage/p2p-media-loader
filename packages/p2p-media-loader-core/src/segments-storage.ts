@@ -1,4 +1,5 @@
 import { Segment, Settings, Stream } from "./types";
+import Debug from "debug";
 
 type StorageSettings = Pick<
   Settings,
@@ -60,14 +61,19 @@ export class SegmentsMemoryStorage {
     segment: Segment
   ) => boolean)[] = [];
   private onUpdateHandlers = new Map<string, Subscriptions>();
+  private readonly logger: Debug.Debugger;
 
   constructor(
     private readonly masterManifestUrl: string,
     private readonly settings: StorageSettings
-  ) {}
+  ) {
+    this.logger = Debug("core:segment-memory-storage");
+    this.logger.color = "RebeccaPurple";
+  }
 
   async initialize() {
     this._isInitialized = true;
+    this.logger("initialized");
   }
 
   get isInitialized(): boolean {
@@ -90,6 +96,7 @@ export class SegmentsMemoryStorage {
       data,
       lastAccessed: performance.now(),
     });
+    this.logger(`add segment: ${id}`);
     this.fireOnUpdateSubscriptions(streamId);
     void this.clear();
   }
@@ -158,6 +165,7 @@ export class SegmentsMemoryStorage {
     }
 
     if (itemsToDelete.length) {
+      this.logger(`cleared ${itemsToDelete.length} segments`);
       itemsToDelete.forEach((id) => this.cache.delete(id));
       for (const streamId of streamIdsOfChangedItems) {
         this.fireOnUpdateSubscriptions(streamId);
