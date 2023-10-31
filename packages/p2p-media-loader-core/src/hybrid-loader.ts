@@ -8,11 +8,11 @@ import {
   RequestContainer,
   EngineCallbacks,
   HybridLoaderRequest,
-} from "./request";
+} from "./request-container";
 import * as QueueUtils from "./utils/queue";
 import * as LoggerUtils from "./utils/logger";
 import { FetchError } from "./errors";
-import { P2PLoadersContainer } from "./p2p/p2p-loaders-container";
+import { P2PLoadersContainer } from "./p2p/loaders-container";
 import debug from "debug";
 
 export class HybridLoader {

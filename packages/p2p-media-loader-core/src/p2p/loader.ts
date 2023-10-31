@@ -7,7 +7,7 @@ import { SegmentsMemoryStorage } from "../segments-storage";
 import * as Utils from "../utils/utils";
 import * as LoggerUtils from "../utils/logger";
 import { PeerSegmentStatus } from "../enums";
-import { RequestContainer } from "../request";
+import { RequestContainer } from "../request-container";
 import debug from "debug";
 
 export class P2PLoader {

@@ -1,4 +1,4 @@
-import { LoadProgress } from "./request";
+import { LoadProgress } from "./request-container";
 
 export class BandwidthApproximator {
   private readonly loadings: LoadProgress[] = [];

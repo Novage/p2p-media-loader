@@ -10,7 +10,7 @@ import {
 import * as Utils from "./utils/utils";
 import { LinkedMap } from "./linked-map";
 import { BandwidthApproximator } from "./bandwidth-approximator";
-import { EngineCallbacks } from "./request";
+import { EngineCallbacks } from "./request-container";
 import { SegmentsMemoryStorage } from "./segments-storage";
 
 export class Core<TStream extends Stream = Stream> {

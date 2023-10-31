@@ -1,6 +1,6 @@
 import { LinkedMap } from "./linked-map";
 
-export type { EngineCallbacks } from "./request";
+export type { EngineCallbacks } from "./request-container";
 
 export type StreamType = "main" | "secondary";
 
