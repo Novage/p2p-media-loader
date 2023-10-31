@@ -1,18 +1,13 @@
 import { Segment, Stream, StreamWithSegments } from "../index";
 
+const PEER_PROTOCOL_VERSION = "V1";
+
 export function getStreamExternalId(
   manifestResponseUrl: string,
   stream: Readonly<Stream>
 ): string {
   const { type, index } = stream;
-  return `${manifestResponseUrl}-${type}-${index}`;
-}
-
-export function getSegmentFullExternalId(
-  externalStreamId: string,
-  externalSegmentId: string
-) {
-  return `${externalStreamId}|${externalSegmentId}`;
+  return `${PEER_PROTOCOL_VERSION}:${manifestResponseUrl}-${type}-${index}`;
 }
 
 export function getSegmentFromStreamsMap(

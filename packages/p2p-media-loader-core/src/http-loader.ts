@@ -38,10 +38,7 @@ function fetchSegmentData(segment: Segment) {
       });
 
       if (response.ok) {
-        const data = await getDataPromiseAndMonitorProgress(response, progress);
-        // Don't return dataPromise immediately
-        // should await it for catch correct working
-        return data;
+        return await getDataPromiseAndMonitorProgress(response, progress);
       }
       throw new FetchError(
         response.statusText ?? `Network response was not for ${segmentId}`,
@@ -49,7 +46,7 @@ function fetchSegmentData(segment: Segment) {
         response
       );
     } catch (error) {
-      if (isAbortFetchError(error)) {
+      if (error instanceof Error && error.name === "AbortError") {
         throw new RequestAbortError(`Segment fetch was aborted ${segmentId}`);
       }
       throw error;
@@ -119,11 +116,4 @@ async function* readStream(
     if (done) break;
     yield value;
   }
-}
-
-function isAbortFetchError(error: unknown) {
-  return (
-    typeof error === "object" &&
-    (error as { name?: string }).name === "AbortError"
-  );
 }

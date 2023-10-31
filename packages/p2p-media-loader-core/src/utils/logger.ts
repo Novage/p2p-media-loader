@@ -10,11 +10,6 @@ export function getSegmentString(segment: Segment) {
   return `(${getStreamString(segment.stream)} | ${externalId})`;
 }
 
-export function getSegmentFullString(segment: Segment) {
-  const { externalId } = segment;
-  return `(${getStreamString(segment.stream)} | ${externalId})`;
-}
-
 export function getStatusesString(statuses: QueueItemStatuses): string {
   const { isHighDemand, isHttpDownloadable, isP2PDownloadable } = statuses;
   if (isHighDemand) return "high-demand";

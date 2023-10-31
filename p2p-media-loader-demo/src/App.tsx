@@ -419,13 +419,13 @@ function useLocalStorageItem<T>(
       else localStorage.removeItem(prop);
     }
   }, []);
-  const eventHandler = useCallback((event: StorageEvent) => {
-    if (event.key !== prop) return;
-    const value = event.newValue;
-    setValue(storageItemToValue(value));
-  }, []);
 
   useEffect(() => {
+    const eventHandler = (event: StorageEvent) => {
+      if (event.key !== prop) return;
+      const value = event.newValue;
+      setValue(storageItemToValue(value));
+    };
     window.addEventListener("storage", eventHandler);
     return () => {
       window.removeEventListener("storage", eventHandler);

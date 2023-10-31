@@ -84,7 +84,7 @@ export class HybridLoader {
       this.logger.engine(
         `STREAM CHANGED ${LoggerUtils.getStreamString(stream)}`
       );
-      this.p2pLoaders.changeActiveLoader(stream);
+      this.p2pLoaders.changeCurrentLoader(stream);
       this.refreshLevelBandwidth(true);
     }
     this.lastRequestedSegment = segment;
@@ -225,10 +225,12 @@ export class HybridLoader {
   }
 
   private async loadThroughP2P(item: QueueItem) {
-    const p2pLoader = this.p2pLoaders.activeLoader;
+    const p2pLoader = this.p2pLoaders.currentLoader;
     try {
-      const data = await p2pLoader.downloadSegment(item);
-      if (data) this.onSegmentLoaded(item, "p2p", data);
+      const downloadPromise = p2pLoader.downloadSegment(item);
+      if (downloadPromise === undefined) return;
+      const data = await downloadPromise;
+      this.onSegmentLoaded(item, "p2p", data);
     } catch (error) {
       this.processQueue();
     }
@@ -236,7 +238,7 @@ export class HybridLoader {
 
   private loadRandomThroughHttp() {
     const { simultaneousHttpDownloads } = this.settings;
-    const p2pLoader = this.p2pLoaders.activeLoader;
+    const p2pLoader = this.p2pLoaders.currentLoader;
     const connectedPeersAmount = p2pLoader.connectedPeersAmount;
     if (
       this.requests.httpRequestsCount >= simultaneousHttpDownloads ||

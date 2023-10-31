@@ -14,7 +14,7 @@ type P2PLoaderContainerItem = {
 
 export class P2PLoadersContainer {
   private readonly loaders = new Map<string, P2PLoaderContainerItem>();
-  private _activeLoaderItem!: P2PLoaderContainerItem;
+  private _currentLoaderItem!: P2PLoaderContainerItem;
   private readonly logger = debug("core:p2p-loaders-container");
 
   constructor(
@@ -24,7 +24,7 @@ export class P2PLoadersContainer {
     private readonly segmentStorage: SegmentsMemoryStorage,
     private readonly settings: Settings
   ) {
-    this.changeActiveLoader(stream);
+    this.changeCurrentLoader(stream);
   }
 
   private createLoader(stream: StreamWithSegments): P2PLoaderContainerItem {
@@ -47,26 +47,29 @@ export class P2PLoadersContainer {
     };
   }
 
-  changeActiveLoader(stream: StreamWithSegments) {
+  changeCurrentLoader(stream: StreamWithSegments) {
     const loaderItem = this.loaders.get(stream.localId);
-    const prevActive = this._activeLoaderItem;
+    const prev = this._currentLoaderItem;
     if (loaderItem) {
-      this._activeLoaderItem = loaderItem;
+      this._currentLoaderItem = loaderItem;
       clearTimeout(loaderItem.destroyTimeoutId);
+      loaderItem.destroyTimeoutId = undefined;
     } else {
       const loader = this.createLoader(stream);
       this.loaders.set(stream.localId, loader);
-      this._activeLoaderItem = loader;
+      this._currentLoaderItem = loader;
     }
     this.logger(
-      `change active p2p loader: ${LoggerUtils.getStreamString(stream)}`
+      `change current p2p loader: ${LoggerUtils.getStreamString(stream)}`
     );
 
-    if (!prevActive) return;
+    if (!prev) return;
 
-    const ids = this.segmentStorage.getStoredSegmentExternalIdsOfStream(stream);
-    if (!ids.length) this.destroyAndRemoveLoader(prevActive);
-    else this.setLoaderDestroyTimeout(prevActive);
+    const ids = this.segmentStorage.getStoredSegmentExternalIdsOfStream(
+      prev.stream
+    );
+    if (!ids.length) this.destroyAndRemoveLoader(prev);
+    else this.setLoaderDestroyTimeout(prev);
   }
 
   private setLoaderDestroyTimeout(item: P2PLoaderContainerItem) {
@@ -82,8 +85,8 @@ export class P2PLoadersContainer {
     this.logger(`destroy p2p loader: `, item.loggerInfo);
   }
 
-  get activeLoader() {
-    return this._activeLoaderItem.loader;
+  get currentLoader() {
+    return this._currentLoaderItem.loader;
   }
 
   destroy() {

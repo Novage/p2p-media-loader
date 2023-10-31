@@ -29,10 +29,10 @@ export type BasePeerCommand<T extends PeerCommandType = PeerCommandType> = {
   c: T;
 };
 
-// {i: segmentExternalId[]; s: segment status separator position in ids array}
+// {l: loadedSegmentsExternalIds; p: loadingInProcessSegmentExternalIds}
 export type JsonSegmentAnnouncement = {
-  i: string;
-  s?: number;
+  l: string;
+  p: string;
 };
 
 export type PeerSegmentCommand = BasePeerCommand<

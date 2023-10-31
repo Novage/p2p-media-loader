@@ -2,7 +2,7 @@ import TrackerClient, { PeerConnection } from "bittorrent-tracker";
 import { Peer } from "./peer";
 import * as PeerUtil from "./utils/peer-utils";
 import { Segment, Settings, StreamWithSegments } from "./types";
-import { JsonSegmentAnnouncement, QueueItem } from "./internal-types";
+import { QueueItem } from "./internal-types";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import * as Utils from "./utils/utils";
 import * as LoggerUtils from "./utils/logger";
@@ -11,12 +11,10 @@ import { RequestContainer } from "./request";
 import debug from "debug";
 
 export class P2PLoader {
-  private readonly streamExternalId: string;
   private readonly streamHash: string;
   private readonly peerId: string;
   private readonly trackerClient: TrackerClient;
   private readonly peers = new Map<string, Peer>();
-  private announcement: JsonSegmentAnnouncement = { i: "" };
   private readonly logger = debug("core:p2p-loader");
   private broadcastAnnouncementTaskId?: number;
 
@@ -28,14 +26,11 @@ export class P2PLoader {
     private readonly settings: Settings
   ) {
     this.peerId = PeerUtil.generatePeerId();
-    this.streamExternalId = Utils.getStreamExternalId(
+    const streamExternalId = Utils.getStreamExternalId(
       this.streamManifestUrl,
       this.stream
     );
-    this.streamHash = PeerUtil.getStreamHash(
-      this.streamManifestUrl,
-      this.stream
-    );
+    this.streamHash = PeerUtil.getStreamHash(streamExternalId);
 
     this.trackerClient = createTrackerClient({
       streamHash: utf8ToHex(this.streamHash),
@@ -49,12 +44,9 @@ export class P2PLoader {
     this.subscribeOnTrackerEvents(this.trackerClient);
     this.segmentStorage.subscribeOnUpdate(
       this.stream,
-      this.updateAndBroadcastAnnouncement
+      this.broadcastAnnouncement
     );
-    this.requests.subscribeOnHttpRequestsUpdate(
-      this.updateAndBroadcastAnnouncement
-    );
-    this.updateSegmentAnnouncement();
+    this.requests.subscribeOnHttpRequestsUpdate(this.broadcastAnnouncement);
     this.trackerClient.start();
   }
 
@@ -63,7 +55,7 @@ export class P2PLoader {
     trackerClient.on("update", () => {});
     trackerClient.on("peer", (peerConnection) => {
       const peer = this.peers.get(peerConnection.id);
-      if (peer) peer.setConnection(peerConnection);
+      if (peer) peer.addConnection(peerConnection);
       else this.createPeer(peerConnection);
     });
     trackerClient.on("warning", (warning) => {
@@ -94,11 +86,11 @@ export class P2PLoader {
     this.peers.set(connection.id, peer);
   }
 
-  async downloadSegment(item: QueueItem): Promise<ArrayBuffer | undefined> {
+  downloadSegment(item: QueueItem): Promise<ArrayBuffer> | undefined {
     const { segment, statuses } = item;
     const untestedPeers: Peer[] = [];
     let fastestPeer: Peer | undefined;
-    let fastedPeerBandwidth = 0;
+    let fastestPeerBandwidth = 0;
 
     for (const peer of this.peers.values()) {
       if (
@@ -108,8 +100,8 @@ export class P2PLoader {
         const { bandwidth } = peer;
         if (bandwidth === undefined) {
           untestedPeers.push(peer);
-        } else if (bandwidth > fastedPeerBandwidth) {
-          fastedPeerBandwidth = bandwidth;
+        } else if (bandwidth > fastestPeerBandwidth) {
+          fastestPeerBandwidth = bandwidth;
           fastestPeer = peer;
         }
       }
@@ -150,7 +142,7 @@ export class P2PLoader {
     return count;
   }
 
-  private updateSegmentAnnouncement() {
+  private getSegmentsAnnouncement() {
     const loaded: string[] =
       this.segmentStorage.getStoredSegmentExternalIdsOfStream(this.stream);
     const httpLoading: string[] = [];
@@ -161,16 +153,13 @@ export class P2PLoader {
 
       httpLoading.push(segment.externalId);
     }
-
-    this.announcement = PeerUtil.getJsonSegmentsAnnouncement(
-      loaded,
-      httpLoading
-    );
+    return PeerUtil.getJsonSegmentsAnnouncement(loaded, httpLoading);
   }
 
   private onPeerConnected(peer: Peer) {
     this.logger(`connected with peer: ${peer.id}`);
-    peer.sendSegmentsAnnouncement(this.announcement);
+    const announcement = this.getSegmentsAnnouncement();
+    peer.sendSegmentsAnnouncement(announcement);
   }
 
   private onPeerClosed(peer: Peer) {
@@ -178,13 +167,16 @@ export class P2PLoader {
     this.peers.delete(peer.id);
   }
 
-  private updateAndBroadcastAnnouncement = () => {
+  private broadcastAnnouncement = () => {
     if (this.broadcastAnnouncementTaskId) return;
 
     // for only execution for macrotask
     this.broadcastAnnouncementTaskId = window.setTimeout(() => {
-      this.updateSegmentAnnouncement();
-      this.broadcastSegmentAnnouncement();
+      const announcement = this.getSegmentsAnnouncement();
+      for (const peer of this.peers.values()) {
+        if (!peer.isConnected) continue;
+        peer.sendSegmentsAnnouncement(announcement);
+      }
       this.broadcastAnnouncementTaskId = undefined;
     }, 0);
   };
@@ -200,24 +192,15 @@ export class P2PLoader {
     else peer.sendSegmentAbsent(segmentExternalId);
   }
 
-  private broadcastSegmentAnnouncement() {
-    for (const peer of this.peers.values()) {
-      if (!peer.isConnected) continue;
-      peer.sendSegmentsAnnouncement(this.announcement);
-    }
-  }
-
   destroy() {
     this.logger(
       `destroy tracker client: ${LoggerUtils.getStreamString(this.stream)}`
     );
     this.segmentStorage.unsubscribeFromUpdate(
       this.stream,
-      this.updateAndBroadcastAnnouncement
+      this.broadcastAnnouncement
     );
-    this.requests.unsubscribeFromHttpRequestsUpdate(
-      this.updateAndBroadcastAnnouncement
-    );
+    this.requests.unsubscribeFromHttpRequestsUpdate(this.broadcastAnnouncement);
     for (const peer of this.peers.values()) {
       peer.destroy();
     }

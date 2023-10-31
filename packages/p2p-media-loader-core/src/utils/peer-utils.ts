@@ -2,19 +2,14 @@ import { JsonSegmentAnnouncement, PeerCommand } from "../internal-types";
 import * as TypeGuard from "../type-guards";
 import { PeerSegmentStatus } from "../enums";
 import RIPEMD160 from "ripemd160";
-import { Stream } from "../types";
 
-export function getStreamHash(
-  masterManifestUrl: string,
-  stream: Stream
-): string {
-  const { type } = stream;
-  const versionPrefix = "V2:";
-  const urlWithPrefix = versionPrefix + masterManifestUrl + type;
-  const HASH_SYMBOLS =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+const HASH_SYMBOLS =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+const PEER_ID_LENGTH = 20;
+
+export function getStreamHash(streamId: string): string {
   const symbolsCount = HASH_SYMBOLS.length;
-  const bytes = new RIPEMD160().update(urlWithPrefix).digest();
+  const bytes = new RIPEMD160().update(streamId).digest();
   let hash = "";
 
   for (const byte of bytes) {
@@ -25,11 +20,6 @@ export function getStreamHash(
 }
 
 export function generatePeerId(): string {
-  // Base64 characters
-  const HASH_SYMBOLS =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  const PEER_ID_LENGTH = 20;
-
   let peerId = "PEER:";
   const randomCharsAmount = PEER_ID_LENGTH - peerId.length;
 
@@ -67,33 +57,22 @@ export function getSegmentsFromPeerAnnouncement(
   announcement: JsonSegmentAnnouncement
 ): Map<string, PeerSegmentStatus> {
   const segmentStatusMap = new Map<string, PeerSegmentStatus>();
-  const separator = announcement.s;
-  const ids = announcement.i.split("|");
-  if (!separator) {
-    return new Map(ids.map((id) => [id, PeerSegmentStatus.Loaded]));
-  }
-  for (const [index, segmentExternalId] of ids.entries()) {
-    if (index < separator) {
-      segmentStatusMap.set(segmentExternalId, PeerSegmentStatus.Loaded);
-    } else {
-      segmentStatusMap.set(segmentExternalId, PeerSegmentStatus.LoadingByHttp);
-    }
-  }
+  announcement.l
+    .split("|")
+    .forEach((id) => segmentStatusMap.set(id, PeerSegmentStatus.Loaded));
+
+  announcement.p
+    .split("|")
+    .forEach((id) => segmentStatusMap.set(id, PeerSegmentStatus.LoadingByHttp));
   return segmentStatusMap;
 }
 
 export function getJsonSegmentsAnnouncement(
-  storedSegmentExternalIds: string[],
+  loadedSegmentExternalIds: string[],
   loadingByHttpSegmentExternalIds: string[]
 ): JsonSegmentAnnouncement {
-  let segmentsListing = storedSegmentExternalIds.join("|");
-  if (loadingByHttpSegmentExternalIds.length) {
-    if (segmentsListing) segmentsListing += "|";
-    segmentsListing += loadingByHttpSegmentExternalIds.join("|");
-  }
-  const announcement: JsonSegmentAnnouncement = { i: segmentsListing };
-  if (loadingByHttpSegmentExternalIds.length) {
-    announcement.s = storedSegmentExternalIds.length;
-  }
-  return announcement;
+  return {
+    l: loadedSegmentExternalIds.join("|"),
+    p: loadingByHttpSegmentExternalIds.join("|"),
+  };
 }

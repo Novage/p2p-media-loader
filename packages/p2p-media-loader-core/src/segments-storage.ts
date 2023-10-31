@@ -2,7 +2,7 @@ import { Segment, Settings, Stream } from "./types";
 
 type StorageSettings = Pick<
   Settings,
-  "cachedSegmentExpiration" | "cachedSegmentsCount" | "storageCleanupInterval"
+  "cachedSegmentExpiration" | "cachedSegmentsCount"
 >;
 
 function getStreamShortExternalId(stream: Readonly<Stream>) {
@@ -56,7 +56,6 @@ type StorageItem = {
 export class SegmentsMemoryStorage {
   private cache = new Map<string, StorageItem>();
   private _isInitialized = false;
-  private cleanupIntervalId?: number;
   private readonly isSegmentLockedPredicates: ((
     segment: Segment
   ) => boolean)[] = [];
@@ -69,10 +68,6 @@ export class SegmentsMemoryStorage {
 
   async initialize() {
     this._isInitialized = true;
-    this.cleanupIntervalId = window.setInterval(
-      () => this.clear(),
-      this.settings.storageCleanupInterval
-    );
   }
 
   get isInitialized(): boolean {
@@ -96,6 +91,7 @@ export class SegmentsMemoryStorage {
       lastAccessed: performance.now(),
     });
     this.fireOnUpdateSubscriptions(streamId);
+    void this.clear();
   }
 
   async getSegmentData(segment: Segment): Promise<ArrayBuffer | undefined> {
@@ -198,6 +194,5 @@ export class SegmentsMemoryStorage {
     this.cache.clear();
     this.onUpdateHandlers.clear();
     this._isInitialized = false;
-    clearInterval(this.cleanupIntervalId);
   }
 }

@@ -3,8 +3,6 @@ import { RequestAbortError } from "./errors";
 import { Subscriptions } from "./segments-storage";
 import Debug from "debug";
 
-type SetRequired<T, K extends keyof T> = Omit<T, K> & Required<Pick<T, K>>;
-
 export type EngineCallbacks = {
   onSuccess: (response: SegmentResponse) => void;
   onError: (reason?: unknown) => void;
@@ -41,8 +39,6 @@ type Request = {
   engineCallbacks?: Readonly<EngineCallbacks>;
 };
 
-type RequestWithEngineCallbacks = SetRequired<Request, "engineCallbacks">;
-
 function getRequestItemId(segment: Segment) {
   return segment.localId;
 }
@@ -51,10 +47,6 @@ export class RequestContainer {
   private readonly requests = new Map<string, Request>();
   private readonly onHttpRequestsHandlers = new Subscriptions();
   private readonly debug = Debug("core:request-container");
-
-  get totalCount() {
-    return this.requests.size;
-  }
 
   get httpRequestsCount() {
     let count = 0;
@@ -141,19 +133,9 @@ export class RequestContainer {
     }
   }
 
-  *engineRequests(): Generator<RequestWithEngineCallbacks, void> {
-    for (const request of this.requests.values()) {
-      if (request.engineCallbacks) yield request as RequestWithEngineCallbacks;
-    }
-  }
-
   resolveEngineRequest(segment: Segment, response: SegmentResponse) {
     const id = getRequestItemId(segment);
     this.requests.get(id)?.engineCallbacks?.onSuccess(response);
-  }
-
-  isRequestedByEngine(segmentId: string): boolean {
-    return !!this.requests.get(segmentId)?.engineCallbacks;
   }
 
   isHttpRequested(segment: Segment): boolean {

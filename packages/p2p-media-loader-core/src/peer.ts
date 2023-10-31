@@ -55,11 +55,7 @@ export class Peer {
   private request?: PeerRequest;
   private readonly logger = debug("core:peer");
   private readonly bandwidthMeasurer = new BandwidthMeasurer();
-  private uploadingPromise?: {
-    promise: Promise<void>;
-    resolve: () => void;
-    reject: () => void;
-  };
+  private isUploadingSegment = false;
 
   constructor(
     connection: PeerConnection,
@@ -68,13 +64,19 @@ export class Peer {
   ) {
     this.id = hexToUtf8(connection.id);
     this.eventHandlers = eventHandlers;
-    this.setConnection(connection);
+    this.addConnection(connection);
   }
 
-  setConnection(connection: PeerConnection) {
-    if (this.connection && connection !== this.connection) connection.destroy();
+  addConnection(connection: PeerConnection) {
+    if (this.connection && connection !== this.connection) {
+      connection.destroy();
+      return;
+    }
+    this.connections.add(connection);
 
     connection.on("connect", () => {
+      if (this.connection) return;
+
       this.connection = connection;
       for (const item of this.connections) {
         if (item !== connection) {
@@ -84,23 +86,22 @@ export class Peer {
       }
       this.eventHandlers.onPeerConnected(this);
       this.logger(`connected with peer: ${this.id}`);
-    });
-    connection.on("data", this.onReceiveData.bind(this));
-    connection.on("close", () => {
-      if (connection !== this.connection) return;
-      this.connection = undefined;
-      this.cancelSegmentRequest("peer-closed");
-      this.logger(`connection with peer closed: ${this.id}`);
-      this.destroy();
-      this.eventHandlers.onPeerClosed(this);
-    });
-    connection.on("error", (error) => {
-      if (connection !== this.connection) return;
-      if (error.code === "ERR_DATA_CHANNEL") {
-        this.logger(`peer error: ${this.id} ${error.code}`);
+
+      connection.on("data", this.onReceiveData.bind(this));
+      connection.on("close", () => {
+        this.connection = undefined;
+        this.cancelSegmentRequest("peer-closed");
+        this.logger(`connection with peer closed: ${this.id}`);
         this.destroy();
         this.eventHandlers.onPeerClosed(this);
-      }
+      });
+      connection.on("error", (error) => {
+        if (error.code === "ERR_DATA_CHANNEL") {
+          this.logger(`peer error: ${this.id} ${error.code}`);
+          this.destroy();
+          this.eventHandlers.onPeerClosed(this);
+        }
+      });
     });
   }
 
@@ -153,7 +154,7 @@ export class Peer {
         break;
 
       case PeerCommandType.CancelSegmentRequest:
-        this.stopUploadingSegmentData();
+        this.isUploadingSegment = false;
         break;
     }
   }
@@ -178,7 +179,6 @@ export class Peer {
   }
 
   sendSegmentsAnnouncement(announcement: JsonSegmentAnnouncement) {
-    if (!announcement.i) return;
     const command: PeerSegmentAnnouncementCommand = {
       c: PeerCommandType.SegmentsAnnouncement,
       a: announcement,
@@ -197,39 +197,36 @@ export class Peer {
     this.sendCommand(command);
 
     const chunks = getBufferChunks(data, this.settings.webRtcMaxMessageSize);
-
     const connection = this.connection;
     const channel = connection._channel;
-    this.uploadingPromise = Utils.getControlledPromise<void>();
+    const { promise, resolve, reject } = Utils.getControlledPromise<void>();
+
     const sendChunk = () => {
       while (channel.bufferedAmount <= channel.bufferedAmountLowThreshold) {
-        if (!this.uploadingPromise) break;
         const chunk = chunks.next().value;
         if (!chunk) {
-          this.uploadingPromise.resolve();
+          resolve();
+          break;
+        }
+        if (chunk && !this.isUploadingSegment) {
+          reject();
           break;
         }
         connection.send(chunk);
       }
     };
-    this.connection._channel.addEventListener("bufferedamountlow", sendChunk);
-    sendChunk();
     try {
-      await this.uploadingPromise?.promise;
+      channel.addEventListener("bufferedamountlow", sendChunk);
+      this.isUploadingSegment = true;
+      sendChunk();
+      await promise;
       this.logger(`segment ${segmentExternalId} has been sent to ${this.id}`);
-      this.uploadingPromise = undefined;
     } catch (err) {
-      // ignore
+      this.logger(`cancel segment uploading ${segmentExternalId}`);
     } finally {
-      this.connection._channel.removeEventListener(
-        "bufferedamountlow",
-        sendChunk
-      );
+      channel.removeEventListener("bufferedamountlow", sendChunk);
+      this.isUploadingSegment = false;
     }
-  }
-
-  stopUploadingSegmentData() {
-    this.uploadingPromise?.reject();
   }
 
   sendSegmentAbsent(segmentExternalId: string) {
@@ -297,7 +294,13 @@ export class Peer {
       `cancel segment request ${this.request?.segment.externalId} (${type})`
     );
     const error = new PeerRequestError(type);
-    if (!["segment-absent", "peer-closed"].includes(type)) {
+    const sendCancelCommandTypes: PeerRequestError["type"][] = [
+      "destroy",
+      "abort",
+      "request-timeout",
+      "response-bytes-mismatch",
+    ];
+    if (sendCancelCommandTypes.includes(type)) {
       this.sendCommand({
         c: PeerCommandType.CancelSegmentRequest,
         i: this.request.segment.externalId,
@@ -323,6 +326,10 @@ export class Peer {
     this.cancelSegmentRequest("destroy");
     this.connection?.destroy();
     this.connection = undefined;
+    for (const connection of this.connections) {
+      connection.destroy();
+    }
+    this.connections.clear();
   }
 }
 
