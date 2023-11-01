@@ -45,6 +45,7 @@ const streamUrl = {
     "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/a1/prog_index.m3u8",
   dash1:
     "http://dash.akamaized.net/dash264/TestCases/1a/qualcomm/1/MultiRate.mpd",
+  dash2: "http://dash.akamaized.net/dash264/TestCases/5b/nomor/6.mpd",
 };
 
 function App() {
@@ -116,7 +117,7 @@ function App() {
     (window as unknown as ExtendedWindow).videoPlayer = player;
   };
 
-  const initShakaDplayer = (url: string) => {
+  const initShakaDPlayer = (url: string) => {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const engine = shakaEngine.current!;
     const player = new DPlayer({
@@ -126,6 +127,7 @@ function App() {
         type: "customHlsOrDash",
         customType: {
           customHlsOrDash: (video: HTMLVideoElement) => {
+            video.autoplay = true;
             const src = video.src;
             const shakaPlayer = new shakaLib.Player(video);
             const onError = (error: { code: number }) => {
@@ -179,7 +181,7 @@ function App() {
     setPlayerToWindow(hls);
   };
 
-  const initHlsDplayer = (url: string) => {
+  const initHlsDPlayer = (url: string) => {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const engine = hlsEngine.current!;
     const player = new DPlayer({
@@ -227,13 +229,13 @@ function App() {
     setP2PLoadedGlob(0);
     switch (playerType) {
       case "hls-dplayer":
-        initHlsDplayer(url);
+        initHlsDPlayer(url);
         break;
       case "hlsjs":
         initHlsJsPlayer(url);
         break;
       case "shaka-dplayer":
-        initShakaDplayer(url);
+        initShakaDPlayer(url);
         break;
       case "shaka-player":
         initShakaPlayer(url);

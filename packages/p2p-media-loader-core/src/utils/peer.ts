@@ -1,6 +1,5 @@
 import { JsonSegmentAnnouncement, PeerCommand } from "../internal-types";
-import * as TypeGuard from "../type-guards";
-import { PeerSegmentStatus } from "../enums";
+import { PeerCommandType, PeerSegmentStatus } from "../enums";
 import RIPEMD160 from "ripemd160";
 
 const HASH_SYMBOLS =
@@ -46,7 +45,7 @@ export function getPeerCommandFromArrayBuffer(
     try {
       const decoded = new TextDecoder().decode(data);
       const parsed = JSON.parse(decoded) as object;
-      if (TypeGuard.isPeerCommand(parsed)) return parsed;
+      if (isPeerCommand(parsed)) return parsed;
     } catch {
       return undefined;
     }
@@ -75,4 +74,11 @@ export function getJsonSegmentsAnnouncement(
     l: loadedSegmentExternalIds.join("|"),
     p: loadingByHttpSegmentExternalIds.join("|"),
   };
+}
+
+function isPeerCommand(command: object): command is PeerCommand {
+  return (
+    (command as PeerCommand).c !== undefined &&
+    Object.values(PeerCommandType).includes((command as PeerCommand).c)
+  );
 }
