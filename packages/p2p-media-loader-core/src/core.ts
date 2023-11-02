@@ -12,6 +12,8 @@ import { LinkedMap } from "./linked-map";
 import { BandwidthApproximator } from "./bandwidth-approximator";
 import { EngineCallbacks } from "./request-container";
 import { SegmentsMemoryStorage } from "./segments-storage";
+import * as Bits from "./p2p/bits";
+import { serializeNumbersArray } from "./p2p/bits";
 
 export class Core<TStream extends Stream = Stream> {
   private manifestResponseUrl?: string;
@@ -33,7 +35,20 @@ export class Core<TStream extends Stream = Stream> {
   private mainStreamLoader?: HybridLoader;
   private secondaryStreamLoader?: HybridLoader;
 
-  constructor(private readonly eventHandlers?: CoreEventHandlers) {}
+  constructor(private readonly eventHandlers?: CoreEventHandlers) {
+    const numbers = [
+      70001, 70002, 70003, 70004, 70005, 70006, 70007, 70008, 70009, 700010,
+      700011, 70012,
+    ];
+    const stringified = JSON.stringify(numbers);
+    const encoded = new TextEncoder().encode(stringified);
+    const serialized = Bits.serializeNumbersArray(numbers, "l");
+    const { numbersArray } = Bits.deserializeNumbersArray(serialized, 0);
+
+    console.log("Encoded bytes: ", encoded.length);
+    console.log("Serialized: ", serialized);
+    console.log("deserialized", numbersArray);
+  }
 
   setManifestResponseUrl(url: string): void {
     this.manifestResponseUrl = url.split("?")[0];
