@@ -1,40 +1,51 @@
 import { SegmentManager } from "./segment-manager";
 import Debug from "debug";
-import { HookedStream, StreamProtocol, Shaka } from "./types";
+import {
+  HookedStream,
+  Shaka,
+  HookedNetworkingEngine,
+  P2PMLShakaData,
+} from "./types";
 import { StreamType } from "p2p-media-loader-core";
 import * as Utils from "./stream-utils";
 
 export class ManifestParserDecorator implements shaka.extern.ManifestParser {
-  private readonly originalManifestParser: shaka.extern.ManifestParser;
-  private readonly segmentManager: SegmentManager;
   private readonly debug = Debug("p2pml-shaka:manifest-parser");
   private readonly isHLS: boolean;
   private readonly isDash: boolean;
+  private segmentManager?: SegmentManager;
 
   constructor(
-    originalManifestParser: shaka.extern.ManifestParser,
-    segmentManager: SegmentManager,
-    protocol: StreamProtocol
+    shaka: Readonly<Shaka>,
+    private readonly originalManifestParser: shaka.extern.ManifestParser
   ) {
-    this.originalManifestParser = originalManifestParser;
-    this.segmentManager = segmentManager;
-
-    this.isHLS = protocol === "hls";
-    this.isDash = protocol === "dash";
+    this.isHLS = this.originalManifestParser instanceof shaka.hls.HlsParser;
+    this.isDash = this.originalManifestParser instanceof shaka.dash.DashParser;
   }
 
   configure(config: shaka.extern.ManifestConfiguration) {
     return this.originalManifestParser.configure(config);
   }
 
+  private setP2PMediaLoaderData(p2pml?: P2PMLShakaData) {
+    if (!p2pml) return;
+    this.segmentManager = p2pml.segmentManager;
+    p2pml.streamInfo.protocol = this.isHLS ? "hls" : "dash";
+  }
+
   async start(
     uri: string,
     playerInterface: shaka.extern.ManifestParser.PlayerInterface
   ): Promise<shaka.extern.Manifest> {
+    const { p2pml } =
+      playerInterface.networkingEngine as HookedNetworkingEngine;
+    this.setP2PMediaLoaderData(p2pml);
     const manifest = await this.originalManifestParser.start(
       uri,
       playerInterface
     );
+    if (!p2pml) return manifest;
+
     if (this.isHLS) {
       const success = this.retrieveStreamMediaSequenceTimeMaps(
         manifest.variants
@@ -62,15 +73,17 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   }
 
   private processStreams(variants: shaka.extern.Variant[]) {
-    const processedStreams = new Set<number>();
+    const { segmentManager } = this;
+    if (!segmentManager) return;
 
+    const processedStreams = new Set<number>();
     const processStream = (
       stream: shaka.extern.Stream,
       type: StreamType,
       order: number
     ) => {
       if (this.isDash) this.hookSegmentIndex(stream);
-      this.segmentManager.setStream(stream as HookedStream, type, order);
+      segmentManager.setStream(stream as HookedStream, type, order);
       processedStreams.add(stream.id);
       return true;
     };
@@ -90,6 +103,9 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   }
 
   private hookSegmentIndex(stream: shaka.extern.Stream): void {
+    const { segmentManager } = this;
+    if (!segmentManager) return;
+
     const createSegmentIndexOriginal = stream.createSegmentIndex;
     stream.createSegmentIndex = async () => {
       const result = await createSegmentIndexOriginal.call(stream);
@@ -130,7 +146,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
             stream,
             this.isHLS
           );
-          this.segmentManager.updateStreamSegments(streamLocalId, references);
+          segmentManager.updateStreamSegments(streamLocalId, references);
           this.debug(`Stream ${streamLocalId} is updated`);
           prevFirstItemReference = firstItemReference;
           prevLastItemReference = lastItemReference;
@@ -234,23 +250,13 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
 }
 
 export class HlsManifestParser extends ManifestParserDecorator {
-  public constructor(
-    shaka: Shaka,
-    segmentManager: SegmentManager,
-    setProtocol: (protocol: StreamProtocol) => void
-  ) {
-    super(new shaka.hls.HlsParser(), segmentManager, "hls");
-    setProtocol("hls");
+  public constructor(shaka: Shaka) {
+    super(shaka, new shaka.hls.HlsParser());
   }
 }
 
 export class DashManifestParser extends ManifestParserDecorator {
-  public constructor(
-    shaka: Shaka,
-    segmentsManager: SegmentManager,
-    setProtocol: (protocol: StreamProtocol) => void
-  ) {
-    super(new shaka.dash.DashParser(), segmentsManager, "dash");
-    setProtocol("dash");
+  public constructor(shaka: Shaka) {
+    super(shaka, new shaka.dash.DashParser());
   }
 }

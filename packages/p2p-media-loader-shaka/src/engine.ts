@@ -5,7 +5,14 @@ import {
 } from "./manifest-parser-decorator";
 import { SegmentManager } from "./segment-manager";
 import Debug from "debug";
-import { StreamInfo, StreamProtocol, Shaka, Stream } from "./types";
+import {
+  StreamInfo,
+  Shaka,
+  Stream,
+  HookedNetworkingEngine,
+  HookedRequest,
+  P2PMLShakaData,
+} from "./types";
 import { LoadingHandler } from "./loading-handler";
 import { decorateMethod } from "./utils";
 import { Core, CoreEventHandlers } from "p2p-media-loader-core";
@@ -24,6 +31,21 @@ export class Engine {
   }
 
   initShakaPlayer(player: shaka.Player) {
+    const networkingEngine =
+      player.getNetworkingEngine() as HookedNetworkingEngine | null;
+    if (networkingEngine) {
+      const p2pml: P2PMLShakaData = {
+        shaka: this.shaka,
+        core: this.core,
+        streamInfo: this.streamInfo,
+        segmentManager: this.segmentManager,
+      };
+      networkingEngine.p2pml = p2pml;
+      networkingEngine.registerRequestFilter((requestType, request) => {
+        (request as HookedRequest).p2pml = p2pml;
+      });
+    }
+
     this.initializeNetworkingEngine();
     this.registerParsers();
 
@@ -61,13 +83,8 @@ export class Engine {
   }
 
   private registerParsers() {
-    const setProtocol = (protocol: StreamProtocol) => {
-      this.streamInfo.protocol = protocol;
-    };
-    const hlsParserFactory = () =>
-      new HlsManifestParser(this.shaka, this.segmentManager, setProtocol);
-    const dashParserFactory = () =>
-      new DashManifestParser(this.shaka, this.segmentManager, setProtocol);
+    const hlsParserFactory = () => new HlsManifestParser(this.shaka);
+    const dashParserFactory = () => new DashManifestParser(this.shaka);
     this.shaka.media.ManifestParser.registerParserByExtension(
       "mpd",
       dashParserFactory
@@ -92,14 +109,19 @@ export class Engine {
 
   private initializeNetworkingEngine() {
     const handleLoading: shaka.extern.SchemePlugin = (...args) => {
-      const loadingHandler = new LoadingHandler({
-        shaka: this.shaka,
-        streamInfo: this.streamInfo,
-        segmentManager: this.segmentManager,
-        core: this.core,
-      });
+      const request = args[1] as HookedRequest;
+      const { p2pml } = request;
+      if (!p2pml) return this.shaka.net.HttpFetchPlugin.parse(...args);
+
+      const loadingHandler = new LoadingHandler(
+        p2pml.shaka,
+        p2pml.core,
+        p2pml.streamInfo,
+        p2pml.segmentManager
+      );
       return loadingHandler.handleLoading(...args);
     };
+
     this.shaka.net.NetworkingEngine.registerScheme("http", handleLoading);
     this.shaka.net.NetworkingEngine.registerScheme("https", handleLoading);
   }
