@@ -15,20 +15,19 @@ import {
 } from "./types";
 import { LoadingHandler } from "./loading-handler";
 import { decorateMethod } from "./utils";
-import { Core } from "p2p-media-loader-core";
+import { Core, CoreEventHandlers } from "p2p-media-loader-core";
 
 export class Engine {
   private readonly shaka: Shaka;
   private readonly streamInfo: StreamInfo = {};
-  private readonly core = new Core<Stream>();
-  private readonly segmentManager = new SegmentManager(
-    this.streamInfo,
-    this.core
-  );
+  private readonly core: Core<Stream>;
+  private readonly segmentManager: SegmentManager;
   private debugDestroying = Debug("shaka:destroying");
 
-  constructor(shaka?: unknown) {
+  constructor(shaka?: unknown, eventHandlers?: CoreEventHandlers) {
     this.shaka = (shaka as Shaka | undefined) ?? window.shaka;
+    this.core = new Core(eventHandlers);
+    this.segmentManager = new SegmentManager(this.streamInfo, this.core);
   }
 
   initShakaPlayer(player: shaka.Player) {

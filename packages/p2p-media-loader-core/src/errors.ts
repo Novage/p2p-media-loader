@@ -8,3 +8,9 @@ export class FetchError extends Error {
     this.details = details;
   }
 }
+
+export class RequestAbortError extends Error {
+  constructor(message = "AbortError") {
+    super(message);
+  }
+}

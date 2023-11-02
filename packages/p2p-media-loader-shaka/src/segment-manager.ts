@@ -3,7 +3,7 @@ import { HookedStream, StreamInfo, Stream } from "./types";
 import {
   Core,
   StreamWithReadonlySegments,
-  Segment,
+  SegmentBase,
   StreamType,
 } from "p2p-media-loader-core";
 
@@ -61,9 +61,9 @@ export class SegmentManager {
     segmentReferences: shaka.media.SegmentReference[]
   ) {
     const staleSegmentsIds = new Set(managerStream.segments.keys());
-    const newSegments: Segment[] = [];
+    const newSegments: SegmentBase[] = [];
     for (const reference of segmentReferences) {
-      const externalId = reference.getStartTime();
+      const externalId = (+reference.getStartTime().toFixed(3)).toString();
 
       const segmentLocalId = Utils.getSegmentLocalIdFromReference(reference);
       if (!managerStream.segments.has(segmentLocalId)) {
@@ -89,7 +89,7 @@ export class SegmentManager {
     const segments = [...managerStream.segments.values()];
     const lastMediaSequence = Utils.getStreamLastMediaSequence(managerStream);
 
-    const newSegments: Segment[] = [];
+    const newSegments: SegmentBase[] = [];
     if (segments.length === 0) {
       const firstReferenceMediaSequence =
         lastMediaSequence === undefined
@@ -98,7 +98,7 @@ export class SegmentManager {
       segmentReferences.forEach((reference, index) => {
         const segment = Utils.createSegment({
           segmentReference: reference,
-          externalId: firstReferenceMediaSequence + index,
+          externalId: (firstReferenceMediaSequence + index).toString(),
         });
         newSegments.push(segment);
       });
@@ -116,7 +116,7 @@ export class SegmentManager {
         const segment = Utils.createSegment({
           localId,
           segmentReference: reference,
-          externalId: index,
+          externalId: index.toString(),
         });
         newSegments.push(segment);
         index--;

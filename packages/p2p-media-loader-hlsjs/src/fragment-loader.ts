@@ -8,7 +8,12 @@ import type {
   LoaderStats,
 } from "hls.js";
 import * as Utils from "./utils";
-import { Core, FetchError, SegmentResponse } from "p2p-media-loader-core";
+import {
+  RequestAbortError,
+  Core,
+  FetchError,
+  SegmentResponse,
+} from "p2p-media-loader-core";
 
 const DEFAULT_DOWNLOAD_LATENCY = 10;
 
@@ -65,28 +70,30 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       return;
     }
 
-    try {
-      this.response = await this.core.loadSegment(this.segmentId);
-    } catch (error) {
-      if (this.stats.aborted) return;
-      return this.handleError(error);
-    }
-    if (!this.response) return;
-    const loadedBytes = this.response.data.byteLength;
+    const onSuccess = (response: SegmentResponse) => {
+      this.response = response;
+      const loadedBytes = this.response.data.byteLength;
+      stats.loading = getLoadingStat({
+        targetBitrate: this.response.bandwidth,
+        loadingEndTime: performance.now(),
+        loadedBytes,
+      });
+      stats.total = stats.loaded = loadedBytes;
 
-    stats.loading = getLoadingStat({
-      targetBitrate: this.response.bandwidth,
-      loadingEndTime: performance.now(),
-      loadedBytes,
-    });
-    stats.total = stats.loaded = loadedBytes;
+      callbacks.onSuccess(
+        { data: this.response.data, url: context.url },
+        this.stats,
+        context,
+        this.response
+      );
+    };
 
-    callbacks.onSuccess(
-      { data: this.response.data, url: context.url },
-      this.stats,
-      context,
-      this.response
-    );
+    const onError = (error: unknown) => {
+      if (error instanceof RequestAbortError && this.stats.aborted) return;
+      this.handleError(error);
+    };
+
+    void this.core.loadSegment(this.segmentId, { onSuccess, onError });
   }
 
   private handleError(thrownError: unknown) {
@@ -104,8 +111,8 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
 
   private abortInternal() {
     if (!this.response && this.segmentId) {
-      this.core.abortSegmentLoading(this.segmentId);
       this.stats.aborted = true;
+      this.core.abortSegmentLoading(this.segmentId);
     }
   }
 
@@ -122,7 +129,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     if (this.defaultLoader) {
       this.defaultLoader.destroy();
     } else {
-      this.abortInternal();
+      if (!this.stats.aborted) this.abortInternal();
       this.callbacks = null;
       this.config = null;
     }

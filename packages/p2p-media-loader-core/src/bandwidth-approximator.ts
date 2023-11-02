@@ -1,58 +1,53 @@
-const SMOOTH_INTERVAL = 15 * 1000;
-const MEASURE_INTERVAL = 60 * 1000;
-
-type NumberWithTime = {
-  readonly value: number;
-  readonly timeStamp: number;
-};
+import { LoadProgress } from "./request-container";
 
 export class BandwidthApproximator {
-  private lastBytes: NumberWithTime[] = [];
-  private currentBytesSum = 0;
-  private lastBandwidth: NumberWithTime[] = [];
+  private readonly loadings: LoadProgress[] = [];
 
-  addBytes(bytes: number): void {
-    const timeStamp = performance.now();
-    this.lastBytes.push({ value: bytes, timeStamp });
-    this.currentBytesSum += bytes;
-
-    while (timeStamp - this.lastBytes[0].timeStamp > SMOOTH_INTERVAL) {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      this.currentBytesSum -= this.lastBytes.shift()!.value;
-    }
-
-    const interval = Math.min(SMOOTH_INTERVAL, timeStamp);
-    this.lastBandwidth.push({
-      value: (this.currentBytesSum * 8000) / interval,
-      timeStamp,
-    });
+  addLoading(progress: LoadProgress) {
+    this.clearStale();
+    this.loadings.push(progress);
   }
 
-  // in bits per seconds
+  // in bits per second
   getBandwidth(): number {
-    const timeStamp = performance.now();
-    while (
-      this.lastBandwidth.length !== 0 &&
-      timeStamp - this.lastBandwidth[0].timeStamp > MEASURE_INTERVAL
-    ) {
-      this.lastBandwidth.shift();
+    this.clearStale();
+    return getBandwidthByProgressList(this.loadings);
+  }
+
+  private clearStale() {
+    const now = performance.now();
+    for (const { startTimestamp } of this.loadings) {
+      if (now - startTimestamp <= 15000) break;
+      this.loadings.shift();
+    }
+  }
+}
+
+function getBandwidthByProgressList(loadings: LoadProgress[]) {
+  if (!loadings.length) return 0;
+  let margin: number | undefined;
+  let totalLoadingTime = 0;
+  let totalBytes = 0;
+  const now = performance.now();
+
+  for (const {
+    startTimestamp: from,
+    lastLoadedChunkTimestamp: to = now,
+    loadedBytes,
+  } of loadings) {
+    totalBytes += loadedBytes;
+
+    if (margin === undefined || from > margin) {
+      margin = to;
+      totalLoadingTime += to - from;
+      continue;
     }
 
-    let maxBandwidth = 0;
-    for (const bandwidth of this.lastBandwidth) {
-      if (bandwidth.value > maxBandwidth) {
-        maxBandwidth = bandwidth.value;
-      }
+    if (from <= margin && to > margin) {
+      totalLoadingTime += to - margin;
+      margin = to;
     }
-
-    return maxBandwidth;
   }
 
-  getSmoothInterval(): number {
-    return SMOOTH_INTERVAL;
-  }
-
-  getMeasureInterval(): number {
-    return MEASURE_INTERVAL;
-  }
+  return (totalBytes * 8000) / totalLoadingTime;
 }

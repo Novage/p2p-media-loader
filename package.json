@@ -26,5 +26,10 @@
   },
   "dependencies": {
     "debug": "^4.3.4"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "bittorrent-tracker@10.0.12": "patches/bittorrent-tracker@10.0.12.patch"
+    }
   }
 }

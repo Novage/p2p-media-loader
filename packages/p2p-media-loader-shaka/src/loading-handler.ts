@@ -2,7 +2,7 @@ import * as Utils from "./stream-utils";
 import { SegmentManager } from "./segment-manager";
 import { StreamInfo } from "./types";
 import { Shaka, Stream } from "./types";
-import { Core } from "p2p-media-loader-core";
+import { Core, EngineCallbacks, SegmentResponse } from "p2p-media-loader-core";
 
 interface LoadingHandlerInterface {
   handleLoading: shaka.extern.SchemePlugin;
@@ -69,9 +69,9 @@ export class LoadingHandler implements LoadingHandlerInterface {
     if (!this.core.hasSegment(segmentId)) return this.defaultLoad();
 
     const loadSegment = async (): Promise<Response> => {
-      const response = await this.core.loadSegment(segmentId);
-
-      const { data, bandwidth } = response;
+      const { request, callbacks } = getSegmentRequest();
+      await this.core.loadSegment(segmentId, callbacks);
+      const { data, bandwidth } = await request;
       return {
         data,
         headers: {},
@@ -98,4 +98,26 @@ function getLoadingDurationBasedOnBandwidth(
 ) {
   const bits = bytesLoaded * 8;
   return Math.round(bits / bandwidth) * 1000;
+}
+
+function getSegmentRequest(): {
+  callbacks: EngineCallbacks;
+  request: Promise<SegmentResponse>;
+} {
+  let onSuccess: (value: SegmentResponse) => void;
+  let onError: (reason?: unknown) => void;
+  const request = new Promise<SegmentResponse>((resolve, reject) => {
+    onSuccess = resolve;
+    onError = reject;
+  });
+
+  return {
+    request,
+    callbacks: {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      onSuccess: onSuccess!,
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      onError: onError!,
+    },
+  };
 }

@@ -4,7 +4,7 @@ import type {
   LevelUpdatedData,
   AudioTrackLoadedData,
 } from "hls.js";
-import { Core, Segment } from "p2p-media-loader-core";
+import { Core, SegmentBase } from "p2p-media-loader-core";
 
 export class SegmentManager {
   core: Core;
@@ -43,7 +43,7 @@ export class SegmentManager {
     if (!playlist) return;
 
     const segmentToRemoveIds = new Set(playlist.segments.keys());
-    const newSegments: Segment[] = [];
+    const newSegments: SegmentBase[] = [];
     fragments.forEach((fragment, index) => {
       const {
         url: responseUrl,
@@ -66,13 +66,14 @@ export class SegmentManager {
       newSegments.push({
         localId: segmentLocalId,
         url: responseUrl,
-        externalId: live ? sn : index,
+        externalId: live ? sn.toString() : index.toString(),
         byteRange,
         startTime,
         endTime,
       });
     });
 
+    if (!newSegments.length && !segmentToRemoveIds.size) return;
     this.core.updateStream(url, newSegments, [...segmentToRemoveIds]);
   }
 }

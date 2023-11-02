@@ -1,76 +1,119 @@
-import { FetchError } from "./errors";
+import { RequestAbortError, FetchError } from "./errors";
 import { Segment } from "./types";
+import { HttpRequest, LoadProgress } from "./request-container";
 
-type Request = {
-  promise: Promise<ArrayBuffer>;
-  abortController: AbortController;
-};
+export function getHttpSegmentRequest(segment: Segment): Readonly<HttpRequest> {
+  const { promise, abortController, progress } = fetchSegmentData(segment);
+  return {
+    type: "http",
+    promise,
+    progress,
+    abort: () => abortController.abort(),
+  };
+}
 
-export class HttpLoader {
-  private readonly requests = new Map<string, Request>();
+function fetchSegmentData(segment: Segment) {
+  const headers = new Headers();
+  const { url, byteRange, localId: segmentId } = segment;
 
-  async load(segment: Segment) {
-    const abortController = new AbortController();
-    const promise = this.fetch(segment, abortController);
-    const requestContext: Request = {
-      abortController,
-      promise,
-    };
-    this.requests.set(segment.localId, requestContext);
-    await promise;
-    this.requests.delete(segment.localId);
-    return promise;
+  if (byteRange) {
+    const { start, end } = byteRange;
+    const byteRangeString = `bytes=${start}-${end}`;
+    headers.set("Range", byteRangeString);
   }
+  const abortController = new AbortController();
 
-  private async fetch(segment: Segment, abortController: AbortController) {
-    const headers = new Headers();
-    const { url, byteRange } = segment;
+  const progress: LoadProgress = {
+    canBeTracked: false,
+    totalBytes: 0,
+    loadedBytes: 0,
+    percent: 0,
+    startTimestamp: performance.now(),
+  };
+  const loadSegmentData = async () => {
+    try {
+      const response = await window.fetch(url, {
+        headers,
+        signal: abortController.signal,
+      });
 
-    if (byteRange) {
-      const { start, end } = byteRange;
-      const byteRangeString = `bytes=${start}-${end}`;
-      headers.set("Range", byteRangeString);
-    }
-    const response = await fetch(url, {
-      headers,
-      signal: abortController.signal,
-    });
-    if (!response.ok) {
+      if (response.ok) {
+        return await getDataPromiseAndMonitorProgress(response, progress);
+      }
       throw new FetchError(
-        response.statusText ?? "Fetch, bad network response",
+        response.statusText ?? `Network response was not for ${segmentId}`,
         response.status,
         response
       );
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new RequestAbortError(`Segment fetch was aborted ${segmentId}`);
+      }
+      throw error;
     }
+  };
 
-    return response.arrayBuffer();
+  return {
+    promise: loadSegmentData(),
+    abortController,
+    progress,
+  };
+}
+
+async function getDataPromiseAndMonitorProgress(
+  response: Response,
+  progress: LoadProgress
+): Promise<ArrayBuffer> {
+  const totalBytesString = response.headers.get("Content-Length");
+  if (!response.body) {
+    return response.arrayBuffer().then((data) => {
+      progress.loadedBytes = data.byteLength;
+      progress.totalBytes = data.byteLength;
+      progress.lastLoadedChunkTimestamp = performance.now();
+      progress.percent = 100;
+      return data;
+    });
   }
 
-  isLoading(segmentId: string) {
-    return this.requests.has(segmentId);
+  if (totalBytesString) {
+    progress.totalBytes = +totalBytesString;
+    progress.canBeTracked = true;
   }
 
-  abort(segmentId: string) {
-    this.requests.get(segmentId)?.abortController.abort();
-    this.requests.delete(segmentId);
-  }
+  const reader = response.body.getReader();
 
-  getLoadingsAmount() {
-    return this.requests.size;
-  }
-
-  getLoadingSegmentIds() {
-    return this.requests.keys();
-  }
-
-  getRequest(segmentId: string) {
-    return this.requests.get(segmentId)?.promise;
-  }
-
-  abortAll() {
-    for (const request of this.requests.values()) {
-      request.abortController.abort();
+  progress.startTimestamp = performance.now();
+  const chunks: Uint8Array[] = [];
+  for await (const chunk of readStream(reader)) {
+    chunks.push(chunk);
+    progress.loadedBytes += chunk.length;
+    progress.lastLoadedChunkTimestamp = performance.now();
+    if (progress.canBeTracked) {
+      progress.percent = (progress.loadedBytes / progress.totalBytes) * 100;
     }
-    this.requests.clear();
+  }
+
+  if (!progress.canBeTracked) {
+    progress.totalBytes = progress.loadedBytes;
+    progress.percent = 100;
+  }
+  const resultBuffer = new ArrayBuffer(progress.loadedBytes);
+  const view = new Uint8Array(resultBuffer);
+
+  let offset = 0;
+  for (const chunk of chunks) {
+    view.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return resultBuffer;
+}
+
+async function* readStream(
+  reader: ReadableStreamDefaultReader<Uint8Array>
+): AsyncGenerator<Uint8Array> {
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    yield value;
   }
 }
