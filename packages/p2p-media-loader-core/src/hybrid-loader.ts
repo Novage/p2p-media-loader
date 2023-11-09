@@ -104,7 +104,7 @@ export class HybridLoader {
       this.requests.addEngineCallbacks(segment, callbacks);
     }
 
-    this.processQueue();
+    this.createProcessQueueMicrotask();
   }
 
   private createProcessQueueMicrotask(force = true) {
@@ -245,7 +245,7 @@ export class HybridLoader {
       ) {
         return;
       }
-      this.processQueue();
+      this.createProcessQueueMicrotask();
     }
   }
 
@@ -265,7 +265,7 @@ export class HybridLoader {
         return;
       }
       const request = this.requests.get(segment);
-      this.processQueue();
+      this.createProcessQueueMicrotask();
     }
   }
 
@@ -321,7 +321,7 @@ export class HybridLoader {
 
     this.requests.resolveAndRemoveRequest(segment, { data, bandwidth });
     this.eventHandlers?.onSegmentLoaded?.(byteLength, type);
-    this.processQueue();
+    this.createProcessQueueMicrotask();
   }
 
   private abortLastHttpLoadingAfter(queue: QueueItem[], segment: Segment) {
@@ -376,13 +376,13 @@ export class HybridLoader {
     if (isPositionSignificantlyChanged) {
       this.logger.engine("position significantly changed");
     }
-    void this.processQueue(isPositionSignificantlyChanged);
+    void this.createProcessQueueMicrotask(isPositionSignificantlyChanged);
   }
 
   updateStream(stream: StreamWithSegments) {
     if (stream !== this.lastRequestedSegment.stream) return;
     this.logger.engine(`update stream: ${LoggerUtils.getStreamString(stream)}`);
-    this.processQueue();
+    this.createProcessQueueMicrotask();
   }
 
   destroy() {
