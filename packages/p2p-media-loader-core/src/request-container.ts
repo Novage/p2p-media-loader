@@ -1,42 +1,45 @@
 import { Segment, SegmentResponse, StreamType } from "./types";
-import { RequestAbortError } from "./errors";
 import { Subscriptions } from "./segments-storage";
+import { PeerRequestError } from "./p2p/peer";
+import { HttpLoaderError } from "./http-loader";
 import Debug from "debug";
 
 export type EngineCallbacks = {
   onSuccess: (response: SegmentResponse) => void;
-  onError: (reason?: unknown) => void;
+  onError: (reason: "failed" | "abort") => void;
 };
 
 export type LoadProgress = {
   startTimestamp: number;
   lastLoadedChunkTimestamp?: number;
-  percent: number;
   loadedBytes: number;
-  totalBytes: number;
-  canBeTracked: boolean;
+  totalBytes?: number;
+  chunks: Uint8Array[];
 };
 
-type RequestBase = {
+type HybridLoaderRequestBase = {
   promise: Promise<ArrayBuffer>;
   abort: () => void;
   progress: LoadProgress;
 };
 
-export type HttpRequest = RequestBase & {
+export type HttpRequest = HybridLoaderRequestBase & {
   type: "http";
+  error?: HttpLoaderError;
 };
 
-export type P2PRequest = RequestBase & {
+export type P2PRequest = HybridLoaderRequestBase & {
   type: "p2p";
+  error?: PeerRequestError;
 };
 
 export type HybridLoaderRequest = HttpRequest | P2PRequest;
 
-type Request = {
+type RequestItem = {
   segment: Readonly<Segment>;
-  loaderRequest?: Readonly<HybridLoaderRequest>;
+  loaderRequest?: HybridLoaderRequest;
   engineCallbacks?: Readonly<EngineCallbacks>;
+  prevAttempts: HybridLoaderRequest[];
 };
 
 function getRequestItemId(segment: Segment) {
@@ -44,7 +47,7 @@ function getRequestItemId(segment: Segment) {
 }
 
 export class RequestsContainer {
-  private readonly requests = new Map<string, Request>();
+  private readonly requests = new Map<string, RequestItem>();
   private readonly onHttpRequestsHandlers = new Subscriptions();
   private readonly logger: Debug.Debugger;
 
@@ -69,10 +72,20 @@ export class RequestsContainer {
 
   get(segment: Segment) {
     const id = getRequestItemId(segment);
+    return this.requests.get(id);
+  }
+
+  getHybridLoaderRequest(segment: Segment) {
+    const id = getRequestItemId(segment);
     return this.requests.get(id)?.loaderRequest;
   }
 
-  addLoaderRequest(segment: Segment, loaderRequest: HybridLoaderRequest) {
+  remove(segment: Segment) {
+    const id = getRequestItemId(segment);
+    this.requests.delete(id);
+  }
+
+  addHybridLoaderRequest(segment: Segment, loaderRequest: HybridLoaderRequest) {
     const segmentId = getRequestItemId(segment);
     const existingRequest = this.requests.get(segmentId);
     if (existingRequest) {
@@ -81,18 +94,12 @@ export class RequestsContainer {
       this.requests.set(segmentId, {
         segment,
         loaderRequest,
+        prevAttempts: [],
       });
     }
     this.logger(
       `add loader request: ${loaderRequest.type} ${segment.externalId}`
     );
-
-    const clearRequestItem = () => this.clearRequestItem(segmentId, "loader");
-    loaderRequest.promise
-      .then(() => clearRequestItem())
-      .catch((err) => {
-        if (err instanceof RequestAbortError) clearRequestItem();
-      });
     if (loaderRequest.type === "http") this.onHttpRequestsHandlers.fire();
   }
 
@@ -100,25 +107,13 @@ export class RequestsContainer {
     const segmentId = getRequestItemId(segment);
     const requestItem = this.requests.get(segmentId);
 
-    const { onSuccess, onError } = engineCallbacks;
-    engineCallbacks.onSuccess = (response) => {
-      this.clearRequestItem(segmentId, "engine");
-      return onSuccess(response);
-    };
-
-    engineCallbacks.onError = (error) => {
-      if (error instanceof RequestAbortError) {
-        this.clearRequestItem(segmentId, "engine");
-      }
-      return onError(error);
-    };
-
     if (requestItem) {
       requestItem.engineCallbacks = engineCallbacks;
     } else {
       this.requests.set(segmentId, {
         segment,
         engineCallbacks,
+        prevAttempts: [],
       });
     }
     this.logger(`add engine request ${segment.externalId}`);
@@ -128,21 +123,24 @@ export class RequestsContainer {
     return this.requests.values();
   }
 
-  *httpRequests(): Generator<Request, void> {
+  *httpRequests(): Generator<RequestItem, void> {
     for (const request of this.requests.values()) {
       if (request.loaderRequest?.type === "http") yield request;
     }
   }
 
-  *p2pRequests(): Generator<Request, void> {
+  *p2pRequests(): Generator<RequestItem, void> {
     for (const request of this.requests.values()) {
       if (request.loaderRequest?.type === "p2p") yield request;
     }
   }
 
-  resolveEngineRequest(segment: Segment, response: SegmentResponse) {
+  resolveAndRemoveRequest(segment: Segment, response: SegmentResponse) {
     const id = getRequestItemId(segment);
-    this.requests.get(id)?.engineCallbacks?.onSuccess(response);
+    const request = this.requests.get(id);
+    if (!request) return;
+    request.engineCallbacks?.onSuccess(response);
+    this.requests.delete(id);
   }
 
   isHttpRequested(segment: Segment): boolean {
@@ -165,42 +163,13 @@ export class RequestsContainer {
     const request = this.requests.get(id);
     if (!request) return;
 
-    request.engineCallbacks?.onError(new RequestAbortError());
+    // request.engineCallbacks?.onError(new RequestAbortError());
     request.loaderRequest?.abort();
   }
 
   abortLoaderRequest(segment: Segment) {
     const id = getRequestItemId(segment);
     this.requests.get(id)?.loaderRequest?.abort();
-  }
-
-  private clearRequestItem(
-    requestItemId: string,
-    type: "loader" | "engine"
-  ): void {
-    const requestItem = this.requests.get(requestItemId);
-    if (!requestItem) return;
-    const { segment, loaderRequest } = requestItem;
-    const segmentExternalId = segment.externalId;
-
-    if (type === "engine") {
-      this.logger(`remove engine callbacks: ${segmentExternalId}`);
-      delete requestItem.engineCallbacks;
-    }
-    if (type === "loader" && loaderRequest) {
-      this.logger(
-        `remove loader request: ${loaderRequest.type} ${segmentExternalId}`
-      );
-      if (loaderRequest.type === "http") {
-        this.onHttpRequestsHandlers.fire();
-      }
-      delete requestItem.loaderRequest;
-    }
-    if (!requestItem.engineCallbacks && !requestItem.loaderRequest) {
-      this.logger(`remove request item ${segmentExternalId}`);
-      const segmentId = getRequestItemId(segment);
-      this.requests.delete(segmentId);
-    }
   }
 
   abortAllNotRequestedByEngine(isLocked?: (segment: Segment) => boolean) {
@@ -226,7 +195,7 @@ export class RequestsContainer {
   destroy() {
     for (const request of this.requests.values()) {
       request.loaderRequest?.abort();
-      request.engineCallbacks?.onError();
+      request.engineCallbacks?.onError("failed");
     }
     this.requests.clear();
   }

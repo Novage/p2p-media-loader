@@ -45,3 +45,20 @@ export function getControlledPromise<T>() {
     reject: reject!,
   };
 }
+
+export function joinChunks(
+  chunks: Uint8Array[],
+  totalBytes?: number
+): ArrayBuffer {
+  if (totalBytes === undefined) {
+    totalBytes = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+  }
+  const buffer = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    buffer.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  return buffer;
+}

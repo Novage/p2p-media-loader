@@ -16,7 +16,7 @@ import debug from "debug";
 export class PeerRequestError extends Error {
   constructor(
     readonly type:
-      | "abort"
+      | "manual-abort"
       | "request-timeout"
       | "response-bytes-mismatch"
       | "segment-absent"
@@ -38,7 +38,6 @@ type PeerRequest = {
   p2pRequest: P2PRequest;
   resolve: (data: ArrayBuffer) => void;
   reject: (error: PeerRequestError) => void;
-  chunks: ArrayBuffer[];
   responseTimeoutId: number;
 };
 
@@ -122,7 +121,7 @@ export class Peer {
     return this.segments.get(externalId);
   }
 
-  private onReceiveData(data: ArrayBuffer) {
+  private onReceiveData(data: Uint8Array) {
     const command = PeerUtil.getPeerCommandFromArrayBuffer(data);
     if (!command) {
       this.receiveSegmentChunk(data);
@@ -142,7 +141,6 @@ export class Peer {
         if (this.request?.segment.externalId === command.i) {
           const { progress } = this.request.p2pRequest;
           progress.totalBytes = command.s;
-          progress.canBeTracked = true;
         }
         break;
 
@@ -245,47 +243,45 @@ export class Peer {
       resolve,
       reject,
       responseTimeoutId: this.setRequestTimeout(),
-      chunks: [],
       p2pRequest: {
         type: "p2p",
         progress: {
-          canBeTracked: false,
-          totalBytes: 0,
           loadedBytes: 0,
-          percent: 0,
           startTimestamp: performance.now(),
+          chunks: [],
         },
         promise,
-        abort: () => this.cancelSegmentRequest("abort"),
+        abort: () => this.cancelSegmentRequest("manual-abort"),
       },
     };
   }
 
-  private receiveSegmentChunk(chunk: ArrayBuffer): void {
+  private receiveSegmentChunk(chunk: Uint8Array): void {
     const { request } = this;
-    const progress = request?.p2pRequest?.progress;
-    if (!request || !progress) return;
+    if (!request) return;
 
+    const { progress } = request.p2pRequest;
     progress.loadedBytes += chunk.byteLength;
-    progress.percent = (progress.loadedBytes / progress.loadedBytes) * 100;
     progress.lastLoadedChunkTimestamp = performance.now();
-    request.chunks.push(chunk);
+    progress.chunks.push(chunk);
 
     if (progress.loadedBytes === progress.totalBytes) {
-      const segmentData = joinChunks(request.chunks);
+      const segmentData = Utils.joinChunks(
+        progress.chunks,
+        progress.totalBytes
+      );
       const { lastLoadedChunkTimestamp, startTimestamp, loadedBytes } =
         progress;
       const loadingDuration = lastLoadedChunkTimestamp - startTimestamp;
       this.bandwidthMeasurer.addMeasurement(loadedBytes, loadingDuration);
-      this.approveRequest(segmentData);
-    } else if (progress.loadedBytes > progress.totalBytes) {
+      request.resolve(segmentData);
+      this.clearRequest();
+    } else if (
+      progress.totalBytes !== undefined &&
+      progress.loadedBytes > progress.totalBytes
+    ) {
       this.cancelSegmentRequest("response-bytes-mismatch");
     }
-  }
-
-  private approveRequest(data: ArrayBuffer) {
-    this.request?.resolve(data);
-    this.clearRequest();
   }
 
   private cancelSegmentRequest(type: PeerRequestError["type"]) {
@@ -296,7 +292,7 @@ export class Peer {
     const error = new PeerRequestError(type);
     const sendCancelCommandTypes: PeerRequestError["type"][] = [
       "destroy",
-      "abort",
+      "manual-abort",
       "request-timeout",
       "response-bytes-mismatch",
     ];
@@ -366,18 +362,6 @@ function* getBufferChunks(
     bytesLeft -= bytesToSend;
     yield buffer;
   }
-}
-
-function joinChunks(chunks: ArrayBuffer[]): ArrayBuffer {
-  const bytesSum = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
-  const buffer = new Uint8Array(bytesSum);
-  let offset = 0;
-  for (const chunk of chunks) {
-    buffer.set(new Uint8Array(chunk), offset);
-    offset += chunk.byteLength;
-  }
-
-  return buffer;
 }
 
 function hexToUtf8(hexString: string) {

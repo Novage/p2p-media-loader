@@ -114,7 +114,7 @@ export class P2PLoader {
     if (!peer) return;
 
     const request = peer.requestSegment(segment);
-    this.requests.addLoaderRequest(segment, request);
+    this.requests.addHybridLoaderRequest(segment, request);
     this.logger(
       `p2p request ${segment.externalId} | ${LoggerUtils.getStatusesString(
         statuses

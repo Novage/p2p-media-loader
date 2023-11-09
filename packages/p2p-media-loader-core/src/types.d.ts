@@ -60,6 +60,7 @@ export type Settings = {
   webRtcMaxMessageSize: number;
   p2pSegmentDownloadTimeout: number;
   p2pLoaderDestroyTimeout: number;
+  httpRequestTimeout: number;
 };
 
 export type CoreEventHandlers = {

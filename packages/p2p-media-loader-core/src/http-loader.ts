@@ -1,36 +1,32 @@
-import { RequestAbortError, FetchError } from "./errors";
-import { Segment } from "./types";
+import { Segment, Settings } from "./types";
 import { HttpRequest, LoadProgress } from "./request-container";
+import * as Utils from "./utils/utils";
 
-export function getHttpSegmentRequest(segment: Segment): Readonly<HttpRequest> {
-  const { promise, abortController, progress } = fetchSegmentData(segment);
-  return {
-    type: "http",
-    promise,
-    progress,
-    abort: () => abortController.abort(),
-  };
-}
-
-function fetchSegmentData(segment: Segment) {
+export function getHttpSegmentRequest(
+  segment: Segment,
+  settings: Pick<Settings, "httpRequestTimeout">
+): Readonly<HttpRequest> {
   const headers = new Headers();
-  const { url, byteRange, localId: segmentId } = segment;
+  const { url, byteRange } = segment;
 
   if (byteRange) {
     const { start, end } = byteRange;
     const byteRangeString = `bytes=${start}-${end}`;
     headers.set("Range", byteRangeString);
   }
-  const abortController = new AbortController();
 
+  const abortController = new AbortController();
   const progress: LoadProgress = {
-    canBeTracked: false,
-    totalBytes: 0,
     loadedBytes: 0,
-    percent: 0,
     startTimestamp: performance.now(),
+    chunks: [],
   };
   const loadSegmentData = async () => {
+    const requestAbortTimeout = setTimeout(() => {
+      const errorType: HttpLoaderError["type"] = "request-timeout";
+      abortController.abort(errorType);
+    }, settings.httpRequestTimeout);
+
     try {
       const response = await window.fetch(url, {
         headers,
@@ -38,25 +34,36 @@ function fetchSegmentData(segment: Segment) {
       });
 
       if (response.ok) {
-        return await getDataPromiseAndMonitorProgress(response, progress);
+        const data = await getDataPromiseAndMonitorProgress(response, progress);
+        clearTimeout(requestAbortTimeout);
+        return data;
       }
-      throw new FetchError(
-        response.statusText ?? `Network response was not for ${segmentId}`,
-        response.status,
-        response
-      );
+      throw new HttpLoaderError("fetch-error", response.statusText);
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        throw new RequestAbortError(`Segment fetch was aborted ${segmentId}`);
+      if (error instanceof Error) {
+        if ((error.name as HttpLoaderError["type"]) === "manual-abort") {
+          throw new HttpLoaderError("manual-abort");
+        }
+        if ((error.name as HttpLoaderError["type"]) === "request-timeout") {
+          throw new HttpLoaderError("request-timeout");
+        }
+        if (!(error instanceof HttpLoaderError)) {
+          throw new HttpLoaderError("fetch-error", error.message);
+        }
       }
+
       throw error;
     }
   };
 
   return {
+    type: "http",
     promise: loadSegmentData(),
-    abortController,
     progress,
+    abort: () => {
+      const abortErrorType: HttpLoaderError["type"] = "manual-abort";
+      abortController.abort(abortErrorType);
+    },
   };
 }
 
@@ -70,42 +77,25 @@ async function getDataPromiseAndMonitorProgress(
       progress.loadedBytes = data.byteLength;
       progress.totalBytes = data.byteLength;
       progress.lastLoadedChunkTimestamp = performance.now();
-      progress.percent = 100;
       return data;
     });
   }
 
-  if (totalBytesString) {
-    progress.totalBytes = +totalBytesString;
-    progress.canBeTracked = true;
-  }
+  if (totalBytesString) progress.totalBytes = +totalBytesString;
 
   const reader = response.body.getReader();
-
   progress.startTimestamp = performance.now();
-  const chunks: Uint8Array[] = [];
+
+  progress.chunks = [];
   for await (const chunk of readStream(reader)) {
-    chunks.push(chunk);
+    progress.chunks.push(chunk);
     progress.loadedBytes += chunk.length;
     progress.lastLoadedChunkTimestamp = performance.now();
-    if (progress.canBeTracked) {
-      progress.percent = (progress.loadedBytes / progress.totalBytes) * 100;
-    }
   }
 
-  if (!progress.canBeTracked) {
-    progress.totalBytes = progress.loadedBytes;
-    progress.percent = 100;
-  }
-  const resultBuffer = new ArrayBuffer(progress.loadedBytes);
-  const view = new Uint8Array(resultBuffer);
+  progress.totalBytes = progress.loadedBytes;
 
-  let offset = 0;
-  for (const chunk of chunks) {
-    view.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return resultBuffer;
+  return Utils.joinChunks(progress.chunks, progress.totalBytes);
 }
 
 async function* readStream(
@@ -115,5 +105,14 @@ async function* readStream(
     const { done, value } = await reader.read();
     if (done) break;
     yield value;
+  }
+}
+
+export class HttpLoaderError extends Error {
+  constructor(
+    readonly type: "request-timeout" | "fetch-error" | "manual-abort",
+    message?: string
+  ) {
+    super(message);
   }
 }

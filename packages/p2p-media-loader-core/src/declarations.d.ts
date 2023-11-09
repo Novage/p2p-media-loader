@@ -38,7 +38,7 @@ declare module "bittorrent-tracker" {
     E extends "connect"
       ? () => void
       : E extends "data"
-      ? (data: ArrayBuffer) => void
+      ? (data: Uint8Array) => void
       : E extends "close"
       ? () => void
       : E extends "error"
