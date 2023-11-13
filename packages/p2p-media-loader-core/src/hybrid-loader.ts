@@ -4,14 +4,12 @@ import { SegmentsMemoryStorage } from "./segments-storage";
 import { Settings, CoreEventHandlers } from "./types";
 import { BandwidthApproximator } from "./bandwidth-approximator";
 import { Playback, QueueItem } from "./internal-types";
-import {
-  RequestsContainer,
-  EngineCallbacks,
-  HybridLoaderRequest,
-  Request,
-} from "./request-container";
+import { RequestsContainer } from "./request-container";
+import { Request, EngineCallbacks, HybridLoaderRequest } from "./request";
 import * as QueueUtils from "./utils/queue";
 import * as LoggerUtils from "./utils/logger";
+import * as StreamUtils from "./utils/stream";
+import * as Utils from "./utils/utils";
 import { P2PLoadersContainer } from "./p2p/loaders-container";
 import { PeerRequestError } from "./p2p/peer";
 import debug from "debug";
@@ -40,7 +38,7 @@ export class HybridLoader {
     this.lastRequestedSegment = requestedSegment;
     const activeStream = requestedSegment.stream;
     this.playback = { position: requestedSegment.startTime, rate: 1 };
-    this.segmentAvgDuration = getSegmentAvgDuration(activeStream);
+    this.segmentAvgDuration = StreamUtils.getSegmentAvgDuration(activeStream);
     this.requests = new RequestsContainer(
       requestedSegment.stream.type,
       this.bandwidthApproximator
@@ -159,23 +157,6 @@ export class HybridLoader {
 
       if (statuses.isHighDemand) {
         if (request?.type === "http") continue;
-
-        if (request?.type === "p2p") {
-          const timeToPlayback = getTimeToSegmentPlayback(
-            segment,
-            this.playback
-          );
-          const remainingDownloadTime =
-            getPredictedRemainingDownloadTime(request);
-          if (
-            remainingDownloadTime === undefined ||
-            remainingDownloadTime > timeToPlayback
-          ) {
-            request.abort();
-          } else {
-            continue;
-          }
-        }
         if (this.requests.executingHttpCount < simultaneousHttpDownloads) {
           void this.loadThroughHttp(item);
           continue;
@@ -218,8 +199,11 @@ export class HybridLoader {
 
   // api method for engines
   abortSegment(segment: Segment) {
+    const request = this.requests.get(segment);
+    if (!request) return;
+    request.abort();
+    this.createProcessQueueMicrotask();
     this.logger.engine("abort: ", LoggerUtils.getSegmentString(segment));
-    this.requests.abortEngineRequest(segment);
   }
 
   private async loadThroughHttp(item: QueueItem, isRandom = false) {
@@ -286,7 +270,7 @@ export class HybridLoader {
     const shouldLoad = Math.random() < probability;
 
     if (!shouldLoad) return;
-    const item = queue[Math.floor(Math.random() * queue.length)];
+    const item = Utils.getRandomItem(queue);
     void this.loadThroughHttp(item, true);
 
     this.logger.loader(
@@ -386,37 +370,4 @@ function* arrayBackwards<T>(arr: T[]) {
   for (let i = arr.length - 1; i >= 0; i--) {
     yield arr[i];
   }
-}
-
-function getTimeToSegmentPlayback(segment: Segment, playback: Playback) {
-  return Math.max(segment.startTime - playback.position, 0) / playback.rate;
-}
-
-function getPredictedRemainingDownloadTime(request: HybridLoaderRequest) {
-  const { progress } = request;
-  if (!progress || progress.lastLoadedChunkTimestamp === undefined) {
-    return undefined;
-  }
-
-  const now = performance.now();
-  const bandwidth =
-    progress.percent /
-    (progress.lastLoadedChunkTimestamp - progress.startTimestamp);
-  const remainingDownloadPercent = 100 - progress.percent;
-  const predictedRemainingTimeFromLastDownload =
-    remainingDownloadPercent / bandwidth;
-  const timeFromLastDownload = now - progress.lastLoadedChunkTimestamp;
-  return (predictedRemainingTimeFromLastDownload - timeFromLastDownload) / 1000;
-}
-
-function getSegmentAvgDuration(stream: StreamWithSegments) {
-  const { segments } = stream;
-  let sumDuration = 0;
-  const size = segments.size;
-  for (const segment of segments.values()) {
-    const duration = segment.endTime - segment.startTime;
-    sumDuration += duration;
-  }
-
-  return sumDuration / size;
 }

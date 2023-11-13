@@ -35,15 +35,9 @@ export async function fulfillHttpSegmentRequest(
     });
 
     if (fetchResponse.ok) {
-      const totalBytesString = fetchResponse.headers.get("Content-Length");
-      if (!fetchResponse.body) {
-        fetchResponse.arrayBuffer().then((data) => {
-          requestControls.addLoadedChunk(data);
-          requestControls.completeOnSuccess();
-        });
-        return;
-      }
+      if (!fetchResponse.body) return;
 
+      const totalBytesString = fetchResponse.headers.get("Content-Length");
       if (totalBytesString) request.setTotalBytes(+totalBytesString);
 
       const reader = fetchResponse.body.getReader();

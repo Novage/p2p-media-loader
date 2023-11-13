@@ -4,10 +4,12 @@ import * as PeerUtil from "../utils/peer";
 import { Segment, Settings, StreamWithSegments } from "../types";
 import { QueueItem } from "../internal-types";
 import { SegmentsMemoryStorage } from "../segments-storage";
-import * as Utils from "../utils/utils";
 import * as LoggerUtils from "../utils/logger";
+import * as StreamUtils from "../utils/stream";
+import * as Utils from "../utils/utils";
 import { PeerSegmentStatus } from "../enums";
-import { Request, RequestsContainer } from "../request-container";
+import { RequestsContainer } from "../request-container";
+import { Request } from "../request";
 import debug from "debug";
 
 export class P2PLoader {
@@ -26,7 +28,7 @@ export class P2PLoader {
     private readonly settings: Settings
   ) {
     this.peerId = PeerUtil.generatePeerId();
-    const streamExternalId = Utils.getStreamExternalId(
+    const streamExternalId = StreamUtils.getStreamExternalId(
       this.streamManifestUrl,
       this.stream
     );
@@ -108,7 +110,7 @@ export class P2PLoader {
     }
 
     const peer = untestedPeers.length
-      ? getRandomItem(untestedPeers)
+      ? Utils.getRandomItem(untestedPeers)
       : fastestPeer;
 
     if (!peer) return;
@@ -182,7 +184,7 @@ export class P2PLoader {
   };
 
   private async onSegmentRequested(peer: Peer, segmentExternalId: string) {
-    const segment = Utils.getSegmentFromStreamByExternalId(
+    const segment = StreamUtils.getSegmentFromStreamByExternalId(
       this.stream,
       segmentExternalId
     );
@@ -244,8 +246,4 @@ function utf8ToHex(utf8String: string) {
   }
 
   return result;
-}
-
-function getRandomItem<T>(items: T[]): T {
-  return items[Math.floor(Math.random() * items.length)];
 }

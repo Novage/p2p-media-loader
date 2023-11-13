@@ -8,7 +8,7 @@ import {
 } from "../internal-types";
 import { PeerCommandType, PeerSegmentStatus } from "../enums";
 import * as PeerUtil from "../utils/peer";
-import { Request, RequestControls } from "../request-container";
+import { Request, RequestControls } from "../request";
 import { Segment, Settings } from "../types";
 import * as Utils from "../utils/utils";
 import debug from "debug";
