@@ -8,7 +8,7 @@ import {
 } from "../internal-types";
 import { PeerCommandType, PeerSegmentStatus } from "../enums";
 import * as PeerUtil from "../utils/peer";
-import { P2PRequest } from "../request-container";
+import { Request, RequestControls } from "../request-container";
 import { Segment, Settings } from "../types";
 import * as Utils from "../utils/utils";
 import debug from "debug";
@@ -33,14 +33,6 @@ type PeerEventHandlers = {
   onSegmentRequested: (peer: Peer, segmentId: string) => void;
 };
 
-type PeerRequest = {
-  segment: Segment;
-  p2pRequest: P2PRequest;
-  resolve: (data: ArrayBuffer) => void;
-  reject: (error: PeerRequestError) => void;
-  responseTimeoutId: number;
-};
-
 type PeerSettings = Pick<
   Settings,
   "p2pSegmentDownloadTimeout" | "webRtcMaxMessageSize"
@@ -51,7 +43,7 @@ export class Peer {
   private connection?: PeerConnection;
   private connections = new Set<PeerConnection>();
   private segments = new Map<string, PeerSegmentStatus>();
-  private request?: PeerRequest;
+  private requestData?: { request: Request; controls: RequestControls };
   private readonly logger = debug("core:peer");
   private readonly bandwidthMeasurer = new BandwidthMeasurer();
   private isUploadingSegment = false;
@@ -109,7 +101,7 @@ export class Peer {
   }
 
   get downloadingSegment(): Segment | undefined {
-    return this.request?.segment;
+    return this.requestData?.request.segment;
   }
 
   get bandwidth(): number | undefined {
@@ -138,14 +130,13 @@ export class Peer {
         break;
 
       case PeerCommandType.SegmentData:
-        if (this.request?.segment.externalId === command.i) {
-          const { progress } = this.request.p2pRequest;
-          progress.totalBytes = command.s;
+        if (this.requestData?.request.segment.externalId === command.i) {
+          this.requestData.request.setTotalBytes(command.s);
         }
         break;
 
       case PeerCommandType.SegmentAbsent:
-        if (this.request?.segment.externalId === command.i) {
+        if (this.requestData?.request.segment.externalId === command.i) {
           this.cancelSegmentRequest("segment-absent");
           this.segments.delete(command.i);
         }
@@ -162,18 +153,21 @@ export class Peer {
     this.connection.send(JSON.stringify(command));
   }
 
-  requestSegment(segment: Segment) {
-    if (this.request) {
+  fulfillSegmentRequest(request: Request) {
+    if (this.requestData) {
       throw new Error("Segment already is downloading");
     }
-    const { externalId } = segment;
+    this.requestData = {
+      request,
+      controls: request.start("p2p", () =>
+        this.cancelSegmentRequest("manual-abort")
+      ),
+    };
     const command: PeerSegmentCommand = {
       c: PeerCommandType.SegmentRequest,
-      i: externalId,
+      i: request.segment.externalId,
     };
     this.sendCommand(command);
-    this.request = this.createPeerRequest(segment);
-    return this.request.p2pRequest;
   }
 
   sendSegmentsAnnouncement(announcement: JsonSegmentAnnouncement) {
@@ -235,60 +229,27 @@ export class Peer {
     this.sendCommand(command);
   }
 
-  private createPeerRequest(segment: Segment): PeerRequest {
-    const { promise, resolve, reject } =
-      Utils.getControlledPromise<ArrayBuffer>();
-    return {
-      segment,
-      resolve,
-      reject,
-      responseTimeoutId: this.setRequestTimeout(),
-      p2pRequest: {
-        type: "p2p",
-        progress: {
-          loadedBytes: 0,
-          startTimestamp: performance.now(),
-          chunks: [],
-        },
-        promise,
-        abort: () => this.cancelSegmentRequest("manual-abort"),
-      },
-    };
-  }
-
   private receiveSegmentChunk(chunk: Uint8Array): void {
-    const { request } = this;
-    if (!request) return;
+    if (!this.requestData) return;
+    const { request, controls } = this.requestData;
+    controls.addLoadedChunk(chunk);
 
-    const { progress } = request.p2pRequest;
-    progress.loadedBytes += chunk.byteLength;
-    progress.lastLoadedChunkTimestamp = performance.now();
-    progress.chunks.push(chunk);
-
-    if (progress.loadedBytes === progress.totalBytes) {
-      const segmentData = Utils.joinChunks(
-        progress.chunks,
-        progress.totalBytes
-      );
-      const { lastLoadedChunkTimestamp, startTimestamp, loadedBytes } =
-        progress;
-      const loadingDuration = lastLoadedChunkTimestamp - startTimestamp;
-      this.bandwidthMeasurer.addMeasurement(loadedBytes, loadingDuration);
-      request.resolve(segmentData);
+    if (request.loadedBytes === request.totalBytes) {
+      controls.completeOnSuccess();
       this.clearRequest();
     } else if (
-      progress.totalBytes !== undefined &&
-      progress.loadedBytes > progress.totalBytes
+      request.totalBytes !== undefined &&
+      request.loadedBytes > request.totalBytes
     ) {
       this.cancelSegmentRequest("response-bytes-mismatch");
     }
   }
 
   private cancelSegmentRequest(type: PeerRequestError["type"]) {
-    if (!this.request) return;
-    this.logger(
-      `cancel segment request ${this.request?.segment.externalId} (${type})`
-    );
+    if (!this.requestData) return;
+    const { request, controls } = this.requestData;
+    const { segment } = request;
+    this.logger(`cancel segment request ${segment.externalId} (${type})`);
     const error = new PeerRequestError(type);
     const sendCancelCommandTypes: PeerRequestError["type"][] = [
       "destroy",
@@ -299,10 +260,10 @@ export class Peer {
     if (sendCancelCommandTypes.includes(type)) {
       this.sendCommand({
         c: PeerCommandType.CancelSegmentRequest,
-        i: this.request.segment.externalId,
+        i: segment.externalId,
       });
     }
-    this.request.reject(error);
+    controls.cancelOnError(error);
     this.clearRequest();
   }
 

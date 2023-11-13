@@ -1,12 +1,12 @@
-import { Segment, Settings } from "./types";
-import { HttpRequest, LoadProgress } from "./request-container";
-import * as Utils from "./utils/utils";
+import { Settings } from "./types";
+import { Request } from "./request-container";
 
-export function getHttpSegmentRequest(
-  segment: Segment,
+export async function fulfillHttpSegmentRequest(
+  request: Request,
   settings: Pick<Settings, "httpRequestTimeout">
-): Readonly<HttpRequest> {
+) {
   const headers = new Headers();
+  const { segment } = request;
   const { url, byteRange } = segment;
 
   if (byteRange) {
@@ -16,86 +16,61 @@ export function getHttpSegmentRequest(
   }
 
   const abortController = new AbortController();
-  const progress: LoadProgress = {
-    loadedBytes: 0,
-    startTimestamp: performance.now(),
-    chunks: [],
-  };
-  const loadSegmentData = async () => {
-    const requestAbortTimeout = setTimeout(() => {
-      const errorType: HttpLoaderError["type"] = "request-timeout";
-      abortController.abort(errorType);
-    }, settings.httpRequestTimeout);
 
-    try {
-      const response = await window.fetch(url, {
-        headers,
-        signal: abortController.signal,
-      });
+  const requestAbortTimeout = setTimeout(() => {
+    const errorType: HttpLoaderError["type"] = "request-timeout";
+    abortController.abort(errorType);
+  }, settings.httpRequestTimeout);
 
-      if (response.ok) {
-        const data = await getDataPromiseAndMonitorProgress(response, progress);
-        clearTimeout(requestAbortTimeout);
-        return data;
-      }
-      throw new HttpLoaderError("fetch-error", response.statusText);
-    } catch (error) {
-      if (error instanceof Error) {
-        if ((error.name as HttpLoaderError["type"]) === "manual-abort") {
-          throw new HttpLoaderError("manual-abort");
-        }
-        if ((error.name as HttpLoaderError["type"]) === "request-timeout") {
-          throw new HttpLoaderError("request-timeout");
-        }
-        if (!(error instanceof HttpLoaderError)) {
-          throw new HttpLoaderError("fetch-error", error.message);
-        }
-      }
-
-      throw error;
-    }
+  const abortManually = () => {
+    const abortErrorType: HttpLoaderError["type"] = "manual-abort";
+    abortController.abort(abortErrorType);
   };
 
-  return {
-    type: "http",
-    promise: loadSegmentData(),
-    progress,
-    abort: () => {
-      const abortErrorType: HttpLoaderError["type"] = "manual-abort";
-      abortController.abort(abortErrorType);
-    },
-  };
-}
-
-async function getDataPromiseAndMonitorProgress(
-  response: Response,
-  progress: LoadProgress
-): Promise<ArrayBuffer> {
-  const totalBytesString = response.headers.get("Content-Length");
-  if (!response.body) {
-    return response.arrayBuffer().then((data) => {
-      progress.loadedBytes = data.byteLength;
-      progress.totalBytes = data.byteLength;
-      progress.lastLoadedChunkTimestamp = performance.now();
-      return data;
+  const requestControls = request.start("http", abortManually);
+  try {
+    const fetchResponse = await window.fetch(url, {
+      headers,
+      signal: abortController.signal,
     });
+
+    if (fetchResponse.ok) {
+      const totalBytesString = fetchResponse.headers.get("Content-Length");
+      if (!fetchResponse.body) {
+        fetchResponse.arrayBuffer().then((data) => {
+          requestControls.addLoadedChunk(data);
+          requestControls.completeOnSuccess();
+        });
+        return;
+      }
+
+      if (totalBytesString) request.setTotalBytes(+totalBytesString);
+
+      const reader = fetchResponse.body.getReader();
+      for await (const chunk of readStream(reader)) {
+        requestControls.addLoadedChunk(chunk);
+      }
+      requestControls.completeOnSuccess();
+      clearTimeout(requestAbortTimeout);
+    }
+    throw new HttpLoaderError("fetch-error", fetchResponse.statusText);
+  } catch (error) {
+    if (error instanceof Error) {
+      let httpLoaderError: HttpLoaderError;
+      if ((error.name as HttpLoaderError["type"]) === "manual-abort") {
+        httpLoaderError = new HttpLoaderError("manual-abort");
+      } else if (
+        (error.name as HttpLoaderError["type"]) === "request-timeout"
+      ) {
+        httpLoaderError = new HttpLoaderError("request-timeout");
+      } else if (!(error instanceof HttpLoaderError)) {
+        httpLoaderError = new HttpLoaderError("fetch-error", error.message);
+      } else {
+        httpLoaderError = error;
+      }
+      requestControls.cancelOnError(httpLoaderError);
+    }
   }
-
-  if (totalBytesString) progress.totalBytes = +totalBytesString;
-
-  const reader = response.body.getReader();
-  progress.startTimestamp = performance.now();
-
-  progress.chunks = [];
-  for await (const chunk of readStream(reader)) {
-    progress.chunks.push(chunk);
-    progress.loadedBytes += chunk.length;
-    progress.lastLoadedChunkTimestamp = performance.now();
-  }
-
-  progress.totalBytes = progress.loadedBytes;
-
-  return Utils.joinChunks(progress.chunks, progress.totalBytes);
 }
 
 async function* readStream(

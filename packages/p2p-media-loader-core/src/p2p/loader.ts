@@ -7,7 +7,7 @@ import { SegmentsMemoryStorage } from "../segments-storage";
 import * as Utils from "../utils/utils";
 import * as LoggerUtils from "../utils/logger";
 import { PeerSegmentStatus } from "../enums";
-import { RequestsContainer } from "../request-container";
+import { Request, RequestsContainer } from "../request-container";
 import debug from "debug";
 
 export class P2PLoader {
@@ -86,7 +86,7 @@ export class P2PLoader {
     this.peers.set(connection.id, peer);
   }
 
-  downloadSegment(item: QueueItem): Promise<ArrayBuffer> | undefined {
+  downloadSegment(item: QueueItem): Request | undefined {
     const { segment, statuses } = item;
     const untestedPeers: Peer[] = [];
     let fastestPeer: Peer | undefined;
@@ -113,18 +113,18 @@ export class P2PLoader {
 
     if (!peer) return;
 
-    const request = peer.requestSegment(segment);
-    this.requests.addHybridLoaderRequest(segment, request);
+    const request = this.requests.getOrCreateRequest(segment);
+    peer.fulfillSegmentRequest(request);
     this.logger(
       `p2p request ${segment.externalId} | ${LoggerUtils.getStatusesString(
         statuses
       )}`
     );
-    request.promise.then(() => {
+    request.subscribe("onCompleted", () => {
       this.logger(`p2p loaded: ${segment.externalId}`);
     });
 
-    return request.promise;
+    return request;
   }
 
   isLoadingOrLoadedBySomeone(segment: Segment): boolean {
