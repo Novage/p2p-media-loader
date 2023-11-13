@@ -1,4 +1,5 @@
 import { Segment, Stream, StreamWithSegments } from "../types";
+import { Playback } from "../internal-types";
 
 const PEER_PROTOCOL_VERSION = "V1";
 
@@ -31,4 +32,20 @@ export function getSegmentFromStreamByExternalId(
 
 export function getStreamShortId(stream: Stream) {
   return `${stream.type}-${stream.index}`;
+}
+
+export function getSegmentAvgDuration(stream: StreamWithSegments) {
+  const { segments } = stream;
+  let sumDuration = 0;
+  const size = segments.size;
+  for (const segment of segments.values()) {
+    const duration = segment.endTime - segment.startTime;
+    sumDuration += duration;
+  }
+
+  return sumDuration / size;
+}
+
+export function getTimeToSegmentPlayback(segment: Segment, playback: Playback) {
+  return Math.max(segment.startTime - playback.position, 0) / playback.rate;
 }
