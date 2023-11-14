@@ -1,4 +1,7 @@
-import TrackerClient, { PeerConnection } from "bittorrent-tracker";
+import TrackerClient, {
+  PeerConnection,
+  TrackerClientEvents,
+} from "bittorrent-tracker";
 import { Peer } from "./peer";
 import * as PeerUtil from "../utils/peer";
 import { Segment, Settings, StreamWithSegments } from "../types";
@@ -13,10 +16,8 @@ import { Request } from "../request";
 import debug from "debug";
 
 export class P2PLoader {
-  private readonly streamHash: string;
   private readonly peerId: string;
-  private readonly trackerClient: TrackerClient;
-  private readonly peers = new Map<string, Peer>();
+  private readonly trackerClient: P2PTrackerClient;
   private readonly logger = debug("core:p2p-loader");
   private isAnnounceMicrotaskCreated = false;
 
@@ -32,60 +33,24 @@ export class P2PLoader {
       this.streamManifestUrl,
       this.stream
     );
-    this.streamHash = PeerUtil.getStreamHash(streamExternalId);
-
-    this.trackerClient = createTrackerClient({
-      streamHash: utf8ToHex(this.streamHash),
-      peerHash: utf8ToHex(this.peerId),
-    });
-    this.logger(
-      `create tracker client: ${LoggerUtils.getStreamString(stream)}; ${
-        this.peerId
-      }`
+    this.trackerClient = new P2PTrackerClient(
+      this.peerId,
+      streamExternalId,
+      this.stream,
+      {
+        onPeerConnected: this.onPeerConnected,
+        onSegmentRequested: this.onSegmentRequested,
+      },
+      this.settings,
+      this.logger
     );
-    this.subscribeOnTrackerEvents(this.trackerClient);
+
     this.segmentStorage.subscribeOnUpdate(
       this.stream,
       this.broadcastAnnouncement
     );
-    this.requests.subscribeOnHttpRequestsUpdate(this.broadcastAnnouncement);
+    // this.requests.subscribeOnHttpRequestsUpdate(this.broadcastAnnouncement);
     this.trackerClient.start();
-  }
-
-  private subscribeOnTrackerEvents(trackerClient: TrackerClient) {
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
-    trackerClient.on("update", () => {});
-    trackerClient.on("peer", (peerConnection) => {
-      const peer = this.peers.get(peerConnection.id);
-      if (peer) peer.addConnection(peerConnection);
-      else this.createPeer(peerConnection);
-    });
-    trackerClient.on("warning", (warning) => {
-      this.logger(
-        `tracker warning (${LoggerUtils.getStreamString(
-          this.stream
-        )}: ${warning})`
-      );
-    });
-    trackerClient.on("error", (error) => {
-      this.logger(
-        `tracker error (${LoggerUtils.getStreamString(this.stream)}: ${error})`
-      );
-    });
-  }
-
-  private createPeer(connection: PeerConnection) {
-    const peer = new Peer(
-      connection,
-      {
-        onPeerConnected: this.onPeerConnected.bind(this),
-        onPeerClosed: this.onPeerClosed.bind(this),
-        onSegmentRequested: this.onSegmentRequested.bind(this),
-      },
-      this.settings
-    );
-    this.logger(`create new peer: ${peer.id}`);
-    this.peers.set(connection.id, peer);
   }
 
   downloadSegment(item: QueueItem): Request | undefined {
@@ -94,7 +59,7 @@ export class P2PLoader {
     let fastestPeer: Peer | undefined;
     let fastestPeerBandwidth = 0;
 
-    for (const peer of this.peers.values()) {
+    for (const peer of this.trackerClient.peers()) {
       if (
         !peer.downloadingSegment &&
         peer.getSegmentStatus(segment) === PeerSegmentStatus.Loaded
@@ -130,7 +95,7 @@ export class P2PLoader {
   }
 
   isLoadingOrLoadedBySomeone(segment: Segment): boolean {
-    for (const peer of this.peers.values()) {
+    for (const peer of this.trackerClient.peers()) {
       if (peer.getSegmentStatus(segment)) return true;
     }
     return false;
@@ -138,9 +103,7 @@ export class P2PLoader {
 
   get connectedPeersAmount() {
     let count = 0;
-    for (const peer of this.peers.values()) {
-      if (peer.isConnected) count++;
-    }
+    for (const peer of this.trackerClient.peers()) count++;
     return count;
   }
 
@@ -164,19 +127,13 @@ export class P2PLoader {
     peer.sendSegmentsAnnouncement(announcement);
   }
 
-  private onPeerClosed(peer: Peer) {
-    this.logger(`peer closed: ${peer.id}`);
-    this.peers.delete(peer.id);
-  }
-
   private broadcastAnnouncement = () => {
     if (this.isAnnounceMicrotaskCreated) return;
 
     this.isAnnounceMicrotaskCreated = true;
     queueMicrotask(() => {
       const announcement = this.getSegmentsAnnouncement();
-      for (const peer of this.peers.values()) {
-        if (!peer.isConnected) continue;
+      for (const peer of this.trackerClient.peers()) {
         peer.sendSegmentsAnnouncement(announcement);
       }
       this.isAnnounceMicrotaskCreated = false;
@@ -202,41 +159,135 @@ export class P2PLoader {
       this.stream,
       this.broadcastAnnouncement
     );
-    this.requests.unsubscribeFromHttpRequestsUpdate(this.broadcastAnnouncement);
-    for (const peer of this.peers.values()) {
-      peer.destroy();
-    }
-    this.peers.clear();
+    // this.requests.unsubscribeFromHttpRequestsUpdate(this.broadcastAnnouncement);
     this.trackerClient.destroy();
   }
 }
 
-function createTrackerClient({
-  streamHash,
-  peerHash,
-}: {
-  streamHash: string;
-  peerHash: string;
-}) {
-  return new TrackerClient({
-    infoHash: streamHash,
-    peerId: peerHash,
-    port: 6881,
-    announce: [
-      // "wss://tracker.novage.com.ua",
-      "wss://tracker.openwebtorrent.com",
-    ],
-    rtcConfig: {
-      iceServers: [
-        {
-          urls: [
-            "stun:stun.l.google.com:19302",
-            "stun:global.stun.twilio.com:3478",
-          ],
-        },
+type PeerItem = { peer?: Peer; potentialConnections: Set<PeerConnection> };
+
+type P2PTrackerClientEventHandlers = {
+  onPeerConnected: (peer: Peer) => void;
+  onSegmentRequested: (peer: Peer, segmentExternalId: string) => void;
+};
+
+class P2PTrackerClient {
+  private readonly client: TrackerClient;
+  private readonly _peers = new Map<string, PeerItem>();
+  private readonly streamHash: string;
+
+  constructor(
+    private readonly peerId: string,
+    private readonly streamExternalId: string,
+    private readonly stream: StreamWithSegments,
+    private readonly eventHandlers: P2PTrackerClientEventHandlers,
+    private readonly settings: Settings,
+    private readonly logger: debug.Debugger
+  ) {
+    this.streamHash = PeerUtil.getStreamHash(streamExternalId);
+    this.client = new TrackerClient({
+      infoHash: utf8ToHex(this.streamHash),
+      peerId: utf8ToHex(this.peerId),
+      port: 6881,
+      announce: [
+        // "wss://tracker.novage.com.ua",
+        "wss://tracker.openwebtorrent.com",
       ],
-    },
-  });
+      rtcConfig: {
+        iceServers: [
+          {
+            urls: [
+              "stun:stun.l.google.com:19302",
+              "stun:global.stun.twilio.com:3478",
+            ],
+          },
+        ],
+      },
+    });
+    this.client.on("peer", this.onReceivePeerConnection);
+    this.client.on("warning", this.onTrackerClientWarning);
+    this.client.on("error", this.onTrackerClientError);
+    this.logger(
+      `create tracker client: ${LoggerUtils.getStreamString(stream)}; ${
+        this.peerId
+      }`
+    );
+  }
+
+  start() {
+    this.client.start();
+  }
+
+  destroy() {
+    this.client.destroy();
+    for (const { peer, potentialConnections } of this._peers.values()) {
+      peer?.destroy();
+      for (const connection of potentialConnections) {
+        connection.destroy();
+      }
+    }
+  }
+
+  private onReceivePeerConnection: TrackerClientEvents["peer"] = (
+    peerConnection
+  ) => {
+    let peerItem = this._peers.get(peerConnection.id);
+
+    if (peerItem?.peer) {
+      peerConnection.destroy();
+      return;
+    } else if (!peerItem) {
+      peerItem = { potentialConnections: new Set() };
+      peerItem.potentialConnections.add(peerConnection);
+      const itemId = Peer.getPeerIdFromHexString(peerConnection.id);
+      this._peers.set(itemId, peerItem);
+    }
+
+    peerConnection.on("connect", () => {
+      if (!peerItem) return;
+
+      for (const connection of peerItem.potentialConnections) {
+        if (connection !== peerConnection) connection.destroy();
+      }
+      peerItem.potentialConnections.clear();
+      peerItem.peer = new Peer(
+        peerConnection,
+        {
+          onPeerClosed: this.onPeerClosed,
+          onSegmentRequested: this.eventHandlers.onSegmentRequested,
+        },
+        this.settings
+      );
+      this.eventHandlers.onPeerConnected(peerItem.peer);
+    });
+  };
+
+  private onTrackerClientWarning: TrackerClientEvents["warning"] = (
+    warning
+  ) => {
+    this.logger(
+      `tracker warning (${LoggerUtils.getStreamString(
+        this.stream
+      )}: ${warning})`
+    );
+  };
+
+  private onTrackerClientError: TrackerClientEvents["error"] = (error) => {
+    this.logger(
+      `tracker error (${LoggerUtils.getStreamString(this.stream)}: ${error})`
+    );
+  };
+
+  *peers() {
+    for (const peerItem of this._peers.values()) {
+      if (peerItem?.peer) yield peerItem.peer;
+    }
+  }
+
+  private onPeerClosed = (peer: Peer) => {
+    this.logger(`peer closed: ${peer.id}`);
+    this._peers.delete(peer.id);
+  };
 }
 
 function utf8ToHex(utf8String: string) {

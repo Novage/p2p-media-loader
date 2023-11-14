@@ -1,5 +1,5 @@
 import { Settings } from "./types";
-import { Request } from "./request-container";
+import { Request } from "./request";
 
 export async function fulfillHttpSegmentRequest(
   request: Request,

@@ -4,13 +4,13 @@ export class EventDispatcher<
 > {
   private readonly listeners = new Map<keyof T, Set<T[K]>>();
 
-  subscribe(eventType: K, listener: T[K]) {
+  subscribe(eventType: K, ...listeners: T[K][]) {
     let eventListeners = this.listeners.get(eventType);
     if (!eventListeners) {
       eventListeners = new Set();
       this.listeners.set(eventType, eventListeners);
     }
-    eventListeners.add(listener);
+    for (const listener of listeners) eventListeners.add(listener);
   }
 
   unsubscribe(eventType: K, listener: T[K]) {

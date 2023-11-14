@@ -28,7 +28,6 @@ export class PeerRequestError extends Error {
 }
 
 type PeerEventHandlers = {
-  onPeerConnected: (peer: Peer) => void;
   onPeerClosed: (peer: Peer) => void;
   onSegmentRequested: (peer: Peer, segmentId: string) => void;
 };
@@ -40,8 +39,6 @@ type PeerSettings = Pick<
 
 export class Peer {
   readonly id: string;
-  private connection?: PeerConnection;
-  private connections = new Set<PeerConnection>();
   private segments = new Map<string, PeerSegmentStatus>();
   private requestData?: { request: Request; controls: RequestControls };
   private readonly logger = debug("core:peer");
@@ -49,55 +46,27 @@ export class Peer {
   private isUploadingSegment = false;
 
   constructor(
-    connection: PeerConnection,
+    private readonly connection: PeerConnection,
     private readonly eventHandlers: PeerEventHandlers,
     private readonly settings: PeerSettings
   ) {
     this.id = hexToUtf8(connection.id);
     this.eventHandlers = eventHandlers;
-    this.addConnection(connection);
-  }
 
-  addConnection(connection: PeerConnection) {
-    if (this.connection && connection !== this.connection) {
-      connection.destroy();
-      return;
-    }
-    this.connections.add(connection);
-
-    connection.on("connect", () => {
-      if (this.connection) return;
-
-      this.connection = connection;
-      for (const item of this.connections) {
-        if (item !== connection) {
-          this.connections.delete(item);
-          item.destroy();
-        }
-      }
-      this.eventHandlers.onPeerConnected(this);
-      this.logger(`connected with peer: ${this.id}`);
-
-      connection.on("data", this.onReceiveData.bind(this));
-      connection.on("close", () => {
-        this.connection = undefined;
-        this.cancelSegmentRequest("peer-closed");
-        this.logger(`connection with peer closed: ${this.id}`);
+    connection.on("data", this.onReceiveData.bind(this));
+    connection.on("close", () => {
+      this.cancelSegmentRequest("peer-closed");
+      this.logger(`connection with peer closed: ${this.id}`);
+      this.destroy();
+      this.eventHandlers.onPeerClosed(this);
+    });
+    connection.on("error", (error) => {
+      if (error.code === "ERR_DATA_CHANNEL") {
+        this.logger(`peer error: ${this.id} ${error.code}`);
         this.destroy();
         this.eventHandlers.onPeerClosed(this);
-      });
-      connection.on("error", (error) => {
-        if (error.code === "ERR_DATA_CHANNEL") {
-          this.logger(`peer error: ${this.id} ${error.code}`);
-          this.destroy();
-          this.eventHandlers.onPeerClosed(this);
-        }
-      });
+      }
     });
-  }
-
-  get isConnected() {
-    return !!this.connection;
   }
 
   get downloadingSegment(): Segment | undefined {
@@ -149,7 +118,6 @@ export class Peer {
   }
 
   private sendCommand(command: PeerCommand) {
-    if (!this.connection) return;
     this.connection.send(JSON.stringify(command));
   }
 
@@ -179,7 +147,6 @@ export class Peer {
   }
 
   async sendSegmentData(segmentExternalId: string, data: ArrayBuffer) {
-    if (!this.connection) return;
     this.logger(`send segment ${segmentExternalId} to ${this.id}`);
     const command: PeerSendSegmentCommand = {
       c: PeerCommandType.SegmentData,
@@ -189,8 +156,7 @@ export class Peer {
     this.sendCommand(command);
 
     const chunks = getBufferChunks(data, this.settings.webRtcMaxMessageSize);
-    const connection = this.connection;
-    const channel = connection._channel;
+    const channel = this.connection._channel;
     const { promise, resolve, reject } = Utils.getControlledPromise<void>();
 
     const sendChunk = () => {
@@ -204,7 +170,7 @@ export class Peer {
           reject();
           break;
         }
-        connection.send(chunk);
+        this.connection.send(chunk);
       }
     };
     try {
@@ -281,12 +247,11 @@ export class Peer {
 
   destroy() {
     this.cancelSegmentRequest("destroy");
-    this.connection?.destroy();
-    this.connection = undefined;
-    for (const connection of this.connections) {
-      connection.destroy();
-    }
-    this.connections.clear();
+    this.connection.destroy();
+  }
+
+  static getPeerIdFromHexString(hex: string) {
+    return hexToUtf8(hex);
   }
 }
 
