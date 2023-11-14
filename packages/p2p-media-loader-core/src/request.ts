@@ -7,6 +7,7 @@ import { PeerRequestError } from "./p2p/peer";
 
 export type EngineCallbacks = {
   onSuccess: (response: SegmentResponse) => void;
+  // TODO: Error for engines
   onError: (reason: "failed" | "abort") => void;
 };
 
