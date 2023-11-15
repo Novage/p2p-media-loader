@@ -36,12 +36,17 @@ export type JsonSegmentAnnouncement = {
 };
 
 export type PeerSegmentCommand = BasePeerCommand<
-  | PeerCommandType.SegmentRequest
-  | PeerCommandType.SegmentAbsent
-  | PeerCommandType.CancelSegmentRequest
+  PeerCommandType.SegmentAbsent | PeerCommandType.CancelSegmentRequest
 > & {
   i: string;
 };
+
+export type PeerSegmentRequestCommand =
+  BasePeerCommand<PeerCommandType.SegmentRequest> & {
+    i: string;
+    // start byte of range
+    b?: number;
+  };
 
 export type PeerSegmentAnnouncementCommand =
   BasePeerCommand<PeerCommandType.SegmentsAnnouncement> & {
@@ -56,5 +61,6 @@ export type PeerSendSegmentCommand =
 
 export type PeerCommand =
   | PeerSegmentCommand
+  | PeerSegmentRequestCommand
   | PeerSegmentAnnouncementCommand
   | PeerSendSegmentCommand;

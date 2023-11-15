@@ -2,8 +2,6 @@ import { EventDispatcher } from "./event-dispatcher";
 import { Segment, SegmentResponse } from "./types";
 import { BandwidthApproximator } from "./bandwidth-approximator";
 import * as Utils from "./utils/utils";
-import { HttpLoaderError } from "./http-loader";
-import { PeerRequestError } from "./p2p/peer";
 
 export type EngineCallbacks = {
   onSuccess: (response: SegmentResponse) => void;
@@ -14,37 +12,39 @@ export type EngineCallbacks = {
 export type LoadProgress = {
   startTimestamp: number;
   lastLoadedChunkTimestamp?: number;
+  startFromByte?: number;
   loadedBytes: number;
-  totalBytes?: number;
 };
 
-type HybridLoaderRequestBase = {
-  abort: () => void;
-  progress: LoadProgress;
-};
-
-type HttpRequest = HybridLoaderRequestBase & {
+type HttpRequestAttempt = {
   type: "http";
-  error?: HttpLoaderError;
+  error?: RequestError;
 };
 
-type P2PRequest = HybridLoaderRequestBase & {
+type P2PRequestAttempt = {
   type: "p2p";
-  error?: PeerRequestError;
+  peerId: string;
+  error?: RequestError;
 };
 
-export type HybridLoaderRequest = HttpRequest | P2PRequest;
+export type RequestAttempt = HttpRequestAttempt | P2PRequestAttempt;
 
 export type RequestEvents = {
-  onCompleted: (request: Request, data: ArrayBuffer) => void;
-  onError: (request: Request, data: Error) => void;
+  onSuccess: (request: Request, data: ArrayBuffer) => void;
+  onError: (request: Request, data: RequestError) => void;
 };
 
-export type RequestControls = {
+export type RequestControls = Readonly<{
+  firstBytesReceived: Request["firstBytesReceived"];
   addLoadedChunk: Request["addLoadedChunk"];
   completeOnSuccess: Request["completeOnSuccess"];
   cancelOnError: Request["cancelOnError"];
-};
+}>;
+
+type OmitEncapsulated<T extends RequestAttempt> = Omit<T, "error">;
+type StartRequestParameters =
+  | OmitEncapsulated<HttpRequestAttempt>
+  | OmitEncapsulated<P2PRequestAttempt>;
 
 type RequestStatus =
   | "not-started"
@@ -56,12 +56,16 @@ type RequestStatus =
 export class Request extends EventDispatcher<RequestEvents> {
   readonly id: string;
   private _engineCallbacks?: EngineCallbacks;
-  private hybridLoaderRequest?: HybridLoaderRequest;
-  private prevAttempts: HybridLoaderRequest[] = [];
+  private currentAttempt?: RequestAttempt;
+  private prevAttempts: RequestAttempt[] = [];
   private chunks: Uint8Array[] = [];
   private _loadedBytes = 0;
   private _totalBytes?: number;
   private _status: RequestStatus = "not-started";
+  private progress?: LoadProgress;
+  private firstBytesTimeout: Timeout;
+  private fullBytesTimeout: Timeout;
+  private _abortRequestCallback?: (errorType: RequestInnerErrorType) => void;
 
   constructor(
     readonly segment: Segment,
@@ -69,6 +73,8 @@ export class Request extends EventDispatcher<RequestEvents> {
   ) {
     super();
     this.id = Request.getRequestItemId(segment);
+    this.firstBytesTimeout = new Timeout(this.onFirstBytesTimeout);
+    this.fullBytesTimeout = new Timeout(this.onFullBytesTimeout);
   }
 
   get status() {
@@ -80,7 +86,7 @@ export class Request extends EventDispatcher<RequestEvents> {
   }
 
   get type() {
-    return this.hybridLoaderRequest?.type;
+    return this.currentAttempt?.type;
   }
 
   get loadedBytes() {
@@ -110,22 +116,46 @@ export class Request extends EventDispatcher<RequestEvents> {
     return Utils.getPercent(this.loadedBytes, this._totalBytes);
   }
 
-  start(type: "http" | "p2p", abortLoading: () => void): RequestControls {
+  get requestAttempts(): ReadonlyArray<Readonly<RequestAttempt>> {
+    return this.prevAttempts;
+  }
+
+  start(
+    requestData: StartRequestParameters,
+    controls: {
+      firstBytesTimeoutMs?: number;
+      fullLoadingTimeoutMs?: number;
+      abort: (errorType: RequestInnerErrorType) => void;
+    }
+  ): RequestControls {
+    if (this._status === "succeed") {
+      throw new Error("Request has been already succeed.");
+    }
     if (this._status === "loading") {
       throw new Error("Request has been already started.");
     }
 
     this._status = "loading";
-    this.hybridLoaderRequest = {
-      type,
-      abort: abortLoading,
-      progress: {
-        loadedBytes: 0,
-        startTimestamp: performance.now(),
-      },
+    const attempt: RequestAttempt = {
+      ...requestData,
     };
+    this.progress = {
+      startFromByte: this._loadedBytes,
+      loadedBytes: 0,
+      startTimestamp: performance.now(),
+    };
+    const { firstBytesTimeoutMs, fullLoadingTimeoutMs, abort } = controls;
+    this._abortRequestCallback = abort;
+    if (firstBytesTimeoutMs !== undefined) {
+      this.firstBytesTimeout.start(firstBytesTimeoutMs);
+    }
+    if (fullLoadingTimeoutMs !== undefined) {
+      this.fullBytesTimeout.start(fullLoadingTimeoutMs);
+    }
 
+    this.currentAttempt = attempt;
     return {
+      firstBytesReceived: this.firstBytesReceived,
       addLoadedChunk: this.addLoadedChunk,
       completeOnSuccess: this.completeOnSuccess,
       cancelOnError: this.cancelOnError,
@@ -133,9 +163,11 @@ export class Request extends EventDispatcher<RequestEvents> {
   }
 
   abort() {
-    if (!this.hybridLoaderRequest) return;
-    this.hybridLoaderRequest.abort();
+    this.throwErrorIfNotLoadingStatus();
+    if (!this._abortRequestCallback) return;
     this._status = "aborted";
+    this._abortRequestCallback("abort");
+    this._abortRequestCallback = undefined;
   }
 
   abortEngineRequest() {
@@ -145,31 +177,66 @@ export class Request extends EventDispatcher<RequestEvents> {
 
   private completeOnSuccess = () => {
     this.throwErrorIfNotLoadingStatus();
+    if (!this.currentAttempt) return;
+
+    this.fullBytesTimeout.stopAndClear();
     const data = Utils.joinChunks(this.chunks);
     this._status = "succeed";
+    this.prevAttempts.push(this.currentAttempt);
+    this.currentAttempt = undefined;
+
     this._engineCallbacks?.onSuccess({
       data,
       bandwidth: this.bandwidthApproximator.getBandwidth(),
     });
-    this.dispatch("onCompleted", this, data);
+    this.dispatch("onSuccess", this, data);
   };
 
   private addLoadedChunk = (chunk: Uint8Array) => {
     this.throwErrorIfNotLoadingStatus();
-    const { hybridLoaderRequest: request } = this;
-    if (!request) return;
+    if (!this.currentAttempt || !this.progress) return;
+
     this.chunks.push(chunk);
-    request.progress.lastLoadedChunkTimestamp = performance.now();
+    this.progress.lastLoadedChunkTimestamp = performance.now();
+    this.progress.loadedBytes += chunk.length;
     this._loadedBytes += chunk.length;
   };
 
-  private cancelOnError = (error: Error) => {
+  private firstBytesReceived = () => {
     this.throwErrorIfNotLoadingStatus();
-    if (!this.hybridLoaderRequest) return;
+    this.firstBytesTimeout.stopAndClear();
+  };
+
+  private cancelOnError = (error: RequestError) => {
+    this.throwErrorIfNotLoadingStatus();
+    this.throwRequestError(error, false);
+  };
+
+  private throwRequestError(error: RequestError, abort = true) {
+    this.throwErrorIfNotLoadingStatus();
+    if (!this.currentAttempt) return;
     this._status = "failed";
-    this.hybridLoaderRequest.error = error;
-    this.prevAttempts.push(this.hybridLoaderRequest);
+    if (
+      abort &&
+      this._abortRequestCallback &&
+      RequestError.isRequestInnerErrorType(error)
+    ) {
+      this._abortRequestCallback(error.type);
+    }
+    this.currentAttempt.error = error;
+    this.prevAttempts.push(this.currentAttempt);
+    this.currentAttempt = undefined;
     this.dispatch("onError", this, error);
+  }
+
+  private onFirstBytesTimeout = () => {
+    this.throwErrorIfNotLoadingStatus();
+    this.throwRequestError(new RequestError("first-bytes-timeout"), true);
+  };
+
+  private onFullBytesTimeout = () => {
+    this.throwErrorIfNotLoadingStatus();
+    this.throwRequestError(new RequestError("full-bytes-timeout"), true);
   };
 
   private throwErrorIfNotLoadingStatus() {
@@ -180,5 +247,73 @@ export class Request extends EventDispatcher<RequestEvents> {
 
   static getRequestItemId(segment: Segment) {
     return segment.localId;
+  }
+}
+
+const requestInnerErrorTypes = [
+  "abort",
+  "first-bytes-timeout",
+  "full-bytes-timeout",
+] as const;
+
+const httpRequestErrorTypes = ["fetch-error"] as const;
+
+const peerRequestErrorTypes = [
+  "peer-response-bytes-mismatch",
+  "peer-segment-absent",
+  "peer-closed",
+] as const;
+
+export type RequestInnerErrorType = (typeof requestInnerErrorTypes)[number];
+export type HttpRequestErrorType = (typeof httpRequestErrorTypes)[number];
+export type PeerRequestErrorType = (typeof peerRequestErrorTypes)[number];
+
+export class RequestError<
+  T extends
+    | RequestInnerErrorType
+    | PeerRequestErrorType
+    | HttpRequestErrorType =
+    | RequestInnerErrorType
+    | PeerRequestErrorType
+    | HttpRequestErrorType
+> extends Error {
+  constructor(readonly type: T, message?: string) {
+    super(message);
+  }
+
+  static isRequestInnerErrorType(
+    error: RequestError
+  ): error is RequestError<RequestInnerErrorType> {
+    return requestInnerErrorTypes.includes(error.type as any);
+  }
+
+  static isPeerErrorType(
+    error: RequestError
+  ): error is RequestError<PeerRequestErrorType> {
+    return peerRequestErrorTypes.includes(error.type as any);
+  }
+
+  static isHttpErrorType(
+    error: RequestError
+  ): error is RequestError<HttpRequestErrorType> {
+    return peerRequestErrorTypes.includes(error.type as any);
+  }
+}
+
+class Timeout {
+  private timeoutId?: number;
+
+  constructor(private readonly action: () => void) {}
+
+  start(ms: number) {
+    if (this.timeoutId) {
+      throw new Error("Timeout is already started.");
+    }
+    this.timeoutId = window.setTimeout(this.action, ms);
+  }
+
+  stopAndClear() {
+    clearTimeout(this.timeoutId);
+    this.timeoutId = undefined;
   }
 }

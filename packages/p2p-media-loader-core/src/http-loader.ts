@@ -1,9 +1,9 @@
 import { Settings } from "./types";
-import { Request } from "./request";
+import { Request, RequestError, HttpRequestErrorType } from "./request";
 
 export async function fulfillHttpSegmentRequest(
   request: Request,
-  settings: Pick<Settings, "httpRequestTimeout">
+  settings: Pick<Settings, "httpDownloadTimeoutMs">
 ) {
   const headers = new Headers();
   const { segment } = request;
@@ -16,23 +16,19 @@ export async function fulfillHttpSegmentRequest(
   }
 
   const abortController = new AbortController();
-
-  const requestAbortTimeout = setTimeout(() => {
-    const errorType: HttpLoaderError["type"] = "request-timeout";
-    abortController.abort(errorType);
-  }, settings.httpRequestTimeout);
-
-  const abortManually = () => {
-    const abortErrorType: HttpLoaderError["type"] = "manual-abort";
-    abortController.abort(abortErrorType);
-  };
-
-  const requestControls = request.start("http", abortManually);
+  const requestControls = request.start(
+    { type: "http" },
+    {
+      abort: (errorType) => abortController.abort(errorType),
+      fullLoadingTimeoutMs: settings.httpDownloadTimeoutMs,
+    }
+  );
   try {
     const fetchResponse = await window.fetch(url, {
       headers,
       signal: abortController.signal,
     });
+    requestControls.firstBytesReceived();
 
     if (fetchResponse.ok) {
       if (!fetchResponse.body) return;
@@ -45,20 +41,13 @@ export async function fulfillHttpSegmentRequest(
         requestControls.addLoadedChunk(chunk);
       }
       requestControls.completeOnSuccess();
-      clearTimeout(requestAbortTimeout);
     }
-    throw new HttpLoaderError("fetch-error", fetchResponse.statusText);
+    throw new RequestError("fetch-error", fetchResponse.statusText);
   } catch (error) {
     if (error instanceof Error) {
-      let httpLoaderError: HttpLoaderError;
-      if ((error.name as HttpLoaderError["type"]) === "manual-abort") {
-        httpLoaderError = new HttpLoaderError("manual-abort");
-      } else if (
-        (error.name as HttpLoaderError["type"]) === "request-timeout"
-      ) {
-        httpLoaderError = new HttpLoaderError("request-timeout");
-      } else if (!(error instanceof HttpLoaderError)) {
-        httpLoaderError = new HttpLoaderError("fetch-error", error.message);
+      let httpLoaderError: RequestError<HttpRequestErrorType>;
+      if (!(error instanceof RequestError)) {
+        httpLoaderError = new RequestError("fetch-error", error.message);
       } else {
         httpLoaderError = error;
       }
@@ -74,14 +63,5 @@ async function* readStream(
     const { done, value } = await reader.read();
     if (done) break;
     yield value;
-  }
-}
-
-export class HttpLoaderError extends Error {
-  constructor(
-    readonly type: "request-timeout" | "fetch-error" | "manual-abort",
-    message?: string
-  ) {
-    super(message);
   }
 }

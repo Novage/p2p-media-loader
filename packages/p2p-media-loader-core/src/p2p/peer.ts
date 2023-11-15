@@ -4,28 +4,21 @@ import {
   PeerCommand,
   PeerSegmentAnnouncementCommand,
   PeerSegmentCommand,
+  PeerSegmentRequestCommand,
   PeerSendSegmentCommand,
 } from "../internal-types";
 import { PeerCommandType, PeerSegmentStatus } from "../enums";
 import * as PeerUtil from "../utils/peer";
-import { Request, RequestControls } from "../request";
+import {
+  Request,
+  RequestControls,
+  RequestError,
+  PeerRequestErrorType,
+  RequestInnerErrorType,
+} from "../request";
 import { Segment, Settings } from "../types";
 import * as Utils from "../utils/utils";
 import debug from "debug";
-
-export class PeerRequestError extends Error {
-  constructor(
-    readonly type:
-      | "manual-abort"
-      | "request-timeout"
-      | "response-bytes-mismatch"
-      | "segment-absent"
-      | "peer-closed"
-      | "destroy"
-  ) {
-    super();
-  }
-}
 
 type PeerEventHandlers = {
   onPeerClosed: (peer: Peer) => void;
@@ -34,13 +27,15 @@ type PeerEventHandlers = {
 
 type PeerSettings = Pick<
   Settings,
-  "p2pSegmentDownloadTimeout" | "webRtcMaxMessageSize"
+  | "p2pSegmentDownloadTimeoutMs"
+  | "p2pSegmentFirstBytesTimeoutMs"
+  | "webRtcMaxMessageSize"
 >;
 
 export class Peer {
   readonly id: string;
   private segments = new Map<string, PeerSegmentStatus>();
-  private requestData?: { request: Request; controls: RequestControls };
+  private requestContext?: { request: Request; controls: RequestControls };
   private readonly logger = debug("core:peer");
   private readonly bandwidthMeasurer = new BandwidthMeasurer();
   private isUploadingSegment = false;
@@ -55,7 +50,6 @@ export class Peer {
 
     connection.on("data", this.onReceiveData.bind(this));
     connection.on("close", () => {
-      this.cancelSegmentRequest("peer-closed");
       this.logger(`connection with peer closed: ${this.id}`);
       this.destroy();
       this.eventHandlers.onPeerClosed(this);
@@ -70,7 +64,7 @@ export class Peer {
   }
 
   get downloadingSegment(): Segment | undefined {
-    return this.requestData?.request.segment;
+    return this.requestContext?.request.segment;
   }
 
   get bandwidth(): number | undefined {
@@ -99,14 +93,21 @@ export class Peer {
         break;
 
       case PeerCommandType.SegmentData:
-        if (this.requestData?.request.segment.externalId === command.i) {
-          this.requestData.request.setTotalBytes(command.s);
+        {
+          const request = this.requestContext?.request;
+          this.requestContext?.controls.firstBytesReceived();
+          if (
+            request?.segment.externalId === command.i &&
+            request.totalBytes === undefined
+          ) {
+            request.setTotalBytes(command.s);
+          }
         }
         break;
 
       case PeerCommandType.SegmentAbsent:
-        if (this.requestData?.request.segment.externalId === command.i) {
-          this.cancelSegmentRequest("segment-absent");
+        if (this.requestContext?.request.segment.externalId === command.i) {
+          this.cancelSegmentRequest("peer-segment-absent");
           this.segments.delete(command.i);
         }
         break;
@@ -122,19 +123,25 @@ export class Peer {
   }
 
   fulfillSegmentRequest(request: Request) {
-    if (this.requestData) {
+    if (this.requestContext) {
       throw new Error("Segment already is downloading");
     }
-    this.requestData = {
+    this.requestContext = {
       request,
-      controls: request.start("p2p", () =>
-        this.cancelSegmentRequest("manual-abort")
+      controls: request.start(
+        { type: "p2p", peerId: this.id },
+        {
+          abort: this.abortRequest,
+          firstBytesTimeoutMs: this.settings.p2pSegmentFirstBytesTimeoutMs,
+          fullLoadingTimeoutMs: this.settings.p2pSegmentDownloadTimeoutMs,
+        }
       ),
     };
-    const command: PeerSegmentCommand = {
+    const command: PeerSegmentRequestCommand = {
       c: PeerCommandType.SegmentRequest,
       i: request.segment.externalId,
     };
+    if (request.loadedBytes) command.b = request.loadedBytes;
     this.sendCommand(command);
   }
 
@@ -196,57 +203,50 @@ export class Peer {
   }
 
   private receiveSegmentChunk(chunk: Uint8Array): void {
-    if (!this.requestData) return;
-    const { request, controls } = this.requestData;
+    if (!this.requestContext) return;
+    const { request, controls } = this.requestContext;
     controls.addLoadedChunk(chunk);
 
     if (request.loadedBytes === request.totalBytes) {
       controls.completeOnSuccess();
-      this.clearRequest();
+      this.requestContext = undefined;
     } else if (
       request.totalBytes !== undefined &&
       request.loadedBytes > request.totalBytes
     ) {
-      this.cancelSegmentRequest("response-bytes-mismatch");
+      this.cancelSegmentRequest("peer-response-bytes-mismatch");
     }
   }
 
-  private cancelSegmentRequest(type: PeerRequestError["type"]) {
-    if (!this.requestData) return;
-    const { request, controls } = this.requestData;
+  private abortRequest = (reason: RequestInnerErrorType) => {
+    if (!this.requestContext) return;
+    const { request } = this.requestContext;
+    this.sendCancelSegmentRequestCommand(request.segment);
+    this.requestContext = undefined;
+  };
+
+  private cancelSegmentRequest(type: PeerRequestErrorType) {
+    if (!this.requestContext) return;
+    const { request, controls } = this.requestContext;
     const { segment } = request;
     this.logger(`cancel segment request ${segment.externalId} (${type})`);
-    const error = new PeerRequestError(type);
-    const sendCancelCommandTypes: PeerRequestError["type"][] = [
-      "destroy",
-      "manual-abort",
-      "request-timeout",
-      "response-bytes-mismatch",
-    ];
-    if (sendCancelCommandTypes.includes(type)) {
-      this.sendCommand({
-        c: PeerCommandType.CancelSegmentRequest,
-        i: segment.externalId,
-      });
+    const error = new RequestError(type);
+    if (type === "peer-response-bytes-mismatch") {
+      this.sendCancelSegmentRequestCommand(request.segment);
     }
     controls.cancelOnError(error);
-    this.clearRequest();
+    this.requestContext = undefined;
   }
 
-  private setRequestTimeout(): number {
-    return window.setTimeout(
-      () => this.cancelSegmentRequest("request-timeout"),
-      this.settings.p2pSegmentDownloadTimeout
-    );
-  }
-
-  private clearRequest() {
-    clearTimeout(this.request?.responseTimeoutId);
-    this.request = undefined;
+  private sendCancelSegmentRequestCommand(segment: Segment) {
+    this.sendCommand({
+      c: PeerCommandType.CancelSegmentRequest,
+      i: segment.externalId,
+    });
   }
 
   destroy() {
-    this.cancelSegmentRequest("destroy");
+    this.cancelSegmentRequest("peer-closed");
     this.connection.destroy();
   }
 
