@@ -183,7 +183,6 @@ export class Request extends EventDispatcher<RequestEvents> {
     const data = Utils.joinChunks(this.chunks);
     this._status = "succeed";
     this.prevAttempts.push(this.currentAttempt);
-    this.currentAttempt = undefined;
 
     this._engineCallbacks?.onSuccess({
       data,
@@ -225,7 +224,6 @@ export class Request extends EventDispatcher<RequestEvents> {
     }
     this.currentAttempt.error = error;
     this.prevAttempts.push(this.currentAttempt);
-    this.currentAttempt = undefined;
     this.dispatch("onError", this, error);
   }
 
@@ -283,19 +281,8 @@ export class RequestError<
   static isRequestInnerErrorType(
     error: RequestError
   ): error is RequestError<RequestInnerErrorType> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return requestInnerErrorTypes.includes(error.type as any);
-  }
-
-  static isPeerErrorType(
-    error: RequestError
-  ): error is RequestError<PeerRequestErrorType> {
-    return peerRequestErrorTypes.includes(error.type as any);
-  }
-
-  static isHttpErrorType(
-    error: RequestError
-  ): error is RequestError<HttpRequestErrorType> {
-    return peerRequestErrorTypes.includes(error.type as any);
   }
 }
 
@@ -305,7 +292,7 @@ export class CoreRequestError extends Error {
   }
 }
 
-class Timeout {
+export class Timeout {
   private timeoutId?: number;
 
   constructor(private readonly action: () => void) {}

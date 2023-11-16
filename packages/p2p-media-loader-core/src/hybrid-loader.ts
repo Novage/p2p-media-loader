@@ -22,7 +22,10 @@ export class HybridLoader {
   private lastQueueProcessingTimeStamp?: number;
   private readonly segmentAvgDuration: number;
   private randomHttpDownloadInterval!: number;
-  private readonly logger: { engine: debug.Debugger; loader: debug.Debugger };
+  private readonly logger: {
+    engine: debug.Debugger;
+    loader: debug.Debugger;
+  };
   private readonly levelBandwidth = { value: 0, refreshCount: 0 };
   private isProcessQueueMicrotaskCreated = false;
 
@@ -212,6 +215,7 @@ export class HybridLoader {
     request.subscribe("onSuccess", this.onRequestSuccess);
     request.subscribe("onError", this.onRequestError);
 
+    this.p2pLoaders.currentLoader.broadcastAnnouncement();
     void fulfillHttpSegmentRequest(request, this.settings);
     if (!isRandom) {
       this.logger.loader(
@@ -230,13 +234,22 @@ export class HybridLoader {
   }
 
   private onRequestSuccess = (request: Request, data: ArrayBuffer) => {
-    const { segment } = request;
-    this.logger.loader(`http responses: ${segment.externalId}`);
-    this.eventHandlers?.onSegmentLoaded?.(data.byteLength, "http");
+    const requestType = request.type;
+    if (!requestType) return;
+
+    if (requestType === "http") {
+      this.logger.loader(`http responses: ${request.segment.externalId}`);
+      this.p2pLoaders.currentLoader.broadcastAnnouncement();
+    }
+
+    this.eventHandlers?.onSegmentLoaded?.(data.byteLength, requestType);
     this.createProcessQueueMicrotask();
   };
 
-  private onRequestError = () => {
+  private onRequestError = (request: Request) => {
+    if (request.type === "http") {
+      this.p2pLoaders.currentLoader.broadcastAnnouncement();
+    }
     this.createProcessQueueMicrotask();
   };
 

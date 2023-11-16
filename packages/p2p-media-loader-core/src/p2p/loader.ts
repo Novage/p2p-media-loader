@@ -49,7 +49,6 @@ export class P2PLoader {
       this.stream,
       this.broadcastAnnouncement
     );
-    // this.requests.subscribeOnHttpRequestsUpdate(this.broadcastAnnouncement);
     this.trackerClient.start();
   }
 
@@ -103,6 +102,7 @@ export class P2PLoader {
 
   get connectedPeersAmount() {
     let count = 0;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     for (const peer of this.trackerClient.peers()) count++;
     return count;
   }
@@ -127,7 +127,7 @@ export class P2PLoader {
     peer.sendSegmentsAnnouncement(announcement);
   }
 
-  private broadcastAnnouncement = () => {
+  broadcastAnnouncement() {
     if (this.isAnnounceMicrotaskCreated) return;
 
     this.isAnnounceMicrotaskCreated = true;
@@ -138,7 +138,7 @@ export class P2PLoader {
       }
       this.isAnnounceMicrotaskCreated = false;
     });
-  };
+  }
 
   private async onSegmentRequested(peer: Peer, segmentExternalId: string) {
     const segment = StreamUtils.getSegmentFromStreamByExternalId(
@@ -159,7 +159,6 @@ export class P2PLoader {
       this.stream,
       this.broadcastAnnouncement
     );
-    // this.requests.unsubscribeFromHttpRequestsUpdate(this.broadcastAnnouncement);
     this.trackerClient.destroy();
   }
 }
