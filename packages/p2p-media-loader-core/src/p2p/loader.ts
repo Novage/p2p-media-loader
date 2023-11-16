@@ -127,7 +127,7 @@ export class P2PLoader {
     peer.sendSegmentsAnnouncement(announcement);
   };
 
-  broadcastAnnouncement() {
+  broadcastAnnouncement = () => {
     if (this.isAnnounceMicrotaskCreated) return;
 
     this.isAnnounceMicrotaskCreated = true;
@@ -138,7 +138,7 @@ export class P2PLoader {
       }
       this.isAnnounceMicrotaskCreated = false;
     });
-  }
+  };
 
   private onSegmentRequested = async (
     peer: Peer,
