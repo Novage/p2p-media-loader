@@ -13,7 +13,6 @@ import { BandwidthApproximator } from "./bandwidth-approximator";
 import { EngineCallbacks } from "./request-container";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import * as Bits from "./p2p/bits";
-import { serializeNumbersArray } from "./p2p/bits";
 
 export class Core<TStream extends Stream = Stream> {
   private manifestResponseUrl?: string;
