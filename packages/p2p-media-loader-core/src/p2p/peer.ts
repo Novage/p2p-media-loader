@@ -8,15 +8,14 @@ import {
   PeerSendSegmentCommand,
 } from "../internal-types";
 import { PeerCommandType, PeerSegmentStatus } from "../enums";
-import * as PeerUtil from "../utils/peer";
 import {
   Request,
   RequestControls,
   RequestError,
   PeerRequestErrorType,
-  RequestInnerErrorType,
 } from "../request";
 import { Segment, Settings } from "../types";
+import * as PeerUtil from "../utils/peer";
 import * as Utils from "../utils/utils";
 import debug from "debug";
 
@@ -218,7 +217,7 @@ export class Peer {
     }
   }
 
-  private abortRequest = (reason: RequestInnerErrorType) => {
+  private abortRequest = () => {
     if (!this.requestContext) return;
     const { request } = this.requestContext;
     this.sendCancelSegmentRequestCommand(request.segment);

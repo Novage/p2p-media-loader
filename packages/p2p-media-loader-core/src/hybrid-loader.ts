@@ -5,7 +5,7 @@ import { Settings, CoreEventHandlers } from "./types";
 import { BandwidthApproximator } from "./bandwidth-approximator";
 import { Playback, QueueItem } from "./internal-types";
 import { RequestsContainer } from "./request-container";
-import { Request, EngineCallbacks, RequestError } from "./request";
+import { Request, EngineCallbacks } from "./request";
 import * as QueueUtils from "./utils/queue";
 import * as LoggerUtils from "./utils/logger";
 import * as StreamUtils from "./utils/stream";
@@ -209,7 +209,7 @@ export class HybridLoader {
     const { segment } = item;
 
     const request = this.requests.getOrCreateRequest(segment);
-    request.subscribe("onSuccess", this.onRequestSucceed);
+    request.subscribe("onSuccess", this.onRequestSuccess);
     request.subscribe("onError", this.onRequestError);
 
     void fulfillHttpSegmentRequest(request, this.settings);
@@ -225,18 +225,18 @@ export class HybridLoader {
     const request = p2pLoader.downloadSegment(item);
     if (request === undefined) return;
 
-    request.subscribe("onSuccess", this.onRequestSucceed);
+    request.subscribe("onSuccess", this.onRequestSuccess);
     request.subscribe("onError", this.onRequestError);
   }
 
-  private onRequestSucceed = (request: Request, data: ArrayBuffer) => {
+  private onRequestSuccess = (request: Request, data: ArrayBuffer) => {
     const { segment } = request;
     this.logger.loader(`http responses: ${segment.externalId}`);
     this.eventHandlers?.onSegmentLoaded?.(data.byteLength, "http");
     this.createProcessQueueMicrotask();
   };
 
-  private onRequestError = (request: Request, error: RequestError) => {
+  private onRequestError = () => {
     this.createProcessQueueMicrotask();
   };
 

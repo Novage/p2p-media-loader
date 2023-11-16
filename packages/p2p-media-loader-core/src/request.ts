@@ -5,8 +5,7 @@ import * as Utils from "./utils/utils";
 
 export type EngineCallbacks = {
   onSuccess: (response: SegmentResponse) => void;
-  // TODO: Error for engines
-  onError: (reason: "failed" | "abort") => void;
+  onError: (reason: CoreRequestError) => void;
 };
 
 export type LoadProgress = {
@@ -144,6 +143,7 @@ export class Request extends EventDispatcher<RequestEvents> {
       loadedBytes: 0,
       startTimestamp: performance.now(),
     };
+    this.bandwidthApproximator.addLoading(this.progress);
     const { firstBytesTimeoutMs, fullLoadingTimeoutMs, abort } = controls;
     this._abortRequestCallback = abort;
     if (firstBytesTimeoutMs !== undefined) {
@@ -171,7 +171,7 @@ export class Request extends EventDispatcher<RequestEvents> {
   }
 
   abortEngineRequest() {
-    this._engineCallbacks?.onError("abort");
+    this._engineCallbacks?.onError(new CoreRequestError("aborted"));
     this._engineCallbacks = undefined;
   }
 
@@ -268,14 +268,13 @@ export type RequestInnerErrorType = (typeof requestInnerErrorTypes)[number];
 export type HttpRequestErrorType = (typeof httpRequestErrorTypes)[number];
 export type PeerRequestErrorType = (typeof peerRequestErrorTypes)[number];
 
+type RequestErrorType =
+  | RequestInnerErrorType
+  | PeerRequestErrorType
+  | HttpRequestErrorType;
+
 export class RequestError<
-  T extends
-    | RequestInnerErrorType
-    | PeerRequestErrorType
-    | HttpRequestErrorType =
-    | RequestInnerErrorType
-    | PeerRequestErrorType
-    | HttpRequestErrorType
+  T extends RequestErrorType = RequestErrorType
 > extends Error {
   constructor(readonly type: T, message?: string) {
     super(message);
@@ -297,6 +296,12 @@ export class RequestError<
     error: RequestError
   ): error is RequestError<HttpRequestErrorType> {
     return peerRequestErrorTypes.includes(error.type as any);
+  }
+}
+
+export class CoreRequestError extends Error {
+  constructor(readonly type: "failed" | "aborted") {
+    super();
   }
 }
 

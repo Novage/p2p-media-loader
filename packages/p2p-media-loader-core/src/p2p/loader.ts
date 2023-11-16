@@ -87,7 +87,7 @@ export class P2PLoader {
         statuses
       )}`
     );
-    request.subscribe("onCompleted", () => {
+    request.subscribe("onSuccess", () => {
       this.logger(`p2p loaded: ${segment.externalId}`);
     });
 

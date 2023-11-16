@@ -1,17 +1,11 @@
 import { Segment, StreamType } from "./types";
 import Debug from "debug";
-import { EventDispatcher } from "./event-dispatcher";
 import { BandwidthApproximator } from "./bandwidth-approximator";
 import { Request, RequestEvents } from "./request";
-
-type RequestsContainerEvents = {
-  httpRequestsUpdated: () => void;
-};
 
 export class RequestsContainer {
   private readonly requests = new Map<string, Request>();
   private readonly logger: Debug.Debugger;
-  private readonly events = new EventDispatcher<RequestsContainerEvents>();
 
   constructor(
     streamType: StreamType,
@@ -47,13 +41,13 @@ export class RequestsContainer {
     let request = this.requests.get(id);
     if (!request) {
       request = new Request(segment, this.bandwidthApproximator);
-      request.subscribe("onCompleted", this.onRequestCompleted);
+      request.subscribe("onSuccess", this.onRequestCompleted);
       this.requests.set(request.id, request);
     }
     return request;
   }
 
-  private onRequestCompleted: RequestEvents["onCompleted"] = (request) => {
+  private onRequestCompleted: RequestEvents["onSuccess"] = (request) => {
     this.requests.delete(request.id);
   };
 
@@ -97,7 +91,7 @@ export class RequestsContainer {
   destroy() {
     for (const request of this.requests.values()) {
       request.abort();
-      request.engineCallbacks?.onError("failed");
+      request.abortEngineRequest();
     }
     this.requests.clear();
   }

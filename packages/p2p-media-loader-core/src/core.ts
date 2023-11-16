@@ -7,10 +7,10 @@ import {
   SegmentBase,
   CoreEventHandlers,
 } from "./types";
-import * as Utils from "./utils/utils";
+import * as StreamUtils from "./utils/stream";
 import { LinkedMap } from "./linked-map";
 import { BandwidthApproximator } from "./bandwidth-approximator";
-import { EngineCallbacks } from "./request-container";
+import { EngineCallbacks } from "./request";
 import { SegmentsMemoryStorage } from "./segments-storage";
 
 export class Core<TStream extends Stream = Stream> {
@@ -25,9 +25,10 @@ export class Core<TStream extends Stream = Stream> {
     cachedSegmentExpiration: 120 * 1000,
     cachedSegmentsCount: 50,
     webRtcMaxMessageSize: 64 * 1024 - 1,
-    p2pSegmentDownloadTimeout: 5000,
-    p2pLoaderDestroyTimeout: 30 * 1000,
-    httpRequestTimeout: 5000,
+    p2pSegmentFirstBytesTimeoutMs: 1000,
+    p2pSegmentDownloadTimeoutMs: 5000,
+    p2pLoaderDestroyTimeoutMs: 30 * 1000,
+    httpDownloadTimeoutMs: 5000,
   };
   private readonly bandwidthApproximator = new BandwidthApproximator();
   private segmentStorage?: SegmentsMemoryStorage;
@@ -41,7 +42,7 @@ export class Core<TStream extends Stream = Stream> {
   }
 
   hasSegment(segmentLocalId: string): boolean {
-    const segment = Utils.getSegmentFromStreamsMap(
+    const segment = StreamUtils.getSegmentFromStreamsMap(
       this.streams,
       segmentLocalId
     );
@@ -117,7 +118,10 @@ export class Core<TStream extends Stream = Stream> {
       throw new Error("Manifest response url is undefined");
     }
 
-    const segment = Utils.getSegmentFromStreamsMap(this.streams, segmentId);
+    const segment = StreamUtils.getSegmentFromStreamsMap(
+      this.streams,
+      segmentId
+    );
     if (!segment) {
       throw new Error(`Not found segment with id: ${segmentId}`);
     }

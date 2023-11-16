@@ -8,12 +8,7 @@ import type {
   LoaderStats,
 } from "hls.js";
 import * as Utils from "./utils";
-import {
-  RequestAbortError,
-  Core,
-  FetchError,
-  SegmentResponse,
-} from "p2p-media-loader-core";
+import { Core, SegmentResponse, CoreRequestError } from "p2p-media-loader-core";
 
 const DEFAULT_DOWNLOAD_LATENCY = 10;
 
@@ -89,7 +84,13 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     };
 
     const onError = (error: unknown) => {
-      if (error instanceof RequestAbortError && this.stats.aborted) return;
+      if (
+        error instanceof CoreRequestError &&
+        error.type === "aborted" &&
+        this.stats.aborted
+      ) {
+        return;
+      }
       this.handleError(error);
     };
 
@@ -98,15 +99,16 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
 
   private handleError(thrownError: unknown) {
     const error = { code: 0, text: "" };
-    let details: object | null = null;
-    if (thrownError instanceof FetchError) {
-      error.code = thrownError.code;
+    if (
+      thrownError instanceof CoreRequestError &&
+      thrownError.type === "failed"
+    ) {
+      // error.code = thrownError.code;
       error.text = thrownError.message;
-      details = thrownError.details;
     } else if (thrownError instanceof Error) {
       error.text = thrownError.message;
     }
-    this.callbacks?.onError(error, this.context, details, this.stats);
+    this.callbacks?.onError(error, this.context, null, this.stats);
   }
 
   private abortInternal() {
