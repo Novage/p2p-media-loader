@@ -3,10 +3,10 @@ import TrackerClient, {
   TrackerClientEvents,
 } from "bittorrent-tracker";
 import { Peer } from "./peer";
-import * as PeerUtil from "../utils/peer";
 import { Segment, Settings, StreamWithSegments } from "../types";
 import { QueueItem } from "../internal-types";
 import { SegmentsMemoryStorage } from "../segments-storage";
+import * as PeerUtil from "../utils/peer";
 import * as LoggerUtils from "../utils/logger";
 import * as StreamUtils from "../utils/stream";
 import * as Utils from "../utils/utils";
@@ -121,11 +121,11 @@ export class P2PLoader {
     return PeerUtil.getJsonSegmentsAnnouncement(loaded, httpLoading);
   }
 
-  private onPeerConnected(peer: Peer) {
+  private onPeerConnected = (peer: Peer) => {
     this.logger(`connected with peer: ${peer.id}`);
     const announcement = this.getSegmentsAnnouncement();
     peer.sendSegmentsAnnouncement(announcement);
-  }
+  };
 
   broadcastAnnouncement() {
     if (this.isAnnounceMicrotaskCreated) return;
@@ -140,7 +140,10 @@ export class P2PLoader {
     });
   }
 
-  private async onSegmentRequested(peer: Peer, segmentExternalId: string) {
+  private onSegmentRequested = async (
+    peer: Peer,
+    segmentExternalId: string
+  ) => {
     const segment = StreamUtils.getSegmentFromStreamByExternalId(
       this.stream,
       segmentExternalId
@@ -149,7 +152,7 @@ export class P2PLoader {
       segment && (await this.segmentStorage.getSegmentData(segment));
     if (segmentData) void peer.sendSegmentData(segmentExternalId, segmentData);
     else peer.sendSegmentAbsent(segmentExternalId);
-  }
+  };
 
   destroy() {
     this.logger(
@@ -163,7 +166,10 @@ export class P2PLoader {
   }
 }
 
-type PeerItem = { peer?: Peer; potentialConnections: Set<PeerConnection> };
+type PeerItem = {
+  peer?: Peer;
+  potentialConnections: Set<PeerConnection>;
+};
 
 type P2PTrackerClientEventHandlers = {
   onPeerConnected: (peer: Peer) => void;

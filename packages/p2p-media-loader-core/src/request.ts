@@ -92,22 +92,8 @@ export class Request extends EventDispatcher<RequestEvents> {
     return this._loadedBytes;
   }
 
-  set engineCallbacks(callbacks: EngineCallbacks) {
-    if (this._engineCallbacks) {
-      throw new Error("Segment is already requested by engine");
-    }
-    this._engineCallbacks = callbacks;
-  }
-
   get totalBytes(): number | undefined {
     return this._totalBytes;
-  }
-
-  setTotalBytes(value: number) {
-    if (this._totalBytes !== undefined) {
-      throw new Error("Request total bytes value is already set");
-    }
-    this._totalBytes = value;
   }
 
   get loadedPercent() {
@@ -117,6 +103,20 @@ export class Request extends EventDispatcher<RequestEvents> {
 
   get requestAttempts(): ReadonlyArray<Readonly<RequestAttempt>> {
     return this.prevAttempts;
+  }
+
+  setEngineCallbacks(callbacks: EngineCallbacks) {
+    if (this._engineCallbacks) {
+      throw new Error("Segment is already requested by engine");
+    }
+    this._engineCallbacks = callbacks;
+  }
+
+  setTotalBytes(value: number) {
+    if (this._totalBytes !== undefined) {
+      throw new Error("Request total bytes value is already set");
+    }
+    this._totalBytes = value;
   }
 
   start(
@@ -135,9 +135,7 @@ export class Request extends EventDispatcher<RequestEvents> {
     }
 
     this._status = "loading";
-    const attempt: RequestAttempt = {
-      ...requestData,
-    };
+    this.currentAttempt = { ...requestData };
     this.progress = {
       startFromByte: this._loadedBytes,
       loadedBytes: 0,
@@ -152,8 +150,6 @@ export class Request extends EventDispatcher<RequestEvents> {
     if (fullLoadingTimeoutMs !== undefined) {
       this.fullBytesTimeout.start(fullLoadingTimeoutMs);
     }
-
-    this.currentAttempt = attempt;
     return {
       firstBytesReceived: this.firstBytesReceived,
       addLoadedChunk: this.addLoadedChunk,
@@ -168,6 +164,7 @@ export class Request extends EventDispatcher<RequestEvents> {
     this._status = "aborted";
     this._abortRequestCallback("abort");
     this._abortRequestCallback = undefined;
+    this.clearTimeouts();
   }
 
   abortEngineRequest() {
@@ -179,9 +176,10 @@ export class Request extends EventDispatcher<RequestEvents> {
     this.throwErrorIfNotLoadingStatus();
     if (!this.currentAttempt) return;
 
-    this.fullBytesTimeout.stopAndClear();
+    this.fullBytesTimeout.clear();
     const data = Utils.joinChunks(this.chunks);
     this._status = "succeed";
+    this._totalBytes = this._loadedBytes;
     this.prevAttempts.push(this.currentAttempt);
 
     this._engineCallbacks?.onSuccess({
@@ -203,7 +201,7 @@ export class Request extends EventDispatcher<RequestEvents> {
 
   private firstBytesReceived = () => {
     this.throwErrorIfNotLoadingStatus();
-    this.firstBytesTimeout.stopAndClear();
+    this.firstBytesTimeout.clear();
   };
 
   private cancelOnError = (error: RequestError) => {
@@ -224,6 +222,7 @@ export class Request extends EventDispatcher<RequestEvents> {
     }
     this.currentAttempt.error = error;
     this.prevAttempts.push(this.currentAttempt);
+    this.clearTimeouts();
     this.dispatch("onError", this, error);
   }
 
@@ -237,9 +236,14 @@ export class Request extends EventDispatcher<RequestEvents> {
     this.throwRequestError(new RequestError("full-bytes-timeout"), true);
   };
 
+  private clearTimeouts() {
+    this.firstBytesTimeout.clear();
+    this.fullBytesTimeout.clear();
+  }
+
   private throwErrorIfNotLoadingStatus() {
     if (this._status !== "loading") {
-      throw new Error("Request has been already completed/aborted/failed.");
+      throw new Error(`Request has been already ${this.status}.`);
     }
   }
 
@@ -304,7 +308,7 @@ export class Timeout {
     this.timeoutId = window.setTimeout(this.action, ms);
   }
 
-  stopAndClear() {
+  clear() {
     clearTimeout(this.timeoutId);
     this.timeoutId = undefined;
   }

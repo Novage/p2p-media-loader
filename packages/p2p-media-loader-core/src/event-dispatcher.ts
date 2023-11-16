@@ -1,6 +1,6 @@
 export class EventDispatcher<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  T extends { [key: string]: (...args: any) => void | Promise<void> },
+  T extends { [key: string]: (...args: any[]) => void | Promise<void> },
   K extends keyof T = keyof T
 > {
   private readonly listeners = new Map<keyof T, Set<T[K]>>();
@@ -25,7 +25,7 @@ export class EventDispatcher<
     const eventListeners = this.listeners.get(eventType);
     if (!eventListeners) return;
     for (const listener of eventListeners) {
-      listener(args);
+      listener(...args);
     }
   }
 }

@@ -26,7 +26,6 @@ export class HybridLoader {
     engine: debug.Debugger;
     loader: debug.Debugger;
   };
-  private readonly levelBandwidth = { value: 0, refreshCount: 0 };
   private isProcessQueueMicrotaskCreated = false;
 
   constructor(
@@ -91,7 +90,6 @@ export class HybridLoader {
         `stream changed to ${LoggerUtils.getStreamString(stream)}`
       );
       this.p2pLoaders.changeCurrentLoader(stream);
-      this.refreshLevelBandwidth(true);
     }
     this.lastRequestedSegment = segment;
 
@@ -101,12 +99,12 @@ export class HybridLoader {
       if (data) {
         callbacks.onSuccess({
           data,
-          bandwidth: this.levelBandwidth.value,
+          bandwidth: this.bandwidthApproximator.getBandwidth(),
         });
       }
     } else {
       const request = this.requests.getOrCreateRequest(segment);
-      request.engineCallbacks = callbacks;
+      request.setEngineCallbacks(callbacks);
     }
 
     this.createProcessQueueMicrotask();
@@ -146,7 +144,7 @@ export class HybridLoader {
         !queueSegmentIds.has(request.segment.localId)
       ) {
         request.abort();
-        this.requests.remove(request);
+        this.requests.remove(request.segment);
       }
     }
 
@@ -237,6 +235,7 @@ export class HybridLoader {
     const requestType = request.type;
     if (!requestType) return;
 
+    void this.segmentStorage.storeSegment(request.segment, data);
     if (requestType === "http") {
       this.logger.loader(`http responses: ${request.segment.externalId}`);
       this.p2pLoaders.currentLoader.broadcastAnnouncement();
@@ -312,15 +311,6 @@ export class HybridLoader {
         );
         break;
       }
-    }
-  }
-
-  private refreshLevelBandwidth(levelChanged = false) {
-    if (levelChanged) this.levelBandwidth.refreshCount = 0;
-    if (this.levelBandwidth.refreshCount < 3) {
-      const currentBandwidth = this.bandwidthApproximator.getBandwidth();
-      this.levelBandwidth.value = currentBandwidth ?? 0;
-      this.levelBandwidth.refreshCount++;
     }
   }
 

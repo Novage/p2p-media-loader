@@ -19,7 +19,7 @@ export async function fulfillHttpSegmentRequest(
   const requestControls = request.start(
     { type: "http" },
     {
-      abort: (errorType) => abortController.abort(errorType),
+      abort: () => abortController.abort("abort"),
       fullLoadingTimeoutMs: settings.httpDownloadTimeoutMs,
     }
   );
@@ -30,27 +30,29 @@ export async function fulfillHttpSegmentRequest(
     });
     requestControls.firstBytesReceived();
 
-    if (fetchResponse.ok) {
-      if (!fetchResponse.body) return;
-
-      const totalBytesString = fetchResponse.headers.get("Content-Length");
-      if (totalBytesString) request.setTotalBytes(+totalBytesString);
-
-      const reader = fetchResponse.body.getReader();
-      for await (const chunk of readStream(reader)) {
-        requestControls.addLoadedChunk(chunk);
-      }
-      requestControls.completeOnSuccess();
+    if (!fetchResponse.ok) {
+      throw new RequestError("fetch-error", fetchResponse.statusText);
     }
-    throw new RequestError("fetch-error", fetchResponse.statusText);
+
+    if (!fetchResponse.body) return;
+    const totalBytesString = fetchResponse.headers.get("Content-Length");
+    if (totalBytesString) request.setTotalBytes(+totalBytesString);
+
+    const reader = fetchResponse.body.getReader();
+    for await (const chunk of readStream(reader)) {
+      requestControls.addLoadedChunk(chunk);
+    }
+    requestControls.completeOnSuccess();
   } catch (error) {
     if (error instanceof Error) {
-      let httpLoaderError: RequestError<HttpRequestErrorType>;
-      if (!(error instanceof RequestError)) {
-        httpLoaderError = new RequestError("fetch-error", error.message);
-      } else {
-        httpLoaderError = error;
-      }
+      if (error.name !== "abort") return;
+
+      const httpLoaderError: RequestError<HttpRequestErrorType> = !(
+        error instanceof RequestError
+      )
+        ? new RequestError("fetch-error", error.message)
+        : error;
+      console.log("HTTP ERROR");
       requestControls.cancelOnError(httpLoaderError);
     }
   }

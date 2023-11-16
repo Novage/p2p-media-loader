@@ -17,7 +17,7 @@ export class Core<TStream extends Stream = Stream> {
   private manifestResponseUrl?: string;
   private readonly streams = new Map<string, StreamWithSegments<TStream>>();
   private readonly settings: Settings = {
-    simultaneousHttpDownloads: 2,
+    simultaneousHttpDownloads: 1,
     simultaneousP2PDownloads: 3,
     highDemandTimeWindow: 15,
     httpDownloadTimeWindow: 45,

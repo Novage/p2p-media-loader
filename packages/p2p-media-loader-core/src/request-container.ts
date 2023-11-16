@@ -4,7 +4,7 @@ import { BandwidthApproximator } from "./bandwidth-approximator";
 import { Request, RequestEvents } from "./request";
 
 export class RequestsContainer {
-  private readonly requests = new Map<string, Request>();
+  private readonly requests = new Map<Segment, Request>();
   private readonly logger: Debug.Debugger;
 
   constructor(
@@ -32,29 +32,25 @@ export class RequestsContainer {
   }
 
   get(segment: Segment) {
-    const id = Request.getRequestItemId(segment);
-    return this.requests.get(id);
+    return this.requests.get(segment);
   }
 
   getOrCreateRequest(segment: Segment) {
-    const id = Request.getRequestItemId(segment);
-    let request = this.requests.get(id);
+    let request = this.requests.get(segment);
     if (!request) {
       request = new Request(segment, this.bandwidthApproximator);
       request.subscribe("onSuccess", this.onRequestCompleted);
-      this.requests.set(request.id, request);
+      this.requests.set(segment, request);
     }
     return request;
   }
 
   private onRequestCompleted: RequestEvents["onSuccess"] = (request) => {
-    this.requests.delete(request.id);
+    this.requests.delete(request.segment);
   };
 
-  remove(value: Segment | Request) {
-    const id =
-      value instanceof Request ? value.id : Request.getRequestItemId(value);
-    this.requests.delete(id);
+  remove(segment: Segment) {
+    this.requests.delete(segment);
   }
 
   values() {
@@ -74,18 +70,15 @@ export class RequestsContainer {
   }
 
   isHttpRequested(segment: Segment): boolean {
-    const id = Request.getRequestItemId(segment);
-    return this.requests.get(id)?.type === "http";
+    return this.requests.get(segment)?.type === "http";
   }
 
   isP2PRequested(segment: Segment): boolean {
-    const id = Request.getRequestItemId(segment);
-    return this.requests.get(id)?.type === "p2p";
+    return this.requests.get(segment)?.type === "p2p";
   }
 
   isHybridLoaderRequested(segment: Segment): boolean {
-    const id = Request.getRequestItemId(segment);
-    return !!this.requests.get(id)?.type;
+    return !!this.requests.get(segment)?.type;
   }
 
   destroy() {
