@@ -6,7 +6,8 @@ import {
   PeerSegmentCommand,
   PeerSendSegmentCommand,
 } from "../internal-types";
-import { PeerCommandType, PeerSegmentStatus } from "../enums";
+import { PeerCommandType } from "./command";
+import { PeerSegmentStatus } from "../enums";
 import * as PeerUtil from "../utils/peer";
 import { P2PRequest } from "../request-container";
 import { Segment, Settings } from "../types";

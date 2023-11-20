@@ -1,5 +1,6 @@
 import { JsonSegmentAnnouncement, PeerCommand } from "../internal-types";
-import { PeerCommandType, PeerSegmentStatus } from "../enums";
+import { PeerSegmentStatus } from "../enums";
+import { PeerCommandType } from "../p2p/command";
 import RIPEMD160 from "ripemd160";
 
 const HASH_SYMBOLS =

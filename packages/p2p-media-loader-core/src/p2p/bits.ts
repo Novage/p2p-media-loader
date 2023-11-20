@@ -1,4 +1,4 @@
-import { PeerCommandType } from "../enums";
+import { PeerCommandType } from "./command";
 
 export function integerToBytesArray(num: number): number[] {
   const bytesAmount = requiredBytesForInteger(num);

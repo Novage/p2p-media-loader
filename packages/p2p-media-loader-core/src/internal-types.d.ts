@@ -1,5 +1,5 @@
 import { Segment } from "./types";
-import { PeerCommandType } from "./enums";
+import { PeerCommandType } from "./p2p/command";
 
 export type Playback = {
   position: number;
