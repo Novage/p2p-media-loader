@@ -14,11 +14,11 @@ function getRequiredBytesForInt(num: bigint): number {
   return Math.ceil(necessaryBits / 8);
 }
 
-export function intToBytes(num: bigint, isNegativeZero = false): Uint8Array {
-  const isNegative = num < 0 || (num === 0n && isNegativeZero);
+export function intToBytes(num: bigint): Uint8Array {
   const bytesAmountNumber = getRequiredBytesForInt(num);
   const bytes = new Uint8Array(bytesAmountNumber);
   const bytesAmount = BigInt(bytesAmountNumber);
+  const isNegative = num < 0;
 
   num = abs(num);
   for (let i = 0; i < bytesAmountNumber; i++) {
@@ -73,22 +73,13 @@ export function serializeSimilarIntArr(numbers: bigint[]) {
   let common = abs(numbers[0]);
   for (let i = 1; i < numbers.length; i++) common &= abs(numbers[i]);
 
-  console.log("common", common);
-
   const diffMask = ~common;
-  const diffParts = numbers.map<[bigint, boolean?]>((num) => {
-    if (num < 0) {
-      const diffPart = -(-num & diffMask);
-      const isNegativeZero = num === 0n;
-      if (isNegativeZero) return [diffPart, isNegativeZero];
-      return [diffPart];
-    }
-    return [num & diffMask];
+  const diffParts = numbers.map<bigint>((num) => {
+    if (num < 0) return -(-num & diffMask);
+    return num & diffMask;
   });
 
-  console.log("diffParts", diffParts);
-
-  const groups = groupArrayItemsBy(diffParts, ([num]) =>
+  const groups = groupArrayItemsBy(diffParts, (num) =>
     getRequiredBytesForInt(num)
   );
   const bytesSequences: Uint8Array[] = [];
@@ -137,7 +128,7 @@ export function deserializeSimilarIntArr(bytes: Uint8Array) {
 }
 
 function serializeIntSequence(
-  numbers: [bigint, boolean? /*is negative zero*/][],
+  numbers: bigint[],
   byteLength: number
 ): Uint8Array {
   if (byteLength > 8 || byteLength < 1) {
@@ -146,12 +137,12 @@ function serializeIntSequence(
   // 2 bytes for metadata: 3 bits for list item byte length; 13 for arr length
   const arrayLength = numbers.length;
   const bytes = new Uint8Array(2 + arrayLength * byteLength);
-  bytes[0] = (byteLength << 5) | (arrayLength >> 8 && 0b00011111);
+  bytes[0] = (byteLength << 5) | ((arrayLength >> 8) & 0b00011111);
   bytes[1] = arrayLength & 0xff;
 
   for (let i = 0, offset = 2; i < arrayLength; i++, offset += byteLength) {
-    const [number, isNegativeZero] = numbers[i];
-    const numBytes = intToBytes(number, isNegativeZero);
+    const number = numbers[i];
+    const numBytes = intToBytes(number);
     bytes.set(numBytes, offset);
   }
 
