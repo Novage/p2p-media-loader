@@ -3,6 +3,7 @@ export enum SerializedItem {
   Int,
   SimilarIntArray,
 }
+export const serializedItemTypes = Object.values(SerializedItem);
 
 function abs(num: bigint): bigint {
   return num < 0 ? -num : num;

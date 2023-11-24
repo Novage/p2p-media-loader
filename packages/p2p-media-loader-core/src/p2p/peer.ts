@@ -1,10 +1,11 @@
 import { PeerConnection } from "bittorrent-tracker";
-import { PeerCommandType } from "./command";
 import { P2PRequest } from "../request-container";
 import { Segment, Settings } from "../types";
 import * as Command from "./command";
 import * as Utils from "../utils/utils";
 import debug from "debug";
+
+const { PeerCommandType } = Command;
 
 export class PeerRequestError extends Error {
   constructor(
@@ -82,10 +83,11 @@ export class Peer {
       this.logger(`connected with peer: ${this.id}`);
 
       connection.on("data", (data) => {
-        try {
+        if (Command.isCommandBuffer(data)) {
+          // TODO: error handling
           const command = Command.deserializeCommand(data);
           this.receiveCommand(command);
-        } catch (err) {
+        } else {
           this.receiveSegmentChunk(data);
         }
       });
@@ -137,7 +139,7 @@ export class Peer {
 
       case PeerCommandType.SegmentData:
         if (this.request?.segment.externalId === command.i) {
-          const { progress } = this.request!.p2pRequest;
+          const { progress } = this.request.p2pRequest;
           progress.totalBytes = command.s;
           progress.canBeTracked = true;
         }

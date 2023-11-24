@@ -8,6 +8,8 @@ export enum PeerCommandType {
   CancelSegmentRequest,
 }
 
+const peerCommandTypes = Object.values(PeerCommandType);
+
 type BasePeerCommand<T extends PeerCommandType = PeerCommandType> = {
   c: T;
 };
@@ -59,18 +61,19 @@ export function serializePeerSendSegmentCommand(
 ) {
   const creator = new BinaryCommandCreator(command.c);
   creator.addInteger("i", command.i);
+  creator.addInteger("s", command.s);
   creator.complete();
   return creator.getResultBuffer();
 }
 
-function isCommandBuffer(bytes: Uint8Array) {
+export function isCommandBuffer(bytes: Uint8Array) {
   const [start, commandCode] = bytes;
   const end = bytes[bytes.length - 1];
 
   return (
     start === "{".charCodeAt(0) &&
     end === "}".charCodeAt(0) &&
-    Object.values(PeerCommandType).includes(commandCode)
+    peerCommandTypes.includes(commandCode)
   );
 }
 
@@ -79,6 +82,7 @@ export function deserializeCommand(bytes: Uint8Array): PeerCommand {
     throw new Error("Given bytes don't represent peer command.");
   }
   const [, commandCode] = bytes;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const deserializedCommand: { [key: string]: any } = {
     c: commandCode,
   };
@@ -108,14 +112,15 @@ export function deserializeCommand(bytes: Uint8Array): PeerCommand {
         }
         break;
     }
-  } while (bytes[offset] !== "}".charCodeAt(0) && offset < bytes.length);
+  } while (offset < bytes.length && bytes[offset] !== "}".charCodeAt(0));
   // TODO: type guards
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return deserializedCommand as any as PeerCommand;
 }
 
 function getDataTypeFromByte(byte: number): Serialization.SerializedItem {
   const typeCode = byte >> 4;
-  if (!Object.values(Serialization.SerializedItem).includes(typeCode)) {
+  if (!Serialization.serializedItemTypes.includes(typeCode)) {
     throw new Error("Not existing type");
   }
 
@@ -133,7 +138,7 @@ class BinaryCommandCreator {
 
   addInteger(name: string, value: number) {
     this.bytes.push(name.charCodeAt(0));
-    const bytes = Serialization.intToBytes(BigInt(value));
+    const bytes = Serialization.serializeInt(BigInt(value));
     this.bytes.push(bytes);
   }
 
