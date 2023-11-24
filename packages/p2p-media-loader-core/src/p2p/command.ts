@@ -12,7 +12,7 @@ type BasePeerCommand<T extends PeerCommandType = PeerCommandType> = {
   c: T;
 };
 
-type PeerSegmentCommand = BasePeerCommand<
+export type PeerSegmentCommand = BasePeerCommand<
   | PeerCommandType.SegmentRequest
   | PeerCommandType.SegmentAbsent
   | PeerCommandType.CancelSegmentRequest
@@ -20,16 +20,17 @@ type PeerSegmentCommand = BasePeerCommand<
   i: number; // segment id
 };
 
-type PeerSegmentAnnouncementCommand =
+export type PeerSegmentAnnouncementCommand =
   BasePeerCommand<PeerCommandType.SegmentsAnnouncement> & {
     l: number[]; // loaded segments
     p: number[]; // segments loading by http
   };
 
-type PeerSendSegmentCommand = BasePeerCommand<PeerCommandType.SegmentData> & {
-  i: number; // segment id
-  s: number; // size in bytes
-};
+export type PeerSendSegmentCommand =
+  BasePeerCommand<PeerCommandType.SegmentData> & {
+    i: number; // segment id
+    s: number; // size in bytes
+  };
 
 export type PeerCommand =
   | PeerSegmentCommand
@@ -62,7 +63,7 @@ export function serializePeerSendSegmentCommand(
   return creator.getResultBuffer();
 }
 
-function isBufferCommand(bytes: Uint8Array) {
+function isCommandBuffer(bytes: Uint8Array) {
   const [start, commandCode] = bytes;
   const end = bytes[bytes.length - 1];
 
@@ -73,8 +74,8 @@ function isBufferCommand(bytes: Uint8Array) {
   );
 }
 
-export function deserializeCommand(bytes: Uint8Array) {
-  if (!isBufferCommand(bytes)) {
+export function deserializeCommand(bytes: Uint8Array): PeerCommand {
+  if (!isCommandBuffer(bytes)) {
     throw new Error("Given bytes don't represent peer command.");
   }
   const [, commandCode] = bytes;
@@ -108,8 +109,8 @@ export function deserializeCommand(bytes: Uint8Array) {
         break;
     }
   } while (bytes[offset] !== "}".charCodeAt(0) && offset < bytes.length);
-
-  return deserializedCommand;
+  // TODO: type guards
+  return deserializedCommand as any as PeerCommand;
 }
 
 function getDataTypeFromByte(byte: number): Serialization.SerializedItem {

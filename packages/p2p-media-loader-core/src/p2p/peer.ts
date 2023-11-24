@@ -1,16 +1,8 @@
 import { PeerConnection } from "bittorrent-tracker";
-import {
-  JsonSegmentAnnouncement,
-  PeerCommand,
-  PeerSegmentAnnouncementCommand,
-  PeerSegmentCommand,
-  PeerSendSegmentCommand,
-} from "../internal-types";
 import { PeerCommandType } from "./command";
-import { PeerSegmentStatus } from "../enums";
-import * as PeerUtil from "../utils/peer";
 import { P2PRequest } from "../request-container";
 import { Segment, Settings } from "../types";
+import * as Command from "./command";
 import * as Utils from "../utils/utils";
 import debug from "debug";
 
@@ -31,7 +23,7 @@ export class PeerRequestError extends Error {
 type PeerEventHandlers = {
   onPeerConnected: (peer: Peer) => void;
   onPeerClosed: (peer: Peer) => void;
-  onSegmentRequested: (peer: Peer, segmentId: string) => void;
+  onSegmentRequested: (peer: Peer, segmentId: number) => void;
 };
 
 type PeerRequest = {
@@ -52,7 +44,8 @@ export class Peer {
   readonly id: string;
   private connection?: PeerConnection;
   private connections = new Set<PeerConnection>();
-  private segments = new Map<string, PeerSegmentStatus>();
+  private loadedSegments = new Set<number>();
+  private httpLoadingSegments = new Set<number>();
   private request?: PeerRequest;
   private readonly logger = debug("core:peer");
   private readonly bandwidthMeasurer = new BandwidthMeasurer();
@@ -88,7 +81,14 @@ export class Peer {
       this.eventHandlers.onPeerConnected(this);
       this.logger(`connected with peer: ${this.id}`);
 
-      connection.on("data", this.onReceiveData.bind(this));
+      connection.on("data", (data) => {
+        try {
+          const command = Command.deserializeCommand(data);
+          this.receiveCommand(command);
+        } catch (err) {
+          this.receiveSegmentChunk(data);
+        }
+      });
       connection.on("close", () => {
         this.connection = undefined;
         this.cancelSegmentRequest("peer-closed");
@@ -118,21 +118,17 @@ export class Peer {
     return this.bandwidthMeasurer.getBandwidth();
   }
 
-  getSegmentStatus(segment: Segment): PeerSegmentStatus | undefined {
+  getSegmentStatus(segment: Segment): "loaded" | "http-loading" | undefined {
     const { externalId } = segment;
-    return this.segments.get(externalId);
+    if (this.loadedSegments.has(externalId)) return "loaded";
+    if (this.httpLoadingSegments.has(externalId)) return "http-loading";
   }
 
-  private onReceiveData(data: ArrayBuffer) {
-    const command = PeerUtil.getPeerCommandFromArrayBuffer(data);
-    if (!command) {
-      this.receiveSegmentChunk(data);
-      return;
-    }
-
+  private receiveCommand(command: Command.PeerCommand) {
     switch (command.c) {
       case PeerCommandType.SegmentsAnnouncement:
-        this.segments = PeerUtil.getSegmentsFromPeerAnnouncement(command.a);
+        this.loadedSegments = new Set(command.l);
+        this.httpLoadingSegments = new Set(command.p);
         break;
 
       case PeerCommandType.SegmentRequest:
@@ -141,7 +137,7 @@ export class Peer {
 
       case PeerCommandType.SegmentData:
         if (this.request?.segment.externalId === command.i) {
-          const { progress } = this.request.p2pRequest;
+          const { progress } = this.request!.p2pRequest;
           progress.totalBytes = command.s;
           progress.canBeTracked = true;
         }
@@ -150,7 +146,7 @@ export class Peer {
       case PeerCommandType.SegmentAbsent:
         if (this.request?.segment.externalId === command.i) {
           this.cancelSegmentRequest("segment-absent");
-          this.segments.delete(command.i);
+          this.loadedSegments.delete(command.i);
         }
         break;
 
@@ -160,9 +156,24 @@ export class Peer {
     }
   }
 
-  private sendCommand(command: PeerCommand) {
+  private sendCommand(command: Command.PeerCommand) {
     if (!this.connection) return;
-    this.connection.send(JSON.stringify(command));
+    let serializedCommand: Uint8Array | undefined;
+    switch (command.c) {
+      case PeerCommandType.SegmentRequest:
+      case PeerCommandType.CancelSegmentRequest:
+      case PeerCommandType.SegmentAbsent:
+        serializedCommand = Command.serializePeerSegmentCommand(command);
+        break;
+      case PeerCommandType.SegmentsAnnouncement:
+        serializedCommand =
+          Command.serializeSegmentAnnouncementCommand(command);
+        break;
+      case PeerCommandType.SegmentData:
+        this.connection.send(Command.serializePeerSendSegmentCommand(command));
+        break;
+    }
+    if (serializedCommand) this.connection.send(serializedCommand);
   }
 
   requestSegment(segment: Segment) {
@@ -170,7 +181,7 @@ export class Peer {
       throw new Error("Segment already is downloading");
     }
     const { externalId } = segment;
-    const command: PeerSegmentCommand = {
+    const command: Command.PeerSegmentCommand = {
       c: PeerCommandType.SegmentRequest,
       i: externalId,
     };
@@ -179,18 +190,22 @@ export class Peer {
     return this.request.p2pRequest;
   }
 
-  sendSegmentsAnnouncement(announcement: JsonSegmentAnnouncement) {
-    const command: PeerSegmentAnnouncementCommand = {
+  sendSegmentsAnnouncement(announcement: {
+    loaded: number[];
+    httpLoading: number[];
+  }) {
+    const command: Command.PeerSegmentAnnouncementCommand = {
       c: PeerCommandType.SegmentsAnnouncement,
-      a: announcement,
+      p: announcement.httpLoading,
+      l: announcement.loaded,
     };
     this.sendCommand(command);
   }
 
-  async sendSegmentData(segmentExternalId: string, data: ArrayBuffer) {
+  async sendSegmentData(segmentExternalId: number, data: ArrayBuffer) {
     if (!this.connection) return;
     this.logger(`send segment ${segmentExternalId} to ${this.id}`);
-    const command: PeerSendSegmentCommand = {
+    const command: Command.PeerSendSegmentCommand = {
       c: PeerCommandType.SegmentData,
       i: segmentExternalId,
       s: data.byteLength,
@@ -230,12 +245,11 @@ export class Peer {
     }
   }
 
-  sendSegmentAbsent(segmentExternalId: string) {
-    const command: PeerSegmentCommand = {
+  sendSegmentAbsent(segmentExternalId: number) {
+    this.sendCommand({
       c: PeerCommandType.SegmentAbsent,
       i: segmentExternalId,
-    };
-    this.sendCommand(command);
+    });
   }
 
   private createPeerRequest(segment: Segment): PeerRequest {

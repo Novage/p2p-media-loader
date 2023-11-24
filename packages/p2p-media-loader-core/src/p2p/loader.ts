@@ -6,7 +6,6 @@ import { QueueItem } from "../internal-types";
 import { SegmentsMemoryStorage } from "../segments-storage";
 import * as Utils from "../utils/utils";
 import * as LoggerUtils from "../utils/logger";
-import { PeerSegmentStatus } from "../enums";
 import { RequestsContainer } from "../request-container";
 import debug from "debug";
 
@@ -95,7 +94,7 @@ export class P2PLoader {
     for (const peer of this.peers.values()) {
       if (
         !peer.downloadingSegment &&
-        peer.getSegmentStatus(segment) === PeerSegmentStatus.Loaded
+        peer.getSegmentStatus(segment) === "loaded"
       ) {
         const { bandwidth } = peer;
         if (bandwidth === undefined) {
@@ -143,9 +142,9 @@ export class P2PLoader {
   }
 
   private getSegmentsAnnouncement() {
-    const loaded: string[] =
+    const loaded: number[] =
       this.segmentStorage.getStoredSegmentExternalIdsOfStream(this.stream);
-    const httpLoading: string[] = [];
+    const httpLoading: number[] = [];
 
     for (const request of this.requests.httpRequests()) {
       const segment = this.stream.segments.get(request.segment.localId);
@@ -153,7 +152,7 @@ export class P2PLoader {
 
       httpLoading.push(segment.externalId);
     }
-    return PeerUtil.getJsonSegmentsAnnouncement(loaded, httpLoading);
+    return { loaded, httpLoading };
   }
 
   private onPeerConnected(peer: Peer) {
@@ -181,7 +180,7 @@ export class P2PLoader {
     });
   };
 
-  private async onSegmentRequested(peer: Peer, segmentExternalId: string) {
+  private async onSegmentRequested(peer: Peer, segmentExternalId: number) {
     const segment = Utils.getSegmentFromStreamByExternalId(
       this.stream,
       segmentExternalId

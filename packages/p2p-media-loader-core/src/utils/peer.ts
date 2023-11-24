@@ -1,6 +1,3 @@
-import { JsonSegmentAnnouncement, PeerCommand } from "../internal-types";
-import { PeerSegmentStatus } from "../enums";
-import { PeerCommandType } from "../p2p/command";
 import RIPEMD160 from "ripemd160";
 
 const HASH_SYMBOLS =
@@ -30,56 +27,4 @@ export function generatePeerId(): string {
   }
 
   return peerId;
-}
-
-export function getPeerCommandFromArrayBuffer(
-  data: ArrayBuffer
-): PeerCommand | undefined {
-  const bytes = new Uint8Array(data);
-
-  // Serialized JSON string check by first, second and last characters: '{" .... }'
-  if (
-    bytes[0] === 123 &&
-    bytes[1] === 34 &&
-    bytes[data.byteLength - 1] === 125
-  ) {
-    try {
-      const decoded = new TextDecoder().decode(data);
-      const parsed = JSON.parse(decoded) as object;
-      if (isPeerCommand(parsed)) return parsed;
-    } catch {
-      return undefined;
-    }
-  }
-}
-
-export function getSegmentsFromPeerAnnouncement(
-  announcement: JsonSegmentAnnouncement
-): Map<string, PeerSegmentStatus> {
-  const segmentStatusMap = new Map<string, PeerSegmentStatus>();
-  announcement.l
-    .split("|")
-    .forEach((id) => segmentStatusMap.set(id, PeerSegmentStatus.Loaded));
-
-  announcement.p
-    .split("|")
-    .forEach((id) => segmentStatusMap.set(id, PeerSegmentStatus.LoadingByHttp));
-  return segmentStatusMap;
-}
-
-export function getJsonSegmentsAnnouncement(
-  loadedSegmentExternalIds: string[],
-  loadingByHttpSegmentExternalIds: string[]
-): JsonSegmentAnnouncement {
-  return {
-    l: loadedSegmentExternalIds.join("|"),
-    p: loadingByHttpSegmentExternalIds.join("|"),
-  };
-}
-
-function isPeerCommand(command: object): command is PeerCommand {
-  return (
-    (command as PeerCommand).c !== undefined &&
-    Object.values(PeerCommandType).includes((command as PeerCommand).c)
-  );
 }

@@ -63,7 +63,7 @@ export class SegmentManager {
     const staleSegmentsIds = new Set(managerStream.segments.keys());
     const newSegments: SegmentBase[] = [];
     for (const reference of segmentReferences) {
-      const externalId = (+reference.getStartTime().toFixed(3)).toString();
+      const externalId = Math.trunc(reference.getStartTime());
 
       const segmentLocalId = Utils.getSegmentLocalIdFromReference(reference);
       if (!managerStream.segments.has(segmentLocalId)) {
@@ -98,7 +98,7 @@ export class SegmentManager {
       segmentReferences.forEach((reference, index) => {
         const segment = Utils.createSegment({
           segmentReference: reference,
-          externalId: (firstReferenceMediaSequence + index).toString(),
+          externalId: firstReferenceMediaSequence + index,
         });
         newSegments.push(segment);
       });
@@ -116,7 +116,7 @@ export class SegmentManager {
         const segment = Utils.createSegment({
           localId,
           segmentReference: reference,
-          externalId: index.toString(),
+          externalId: index,
         });
         newSegments.push(segment);
         index--;
