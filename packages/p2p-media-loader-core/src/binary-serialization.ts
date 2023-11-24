@@ -56,17 +56,76 @@ export function serializeInt(num: bigint): Uint8Array {
 
 export function deserializeInt(bytes: Uint8Array) {
   const metadata = bytes[0];
-  const code = (metadata >> 4) & 0b00001111;
+  const code = metadata >> 4;
   if (code !== SerializedItem.Int) {
-    throw new Error("error");
+    throw new Error(
+      "Trying to deserialize integer with invalid serialized item code"
+    );
   }
-  const numberBytesLength = metadata & 0b00001111;
+  const numberBytesLength = metadata & 0b1111;
   const start = 1;
   const end = start + numberBytesLength;
   return {
     number: bytesToInt(bytes.slice(start, end)),
     byteLength: numberBytesLength + 1,
   };
+}
+
+export function serializeSimilarIntArray(numbers: bigint[]) {
+  const commonPartNumbersMap = new Map<bigint, ResizableUint8Array>();
+
+  for (const number of numbers) {
+    const common = number & ~0xffn;
+    const diffByte = number & 0xffn;
+    const bytes = commonPartNumbersMap.get(common) ?? new ResizableUint8Array();
+    if (!bytes.length) commonPartNumbersMap.set(common, bytes);
+    bytes.push(Number(diffByte));
+  }
+
+  const arrayMetadata = [
+    SerializedItem.SimilarIntArray << 4,
+    commonPartNumbersMap.size,
+  ];
+  const result = new ResizableUint8Array();
+  result.unshift(arrayMetadata);
+
+  for (const [commonPart, binaryArray] of commonPartNumbersMap) {
+    const { length } = binaryArray.getBytesChunks();
+    const commonPartWithLength = commonPart | (BigInt(length) & 0xffn);
+    binaryArray.unshift(serializeInt(commonPartWithLength));
+    result.push(binaryArray.getBytes());
+  }
+
+  return result.getBytes();
+}
+
+export function deserializeSimilarIntArray(bytes: Uint8Array) {
+  const [codeByte, commonPartArraysAmount] = bytes;
+  const code = codeByte >> 4;
+  if (code !== SerializedItem.SimilarIntArray) {
+    throw new Error(
+      "Trying to deserialize similar int array with invalid serialized item code"
+    );
+  }
+
+  let offset = 2;
+  const originalIntArr: bigint[] = [];
+  for (let i = 0; i < commonPartArraysAmount; i++) {
+    const { number: commonPartWithLength, byteLength } = deserializeInt(
+      bytes.slice(offset)
+    );
+    offset += byteLength;
+    const arrayLength = commonPartWithLength & 0xffn;
+    const commonPart = commonPartWithLength & ~0xffn;
+
+    for (let j = 0; j < arrayLength; j++) {
+      const diffPart = BigInt(bytes[offset]);
+      originalIntArr.push(commonPart | diffPart);
+      offset++;
+    }
+  }
+
+  return { numbers: originalIntArr, byteLength: offset };
 }
 
 function joinUint8Arrays(arrays: Uint8Array[], length?: number) {
@@ -86,6 +145,17 @@ export class ResizableUint8Array {
   private _length = 0;
 
   push(bytes: Uint8Array | number | number[]) {
+    this.addBytes(bytes, "end");
+  }
+
+  unshift(bytes: Uint8Array | number | number[]) {
+    this.addBytes(bytes, "start");
+  }
+
+  private addBytes(
+    bytes: Uint8Array | number | number[],
+    position: "start" | "end"
+  ) {
     let bytesToAdd: Uint8Array;
     if (bytes instanceof Uint8Array) {
       bytesToAdd = bytes;
@@ -95,7 +165,7 @@ export class ResizableUint8Array {
       bytesToAdd = new Uint8Array([bytes]);
     }
     this._length += bytesToAdd.length;
-    this.bytes.push(bytesToAdd);
+    this.bytes[position === "start" ? "unshift" : "push"](bytesToAdd);
   }
 
   getBytesChunks(): ReadonlyArray<Uint8Array> {
@@ -105,41 +175,8 @@ export class ResizableUint8Array {
   getBytes(): Uint8Array {
     return joinUint8Arrays(this.bytes, this._length);
   }
-}
 
-function serializeSimilarIntArray(numbers: bigint[]) {
-  const map = new Map<bigint, ResizableUint8Array>();
-
-  for (const number of numbers) {
-    const common = number & ~0xffn;
-    const diffByte = number & 0xffn;
-    let bytes = map.get(common);
-    if (!bytes) {
-      bytes = new ResizableUint8Array();
-      const commonWithLength = common &
-      const commonBytes = intToBytes(common);
-      bytes.push(commonBytes);
-      map.set(common, bytes);
-    }
-    bytes.push(Number(diffByte));
-  }
-
-  const arrayMetadata = (SerializedItem.SimilarIntArray << 4) | map.size;
-  const result = new ResizableUint8Array();
-  result.push(arrayMetadata);
-
-  for (const binaryArray of map.values()) {
-    result.push(binaryArray.getBytes());
-  }
-
-  return result.getBytes();
-}
-
-function deserializeSimilarIntArray(bytes: Uint8Array) {
-  const metadata = bytes[0];
-  const code = (metadata >> 4) & 0b00001111;
-  const
-  if (code !== SerializedItem.SimilarIntArray) {
-    throw new Error("error");
+  get length() {
+    return this._length;
   }
 }

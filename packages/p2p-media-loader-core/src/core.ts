@@ -12,9 +12,6 @@ import { LinkedMap } from "./linked-map";
 import { BandwidthApproximator } from "./bandwidth-approximator";
 import { EngineCallbacks } from "./request-container";
 import { SegmentsMemoryStorage } from "./segments-storage";
-// import * as Bits from "./p2p/bits";
-import * as Command from "./p2p/command";
-import * as Serialization from "./binary-serialization";
 
 export class Core<TStream extends Stream = Stream> {
   private manifestResponseUrl?: string;
@@ -36,38 +33,7 @@ export class Core<TStream extends Stream = Stream> {
   private mainStreamLoader?: HybridLoader;
   private secondaryStreamLoader?: HybridLoader;
 
-  constructor(private readonly eventHandlers?: CoreEventHandlers) {
-    // const numbers = [
-    //   9999991, 9999992, 9999993, 9999994, 9999995, 9999996, 9999997, 9999998,
-    //   9999999, 9999990, 9999981, 9999982, 9999983, 9999984, 9999985, 9999986,
-    // ];
-
-    const numbers = [-112, -113, -114, -115, -116];
-    // const stringified = JSON.stringify(numbers);
-    // const encoded = new TextEncoder().encode(stringified);
-
-    // const serialized = Command.serializeSegmentAnnouncementCommand({
-    //   c: Command.PeerCommandType.SegmentsAnnouncement,
-    //   p: numbers,
-    //   l: numbers,
-    // });
-    // const command = Command.deserializeCommand(serialized);
-
-    // const number = 546515;
-    // const serializedNumber = Serialization.serializeInt(BigInt(number));
-    // const deserializedNumber = Serialization.deserializeInt(serializedNumber);
-
-    const serialized = Serialization.serializeSimilarIntArr(
-      numbers.map((number) => BigInt(number))
-    );
-    const command = Serialization.deserializeSimilarIntArr(serialized);
-
-    // console.log("Encoded bytes: ", encoded.length);
-    console.log("Serialized: ", serialized);
-    console.log("Deserialized", command);
-    // console.log("serializedNumber: ", serializedNumber);
-    // console.log("deserializedNumber", deserializedNumber);
-  }
+  constructor(private readonly eventHandlers?: CoreEventHandlers) {}
 
   setManifestResponseUrl(url: string): void {
     this.manifestResponseUrl = url.split("?")[0];

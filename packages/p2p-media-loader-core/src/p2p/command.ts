@@ -40,15 +40,15 @@ export function serializeSegmentAnnouncementCommand(
   command: PeerSegmentAnnouncementCommand
 ) {
   const creator = new BinaryCommandCreator(command.c);
-  creator.addSimilarUIntArr("l", command.l);
-  creator.addSimilarUIntArr("p", command.p);
+  creator.addSimilarIntArr("l", command.l);
+  creator.addSimilarIntArr("p", command.p);
   creator.complete();
   return creator.getResultBuffer();
 }
 
 export function serializePeerSegmentCommand(command: PeerSegmentCommand) {
   const creator = new BinaryCommandCreator(command.c);
-  creator.addUInteger("i", command.i);
+  creator.addInteger("i", command.i);
   creator.complete();
   return creator.getResultBuffer();
 }
@@ -57,7 +57,7 @@ export function serializePeerSendSegmentCommand(
   command: PeerSendSegmentCommand
 ) {
   const creator = new BinaryCommandCreator(command.c);
-  creator.addUInteger("i", command.i);
+  creator.addInteger("i", command.i);
   creator.complete();
   return creator.getResultBuffer();
 }
@@ -74,11 +74,13 @@ function isBufferCommand(bytes: Uint8Array) {
 }
 
 export function deserializeCommand(bytes: Uint8Array) {
-  if (!isBufferCommand) {
+  if (!isBufferCommand(bytes)) {
     throw new Error("Given bytes don't represent peer command.");
   }
   const [, commandCode] = bytes;
-  const data: { [key: string]: any } = {};
+  const deserializedCommand: { [key: string]: any } = {
+    c: commandCode,
+  };
 
   let offset = 2;
   do {
@@ -92,26 +94,26 @@ export function deserializeCommand(bytes: Uint8Array) {
           const { number, byteLength } = Serialization.deserializeInt(
             bytes.slice(offset)
           );
-          data[name] = Number(number);
+          deserializedCommand[name] = Number(number);
           offset += byteLength;
         }
         break;
       case Serialization.SerializedItem.SimilarIntArray:
         {
           const { numbers, byteLength } =
-            Serialization.deserializeSimilarIntArr(bytes.slice(offset));
-          data[name] = numbers.map((n) => Number(n));
+            Serialization.deserializeSimilarIntArray(bytes.slice(offset));
+          deserializedCommand[name] = numbers.map((n) => Number(n));
           offset += byteLength;
         }
         break;
     }
   } while (bytes[offset] !== "}".charCodeAt(0) && offset < bytes.length);
 
-  return { commandCode, data };
+  return deserializedCommand;
 }
 
 function getDataTypeFromByte(byte: number): Serialization.SerializedItem {
-  const typeCode = (byte & 0b11100000) >> 5;
+  const typeCode = byte >> 4;
   if (!Object.values(Serialization.SerializedItem).includes(typeCode)) {
     throw new Error("Not existing type");
   }
@@ -128,15 +130,15 @@ class BinaryCommandCreator {
     this.bytes.push(commandType);
   }
 
-  addUInteger(name: string, value: number) {
+  addInteger(name: string, value: number) {
     this.bytes.push(name.charCodeAt(0));
     const bytes = Serialization.intToBytes(BigInt(value));
     this.bytes.push(bytes);
   }
 
-  addSimilarUIntArr(name: string, arr: number[]) {
+  addSimilarIntArr(name: string, arr: number[]) {
     this.bytes.push(name.charCodeAt(0));
-    const bytes = Serialization.serializeSimilarIntArr(
+    const bytes = Serialization.serializeSimilarIntArray(
       arr.map((num) => BigInt(num))
     );
     this.bytes.push(bytes);
