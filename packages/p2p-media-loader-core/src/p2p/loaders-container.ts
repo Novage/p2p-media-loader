@@ -49,7 +49,13 @@ export class P2PLoadersContainer {
 
   changeCurrentLoader(stream: StreamWithSegments) {
     const loaderItem = this.loaders.get(stream.localId);
-    const prev = this._currentLoaderItem;
+    if (this._currentLoaderItem) {
+      const ids = this.segmentStorage.getStoredSegmentExternalIdsOfStream(
+        this._currentLoaderItem.stream
+      );
+      if (!ids.length) this.destroyAndRemoveLoader(this._currentLoaderItem);
+      else this.setLoaderDestroyTimeout(this._currentLoaderItem);
+    }
     if (loaderItem) {
       this._currentLoaderItem = loaderItem;
       clearTimeout(loaderItem.destroyTimeoutId);
@@ -62,14 +68,6 @@ export class P2PLoadersContainer {
     this.logger(
       `change current p2p loader: ${LoggerUtils.getStreamString(stream)}`
     );
-
-    if (!prev) return;
-
-    const ids = this.segmentStorage.getStoredSegmentExternalIdsOfStream(
-      prev.stream
-    );
-    if (!ids.length) this.destroyAndRemoveLoader(prev);
-    else this.setLoaderDestroyTimeout(prev);
   }
 
   private setLoaderDestroyTimeout(item: P2PLoaderContainerItem) {
