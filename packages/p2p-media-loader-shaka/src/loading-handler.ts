@@ -71,7 +71,6 @@ export class Loader {
 
     const loadSegment = async (): Promise<Response> => {
       const { request, callbacks } = getSegmentRequest();
-      console.log("segment url", segmentUrl);
       void this.core.loadSegment(segmentId, callbacks);
       try {
         const { data, bandwidth } = await request;
@@ -86,7 +85,6 @@ export class Loader {
           ),
         };
       } catch (error) {
-        console.log(error);
         // TODO: throw Shaka Errors
         if (error instanceof CoreRequestError) {
           const { Error: ShakaError } = this.shaka.util;

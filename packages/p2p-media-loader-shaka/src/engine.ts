@@ -113,7 +113,6 @@ export class Engine {
       const { p2pml } = request;
       if (!p2pml) return this.shaka.net.HttpFetchPlugin.parse(...args);
 
-      console.log("HANDLE LOADING", p2pml);
       const loadingHandler = new Loader(
         p2pml.shaka,
         p2pml.core,

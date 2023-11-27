@@ -1,7 +1,6 @@
 import { Segment, SegmentResponse } from "./types";
 import { BandwidthApproximator } from "./bandwidth-approximator";
 import * as Utils from "./utils/utils";
-import * as LoggerUtils from "./utils/logger";
 
 export type EngineCallbacks = {
   onSuccess: (response: SegmentResponse) => void;
@@ -209,7 +208,6 @@ export class Request {
     this.throwErrorIfNotLoadingStatus();
     if (!this.currentAttempt) return;
 
-    console.log("segment loaded", LoggerUtils.getSegmentString(this.segment));
     this.notReceivingBytesTimeout.clear();
     this.finalData = Utils.joinChunks(this.bytes);
     this._status = "succeed";
