@@ -5,7 +5,7 @@ import { Settings, CoreEventHandlers } from "./types";
 import { BandwidthApproximator } from "./bandwidth-approximator";
 import { Playback, QueueItem } from "./internal-types";
 import { RequestsContainer } from "./request-container";
-import { EngineCallbacks, RequestStatus } from "./request";
+import { EngineCallbacks } from "./request";
 import * as QueueUtils from "./utils/queue";
 import * as LoggerUtils from "./utils/logger";
 import * as StreamUtils from "./utils/stream";
@@ -141,26 +141,25 @@ export class HybridLoader {
       skipSegment: (segment) => this.segmentStorage.hasSegment(segment),
     });
 
-    const removeRequestStatuses: RequestStatus[] = ["not-started", "aborted"];
     for (const request of this.requests.items()) {
-      if (
-        request.status === "loading" &&
-        !request.isSegmentRequestedByEngine &&
-        !queueSegmentIds.has(request.segment.localId)
-      ) {
-        request.abortFromProcessQueue();
-        this.requests.remove(request);
+      if (request.status === "loading") {
+        if (
+          !request.isSegmentRequestedByEngine &&
+          !queueSegmentIds.has(request.segment.localId)
+        ) {
+          request.abortFromProcessQueue();
+          this.requests.remove(request);
+        }
         continue;
       }
 
       if (request.status === "succeed") {
-        if (request.type === "http") {
+        const { type, data } = request;
+        if (!type || !data) continue;
+        if (type === "http") {
           this.p2pLoaders.currentLoader.broadcastAnnouncement();
         }
-        this.eventHandlers?.onSegmentLoaded?.(
-          request.data!.byteLength,
-          request.type!
-        );
+        this.eventHandlers?.onSegmentLoaded?.(data.byteLength, type);
         continue;
       }
 
@@ -172,7 +171,7 @@ export class HybridLoader {
       }
 
       if (
-        removeRequestStatuses.includes(request.status) &&
+        (request.status === "not-started" || request.status === "aborted") &&
         !request.isSegmentRequestedByEngine
       ) {
         this.requests.remove(request);

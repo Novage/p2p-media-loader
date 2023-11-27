@@ -27,11 +27,6 @@ type P2PRequestAttempt = {
 
 export type RequestAttempt = HttpRequestAttempt | P2PRequestAttempt;
 
-export type RequestEvents = {
-  onSuccess: (request: Request, data: ArrayBuffer) => void;
-  onError: (request: Request, data: RequestError) => void;
-};
-
 export type RequestControls = Readonly<{
   firstBytesReceived: Request["firstBytesReceived"];
   addLoadedChunk: Request["addLoadedChunk"];

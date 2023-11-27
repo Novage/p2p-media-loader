@@ -1,7 +1,7 @@
 import { Segment, StreamType } from "./types";
 import Debug from "debug";
 import { BandwidthApproximator } from "./bandwidth-approximator";
-import { Request, RequestEvents } from "./request";
+import { Request } from "./request";
 
 export class RequestsContainer {
   private readonly requests = new Map<Segment, Request>();
