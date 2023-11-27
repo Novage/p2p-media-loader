@@ -9,15 +9,11 @@ import {
   EngineCallbacks,
 } from "p2p-media-loader-core";
 
-interface LoadingHandlerInterface {
-  handleLoading: shaka.extern.SchemePlugin;
-}
-
 type LoadingHandlerParams = Parameters<shaka.extern.SchemePlugin>;
 type Response = shaka.extern.Response;
 type LoadingHandlerResult = shaka.extern.IAbortableOperation<Response>;
 
-export class LoadingHandler implements LoadingHandlerInterface {
+export class Loader {
   private loadArgs!: LoadingHandlerParams;
 
   constructor(
@@ -32,12 +28,12 @@ export class LoadingHandler implements LoadingHandlerInterface {
     return fetchPlugin.parse(...this.loadArgs);
   }
 
-  handleLoading(...args: LoadingHandlerParams): LoadingHandlerResult {
+  load(...args: LoadingHandlerParams): LoadingHandlerResult {
     this.loadArgs = args;
     const { RequestType } = this.shaka.net.NetworkingEngine;
     const [url, request, requestType] = args;
     if (requestType === RequestType.SEGMENT) {
-      return this.handleSegmentLoading(url, request.headers.Range);
+      return this.loadSegment(url, request.headers.Range);
     }
 
     const loading = this.defaultLoad();
@@ -66,7 +62,7 @@ export class LoadingHandler implements LoadingHandlerInterface {
     }
   }
 
-  private handleSegmentLoading(
+  private loadSegment(
     segmentUrl: string,
     byteRangeString: string
   ): LoadingHandlerResult {
@@ -75,6 +71,7 @@ export class LoadingHandler implements LoadingHandlerInterface {
 
     const loadSegment = async (): Promise<Response> => {
       const { request, callbacks } = getSegmentRequest();
+      console.log("segment url", segmentUrl);
       void this.core.loadSegment(segmentId, callbacks);
       try {
         const { data, bandwidth } = await request;
@@ -89,6 +86,7 @@ export class LoadingHandler implements LoadingHandlerInterface {
           ),
         };
       } catch (error) {
+        console.log(error);
         // TODO: throw Shaka Errors
         if (error instanceof CoreRequestError) {
           const { Error: ShakaError } = this.shaka.util;

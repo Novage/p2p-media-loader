@@ -13,7 +13,7 @@ import {
   HookedRequest,
   P2PMLShakaData,
 } from "./types";
-import { LoadingHandler } from "./loading-handler";
+import { Loader } from "./loading-handler";
 import { decorateMethod } from "./utils";
 import { Core, CoreEventHandlers } from "p2p-media-loader-core";
 
@@ -113,13 +113,14 @@ export class Engine {
       const { p2pml } = request;
       if (!p2pml) return this.shaka.net.HttpFetchPlugin.parse(...args);
 
-      const loadingHandler = new LoadingHandler(
+      console.log("HANDLE LOADING", p2pml);
+      const loadingHandler = new Loader(
         p2pml.shaka,
         p2pml.core,
         p2pml.streamInfo,
         p2pml.segmentManager
       );
-      return loadingHandler.handleLoading(...args);
+      return loadingHandler.load(...args);
     };
 
     this.shaka.net.NetworkingEngine.registerScheme("http", handleLoading);

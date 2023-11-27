@@ -105,7 +105,7 @@ export class HybridLoader {
       }
     } else {
       const request = this.requests.getOrCreateRequest(segment);
-      request.setEngineCallbacks(callbacks);
+      request.setOrResolveEngineCallbacks(callbacks);
     }
 
     this.requestProcessQueueMicrotask();
@@ -138,7 +138,12 @@ export class HybridLoader {
       lastRequestedSegment: this.lastRequestedSegment,
       playback: this.playback,
       settings: this.settings,
-      skipSegment: (segment) => this.segmentStorage.hasSegment(segment),
+      skipSegment: (segment) => {
+        return (
+          this.requests.get(segment)?.status === "succeed" ||
+          this.segmentStorage.hasSegment(segment)
+        );
+      },
     });
 
     for (const request of this.requests.items()) {
@@ -159,7 +164,9 @@ export class HybridLoader {
         if (type === "http") {
           this.p2pLoaders.currentLoader.broadcastAnnouncement();
         }
+        void this.segmentStorage.storeSegment(request.segment, data);
         this.eventHandlers?.onSegmentLoaded?.(data.byteLength, type);
+        this.requests.remove(request);
         continue;
       }
 
@@ -187,6 +194,7 @@ export class HybridLoader {
 
       if (statuses.isHighDemand) {
         if (request?.type === "http") continue;
+
         if (this.requests.executingHttpCount < simultaneousHttpDownloads) {
           void this.loadThroughHttp(item);
           continue;
@@ -228,11 +236,14 @@ export class HybridLoader {
   }
 
   // api method for engines
-  abortSegment(segment: Segment) {
-    const request = this.requests.get(segment);
+  abortSegmentRequest(segmentLocalId: string) {
+    const request = this.requests.getBySegmentLocalId(segmentLocalId);
     if (!request) return;
     request.abortFromEngine();
-    this.logger.engine("abort: ", LoggerUtils.getSegmentString(segment));
+    this.logger.engine(
+      "abort: ",
+      LoggerUtils.getSegmentString(request.segment)
+    );
   }
 
   private async loadThroughHttp(item: QueueItem, isRandom = false) {

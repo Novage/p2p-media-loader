@@ -36,6 +36,12 @@ export class RequestsContainer {
     return this.requests.get(segment);
   }
 
+  getBySegmentLocalId(id: string) {
+    for (const request of this.requests.values()) {
+      if (request.segment.localId === id) return request;
+    }
+  }
+
   getOrCreateRequest(segment: Segment) {
     let request = this.requests.get(segment);
     if (!request) {

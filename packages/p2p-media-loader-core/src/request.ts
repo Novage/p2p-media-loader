@@ -1,6 +1,7 @@
 import { Segment, SegmentResponse } from "./types";
 import { BandwidthApproximator } from "./bandwidth-approximator";
 import * as Utils from "./utils/utils";
+import * as LoggerUtils from "./utils/logger";
 
 export type EngineCallbacks = {
   onSuccess: (response: SegmentResponse) => void;
@@ -91,7 +92,8 @@ export class Request {
 
   get data(): ArrayBuffer | undefined {
     if (this.status !== "succeed") return;
-    return this.finalData ?? Utils.joinChunks(this.bytes);
+    if (!this.finalData) this.finalData = Utils.joinChunks(this.bytes);
+    return this.finalData;
   }
 
   get loadedPercent() {
@@ -103,11 +105,12 @@ export class Request {
     return this._failedAttempts;
   }
 
-  setEngineCallbacks(callbacks: EngineCallbacks) {
+  setOrResolveEngineCallbacks(callbacks: EngineCallbacks) {
     if (this._engineCallbacks) {
       throw new Error("Segment is already requested by engine");
     }
     this._engineCallbacks = callbacks;
+    if (this.finalData) this.resolveEngineCallbacksSuccessfully(this.finalData);
   }
 
   setTotalBytes(value: number) {
@@ -154,6 +157,14 @@ export class Request {
     };
   }
 
+  private resolveEngineCallbacksSuccessfully(data: ArrayBuffer) {
+    this._engineCallbacks?.onSuccess({
+      data,
+      bandwidth: this.bandwidthApproximator.getBandwidth(),
+    });
+    this._engineCallbacks = undefined;
+  }
+
   abortFromEngine() {
     this._engineCallbacks?.onError(new CoreRequestError("aborted"));
     this._engineCallbacks = undefined;
@@ -198,15 +209,13 @@ export class Request {
     this.throwErrorIfNotLoadingStatus();
     if (!this.currentAttempt) return;
 
+    console.log("segment loaded", LoggerUtils.getSegmentString(this.segment));
     this.notReceivingBytesTimeout.clear();
     this.finalData = Utils.joinChunks(this.bytes);
     this._status = "succeed";
     this._totalBytes = this._loadedBytes;
 
-    this._engineCallbacks?.onSuccess({
-      data: this.finalData,
-      bandwidth: this.bandwidthApproximator.getBandwidth(),
-    });
+    this.resolveEngineCallbacksSuccessfully(this.finalData);
   };
 
   private addLoadedChunk = (chunk: Uint8Array) => {

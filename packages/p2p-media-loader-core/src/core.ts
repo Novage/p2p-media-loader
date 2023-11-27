@@ -17,7 +17,7 @@ export class Core<TStream extends Stream = Stream> {
   private manifestResponseUrl?: string;
   private readonly streams = new Map<string, StreamWithSegments<TStream>>();
   private readonly settings: Settings = {
-    simultaneousHttpDownloads: 1,
+    simultaneousHttpDownloads: 3,
     simultaneousP2PDownloads: 3,
     highDemandTimeWindow: 15,
     httpDownloadTimeWindow: 45,
@@ -93,11 +93,9 @@ export class Core<TStream extends Stream = Stream> {
     void loader.loadSegment(segment, callbacks);
   }
 
-  abortSegmentLoading(segmentId: string): void {
-    const segment = this.identifySegment(segmentId);
-    const streamType = segment.stream.type;
-    if (streamType === "main") this.mainStreamLoader?.abortSegment(segment);
-    else this.secondaryStreamLoader?.abortSegment(segment);
+  abortSegmentLoading(segmentLocalId: string): void {
+    this.mainStreamLoader?.abortSegmentRequest(segmentLocalId);
+    this.secondaryStreamLoader?.abortSegmentRequest(segmentLocalId);
   }
 
   updatePlayback(position: number, rate: number): void {
