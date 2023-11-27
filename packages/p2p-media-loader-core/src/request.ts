@@ -37,7 +37,7 @@ export type RequestControls = Readonly<{
   firstBytesReceived: Request["firstBytesReceived"];
   addLoadedChunk: Request["addLoadedChunk"];
   completeOnSuccess: Request["completeOnSuccess"];
-  cancelOnError: Request["cancelOnError"];
+  abortOnError: Request["abortOnError"];
 }>;
 
 type OmitEncapsulated<T extends RequestAttempt> = Omit<T, "error">;
@@ -52,28 +52,25 @@ type RequestStatus =
   | "failed"
   | "aborted";
 
-export class Request extends EventDispatcher<RequestEvents> {
+export class Request {
   readonly id: string;
   private _engineCallbacks?: EngineCallbacks;
   private currentAttempt?: RequestAttempt;
-  private prevAttempts: RequestAttempt[] = [];
-  private chunks: Uint8Array[] = [];
+  private _failedAttempts: RequestAttempt[] = [];
+  private bytes: Uint8Array[] = [];
   private _loadedBytes = 0;
   private _totalBytes?: number;
   private _status: RequestStatus = "not-started";
   private progress?: LoadProgress;
-  private firstBytesTimeout: Timeout;
-  private fullBytesTimeout: Timeout;
+  private notReceivingBytesTimeout: Timeout;
   private _abortRequestCallback?: (errorType: RequestInnerErrorType) => void;
 
   constructor(
     readonly segment: Segment,
     private readonly bandwidthApproximator: BandwidthApproximator
   ) {
-    super();
     this.id = Request.getRequestItemId(segment);
-    this.firstBytesTimeout = new Timeout(this.onFirstBytesTimeout);
-    this.fullBytesTimeout = new Timeout(this.onFullBytesTimeout);
+    this.notReceivingBytesTimeout = new Timeout(this.abortOnTimeout);
   }
 
   get status() {
@@ -101,8 +98,8 @@ export class Request extends EventDispatcher<RequestEvents> {
     return Utils.getPercent(this.loadedBytes, this._totalBytes);
   }
 
-  get requestAttempts(): ReadonlyArray<Readonly<RequestAttempt>> {
-    return this.prevAttempts;
+  get failedAttempts(): ReadonlyArray<Readonly<RequestAttempt>> {
+    return this._failedAttempts;
   }
 
   setEngineCallbacks(callbacks: EngineCallbacks) {
@@ -122,8 +119,7 @@ export class Request extends EventDispatcher<RequestEvents> {
   start(
     requestData: StartRequestParameters,
     controls: {
-      firstBytesTimeoutMs?: number;
-      fullLoadingTimeoutMs?: number;
+      notReceivingBytesTimeoutMs?: number;
       abort: (errorType: RequestInnerErrorType) => void;
     }
   ): RequestControls {
@@ -142,58 +138,78 @@ export class Request extends EventDispatcher<RequestEvents> {
       startTimestamp: performance.now(),
     };
     this.bandwidthApproximator.addLoading(this.progress);
-    const { firstBytesTimeoutMs, fullLoadingTimeoutMs, abort } = controls;
+    const { notReceivingBytesTimeoutMs, abort } = controls;
     this._abortRequestCallback = abort;
-    if (firstBytesTimeoutMs !== undefined) {
-      this.firstBytesTimeout.start(firstBytesTimeoutMs);
+
+    if (notReceivingBytesTimeoutMs !== undefined) {
+      this.notReceivingBytesTimeout.start(notReceivingBytesTimeoutMs);
     }
-    if (fullLoadingTimeoutMs !== undefined) {
-      this.fullBytesTimeout.start(fullLoadingTimeoutMs);
-    }
+
     return {
       firstBytesReceived: this.firstBytesReceived,
       addLoadedChunk: this.addLoadedChunk,
       completeOnSuccess: this.completeOnSuccess,
-      cancelOnError: this.cancelOnError,
+      abortOnError: this.abortOnError,
     };
   }
 
-  abort() {
-    this.throwErrorIfNotLoadingStatus();
-    if (!this._abortRequestCallback) return;
-    this._status = "aborted";
-    this._abortRequestCallback("abort");
-    this._abortRequestCallback = undefined;
-    this.clearTimeouts();
-  }
-
-  abortEngineRequest() {
+  abortFromEngine() {
     this._engineCallbacks?.onError(new CoreRequestError("aborted"));
     this._engineCallbacks = undefined;
   }
+
+  abortFromProcessQueue() {
+    this.throwErrorIfNotLoadingStatus();
+    this._status = "aborted";
+    this._abortRequestCallback?.("abort");
+    this._abortRequestCallback = undefined;
+    this.notReceivingBytesTimeout.clear();
+  }
+
+  private abortOnTimeout = () => {
+    this.throwErrorIfNotLoadingStatus();
+    if (!this.currentAttempt) return;
+
+    this._status = "failed";
+    const error = new RequestError("bytes-receiving-timeout");
+    this._abortRequestCallback?.(error.type);
+
+    this.currentAttempt.error = error;
+    this._failedAttempts.push(this.currentAttempt);
+    this.notReceivingBytesTimeout.clear();
+  };
+
+  private abortOnError = (error: RequestError) => {
+    this.throwErrorIfNotLoadingStatus();
+    if (!this.currentAttempt) return;
+
+    this._status = "failed";
+    this.currentAttempt.error = error;
+    this._failedAttempts.push(this.currentAttempt);
+    this.notReceivingBytesTimeout.clear();
+  };
 
   private completeOnSuccess = () => {
     this.throwErrorIfNotLoadingStatus();
     if (!this.currentAttempt) return;
 
-    this.fullBytesTimeout.clear();
-    const data = Utils.joinChunks(this.chunks);
+    this.notReceivingBytesTimeout.clear();
+    const data = Utils.joinChunks(this.bytes);
     this._status = "succeed";
     this._totalBytes = this._loadedBytes;
-    this.prevAttempts.push(this.currentAttempt);
 
     this._engineCallbacks?.onSuccess({
       data,
       bandwidth: this.bandwidthApproximator.getBandwidth(),
     });
-    this.dispatch("onSuccess", this, data);
   };
 
   private addLoadedChunk = (chunk: Uint8Array) => {
     this.throwErrorIfNotLoadingStatus();
     if (!this.currentAttempt || !this.progress) return;
+    this.notReceivingBytesTimeout.restart();
 
-    this.chunks.push(chunk);
+    this.bytes.push(chunk);
     this.progress.lastLoadedChunkTimestamp = performance.now();
     this.progress.loadedBytes += chunk.length;
     this._loadedBytes += chunk.length;
@@ -201,45 +217,8 @@ export class Request extends EventDispatcher<RequestEvents> {
 
   private firstBytesReceived = () => {
     this.throwErrorIfNotLoadingStatus();
-    this.firstBytesTimeout.clear();
+    this.notReceivingBytesTimeout.restart();
   };
-
-  private cancelOnError = (error: RequestError) => {
-    this.throwErrorIfNotLoadingStatus();
-    this.throwRequestError(error, false);
-  };
-
-  private throwRequestError(error: RequestError, abort = true) {
-    this.throwErrorIfNotLoadingStatus();
-    if (!this.currentAttempt) return;
-    this._status = "failed";
-    if (
-      abort &&
-      this._abortRequestCallback &&
-      RequestError.isRequestInnerErrorType(error)
-    ) {
-      this._abortRequestCallback(error.type);
-    }
-    this.currentAttempt.error = error;
-    this.prevAttempts.push(this.currentAttempt);
-    this.clearTimeouts();
-    this.dispatch("onError", this, error);
-  }
-
-  private onFirstBytesTimeout = () => {
-    this.throwErrorIfNotLoadingStatus();
-    this.throwRequestError(new RequestError("first-bytes-timeout"), true);
-  };
-
-  private onFullBytesTimeout = () => {
-    this.throwErrorIfNotLoadingStatus();
-    this.throwRequestError(new RequestError("full-bytes-timeout"), true);
-  };
-
-  private clearTimeouts() {
-    this.firstBytesTimeout.clear();
-    this.fullBytesTimeout.clear();
-  }
 
   private throwErrorIfNotLoadingStatus() {
     if (this._status !== "loading") {
@@ -252,11 +231,7 @@ export class Request extends EventDispatcher<RequestEvents> {
   }
 }
 
-const requestInnerErrorTypes = [
-  "abort",
-  "first-bytes-timeout",
-  "full-bytes-timeout",
-] as const;
+const requestInnerErrorTypes = ["abort", "bytes-receiving-timeout"] as const;
 
 const httpRequestErrorTypes = ["fetch-error"] as const;
 
@@ -298,6 +273,7 @@ export class CoreRequestError extends Error {
 
 export class Timeout {
   private timeoutId?: number;
+  private ms?: number;
 
   constructor(private readonly action: () => void) {}
 
@@ -305,7 +281,15 @@ export class Timeout {
     if (this.timeoutId) {
       throw new Error("Timeout is already started.");
     }
-    this.timeoutId = window.setTimeout(this.action, ms);
+    this.ms = ms;
+    this.timeoutId = window.setTimeout(this.action, this.ms);
+  }
+
+  restart(ms?: number) {
+    if (this.timeoutId) clearTimeout(this.timeoutId);
+    if (ms) this.ms = ms;
+    if (!this.ms) return;
+    this.timeoutId = window.setTimeout(this.action, this.ms);
   }
 
   clear() {

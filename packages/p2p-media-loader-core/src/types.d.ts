@@ -56,10 +56,9 @@ export type Settings = {
   cachedSegmentExpiration: number;
   cachedSegmentsCount: number;
   webRtcMaxMessageSize: number;
-  p2pSegmentFirstBytesTimeoutMs: number;
-  p2pSegmentDownloadTimeoutMs: number;
+  p2pNotReceivingBytesTimeoutMs: number;
   p2pLoaderDestroyTimeoutMs: number;
-  httpDownloadTimeoutMs: number;
+  httpNotReceivingBytesTimeoutMs: number;
 };
 
 export type CoreEventHandlers = {

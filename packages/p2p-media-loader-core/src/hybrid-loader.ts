@@ -107,10 +107,10 @@ export class HybridLoader {
       request.setEngineCallbacks(callbacks);
     }
 
-    this.createProcessQueueMicrotask();
+    this.requestProcessQueueMicrotask();
   }
 
-  private createProcessQueueMicrotask(force = true) {
+  private requestProcessQueueMicrotask(force = true) {
     const now = performance.now();
     if (
       (!force &&
@@ -123,9 +123,12 @@ export class HybridLoader {
 
     this.isProcessQueueMicrotaskCreated = true;
     queueMicrotask(() => {
-      this.processQueue();
-      this.lastQueueProcessingTimeStamp = now;
-      this.isProcessQueueMicrotaskCreated = false;
+      try {
+        this.processQueue();
+        this.lastQueueProcessingTimeStamp = now;
+      } finally {
+        this.isProcessQueueMicrotaskCreated = false;
+      }
     });
   }
 
@@ -137,13 +140,13 @@ export class HybridLoader {
       skipSegment: (segment) => this.segmentStorage.hasSegment(segment),
     });
 
-    for (const request of this.requests.values()) {
+    for (const request of this.requests.items()) {
       if (
         !request.isSegmentRequestedByEngine &&
         request.status === "loading" &&
         !queueSegmentIds.has(request.segment.localId)
       ) {
-        request.abort();
+        request.abortFromProcessQueue();
         this.requests.remove(request.segment);
       }
     }
@@ -201,8 +204,8 @@ export class HybridLoader {
   abortSegment(segment: Segment) {
     const request = this.requests.get(segment);
     if (!request) return;
-    request.abortEngineRequest();
-    this.createProcessQueueMicrotask();
+    request.abortFromEngine();
+    this.requestProcessQueueMicrotask();
     this.logger.engine("abort: ", LoggerUtils.getSegmentString(segment));
   }
 
@@ -242,14 +245,14 @@ export class HybridLoader {
     }
 
     this.eventHandlers?.onSegmentLoaded?.(data.byteLength, requestType);
-    this.createProcessQueueMicrotask();
+    this.requestProcessQueueMicrotask();
   };
 
   private onRequestError = (request: Request) => {
     if (request.type === "http") {
       this.p2pLoaders.currentLoader.broadcastAnnouncement();
     }
-    this.createProcessQueueMicrotask();
+    this.requestProcessQueueMicrotask();
   };
 
   private loadRandomThroughHttp() {
@@ -290,7 +293,7 @@ export class HybridLoader {
     for (const { segment: itemSegment } of arrayBackwards(queue)) {
       if (itemSegment.localId === segment.localId) break;
       if (this.requests.isHttpRequested(segment)) {
-        this.requests.get(segment)?.abort();
+        this.requests.get(segment)?.abortFromProcessQueue();
         this.logger.loader(
           "http aborted: ",
           LoggerUtils.getSegmentString(segment)
@@ -304,7 +307,7 @@ export class HybridLoader {
     for (const { segment: itemSegment } of arrayBackwards(queue)) {
       if (itemSegment.localId === segment.localId) break;
       if (this.requests.isP2PRequested(segment)) {
-        this.requests.get(segment)?.abort();
+        this.requests.get(segment)?.abortFromProcessQueue();
         this.logger.loader(
           "p2p aborted: ",
           LoggerUtils.getSegmentString(segment)
@@ -329,13 +332,13 @@ export class HybridLoader {
     if (isPositionSignificantlyChanged) {
       this.logger.engine("position significantly changed");
     }
-    void this.createProcessQueueMicrotask(isPositionSignificantlyChanged);
+    void this.requestProcessQueueMicrotask(isPositionSignificantlyChanged);
   }
 
   updateStream(stream: StreamWithSegments) {
     if (stream !== this.lastRequestedSegment.stream) return;
     this.logger.engine(`update stream: ${LoggerUtils.getStreamString(stream)}`);
-    this.createProcessQueueMicrotask();
+    this.requestProcessQueueMicrotask();
   }
 
   destroy() {

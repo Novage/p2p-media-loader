@@ -3,7 +3,7 @@ import { Request, RequestError, HttpRequestErrorType } from "./request";
 
 export async function fulfillHttpSegmentRequest(
   request: Request,
-  settings: Pick<Settings, "httpDownloadTimeoutMs">
+  settings: Pick<Settings, "httpNotReceivingBytesTimeoutMs">
 ) {
   const headers = new Headers();
   const { segment } = request;
@@ -20,7 +20,7 @@ export async function fulfillHttpSegmentRequest(
     { type: "http" },
     {
       abort: () => abortController.abort("abort"),
-      fullLoadingTimeoutMs: settings.httpDownloadTimeoutMs,
+      notReceivingBytesTimeoutMs: settings.httpNotReceivingBytesTimeoutMs,
     }
   );
   try {
@@ -52,8 +52,7 @@ export async function fulfillHttpSegmentRequest(
       )
         ? new RequestError("fetch-error", error.message)
         : error;
-      console.log("HTTP ERROR");
-      requestControls.cancelOnError(httpLoaderError);
+      requestControls.abortOnError(httpLoaderError);
     }
   }
 }

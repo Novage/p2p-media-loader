@@ -53,7 +53,7 @@ export class RequestsContainer {
     this.requests.delete(segment);
   }
 
-  values() {
+  items() {
     return this.requests.values();
   }
 
@@ -83,8 +83,8 @@ export class RequestsContainer {
 
   destroy() {
     for (const request of this.requests.values()) {
-      request.abort();
-      request.abortEngineRequest();
+      request.abortFromProcessQueue();
+      request.abortFromEngine();
     }
     this.requests.clear();
   }

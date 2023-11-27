@@ -86,9 +86,9 @@ export class P2PLoader {
         statuses
       )}`
     );
-    request.subscribe("onSuccess", () => {
-      this.logger(`p2p loaded: ${segment.externalId}`);
-    });
+    // request.subscribe("onSuccess", () => {
+    //   this.logger(`p2p loaded: ${segment.externalId}`);
+    // });
 
     return request;
   }

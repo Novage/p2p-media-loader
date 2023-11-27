@@ -26,9 +26,7 @@ type PeerEventHandlers = {
 
 type PeerSettings = Pick<
   Settings,
-  | "p2pSegmentDownloadTimeoutMs"
-  | "p2pSegmentFirstBytesTimeoutMs"
-  | "webRtcMaxMessageSize"
+  "p2pNotReceivingBytesTimeoutMs" | "webRtcMaxMessageSize"
 >;
 
 export class Peer {
@@ -131,8 +129,8 @@ export class Peer {
         { type: "p2p", peerId: this.id },
         {
           abort: this.abortRequest,
-          firstBytesTimeoutMs: this.settings.p2pSegmentFirstBytesTimeoutMs,
-          fullLoadingTimeoutMs: this.settings.p2pSegmentDownloadTimeoutMs,
+          notReceivingBytesTimeoutMs:
+            this.settings.p2pNotReceivingBytesTimeoutMs,
         }
       ),
     };
@@ -233,7 +231,7 @@ export class Peer {
     if (type === "peer-response-bytes-mismatch") {
       this.sendCancelSegmentRequestCommand(request.segment);
     }
-    controls.cancelOnError(error);
+    controls.abortOnError(error);
     this.requestContext = undefined;
   }
 
