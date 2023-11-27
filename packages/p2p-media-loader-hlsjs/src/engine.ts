@@ -81,14 +81,14 @@ export class Engine {
   private createFragmentLoaderClass() {
     const core = this.core;
     // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const engine = this;
+    const engine: Engine = this;
 
     return class FragmentLoader extends FragmentLoaderBase {
       constructor(config: HlsConfig) {
         super(config, core);
       }
 
-      static getEngine() {
+      static getEngine(): Engine {
         return engine;
       }
     };

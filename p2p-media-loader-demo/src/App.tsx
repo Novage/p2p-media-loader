@@ -3,23 +3,27 @@ import { Engine as HlsJsEngine } from "p2p-media-loader-hlsjs";
 import { Engine as ShakaEngine } from "p2p-media-loader-shaka";
 import Hls from "hls.js";
 import DPlayer from "dplayer";
+import Clappr from "@clappr/player";
 import shakaLib from "shaka-player";
 import muxjs from "mux.js";
 import debug from "debug";
 
 window.muxjs = muxjs;
+(window as any).Clappr = Clappr;
+(window as any).Hls = Hls;
 
 const players = [
   "hlsjs",
   "hls-dplayer",
   "shaka-dplayer",
   "shaka-player",
+  "hls-clappr",
 ] as const;
 type Player = (typeof players)[number];
 type ShakaPlayer = shaka.Player;
 type ExtendedWindow = Window & { videoPlayer?: { destroy?: () => void } };
 
-const streamUrl = {
+const streamUrls = {
   bigBunnyBuck: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
   byteRangeVideo:
     "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8",
@@ -52,7 +56,7 @@ function App() {
   const [playerType, setPlayerType] = useState<Player | undefined>(
     localStorage.player
   );
-  const [url, setUrl] = useState<string>(localStorage.streamUrl);
+  const [streamUrl, setStreamUrl] = useState<string>(localStorage.streamUrl);
   const shakaInstance = useRef<shaka.Player>();
   const hlsInstance = useRef<Hls>();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -106,10 +110,9 @@ function App() {
       setPlayerType("hls-dplayer");
     }
     if (!localStorage.streamUrl) {
-      localStorage.streamUrl = streamUrl.live2;
-      setUrl(streamUrl.live2);
+      localStorage.streamUrl = streamUrls.live2;
+      setStreamUrl(streamUrls.live2);
     }
-
     createNewPlayer();
   }, [playerType]);
 
@@ -207,6 +210,25 @@ function App() {
     setPlayerToWindow(player);
   };
 
+  const initHlsClapprPlayer = (url: string) => {
+    const engine = hlsEngine.current!;
+    const clapprPlayer = new Clappr.Player({
+      parentId: "#player-container",
+      source: url,
+      playback: {
+        hlsjsConfig: {
+          ...engine.getConfig(),
+          // enableWorker: true,
+        },
+      },
+    });
+    clapprPlayer.play();
+    console.log(engine);
+    console.log(clapprPlayer);
+    initClapprPlayer(clapprPlayer);
+    setPlayerToWindow(clapprPlayer);
+  };
+
   const destroyAndWindowPlayer = () => {
     const extendedWindow = window as ExtendedWindow;
     extendedWindow.videoPlayer?.destroy?.();
@@ -219,9 +241,9 @@ function App() {
     destroyAndWindowPlayer();
   };
 
-  const onVideoUrlChange = (url: string) => {
-    localStorage.streamUrl = url;
-    setUrl(url);
+  const onVideoUrlChange = (streamUrl: string) => {
+    localStorage.streamUrl = streamUrl;
+    setStreamUrl(streamUrl);
   };
 
   const createNewPlayer = () => {
@@ -229,16 +251,19 @@ function App() {
     setP2PLoadedGlob(0);
     switch (playerType) {
       case "hls-dplayer":
-        initHlsDPlayer(url);
+        initHlsDPlayer(streamUrl);
         break;
       case "hlsjs":
-        initHlsJsPlayer(url);
+        initHlsJsPlayer(streamUrl);
         break;
       case "shaka-dplayer":
-        initShakaDPlayer(url);
+        initShakaDPlayer(streamUrl);
         break;
       case "shaka-player":
-        initShakaPlayer(url);
+        initShakaPlayer(streamUrl);
+        break;
+      case "hls-clappr":
+        initHlsClapprPlayer(streamUrl);
         break;
     }
   };
@@ -247,11 +272,11 @@ function App() {
     switch (playerType) {
       case "hls-dplayer":
       case "hlsjs":
-        hlsInstance.current?.loadSource(url);
+        hlsInstance.current?.loadSource(streamUrl);
         break;
       case "shaka-player":
       case "shaka-dplayer":
-        shakaInstance.current?.load(url).catch(() => undefined);
+        shakaInstance.current?.load(streamUrl).catch(() => undefined);
         break;
     }
   };
@@ -277,10 +302,10 @@ function App() {
               })}
             </select>
             <select
-              value={url}
+              value={streamUrl}
               onChange={(event) => onVideoUrlChange(event.target.value)}
             >
-              {Object.entries(streamUrl).map(([name, url]) => {
+              {Object.entries(streamUrls).map(([name, url]) => {
                 return (
                   <option key={name} value={url}>
                     {name}
@@ -299,7 +324,7 @@ function App() {
             ref={containerRef}
             id="player-container"
             style={{ width: 1000 }}
-          ></div>
+          />
         </div>
         {!!playerType && ["hlsjs", "shaka-player"].includes(playerType) && (
           <video ref={videoRef} controls muted style={{ width: 800 }} />
@@ -453,3 +478,23 @@ const loggers = [
   "core:requests-container-secondary",
   "core:segment-memory-storage",
 ] as const;
+
+export function initHlsJsPlayer(hlsInstance: Hls): void {
+  if (
+    hlsInstance.config?.loader &&
+    typeof (hlsInstance.config.fLoader as any).getEngine === "function"
+  ) {
+    const engine: HlsJsEngine = (hlsInstance.config.fLoader as any).getEngine();
+    engine.initHlsJsEvents(hlsInstance);
+  }
+}
+
+export function initClapprPlayer(clapprPlayer: any): void {
+  clapprPlayer.on("play", () => {
+    const playback = clapprPlayer.core.getCurrentPlayback();
+    if (playback._hls && !playback._hls._p2pm_linitialized) {
+      playback._hls._p2pm_linitialized = true;
+      initHlsJsPlayer(clapprPlayer.core.getCurrentPlayback()._hls);
+    }
+  });
+}

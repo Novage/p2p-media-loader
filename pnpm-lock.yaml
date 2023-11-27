@@ -1,9 +1,5 @@
 lockfileVersion: '6.0'
 
-settings:
-  autoInstallPeers: true
-  excludeLinksFromLockfile: false
-
 patchedDependencies:
   bittorrent-tracker@10.0.12:
     hash: 3bacck7ok4ioq2ztv47aeh7t7e
@@ -47,6 +43,9 @@ importers:
 
   p2p-media-loader-demo:
     dependencies:
+      '@clappr/player':
+        specifier: ^0.5.0
+        version: 0.5.0
       dplayer:
         specifier: ^1.27.1
         version: 1.27.1(debug@4.3.4)
@@ -366,6 +365,10 @@ packages:
       '@babel/helper-validator-identifier': 7.22.5
       to-fast-properties: 2.0.0
     dev: true
+
+  /@clappr/player@0.5.0:
+    resolution: {integrity: sha512-/CKtOOy4iImTy7fjt5VbJM68q/Dlhic0oavjCeWNrd73olzWXrfF/kzC4Z9pc/Q69soBLh7H/KdV2HNnS26cJw==}
+    dev: false
 
   /@esbuild/android-arm64@0.17.19:
     resolution: {integrity: sha512-KBMWvEZooR7+kzY0BtbTQn0OAYY7CsiydT63pVEaPtVYF0hXbUaOyZog37DKxK7NF3XacBJOpYT4adIJh+avxA==}
@@ -3631,3 +3634,7 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
     dev: true
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
