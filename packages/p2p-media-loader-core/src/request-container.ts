@@ -9,6 +9,7 @@ export class RequestsContainer {
 
   constructor(
     streamType: StreamType,
+    private readonly requestProcessQueueCallback: () => void,
     private readonly bandwidthApproximator: BandwidthApproximator
   ) {
     this.logger = Debug(`core:requests-container-${streamType}`);
@@ -38,19 +39,18 @@ export class RequestsContainer {
   getOrCreateRequest(segment: Segment) {
     let request = this.requests.get(segment);
     if (!request) {
-      request = new Request(segment, this.bandwidthApproximator);
-      request.subscribe("onSuccess", this.onRequestCompleted);
+      request = new Request(
+        segment,
+        this.requestProcessQueueCallback,
+        this.bandwidthApproximator
+      );
       this.requests.set(segment, request);
     }
     return request;
   }
 
-  private onRequestCompleted: RequestEvents["onSuccess"] = (request) => {
+  remove(request: Request) {
     this.requests.delete(request.segment);
-  };
-
-  remove(segment: Segment) {
-    this.requests.delete(segment);
   }
 
   items() {

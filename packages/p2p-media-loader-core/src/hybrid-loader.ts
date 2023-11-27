@@ -5,7 +5,7 @@ import { Settings, CoreEventHandlers } from "./types";
 import { BandwidthApproximator } from "./bandwidth-approximator";
 import { Playback, QueueItem } from "./internal-types";
 import { RequestsContainer } from "./request-container";
-import { Request, EngineCallbacks } from "./request";
+import { EngineCallbacks, RequestStatus } from "./request";
 import * as QueueUtils from "./utils/queue";
 import * as LoggerUtils from "./utils/logger";
 import * as StreamUtils from "./utils/stream";
@@ -42,6 +42,7 @@ export class HybridLoader {
     this.segmentAvgDuration = StreamUtils.getSegmentAvgDuration(activeStream);
     this.requests = new RequestsContainer(
       requestedSegment.stream.type,
+      this.requestProcessQueueMicrotask,
       this.bandwidthApproximator
     );
 
@@ -110,7 +111,7 @@ export class HybridLoader {
     this.requestProcessQueueMicrotask();
   }
 
-  private requestProcessQueueMicrotask(force = true) {
+  private requestProcessQueueMicrotask = (force = true) => {
     const now = performance.now();
     if (
       (!force &&
@@ -130,7 +131,7 @@ export class HybridLoader {
         this.isProcessQueueMicrotaskCreated = false;
       }
     });
-  }
+  };
 
   private processQueue() {
     const { queue, queueSegmentIds } = QueueUtils.generateQueue({
@@ -140,14 +141,41 @@ export class HybridLoader {
       skipSegment: (segment) => this.segmentStorage.hasSegment(segment),
     });
 
+    const removeRequestStatuses: RequestStatus[] = ["not-started", "aborted"];
     for (const request of this.requests.items()) {
       if (
-        !request.isSegmentRequestedByEngine &&
         request.status === "loading" &&
+        !request.isSegmentRequestedByEngine &&
         !queueSegmentIds.has(request.segment.localId)
       ) {
         request.abortFromProcessQueue();
-        this.requests.remove(request.segment);
+        this.requests.remove(request);
+        continue;
+      }
+
+      if (request.status === "succeed") {
+        if (request.type === "http") {
+          this.p2pLoaders.currentLoader.broadcastAnnouncement();
+        }
+        this.eventHandlers?.onSegmentLoaded?.(
+          request.data!.byteLength,
+          request.type!
+        );
+        continue;
+      }
+
+      if (request.status === "failed") {
+        if (request.type === "http") {
+          this.p2pLoaders.currentLoader.broadcastAnnouncement();
+        }
+        continue;
+      }
+
+      if (
+        removeRequestStatuses.includes(request.status) &&
+        !request.isSegmentRequestedByEngine
+      ) {
+        this.requests.remove(request);
       }
     }
 
@@ -205,19 +233,14 @@ export class HybridLoader {
     const request = this.requests.get(segment);
     if (!request) return;
     request.abortFromEngine();
-    this.requestProcessQueueMicrotask();
     this.logger.engine("abort: ", LoggerUtils.getSegmentString(segment));
   }
 
   private async loadThroughHttp(item: QueueItem, isRandom = false) {
     const { segment } = item;
-
     const request = this.requests.getOrCreateRequest(segment);
-    request.subscribe("onSuccess", this.onRequestSuccess);
-    request.subscribe("onError", this.onRequestError);
-
-    this.p2pLoaders.currentLoader.broadcastAnnouncement();
     void fulfillHttpSegmentRequest(request, this.settings);
+    this.p2pLoaders.currentLoader.broadcastAnnouncement();
     if (!isRandom) {
       this.logger.loader(
         `http request: ${LoggerUtils.getQueueItemString(item)}`
@@ -226,34 +249,8 @@ export class HybridLoader {
   }
 
   private async loadThroughP2P(item: QueueItem) {
-    const p2pLoader = this.p2pLoaders.currentLoader;
-    const request = p2pLoader.downloadSegment(item);
-    if (request === undefined) return;
-
-    request.subscribe("onSuccess", this.onRequestSuccess);
-    request.subscribe("onError", this.onRequestError);
+    this.p2pLoaders.currentLoader.downloadSegment(item);
   }
-
-  private onRequestSuccess = (request: Request, data: ArrayBuffer) => {
-    const requestType = request.type;
-    if (!requestType) return;
-
-    void this.segmentStorage.storeSegment(request.segment, data);
-    if (requestType === "http") {
-      this.logger.loader(`http responses: ${request.segment.externalId}`);
-      this.p2pLoaders.currentLoader.broadcastAnnouncement();
-    }
-
-    this.eventHandlers?.onSegmentLoaded?.(data.byteLength, requestType);
-    this.requestProcessQueueMicrotask();
-  };
-
-  private onRequestError = (request: Request) => {
-    if (request.type === "http") {
-      this.p2pLoaders.currentLoader.broadcastAnnouncement();
-    }
-    this.requestProcessQueueMicrotask();
-  };
 
   private loadRandomThroughHttp() {
     const { simultaneousHttpDownloads } = this.settings;

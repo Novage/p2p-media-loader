@@ -1,4 +1,3 @@
-import { EventDispatcher } from "./event-dispatcher";
 import { Segment, SegmentResponse } from "./types";
 import { BandwidthApproximator } from "./bandwidth-approximator";
 import * as Utils from "./utils/utils";
@@ -45,7 +44,7 @@ type StartRequestParameters =
   | OmitEncapsulated<HttpRequestAttempt>
   | OmitEncapsulated<P2PRequestAttempt>;
 
-type RequestStatus =
+export type RequestStatus =
   | "not-started"
   | "loading"
   | "succeed"
@@ -57,6 +56,7 @@ export class Request {
   private _engineCallbacks?: EngineCallbacks;
   private currentAttempt?: RequestAttempt;
   private _failedAttempts: RequestAttempt[] = [];
+  private finalData?: ArrayBuffer;
   private bytes: Uint8Array[] = [];
   private _loadedBytes = 0;
   private _totalBytes?: number;
@@ -67,6 +67,7 @@ export class Request {
 
   constructor(
     readonly segment: Segment,
+    private readonly requestProcessQueueCallback: () => void,
     private readonly bandwidthApproximator: BandwidthApproximator
   ) {
     this.id = Request.getRequestItemId(segment);
@@ -91,6 +92,11 @@ export class Request {
 
   get totalBytes(): number | undefined {
     return this._totalBytes;
+  }
+
+  get data(): ArrayBuffer | undefined {
+    if (this.status !== "succeed") return;
+    return this.finalData ?? Utils.joinChunks(this.bytes);
   }
 
   get loadedPercent() {
@@ -156,6 +162,7 @@ export class Request {
   abortFromEngine() {
     this._engineCallbacks?.onError(new CoreRequestError("aborted"));
     this._engineCallbacks = undefined;
+    this.requestProcessQueueCallback();
   }
 
   abortFromProcessQueue() {
@@ -163,6 +170,7 @@ export class Request {
     this._status = "aborted";
     this._abortRequestCallback?.("abort");
     this._abortRequestCallback = undefined;
+    this.currentAttempt = undefined;
     this.notReceivingBytesTimeout.clear();
   }
 
@@ -177,6 +185,7 @@ export class Request {
     this.currentAttempt.error = error;
     this._failedAttempts.push(this.currentAttempt);
     this.notReceivingBytesTimeout.clear();
+    this.requestProcessQueueCallback();
   };
 
   private abortOnError = (error: RequestError) => {
@@ -187,6 +196,7 @@ export class Request {
     this.currentAttempt.error = error;
     this._failedAttempts.push(this.currentAttempt);
     this.notReceivingBytesTimeout.clear();
+    this.requestProcessQueueCallback();
   };
 
   private completeOnSuccess = () => {
@@ -194,12 +204,12 @@ export class Request {
     if (!this.currentAttempt) return;
 
     this.notReceivingBytesTimeout.clear();
-    const data = Utils.joinChunks(this.bytes);
+    this.finalData = Utils.joinChunks(this.bytes);
     this._status = "succeed";
     this._totalBytes = this._loadedBytes;
 
     this._engineCallbacks?.onSuccess({
-      data,
+      data: this.finalData,
       bandwidth: this.bandwidthApproximator.getBandwidth(),
     });
   };
