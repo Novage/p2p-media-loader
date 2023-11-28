@@ -96,13 +96,13 @@ export function getSegmentPlaybackStatuses(
   };
 }
 
-const isInTimeWindow = (
+function isInTimeWindow(
   segment: Segment,
   playback: Playback,
   timeWindowLength: number
-) => {
+) {
   const { startTime, endTime } = segment;
   const { position, rate } = playback;
   const rightMargin = position + timeWindowLength * rate;
   return !(rightMargin < startTime || position > endTime);
-};
+}
