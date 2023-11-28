@@ -73,17 +73,6 @@ export class RequestsContainer {
       if (request.type === "p2p") yield request;
     }
   }
-
-  isHttpRequested(segment: Segment): boolean {
-    const request = this.requests.get(segment);
-    return request?.type === "http" && request.status === "loading";
-  }
-
-  isP2PRequested(segment: Segment): boolean {
-    const request = this.requests.get(segment);
-    return request?.type === "p2p" && request.status === "loading";
-  }
-
   isHybridLoaderRequested(segment: Segment): boolean {
     return !!this.requests.get(segment)?.type;
   }
