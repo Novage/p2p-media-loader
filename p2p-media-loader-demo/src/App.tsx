@@ -443,13 +443,11 @@ function useLocalStorageItem<T>(
 
 const loggers = [
   "core:hybrid-loader-main",
-  "core:hybrid-loader-main-engine",
   "core:hybrid-loader-secondary",
-  "core:hybrid-loader-secondary-engine",
-  "core:p2p-loader",
+  "core:p2p-tracker-client",
   "core:peer",
   "core:p2p-loaders-container",
-  "core:requests-container-main",
-  "core:requests-container-secondary",
+  "core:request-main",
+  "core:request-secondary",
   "core:segment-memory-storage",
 ] as const;

@@ -1,21 +1,17 @@
 import { Peer } from "./peer";
 import { Segment, Settings, StreamWithSegments } from "../types";
-import { QueueItem } from "../internal-types";
 import { SegmentsMemoryStorage } from "../segments-storage";
 import * as PeerUtil from "../utils/peer";
-import * as LoggerUtils from "../utils/logger";
 import * as StreamUtils from "../utils/stream";
 import * as Utils from "../utils/utils";
 import { PeerSegmentStatus } from "../enums";
 import { RequestsContainer } from "../request-container";
 import { Request } from "../request";
 import { P2PTrackerClient } from "./tracker-client";
-import debug from "debug";
 
 export class P2PLoader {
   private readonly peerId: string;
   private readonly trackerClient: P2PTrackerClient;
-  private readonly logger = debug("core:p2p-loader");
   private isAnnounceMicrotaskCreated = false;
 
   constructor(
@@ -38,8 +34,7 @@ export class P2PLoader {
         onPeerConnected: this.onPeerConnected,
         onSegmentRequested: this.onSegmentRequested,
       },
-      this.settings,
-      this.logger
+      this.settings
     );
 
     this.segmentStorage.subscribeOnUpdate(
@@ -49,45 +44,22 @@ export class P2PLoader {
     this.trackerClient.start();
   }
 
-  downloadSegment(item: QueueItem): Request | undefined {
-    const { segment, statuses } = item;
-    const untestedPeers: Peer[] = [];
-    let fastestPeer: Peer | undefined;
-    let fastestPeerBandwidth = 0;
-
+  downloadSegment(segment: Segment): Request | undefined {
+    const peersWithSegment: Peer[] = [];
     for (const peer of this.trackerClient.peers()) {
       if (
         !peer.downloadingSegment &&
         peer.getSegmentStatus(segment) === PeerSegmentStatus.Loaded
       ) {
-        const { bandwidth } = peer;
-        if (bandwidth === undefined) {
-          untestedPeers.push(peer);
-        } else if (bandwidth > fastestPeerBandwidth) {
-          fastestPeerBandwidth = bandwidth;
-          fastestPeer = peer;
-        }
+        peersWithSegment.push(peer);
       }
     }
 
-    const peer = untestedPeers.length
-      ? Utils.getRandomItem(untestedPeers)
-      : fastestPeer;
-
+    const peer = Utils.getRandomItem(peersWithSegment);
     if (!peer) return;
 
     const request = this.requests.getOrCreateRequest(segment);
     peer.fulfillSegmentRequest(request);
-    this.logger(
-      `p2p request ${segment.externalId} | ${LoggerUtils.getStatusesString(
-        statuses
-      )}`
-    );
-    // request.subscribe("onSuccess", () => {
-    //   this.logger(`p2p loaded: ${segment.externalId}`);
-    // });
-
-    return request;
   }
 
   isLoadingOrLoadedBySomeone(segment: Segment): boolean {
@@ -119,7 +91,6 @@ export class P2PLoader {
   }
 
   private onPeerConnected = (peer: Peer) => {
-    this.logger(`connected with peer: ${peer.id}`);
     const announcement = this.getSegmentsAnnouncement();
     peer.sendSegmentsAnnouncement(announcement);
   };
@@ -152,9 +123,6 @@ export class P2PLoader {
   };
 
   destroy() {
-    this.logger(
-      `destroy tracker client: ${LoggerUtils.getStreamString(this.stream)}`
-    );
     this.segmentStorage.unsubscribeFromUpdate(
       this.stream,
       this.broadcastAnnouncement

@@ -34,7 +34,6 @@ export class Peer {
   private segments = new Map<string, PeerSegmentStatus>();
   private requestContext?: { request: Request; controls: RequestControls };
   private readonly logger = debug("core:peer");
-  private readonly bandwidthMeasurer = new BandwidthMeasurer();
   private isUploadingSegment = false;
 
   constructor(
@@ -42,7 +41,7 @@ export class Peer {
     private readonly eventHandlers: PeerEventHandlers,
     private readonly settings: PeerSettings
   ) {
-    this.id = hexToUtf8(connection.id);
+    this.id = Peer.getPeerIdFromHexString(connection.id);
     this.eventHandlers = eventHandlers;
 
     connection.on("data", this.onReceiveData.bind(this));
@@ -62,10 +61,6 @@ export class Peer {
 
   get downloadingSegment(): Segment | undefined {
     return this.requestContext?.request.segment;
-  }
-
-  get bandwidth(): number | undefined {
-    return this.bandwidthMeasurer.getBandwidth();
   }
 
   getSegmentStatus(segment: Segment): PeerSegmentStatus | undefined {
@@ -249,27 +244,6 @@ export class Peer {
 
   static getPeerIdFromHexString(hex: string) {
     return hexToUtf8(hex);
-  }
-}
-
-const SMOOTHING_COEF = 0.5;
-
-class BandwidthMeasurer {
-  private bandwidth?: number;
-
-  addMeasurement(bytes: number, loadingDurationMs: number) {
-    const bits = bytes * 8;
-    const currentBandwidth = (bits * 1000) / loadingDurationMs;
-
-    this.bandwidth =
-      this.bandwidth !== undefined
-        ? currentBandwidth * SMOOTHING_COEF +
-          (1 - SMOOTHING_COEF) * this.bandwidth
-        : currentBandwidth;
-  }
-
-  getBandwidth() {
-    return this.bandwidth;
   }
 }
 

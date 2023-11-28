@@ -1,5 +1,16 @@
-import { Segment, Stream, StreamWithSegments } from "../types";
+import { Segment, Settings, Stream, StreamWithSegments } from "../types";
 import { Playback } from "../internal-types";
+
+export type SegmentPlaybackStatuses = {
+  isHighDemand: boolean;
+  isHttpDownloadable: boolean;
+  isP2PDownloadable: boolean;
+};
+
+export type PlaybackTimeWindowsSettings = Pick<
+  Settings,
+  "highDemandTimeWindow" | "httpDownloadTimeWindow" | "p2pDownloadTimeWindow"
+>;
 
 const PEER_PROTOCOL_VERSION = "V1";
 
@@ -46,6 +57,52 @@ export function getSegmentAvgDuration(stream: StreamWithSegments) {
   return sumDuration / size;
 }
 
-export function getTimeToSegmentPlayback(segment: Segment, playback: Playback) {
-  return Math.max(segment.startTime - playback.position, 0) / playback.rate;
+export function isSegmentActualInPlayback(
+  segment: Readonly<Segment>,
+  playback: Playback,
+  timeWindowsSettings: PlaybackTimeWindowsSettings
+) {
+  const statuses = getSegmentPlaybackStatuses(
+    segment,
+    playback,
+    timeWindowsSettings
+  );
+  return (
+    statuses.isHighDemand ||
+    statuses.isHttpDownloadable ||
+    statuses.isP2PDownloadable
+  );
 }
+
+export function getSegmentPlaybackStatuses(
+  segment: Segment,
+  playback: Playback,
+  timeWindowsSettings: PlaybackTimeWindowsSettings
+): SegmentPlaybackStatuses {
+  const {
+    highDemandTimeWindow,
+    httpDownloadTimeWindow,
+    p2pDownloadTimeWindow,
+  } = timeWindowsSettings;
+
+  return {
+    isHighDemand: isInTimeWindow(segment, playback, highDemandTimeWindow),
+    isHttpDownloadable: isInTimeWindow(
+      segment,
+      playback,
+      httpDownloadTimeWindow
+    ),
+    isP2PDownloadable: isInTimeWindow(segment, playback, p2pDownloadTimeWindow),
+  };
+}
+
+const isInTimeWindow = (
+  segment: Segment,
+  playback: Playback,
+  timeWindowLength: number
+) => {
+  const { startTime, endTime } = segment;
+  const { position, rate } = playback;
+  const rightMargin = position + timeWindowLength * rate;
+  return !(rightMargin < startTime || position > endTime);
+};

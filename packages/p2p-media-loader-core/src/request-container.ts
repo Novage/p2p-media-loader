@@ -1,20 +1,17 @@
-import { Segment, StreamType } from "./types";
-import Debug from "debug";
+import { Segment, Settings } from "./types";
 import { BandwidthApproximator } from "./bandwidth-approximator";
 import { Request } from "./request";
+import { Playback } from "./internal-types";
 
 export class RequestsContainer {
   private readonly requests = new Map<Segment, Request>();
-  private readonly logger: Debug.Debugger;
 
   constructor(
-    streamType: StreamType,
     private readonly requestProcessQueueCallback: () => void,
-    private readonly bandwidthApproximator: BandwidthApproximator
-  ) {
-    this.logger = Debug(`core:requests-container-${streamType}`);
-    this.logger.color = "LightSeaGreen";
-  }
+    private readonly bandwidthApproximator: BandwidthApproximator,
+    private readonly playback: Playback,
+    private readonly settings: Settings
+  ) {}
 
   get executingHttpCount() {
     let count = 0;
@@ -48,7 +45,9 @@ export class RequestsContainer {
       request = new Request(
         segment,
         this.requestProcessQueueCallback,
-        this.bandwidthApproximator
+        this.bandwidthApproximator,
+        this.playback,
+        this.settings
       );
       this.requests.set(segment, request);
     }
@@ -76,11 +75,13 @@ export class RequestsContainer {
   }
 
   isHttpRequested(segment: Segment): boolean {
-    return this.requests.get(segment)?.type === "http";
+    const request = this.requests.get(segment);
+    return request?.type === "http" && request.status === "loading";
   }
 
   isP2PRequested(segment: Segment): boolean {
-    return this.requests.get(segment)?.type === "p2p";
+    const request = this.requests.get(segment);
+    return request?.type === "p2p" && request.status === "loading";
   }
 
   isHybridLoaderRequested(segment: Segment): boolean {

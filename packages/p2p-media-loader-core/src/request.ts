@@ -1,6 +1,10 @@
 import { Segment, SegmentResponse } from "./types";
 import { BandwidthApproximator } from "./bandwidth-approximator";
+import * as StreamUtils from "./utils/stream";
 import * as Utils from "./utils/utils";
+import * as LoggerUtils from "./utils/logger";
+import debug from "debug";
+import { Playback } from "./internal-types";
 
 export type EngineCallbacks = {
   onSuccess: (response: SegmentResponse) => void;
@@ -59,14 +63,20 @@ export class Request {
   private progress?: LoadProgress;
   private notReceivingBytesTimeout: Timeout;
   private _abortRequestCallback?: (errorType: RequestInnerErrorType) => void;
+  private readonly _logger: debug.Debugger;
 
   constructor(
     readonly segment: Segment,
     private readonly requestProcessQueueCallback: () => void,
-    private readonly bandwidthApproximator: BandwidthApproximator
+    private readonly bandwidthApproximator: BandwidthApproximator,
+    private readonly playback: Playback,
+    private readonly settings: StreamUtils.PlaybackTimeWindowsSettings
   ) {
     this.id = Request.getRequestItemId(segment);
     this.notReceivingBytesTimeout = new Timeout(this.abortOnTimeout);
+
+    const { type } = this.segment.stream;
+    this._logger = debug(`core:request-${type}`);
   }
 
   get status() {
@@ -148,6 +158,16 @@ export class Request {
       this.notReceivingBytesTimeout.start(notReceivingBytesTimeoutMs);
     }
 
+    const statuses = StreamUtils.getSegmentPlaybackStatuses(
+      this.segment,
+      this.playback,
+      this.settings
+    );
+    const statusString = LoggerUtils.getSegmentPlaybackStatusesString(statuses);
+    this.logger(
+      `${requestData.type} ${this.segment.externalId} ${statusString} started`
+    );
+
     return {
       firstBytesReceived: this.firstBytesReceived,
       addLoadedChunk: this.addLoadedChunk,
@@ -214,6 +234,10 @@ export class Request {
     this._totalBytes = this._loadedBytes;
 
     this.resolveEngineCallbacksSuccessfully(this.finalData);
+    this.logger(
+      `${this.currentAttempt.type} ${this.segment.externalId} succeed`
+    );
+    this.requestProcessQueueCallback();
   };
 
   private addLoadedChunk = (chunk: Uint8Array) => {
@@ -236,6 +260,12 @@ export class Request {
     if (this._status !== "loading") {
       throw new Error(`Request has been already ${this.status}.`);
     }
+  }
+
+  private logger(message: string) {
+    this._logger.color = this.currentAttempt?.type === "http" ? "green" : "red";
+    this._logger(message);
+    this._logger.color = "";
   }
 
   static getRequestItemId(segment: Segment) {

@@ -20,19 +20,19 @@ type P2PTrackerClientEventHandlers = {
 export class P2PTrackerClient {
   private readonly client: TrackerClient;
   private readonly _peers = new Map<string, PeerItem>();
-  private readonly streamHash: string;
+  private readonly logger = debug("core:p2p-tracker-client");
 
   constructor(
     private readonly peerId: string,
-    private readonly streamExternalId: string,
+    streamExternalId: string,
     private readonly stream: StreamWithSegments,
     private readonly eventHandlers: P2PTrackerClientEventHandlers,
-    private readonly settings: Settings,
-    private readonly logger: debug.Debugger
+    private readonly settings: Settings
   ) {
-    this.streamHash = PeerUtil.getStreamHash(streamExternalId);
+    const streamHash = PeerUtil.getStreamHash(streamExternalId);
+    const streamShortId = LoggerUtils.getStreamString(stream);
     this.client = new TrackerClient({
-      infoHash: utf8ToHex(this.streamHash),
+      infoHash: utf8ToHex(streamHash),
       peerId: utf8ToHex(this.peerId),
       port: 6881,
       announce: [
@@ -54,9 +54,7 @@ export class P2PTrackerClient {
     this.client.on("warning", this.onTrackerClientWarning);
     this.client.on("error", this.onTrackerClientError);
     this.logger(
-      `create tracker client: ${LoggerUtils.getStreamString(stream)}; ${
-        this.peerId
-      }`
+      `create new client; \nstream: ${streamShortId}; hash: ${streamHash}; \npeer id: ${this.peerId}`
     );
   }
 
@@ -72,25 +70,28 @@ export class P2PTrackerClient {
         connection.destroy();
       }
     }
+    this._peers.clear();
+    this.logger(
+      `destroy client; stream: ${LoggerUtils.getStreamString(this.stream)}`
+    );
   }
 
   private onReceivePeerConnection: TrackerClientEvents["peer"] = (
     peerConnection
   ) => {
-    let peerItem = this._peers.get(peerConnection.id);
-
+    const itemId = Peer.getPeerIdFromHexString(peerConnection.id);
+    let peerItem = this._peers.get(itemId);
     if (peerItem?.peer) {
       peerConnection.destroy();
       return;
     } else if (!peerItem) {
       peerItem = { potentialConnections: new Set() };
       peerItem.potentialConnections.add(peerConnection);
-      const itemId = Peer.getPeerIdFromHexString(peerConnection.id);
       this._peers.set(itemId, peerItem);
     }
 
     peerConnection.on("connect", () => {
-      if (!peerItem) return;
+      if (!peerItem || peerItem.peer) return;
 
       for (const connection of peerItem.potentialConnections) {
         if (connection !== peerConnection) connection.destroy();
@@ -104,6 +105,7 @@ export class P2PTrackerClient {
         },
         this.settings
       );
+      this.logger(`connected with peer: ${peerItem.peer.id}`);
       this.eventHandlers.onPeerConnected(peerItem.peer);
     });
   };
