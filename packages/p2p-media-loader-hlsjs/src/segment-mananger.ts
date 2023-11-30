@@ -16,21 +16,24 @@ export class SegmentManager {
   processMasterManifest(data: ManifestLoadedData) {
     const { levels, audioTracks } = data;
     // in the case of audio only stream it is stored in levels
-    levels.forEach((level, index) =>
+
+    for (const [index, level] of levels.entries()) {
+      const { url } = level;
       this.core.addStreamIfNoneExists({
-        localId: level.url,
+        localId: Array.isArray(url) ? url[0] : url,
         type: "main",
         index,
-      })
-    );
+      });
+    }
 
-    audioTracks.forEach((track, index) =>
+    for (const [index, track] of audioTracks.entries()) {
+      const { url } = track;
       this.core.addStreamIfNoneExists({
-        localId: track.url,
+        localId: Array.isArray(url) ? url[0] : url,
         type: "secondary",
         index,
-      })
-    );
+      });
+    }
   }
 
   updatePlaylist(data: LevelUpdatedData | AudioTrackLoadedData) {

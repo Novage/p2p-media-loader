@@ -73,18 +73,26 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     const onSuccess = (response: SegmentResponse) => {
       this.response = response;
       const loadedBytes = this.response.data.byteLength;
-      stats.loading = getLoadingStat({
-        targetBitrate: this.response.bandwidth,
-        loadingEndTime: performance.now(),
+      stats.loading = getLoadingStat(
+        this.response.bandwidth,
         loadedBytes,
-      });
+        performance.now()
+      );
       stats.total = stats.loaded = loadedBytes;
 
+      if (callbacks.onProgress) {
+        callbacks.onProgress(
+          this.stats,
+          context,
+          this.response.data,
+          undefined
+        );
+      }
       callbacks.onSuccess(
         { data: this.response.data, url: context.url },
         this.stats,
         context,
-        this.response
+        undefined
       );
     };
 
@@ -136,15 +144,11 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   }
 }
 
-function getLoadingStat({
-  loadedBytes,
-  targetBitrate,
-  loadingEndTime,
-}: {
-  targetBitrate: number;
-  loadedBytes: number;
-  loadingEndTime: number;
-}) {
+function getLoadingStat(
+  targetBitrate: number,
+  loadedBytes: number,
+  loadingEndTime: number
+) {
   const bits = loadedBytes * 8;
   const timeForLoading = (bits / targetBitrate) * 1000;
   const first = loadingEndTime - timeForLoading;

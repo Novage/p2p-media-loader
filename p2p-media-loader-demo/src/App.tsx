@@ -3,15 +3,11 @@ import { Engine as HlsJsEngine } from "p2p-media-loader-hlsjs";
 import { Engine as ShakaEngine } from "p2p-media-loader-shaka";
 import Hls from "hls.js";
 import DPlayer from "dplayer";
-import Clappr from "@clappr/player";
 import shakaLib from "shaka-player";
 import muxjs from "mux.js";
 import debug from "debug";
 
 window.muxjs = muxjs;
-(window as any).Clappr = Clappr;
-(window as any).Hls = Hls;
-
 const players = [
   "hlsjs",
   "hls-dplayer",
@@ -48,8 +44,8 @@ const streamUrls = {
   audioOnly:
     "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/a1/prog_index.m3u8",
   dash1:
-    "http://dash.akamaized.net/dash264/TestCases/1a/qualcomm/1/MultiRate.mpd",
-  dash2: "http://dash.akamaized.net/dash264/TestCases/5b/nomor/6.mpd",
+    "https://dash.akamaized.net/dash264/TestCases/1a/qualcomm/1/MultiRate.mpd",
+  dash2: "https://dash.akamaized.net/dash264/TestCases/5b/nomor/6.mpd",
 };
 
 function App() {
@@ -212,20 +208,19 @@ function App() {
 
   const initHlsClapprPlayer = (url: string) => {
     const engine = hlsEngine.current!;
-    const clapprPlayer = new Clappr.Player({
+    const clapprPlayer = new window.Clappr.Player({
       parentId: "#player-container",
       source: url,
       playback: {
         hlsjsConfig: {
           ...engine.getConfig(),
-          // enableWorker: true,
+          _getHlsInstance: () => {
+            return clapprPlayer.core.getCurrentPlayback()?._hls;
+          },
         },
       },
+      plugins: [window.LevelSelector],
     });
-    clapprPlayer.play();
-    console.log(engine);
-    console.log(clapprPlayer);
-    initClapprPlayer(clapprPlayer);
     setPlayerToWindow(clapprPlayer);
   };
 
@@ -478,23 +473,3 @@ const loggers = [
   "core:requests-container-secondary",
   "core:segment-memory-storage",
 ] as const;
-
-export function initHlsJsPlayer(hlsInstance: Hls): void {
-  if (
-    hlsInstance.config?.loader &&
-    typeof (hlsInstance.config.fLoader as any).getEngine === "function"
-  ) {
-    const engine: HlsJsEngine = (hlsInstance.config.fLoader as any).getEngine();
-    engine.initHlsJsEvents(hlsInstance);
-  }
-}
-
-export function initClapprPlayer(clapprPlayer: any): void {
-  clapprPlayer.on("play", () => {
-    const playback = clapprPlayer.core.getCurrentPlayback();
-    if (playback._hls && !playback._hls._p2pm_linitialized) {
-      playback._hls._p2pm_linitialized = true;
-      initHlsJsPlayer(clapprPlayer.core.getCurrentPlayback()._hls);
-    }
-  });
-}
