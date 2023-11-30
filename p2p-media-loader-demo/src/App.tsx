@@ -207,6 +207,7 @@ function App() {
   };
 
   const initHlsClapprPlayer = (url: string) => {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const engine = hlsEngine.current!;
     const clapprPlayer = new window.Clappr.Player({
       parentId: "#player-container",
