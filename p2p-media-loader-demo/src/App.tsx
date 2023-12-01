@@ -160,6 +160,7 @@ function App() {
     const engine = hlsEngine.current;
     if (!engine) return;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const clapprPlayer: any = new window.Clappr.Player({
       parentId: "#player-container",
       source: url,
@@ -234,6 +235,7 @@ function App() {
       parentId: "#player-container",
       source: url,
       plugins: [window.DashShakaPlayback, window.LevelSelector],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       shakaOnBeforeLoad: (shakaPlayerInstance: any) => {
         engine.initShakaPlayer(shakaPlayerInstance);
       },
