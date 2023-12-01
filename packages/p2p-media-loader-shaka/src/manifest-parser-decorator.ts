@@ -7,12 +7,10 @@ import {
   P2PMLShakaData,
 } from "./types";
 import { StreamType } from "p2p-media-loader-core";
-import * as Utils from "./stream-utils";
 
 export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   private readonly debug = Debug("p2pml-shaka:manifest-parser");
   private readonly isHLS: boolean;
-  private readonly isDash: boolean;
   private segmentManager?: SegmentManager;
 
   constructor(
@@ -20,7 +18,6 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     private readonly originalManifestParser: shaka.extern.ManifestParser
   ) {
     this.isHLS = this.originalManifestParser instanceof shaka.hls.HlsParser;
-    this.isDash = this.originalManifestParser instanceof shaka.dash.DashParser;
   }
 
   configure(config: shaka.extern.ManifestConfiguration) {
@@ -47,13 +44,9 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     if (!p2pml) return manifest;
 
     if (this.isHLS) {
-      const success = this.retrieveStreamMediaSequenceTimeMaps(
-        manifest.variants
-      );
-      this.retrieveStreamUrls(!success);
+      this.hookHLSStreamMediaSequenceTimeMaps(manifest.variants);
     }
     this.processStreams(manifest.variants);
-
     return manifest;
   }
 
@@ -82,7 +75,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       type: StreamType,
       order: number
     ) => {
-      if (this.isDash) this.hookSegmentIndex(stream);
+      this.hookSegmentIndex(stream);
       segmentManager.setStream(stream as HookedStream, type, order);
       processedStreams.add(stream.id);
       return true;
@@ -142,12 +135,8 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
           lastItemReference !== prevLastItemReference
         ) {
           // Segment index have been updated
-          const streamLocalId = Utils.getStreamLocalIdFromShakaStream(
-            stream,
-            this.isHLS
-          );
-          segmentManager.updateStreamSegments(streamLocalId, references);
-          this.debug(`Stream ${streamLocalId} is updated`);
+          segmentManager.updateStreamSegments(stream, references);
+          this.debug(`Stream ${stream.id} is updated`);
           prevFirstItemReference = firstItemReference;
           prevLastItemReference = lastItemReference;
         }
@@ -159,44 +148,40 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     };
   }
 
-  private retrieveStreamMediaSequenceTimeMaps(
-    variants: shaka.extern.Variant[]
-  ) {
+  private hookHLSStreamMediaSequenceTimeMaps(variants: shaka.extern.Variant[]) {
+    const maps = getMapPropertiesFromObject(this.originalManifestParser);
+
     // For version 4.3 and above
-    const manifestProperties = Object.values(this.originalManifestParser);
     let videoMap: Map<number, number> | undefined = undefined;
     let audioMap: Map<number, number> | undefined = undefined;
+    const keysToCheck = ["video", "audio", "text", "image"];
+    for (const map of maps) {
+      if (!keysToCheck.every((key) => map.has(key))) continue;
 
-    for (const manifestProp of manifestProperties) {
-      if (typeof manifestProp === "object" && manifestProp instanceof Map) {
-        const mapKeys = Array.from(manifestProp.keys());
-        if (
-          ["video", "audio", "text", "image"].every((i) => mapKeys.includes(i))
-        ) {
-          videoMap = manifestProp.get("video");
-          audioMap = manifestProp.get("audio");
-          break;
+      videoMap = map.get("video");
+      audioMap = map.get("audio");
+    }
+
+    if (videoMap && audioMap) {
+      for (const variant of variants) {
+        const { video: videoStream, audio: audioStream } = variant;
+        if (videoStream && videoMap) {
+          (videoStream as HookedStream).mediaSequenceTimeMap = videoMap;
+        }
+        if (audioStream && audioMap) {
+          (audioStream as HookedStream).mediaSequenceTimeMap = videoMap;
         }
       }
+      return;
     }
 
-    if (!videoMap && !audioMap) return false;
+    // For version 4.2; Retrieving mediaSequence map for each of HLS playlists
+    const manifestVariantsMap = maps.find((map) => {
+      const item = map.values().next().value;
+      return typeof item === "object" && item.streams?.createSegmentIndex;
+    });
 
-    for (const variant of variants) {
-      const { video: videoStream, audio: audioStream } = variant;
-      if (videoStream && videoMap) {
-        (videoStream as HookedStream).mediaSequenceTimeMap = videoMap;
-      }
-      if (audioStream && audioMap) {
-        (audioStream as HookedStream).mediaSequenceTimeMap = videoMap;
-      }
-    }
-
-    return true;
-  }
-
-  private retrieveStreamUrls(retrieveMediaSequenceMaps: boolean) {
-    const manifestProperties = Object.values(this.originalManifestParser);
+    if (!manifestVariantsMap) throw new Error();
 
     let manifestVariantMapValues: {
       stream: {
@@ -206,44 +191,22 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
         mediaSequenceTimeMap?: Map<number, number>;
       };
       [key: string]: unknown;
-    }[] = [];
-    for (const manifestProp of manifestProperties) {
-      if (!(manifestProp instanceof Map)) continue;
+    }[] = [...manifestVariantsMap.values()];
 
-      const value = manifestProp.values().next().value;
-      if (typeof value !== "object" || !value.stream?.createSegmentIndex) {
-        continue;
-      }
-
-      manifestVariantMapValues = [...manifestProp.values()];
-      if (!retrieveMediaSequenceMaps) break;
-
-      // For version 4.2; Retrieving mediaSequence map for each of HLS playlists
-      for (const variant of manifestVariantMapValues) {
-        const variantProps = Object.values(variant);
-        const mediaSequenceTimeMap = variantProps.find((p) => p instanceof Map);
-        if (!mediaSequenceTimeMap || variant.stream.mediaSequenceTimeMap) {
-          continue;
-        }
-        variant.stream.mediaSequenceTimeMap = mediaSequenceTimeMap as Map<
-          number,
-          number
-        >;
-      }
-      break;
-    }
-
-    // Retrieve HLS playlists urls
     for (const variant of manifestVariantMapValues) {
-      const variantProps = Object.values(variant) as unknown[];
-      let streamUrl = "";
-      for (const property of variantProps) {
-        if (typeof property === "string" && property.startsWith("http")) {
-          streamUrl = property;
-        }
-      }
+      if (variant.stream.mediaSequenceTimeMap) continue;
 
-      variant.stream.streamUrl = streamUrl;
+      const mediaSequenceTimeMap = getMapPropertiesFromObject(variant).find(
+        (map) => {
+          const [key, value] = map.entries().next().value ?? [];
+          return typeof key === "number" && typeof value === "number";
+        }
+      );
+      if (!mediaSequenceTimeMap) continue;
+      variant.stream.mediaSequenceTimeMap = mediaSequenceTimeMap as Map<
+        number,
+        number
+      >;
     }
   }
 }
@@ -258,4 +221,8 @@ export class DashManifestParser extends ManifestParserDecorator {
   public constructor(shaka: Shaka) {
     super(shaka, new shaka.dash.DashParser());
   }
+}
+
+function getMapPropertiesFromObject(object: object): Map<any, any>[] {
+  return Object.values(object).filter((property) => property instanceof Map);
 }

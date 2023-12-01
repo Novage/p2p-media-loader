@@ -87,17 +87,3 @@ export function getStreamLastMediaSequence(
     return firstMediaSequence + map.size - 1;
   }
 }
-
-export function getStreamLocalIdFromShakaStream(
-  stream: shaka.extern.Stream | HookedStream,
-  isHls: boolean
-): string {
-  if (isHls) {
-    const streamUrl = (stream as HookedStream).streamUrl;
-    if (!streamUrl) {
-      throw Error("Stream url must be set for HLS stream");
-    }
-    return streamUrl;
-  }
-  return stream.id.toString();
-}
