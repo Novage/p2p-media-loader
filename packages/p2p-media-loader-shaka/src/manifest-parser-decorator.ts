@@ -162,7 +162,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   private retrieveStreamMediaSequenceTimeMaps(
     variants: shaka.extern.Variant[]
   ) {
-    // For version 4.3
+    // For version 4.3 and above
     const manifestProperties = Object.values(this.originalManifestParser);
     let videoMap: Map<number, number> | undefined = undefined;
     let audioMap: Map<number, number> | undefined = undefined;
