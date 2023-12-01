@@ -11,13 +11,10 @@ type EngineState = {
   isPlaybackEventHandlersSet: boolean;
 };
 
-type HookedConfig = HlsConfig & {
-  _getHlsInstance?: () => Hls;
-};
-
 export class Engine {
   private readonly core: Core;
   private readonly segmentManager: SegmentManager;
+  private getHlsJsInstance?: () => Hls;
   private debugDestroying = Debug("hls:destroying");
   private state: EngineState = {
     isHlsJSEventsInit: false,
@@ -29,10 +26,10 @@ export class Engine {
     this.segmentManager = new SegmentManager(this.core);
   }
 
-  public getConfig(): Pick<
-    HlsConfig,
-    "fLoader" | "pLoader" | "liveSyncDurationCount"
-  > {
+  public getConfig(
+    getHlsJsInstance?: () => Hls
+  ): Pick<HlsConfig, "fLoader" | "pLoader" | "liveSyncDurationCount"> {
+    this.getHlsJsInstance = getHlsJsInstance;
     return {
       liveSyncDurationCount: 7,
       fLoader: this.createFragmentLoaderClass(),
@@ -125,13 +122,10 @@ export class Engine {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const engine: Engine = this;
     return class PlaylistLoader extends PlaylistLoaderBase {
-      constructor(config: HookedConfig) {
+      constructor(config: HlsConfig) {
         super(config);
-        if (
-          !engine.state.isHlsJSEventsInit &&
-          typeof config._getHlsInstance === "function"
-        ) {
-          const hlsInstance = config._getHlsInstance();
+        if (!engine.state.isHlsJSEventsInit && engine.getHlsJsInstance) {
+          const hlsInstance = engine.getHlsJsInstance();
           if (hlsInstance) engine.initHlsJsEvents(hlsInstance);
         }
       }
