@@ -176,8 +176,9 @@ function App() {
   };
 
   const initShakaDPlayer = (url: string) => {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const engine = shakaEngine.current!;
+    const engine = shakaEngine.current;
+    if (!engine) return;
+
     const player = new DPlayer({
       container: containerRef.current,
       video: {
@@ -208,9 +209,8 @@ function App() {
   };
 
   const initShakaPlayer = (url: string) => {
-    if (!videoRef.current) return;
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const engine = shakaEngine.current!;
+    const engine = shakaEngine.current;
+    if (!videoRef.current || !engine) return;
 
     const player = new window.shaka.Player(videoRef.current);
     const onError = (error: { code: unknown }) => {

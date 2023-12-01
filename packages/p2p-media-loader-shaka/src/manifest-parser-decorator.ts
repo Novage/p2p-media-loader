@@ -208,15 +208,14 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       [key: string]: unknown;
     }[] = [];
     for (const manifestProp of manifestProperties) {
-      if (typeof manifestProp !== "object" || !(manifestProp instanceof Map)) {
-        continue;
-      }
+      if (!(manifestProp instanceof Map)) continue;
 
-      manifestVariantMapValues = Array.from(manifestProp.values());
-      const [value] = manifestVariantMapValues;
+      const value = manifestProp.values().next().value;
       if (typeof value !== "object" || !value.stream?.createSegmentIndex) {
         continue;
       }
+
+      manifestVariantMapValues = [...manifestProp.values()];
       if (!retrieveMediaSequenceMaps) break;
 
       // For version 4.2; Retrieving mediaSequence map for each of HLS playlists
