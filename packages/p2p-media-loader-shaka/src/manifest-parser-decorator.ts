@@ -104,10 +104,13 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       const result = await createSegmentIndexOriginal.call(stream);
       const { segmentIndex } = stream;
       let prevReference: shaka.media.SegmentReference | null = null;
-      let prevFirstItemReference: shaka.media.SegmentReference | null = null;
-      let prevLastItemReference: shaka.media.SegmentReference | null = null;
+      let prevFirstItemReference: shaka.media.SegmentReference;
+      let prevLastItemReference: shaka.media.SegmentReference;
 
       if (!segmentIndex) return result;
+      const segmentReferencesPropName =
+        getReferencesListPropertyOfSegmentIndex(segmentIndex);
+      if (!segmentReferencesPropName) return result;
 
       const getOriginal = segmentIndex.get;
       segmentIndex.get = (position) => {
@@ -115,33 +118,25 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
         if (reference === prevReference) return reference;
         prevReference = reference;
 
-        let firstItemReference: shaka.media.SegmentReference | null = null;
-        let lastItemReference: shaka.media.SegmentReference | null = null;
-        const currentGet = segmentIndex.get;
-        segmentIndex.get = getOriginal;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const referencesList = (segmentIndex as any)[
+          segmentReferencesPropName
+        ] as shaka.media.SegmentReference[];
+        const firstItemReference = referencesList[0];
+        const lastItemReference = referencesList[referencesList.length - 1];
 
-        let references: shaka.media.SegmentReference[];
-        try {
-          references = [...segmentIndex];
-          firstItemReference = references[0];
-          lastItemReference = references[references.length - 1];
-        } catch (err) {
-          // For situations when segmentIndex is not iterable (inner array length is 0)
-          segmentIndex.get = getOriginal;
+        if (
+          firstItemReference === prevFirstItemReference &&
+          lastItemReference === prevLastItemReference
+        ) {
           return reference;
         }
-        if (
-          firstItemReference !== prevFirstItemReference ||
-          lastItemReference !== prevLastItemReference
-        ) {
-          // Segment index have been updated
-          segmentManager.updateStreamSegments(stream, references);
-          this.debug(`Stream ${stream.id} is updated`);
-          prevFirstItemReference = firstItemReference;
-          prevLastItemReference = lastItemReference;
-        }
 
-        segmentIndex.get = currentGet;
+        // Segment index have been updated
+        segmentManager.updateStreamSegments(stream, referencesList);
+        this.debug(`Stream ${stream.id} is updated`);
+        prevFirstItemReference = firstItemReference;
+        prevLastItemReference = lastItemReference;
         return reference;
       };
       return result;
@@ -175,15 +170,15 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       return;
     }
 
-    // For version 4.2; Retrieving mediaSequence map for each of HLS playlists
+    // For version 4.2; Retrieving mediaSequence map for each HLS playlist
     const manifestVariantsMap = maps.find((map) => {
       const item = map.values().next().value;
       return typeof item === "object" && item.streams?.createSegmentIndex;
     });
 
-    if (!manifestVariantsMap) throw new Error();
+    if (!manifestVariantsMap) return;
 
-    let manifestVariantMapValues: {
+    const manifestVariantMapValues: {
       stream: {
         createSegmentIndex: () => void;
         type: string;
@@ -223,6 +218,15 @@ export class DashManifestParser extends ManifestParserDecorator {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getMapPropertiesFromObject(object: object): Map<any, any>[] {
   return Object.values(object).filter((property) => property instanceof Map);
+}
+
+function getReferencesListPropertyOfSegmentIndex(
+  segmentIndex: shaka.media.SegmentIndex
+): string | undefined {
+  return Object.entries(segmentIndex).find(
+    ([, value]) => value instanceof Array
+  )?.[0];
 }

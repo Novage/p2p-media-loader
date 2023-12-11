@@ -1,4 +1,4 @@
-import { HookedStream, Stream } from "./types";
+import { Stream } from "./types";
 import {
   SegmentBase,
   StreamWithReadonlySegments,
