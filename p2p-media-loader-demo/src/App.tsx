@@ -123,7 +123,7 @@ function App() {
     const hls = new Hls({
       ...engine.getConfig(),
     });
-    engine.initHlsJsEvents(hls);
+    engine.initHLSEvents(hls);
     hls.attachMedia(videoRef.current);
     hls.loadSource(url);
     hlsInstance.current = hls;
@@ -144,7 +144,7 @@ function App() {
               ...engine.getConfig(),
               liveSyncDurationCount: 7,
             });
-            engine.initHlsJsEvents(hls);
+            engine.initHLSEvents(hls);
             hls.loadSource(video.src);
             hls.attachMedia(video);
             hlsInstance.current = hls;
@@ -165,13 +165,12 @@ function App() {
       source: url,
       playback: {
         hlsjsConfig: {
-          ...engine.getConfig(
-            () => clapprPlayer.core.getCurrentPlayback()?._hls
-          ),
+          ...engine.getConfig(),
         },
       },
       plugins: [window.LevelSelector],
     });
+    engine.initClapprPlayer(clapprPlayer);
     setPlayerToWindow(clapprPlayer);
   };
 
@@ -287,10 +286,12 @@ function App() {
     switch (playerType) {
       case "hls-dplayer":
       case "hlsjs":
+      case "hls-clappr":
         hlsInstance.current?.loadSource(streamUrl);
         break;
       case "shaka-player":
       case "shaka-dplayer":
+      case "shaka-clappr":
         shakaInstance.current?.load(streamUrl).catch(() => undefined);
         break;
     }
