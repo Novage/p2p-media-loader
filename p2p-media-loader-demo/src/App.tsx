@@ -260,6 +260,10 @@ function App() {
   const createNewPlayer = () => {
     setHttpLoadedGlob(0);
     setP2PLoadedGlob(0);
+
+    (window as unknown as ExtendedWindow).videoPlayer?.destroy?.();
+    hlsInstance.current?.destroy();
+    void shakaInstance.current?.destroy();
     switch (playerType) {
       case "hls-dplayer":
         initHlsDPlayer(streamUrl);

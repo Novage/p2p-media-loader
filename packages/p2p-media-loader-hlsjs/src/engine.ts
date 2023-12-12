@@ -34,11 +34,7 @@ export class Engine {
 
   initHLSEvents(hls: Hls) {
     if (this._hlsInstance === hls) return;
-
-    if (this._hlsInstance) {
-      this.updateHlsEventsHandlers("unregister");
-      this.updateMediaElementEventHandlers("unregister");
-    }
+    if (this._hlsInstance) this.destroy();
     this._hlsInstance = hls;
     this.updateHlsEventsHandlers("register");
     this.updateMediaElementEventHandlers("unregister");
@@ -157,6 +153,7 @@ export class Engine {
     return class PlaylistLoader extends PlaylistLoaderBase {
       constructor(config: HlsConfig) {
         super(config);
+        if (engine._hlsInstance) return;
         const hlsInstance = engine.hlsInstanceGetter?.();
         if (hlsInstance) engine.initHLSEvents(hlsInstance);
       }
