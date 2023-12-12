@@ -37,7 +37,7 @@ export class Engine {
     if (this._hlsInstance) this.destroy();
     this._hlsInstance = hls;
     this.updateHlsEventsHandlers("register");
-    this.updateMediaElementEventHandlers("unregister");
+    this.updateMediaElementEventHandlers("register");
   }
 
   private updateHlsEventsHandlers(type: "register" | "unregister") {
