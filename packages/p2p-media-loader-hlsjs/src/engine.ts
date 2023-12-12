@@ -120,7 +120,9 @@ export class Engine {
 
   private destroyCore = () => this.core.destroy();
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   initClapprPlayer(clapprPlayer: any) {
+    this._hlsInstance = undefined;
     this.hlsInstanceGetter = () => clapprPlayer.core.getCurrentPlayback()?._hls;
   }
 
