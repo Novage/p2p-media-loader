@@ -1,111 +1,60 @@
-import { RequestAbortError, FetchError } from "./errors";
-import { Segment } from "./types";
-import { HttpRequest, LoadProgress } from "./request-container";
+import { Settings } from "./types";
+import { Request, RequestError, HttpRequestErrorType } from "./request";
 
-export function getHttpSegmentRequest(segment: Segment): Readonly<HttpRequest> {
-  const { promise, abortController, progress } = fetchSegmentData(segment);
-  return {
-    type: "http",
-    promise,
-    progress,
-    abort: () => abortController.abort(),
-  };
-}
-
-function fetchSegmentData(segment: Segment) {
+export async function fulfillHttpSegmentRequest(
+  request: Request,
+  settings: Pick<Settings, "httpNotReceivingBytesTimeoutMs">
+) {
   const headers = new Headers();
-  const { url, byteRange, localId: segmentId } = segment;
+  const { segment } = request;
+  const { url, byteRange } = segment;
 
   if (byteRange) {
     const { start, end } = byteRange;
     const byteRangeString = `bytes=${start}-${end}`;
     headers.set("Range", byteRangeString);
   }
+
   const abortController = new AbortController();
-
-  const progress: LoadProgress = {
-    canBeTracked: false,
-    totalBytes: 0,
-    loadedBytes: 0,
-    percent: 0,
-    startTimestamp: performance.now(),
-  };
-  const loadSegmentData = async () => {
-    try {
-      const response = await window.fetch(url, {
-        headers,
-        signal: abortController.signal,
-      });
-
-      if (response.ok) {
-        return await getDataPromiseAndMonitorProgress(response, progress);
-      }
-      throw new FetchError(
-        response.statusText ?? `Network response was not for ${segmentId}`,
-        response.status,
-        response
-      );
-    } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        throw new RequestAbortError(`Segment fetch was aborted ${segmentId}`);
-      }
-      throw error;
+  const requestControls = request.start(
+    { type: "http" },
+    {
+      abort: () => abortController.abort("abort"),
+      notReceivingBytesTimeoutMs: settings.httpNotReceivingBytesTimeoutMs,
     }
-  };
-
-  return {
-    promise: loadSegmentData(),
-    abortController,
-    progress,
-  };
-}
-
-async function getDataPromiseAndMonitorProgress(
-  response: Response,
-  progress: LoadProgress
-): Promise<ArrayBuffer> {
-  const totalBytesString = response.headers.get("Content-Length");
-  if (!response.body) {
-    return response.arrayBuffer().then((data) => {
-      progress.loadedBytes = data.byteLength;
-      progress.totalBytes = data.byteLength;
-      progress.lastLoadedChunkTimestamp = performance.now();
-      progress.percent = 100;
-      return data;
+  );
+  try {
+    const fetchResponse = await window.fetch(url, {
+      headers,
+      signal: abortController.signal,
     });
-  }
+    requestControls.firstBytesReceived();
 
-  if (totalBytesString) {
-    progress.totalBytes = +totalBytesString;
-    progress.canBeTracked = true;
-  }
+    if (!fetchResponse.ok) {
+      throw new RequestError("fetch-error", fetchResponse.statusText);
+    }
 
-  const reader = response.body.getReader();
+    if (!fetchResponse.body) return;
+    const totalBytesString = fetchResponse.headers.get("Content-Length");
+    if (totalBytesString) request.setTotalBytes(+totalBytesString);
 
-  progress.startTimestamp = performance.now();
-  const chunks: Uint8Array[] = [];
-  for await (const chunk of readStream(reader)) {
-    chunks.push(chunk);
-    progress.loadedBytes += chunk.length;
-    progress.lastLoadedChunkTimestamp = performance.now();
-    if (progress.canBeTracked) {
-      progress.percent = (progress.loadedBytes / progress.totalBytes) * 100;
+    const reader = fetchResponse.body.getReader();
+    for await (const chunk of readStream(reader)) {
+      requestControls.addLoadedChunk(chunk);
+    }
+    requestControls.completeOnSuccess();
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.name !== "abort") return;
+
+      const httpLoaderError: RequestError<HttpRequestErrorType> = !(
+        error instanceof RequestError
+      )
+        ? new RequestError("fetch-error", error.message)
+        : error;
+      requestControls.abortOnError(httpLoaderError);
     }
   }
-
-  if (!progress.canBeTracked) {
-    progress.totalBytes = progress.loadedBytes;
-    progress.percent = 100;
-  }
-  const resultBuffer = new ArrayBuffer(progress.loadedBytes);
-  const view = new Uint8Array(resultBuffer);
-
-  let offset = 0;
-  for (const chunk of chunks) {
-    view.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return resultBuffer;
 }
 
 async function* readStream(

@@ -7,17 +7,17 @@ import {
   SegmentBase,
   CoreEventHandlers,
 } from "./types";
-import * as Utils from "./utils/utils";
+import * as StreamUtils from "./utils/stream";
 import { LinkedMap } from "./linked-map";
 import { BandwidthApproximator } from "./bandwidth-approximator";
-import { EngineCallbacks } from "./request-container";
+import { EngineCallbacks } from "./request";
 import { SegmentsMemoryStorage } from "./segments-storage";
 
 export class Core<TStream extends Stream = Stream> {
   private manifestResponseUrl?: string;
   private readonly streams = new Map<string, StreamWithSegments<TStream>>();
   private readonly settings: Settings = {
-    simultaneousHttpDownloads: 2,
+    simultaneousHttpDownloads: 3,
     simultaneousP2PDownloads: 3,
     highDemandTimeWindow: 15,
     httpDownloadTimeWindow: 45,
@@ -25,8 +25,9 @@ export class Core<TStream extends Stream = Stream> {
     cachedSegmentExpiration: 120 * 1000,
     cachedSegmentsCount: 50,
     webRtcMaxMessageSize: 64 * 1024 - 1,
-    p2pSegmentDownloadTimeout: 5000,
-    p2pLoaderDestroyTimeout: 30 * 1000,
+    p2pNotReceivingBytesTimeoutMs: 1000,
+    p2pLoaderDestroyTimeoutMs: 30 * 1000,
+    httpNotReceivingBytesTimeoutMs: 1000,
   };
   private readonly bandwidthApproximator = new BandwidthApproximator();
   private segmentStorage?: SegmentsMemoryStorage;
@@ -40,7 +41,7 @@ export class Core<TStream extends Stream = Stream> {
   }
 
   hasSegment(segmentLocalId: string): boolean {
-    const segment = Utils.getSegmentFromStreamsMap(
+    const segment = StreamUtils.getSegmentFromStreamsMap(
       this.streams,
       segmentLocalId
     );
@@ -92,11 +93,9 @@ export class Core<TStream extends Stream = Stream> {
     void loader.loadSegment(segment, callbacks);
   }
 
-  abortSegmentLoading(segmentId: string): void {
-    const segment = this.identifySegment(segmentId);
-    const streamType = segment.stream.type;
-    if (streamType === "main") this.mainStreamLoader?.abortSegment(segment);
-    else this.secondaryStreamLoader?.abortSegment(segment);
+  abortSegmentLoading(segmentLocalId: string): void {
+    this.mainStreamLoader?.abortSegmentRequest(segmentLocalId);
+    this.secondaryStreamLoader?.abortSegmentRequest(segmentLocalId);
   }
 
   updatePlayback(position: number, rate: number): void {
@@ -116,7 +115,10 @@ export class Core<TStream extends Stream = Stream> {
       throw new Error("Manifest response url is undefined");
     }
 
-    const segment = Utils.getSegmentFromStreamsMap(this.streams, segmentId);
+    const segment = StreamUtils.getSegmentFromStreamsMap(
+      this.streams,
+      segmentId
+    );
     if (!segment) {
       throw new Error(`Not found segment with id: ${segmentId}`);
     }

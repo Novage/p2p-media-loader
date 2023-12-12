@@ -1,29 +1,13 @@
 import { Segment } from "./types";
 import { PeerCommandType } from "./enums";
+import { SegmentPlaybackStatuses } from "./utils/stream";
 
 export type Playback = {
   position: number;
   rate: number;
 };
 
-export type NumberRange = {
-  from: number;
-  to: number;
-};
-
-export type LoadBufferRanges = {
-  highDemand: NumberRange;
-  http: NumberRange;
-  p2p: NumberRange;
-};
-
-export type QueueItemStatuses = {
-  isHighDemand: boolean;
-  isHttpDownloadable: boolean;
-  isP2PDownloadable: boolean;
-};
-
-export type QueueItem = { segment: Segment; statuses: QueueItemStatuses };
+export type QueueItem = { segment: Segment; statuses: SegmentPlaybackStatuses };
 
 export type BasePeerCommand<T extends PeerCommandType = PeerCommandType> = {
   c: T;
@@ -36,12 +20,17 @@ export type JsonSegmentAnnouncement = {
 };
 
 export type PeerSegmentCommand = BasePeerCommand<
-  | PeerCommandType.SegmentRequest
-  | PeerCommandType.SegmentAbsent
-  | PeerCommandType.CancelSegmentRequest
+  PeerCommandType.SegmentAbsent | PeerCommandType.CancelSegmentRequest
 > & {
   i: string;
 };
+
+export type PeerSegmentRequestCommand =
+  BasePeerCommand<PeerCommandType.SegmentRequest> & {
+    i: string;
+    // start byte of range
+    b?: number;
+  };
 
 export type PeerSegmentAnnouncementCommand =
   BasePeerCommand<PeerCommandType.SegmentsAnnouncement> & {
@@ -56,5 +45,6 @@ export type PeerSendSegmentCommand =
 
 export type PeerCommand =
   | PeerSegmentCommand
+  | PeerSegmentRequestCommand
   | PeerSegmentAnnouncementCommand
   | PeerSendSegmentCommand;
