@@ -36,18 +36,18 @@ export class Engine {
     if (this._hlsInstance === hls) return;
 
     if (this._hlsInstance) {
-      this.updateHlsEventsHandlers("unsubscribe");
-      this.updateMediaElementEventHandlers("unsubscribe");
+      this.updateHlsEventsHandlers("unregister");
+      this.updateMediaElementEventHandlers("unregister");
     }
     this._hlsInstance = hls;
-    this.updateHlsEventsHandlers("subscribe");
-    this.updateMediaElementEventHandlers("subscribe");
+    this.updateHlsEventsHandlers("register");
+    this.updateMediaElementEventHandlers("unregister");
   }
 
-  private updateHlsEventsHandlers(type: "subscribe" | "unsubscribe") {
+  private updateHlsEventsHandlers(type: "register" | "unregister") {
     const hls = this._hlsInstance;
     if (!hls) return;
-    const method = type === "subscribe" ? "on" : "off";
+    const method = type === "register" ? "on" : "off";
 
     hls[method](
       "hlsManifestLoaded" as Events.MANIFEST_LOADED,
@@ -81,12 +81,12 @@ export class Engine {
   }
 
   private updateMediaElementEventHandlers = (
-    type: "subscribe" | "unsubscribe"
+    type: "register" | "unregister"
   ) => {
     const media = this._hlsInstance?.media;
     if (!media) return;
     const method =
-      type === "subscribe" ? "addEventListener" : "removeEventListener";
+      type === "register" ? "addEventListener" : "removeEventListener";
     media[method]("timeupdate", this.handlePlaybackUpdate);
     media[method]("seeking", this.handlePlaybackUpdate);
     media[method]("ratechange", this.handlePlaybackUpdate);
@@ -110,11 +110,11 @@ export class Engine {
   };
 
   private handleMediaAttached = () => {
-    this.updateMediaElementEventHandlers("subscribe");
+    this.updateMediaElementEventHandlers("register");
   };
 
   private handleMediaDetached = () => {
-    this.updateMediaElementEventHandlers("unsubscribe");
+    this.updateMediaElementEventHandlers("unregister");
   };
 
   private handlePlaybackUpdate = (event: Event) => {
@@ -130,8 +130,8 @@ export class Engine {
 
   destroy = () => {
     this.destroyCore();
-    this.updateHlsEventsHandlers("unsubscribe");
-    this.updateMediaElementEventHandlers("unsubscribe");
+    this.updateHlsEventsHandlers("unregister");
+    this.updateMediaElementEventHandlers("unregister");
     this._hlsInstance = undefined;
   };
 

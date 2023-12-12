@@ -21,6 +21,10 @@ export class BandwidthApproximator {
       this.loadings.shift();
     }
   }
+
+  destroy() {
+    this.loadings.length = 0;
+  }
 }
 
 function getBandwidthByProgressList(loadings: LoadProgress[]) {
