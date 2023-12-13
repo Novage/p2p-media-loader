@@ -1,7 +1,5 @@
 import { LinkedMap } from "./linked-map";
-import { HybridLoaderRequest } from "./request-container";
-
-export type { EngineCallbacks } from "./request-container";
+import { RequestAttempt } from "./request";
 
 export type StreamType = "main" | "secondary";
 
@@ -58,13 +56,11 @@ export type Settings = {
   cachedSegmentExpiration: number;
   cachedSegmentsCount: number;
   webRtcMaxMessageSize: number;
-  p2pSegmentDownloadTimeout: number;
-  p2pLoaderDestroyTimeout: number;
+  p2pNotReceivingBytesTimeoutMs: number;
+  p2pLoaderDestroyTimeoutMs: number;
+  httpNotReceivingBytesTimeoutMs: number;
 };
 
 export type CoreEventHandlers = {
-  onSegmentLoaded?: (
-    byteLength: number,
-    type: HybridLoaderRequest["type"]
-  ) => void;
+  onSegmentLoaded?: (byteLength: number, type: RequestAttempt["type"]) => void;
 };

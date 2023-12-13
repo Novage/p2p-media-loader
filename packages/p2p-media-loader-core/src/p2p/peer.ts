@@ -4,117 +4,63 @@ import {
   PeerCommand,
   PeerSegmentAnnouncementCommand,
   PeerSegmentCommand,
+  PeerSegmentRequestCommand,
   PeerSendSegmentCommand,
 } from "../internal-types";
 import { PeerCommandType, PeerSegmentStatus } from "../enums";
-import * as PeerUtil from "../utils/peer";
-import { P2PRequest } from "../request-container";
+import {
+  Request,
+  RequestControls,
+  RequestError,
+  PeerRequestErrorType,
+} from "../request";
 import { Segment, Settings } from "../types";
+import * as PeerUtil from "../utils/peer";
 import * as Utils from "../utils/utils";
 import debug from "debug";
 
-export class PeerRequestError extends Error {
-  constructor(
-    readonly type:
-      | "abort"
-      | "request-timeout"
-      | "response-bytes-mismatch"
-      | "segment-absent"
-      | "peer-closed"
-      | "destroy"
-  ) {
-    super();
-  }
-}
-
 type PeerEventHandlers = {
-  onPeerConnected: (peer: Peer) => void;
   onPeerClosed: (peer: Peer) => void;
   onSegmentRequested: (peer: Peer, segmentId: string) => void;
 };
 
-type PeerRequest = {
-  segment: Segment;
-  p2pRequest: P2PRequest;
-  resolve: (data: ArrayBuffer) => void;
-  reject: (error: PeerRequestError) => void;
-  chunks: ArrayBuffer[];
-  responseTimeoutId: number;
-};
-
 type PeerSettings = Pick<
   Settings,
-  "p2pSegmentDownloadTimeout" | "webRtcMaxMessageSize"
+  "p2pNotReceivingBytesTimeoutMs" | "webRtcMaxMessageSize"
 >;
 
 export class Peer {
   readonly id: string;
-  private connection?: PeerConnection;
-  private connections = new Set<PeerConnection>();
   private segments = new Map<string, PeerSegmentStatus>();
-  private request?: PeerRequest;
+  private requestContext?: { request: Request; controls: RequestControls };
   private readonly logger = debug("core:peer");
-  private readonly bandwidthMeasurer = new BandwidthMeasurer();
   private isUploadingSegment = false;
 
   constructor(
-    connection: PeerConnection,
+    private readonly connection: PeerConnection,
     private readonly eventHandlers: PeerEventHandlers,
     private readonly settings: PeerSettings
   ) {
-    this.id = hexToUtf8(connection.id);
+    this.id = Peer.getPeerIdFromHexString(connection.id);
     this.eventHandlers = eventHandlers;
-    this.addConnection(connection);
-  }
 
-  addConnection(connection: PeerConnection) {
-    if (this.connection && connection !== this.connection) {
-      connection.destroy();
-      return;
-    }
-    this.connections.add(connection);
-
-    connection.on("connect", () => {
-      if (this.connection) return;
-
-      this.connection = connection;
-      for (const item of this.connections) {
-        if (item !== connection) {
-          this.connections.delete(item);
-          item.destroy();
-        }
-      }
-      this.eventHandlers.onPeerConnected(this);
-      this.logger(`connected with peer: ${this.id}`);
-
-      connection.on("data", this.onReceiveData.bind(this));
-      connection.on("close", () => {
-        this.connection = undefined;
-        this.cancelSegmentRequest("peer-closed");
-        this.logger(`connection with peer closed: ${this.id}`);
+    connection.on("data", this.onReceiveData.bind(this));
+    connection.on("close", () => {
+      this.logger(`connection with peer closed: ${this.id}`);
+      this.destroy();
+      this.eventHandlers.onPeerClosed(this);
+    });
+    connection.on("error", (error) => {
+      if (error.code === "ERR_DATA_CHANNEL") {
+        this.logger(`peer error: ${this.id} ${error.code}`);
         this.destroy();
         this.eventHandlers.onPeerClosed(this);
-      });
-      connection.on("error", (error) => {
-        if (error.code === "ERR_DATA_CHANNEL") {
-          this.logger(`peer error: ${this.id} ${error.code}`);
-          this.destroy();
-          this.eventHandlers.onPeerClosed(this);
-        }
-      });
+      }
     });
   }
 
-  get isConnected() {
-    return !!this.connection;
-  }
-
   get downloadingSegment(): Segment | undefined {
-    return this.request?.segment;
-  }
-
-  get bandwidth(): number | undefined {
-    return this.bandwidthMeasurer.getBandwidth();
+    return this.requestContext?.request.segment;
   }
 
   getSegmentStatus(segment: Segment): PeerSegmentStatus | undefined {
@@ -122,7 +68,7 @@ export class Peer {
     return this.segments.get(externalId);
   }
 
-  private onReceiveData(data: ArrayBuffer) {
+  private onReceiveData(data: Uint8Array) {
     const command = PeerUtil.getPeerCommandFromArrayBuffer(data);
     if (!command) {
       this.receiveSegmentChunk(data);
@@ -139,16 +85,21 @@ export class Peer {
         break;
 
       case PeerCommandType.SegmentData:
-        if (this.request?.segment.externalId === command.i) {
-          const { progress } = this.request.p2pRequest;
-          progress.totalBytes = command.s;
-          progress.canBeTracked = true;
+        {
+          const request = this.requestContext?.request;
+          this.requestContext?.controls.firstBytesReceived();
+          if (
+            request?.segment.externalId === command.i &&
+            request.totalBytes === undefined
+          ) {
+            request.setTotalBytes(command.s);
+          }
         }
         break;
 
       case PeerCommandType.SegmentAbsent:
-        if (this.request?.segment.externalId === command.i) {
-          this.cancelSegmentRequest("segment-absent");
+        if (this.requestContext?.request.segment.externalId === command.i) {
+          this.cancelSegmentRequest("peer-segment-absent");
           this.segments.delete(command.i);
         }
         break;
@@ -160,22 +111,30 @@ export class Peer {
   }
 
   private sendCommand(command: PeerCommand) {
-    if (!this.connection) return;
     this.connection.send(JSON.stringify(command));
   }
 
-  requestSegment(segment: Segment) {
-    if (this.request) {
+  fulfillSegmentRequest(request: Request) {
+    if (this.requestContext) {
       throw new Error("Segment already is downloading");
     }
-    const { externalId } = segment;
-    const command: PeerSegmentCommand = {
-      c: PeerCommandType.SegmentRequest,
-      i: externalId,
+    this.requestContext = {
+      request,
+      controls: request.start(
+        { type: "p2p", peerId: this.id },
+        {
+          abort: this.abortRequest,
+          notReceivingBytesTimeoutMs:
+            this.settings.p2pNotReceivingBytesTimeoutMs,
+        }
+      ),
     };
+    const command: PeerSegmentRequestCommand = {
+      c: PeerCommandType.SegmentRequest,
+      i: request.segment.externalId,
+    };
+    if (request.loadedBytes) command.b = request.loadedBytes;
     this.sendCommand(command);
-    this.request = this.createPeerRequest(segment);
-    return this.request.p2pRequest;
   }
 
   sendSegmentsAnnouncement(announcement: JsonSegmentAnnouncement) {
@@ -187,7 +146,6 @@ export class Peer {
   }
 
   async sendSegmentData(segmentExternalId: string, data: ArrayBuffer) {
-    if (!this.connection) return;
     this.logger(`send segment ${segmentExternalId} to ${this.id}`);
     const command: PeerSendSegmentCommand = {
       c: PeerCommandType.SegmentData,
@@ -197,8 +155,7 @@ export class Peer {
     this.sendCommand(command);
 
     const chunks = getBufferChunks(data, this.settings.webRtcMaxMessageSize);
-    const connection = this.connection;
-    const channel = connection._channel;
+    const channel = this.connection._channel;
     const { promise, resolve, reject } = Utils.getControlledPromise<void>();
 
     const sendChunk = () => {
@@ -212,7 +169,7 @@ export class Peer {
           reject();
           break;
         }
-        connection.send(chunk);
+        this.connection.send(chunk);
       }
     };
     try {
@@ -237,120 +194,56 @@ export class Peer {
     this.sendCommand(command);
   }
 
-  private createPeerRequest(segment: Segment): PeerRequest {
-    const { promise, resolve, reject } =
-      Utils.getControlledPromise<ArrayBuffer>();
-    return {
-      segment,
-      resolve,
-      reject,
-      responseTimeoutId: this.setRequestTimeout(),
-      chunks: [],
-      p2pRequest: {
-        type: "p2p",
-        progress: {
-          canBeTracked: false,
-          totalBytes: 0,
-          loadedBytes: 0,
-          percent: 0,
-          startTimestamp: performance.now(),
-        },
-        promise,
-        abort: () => this.cancelSegmentRequest("abort"),
-      },
-    };
-  }
+  private receiveSegmentChunk(chunk: Uint8Array): void {
+    if (!this.requestContext) return;
+    const { request, controls } = this.requestContext;
+    controls.addLoadedChunk(chunk);
 
-  private receiveSegmentChunk(chunk: ArrayBuffer): void {
-    const { request } = this;
-    const progress = request?.p2pRequest?.progress;
-    if (!request || !progress) return;
-
-    progress.loadedBytes += chunk.byteLength;
-    progress.percent = (progress.loadedBytes / progress.loadedBytes) * 100;
-    progress.lastLoadedChunkTimestamp = performance.now();
-    request.chunks.push(chunk);
-
-    if (progress.loadedBytes === progress.totalBytes) {
-      const segmentData = joinChunks(request.chunks);
-      const { lastLoadedChunkTimestamp, startTimestamp, loadedBytes } =
-        progress;
-      const loadingDuration = lastLoadedChunkTimestamp - startTimestamp;
-      this.bandwidthMeasurer.addMeasurement(loadedBytes, loadingDuration);
-      this.approveRequest(segmentData);
-    } else if (progress.loadedBytes > progress.totalBytes) {
-      this.cancelSegmentRequest("response-bytes-mismatch");
+    if (request.loadedBytes === request.totalBytes) {
+      controls.completeOnSuccess();
+      this.requestContext = undefined;
+    } else if (
+      request.totalBytes !== undefined &&
+      request.loadedBytes > request.totalBytes
+    ) {
+      this.cancelSegmentRequest("peer-response-bytes-mismatch");
     }
   }
 
-  private approveRequest(data: ArrayBuffer) {
-    this.request?.resolve(data);
-    this.clearRequest();
-  }
+  private abortRequest = () => {
+    if (!this.requestContext) return;
+    const { request } = this.requestContext;
+    this.sendCancelSegmentRequestCommand(request.segment);
+    this.requestContext = undefined;
+  };
 
-  private cancelSegmentRequest(type: PeerRequestError["type"]) {
-    if (!this.request) return;
-    this.logger(
-      `cancel segment request ${this.request?.segment.externalId} (${type})`
-    );
-    const error = new PeerRequestError(type);
-    const sendCancelCommandTypes: PeerRequestError["type"][] = [
-      "destroy",
-      "abort",
-      "request-timeout",
-      "response-bytes-mismatch",
-    ];
-    if (sendCancelCommandTypes.includes(type)) {
-      this.sendCommand({
-        c: PeerCommandType.CancelSegmentRequest,
-        i: this.request.segment.externalId,
-      });
+  private cancelSegmentRequest(type: PeerRequestErrorType) {
+    if (!this.requestContext) return;
+    const { request, controls } = this.requestContext;
+    const { segment } = request;
+    this.logger(`cancel segment request ${segment.externalId} (${type})`);
+    const error = new RequestError(type);
+    if (type === "peer-response-bytes-mismatch") {
+      this.sendCancelSegmentRequestCommand(request.segment);
     }
-    this.request.reject(error);
-    this.clearRequest();
+    controls.abortOnError(error);
+    this.requestContext = undefined;
   }
 
-  private setRequestTimeout(): number {
-    return window.setTimeout(
-      () => this.cancelSegmentRequest("request-timeout"),
-      this.settings.p2pSegmentDownloadTimeout
-    );
-  }
-
-  private clearRequest() {
-    clearTimeout(this.request?.responseTimeoutId);
-    this.request = undefined;
+  private sendCancelSegmentRequestCommand(segment: Segment) {
+    this.sendCommand({
+      c: PeerCommandType.CancelSegmentRequest,
+      i: segment.externalId,
+    });
   }
 
   destroy() {
-    this.cancelSegmentRequest("destroy");
-    this.connection?.destroy();
-    this.connection = undefined;
-    for (const connection of this.connections) {
-      connection.destroy();
-    }
-    this.connections.clear();
-  }
-}
-
-const SMOOTHING_COEF = 0.5;
-
-class BandwidthMeasurer {
-  private bandwidth?: number;
-
-  addMeasurement(bytes: number, loadingDurationMs: number) {
-    const bits = bytes * 8;
-    const currentBandwidth = (bits * 1000) / loadingDurationMs;
-
-    this.bandwidth =
-      this.bandwidth !== undefined
-        ? currentBandwidth * SMOOTHING_COEF +
-          (1 - SMOOTHING_COEF) * this.bandwidth
-        : currentBandwidth;
+    this.cancelSegmentRequest("peer-closed");
+    this.connection.destroy();
   }
 
-  getBandwidth() {
-    return this.bandwidth;
+  static getPeerIdFromHexString(hex: string) {
+    return hexToUtf8(hex);
   }
 }
 
@@ -366,18 +259,6 @@ function* getBufferChunks(
     bytesLeft -= bytesToSend;
     yield buffer;
   }
-}
-
-function joinChunks(chunks: ArrayBuffer[]): ArrayBuffer {
-  const bytesSum = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
-  const buffer = new Uint8Array(bytesSum);
-  let offset = 0;
-  for (const chunk of chunks) {
-    buffer.set(new Uint8Array(chunk), offset);
-    offset += chunk.byteLength;
-  }
-
-  return buffer;
 }
 
 function hexToUtf8(hexString: string) {
