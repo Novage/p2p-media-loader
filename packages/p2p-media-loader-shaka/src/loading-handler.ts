@@ -38,24 +38,13 @@ export class Loader {
 
     const loading = this.defaultLoad();
     if (requestType === RequestType.MANIFEST) {
-      void this.handleManifestLoading(url, loading.promise);
+      void this.handleManifestLoading(loading.promise);
     }
     return loading;
   }
 
-  private async handleManifestLoading(
-    streamUrl: string,
-    loadingPromise: Promise<Response>
-  ) {
-    if (
-      this.streamInfo.protocol === "hls" &&
-      !!this.core.getStream(streamUrl)
-    ) {
-      // loading HLS playlist manifest
-      await loadingPromise;
-      // Waiting for the playlist to be parsed
-      setTimeout(() => this.segmentManager.updateStreamSegments(streamUrl), 0);
-    } else if (!this.streamInfo.manifestResponseUrl) {
+  private async handleManifestLoading(loadingPromise: Promise<Response>) {
+    if (!this.streamInfo.manifestResponseUrl) {
       // loading master manifest either HLS or DASH
       const response = await loadingPromise;
       this.setManifestResponseUrl(response.uri);

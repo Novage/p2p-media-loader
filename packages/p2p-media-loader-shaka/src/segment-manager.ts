@@ -17,26 +17,21 @@ export class SegmentManager {
   }
 
   setStream(shakaStream: HookedStream, type: StreamType, index = -1) {
-    const localId = Utils.getStreamLocalIdFromShakaStream(
-      shakaStream,
-      this.streamInfo.protocol === "hls"
-    );
-
     this.core.addStreamIfNoneExists({
-      localId,
+      localId: shakaStream.id.toString(),
       type,
       index,
       shakaStream,
     });
 
-    if (shakaStream.segmentIndex) this.updateStreamSegments(localId);
+    if (shakaStream.segmentIndex) this.updateStreamSegments(shakaStream);
   }
 
   updateStreamSegments(
-    streamLocalId: string,
+    shakaStream: HookedStream,
     segmentReferences?: shaka.media.SegmentReference[]
   ) {
-    const stream = this.core.getStream(streamLocalId);
+    const stream = this.core.getStream(shakaStream.id.toString());
     if (!stream) return;
 
     const { segmentIndex } = stream.shakaStream;

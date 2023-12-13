@@ -3,56 +3,56 @@ import { Engine as HlsJsEngine } from "p2p-media-loader-hlsjs";
 import { Engine as ShakaEngine } from "p2p-media-loader-shaka";
 import Hls from "hls.js";
 import DPlayer from "dplayer";
-import shakaLib from "shaka-player";
 import muxjs from "mux.js";
 import debug from "debug";
 
 window.muxjs = muxjs;
-
 const players = [
   "hlsjs",
   "hls-dplayer",
+  "hls-clappr",
   "shaka-dplayer",
   "shaka-player",
+  "shaka-clappr",
 ] as const;
 type Player = (typeof players)[number];
 type ShakaPlayer = shaka.Player;
 type ExtendedWindow = Window & { videoPlayer?: { destroy?: () => void } };
 
-const streamUrl = {
-  bigBunnyBuck: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
-  byteRangeVideo:
+const streamUrls = {
+  hlsBigBunnyBuck: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+  hlsByteRangeVideo:
     "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8",
-  live: "https://fcc3ddae59ed.us-west-2.playback.live-video.net/api/video/v1/us-west-2.893648527354.channel.DmumNckWFTqz.m3u8",
-  advancedVideo:
+  hlsAdvancedVideo:
     "https://devstreaming-cdn.apple.com/videos/streaming/examples/adv_dv_atmos/main.m3u8",
-  advancedVideo2:
+  hlsAdvancedVideo2:
     "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_adv_example_hevc/master.m3u8",
-  advancedVideo3:
+  hlsAdvancedVideo3:
     "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8",
-  advancedVideo4:
+  hlsAdvancedVideo4:
     "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_fmp4/master.m3u8",
-  basicExample:
+  hlsBasicExample:
     "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8",
-  bigBunnyBuckDash: "https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd",
-  live2: "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8",
+  hlsLive1:
+    "https://fcc3ddae59ed.us-west-2.playback.live-video.net/api/video/v1/us-west-2.893648527354.channel.DmumNckWFTqz.m3u8",
+  hlsLive2:
+    "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8",
   live2OnlyLevel4:
     "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/level_4.m3u8",
-  dashLiveWithSeparateVideoAudio:
-    "https://livesim.dashif.org/livesim/testpic_2s/Manifest.mpd",
-  mss: "https://playready.directtaps.net/smoothstreaming/SSWSS720H264/SuperSpeedway_720.ism/Manifest",
   audioOnly:
     "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/a1/prog_index.m3u8",
-  dash1:
-    "http://dash.akamaized.net/dash264/TestCases/1a/qualcomm/1/MultiRate.mpd",
-  dash2: "http://dash.akamaized.net/dash264/TestCases/5b/nomor/6.mpd",
+  bigBunnyBuckDash: "https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd",
+  dashLiveBigBunnyBuck:
+    "https://livesim.dashif.org/livesim/testpic_2s/Manifest.mpd",
+  dashVODBigBunnyBuck:
+    "https://dash.akamaized.net/dash264/TestCases/5b/nomor/6.mpd",
 };
 
 function App() {
   const [playerType, setPlayerType] = useState<Player | undefined>(
     localStorage.player
   );
-  const [url, setUrl] = useState<string>(localStorage.streamUrl);
+  const [streamUrl, setStreamUrl] = useState<string>(localStorage.streamUrl);
   const shakaInstance = useRef<shaka.Player>();
   const hlsInstance = useRef<Hls>();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -91,7 +91,8 @@ function App() {
   }
 
   if (!shakaEngine.current) {
-    shakaEngine.current = new ShakaEngine(shakaLib, { onSegmentLoaded });
+    ShakaEngine.setGlobalSettings();
+    shakaEngine.current = new ShakaEngine(window.shaka, { onSegmentLoaded });
   }
 
   useEffect(() => {
@@ -106,65 +107,14 @@ function App() {
       setPlayerType("hls-dplayer");
     }
     if (!localStorage.streamUrl) {
-      localStorage.streamUrl = streamUrl.live2;
-      setUrl(streamUrl.live2);
+      localStorage.streamUrl = streamUrls.hlsLive2;
+      setStreamUrl(streamUrls.hlsLive2);
     }
-
     createNewPlayer();
   }, [playerType]);
 
   const setPlayerToWindow = (player: DPlayer | ShakaPlayer | Hls) => {
     (window as unknown as ExtendedWindow).videoPlayer = player;
-  };
-
-  const initShakaDPlayer = (url: string) => {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const engine = shakaEngine.current!;
-    const player = new DPlayer({
-      container: containerRef.current,
-      video: {
-        url,
-        type: "customHlsOrDash",
-        customType: {
-          customHlsOrDash: (video: HTMLVideoElement) => {
-            video.autoplay = true;
-            const src = video.src;
-            const shakaPlayer = new shakaLib.Player(video);
-            const onError = (error: { code: number }) => {
-              // eslint-disable-next-line no-console
-              console.error("Error code", error.toString(), "object", error);
-            };
-            shakaPlayer.addEventListener("error", (event: { code: number }) => {
-              onError(event);
-            });
-            engine.initShakaPlayer(shakaPlayer);
-            shakaPlayer.load(src).catch(onError);
-
-            shakaInstance.current = shakaPlayer;
-          },
-        },
-      },
-    });
-    setPlayerToWindow(player);
-  };
-
-  const initShakaPlayer = (url: string) => {
-    if (!videoRef.current) return;
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const engine = shakaEngine.current!;
-
-    const player = new shakaLib.Player(videoRef.current);
-    const onError = (error: { code: unknown }) => {
-      // eslint-disable-next-line no-console
-      console.error("Error code", error.code, "object", error);
-    };
-    player.addEventListener("error", (event: { detail: { code: unknown } }) => {
-      onError(event.detail);
-    });
-    engine.initShakaPlayer(player);
-    player.load(url).catch(onError);
-    shakaInstance.current = player;
-    setPlayerToWindow(player);
   };
 
   const initHlsJsPlayer = (url: string) => {
@@ -174,7 +124,7 @@ function App() {
     const hls = new Hls({
       ...engine.getConfig(),
     });
-    engine.initHlsJsEvents(hls);
+    engine.setHls(hls);
     hls.attachMedia(videoRef.current);
     hls.loadSource(url);
     hlsInstance.current = hls;
@@ -195,7 +145,7 @@ function App() {
               ...engine.getConfig(),
               liveSyncDurationCount: 7,
             });
-            engine.initHlsJsEvents(hls);
+            engine.setHls(hls);
             hls.loadSource(video.src);
             hls.attachMedia(video);
             hlsInstance.current = hls;
@@ -205,6 +155,90 @@ function App() {
     });
     player.play();
     setPlayerToWindow(player);
+  };
+
+  const initHlsClapprPlayer = (url: string) => {
+    const engine = hlsEngine.current;
+    if (!engine) return;
+
+    const clapprPlayer: any = new window.Clappr.Player({
+      parentId: "#player-container",
+      source: url,
+      playback: {
+        hlsjsConfig: {
+          ...engine.getConfig(),
+        },
+      },
+      plugins: [window.LevelSelector],
+    });
+    engine.initClapprPlayer(clapprPlayer);
+    setPlayerToWindow(clapprPlayer);
+  };
+
+  const initShakaDPlayer = (url: string) => {
+    const engine = shakaEngine.current;
+    if (!engine) return;
+
+    const player = new DPlayer({
+      container: containerRef.current,
+      video: {
+        url,
+        type: "customHlsOrDash",
+        customType: {
+          customHlsOrDash: (video: HTMLVideoElement) => {
+            video.autoplay = true;
+            const src = video.src;
+            const shakaPlayer = new window.shaka.Player();
+            shakaPlayer.attach(video);
+            const onError = (error: { code: number }) => {
+              // eslint-disable-next-line no-console
+              console.error("Error code", error.toString(), "object", error);
+            };
+            shakaPlayer.addEventListener("error", (event: { code: number }) => {
+              onError(event);
+            });
+            engine.initShakaPlayer(shakaPlayer);
+            shakaPlayer.load(src).catch(onError);
+
+            shakaInstance.current = shakaPlayer;
+          },
+        },
+      },
+    });
+    setPlayerToWindow(player);
+  };
+
+  const initShakaPlayer = (url: string) => {
+    const engine = shakaEngine.current;
+    if (!videoRef.current || !engine) return;
+
+    const player = new window.shaka.Player(videoRef.current);
+    const onError = (error: { code: unknown }) => {
+      // eslint-disable-next-line no-console
+      console.error("Error code", error.code, "object", error);
+    };
+    player.addEventListener("error", (event: { detail: { code: unknown } }) => {
+      onError(event.detail);
+    });
+    engine.initShakaPlayer(player);
+    player.load(url).catch(onError);
+    shakaInstance.current = player;
+    setPlayerToWindow(player);
+  };
+
+  const initShakaClapprPlayer = (url: string) => {
+    const engine = shakaEngine.current;
+    if (!engine) return;
+
+    const clapprPlayer = new window.Clappr.Player({
+      parentId: "#player-container",
+      source: url,
+      plugins: [window.DashShakaPlayback, window.LevelSelector],
+      shakaOnBeforeLoad: (shakaPlayerInstance: any) => {
+        engine.initShakaPlayer(shakaPlayerInstance);
+      },
+    });
+    setPlayerToWindow(clapprPlayer);
   };
 
   const destroyAndWindowPlayer = () => {
@@ -219,26 +253,36 @@ function App() {
     destroyAndWindowPlayer();
   };
 
-  const onVideoUrlChange = (url: string) => {
-    localStorage.streamUrl = url;
-    setUrl(url);
+  const onVideoUrlChange = (streamUrl: string) => {
+    localStorage.streamUrl = streamUrl;
+    setStreamUrl(streamUrl);
   };
 
   const createNewPlayer = () => {
     setHttpLoadedGlob(0);
     setP2PLoadedGlob(0);
+
+    (window as unknown as ExtendedWindow).videoPlayer?.destroy?.();
+    hlsInstance.current?.destroy();
+    void shakaInstance.current?.destroy();
     switch (playerType) {
       case "hls-dplayer":
-        initHlsDPlayer(url);
+        initHlsDPlayer(streamUrl);
         break;
       case "hlsjs":
-        initHlsJsPlayer(url);
+        initHlsJsPlayer(streamUrl);
+        break;
+      case "hls-clappr":
+        initHlsClapprPlayer(streamUrl);
         break;
       case "shaka-dplayer":
-        initShakaDPlayer(url);
+        initShakaDPlayer(streamUrl);
         break;
       case "shaka-player":
-        initShakaPlayer(url);
+        initShakaPlayer(streamUrl);
+        break;
+      case "shaka-clappr":
+        initShakaClapprPlayer(streamUrl);
         break;
     }
   };
@@ -247,11 +291,13 @@ function App() {
     switch (playerType) {
       case "hls-dplayer":
       case "hlsjs":
-        hlsInstance.current?.loadSource(url);
+      case "hls-clappr":
+        hlsInstance.current?.loadSource(streamUrl);
         break;
       case "shaka-player":
       case "shaka-dplayer":
-        shakaInstance.current?.load(url).catch(() => undefined);
+      case "shaka-clappr":
+        shakaInstance.current?.load(streamUrl).catch(() => undefined);
         break;
     }
   };
@@ -277,10 +323,10 @@ function App() {
               })}
             </select>
             <select
-              value={url}
+              value={streamUrl}
               onChange={(event) => onVideoUrlChange(event.target.value)}
             >
-              {Object.entries(streamUrl).map(([name, url]) => {
+              {Object.entries(streamUrls).map(([name, url]) => {
                 return (
                   <option key={name} value={url}>
                     {name}
@@ -299,7 +345,7 @@ function App() {
             ref={containerRef}
             id="player-container"
             style={{ width: 1000 }}
-          ></div>
+          />
         </div>
         {!!playerType && ["hlsjs", "shaka-player"].includes(playerType) && (
           <video ref={videoRef} controls muted style={{ width: 800 }} />

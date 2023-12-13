@@ -4,7 +4,6 @@ import {
   DashManifestParser,
 } from "./manifest-parser-decorator";
 import { SegmentManager } from "./segment-manager";
-import Debug from "debug";
 import {
   StreamInfo,
   Shaka,
@@ -14,15 +13,15 @@ import {
   P2PMLShakaData,
 } from "./types";
 import { Loader } from "./loading-handler";
-import { decorateMethod } from "./utils";
 import { Core, CoreEventHandlers } from "p2p-media-loader-core";
 
 export class Engine {
+  private player?: shaka.Player;
   private readonly shaka: Shaka;
   private readonly streamInfo: StreamInfo = {};
   private readonly core: Core<Stream>;
   private readonly segmentManager: SegmentManager;
-  private debugDestroying = Debug("shaka:destroying");
+  private requestFilter?: shaka.extern.RequestFilter;
 
   constructor(shaka?: unknown, eventHandlers?: CoreEventHandlers) {
     this.shaka = (shaka as Shaka | undefined) ?? window.shaka;
@@ -31,98 +30,143 @@ export class Engine {
   }
 
   initShakaPlayer(player: shaka.Player) {
-    const networkingEngine =
-      player.getNetworkingEngine() as HookedNetworkingEngine | null;
-    if (networkingEngine) {
-      const p2pml: P2PMLShakaData = {
-        shaka: this.shaka,
-        core: this.core,
-        streamInfo: this.streamInfo,
-        segmentManager: this.segmentManager,
-      };
-      networkingEngine.p2pml = p2pml;
-      networkingEngine.registerRequestFilter((requestType, request) => {
-        (request as HookedRequest).p2pml = p2pml;
-      });
-    }
-
-    this.initializeNetworkingEngine();
-    this.registerParsers();
-
-    player.addEventListener("loading", () => {
-      this.debugDestroying("Loading manifest");
-      this.destroy();
-    });
-    decorateMethod(player, "destroy", () => {
-      this.debugDestroying("Shaka player destroying");
-      this.destroy();
-    });
-
-    player.addEventListener("loaded", () => {
-      const media = player.getMediaElement();
-      if (!media) return;
-
-      media.addEventListener("timeupdate", () => {
-        this.core.updatePlayback(media.currentTime, media.playbackRate);
-      });
-
-      media.addEventListener("ratechange", () => {
-        this.core.updatePlayback(media.currentTime, media.playbackRate);
-      });
-
-      media.addEventListener("seeking", () => {
-        this.core.updatePlayback(media.currentTime, media.playbackRate);
-      });
-    });
+    if (this.player === player) return;
+    if (this.player) this.destroy();
+    this.player = player;
+    this.updatePlayerEventHandlers("register");
   }
 
-  destroy() {
+  private updatePlayerEventHandlers = (type: "register" | "unregister") => {
+    const { player } = this;
+    if (!player) return;
+
+    if (!this.player) return;
+    const networkingEngine =
+      this.player.getNetworkingEngine() as HookedNetworkingEngine | null;
+    if (networkingEngine) {
+      if (type === "register") {
+        const p2pml: P2PMLShakaData = {
+          shaka: this.shaka,
+          core: this.core,
+          streamInfo: this.streamInfo,
+          segmentManager: this.segmentManager,
+        };
+        this.requestFilter = (requestType, request) => {
+          (request as HookedRequest).p2pml = p2pml;
+        };
+        networkingEngine.p2pml = p2pml;
+        networkingEngine.registerRequestFilter(this.requestFilter);
+      } else {
+        networkingEngine.p2pml = undefined;
+        if (this.requestFilter) {
+          networkingEngine.unregisterRequestFilter(this.requestFilter);
+        }
+      }
+    }
+    const method =
+      type === "register" ? "addEventListener" : "removeEventListener";
+    player[method]("loaded", this.handlePlayerLoaded);
+    player[method]("loading", this.destroyCurrentStreamContext);
+    player[method]("unloading", this.handlePlayerUnloading);
+  };
+
+  private handlePlayerLoaded = () => {
+    this.updateMediaElementEventHandlers("register");
+  };
+
+  private handlePlayerUnloading = () => {
+    this.destroyCurrentStreamContext();
+    this.updateMediaElementEventHandlers("unregister");
+  };
+  private destroyCurrentStreamContext = () => {
     this.streamInfo.protocol = undefined;
     this.streamInfo.manifestResponseUrl = undefined;
     this.core.destroy();
+  };
+
+  private updateMediaElementEventHandlers = (
+    type: "register" | "unregister"
+  ) => {
+    const media = this.player?.getMediaElement();
+    if (!media) return;
+    const method =
+      type === "register" ? "addEventListener" : "removeEventListener";
+    media[method]("timeupdate", this.handlePlaybackUpdate);
+    media[method]("ratechange", this.handlePlaybackUpdate);
+    media[method]("seeking", this.handlePlaybackUpdate);
+  };
+
+  private handlePlaybackUpdate = (event: Event) => {
+    const media = event.target as HTMLVideoElement;
+    this.core.updatePlayback(media.currentTime, media.playbackRate);
+  };
+
+  destroy() {
+    this.destroyCurrentStreamContext();
+    this.updatePlayerEventHandlers("unregister");
+    this.updateMediaElementEventHandlers("unregister");
+    this.player = undefined;
   }
 
-  private registerParsers() {
-    const hlsParserFactory = () => new HlsManifestParser(this.shaka);
-    const dashParserFactory = () => new DashManifestParser(this.shaka);
-    this.shaka.media.ManifestParser.registerParserByExtension(
-      "mpd",
-      dashParserFactory
-    );
-    this.shaka.media.ManifestParser.registerParserByMime(
-      "application/dash+xml",
-      dashParserFactory
-    );
-    this.shaka.media.ManifestParser.registerParserByExtension(
-      "m3u8",
-      hlsParserFactory
-    );
-    this.shaka.media.ManifestParser.registerParserByMime(
-      "application/x-mpegurl",
-      hlsParserFactory
-    );
-    this.shaka.media.ManifestParser.registerParserByMime(
+  private static registerManifestParsers(shaka: Shaka) {
+    const hlsParserFactory = () => new HlsManifestParser(shaka);
+    const dashParserFactory = () => new DashManifestParser(shaka);
+
+    const Parser = shaka.media.ManifestParser;
+    Parser.registerParserByExtension("mpd", dashParserFactory);
+    Parser.registerParserByMime("application/dash+xml", dashParserFactory);
+    Parser.registerParserByExtension("m3u8", hlsParserFactory);
+    Parser.registerParserByMime("application/x-mpegurl", hlsParserFactory);
+    Parser.registerParserByMime(
       "application/vnd.apple.mpegurl",
       hlsParserFactory
     );
   }
 
-  private initializeNetworkingEngine() {
+  private static unregisterManifestParsers(shaka: Shaka) {
+    const Parser = shaka.media.ManifestParser;
+    Parser.unregisterParserByMime("mpd");
+    Parser.unregisterParserByMime("application/dash+xml");
+    Parser.unregisterParserByMime("m3u8");
+    Parser.unregisterParserByMime("application/x-mpegurl");
+    Parser.unregisterParserByMime("application/vnd.apple.mpegurl");
+  }
+
+  private static registerNetworkingEngineSchemes(shaka: Shaka) {
+    const { NetworkingEngine } = shaka.net;
+
     const handleLoading: shaka.extern.SchemePlugin = (...args) => {
       const request = args[1] as HookedRequest;
       const { p2pml } = request;
-      if (!p2pml) return this.shaka.net.HttpFetchPlugin.parse(...args);
+      if (!p2pml) return shaka.net.HttpFetchPlugin.parse(...args);
 
-      const loadingHandler = new Loader(
+      const loader = new Loader(
         p2pml.shaka,
         p2pml.core,
         p2pml.streamInfo,
         p2pml.segmentManager
       );
-      return loadingHandler.load(...args);
+      return loader.load(...args);
     };
+    NetworkingEngine.registerScheme("http", handleLoading);
+    NetworkingEngine.registerScheme("https", handleLoading);
+  }
 
-    this.shaka.net.NetworkingEngine.registerScheme("http", handleLoading);
-    this.shaka.net.NetworkingEngine.registerScheme("https", handleLoading);
+  private static unregisterNetworkingEngineSchemes(shaka: Shaka) {
+    const { NetworkingEngine } = shaka.net;
+    NetworkingEngine.unregisterScheme("http");
+    NetworkingEngine.unregisterScheme("https");
+  }
+
+  static setGlobalSettings(shaka?: unknown) {
+    const shakaGlobal = (shaka as Shaka | undefined) ?? window.shaka;
+    Engine.registerManifestParsers(shakaGlobal);
+    Engine.registerNetworkingEngineSchemes(shakaGlobal);
+  }
+
+  static unsetGlobalSettings(shaka?: unknown) {
+    const shakaGlobal = (shaka as Shaka | undefined) ?? window.shaka;
+    Engine.unregisterManifestParsers(shakaGlobal);
+    Engine.unregisterNetworkingEngineSchemes(shakaGlobal);
   }
 }

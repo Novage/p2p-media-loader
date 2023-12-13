@@ -340,7 +340,6 @@ export class HybridLoader {
     clearInterval(this.storageCleanUpIntervalId);
     clearInterval(this.randomHttpDownloadInterval);
     this.storageCleanUpIntervalId = undefined;
-    void this.segmentStorage.destroy();
     this.requests.destroy();
     this.p2pLoaders.destroy();
     this.logger.destroy();
