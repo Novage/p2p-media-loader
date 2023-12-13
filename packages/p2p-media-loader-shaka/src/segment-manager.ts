@@ -63,7 +63,7 @@ export class SegmentManager {
     const staleSegmentsIds = new Set(managerStream.segments.keys());
     const newSegments: SegmentBase[] = [];
     for (const reference of segmentReferences) {
-      const externalId = Math.trunc(reference.getStartTime());
+      const externalId = Math.trunc(reference.getStartTime() * 10);
 
       const segmentLocalId = Utils.getSegmentLocalIdFromReference(reference);
       if (!managerStream.segments.has(segmentLocalId)) {
