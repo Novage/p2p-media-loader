@@ -91,6 +91,7 @@ function App() {
   }
 
   if (!shakaEngine.current) {
+    ShakaEngine.setGlobalSettings();
     shakaEngine.current = new ShakaEngine(window.shaka, { onSegmentLoaded });
   }
 

@@ -13,7 +13,6 @@ import {
   P2PMLShakaData,
 } from "./types";
 import { LoadingHandler } from "./loading-handler";
-import { decorateMethod, undecorateMethod } from "./utils";
 import { Core, CoreEventHandlers } from "p2p-media-loader-core";
 
 export class Engine {
@@ -34,17 +33,36 @@ export class Engine {
     if (this.player === player) return;
     if (this.player) this.destroy();
     this.player = player;
-
-    this.registerDataToPlayer();
-    this.registerNetworkingEngineSchemes();
-    this.registerManifestParsers();
     this.updatePlayerEventHandlers("register");
-    decorateMethod(player, "destroy", this.destroy);
   }
 
   private updatePlayerEventHandlers = (type: "register" | "unregister") => {
     const { player } = this;
     if (!player) return;
+
+    if (!this.player) return;
+    const networkingEngine =
+      this.player.getNetworkingEngine() as HookedNetworkingEngine | null;
+    if (networkingEngine) {
+      if (type === "register") {
+        const p2pml: P2PMLShakaData = {
+          shaka: this.shaka,
+          core: this.core,
+          streamInfo: this.streamInfo,
+          segmentManager: this.segmentManager,
+        };
+        this.requestFilter = (requestType, request) => {
+          (request as HookedRequest).p2pml = p2pml;
+        };
+        networkingEngine.p2pml = p2pml;
+        networkingEngine.registerRequestFilter(this.requestFilter);
+      } else {
+        networkingEngine.p2pml = undefined;
+        if (this.requestFilter) {
+          networkingEngine.unregisterRequestFilter(this.requestFilter);
+        }
+      }
+    }
     const method =
       type === "register" ? "addEventListener" : "removeEventListener";
     player[method]("loaded", this.handlePlayerLoaded);
@@ -87,48 +105,14 @@ export class Engine {
     this.destroyCurrentStreamContext();
     this.updatePlayerEventHandlers("unregister");
     this.updateMediaElementEventHandlers("unregister");
-    this.unregisterDataFromPlayer();
-    this.unregisterManifestParsers();
-    this.unregisterNetworkingEngineSchemes();
-    if (this.player) undecorateMethod(this.player, "destroy");
     this.player = undefined;
   }
 
-  private registerDataToPlayer() {
-    if (!this.player) return;
-    const networkingEngine =
-      this.player.getNetworkingEngine() as HookedNetworkingEngine | null;
-    if (networkingEngine) {
-      const p2pml: P2PMLShakaData = {
-        shaka: this.shaka,
-        core: this.core,
-        streamInfo: this.streamInfo,
-        segmentManager: this.segmentManager,
-      };
-      this.requestFilter = (requestType, request) => {
-        (request as HookedRequest).p2pml = p2pml;
-      };
-      networkingEngine.p2pml = p2pml;
-      networkingEngine.registerRequestFilter(this.requestFilter);
-    }
-  }
+  private static registerManifestParsers(shaka: Shaka) {
+    const hlsParserFactory = () => new HlsManifestParser(shaka);
+    const dashParserFactory = () => new DashManifestParser(shaka);
 
-  unregisterDataFromPlayer() {
-    if (!this.player) return;
-    const networkingEngine =
-      this.player.getNetworkingEngine() as HookedNetworkingEngine | null;
-    if (!networkingEngine) return;
-    networkingEngine.p2pml = undefined;
-    if (this.requestFilter) {
-      networkingEngine.unregisterRequestFilter(this.requestFilter);
-    }
-  }
-
-  private registerManifestParsers() {
-    const hlsParserFactory = () => new HlsManifestParser(this.shaka);
-    const dashParserFactory = () => new DashManifestParser(this.shaka);
-
-    const Parser = this.shaka.media.ManifestParser;
+    const Parser = shaka.media.ManifestParser;
     Parser.registerParserByExtension("mpd", dashParserFactory);
     Parser.registerParserByMime("application/dash+xml", dashParserFactory);
     Parser.registerParserByExtension("m3u8", hlsParserFactory);
@@ -139,8 +123,8 @@ export class Engine {
     );
   }
 
-  private unregisterManifestParsers() {
-    const Parser = this.shaka.media.ManifestParser;
+  private static unregisterManifestParsers(shaka: Shaka) {
+    const Parser = shaka.media.ManifestParser;
     Parser.unregisterParserByMime("mpd");
     Parser.unregisterParserByMime("application/dash+xml");
     Parser.unregisterParserByMime("m3u8");
@@ -148,13 +132,13 @@ export class Engine {
     Parser.unregisterParserByMime("application/vnd.apple.mpegurl");
   }
 
-  private registerNetworkingEngineSchemes() {
-    const { NetworkingEngine } = this.shaka.net;
+  private static registerNetworkingEngineSchemes(shaka: Shaka) {
+    const { NetworkingEngine } = shaka.net;
 
     const handleLoading: shaka.extern.SchemePlugin = (...args) => {
       const request = args[1] as HookedRequest;
       const { p2pml } = request;
-      if (!p2pml) return this.shaka.net.HttpFetchPlugin.parse(...args);
+      if (!p2pml) return shaka.net.HttpFetchPlugin.parse(...args);
 
       const loadingHandler = new LoadingHandler(
         p2pml.shaka,
@@ -168,9 +152,21 @@ export class Engine {
     NetworkingEngine.registerScheme("https", handleLoading);
   }
 
-  private unregisterNetworkingEngineSchemes() {
-    const { NetworkingEngine } = this.shaka.net;
+  private static unregisterNetworkingEngineSchemes(shaka: Shaka) {
+    const { NetworkingEngine } = shaka.net;
     NetworkingEngine.unregisterScheme("http");
     NetworkingEngine.unregisterScheme("https");
+  }
+
+  static setGlobalSettings(shaka?: unknown) {
+    const shakaGlobal = (shaka as Shaka | undefined) ?? window.shaka;
+    Engine.registerManifestParsers(shakaGlobal);
+    Engine.registerNetworkingEngineSchemes(shakaGlobal);
+  }
+
+  static unsetGlobalSettings(shaka?: unknown) {
+    const shakaGlobal = (shaka as Shaka | undefined) ?? window.shaka;
+    Engine.unregisterManifestParsers(shakaGlobal);
+    Engine.unregisterNetworkingEngineSchemes(shakaGlobal);
   }
 }
