@@ -123,7 +123,7 @@ function App() {
     const hls = new Hls({
       ...engine.getConfig(),
     });
-    engine.initHLSEvents(hls);
+    engine.setHls(hls);
     hls.attachMedia(videoRef.current);
     hls.loadSource(url);
     hlsInstance.current = hls;
@@ -144,7 +144,7 @@ function App() {
               ...engine.getConfig(),
               liveSyncDurationCount: 7,
             });
-            engine.initHLSEvents(hls);
+            engine.setHls(hls);
             hls.loadSource(video.src);
             hls.attachMedia(video);
             hlsInstance.current = hls;

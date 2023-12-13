@@ -14,7 +14,7 @@ export class Engine {
   private readonly core: Core;
   private readonly segmentManager: SegmentManager;
   private hlsInstanceGetter?: () => Hls;
-  private _hlsInstance?: Hls;
+  private currentHlsInstance?: Hls;
 
   constructor(eventHandlers?: CoreEventHandlers) {
     this.core = new Core(eventHandlers);
@@ -32,16 +32,21 @@ export class Engine {
     };
   }
 
-  initHLSEvents(hls: Hls) {
-    if (this._hlsInstance === hls) return;
-    if (this._hlsInstance) this.destroy();
-    this._hlsInstance = hls;
+  setHls(hls: Hls | (() => Hls)) {
+    this.hlsInstanceGetter = typeof hls === "function" ? hls : () => hls;
+  }
+
+  private initHlsEvents() {
+    const hlsInstance = this.hlsInstanceGetter?.();
+    if (this.currentHlsInstance === hlsInstance) return;
+    if (this.currentHlsInstance) this.destroy();
+    this.currentHlsInstance = hlsInstance;
     this.updateHlsEventsHandlers("register");
     this.updateMediaElementEventHandlers("register");
   }
 
   private updateHlsEventsHandlers(type: "register" | "unregister") {
-    const hls = this._hlsInstance;
+    const hls = this.currentHlsInstance;
     if (!hls) return;
     const method = type === "register" ? "on" : "off";
 
@@ -79,7 +84,7 @@ export class Engine {
   private updateMediaElementEventHandlers = (
     type: "register" | "unregister"
   ) => {
-    const media = this._hlsInstance?.media;
+    const media = this.currentHlsInstance?.media;
     if (!media) return;
     const method =
       type === "register" ? "addEventListener" : "removeEventListener";
@@ -122,15 +127,14 @@ export class Engine {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   initClapprPlayer(clapprPlayer: any) {
-    this._hlsInstance = undefined;
-    this.hlsInstanceGetter = () => clapprPlayer.core.getCurrentPlayback()?._hls;
+    this.setHls(() => clapprPlayer.core.getCurrentPlayback()?._hls);
   }
 
   destroy = () => {
     this.destroyCore();
     this.updateHlsEventsHandlers("unregister");
     this.updateMediaElementEventHandlers("unregister");
-    this._hlsInstance = undefined;
+    this.currentHlsInstance = undefined;
   };
 
   private createFragmentLoaderClass() {
@@ -155,9 +159,7 @@ export class Engine {
     return class PlaylistLoader extends PlaylistLoaderBase {
       constructor(config: HlsConfig) {
         super(config);
-        if (engine._hlsInstance) return;
-        const hlsInstance = engine.hlsInstanceGetter?.();
-        if (hlsInstance) engine.initHLSEvents(hlsInstance);
+        engine.initHlsEvents();
       }
     };
   }

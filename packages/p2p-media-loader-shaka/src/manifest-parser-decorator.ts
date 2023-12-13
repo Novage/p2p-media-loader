@@ -10,14 +10,14 @@ import { StreamType } from "p2p-media-loader-core";
 
 export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   private readonly debug = Debug("p2pml-shaka:manifest-parser");
-  private readonly isHLS: boolean;
+  private readonly isHls: boolean;
   private segmentManager?: SegmentManager;
 
   constructor(
     shaka: Readonly<Shaka>,
     private readonly originalManifestParser: shaka.extern.ManifestParser
   ) {
-    this.isHLS = this.originalManifestParser instanceof shaka.hls.HlsParser;
+    this.isHls = this.originalManifestParser instanceof shaka.hls.HlsParser;
   }
 
   configure(config: shaka.extern.ManifestConfiguration) {
@@ -27,7 +27,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   private setP2PMediaLoaderData(p2pml?: P2PMLShakaData) {
     if (!p2pml) return;
     this.segmentManager = p2pml.segmentManager;
-    p2pml.streamInfo.protocol = this.isHLS ? "hls" : "dash";
+    p2pml.streamInfo.protocol = this.isHls ? "hls" : "dash";
   }
 
   async start(
@@ -43,8 +43,8 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     );
     if (!p2pml) return manifest;
 
-    if (this.isHLS) {
-      this.hookHLSStreamMediaSequenceTimeMaps(manifest.variants);
+    if (this.isHls) {
+      this.hookHlsStreamMediaSequenceTimeMaps(manifest.variants);
     }
     this.processStreams(manifest.variants);
     return manifest;
@@ -143,7 +143,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     };
   }
 
-  private hookHLSStreamMediaSequenceTimeMaps(variants: shaka.extern.Variant[]) {
+  private hookHlsStreamMediaSequenceTimeMaps(variants: shaka.extern.Variant[]) {
     const maps = getMapPropertiesFromObject(this.originalManifestParser);
 
     // For version 4.3 and above
