@@ -10,7 +10,6 @@ import { RequestsContainer } from "../request-container";
 import debug from "debug";
 
 export class P2PLoader {
-  private readonly streamHash: string;
   private readonly peerId: string;
   private readonly trackerClient: TrackerClient;
   private readonly peers = new Map<string, Peer>();
@@ -24,17 +23,17 @@ export class P2PLoader {
     private readonly segmentStorage: SegmentsMemoryStorage,
     private readonly settings: Settings
   ) {
-    this.peerId = PeerUtil.generatePeerId();
+    const { string: peerIdString, bytes: peerIdBytes } =
+      PeerUtil.generatePeerId();
+
+    this.peerId = peerIdString;
     const streamExternalId = Utils.getStreamExternalId(
       this.streamManifestUrl,
       this.stream
     );
-    this.streamHash = PeerUtil.getStreamHash(streamExternalId);
 
-    this.trackerClient = createTrackerClient({
-      streamHash: utf8ToHex(this.streamHash),
-      peerHash: utf8ToHex(this.peerId),
-    });
+    const { bytes: stringIdBytes } = PeerUtil.getStreamHash(streamExternalId);
+    this.trackerClient = createTrackerClient(stringIdBytes, peerIdBytes);
     this.logger(
       `create tracker client: ${LoggerUtils.getStreamString(stream)}; ${
         this.peerId
@@ -208,13 +207,7 @@ export class P2PLoader {
   }
 }
 
-function createTrackerClient({
-  streamHash,
-  peerHash,
-}: {
-  streamHash: string;
-  peerHash: string;
-}) {
+function createTrackerClient(streamHash: Uint8Array, peerHash: Uint8Array) {
   return new TrackerClient({
     infoHash: streamHash,
     peerId: peerHash,
@@ -234,15 +227,6 @@ function createTrackerClient({
       ],
     },
   });
-}
-
-function utf8ToHex(utf8String: string) {
-  let result = "";
-  for (let i = 0; i < utf8String.length; i++) {
-    result += utf8String.charCodeAt(i).toString(16);
-  }
-
-  return result;
 }
 
 function getRandomItem<T>(items: T[]): T {

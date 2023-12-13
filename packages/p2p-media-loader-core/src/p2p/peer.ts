@@ -57,7 +57,7 @@ export class Peer {
     private readonly eventHandlers: PeerEventHandlers,
     private readonly settings: PeerSettings
   ) {
-    this.id = hexToUtf8(connection.id);
+    this.id = Utils.hexToUtf8(connection.id);
     this.eventHandlers = eventHandlers;
     this.addConnection(connection);
   }
@@ -395,14 +395,4 @@ function joinChunks(chunks: ArrayBuffer[]): ArrayBuffer {
   }
 
   return buffer;
-}
-
-function hexToUtf8(hexString: string) {
-  const bytes = new Uint8Array(hexString.length / 2);
-
-  for (let i = 0; i < hexString.length; i += 2) {
-    bytes[i / 2] = parseInt(hexString.slice(i, i + 2), 16);
-  }
-  const decoder = new TextDecoder();
-  return decoder.decode(bytes);
 }

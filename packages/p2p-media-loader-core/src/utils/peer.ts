@@ -1,22 +1,26 @@
-import RIPEMD160 from "ripemd160";
+import md5 from "nano-md5";
+import { utf8ToUintArray } from "./utils";
 
 const HASH_SYMBOLS =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 const PEER_ID_LENGTH = 20;
 
-export function getStreamHash(streamId: string): string {
-  const symbolsCount = HASH_SYMBOLS.length;
-  const bytes = new RIPEMD160().update(streamId).digest();
-  let hash = "";
+export function getStreamHash(streamId: string): {
+  string: string;
+  bytes: Uint8Array;
+} {
+  // slice one byte to have 15 bytes binary string
+  const binary15BytesHashString = md5.fromUtf8(streamId).slice(1);
+  const base64Hash20BytesString = btoa(binary15BytesHashString);
+  const hashBytes = utf8ToUintArray(base64Hash20BytesString);
 
-  for (const byte of bytes) {
-    hash += HASH_SYMBOLS[byte % symbolsCount];
-  }
-
-  return hash;
+  return { string: btoa(binary15BytesHashString), bytes: hashBytes };
 }
 
-export function generatePeerId(): string {
+export function generatePeerId(): {
+  string: string;
+  bytes: Uint8Array;
+} {
   let peerId = "PEER:";
   const randomCharsAmount = PEER_ID_LENGTH - peerId.length;
 
@@ -26,5 +30,5 @@ export function generatePeerId(): string {
     );
   }
 
-  return peerId;
+  return { string: peerId, bytes: utf8ToUintArray(peerId) };
 }
