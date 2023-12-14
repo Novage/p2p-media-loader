@@ -132,6 +132,9 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
           this.debug(`Stream ${stream.id} is updated`);
           prevFirstItemReference = firstItemReference;
           prevLastItemReference = lastItemReference;
+        } catch (err) {
+          // This catch is intentionally left blank.
+          // [...segmentIndex] throws an error when segmentIndex inner array is empty
         } finally {
           segmentIndex.get = customGet;
         }

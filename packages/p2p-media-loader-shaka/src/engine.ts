@@ -78,6 +78,7 @@ export class Engine {
     this.destroyCurrentStreamContext();
     this.updateMediaElementEventHandlers("unregister");
   };
+
   private destroyCurrentStreamContext = () => {
     this.streamInfo.protocol = undefined;
     this.streamInfo.manifestResponseUrl = undefined;
