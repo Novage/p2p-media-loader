@@ -34,7 +34,7 @@ export function getSegmentFromStreamsMap(
 
 export function getSegmentFromStreamByExternalId(
   stream: StreamWithSegments,
-  segmentExternalId: string
+  segmentExternalId: number
 ): Segment | undefined {
   for (const segment of stream.segments.values()) {
     if (segment.externalId === segmentExternalId) return segment;

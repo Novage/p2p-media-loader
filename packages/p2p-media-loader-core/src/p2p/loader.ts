@@ -1,16 +1,13 @@
 import { Peer } from "./peer";
 import { Segment, Settings, StreamWithSegments } from "../types";
 import { SegmentsMemoryStorage } from "../segments-storage";
-import * as PeerUtil from "../utils/peer";
-import * as StreamUtils from "../utils/stream";
-import * as Utils from "../utils/utils";
-import * as LoggerUtils from "../utils/logger";
 import { RequestsContainer } from "../request-container";
 import { Request } from "../request";
 import { P2PTrackerClient } from "./tracker-client";
+import * as StreamUtils from "../utils/stream";
+import * as Utils from "../utils/utils";
 
 export class P2PLoader {
-  private readonly peerId: string;
   private readonly trackerClient: P2PTrackerClient;
   private isAnnounceMicrotaskCreated = false;
 
@@ -21,30 +18,19 @@ export class P2PLoader {
     private readonly segmentStorage: SegmentsMemoryStorage,
     private readonly settings: Settings
   ) {
-    const { string: peerIdString, bytes: peerIdBytes } =
-      PeerUtil.generatePeerId();
-    this.peerId = peerIdString;
-
     const streamExternalId = StreamUtils.getStreamExternalId(
       this.streamManifestUrl,
       this.stream
     );
-    const { bytes: streamIdBytes } = PeerUtil.getStreamHash(streamExternalId);
 
     this.trackerClient = new P2PTrackerClient(
-      peerIdBytes,
-      streamIdBytes,
+      streamExternalId,
       this.stream,
       {
         onPeerConnected: this.onPeerConnected,
         onSegmentRequested: this.onSegmentRequested,
       },
       this.settings
-    );
-    this.logger(
-      `create tracker client: ${LoggerUtils.getStreamString(stream)}; ${
-        this.peerId
-      }`
     );
 
     this.segmentStorage.subscribeOnUpdate(

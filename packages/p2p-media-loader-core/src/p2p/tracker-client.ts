@@ -14,26 +14,31 @@ type PeerItem = {
 };
 type P2PTrackerClientEventHandlers = {
   onPeerConnected: (peer: Peer) => void;
-  onSegmentRequested: (peer: Peer, segmentExternalId: string) => void;
+  onSegmentRequested: (peer: Peer, segmentExternalId: number) => void;
 };
 
 export class P2PTrackerClient {
+  private readonly peerId: string;
+  private readonly streamShortId: string;
   private readonly client: TrackerClient;
   private readonly _peers = new Map<string, PeerItem>();
   private readonly logger = debug("core:p2p-tracker-client");
 
   constructor(
-    private readonly peerId: string,
-    streamExternalId: string,
-    private readonly stream: StreamWithSegments,
+    streamId: string,
+    stream: StreamWithSegments,
     private readonly eventHandlers: P2PTrackerClientEventHandlers,
     private readonly settings: Settings
   ) {
-    const streamHash = PeerUtil.getStreamHash(streamExternalId);
-    const streamShortId = LoggerUtils.getStreamString(stream);
+    const { string: peerId, bytes: peerIdBytes } = PeerUtil.generatePeerId();
+    const { bytes: streamIdBytes, string: streamHash } =
+      PeerUtil.getStreamHash(streamId);
+    this.peerId = peerId;
+    this.streamShortId = LoggerUtils.getStreamString(stream);
+
     this.client = new TrackerClient({
-      infoHash: utf8ToHex(streamHash),
-      peerId: utf8ToHex(this.peerId),
+      infoHash: streamIdBytes,
+      peerId: peerIdBytes,
       port: 6881,
       announce: [
         // "wss://tracker.novage.com.ua",
@@ -54,7 +59,7 @@ export class P2PTrackerClient {
     this.client.on("warning", this.onTrackerClientWarning);
     this.client.on("error", this.onTrackerClientError);
     this.logger(
-      `create new client; \nstream: ${streamShortId}; hash: ${streamHash}; \npeer id: ${this.peerId}`
+      `create new client; \nstream: ${this.streamShortId}; hash: ${streamHash}; \npeer id: ${this.peerId}`
     );
   }
 
@@ -71,9 +76,7 @@ export class P2PTrackerClient {
       }
     }
     this._peers.clear();
-    this.logger(
-      `destroy client; stream: ${LoggerUtils.getStreamString(this.stream)}`
-    );
+    this.logger(`destroy client; stream: ${this.streamShortId}`);
   }
 
   private onReceivePeerConnection: TrackerClientEvents["peer"] = (
@@ -113,17 +116,11 @@ export class P2PTrackerClient {
   private onTrackerClientWarning: TrackerClientEvents["warning"] = (
     warning
   ) => {
-    this.logger(
-      `tracker warning (${LoggerUtils.getStreamString(
-        this.stream
-      )}: ${warning})`
-    );
+    this.logger(`tracker warning (${this.streamShortId}: ${warning})`);
   };
 
   private onTrackerClientError: TrackerClientEvents["error"] = (error) => {
-    this.logger(
-      `tracker error (${LoggerUtils.getStreamString(this.stream)}: ${error})`
-    );
+    this.logger(`tracker error (${this.streamShortId}: ${error})`);
   };
 
   *peers() {
@@ -136,13 +133,4 @@ export class P2PTrackerClient {
     this.logger(`peer closed: ${peer.id}`);
     this._peers.delete(peer.id);
   };
-}
-
-function utf8ToHex(utf8String: string) {
-  let result = "";
-  for (let i = 0; i < utf8String.length; i++) {
-    result += utf8String.charCodeAt(i).toString(16);
-  }
-
-  return result;
 }

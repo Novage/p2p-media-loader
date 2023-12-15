@@ -5,7 +5,7 @@ import {
   RequestError,
   PeerRequestErrorType,
 } from "../request";
-import * as Command from "./command";
+import * as Command from "./commands";
 import { Segment, Settings } from "../types";
 import * as Utils from "../utils/utils";
 import debug from "debug";
@@ -137,7 +137,7 @@ export class Peer {
         {
           abort: this.abortRequest,
           notReceivingBytesTimeoutMs:
-          this.settings.p2pNotReceivingBytesTimeoutMs,
+            this.settings.p2pNotReceivingBytesTimeoutMs,
         }
       ),
     };

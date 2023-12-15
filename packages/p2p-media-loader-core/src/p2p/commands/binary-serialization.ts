@@ -1,8 +1,11 @@
+import { joinChunks } from "../../utils/utils";
+
 // restricted to max 16 item types (4 bits to type definition)
 export enum SerializedItem {
   Int,
   SimilarIntArray,
 }
+
 export const serializedItemTypes = Object.values(SerializedItem);
 
 function abs(num: bigint): bigint {
@@ -15,7 +18,7 @@ function getRequiredBytesForInt(num: bigint): number {
   return Math.ceil(necessaryBits / 8);
 }
 
-export function intToBytes(num: bigint): Uint8Array {
+function intToBytes(num: bigint): Uint8Array {
   const isNegative = num < 0;
   const bytesAmountNumber = getRequiredBytesForInt(num);
   const bytes = new Uint8Array(bytesAmountNumber);
@@ -32,7 +35,7 @@ export function intToBytes(num: bigint): Uint8Array {
   return bytes;
 }
 
-export function bytesToInt(bytes: Uint8Array): bigint {
+function bytesToInt(bytes: Uint8Array): bigint {
   const byteLength = BigInt(bytes.length);
   const getNumberPart = (byte: number, i: number): bigint => {
     const shift = 8n * (byteLength - 1n - BigInt(i));
@@ -129,18 +132,6 @@ export function deserializeSimilarIntArray(bytes: Uint8Array) {
   return { numbers: originalIntArr, byteLength: offset };
 }
 
-function joinUint8Arrays(arrays: Uint8Array[], length?: number) {
-  const byteLength = length ?? arrays.reduce((sum, arr) => sum + arr.length, 0);
-  const bytes = new Uint8Array(byteLength);
-  let offset = 0;
-  for (const array of arrays) {
-    bytes.set(array, offset);
-    offset += array.length;
-  }
-
-  return bytes;
-}
-
 export class ResizableUint8Array {
   private bytes: Uint8Array[] = [];
   private _length = 0;
@@ -174,7 +165,7 @@ export class ResizableUint8Array {
   }
 
   getBytes(): Uint8Array {
-    return joinUint8Arrays(this.bytes, this._length);
+    return joinChunks(this.bytes, this._length);
   }
 
   get length() {
