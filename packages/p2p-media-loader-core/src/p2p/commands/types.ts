@@ -11,12 +11,16 @@ export enum PeerCommandType {
 }
 
 export type PeerSegmentCommand = BasePeerCommand<
-  | PeerCommandType.SegmentRequest
-  | PeerCommandType.SegmentAbsent
-  | PeerCommandType.CancelSegmentRequest
+  PeerCommandType.SegmentAbsent | PeerCommandType.CancelSegmentRequest
 > & {
   i: number; // segment id
 };
+
+export type PeerRequestSegmentCommand =
+  BasePeerCommand<PeerCommandType.SegmentRequest> & {
+    i: number; // segment id
+    b?: number; // byte from
+  };
 
 export type PeerSegmentAnnouncementCommand =
   BasePeerCommand<PeerCommandType.SegmentsAnnouncement> & {
@@ -32,5 +36,6 @@ export type PeerSendSegmentCommand =
 
 export type PeerCommand =
   | PeerSegmentCommand
+  | PeerRequestSegmentCommand
   | PeerSegmentAnnouncementCommand
   | PeerSendSegmentCommand;

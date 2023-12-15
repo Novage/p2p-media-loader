@@ -13,7 +13,11 @@ import debug from "debug";
 const { PeerCommandType } = Command;
 type PeerEventHandlers = {
   onPeerClosed: (peer: Peer) => void;
-  onSegmentRequested: (peer: Peer, segmentId: number) => void;
+  onSegmentRequested: (
+    peer: Peer,
+    segmentId: number,
+    byteFrom?: number
+  ) => void;
 };
 
 type PeerSettings = Pick<
@@ -78,7 +82,7 @@ export class Peer {
         break;
 
       case PeerCommandType.SegmentRequest:
-        this.eventHandlers.onSegmentRequested(this, command.i);
+        this.eventHandlers.onSegmentRequested(this, command.i, command.b);
         break;
 
       case PeerCommandType.SegmentData:
@@ -108,22 +112,8 @@ export class Peer {
   }
 
   private sendCommand(command: Command.PeerCommand) {
-    let serializedCommand: Uint8Array | undefined;
-    switch (command.c) {
-      case PeerCommandType.SegmentRequest:
-      case PeerCommandType.CancelSegmentRequest:
-      case PeerCommandType.SegmentAbsent:
-        serializedCommand = Command.serializePeerSegmentCommand(command);
-        break;
-      case PeerCommandType.SegmentsAnnouncement:
-        serializedCommand =
-          Command.serializeSegmentAnnouncementCommand(command);
-        break;
-      case PeerCommandType.SegmentData:
-        this.connection.send(Command.serializePeerSendSegmentCommand(command));
-        break;
-    }
-    if (serializedCommand) this.connection.send(serializedCommand);
+    const binaryCommand = Command.serializePeerCommand(command);
+    this.connection.send(binaryCommand);
   }
 
   fulfillSegmentRequest(request: Request) {
@@ -141,7 +131,7 @@ export class Peer {
         }
       ),
     };
-    const command: Command.PeerSegmentCommand = {
+    const command: Command.PeerRequestSegmentCommand = {
       c: PeerCommandType.SegmentRequest,
       i: request.segment.externalId,
     };

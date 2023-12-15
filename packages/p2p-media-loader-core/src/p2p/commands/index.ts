@@ -1,3 +1,3 @@
 export * from "./types";
-export * from "./command";
+export { serializePeerCommand } from "./commands";
 export { deserializeCommand, isCommandBuffer } from "./binary-command-creator";

@@ -106,16 +106,23 @@ export class P2PLoader {
 
   private onSegmentRequested = async (
     peer: Peer,
-    segmentExternalId: number
+    segmentExternalId: number,
+    byteFrom?: number
   ) => {
     const segment = StreamUtils.getSegmentFromStreamByExternalId(
       this.stream,
       segmentExternalId
     );
-    const segmentData =
-      segment && (await this.segmentStorage.getSegmentData(segment));
-    if (segmentData) void peer.sendSegmentData(segmentExternalId, segmentData);
-    else peer.sendSegmentAbsent(segmentExternalId);
+    if (!segment) return;
+    const segmentData = await this.segmentStorage.getSegmentData(segment);
+    if (!segmentData) {
+      peer.sendSegmentAbsent(segmentExternalId);
+      return;
+    }
+    void peer.sendSegmentData(
+      segmentExternalId,
+      byteFrom !== undefined ? segmentData.slice(byteFrom) : segmentData
+    );
   };
 
   destroy() {
