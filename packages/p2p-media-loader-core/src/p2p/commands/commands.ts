@@ -11,9 +11,12 @@ import {
 function serializeSegmentAnnouncementCommand(
   command: PeerSegmentAnnouncementCommand
 ) {
-  const creator = new BinaryCommandCreator(command.c);
-  creator.addSimilarIntArr("l", command.l);
-  creator.addSimilarIntArr("p", command.p);
+  const { c: commandCode, p: loadingByHttp, l: loaded } = command;
+  const creator = new BinaryCommandCreator(commandCode);
+  if (loaded?.length) creator.addSimilarIntArr("l", loaded);
+  if (loadingByHttp?.length) {
+    creator.addSimilarIntArr("p", loadingByHttp);
+  }
   creator.complete();
   return creator.getResultBuffer();
 }

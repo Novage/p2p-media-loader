@@ -24,8 +24,8 @@ export type PeerRequestSegmentCommand =
 
 export type PeerSegmentAnnouncementCommand =
   BasePeerCommand<PeerCommandType.SegmentsAnnouncement> & {
-    l: number[]; // loaded segments
-    p: number[]; // segments loading by http
+    l?: number[]; // loaded segments
+    p?: number[]; // segments loading by http
   };
 
 export type PeerSendSegmentCommand =
