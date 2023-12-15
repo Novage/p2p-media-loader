@@ -1,4 +1,6 @@
 import { Segment, Settings, Stream } from "./types";
+import { EventDispatcher } from "./event-dispatcher";
+import * as StreamUtils from "./utils/stream";
 import Debug from "debug";
 
 type StorageSettings = Pick<
@@ -6,46 +8,9 @@ type StorageSettings = Pick<
   "cachedSegmentExpiration" | "cachedSegmentsCount"
 >;
 
-function getStreamShortExternalId(stream: Readonly<Stream>) {
-  const { type, index } = stream;
-  return `${type}-${index}`;
-}
-
 function getStorageItemId(segment: Segment) {
-  const streamExternalId = getStreamShortExternalId(segment.stream);
+  const streamExternalId = StreamUtils.getStreamShortId(segment.stream);
   return `${streamExternalId}|${segment.externalId}`;
-}
-
-export class Subscriptions<
-  T extends (...args: unknown[]) => void = () => void
-> {
-  private readonly list: Set<T>;
-
-  constructor(handlers?: T | T[]) {
-    if (handlers) {
-      this.list = new Set<T>(Array.isArray(handlers) ? handlers : [handlers]);
-    } else {
-      this.list = new Set<T>();
-    }
-  }
-
-  add(handler: T) {
-    this.list.add(handler);
-  }
-
-  remove(handler: T) {
-    this.list.delete(handler);
-  }
-
-  fire(...args: Parameters<T>) {
-    for (const handler of this.list) {
-      handler(...args);
-    }
-  }
-
-  get isEmpty() {
-    return this.list.size === 0;
-  }
 }
 
 type StorageItem = {
@@ -54,14 +19,18 @@ type StorageItem = {
   lastAccessed: number;
 };
 
+type StorageEventHandlers = {
+  [key in `onStorageUpdated${string}`]: (steam: Stream) => void;
+};
+
 export class SegmentsMemoryStorage {
   private cache = new Map<string, StorageItem>();
   private _isInitialized = false;
   private readonly isSegmentLockedPredicates: ((
     segment: Segment
   ) => boolean)[] = [];
-  private onUpdateHandlers = new Map<string, Subscriptions>();
   private readonly logger: Debug.Debugger;
+  private readonly events = new EventDispatcher<StorageEventHandlers>();
 
   constructor(
     private readonly masterManifestUrl: string,
@@ -90,14 +59,13 @@ export class SegmentsMemoryStorage {
 
   async storeSegment(segment: Segment, data: ArrayBuffer) {
     const id = getStorageItemId(segment);
-    const streamId = getStreamShortExternalId(segment.stream);
     this.cache.set(id, {
       segment,
       data,
       lastAccessed: performance.now(),
     });
     this.logger(`add segment: ${id}`);
-    this.fireOnUpdateSubscriptions(streamId);
+    this.dispatchStorageUpdatedEvent(segment.stream);
     void this.clear();
   }
 
@@ -116,10 +84,10 @@ export class SegmentsMemoryStorage {
   }
 
   getStoredSegmentExternalIdsOfStream(stream: Stream) {
-    const streamId = getStreamShortExternalId(stream);
+    const streamId = StreamUtils.getStreamShortId(stream);
     const externalIds: number[] = [];
     for (const { segment } of this.cache.values()) {
-      const itemStreamId = getStreamShortExternalId(segment.stream);
+      const itemStreamId = StreamUtils.getStreamShortId(segment.stream);
       if (itemStreamId === streamId) externalIds.push(segment.externalId);
     }
     return externalIds;
@@ -128,7 +96,7 @@ export class SegmentsMemoryStorage {
   private async clear(): Promise<boolean> {
     const itemsToDelete: string[] = [];
     const remainingItems: [string, StorageItem][] = [];
-    const streamIdsOfChangedItems = new Set<string>();
+    const streamsOfChangedItems = new Set<Stream>();
 
     // Delete old segments
     const now = performance.now();
@@ -138,9 +106,8 @@ export class SegmentsMemoryStorage {
       const { lastAccessed, segment } = item;
       if (now - lastAccessed > this.settings.cachedSegmentExpiration) {
         if (!this.isSegmentLocked(segment)) {
-          const streamId = getStreamShortExternalId(segment.stream);
           itemsToDelete.push(itemId);
-          streamIdsOfChangedItems.add(streamId);
+          streamsOfChangedItems.add(segment.stream);
         }
       } else {
         remainingItems.push(entry);
@@ -155,9 +122,8 @@ export class SegmentsMemoryStorage {
 
       for (const [itemId, { segment }] of remainingItems) {
         if (!this.isSegmentLocked(segment)) {
-          const streamId = getStreamShortExternalId(segment.stream);
           itemsToDelete.push(itemId);
-          streamIdsOfChangedItems.add(streamId);
+          streamsOfChangedItems.add(segment.stream);
           countOverhead--;
           if (countOverhead === 0) break;
         }
@@ -167,40 +133,39 @@ export class SegmentsMemoryStorage {
     if (itemsToDelete.length) {
       this.logger(`cleared ${itemsToDelete.length} segments`);
       itemsToDelete.forEach((id) => this.cache.delete(id));
-      for (const streamId of streamIdsOfChangedItems) {
-        this.fireOnUpdateSubscriptions(streamId);
+      for (const stream of streamsOfChangedItems) {
+        this.dispatchStorageUpdatedEvent(stream);
       }
     }
 
     return itemsToDelete.length > 0;
   }
 
-  subscribeOnUpdate(stream: Stream, handler: () => void) {
-    const streamId = getStreamShortExternalId(stream);
-    const handlers = this.onUpdateHandlers.get(streamId);
-    if (!handlers) {
-      this.onUpdateHandlers.set(streamId, new Subscriptions(handler));
-    } else {
-      handlers.add(handler);
-    }
+  subscribeOnUpdate(
+    stream: Stream,
+    listener: StorageEventHandlers["onStorageUpdated"]
+  ) {
+    const localId = StreamUtils.getStreamShortId(stream);
+    this.events.subscribe(`onStorageUpdated-${localId}`, listener);
   }
 
-  unsubscribeFromUpdate(stream: Stream, handler: () => void) {
-    const streamId = getStreamShortExternalId(stream);
-    const handlers = this.onUpdateHandlers.get(streamId);
-    if (handlers) {
-      handlers.remove(handler);
-      if (handlers.isEmpty) this.onUpdateHandlers.delete(streamId);
-    }
+  unsubscribeFromUpdate(
+    stream: Stream,
+    listener: StorageEventHandlers["onStorageUpdated"]
+  ) {
+    const localId = StreamUtils.getStreamShortId(stream);
+    this.events.unsubscribe(`onStorageUpdated-${localId}`, listener);
   }
 
-  private fireOnUpdateSubscriptions(streamId: string) {
-    this.onUpdateHandlers.get(streamId)?.fire();
+  private dispatchStorageUpdatedEvent(stream: Stream) {
+    this.events.dispatch(
+      `onStorageUpdated${StreamUtils.getStreamShortId(stream)}`,
+      stream
+    );
   }
 
   public async destroy() {
     this.cache.clear();
-    this.onUpdateHandlers.clear();
     this._isInitialized = false;
   }
 }

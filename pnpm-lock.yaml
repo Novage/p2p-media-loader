@@ -64,9 +64,6 @@ importers:
       react-dom:
         specifier: ^18.2.0
         version: 18.2.0(react@18.2.0)
-      shaka-player:
-        specifier: ^4.3.7
-        version: 4.3.7
     devDependencies:
       '@types/dplayer':
         specifier: ^1.25.2

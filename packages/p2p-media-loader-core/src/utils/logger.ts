@@ -1,5 +1,6 @@
 import { Segment, Stream } from "../types";
-import { QueueItem, QueueItemStatuses } from "../internal-types";
+import { QueueItem } from "../internal-types";
+import { SegmentPlaybackStatuses } from "./stream";
 
 export function getStreamString(stream: Stream) {
   return `${stream.type}-${stream.index}`;
@@ -10,7 +11,9 @@ export function getSegmentString(segment: Segment) {
   return `(${getStreamString(segment.stream)} | ${externalId})`;
 }
 
-export function getStatusesString(statuses: QueueItemStatuses): string {
+export function getSegmentPlaybackStatusesString(
+  statuses: SegmentPlaybackStatuses
+): string {
   const { isHighDemand, isHttpDownloadable, isP2PDownloadable } = statuses;
   if (isHighDemand) return "high-demand";
   if (isHttpDownloadable && isP2PDownloadable) return "http-p2p-window";
@@ -21,6 +24,6 @@ export function getStatusesString(statuses: QueueItemStatuses): string {
 
 export function getQueueItemString(item: QueueItem) {
   const { segment, statuses } = item;
-  const statusString = getStatusesString(statuses);
+  const statusString = getSegmentPlaybackStatusesString(statuses);
   return `${segment.externalId} ${statusString}`;
 }

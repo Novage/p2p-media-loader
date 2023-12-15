@@ -1,19 +1,17 @@
-import TrackerClient, { PeerConnection } from "bittorrent-tracker";
 import { Peer } from "./peer";
-import * as PeerUtil from "../utils/peer";
 import { Segment, Settings, StreamWithSegments } from "../types";
-import { QueueItem } from "../internal-types";
 import { SegmentsMemoryStorage } from "../segments-storage";
+import * as PeerUtil from "../utils/peer";
+import * as StreamUtils from "../utils/stream";
 import * as Utils from "../utils/utils";
 import * as LoggerUtils from "../utils/logger";
 import { RequestsContainer } from "../request-container";
-import debug from "debug";
+import { Request } from "../request";
+import { P2PTrackerClient } from "./tracker-client";
 
 export class P2PLoader {
   private readonly peerId: string;
-  private readonly trackerClient: TrackerClient;
-  private readonly peers = new Map<string, Peer>();
-  private readonly logger = debug("core:p2p-loader");
+  private readonly trackerClient: P2PTrackerClient;
   private isAnnounceMicrotaskCreated = false;
 
   constructor(
@@ -25,108 +23,57 @@ export class P2PLoader {
   ) {
     const { string: peerIdString, bytes: peerIdBytes } =
       PeerUtil.generatePeerId();
-
     this.peerId = peerIdString;
-    const streamExternalId = Utils.getStreamExternalId(
+
+    const streamExternalId = StreamUtils.getStreamExternalId(
       this.streamManifestUrl,
       this.stream
     );
+    const { bytes: streamIdBytes } = PeerUtil.getStreamHash(streamExternalId);
 
-    const { bytes: stringIdBytes } = PeerUtil.getStreamHash(streamExternalId);
-    this.trackerClient = createTrackerClient(stringIdBytes, peerIdBytes);
+    this.trackerClient = new P2PTrackerClient(
+      peerIdBytes,
+      streamIdBytes,
+      this.stream,
+      {
+        onPeerConnected: this.onPeerConnected,
+        onSegmentRequested: this.onSegmentRequested,
+      },
+      this.settings
+    );
     this.logger(
       `create tracker client: ${LoggerUtils.getStreamString(stream)}; ${
         this.peerId
       }`
     );
-    this.subscribeOnTrackerEvents(this.trackerClient);
+
     this.segmentStorage.subscribeOnUpdate(
       this.stream,
       this.broadcastAnnouncement
     );
-    this.requests.subscribeOnHttpRequestsUpdate(this.broadcastAnnouncement);
     this.trackerClient.start();
   }
 
-  private subscribeOnTrackerEvents(trackerClient: TrackerClient) {
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
-    trackerClient.on("update", () => {});
-    trackerClient.on("peer", (peerConnection) => {
-      const peer = this.peers.get(peerConnection.id);
-      if (peer) peer.addConnection(peerConnection);
-      else this.createPeer(peerConnection);
-    });
-    trackerClient.on("warning", (warning) => {
-      this.logger(
-        `tracker warning (${LoggerUtils.getStreamString(
-          this.stream
-        )}: ${warning})`
-      );
-    });
-    trackerClient.on("error", (error) => {
-      this.logger(
-        `tracker error (${LoggerUtils.getStreamString(this.stream)}: ${error})`
-      );
-    });
-  }
-
-  private createPeer(connection: PeerConnection) {
-    const peer = new Peer(
-      connection,
-      {
-        onPeerConnected: this.onPeerConnected.bind(this),
-        onPeerClosed: this.onPeerClosed.bind(this),
-        onSegmentRequested: this.onSegmentRequested.bind(this),
-      },
-      this.settings
-    );
-    this.logger(`create new peer: ${peer.id}`);
-    this.peers.set(connection.id, peer);
-  }
-
-  downloadSegment(item: QueueItem): Promise<ArrayBuffer> | undefined {
-    const { segment, statuses } = item;
-    const untestedPeers: Peer[] = [];
-    let fastestPeer: Peer | undefined;
-    let fastestPeerBandwidth = 0;
-
-    for (const peer of this.peers.values()) {
+  downloadSegment(segment: Segment): Request | undefined {
+    const peersWithSegment: Peer[] = [];
+    for (const peer of this.trackerClient.peers()) {
       if (
         !peer.downloadingSegment &&
         peer.getSegmentStatus(segment) === "loaded"
       ) {
-        const { bandwidth } = peer;
-        if (bandwidth === undefined) {
-          untestedPeers.push(peer);
-        } else if (bandwidth > fastestPeerBandwidth) {
-          fastestPeerBandwidth = bandwidth;
-          fastestPeer = peer;
-        }
+        peersWithSegment.push(peer);
       }
     }
 
-    const peer = untestedPeers.length
-      ? getRandomItem(untestedPeers)
-      : fastestPeer;
-
+    const peer = Utils.getRandomItem(peersWithSegment);
     if (!peer) return;
 
-    const request = peer.requestSegment(segment);
-    this.requests.addLoaderRequest(segment, request);
-    this.logger(
-      `p2p request ${segment.externalId} | ${LoggerUtils.getStatusesString(
-        statuses
-      )}`
-    );
-    request.promise.then(() => {
-      this.logger(`p2p loaded: ${segment.externalId}`);
-    });
-
-    return request.promise;
+    const request = this.requests.getOrCreateRequest(segment);
+    peer.fulfillSegmentRequest(request);
   }
 
   isLoadingOrLoadedBySomeone(segment: Segment): boolean {
-    for (const peer of this.peers.values()) {
+    for (const peer of this.trackerClient.peers()) {
       if (peer.getSegmentStatus(segment)) return true;
     }
     return false;
@@ -134,9 +81,8 @@ export class P2PLoader {
 
   get connectedPeersAmount() {
     let count = 0;
-    for (const peer of this.peers.values()) {
-      if (peer.isConnected) count++;
-    }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    for (const peer of this.trackerClient.peers()) count++;
     return count;
   }
 
@@ -154,33 +100,29 @@ export class P2PLoader {
     return { loaded, httpLoading };
   }
 
-  private onPeerConnected(peer: Peer) {
-    this.logger(`connected with peer: ${peer.id}`);
+  private onPeerConnected = (peer: Peer) => {
     const announcement = this.getSegmentsAnnouncement();
     peer.sendSegmentsAnnouncement(announcement);
-  }
+  };
 
-  private onPeerClosed(peer: Peer) {
-    this.logger(`peer closed: ${peer.id}`);
-    this.peers.delete(peer.id);
-  }
-
-  private broadcastAnnouncement = () => {
+  broadcastAnnouncement = () => {
     if (this.isAnnounceMicrotaskCreated) return;
 
     this.isAnnounceMicrotaskCreated = true;
     queueMicrotask(() => {
       const announcement = this.getSegmentsAnnouncement();
-      for (const peer of this.peers.values()) {
-        if (!peer.isConnected) continue;
+      for (const peer of this.trackerClient.peers()) {
         peer.sendSegmentsAnnouncement(announcement);
       }
       this.isAnnounceMicrotaskCreated = false;
     });
   };
 
-  private async onSegmentRequested(peer: Peer, segmentExternalId: number) {
-    const segment = Utils.getSegmentFromStreamByExternalId(
+  private onSegmentRequested = async (
+    peer: Peer,
+    segmentExternalId: number
+  ) => {
+    const segment = StreamUtils.getSegmentFromStreamByExternalId(
       this.stream,
       segmentExternalId
     );
@@ -188,47 +130,13 @@ export class P2PLoader {
       segment && (await this.segmentStorage.getSegmentData(segment));
     if (segmentData) void peer.sendSegmentData(segmentExternalId, segmentData);
     else peer.sendSegmentAbsent(segmentExternalId);
-  }
+  };
 
   destroy() {
-    this.logger(
-      `destroy tracker client: ${LoggerUtils.getStreamString(this.stream)}`
-    );
     this.segmentStorage.unsubscribeFromUpdate(
       this.stream,
       this.broadcastAnnouncement
     );
-    this.requests.unsubscribeFromHttpRequestsUpdate(this.broadcastAnnouncement);
-    for (const peer of this.peers.values()) {
-      peer.destroy();
-    }
-    this.peers.clear();
     this.trackerClient.destroy();
   }
-}
-
-function createTrackerClient(streamHash: Uint8Array, peerHash: Uint8Array) {
-  return new TrackerClient({
-    infoHash: streamHash,
-    peerId: peerHash,
-    port: 6881,
-    announce: [
-      // "wss://tracker.novage.com.ua",
-      "wss://tracker.openwebtorrent.com",
-    ],
-    rtcConfig: {
-      iceServers: [
-        {
-          urls: [
-            "stun:stun.l.google.com:19302",
-            "stun:global.stun.twilio.com:3478",
-          ],
-        },
-      ],
-    },
-  });
-}
-
-function getRandomItem<T>(items: T[]): T {
-  return items[Math.floor(Math.random() * items.length)];
 }

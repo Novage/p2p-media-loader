@@ -9,7 +9,10 @@ declare module "bittorrent-tracker" {
       getAnnounceOpts?: () => object;
     });
 
-    on<E extends TrackerEvent>(event: E, handler: TrackerEventHandler<E>): void;
+    on<E extends keyof TrackerClientEvents>(
+      event: E,
+      handler: TrackerClientEvents[E]
+    ): void;
 
     start(): void;
 
@@ -20,39 +23,25 @@ declare module "bittorrent-tracker" {
     destroy(): void;
   }
 
-  export type TrackerEvent = "update" | "peer" | "warning" | "error";
+  export type TrackerClientEvents = {
+    update: (data: object) => void;
+    peer: (peer: PeerConnection) => void;
+    warning: (warning: unknown) => void;
+    error: (error: unknown) => void;
+  };
 
-  export type TrackerEventHandler<E extends TrackerEvent> = E extends "update"
-    ? (data: object) => void
-    : E extends "peer"
-    ? (peer: PeerConnection) => void
-    : E extends "warning"
-    ? (warning: unknown) => void
-    : E extends "error"
-    ? (error: unknown) => void
-    : never;
-
-  type PeerEvent = "connect" | "data" | "close" | "error";
-
-  export type PeerConnectionEventHandler<E extends PeerEvent> =
-    E extends "connect"
-      ? () => void
-      : E extends "data"
-      ? (data: Uint8Array) => void
-      : E extends "close"
-      ? () => void
-      : E extends "error"
-      ? (error: { code: string }) => void
-      : never;
+  export type PeerEvents = {
+    connect: () => void;
+    data: (data: Uint8Array) => void;
+    close: () => void;
+    error: (error: { code: string }) => void;
+  };
 
   export type PeerConnection = {
     id: string;
     initiator: boolean;
     _channel: RTCDataChannel;
-    on<E extends PeerEvent>(
-      event: E,
-      handler: PeerConnectionEventHandler<E>
-    ): void;
+    on<E extends keyof PeerEvents>(event: E, handler: PeerEvents[E]): void;
     send(data: string | ArrayBuffer): void;
     write(data: string | ArrayBuffer): void;
     destroy(): void;

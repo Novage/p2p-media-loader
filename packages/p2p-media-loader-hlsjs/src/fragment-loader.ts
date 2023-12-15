@@ -8,12 +8,7 @@ import type {
   LoaderStats,
 } from "hls.js";
 import * as Utils from "./utils";
-import {
-  RequestAbortError,
-  Core,
-  FetchError,
-  SegmentResponse,
-} from "p2p-media-loader-core";
+import { Core, SegmentResponse, CoreRequestError } from "p2p-media-loader-core";
 
 const DEFAULT_DOWNLOAD_LATENCY = 10;
 
@@ -73,23 +68,37 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     const onSuccess = (response: SegmentResponse) => {
       this.response = response;
       const loadedBytes = this.response.data.byteLength;
-      stats.loading = getLoadingStat({
-        targetBitrate: this.response.bandwidth,
-        loadingEndTime: performance.now(),
+      stats.loading = getLoadingStat(
+        this.response.bandwidth,
         loadedBytes,
-      });
+        performance.now()
+      );
       stats.total = stats.loaded = loadedBytes;
 
+      if (callbacks.onProgress) {
+        callbacks.onProgress(
+          this.stats,
+          context,
+          this.response.data,
+          undefined
+        );
+      }
       callbacks.onSuccess(
         { data: this.response.data, url: context.url },
         this.stats,
         context,
-        this.response
+        undefined
       );
     };
 
     const onError = (error: unknown) => {
-      if (error instanceof RequestAbortError && this.stats.aborted) return;
+      if (
+        error instanceof CoreRequestError &&
+        error.type === "aborted" &&
+        this.stats.aborted
+      ) {
+        return;
+      }
       this.handleError(error);
     };
 
@@ -98,15 +107,16 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
 
   private handleError(thrownError: unknown) {
     const error = { code: 0, text: "" };
-    let details: object | null = null;
-    if (thrownError instanceof FetchError) {
-      error.code = thrownError.code;
+    if (
+      thrownError instanceof CoreRequestError &&
+      thrownError.type === "failed"
+    ) {
+      // error.code = thrownError.code;
       error.text = thrownError.message;
-      details = thrownError.details;
     } else if (thrownError instanceof Error) {
       error.text = thrownError.message;
     }
-    this.callbacks?.onError(error, this.context, details, this.stats);
+    this.callbacks?.onError(error, this.context, null, this.stats);
   }
 
   private abortInternal() {
@@ -136,15 +146,11 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   }
 }
 
-function getLoadingStat({
-  loadedBytes,
-  targetBitrate,
-  loadingEndTime,
-}: {
-  targetBitrate: number;
-  loadedBytes: number;
-  loadingEndTime: number;
-}) {
+function getLoadingStat(
+  targetBitrate: number,
+  loadedBytes: number,
+  loadingEndTime: number
+) {
   const bits = loadedBytes * 8;
   const timeForLoading = (bits / targetBitrate) * 1000;
   const first = loadingEndTime - timeForLoading;

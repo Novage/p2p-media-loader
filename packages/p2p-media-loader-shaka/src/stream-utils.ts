@@ -1,4 +1,4 @@
-import { HookedStream, Stream } from "./types";
+import { Stream } from "./types";
 import {
   SegmentBase,
   StreamWithReadonlySegments,
@@ -86,18 +86,4 @@ export function getStreamLastMediaSequence(
     if (firstMediaSequence === undefined) return;
     return firstMediaSequence + map.size - 1;
   }
-}
-
-export function getStreamLocalIdFromShakaStream(
-  stream: shaka.extern.Stream | HookedStream,
-  isHls: boolean
-): string {
-  if (isHls) {
-    const streamUrl = (stream as HookedStream).streamUrl;
-    if (!streamUrl) {
-      throw Error("Stream url must be set for HLS stream");
-    }
-    return streamUrl;
-  }
-  return stream.id.toString();
 }

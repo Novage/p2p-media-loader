@@ -1,4 +1,4 @@
-import { LoadProgress } from "./request-container";
+import { LoadProgress } from "./request";
 
 export class BandwidthApproximator {
   private readonly loadings: LoadProgress[] = [];
@@ -20,6 +20,10 @@ export class BandwidthApproximator {
       if (now - startTimestamp <= 15000) break;
       this.loadings.shift();
     }
+  }
+
+  destroy() {
+    this.loadings.length = 0;
   }
 }
 

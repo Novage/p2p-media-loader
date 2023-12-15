@@ -7,20 +7,17 @@ import {
   P2PMLShakaData,
 } from "./types";
 import { StreamType } from "p2p-media-loader-core";
-import * as Utils from "./stream-utils";
 
 export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   private readonly debug = Debug("p2pml-shaka:manifest-parser");
-  private readonly isHLS: boolean;
-  private readonly isDash: boolean;
+  private readonly isHls: boolean;
   private segmentManager?: SegmentManager;
 
   constructor(
     shaka: Readonly<Shaka>,
     private readonly originalManifestParser: shaka.extern.ManifestParser
   ) {
-    this.isHLS = this.originalManifestParser instanceof shaka.hls.HlsParser;
-    this.isDash = this.originalManifestParser instanceof shaka.dash.DashParser;
+    this.isHls = this.originalManifestParser instanceof shaka.hls.HlsParser;
   }
 
   configure(config: shaka.extern.ManifestConfiguration) {
@@ -30,7 +27,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   private setP2PMediaLoaderData(p2pml?: P2PMLShakaData) {
     if (!p2pml) return;
     this.segmentManager = p2pml.segmentManager;
-    p2pml.streamInfo.protocol = this.isHLS ? "hls" : "dash";
+    p2pml.streamInfo.protocol = this.isHls ? "hls" : "dash";
   }
 
   async start(
@@ -46,14 +43,10 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     );
     if (!p2pml) return manifest;
 
-    if (this.isHLS) {
-      const success = this.retrieveStreamMediaSequenceTimeMaps(
-        manifest.variants
-      );
-      this.retrieveStreamUrls(!success);
+    if (this.isHls) {
+      this.hookHlsStreamMediaSequenceTimeMaps(manifest.variants);
     }
     this.processStreams(manifest.variants);
-
     return manifest;
   }
 
@@ -82,7 +75,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       type: StreamType,
       order: number
     ) => {
-      if (this.isDash) this.hookSegmentIndex(stream);
+      this.hookSegmentIndex(stream);
       segmentManager.setStream(stream as HookedStream, type, order);
       processedStreams.add(stream.id);
       return true;
@@ -111,10 +104,13 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       const result = await createSegmentIndexOriginal.call(stream);
       const { segmentIndex } = stream;
       let prevReference: shaka.media.SegmentReference | null = null;
-      let prevFirstItemReference: shaka.media.SegmentReference | null = null;
-      let prevLastItemReference: shaka.media.SegmentReference | null = null;
+      let prevFirstItemReference: shaka.media.SegmentReference;
+      let prevLastItemReference: shaka.media.SegmentReference;
 
       if (!segmentIndex) return result;
+      const segmentReferencesPropName =
+        getReferencesListPropertyOfSegmentIndex(segmentIndex);
+      if (!segmentReferencesPropName) return result;
 
       const getOriginal = segmentIndex.get;
       segmentIndex.get = (position) => {
@@ -122,83 +118,67 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
         if (reference === prevReference) return reference;
         prevReference = reference;
 
-        let firstItemReference: shaka.media.SegmentReference | null = null;
-        let lastItemReference: shaka.media.SegmentReference | null = null;
-        const currentGet = segmentIndex.get;
-        segmentIndex.get = getOriginal;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const referencesList = (segmentIndex as any)[
+          segmentReferencesPropName
+        ] as shaka.media.SegmentReference[];
+        const firstItemReference = referencesList[0];
+        const lastItemReference = referencesList[referencesList.length - 1];
 
-        let references: shaka.media.SegmentReference[];
-        try {
-          references = [...segmentIndex];
-          firstItemReference = references[0];
-          lastItemReference = references[references.length - 1];
-        } catch (err) {
-          // For situations when segmentIndex is not iterable (inner array length is 0)
-          segmentIndex.get = getOriginal;
+        if (
+          firstItemReference === prevFirstItemReference &&
+          lastItemReference === prevLastItemReference
+        ) {
           return reference;
         }
-        if (
-          firstItemReference !== prevFirstItemReference ||
-          lastItemReference !== prevLastItemReference
-        ) {
-          // Segment index have been updated
-          const streamLocalId = Utils.getStreamLocalIdFromShakaStream(
-            stream,
-            this.isHLS
-          );
-          segmentManager.updateStreamSegments(streamLocalId, references);
-          this.debug(`Stream ${streamLocalId} is updated`);
-          prevFirstItemReference = firstItemReference;
-          prevLastItemReference = lastItemReference;
-        }
 
-        segmentIndex.get = currentGet;
+        // Segment index have been updated
+        segmentManager.updateStreamSegments(stream, referencesList);
+        this.debug(`Stream ${stream.id} is updated`);
+        prevFirstItemReference = firstItemReference;
+        prevLastItemReference = lastItemReference;
         return reference;
       };
       return result;
     };
   }
 
-  private retrieveStreamMediaSequenceTimeMaps(
-    variants: shaka.extern.Variant[]
-  ) {
-    // For version 4.3
-    const manifestProperties = Object.values(this.originalManifestParser);
+  private hookHlsStreamMediaSequenceTimeMaps(variants: shaka.extern.Variant[]) {
+    const maps = getMapPropertiesFromObject(this.originalManifestParser);
+
+    // For version 4.3 and above
     let videoMap: Map<number, number> | undefined = undefined;
     let audioMap: Map<number, number> | undefined = undefined;
+    const keysToCheck = ["video", "audio", "text", "image"];
+    for (const map of maps) {
+      if (!keysToCheck.every((key) => map.has(key))) continue;
 
-    for (const manifestProp of manifestProperties) {
-      if (typeof manifestProp === "object" && manifestProp instanceof Map) {
-        const mapKeys = Array.from(manifestProp.keys());
-        if (
-          ["video", "audio", "text", "image"].every((i) => mapKeys.includes(i))
-        ) {
-          videoMap = manifestProp.get("video");
-          audioMap = manifestProp.get("audio");
-          break;
+      videoMap = map.get("video");
+      audioMap = map.get("audio");
+    }
+
+    if (videoMap && audioMap) {
+      for (const variant of variants) {
+        const { video: videoStream, audio: audioStream } = variant;
+        if (videoStream && videoMap) {
+          (videoStream as HookedStream).mediaSequenceTimeMap = videoMap;
+        }
+        if (audioStream && audioMap) {
+          (audioStream as HookedStream).mediaSequenceTimeMap = videoMap;
         }
       }
+      return;
     }
 
-    if (!videoMap && !audioMap) return false;
+    // For version 4.2; Retrieving mediaSequence map for each HLS playlist
+    const manifestVariantsMap = maps.find((map) => {
+      const item = map.values().next().value;
+      return typeof item === "object" && item.streams?.createSegmentIndex;
+    });
 
-    for (const variant of variants) {
-      const { video: videoStream, audio: audioStream } = variant;
-      if (videoStream && videoMap) {
-        (videoStream as HookedStream).mediaSequenceTimeMap = videoMap;
-      }
-      if (audioStream && audioMap) {
-        (audioStream as HookedStream).mediaSequenceTimeMap = videoMap;
-      }
-    }
+    if (!manifestVariantsMap) return;
 
-    return true;
-  }
-
-  private retrieveStreamUrls(retrieveMediaSequenceMaps: boolean) {
-    const manifestProperties = Object.values(this.originalManifestParser);
-
-    let manifestVariantMapValues: {
+    const manifestVariantMapValues: {
       stream: {
         createSegmentIndex: () => void;
         type: string;
@@ -206,45 +186,22 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
         mediaSequenceTimeMap?: Map<number, number>;
       };
       [key: string]: unknown;
-    }[] = [];
-    for (const manifestProp of manifestProperties) {
-      if (typeof manifestProp !== "object" || !(manifestProp instanceof Map)) {
-        continue;
-      }
+    }[] = [...manifestVariantsMap.values()];
 
-      manifestVariantMapValues = Array.from(manifestProp.values());
-      const [value] = manifestVariantMapValues;
-      if (typeof value !== "object" || !value.stream?.createSegmentIndex) {
-        continue;
-      }
-      if (!retrieveMediaSequenceMaps) break;
-
-      // For version 4.2; Retrieving mediaSequence map for each of HLS playlists
-      for (const variant of manifestVariantMapValues) {
-        const variantProps = Object.values(variant);
-        const mediaSequenceTimeMap = variantProps.find((p) => p instanceof Map);
-        if (!mediaSequenceTimeMap || variant.stream.mediaSequenceTimeMap) {
-          continue;
-        }
-        variant.stream.mediaSequenceTimeMap = mediaSequenceTimeMap as Map<
-          number,
-          number
-        >;
-      }
-      break;
-    }
-
-    // Retrieve HLS playlists urls
     for (const variant of manifestVariantMapValues) {
-      const variantProps = Object.values(variant) as unknown[];
-      let streamUrl = "";
-      for (const property of variantProps) {
-        if (typeof property === "string" && property.startsWith("http")) {
-          streamUrl = property;
-        }
-      }
+      if (variant.stream.mediaSequenceTimeMap) continue;
 
-      variant.stream.streamUrl = streamUrl;
+      const mediaSequenceTimeMap = getMapPropertiesFromObject(variant).find(
+        (map) => {
+          const [key, value] = map.entries().next().value ?? [];
+          return typeof key === "number" && typeof value === "number";
+        }
+      );
+      if (!mediaSequenceTimeMap) continue;
+      variant.stream.mediaSequenceTimeMap = mediaSequenceTimeMap as Map<
+        number,
+        number
+      >;
     }
   }
 }
@@ -259,4 +216,17 @@ export class DashManifestParser extends ManifestParserDecorator {
   public constructor(shaka: Shaka) {
     super(shaka, new shaka.dash.DashParser());
   }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getMapPropertiesFromObject(object: object): Map<any, any>[] {
+  return Object.values(object).filter((property) => property instanceof Map);
+}
+
+function getReferencesListPropertyOfSegmentIndex(
+  segmentIndex: shaka.media.SegmentIndex
+): string | undefined {
+  return Object.entries(segmentIndex).find(
+    ([, value]) => value instanceof Array
+  )?.[0];
 }
