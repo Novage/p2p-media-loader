@@ -64,3 +64,8 @@ export type Settings = {
 export type CoreEventHandlers = {
   onSegmentLoaded?: (byteLength: number, type: RequestAttempt["type"]) => void;
 };
+
+export type Playback = {
+  position: number;
+  rate: number;
+};

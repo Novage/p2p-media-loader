@@ -1,7 +1,6 @@
-import { Segment, Settings } from "./types";
+import { Segment, Settings, Playback } from "./types";
 import { BandwidthApproximator } from "./bandwidth-approximator";
 import { Request } from "./request";
-import { Playback } from "./internal-types";
 
 export class RequestsContainer {
   private readonly requests = new Map<Segment, Request>();

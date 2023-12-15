@@ -1,10 +1,11 @@
-import { Segment } from "../types";
-import { Playback, QueueItem } from "../internal-types";
+import { Segment, Playback } from "../types";
 import {
   getSegmentPlaybackStatuses,
   SegmentPlaybackStatuses,
   PlaybackTimeWindowsSettings,
 } from "./stream";
+
+export type QueueItem = { segment: Segment; statuses: SegmentPlaybackStatuses };
 
 export function generateQueue({
   lastRequestedSegment,
