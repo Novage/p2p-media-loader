@@ -164,7 +164,7 @@ export class ResizableUint8Array {
     return this.bytes;
   }
 
-  getBytes(): Uint8Array {
+  getBuffer(): Uint8Array {
     return joinChunks(this.bytes, this._length);
   }
 
