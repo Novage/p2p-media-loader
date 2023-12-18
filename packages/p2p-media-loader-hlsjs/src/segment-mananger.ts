@@ -69,7 +69,7 @@ export class SegmentManager {
       newSegments.push({
         localId: segmentLocalId,
         url: responseUrl,
-        externalId: live ? sn.toString() : index.toString(),
+        externalId: live ? sn : index,
         byteRange,
         startTime,
         endTime,

@@ -28,9 +28,8 @@
   },
   "dependencies": {
     "bittorrent-tracker": "10.0.12",
-    "ripemd160": "^2.0.2"
+    "nano-md5": "^1.0.5"
   },
   "devDependencies": {
-    "@types/ripemd160": "^2.0.2"
   }
 }

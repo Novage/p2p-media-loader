@@ -1,10 +1,9 @@
-import { Segment, SegmentResponse } from "./types";
+import { Segment, SegmentResponse, Playback } from "./types";
 import { BandwidthApproximator } from "./bandwidth-approximator";
 import * as StreamUtils from "./utils/stream";
 import * as Utils from "./utils/utils";
 import * as LoggerUtils from "./utils/logger";
 import debug from "debug";
-import { Playback } from "./internal-types";
 
 export type EngineCallbacks = {
   onSuccess: (response: SegmentResponse) => void;

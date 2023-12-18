@@ -1,10 +1,9 @@
 import { Segment, StreamWithSegments } from "./index";
 import { fulfillHttpSegmentRequest } from "./http-loader";
 import { SegmentsMemoryStorage } from "./segments-storage";
-import { Settings, CoreEventHandlers } from "./types";
+import { Settings, CoreEventHandlers, Playback } from "./types";
 import { BandwidthApproximator } from "./bandwidth-approximator";
 import { P2PLoadersContainer } from "./p2p/loaders-container";
-import { Playback, QueueItem } from "./internal-types";
 import { RequestsContainer } from "./request-container";
 import { EngineCallbacks } from "./request";
 import * as QueueUtils from "./utils/queue";
@@ -283,7 +282,7 @@ export class HybridLoader {
   }
 
   private abortLastHttpLoadingInQueueAfterItem(
-    queue: QueueItem[],
+    queue: QueueUtils.QueueItem[],
     segment: Segment
   ): boolean {
     for (const { segment: itemSegment } of arrayBackwards(queue)) {
@@ -298,7 +297,7 @@ export class HybridLoader {
   }
 
   private abortLastP2PLoadingInQueueAfterItem(
-    queue: QueueItem[],
+    queue: QueueUtils.QueueItem[],
     segment: Segment
   ): boolean {
     for (const { segment: itemSegment } of arrayBackwards(queue)) {

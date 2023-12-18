@@ -85,7 +85,7 @@ export class SegmentsMemoryStorage {
 
   getStoredSegmentExternalIdsOfStream(stream: Stream) {
     const streamId = StreamUtils.getStreamShortId(stream);
-    const externalIds: string[] = [];
+    const externalIds: number[] = [];
     for (const { segment } of this.cache.values()) {
       const itemStreamId = StreamUtils.getStreamShortId(segment.stream);
       if (itemStreamId === streamId) externalIds.push(segment.externalId);

@@ -1,5 +1,5 @@
 import { Segment, Stream } from "../types";
-import { QueueItem } from "../internal-types";
+import { QueueItem } from "./queue";
 import { SegmentPlaybackStatuses } from "./stream";
 
 export function getStreamString(stream: Stream) {
