@@ -134,7 +134,7 @@ export class Peer extends PeerBase {
     };
     this.sendCommand(command);
     try {
-      await this.splitToChunksAndUploadAsynchronously(data as Uint8Array);
+      await this.splitDataToChunksAndUploadAsync(data as Uint8Array);
       this.logger(`segment ${segmentExternalId} has been sent to ${this.id}`);
     } catch (err) {
       this.logger(`cancel segment uploading ${segmentExternalId}`);

@@ -50,7 +50,7 @@ export abstract class PeerBase {
     }
   }
 
-  protected async splitToChunksAndUploadAsynchronously(data: Uint8Array) {
+  protected async splitDataToChunksAndUploadAsync(data: Uint8Array) {
     const chunks = getBufferChunks(data, this.settings.webRtcMaxMessageSize);
     const channel = this.connection._channel;
     const { promise, resolve, reject } = Utils.getControlledPromise<void>();

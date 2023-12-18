@@ -97,6 +97,12 @@ export class BinaryCommandCreator {
     this.bytes.push(bytes);
   }
 
+  addString(name: string, string: string) {
+    this.bytes.push(name.charCodeAt(0));
+    const bytes = Serialization.serializeString(string);
+    this.bytes.push(bytes);
+  }
+
   complete() {
     if (!this.bytes.length) throw new Error("Buffer is empty");
     if (this.status === "completed") return;
@@ -154,7 +160,7 @@ export function deserializeCommand(bytes: Uint8Array): PeerCommand {
   };
 
   let offset = 1;
-  do {
+  while (offset < bytes.length) {
     const name = String.fromCharCode(bytes[offset]);
     offset++;
     const dataType = getDataTypeFromByte(bytes[offset]);
@@ -177,8 +183,17 @@ export function deserializeCommand(bytes: Uint8Array): PeerCommand {
           offset += byteLength;
         }
         break;
+      case Serialization.SerializedItem.String:
+        {
+          const { string, byteLength } = Serialization.deserializeString(
+            bytes.slice(offset)
+          );
+          deserializedCommand[name] = string;
+          offset += byteLength;
+        }
+        break;
     }
-  } while (offset < bytes.length);
+  }
   return deserializedCommand as unknown as PeerCommand;
 }
 

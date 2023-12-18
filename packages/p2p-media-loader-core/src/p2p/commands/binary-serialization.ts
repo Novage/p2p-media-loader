@@ -1,9 +1,10 @@
 import { joinChunks } from "../../utils/utils";
 
-// restricted to max 16 item types (4 bits to type definition)
+// restricted up to 16 item types (4 bits to type definition)
 export enum SerializedItem {
   Int,
   SimilarIntArray,
+  String,
 }
 
 export const serializedItemTypes = Object.values(SerializedItem);
@@ -86,12 +87,8 @@ export function serializeSimilarIntArray(numbers: bigint[]) {
     bytes.push(Number(diffByte));
   }
 
-  const arrayMetadata = [
-    SerializedItem.SimilarIntArray << 4,
-    commonPartNumbersMap.size,
-  ];
   const result = new ResizableUint8Array();
-  result.unshift(arrayMetadata);
+  result.push([SerializedItem.SimilarIntArray << 4, commonPartNumbersMap.size]);
 
   for (const [commonPart, binaryArray] of commonPartNumbersMap) {
     const { length } = binaryArray.getBytesChunks();
@@ -130,6 +127,31 @@ export function deserializeSimilarIntArray(bytes: Uint8Array) {
   }
 
   return { numbers: originalIntArr, byteLength: offset };
+}
+
+export function serializeString(string: string) {
+  const { length } = string;
+  const bytes = new ResizableUint8Array();
+  bytes.push([
+    (SerializedItem.String << 4) | ((length >> 8) & 0x0f),
+    length & 0xff,
+  ]);
+  bytes.push(new TextEncoder().encode(string));
+  return bytes.getBuffer();
+}
+
+export function deserializeString(bytes: Uint8Array) {
+  const [codeByte, lengthByte] = bytes;
+  const code = codeByte >> 4;
+  if (code !== SerializedItem.String) {
+    throw new Error(
+      "Trying to deserialize bytes (sting) with invalid serialized item code."
+    );
+  }
+  const length = ((codeByte & 0x0f) << 8) | lengthByte;
+  const stringBytes = bytes.slice(2, length + 2);
+  const string = new TextDecoder("utf8").decode(stringBytes);
+  return { string, byteLength: length + 2 };
 }
 
 export class ResizableUint8Array {
