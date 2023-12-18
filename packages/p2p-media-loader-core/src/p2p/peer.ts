@@ -42,11 +42,10 @@ export class Peer {
     this.eventHandlers = eventHandlers;
 
     connection.on("data", (data) => {
-      if (Command.isCommandBuffer(data)) {
-        // TODO: error handling
+      try {
         const command = Command.deserializeCommand(data);
         this.receiveCommand(command);
-      } else {
+      } catch (err) {
         this.receiveSegmentChunk(data);
       }
     });
@@ -112,8 +111,13 @@ export class Peer {
   }
 
   private sendCommand(command: Command.PeerCommand) {
-    const binaryCommand = Command.serializePeerCommand(command);
-    this.connection.send(binaryCommand);
+    const binaryCommandBuffers = Command.serializePeerCommand(
+      command,
+      this.settings.webRtcMaxMessageSize
+    );
+    for (const buffer of binaryCommandBuffers) {
+      this.connection.send(buffer);
+    }
   }
 
   fulfillSegmentRequest(request: Request) {
