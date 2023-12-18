@@ -1,8 +1,8 @@
 declare module "bittorrent-tracker" {
   export default class Client {
     constructor(options: {
-      infoHash: string;
-      peerId: string;
+      infoHash: Uint8Array;
+      peerId: Uint8Array;
       announce: string[];
       port: number;
       rtcConfig?: RTCConfiguration;
@@ -46,4 +46,14 @@ declare module "bittorrent-tracker" {
     write(data: string | ArrayBuffer): void;
     destroy(): void;
   };
+}
+
+declare module "nano-md5" {
+  type BinaryStringObject = string & { toHex: () => string };
+  const md5: {
+    (utf8String: string): string; // returns hex string interpretation of binary data
+    fromUtf8(utf8String: string): BinaryStringObject;
+  };
+
+  export default md5;
 }

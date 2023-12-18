@@ -18,7 +18,7 @@ export function getControlledPromise<T>() {
 export function joinChunks(
   chunks: Uint8Array[],
   totalBytes?: number
-): ArrayBuffer {
+): Uint8Array {
   if (totalBytes === undefined) {
     totalBytes = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
   }
@@ -38,4 +38,21 @@ export function getPercent(numerator: number, denominator: number): number {
 
 export function getRandomItem<T>(items: T[]): T {
   return items[Math.floor(Math.random() * items.length)];
+}
+
+export function utf8ToUintArray(utf8String: string): Uint8Array {
+  const encoder = new TextEncoder();
+  const hashBytes = new Uint8Array(utf8String.length);
+  encoder.encodeInto(utf8String, hashBytes);
+  return hashBytes;
+}
+
+export function hexToUtf8(hexString: string) {
+  const bytes = new Uint8Array(hexString.length / 2);
+
+  for (let i = 0; i < hexString.length; i += 2) {
+    bytes[i / 2] = parseInt(hexString.slice(i, i + 2), 16);
+  }
+  const decoder = new TextDecoder();
+  return decoder.decode(bytes);
 }

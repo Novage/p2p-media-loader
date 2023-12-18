@@ -1,16 +1,13 @@
 import { Peer } from "./peer";
 import { Segment, Settings, StreamWithSegments } from "../types";
 import { SegmentsMemoryStorage } from "../segments-storage";
-import * as PeerUtil from "../utils/peer";
-import * as StreamUtils from "../utils/stream";
-import * as Utils from "../utils/utils";
-import { PeerSegmentStatus } from "../enums";
 import { RequestsContainer } from "../request-container";
 import { Request } from "../request";
 import { P2PTrackerClient } from "./tracker-client";
+import * as StreamUtils from "../utils/stream";
+import * as Utils from "../utils/utils";
 
 export class P2PLoader {
-  private readonly peerId: string;
   private readonly trackerClient: P2PTrackerClient;
   private isAnnounceMicrotaskCreated = false;
 
@@ -21,13 +18,12 @@ export class P2PLoader {
     private readonly segmentStorage: SegmentsMemoryStorage,
     private readonly settings: Settings
   ) {
-    this.peerId = PeerUtil.generatePeerId();
     const streamExternalId = StreamUtils.getStreamExternalId(
       this.streamManifestUrl,
       this.stream
     );
+
     this.trackerClient = new P2PTrackerClient(
-      this.peerId,
       streamExternalId,
       this.stream,
       {
@@ -49,7 +45,7 @@ export class P2PLoader {
     for (const peer of this.trackerClient.peers()) {
       if (
         !peer.downloadingSegment &&
-        peer.getSegmentStatus(segment) === PeerSegmentStatus.Loaded
+        peer.getSegmentStatus(segment) === "loaded"
       ) {
         peersWithSegment.push(peer);
       }
@@ -59,7 +55,7 @@ export class P2PLoader {
     if (!peer) return;
 
     const request = this.requests.getOrCreateRequest(segment);
-    peer.fulfillSegmentRequest(request);
+    peer.downloadSegment(request);
   }
 
   isLoadingOrLoadedBySomeone(segment: Segment): boolean {
@@ -77,9 +73,9 @@ export class P2PLoader {
   }
 
   private getSegmentsAnnouncement() {
-    const loaded: string[] =
+    const loaded: number[] =
       this.segmentStorage.getStoredSegmentExternalIdsOfStream(this.stream);
-    const httpLoading: string[] = [];
+    const httpLoading: number[] = [];
 
     for (const request of this.requests.httpRequests()) {
       const segment = this.stream.segments.get(request.segment.localId);
@@ -87,12 +83,12 @@ export class P2PLoader {
 
       httpLoading.push(segment.externalId);
     }
-    return PeerUtil.getJsonSegmentsAnnouncement(loaded, httpLoading);
+    return { loaded, httpLoading };
   }
 
   private onPeerConnected = (peer: Peer) => {
-    const announcement = this.getSegmentsAnnouncement();
-    peer.sendSegmentsAnnouncement(announcement);
+    const { httpLoading, loaded } = this.getSegmentsAnnouncement();
+    peer.sendSegmentsAnnouncementCommand(loaded, httpLoading);
   };
 
   broadcastAnnouncement = () => {
@@ -100,9 +96,9 @@ export class P2PLoader {
 
     this.isAnnounceMicrotaskCreated = true;
     queueMicrotask(() => {
-      const announcement = this.getSegmentsAnnouncement();
+      const { httpLoading, loaded } = this.getSegmentsAnnouncement();
       for (const peer of this.trackerClient.peers()) {
-        peer.sendSegmentsAnnouncement(announcement);
+        peer.sendSegmentsAnnouncementCommand(loaded, httpLoading);
       }
       this.isAnnounceMicrotaskCreated = false;
     });
@@ -110,16 +106,23 @@ export class P2PLoader {
 
   private onSegmentRequested = async (
     peer: Peer,
-    segmentExternalId: string
+    segmentExternalId: number,
+    byteFrom?: number
   ) => {
     const segment = StreamUtils.getSegmentFromStreamByExternalId(
       this.stream,
       segmentExternalId
     );
-    const segmentData =
-      segment && (await this.segmentStorage.getSegmentData(segment));
-    if (segmentData) void peer.sendSegmentData(segmentExternalId, segmentData);
-    else peer.sendSegmentAbsent(segmentExternalId);
+    if (!segment) return;
+    const segmentData = await this.segmentStorage.getSegmentData(segment);
+    if (!segmentData) {
+      peer.sendSegmentAbsentCommand(segmentExternalId);
+      return;
+    }
+    void peer.uploadSegmentData(
+      segmentExternalId,
+      byteFrom !== undefined ? segmentData.slice(byteFrom) : segmentData
+    );
   };
 
   destroy() {

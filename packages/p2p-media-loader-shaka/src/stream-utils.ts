@@ -11,7 +11,7 @@ export function createSegment({
   localId,
 }: {
   segmentReference: shaka.media.SegmentReference;
-  externalId: string;
+  externalId: number;
   localId?: string;
 }): SegmentBase {
   const { byteRange, url, startTime, endTime } =
