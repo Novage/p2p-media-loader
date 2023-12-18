@@ -5,7 +5,6 @@ import {
   StreamWithReadonlySegments,
   SegmentBase,
   StreamType,
-  ReadonlyLinkedMap,
 } from "p2p-media-loader-core";
 
 export class SegmentManager {
@@ -73,7 +72,6 @@ export class SegmentManager {
       staleSegmentsIds.delete(segmentLocalId);
     }
 
-    if (!newSegments.length && !staleSegmentsIds.size) return;
     this.core.updateStream(managerStream.localId, newSegments, [
       ...staleSegmentsIds,
     ]);
@@ -83,66 +81,52 @@ export class SegmentManager {
     managerStream: StreamWithReadonlySegments<Stream>,
     segmentReferences: shaka.media.SegmentReference[]
   ) {
-    const { segments } = managerStream;
+    const segments = [...managerStream.segments.values()];
     const lastMediaSequence = Utils.getStreamLastMediaSequence(managerStream);
 
     const newSegments: SegmentBase[] = [];
-    if (segments.size === 0) {
+    if (segments.length === 0) {
       const firstReferenceMediaSequence =
         lastMediaSequence === undefined
           ? 0
           : lastMediaSequence - segmentReferences.length + 1;
-
-      for (const [index, reference] of segmentReferences.entries()) {
+      segmentReferences.forEach((reference, index) => {
         const segment = Utils.createSegment({
           segmentReference: reference,
           externalId: firstReferenceMediaSequence + index,
         });
         newSegments.push(segment);
-      }
+      });
       this.core.updateStream(managerStream.localId, newSegments);
       return;
     }
 
-    if (!lastMediaSequence) return;
-    let mediaSequence = lastMediaSequence;
+    let index = lastMediaSequence ?? 0;
+    const startSize = managerStream.segments.size;
 
-    for (const reference of itemsBackwards(segmentReferences)) {
+    for (let i = segmentReferences.length - 1; i >= 0; i--) {
+      const reference = segmentReferences[i];
       const localId = Utils.getSegmentLocalIdFromReference(reference);
-      if (segments.has(localId)) break;
-      const segment = Utils.createSegment({
-        localId,
-        segmentReference: reference,
-        externalId: mediaSequence,
-      });
-      newSegments.push(segment);
-      mediaSequence--;
+      if (!managerStream.segments.has(localId)) {
+        const segment = Utils.createSegment({
+          localId,
+          segmentReference: reference,
+          externalId: index,
+        });
+        newSegments.push(segment);
+        index--;
+      } else {
+        break;
+      }
     }
     newSegments.reverse();
 
+    const deleteCount = managerStream.segments.size - startSize;
     const staleSegmentIds: string[] = [];
-    const amountToDelete = newSegments.length;
-    for (const segment of nSegmentsBackwards(segments, amountToDelete)) {
+    for (let i = 0; i < deleteCount; i++) {
+      const segment = segments[i];
       staleSegmentIds.push(segment.localId);
     }
-
-    if (!newSegments.length && !staleSegmentIds.length) return;
     this.core.updateStream(managerStream.localId, newSegments, staleSegmentIds);
-  }
-}
-
-function* itemsBackwards<T>(items: T[]) {
-  for (let i = items.length - 1; i >= 0; i--) yield items[i];
-}
-
-function* nSegmentsBackwards(
-  segments: ReadonlyLinkedMap<string, SegmentBase>,
-  amount: number
-) {
-  let i = 0;
-  for (const segment of segments.valuesBackwards()) {
-    if (i >= amount) break;
-    yield segment;
-    i--;
   }
 }

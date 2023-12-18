@@ -6,10 +6,10 @@ import {
 } from "p2p-media-loader-core";
 
 export function createSegment({
-  segmentReference,
-  externalId,
-  localId,
-}: {
+                                segmentReference,
+                                externalId,
+                                localId,
+                              }: {
   segmentReference: shaka.media.SegmentReference;
   externalId: number;
   localId?: string;
@@ -80,9 +80,10 @@ export function getStreamLastMediaSequence(
 ): number | undefined {
   const { shakaStream } = stream;
   const map = shakaStream.mediaSequenceTimeMap;
-  if (!map) return;
 
-  const firstMediaSequence = map.keys().next().value as number | undefined;
-  if (firstMediaSequence === undefined) return;
-  return firstMediaSequence + map.size - 1;
+  if (map) {
+    const firstMediaSequence = map.keys().next().value as number | undefined;
+    if (firstMediaSequence === undefined) return;
+    return firstMediaSequence + map.size - 1;
+  }
 }
