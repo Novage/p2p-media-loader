@@ -97,10 +97,10 @@ export function serializeSimilarIntArray(numbers: bigint[]) {
     const { length } = binaryArray.getBytesChunks();
     const commonPartWithLength = commonPart | (BigInt(length) & 0xffn);
     binaryArray.unshift(serializeInt(commonPartWithLength));
-    result.push(binaryArray.getBytes());
+    result.push(binaryArray.getBuffer());
   }
 
-  return result.getBytes();
+  return result.getBuffer();
 }
 
 export function deserializeSimilarIntArray(bytes: Uint8Array) {

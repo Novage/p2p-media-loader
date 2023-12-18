@@ -9,53 +9,64 @@ import {
 } from "./types";
 
 function serializeSegmentAnnouncementCommand(
-  command: PeerSegmentAnnouncementCommand
+  command: PeerSegmentAnnouncementCommand,
+  maxChunkSize: number
 ) {
   const { c: commandCode, p: loadingByHttp, l: loaded } = command;
-  const creator = new BinaryCommandCreator(commandCode);
+  const creator = new BinaryCommandCreator(commandCode, maxChunkSize);
   if (loaded?.length) creator.addSimilarIntArr("l", loaded);
   if (loadingByHttp?.length) {
     creator.addSimilarIntArr("p", loadingByHttp);
   }
   creator.complete();
-  return creator.getResultBuffer();
+  return creator.getResultBuffers();
 }
 
-function serializePeerSegmentCommand(command: PeerSegmentCommand) {
-  const creator = new BinaryCommandCreator(command.c);
+function serializePeerSegmentCommand(
+  command: PeerSegmentCommand,
+  maxChunkSize: number
+) {
+  const creator = new BinaryCommandCreator(command.c, maxChunkSize);
   creator.addInteger("i", command.i);
   creator.complete();
-  return creator.getResultBuffer();
+  return creator.getResultBuffers();
 }
 
-function serializePeerSendSegmentCommand(command: PeerSendSegmentCommand) {
-  const creator = new BinaryCommandCreator(command.c);
+function serializePeerSendSegmentCommand(
+  command: PeerSendSegmentCommand,
+  maxChunkSize: number
+) {
+  const creator = new BinaryCommandCreator(command.c, maxChunkSize);
   creator.addInteger("i", command.i);
   creator.addInteger("s", command.s);
   creator.complete();
-  return creator.getResultBuffer();
+  return creator.getResultBuffers();
 }
 
 function serializePeerSegmentRequestCommand(
-  command: PeerRequestSegmentCommand
+  command: PeerRequestSegmentCommand,
+  maxChunkSize: number
 ) {
-  const creator = new BinaryCommandCreator(command.c);
+  const creator = new BinaryCommandCreator(command.c, maxChunkSize);
   creator.addInteger("i", command.i);
   if (command.b) creator.addInteger("b", command.b);
   creator.complete();
-  return creator.getResultBuffer();
+  return creator.getResultBuffers();
 }
 
-export function serializePeerCommand(command: PeerCommand) {
+export function serializePeerCommand(
+  command: PeerCommand,
+  maxChunkSize: number
+) {
   switch (command.c) {
     case PeerCommandType.CancelSegmentRequest:
     case PeerCommandType.SegmentAbsent:
-      return serializePeerSegmentCommand(command);
+      return serializePeerSegmentCommand(command, maxChunkSize);
     case PeerCommandType.SegmentRequest:
-      return serializePeerSegmentRequestCommand(command);
+      return serializePeerSegmentRequestCommand(command, maxChunkSize);
     case PeerCommandType.SegmentsAnnouncement:
-      return serializeSegmentAnnouncementCommand(command);
+      return serializeSegmentAnnouncementCommand(command, maxChunkSize);
     case PeerCommandType.SegmentData:
-      return serializePeerSendSegmentCommand(command);
+      return serializePeerSendSegmentCommand(command, maxChunkSize);
   }
 }

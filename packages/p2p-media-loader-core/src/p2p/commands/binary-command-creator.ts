@@ -1,13 +1,75 @@
 import * as Serialization from "./binary-serialization";
 import { PeerCommandType, PeerCommand } from "./types";
 
-const peerCommandTypes = Object.values(PeerCommandType);
+const FRAME_PART_LENGTH = 4;
+const commandFrameStart = stringToUtf8CodesBuffer("cstr", FRAME_PART_LENGTH);
+const commandFrameEnd = stringToUtf8CodesBuffer("cend", FRAME_PART_LENGTH);
+const commandDivFrameStart = stringToUtf8CodesBuffer("dstr", FRAME_PART_LENGTH);
+const commandDivFrameEnd = stringToUtf8CodesBuffer("dend", FRAME_PART_LENGTH);
+const startFrames = [commandFrameStart, commandDivFrameStart];
+const endFrames = [commandFrameEnd, commandDivFrameEnd];
+const commandFramesLength = commandFrameStart.length + commandFrameEnd.length;
 
-const commandFrameStart = stringToUtf8CodesBuffer("cstr");
-const commandFrameEnd = stringToUtf8CodesBuffer("cend");
-const commandDivisionFrameStart = stringToUtf8CodesBuffer("dstr");
-const commandDivisionFrameEnd = stringToUtf8CodesBuffer("dend");
-const commandFrameLength = commandFrameStart.length + commandFrameEnd.length;
+export function isCommandChunk(buffer: Uint8Array) {
+  const length = commandFrameStart.length;
+  const bufferEndingToCompare = buffer.slice(-length);
+  return (
+    startFrames.some((frame) =>
+      areBuffersEqual(buffer, frame, FRAME_PART_LENGTH)
+    ) &&
+    endFrames.some((frame) =>
+      areBuffersEqual(bufferEndingToCompare, frame, FRAME_PART_LENGTH)
+    )
+  );
+}
+
+function isFirstCommandChunk(buffer: Uint8Array) {
+  return areBuffersEqual(buffer, commandFrameStart, FRAME_PART_LENGTH);
+}
+
+function isLastCommandChunk(buffer: Uint8Array) {
+  return areBuffersEqual(
+    buffer.slice(-FRAME_PART_LENGTH),
+    commandFrameEnd,
+    FRAME_PART_LENGTH
+  );
+}
+
+export class BinaryCommandJoiningError extends Error {
+  constructor(readonly type: "incomplete-joining" | "no-first-chunk") {
+    super();
+  }
+}
+
+export class BinaryCommandChunksJoiner {
+  private readonly chunks = new Serialization.ResizableUint8Array();
+  private status: "joining" | "completed" = "joining";
+
+  constructor(
+    private readonly onComplete: (commandBuffer: Uint8Array) => void
+  ) {}
+
+  addCommandChunk(chunk: Uint8Array) {
+    if (this.status === "completed") return;
+
+    const isFirstChunk = isFirstCommandChunk(chunk);
+    if (!this.chunks.length && !isFirstChunk) {
+      throw new BinaryCommandJoiningError("no-first-chunk");
+    }
+    if (this.chunks.length && isFirstChunk) {
+      throw new BinaryCommandJoiningError("incomplete-joining");
+    }
+    this.chunks.push(this.unframeCommandChunk(chunk));
+
+    if (!isLastCommandChunk(chunk)) return;
+    this.status = "completed";
+    this.onComplete(this.chunks.getBuffer());
+  }
+
+  private unframeCommandChunk(chunk: Uint8Array) {
+    return chunk.slice(FRAME_PART_LENGTH, chunk.length - FRAME_PART_LENGTH);
+  }
+}
 
 export class BinaryCommandCreator {
   private readonly bytes = new Serialization.ResizableUint8Array();
@@ -18,7 +80,6 @@ export class BinaryCommandCreator {
     commandType: PeerCommandType,
     private readonly maxChunkLength: number
   ) {
-    this.bytes.push("{".charCodeAt(0));
     this.bytes.push(commandType);
   }
 
@@ -37,11 +98,12 @@ export class BinaryCommandCreator {
   }
 
   complete() {
+    if (!this.bytes.length) throw new Error("Buffer is empty");
     if (this.status === "completed") return;
     this.status = "completed";
 
     const unframedBuffer = this.bytes.getBuffer();
-    if (unframedBuffer.length + commandFrameLength <= this.maxChunkLength) {
+    if (unframedBuffer.length + commandFramesLength <= this.maxChunkLength) {
       this.resultBuffers.push(
         frameBuffer(unframedBuffer, commandFrameStart, commandFrameEnd)
       );
@@ -50,27 +112,27 @@ export class BinaryCommandCreator {
 
     let chunksAmount = Math.ceil(unframedBuffer.length / this.maxChunkLength);
     if (
-      Math.ceil(unframedBuffer.length / chunksAmount) + commandFrameLength >
+      Math.ceil(unframedBuffer.length / chunksAmount) + commandFramesLength >
       this.maxChunkLength
     ) {
       chunksAmount++;
     }
 
-    for (const [index, chunk] of splitBufferToEqualChunks(
+    for (const [i, chunk] of splitBufferToEqualChunks(
       unframedBuffer,
       chunksAmount
     )) {
-      if (index === 0) {
+      if (i === 0) {
         this.resultBuffers.push(
-          frameBuffer(chunk, commandFrameStart, commandDivisionFrameEnd)
+          frameBuffer(chunk, commandFrameStart, commandDivFrameEnd)
         );
-      } else if (index === chunksAmount - 1) {
+      } else if (i === chunksAmount - 1) {
         this.resultBuffers.push(
-          frameBuffer(chunk, commandDivisionFrameStart, commandFrameEnd)
+          frameBuffer(chunk, commandDivFrameStart, commandFrameEnd)
         );
       } else {
         this.resultBuffers.push(
-          frameBuffer(chunk, commandDivisionFrameStart, commandDivisionFrameEnd)
+          frameBuffer(chunk, commandDivFrameStart, commandDivFrameEnd)
         );
       }
     }
@@ -84,28 +146,14 @@ export class BinaryCommandCreator {
   }
 }
 
-export function isCommandBuffer(bytes: Uint8Array) {
-  const [start, commandCode] = bytes;
-  const end = bytes[bytes.length - 1];
-
-  return (
-    start === "{".charCodeAt(0) &&
-    end === "}".charCodeAt(0) &&
-    peerCommandTypes.includes(commandCode)
-  );
-}
-
 export function deserializeCommand(bytes: Uint8Array): PeerCommand {
-  if (!isCommandBuffer(bytes)) {
-    throw new Error("Given bytes don't represent peer command.");
-  }
-  const [, commandCode] = bytes;
+  const [commandCode] = bytes;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const deserializedCommand: { [key: string]: any } = {
     c: commandCode,
   };
 
-  let offset = 2;
+  let offset = 1;
   do {
     const name = String.fromCharCode(bytes[offset]);
     offset++;
@@ -130,8 +178,7 @@ export function deserializeCommand(bytes: Uint8Array): PeerCommand {
         }
         break;
     }
-  } while (offset < bytes.length && bytes[offset] !== "}".charCodeAt(0));
-  // TODO: type guards
+  } while (offset < bytes.length);
   return deserializedCommand as unknown as PeerCommand;
 }
 
@@ -144,8 +191,11 @@ function getDataTypeFromByte(byte: number): Serialization.SerializedItem {
   return typeCode as Serialization.SerializedItem;
 }
 
-function stringToUtf8CodesBuffer(string: string): Uint8Array {
-  const buffer = new Uint8Array(string.length);
+function stringToUtf8CodesBuffer(string: string, length?: number): Uint8Array {
+  if (length && string.length !== length) {
+    throw new Error("Wrong string length");
+  }
+  const buffer = new Uint8Array(length ?? string.length);
   for (let i = 0; i < string.length; i++) buffer[i] = string.charCodeAt(i);
   return buffer;
 }
@@ -173,4 +223,15 @@ function frameBuffer(
   result.set(frameEnd, frameStart.length + buffer.length);
 
   return result;
+}
+
+function areBuffersEqual(
+  buffer1: Uint8Array,
+  buffer2: Uint8Array,
+  length: number
+) {
+  for (let i = 0; i < length; i++) {
+    if (buffer1[i] !== buffer2[i]) return false;
+  }
+  return true;
 }

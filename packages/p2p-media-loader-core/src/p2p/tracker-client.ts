@@ -82,7 +82,7 @@ export class P2PTrackerClient {
   private onReceivePeerConnection: TrackerClientEvents["peer"] = (
     peerConnection
   ) => {
-    const itemId = Peer.getPeerIdFromHexString(peerConnection.id);
+    const itemId = Peer.getPeerIdFromConnection(peerConnection);
     let peerItem = this._peers.get(itemId);
     if (peerItem?.peer) {
       peerConnection.destroy();

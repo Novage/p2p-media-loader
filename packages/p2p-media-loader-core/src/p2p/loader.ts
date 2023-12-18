@@ -55,7 +55,7 @@ export class P2PLoader {
     if (!peer) return;
 
     const request = this.requests.getOrCreateRequest(segment);
-    peer.fulfillSegmentRequest(request);
+    peer.downloadSegment(request);
   }
 
   isLoadingOrLoadedBySomeone(segment: Segment): boolean {
@@ -87,8 +87,8 @@ export class P2PLoader {
   }
 
   private onPeerConnected = (peer: Peer) => {
-    const announcement = this.getSegmentsAnnouncement();
-    peer.sendSegmentsAnnouncement(announcement);
+    const { httpLoading, loaded } = this.getSegmentsAnnouncement();
+    peer.sendSegmentsAnnouncementCommand(loaded, httpLoading);
   };
 
   broadcastAnnouncement = () => {
@@ -96,9 +96,9 @@ export class P2PLoader {
 
     this.isAnnounceMicrotaskCreated = true;
     queueMicrotask(() => {
-      const announcement = this.getSegmentsAnnouncement();
+      const { httpLoading, loaded } = this.getSegmentsAnnouncement();
       for (const peer of this.trackerClient.peers()) {
-        peer.sendSegmentsAnnouncement(announcement);
+        peer.sendSegmentsAnnouncementCommand(loaded, httpLoading);
       }
       this.isAnnounceMicrotaskCreated = false;
     });
@@ -116,10 +116,10 @@ export class P2PLoader {
     if (!segment) return;
     const segmentData = await this.segmentStorage.getSegmentData(segment);
     if (!segmentData) {
-      peer.sendSegmentAbsent(segmentExternalId);
+      peer.sendSegmentAbsentCommand(segmentExternalId);
       return;
     }
-    void peer.sendSegmentData(
+    void peer.uploadSegmentData(
       segmentExternalId,
       byteFrom !== undefined ? segmentData.slice(byteFrom) : segmentData
     );
