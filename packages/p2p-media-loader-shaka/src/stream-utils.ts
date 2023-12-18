@@ -6,10 +6,10 @@ import {
 } from "p2p-media-loader-core";
 
 export function createSegment({
-                                segmentReference,
-                                externalId,
-                                localId,
-                              }: {
+  segmentReference,
+  externalId,
+  localId,
+}: {
   segmentReference: shaka.media.SegmentReference;
   externalId: number;
   localId?: string;
