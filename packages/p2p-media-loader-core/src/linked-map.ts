@@ -68,15 +68,6 @@ export class LinkedMap<K, V extends object> {
     }
   }
 
-  *valuesBackwards(key?: K) {
-    let value = key ? this.map.get(key) : this._last;
-    if (value === undefined) return;
-    while (value?.item !== undefined) {
-      yield value.item[1];
-      value = value.prev;
-    }
-  }
-
   *keys(): Generator<K> {
     let value = this._first;
     if (value === undefined) return;

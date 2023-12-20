@@ -126,12 +126,12 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
           ) {
             return reference;
           }
+          prevFirstItemReference = firstItemReference;
+          prevLastItemReference = lastItemReference;
 
           // Segment index have been updated
           segmentManager.updateStreamSegments(stream, references);
           this.debug(`Stream ${stream.id} is updated`);
-          prevFirstItemReference = firstItemReference;
-          prevLastItemReference = lastItemReference;
         } catch (err) {
           // This catch is intentionally left blank.
           // [...segmentIndex] throws an error when segmentIndex inner array is empty

@@ -141,12 +141,7 @@ export class Engine {
       const { p2pml } = request;
       if (!p2pml) return shaka.net.HttpFetchPlugin.parse(...args);
 
-      const loader = new Loader(
-        p2pml.shaka,
-        p2pml.core,
-        p2pml.streamInfo,
-        p2pml.segmentManager
-      );
+      const loader = new Loader(p2pml.shaka, p2pml.core, p2pml.streamInfo);
       return loader.load(...args);
     };
     NetworkingEngine.registerScheme("http", handleLoading);
