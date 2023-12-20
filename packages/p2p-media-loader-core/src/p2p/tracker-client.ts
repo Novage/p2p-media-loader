@@ -109,9 +109,7 @@ export class P2PTrackerClient {
         this.settings
       );
       this.logger(
-        `connected with peer: ${peerItem.peer.id} ${LoggerUtils.getStreamString(
-          this.stream
-        )}`
+        `connected with peer: ${peerItem.peer.id} ${this.streamShortId}`
       );
       this.eventHandlers.onPeerConnected(peerItem.peer);
     });

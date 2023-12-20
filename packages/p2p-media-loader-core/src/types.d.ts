@@ -26,7 +26,7 @@ export type Stream = {
 
 export type ReadonlyLinkedMap<K, V extends object> = Pick<
   LinkedMap<K, V>,
-  "has" | "keys" | "values" | "valuesBackwards" | "size"
+  "has" | "keys" | "values" | "size"
 >;
 
 export type StreamWithSegments<

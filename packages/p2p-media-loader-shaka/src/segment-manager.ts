@@ -8,6 +8,8 @@ import {
   ReadonlyLinkedMap,
 } from "p2p-media-loader-core";
 
+const SEGMENT_ID_SCALING_DURATION = 0.5;
+
 export class SegmentManager {
   private readonly core: Core<Stream>;
   private streamInfo: Readonly<StreamInfo>;
@@ -59,7 +61,9 @@ export class SegmentManager {
     const staleSegmentsIds = new Set(managerStream.segments.keys());
     const newSegments: SegmentBase[] = [];
     for (const reference of segmentReferences) {
-      const externalId = Math.trunc(reference.getStartTime() * 2);
+      const externalId = Math.trunc(
+        reference.getStartTime() / SEGMENT_ID_SCALING_DURATION
+      );
 
       const segmentLocalId = Utils.getSegmentLocalIdFromReference(reference);
       if (!managerStream.segments.has(segmentLocalId)) {
@@ -140,9 +144,9 @@ function* nSegmentsBackwards(
   amount: number
 ) {
   let i = 0;
-  for (const segment of segments.valuesBackwards()) {
+  for (const segment of segments.values()) {
     if (i >= amount) break;
     yield segment;
-    i--;
+    i++;
   }
 }
