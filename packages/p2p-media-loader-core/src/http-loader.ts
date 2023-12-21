@@ -5,14 +5,17 @@ export async function fulfillHttpSegmentRequest(
   request: Request,
   settings: Pick<Settings, "httpNotReceivingBytesTimeoutMs">
 ) {
-  const headers = new Headers();
-  const { segment } = request;
+  const requestHeaders = new Headers();
+  const { segment, loadedBytes: alreadyLoadedBytes } = request;
   const { url, byteRange } = segment;
 
-  if (byteRange) {
-    const { start, end } = byteRange;
-    const byteRangeString = `bytes=${start}-${end}`;
-    headers.set("Range", byteRangeString);
+  let byteFrom = byteRange?.start;
+  const byteTo = byteRange?.end;
+  if (alreadyLoadedBytes !== 0) byteFrom = (byteFrom ?? 0) + alreadyLoadedBytes;
+
+  if (byteFrom !== undefined) {
+    const byteRangeString = `bytes=${byteFrom}-${byteTo ?? ""}`;
+    requestHeaders.set("Range", byteRangeString);
   }
 
   const abortController = new AbortController();
@@ -25,18 +28,27 @@ export async function fulfillHttpSegmentRequest(
   );
   try {
     const fetchResponse = await window.fetch(url, {
-      headers,
+      headers: requestHeaders,
       signal: abortController.signal,
     });
-    requestControls.firstBytesReceived();
-
     if (!fetchResponse.ok) {
       throw new RequestError("fetch-error", fetchResponse.statusText);
     }
-
     if (!fetchResponse.body) return;
-    const totalBytesString = fetchResponse.headers.get("Content-Length");
-    if (totalBytesString) request.setTotalBytes(+totalBytesString);
+    requestControls.firstBytesReceived();
+
+    if (
+      byteFrom !== undefined &&
+      (fetchResponse.status !== 206 ||
+        !isResponseWithRequestedContentRange(fetchResponse, byteFrom, byteTo))
+    ) {
+      request.clearLoadedBytes();
+    }
+
+    if (request.totalBytes === undefined) {
+      const totalBytesString = fetchResponse.headers.get("Content-Length");
+      if (totalBytesString) request.setTotalBytes(+totalBytesString);
+    }
 
     const reader = fetchResponse.body.getReader();
     for await (const chunk of readStream(reader)) {
@@ -65,4 +77,56 @@ async function* readStream(
     if (done) break;
     yield value;
   }
+}
+
+function getValueFromContentRangeHeader(headerValue: string) {
+  const match = headerValue
+    .trim()
+    .match(/^bytes (?:(?:(\d+)|)-(?:(\d+)|)|\*)\/(?:(\d+)|\*)$/);
+  if (!match) return;
+
+  const [, from, to, total] = match;
+  return {
+    from: from ? parseInt(from) : undefined,
+    to: to ? parseInt(to) : undefined,
+    total: total ? parseInt(total) : undefined,
+  };
+}
+
+function isResponseWithRequestedContentRange(
+  response: Response,
+  requestedFromByte: number,
+  requestedToByte?: number
+): boolean {
+  const requestedBytesAmount =
+    requestedToByte !== undefined
+      ? requestedToByte - requestedFromByte + 1
+      : undefined;
+
+  const { headers } = response;
+  const contentLengthHeader = headers.get("Content-Length");
+  const contentLength = contentLengthHeader && parseInt(contentLengthHeader);
+
+  if (
+    contentLength &&
+    requestedBytesAmount !== undefined &&
+    requestedBytesAmount !== contentLength
+  ) {
+    return false;
+  }
+
+  const contentRangeHeader = headers.get("Content-Range");
+  const contentRange =
+    contentRangeHeader && getValueFromContentRangeHeader(contentRangeHeader);
+  if (!contentRange) return true;
+  const { from, to } = contentRange;
+  if (from !== requestedFromByte) return false;
+  if (
+    to !== undefined &&
+    requestedToByte !== undefined &&
+    to !== requestedToByte
+  ) {
+    return false;
+  }
+  return true;
 }

@@ -1,7 +1,6 @@
 import { PeerConnection } from "bittorrent-tracker";
 import * as Command from "./commands";
 import * as Utils from "../utils/utils";
-import debug from "debug";
 import { Settings } from "../types";
 
 export type PeerSettings = Pick<
@@ -9,38 +8,44 @@ export type PeerSettings = Pick<
   "p2pNotReceivingBytesTimeoutMs" | "webRtcMaxMessageSize"
 >;
 
-export abstract class PeerBase {
-  readonly id: string;
-  private isUploadingSegment = false;
+export class PeerInterface {
   private commandChunks?: Command.BinaryCommandChunksJoiner;
-  protected readonly logger = debug("core:peer");
+  private uploadingContext?: { stopUploading: () => void };
 
-  protected constructor(
+  constructor(
     private readonly connection: PeerConnection,
-    protected readonly settings: PeerSettings
+    private readonly settings: PeerSettings,
+    private readonly eventHandlers: {
+      onCommandReceived: (command: Command.PeerCommand) => void;
+      onSegmentChunkReceived: (data: Uint8Array) => void;
+      onDestroy: () => void;
+    }
   ) {
-    this.id = PeerBase.getPeerIdFromConnection(connection);
     connection.on("data", this.onDataReceived);
     connection.on("close", this.onPeerClosed);
     connection.on("error", this.onConnectionError);
   }
 
   private onDataReceived = (data: Uint8Array) => {
-    if (Command.isCommandChunk(data)) this.receivingCommandBytes(data);
-    else this.receiveSegmentChunk(data);
+    if (Command.isCommandChunk(data)) {
+      this.receivingCommandBytes(data);
+    } else {
+      this.eventHandlers.onSegmentChunkReceived(data);
+    }
   };
 
   private onPeerClosed = () => {
-    this.logger(`connection with peer closed: ${this.id}`);
     this.destroy();
   };
 
   private onConnectionError = (error: { code: string }) => {
-    this.logger(`peer error: ${this.id} ${error.code}`);
-    this.destroy();
+    if (error.code === "ERR_DATA_CHANNEL") {
+      this.destroy();
+      this.eventHandlers.onDestroy();
+    }
   };
 
-  protected sendCommand(command: Command.PeerCommand) {
+  sendCommand(command: Command.PeerCommand) {
     const binaryCommandBuffers = Command.serializePeerCommand(
       command,
       this.settings.webRtcMaxMessageSize
@@ -50,10 +55,25 @@ export abstract class PeerBase {
     }
   }
 
-  protected async splitDataToChunksAndUploadAsync(data: Uint8Array) {
+  stopUploadingSegmentData() {
+    this.uploadingContext?.stopUploading();
+    this.uploadingContext = undefined;
+  }
+
+  async splitSegmentDataToChunksAndUploadAsync(data: Uint8Array) {
+    if (this.uploadingContext) {
+      throw new Error(`Some segment data is already uploading.`);
+    }
     const chunks = getBufferChunks(data, this.settings.webRtcMaxMessageSize);
     const channel = this.connection._channel;
     const { promise, resolve, reject } = Utils.getControlledPromise<void>();
+
+    let isUploadingSegmentData = false;
+    this.uploadingContext = {
+      stopUploading: () => {
+        isUploadingSegmentData = false;
+      },
+    };
 
     const sendChunk = () => {
       while (channel.bufferedAmount <= channel.bufferedAmountLowThreshold) {
@@ -62,7 +82,7 @@ export abstract class PeerBase {
           resolve();
           break;
         }
-        if (chunk && !this.isUploadingSegment) {
+        if (chunk && !isUploadingSegmentData) {
           reject();
           break;
         }
@@ -71,17 +91,14 @@ export abstract class PeerBase {
     };
     try {
       channel.addEventListener("bufferedamountlow", sendChunk);
-      this.isUploadingSegment = true;
+      isUploadingSegmentData = true;
       sendChunk();
       await promise;
       return promise;
     } finally {
-      this.isUploadingSegment = false;
+      channel.removeEventListener("bufferedamountlow", sendChunk);
+      this.uploadingContext = undefined;
     }
-  }
-
-  protected cancelDataUploading() {
-    this.isUploadingSegment = false;
   }
 
   private receivingCommandBytes(buffer: Uint8Array) {
@@ -90,7 +107,7 @@ export abstract class PeerBase {
         (commandBuffer) => {
           this.commandChunks = undefined;
           const command = Command.deserializeCommand(commandBuffer);
-          this.receiveCommand(command);
+          this.eventHandlers.onCommandReceived(command);
         }
       );
     }
@@ -102,23 +119,16 @@ export abstract class PeerBase {
     }
   }
 
-  protected abstract receiveCommand(command: Command.PeerCommand): void;
-
-  protected abstract receiveSegmentChunk(data: Uint8Array): void;
-
-  protected destroy() {
+  destroy() {
     this.connection.destroy();
-  }
-
-  static getPeerIdFromConnection(connection: PeerConnection) {
-    return Utils.hexToUtf8(connection.id);
+    this.eventHandlers.onDestroy();
   }
 }
 
 function* getBufferChunks(
   data: ArrayBuffer,
   maxChunkSize: number
-): Generator<ArrayBuffer> {
+): Generator<ArrayBuffer, void> {
   let bytesLeft = data.byteLength;
   while (bytesLeft > 0) {
     const bytesToSend = bytesLeft >= maxChunkSize ? maxChunkSize : bytesLeft;

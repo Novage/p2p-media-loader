@@ -71,11 +71,22 @@ export class Request {
     private readonly playback: Playback,
     private readonly settings: StreamUtils.PlaybackTimeWindowsSettings
   ) {
-    this.id = Request.getRequestItemId(segment);
+    this.id = Request.getRequestItemId(this.segment);
+    const { byteRange } = this.segment;
+    if (byteRange) {
+      const { end, start } = byteRange;
+      this._totalBytes = end - start + 1;
+    }
     this.notReceivingBytesTimeout = new Timeout(this.abortOnTimeout);
 
     const { type } = this.segment.stream;
     this._logger = debug(`core:request-${type}`);
+  }
+
+  clearLoadedBytes() {
+    this._loadedBytes = 0;
+    this.bytes = [];
+    this._totalBytes = undefined;
   }
 
   get status() {
@@ -136,10 +147,14 @@ export class Request {
     }
   ): RequestControls {
     if (this._status === "succeed") {
-      throw new Error("Request has been already succeed.");
+      throw new Error(
+        `Request ${this.segment.externalId} has been already succeed.`
+      );
     }
     if (this._status === "loading") {
-      throw new Error("Request has been already started.");
+      throw new Error(
+        `Request ${this.segment.externalId} has been already started.`
+      );
     }
 
     this._status = "loading";

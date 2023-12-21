@@ -1,5 +1,5 @@
 import { PeerConnection } from "bittorrent-tracker";
-import { PeerBase, PeerSettings } from "./peer-base";
+import { PeerInterface, PeerSettings } from "./peer-base";
 import {
   Request,
   RequestControls,
@@ -8,6 +8,8 @@ import {
 } from "../request";
 import * as Command from "./commands";
 import { Segment } from "../types";
+import * as Utils from "../utils/utils";
+import debug from "debug";
 
 const { PeerCommandType } = Command;
 type PeerEventHandlers = {
@@ -19,21 +21,33 @@ type PeerEventHandlers = {
   ) => void;
 };
 
-export class Peer extends PeerBase {
-  private requestContext?: { request: Request; controls: RequestControls };
+export class Peer {
+  private readonly id: string;
+  private readonly peerInterface;
+  private downloadingContext?: {
+    request: Request;
+    controls: RequestControls;
+    isSegmentDataCommandReceived: boolean;
+  };
   private loadedSegments = new Set<number>();
   private httpLoadingSegments = new Set<number>();
+  private logger = debug("core:peer");
 
   constructor(
     connection: PeerConnection,
     private readonly eventHandlers: PeerEventHandlers,
-    settings: PeerSettings
+    private readonly settings: PeerSettings
   ) {
-    super(connection, settings);
+    this.id = Peer.getPeerIdFromConnection(connection);
+    this.peerInterface = new PeerInterface(connection, settings, {
+      onSegmentChunkReceived: this.onSegmentChunkReceived,
+      onCommandReceived: this.onCommandReceived,
+      onDestroy: this.destroy,
+    });
   }
 
   get downloadingSegment(): Segment | undefined {
-    return this.requestContext?.request.segment;
+    return this.downloadingContext?.request.segment;
   }
 
   getSegmentStatus(segment: Segment): "loaded" | "http-loading" | undefined {
@@ -42,7 +56,7 @@ export class Peer extends PeerBase {
     if (this.httpLoadingSegments.has(externalId)) return "http-loading";
   }
 
-  protected receiveCommand(command: Command.PeerCommand) {
+  private onCommandReceived = (command: Command.PeerCommand) => {
     switch (command.c) {
       case PeerCommandType.SegmentsAnnouncement:
         this.loadedSegments = new Set(command.l);
@@ -50,15 +64,18 @@ export class Peer extends PeerBase {
         break;
 
       case PeerCommandType.SegmentRequest:
+        this.peerInterface.stopUploadingSegmentData();
         this.eventHandlers.onSegmentRequested(this, command.i, command.b);
         break;
 
       case PeerCommandType.SegmentData:
         {
-          const request = this.requestContext?.request;
-          this.requestContext?.controls.firstBytesReceived();
+          if (!this.downloadingContext) break;
+          this.downloadingContext.isSegmentDataCommandReceived = true;
+          const { request, controls } = this.downloadingContext;
+          controls.firstBytesReceived();
           if (
-            request?.segment.externalId === command.i &&
+            request.segment.externalId === command.i &&
             request.totalBytes === undefined
           ) {
             request.setTotalBytes(command.s);
@@ -67,40 +84,39 @@ export class Peer extends PeerBase {
         break;
 
       case PeerCommandType.SegmentAbsent:
-        if (this.requestContext?.request.segment.externalId === command.i) {
+        if (this.downloadingContext?.request.segment.externalId === command.i) {
           this.cancelSegmentDownloading("peer-segment-absent");
           this.loadedSegments.delete(command.i);
         }
         break;
 
       case PeerCommandType.CancelSegmentRequest:
-        this.cancelDataUploading();
+        this.peerInterface.stopUploadingSegmentData();
         break;
     }
-  }
+  };
 
-  protected receiveSegmentChunk(chunk: Uint8Array): void {
-    if (!this.requestContext) return;
-    const { request, controls } = this.requestContext;
+  protected onSegmentChunkReceived = (chunk: Uint8Array) => {
+    if (!this.downloadingContext?.isSegmentDataCommandReceived) return;
+    const { request, controls } = this.downloadingContext;
     controls.addLoadedChunk(chunk);
 
+    if (request.totalBytes === undefined) return;
     if (request.loadedBytes === request.totalBytes) {
       controls.completeOnSuccess();
-      this.requestContext = undefined;
-    } else if (
-      request.totalBytes !== undefined &&
-      request.loadedBytes > request.totalBytes
-    ) {
+      this.downloadingContext = undefined;
+    } else if (request.loadedBytes > request.totalBytes) {
       this.cancelSegmentDownloading("peer-response-bytes-mismatch");
     }
-  }
+  };
 
   downloadSegment(segmentRequest: Request) {
-    if (this.requestContext) {
-      throw new Error("Segment already is downloading");
+    if (this.downloadingContext) {
+      throw new Error("Some segment already is downloading");
     }
-    this.requestContext = {
+    this.downloadingContext = {
       request: segmentRequest,
+      isSegmentDataCommandReceived: false,
       controls: segmentRequest.start(
         { type: "p2p", peerId: this.id },
         {
@@ -115,14 +131,14 @@ export class Peer extends PeerBase {
       i: segmentRequest.segment.externalId,
     };
     if (segmentRequest.loadedBytes) command.b = segmentRequest.loadedBytes;
-    this.sendCommand(command);
+    this.peerInterface.sendCommand(command);
   }
 
   private abortSegmentDownloading = () => {
-    if (!this.requestContext) return;
-    const { request } = this.requestContext;
+    if (!this.downloadingContext) return;
+    const { request } = this.downloadingContext;
     this.sendCancelSegmentRequestCommand(request.segment);
-    this.requestContext = undefined;
+    this.downloadingContext = undefined;
   };
 
   async uploadSegmentData(segmentExternalId: number, data: ArrayBuffer) {
@@ -132,9 +148,11 @@ export class Peer extends PeerBase {
       i: segmentExternalId,
       s: data.byteLength,
     };
-    this.sendCommand(command);
+    this.peerInterface.sendCommand(command);
     try {
-      await this.splitDataToChunksAndUploadAsync(data as Uint8Array);
+      await this.peerInterface.splitSegmentDataToChunksAndUploadAsync(
+        data as Uint8Array
+      );
       this.logger(`segment ${segmentExternalId} has been sent to ${this.id}`);
     } catch (err) {
       this.logger(`cancel segment uploading ${segmentExternalId}`);
@@ -142,16 +160,16 @@ export class Peer extends PeerBase {
   }
 
   private cancelSegmentDownloading(type: PeerRequestErrorType) {
-    if (!this.requestContext) return;
-    const { request, controls } = this.requestContext;
-    const { segment } = request;
-    this.logger(`cancel segment request ${segment.externalId} (${type})`);
-    const error = new RequestError(type);
+    if (!this.downloadingContext) return;
+    const { request, controls } = this.downloadingContext;
     if (type === "peer-response-bytes-mismatch") {
       this.sendCancelSegmentRequestCommand(request.segment);
     }
+    const { segment } = request;
+    this.logger(`cancel segment request ${segment.externalId} (${type})`);
+    const error = new RequestError(type);
     controls.abortOnError(error);
-    this.requestContext = undefined;
+    this.downloadingContext = undefined;
   }
 
   sendSegmentsAnnouncementCommand(
@@ -163,26 +181,30 @@ export class Peer extends PeerBase {
       p: httpLoadingSegmentsIds,
       l: loadedSegmentsIds,
     };
-    this.sendCommand(command);
+    this.peerInterface.sendCommand(command);
   }
 
   sendSegmentAbsentCommand(segmentExternalId: number) {
-    this.sendCommand({
+    this.peerInterface.sendCommand({
       c: PeerCommandType.SegmentAbsent,
       i: segmentExternalId,
     });
   }
 
   private sendCancelSegmentRequestCommand(segment: Segment) {
-    this.sendCommand({
+    this.peerInterface.sendCommand({
       c: PeerCommandType.CancelSegmentRequest,
       i: segment.externalId,
     });
   }
 
-  destroy() {
-    super.destroy();
+  destroy = () => {
+    this.peerInterface.destroy();
     this.cancelSegmentDownloading("peer-closed");
     this.eventHandlers.onPeerClosed(this);
+  };
+
+  static getPeerIdFromConnection(connection: PeerConnection) {
+    return Utils.hexToUtf8(connection.id);
   }
 }
