@@ -1,5 +1,5 @@
 import { PeerConnection } from "bittorrent-tracker";
-import { PeerInterface, PeerSettings } from "./peer-base";
+import { PeerInterface, PeerSettings } from "./peer-interface";
 import {
   Request,
   RequestControls,
