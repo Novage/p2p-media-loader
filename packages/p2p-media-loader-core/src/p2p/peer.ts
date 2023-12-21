@@ -22,7 +22,7 @@ type PeerEventHandlers = {
 };
 
 export class Peer {
-  private readonly id: string;
+  readonly id: string;
   private readonly peerInterface;
   private downloadingContext?: {
     request: Request;
@@ -201,6 +201,7 @@ export class Peer {
   destroy = () => {
     this.peerInterface.destroy();
     this.cancelSegmentDownloading("peer-closed");
+    this.logger(`peer closed ${this.id}`);
     this.eventHandlers.onPeerClosed(this);
   };
 
