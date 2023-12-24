@@ -10,6 +10,8 @@ import { PlaylistLoaderBase } from "./playlist-loader";
 import { SegmentManager } from "./segment-mananger";
 import { Core, CoreEventHandlers } from "p2p-media-loader-core";
 
+const LIVE_EDGE_DELAY = 25;
+
 export class Engine {
   private readonly core: Core;
   private readonly segmentManager: SegmentManager;
@@ -23,12 +25,12 @@ export class Engine {
 
   public getConfig(): Pick<
     HlsConfig,
-    "fLoader" | "pLoader" | "liveSyncDurationCount"
+    "fLoader" | "pLoader" | "liveSyncDuration"
   > {
     return {
-      liveSyncDurationCount: 7,
       fLoader: this.createFragmentLoaderClass(),
       pLoader: this.createPlaylistLoaderClass(),
+      liveSyncDuration: LIVE_EDGE_DELAY,
     };
   }
 

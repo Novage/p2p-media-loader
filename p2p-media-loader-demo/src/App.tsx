@@ -139,10 +139,7 @@ function App() {
         type: "customHls",
         customType: {
           customHls: (video: HTMLVideoElement) => {
-            const hls = new Hls({
-              ...engine.getConfig(),
-              liveSyncDurationCount: 7,
-            });
+            const hls = new Hls(engine.getConfig());
             engine.setHls(hls);
             hls.loadSource(video.src);
             hls.attachMedia(video);

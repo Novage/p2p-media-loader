@@ -15,6 +15,8 @@ import {
 import { Loader } from "./loading-handler";
 import { Core, CoreEventHandlers } from "p2p-media-loader-core";
 
+const LIVE_EDGE_DELAY = 25;
+
 export class Engine {
   private player?: shaka.Player;
   private readonly shaka: Shaka;
@@ -68,6 +70,14 @@ export class Engine {
     player[method]("loaded", this.handlePlayerLoaded);
     player[method]("loading", this.destroyCurrentStreamContext);
     player[method]("unloading", this.handlePlayerUnloading);
+    player[method]("manifestparsed", this.handleManifestParsed);
+  };
+
+  private handleManifestParsed = () => {
+    const manifest = this.player?.getManifest();
+    if (!manifest) return;
+    const { presentationTimeline } = manifest;
+    presentationTimeline.setDelay(LIVE_EDGE_DELAY);
   };
 
   private handlePlayerLoaded = () => {
