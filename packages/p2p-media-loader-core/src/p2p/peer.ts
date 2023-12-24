@@ -5,6 +5,7 @@ import {
   RequestControls,
   RequestError,
   PeerRequestErrorType,
+  RequestInnerErrorType,
 } from "../request";
 import * as Command from "./commands";
 import { Segment } from "../types";
@@ -31,6 +32,9 @@ export class Peer {
   };
   private loadedSegments = new Set<number>();
   private httpLoadingSegments = new Set<number>();
+  private downloadingErrors: RequestError<
+    PeerRequestErrorType | RequestInnerErrorType
+  >[] = [];
   private logger = debug("core:peer");
 
   constructor(
@@ -106,6 +110,7 @@ export class Peer {
       controls.completeOnSuccess();
       this.downloadingContext = undefined;
     } else if (request.loadedBytes > request.totalBytes) {
+      request.clearLoadedBytes();
       this.cancelSegmentDownloading("peer-response-bytes-mismatch");
     }
   };
@@ -120,9 +125,23 @@ export class Peer {
       controls: segmentRequest.start(
         { type: "p2p", peerId: this.id },
         {
-          abort: this.abortSegmentDownloading,
           notReceivingBytesTimeoutMs:
             this.settings.p2pNotReceivingBytesTimeoutMs,
+          abort: (error) => {
+            if (!this.downloadingContext) return;
+            const { request } = this.downloadingContext;
+            this.sendCancelSegmentRequestCommand(request.segment);
+            this.downloadingContext = undefined;
+            this.downloadingErrors.push(error);
+
+            const timeoutErrors = this.downloadingErrors.filter(
+              (error) => error.type === "bytes-receiving-timeout"
+            );
+            const { maxPeerNotReceivingBytesTimeoutErrors } = this.settings;
+            if (timeoutErrors.length >= maxPeerNotReceivingBytesTimeoutErrors) {
+              this.peerInterface.destroy();
+            }
+          },
         }
       ),
     };
@@ -133,13 +152,6 @@ export class Peer {
     if (segmentRequest.loadedBytes) command.b = segmentRequest.loadedBytes;
     this.peerInterface.sendCommand(command);
   }
-
-  private abortSegmentDownloading = () => {
-    if (!this.downloadingContext) return;
-    const { request } = this.downloadingContext;
-    this.sendCancelSegmentRequestCommand(request.segment);
-    this.downloadingContext = undefined;
-  };
 
   async uploadSegmentData(segmentExternalId: number, data: ArrayBuffer) {
     this.logger(`send segment ${segmentExternalId} to ${this.id}`);
@@ -170,6 +182,7 @@ export class Peer {
     const error = new RequestError(type);
     controls.abortOnError(error);
     this.downloadingContext = undefined;
+    this.downloadingErrors.push(error);
   }
 
   sendSegmentsAnnouncementCommand(
@@ -199,10 +212,9 @@ export class Peer {
   }
 
   destroy = () => {
-    this.peerInterface.destroy();
     this.cancelSegmentDownloading("peer-closed");
-    this.logger(`peer closed ${this.id}`);
     this.eventHandlers.onPeerClosed(this);
+    this.logger(`peer closed ${this.id}`);
   };
 
   static getPeerIdFromConnection(connection: PeerConnection) {

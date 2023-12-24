@@ -97,9 +97,8 @@ export class HybridLoader {
       }
     } else {
       const request = this.requests.getOrCreateRequest(segment);
-      request.setOrResolveEngineCallbacks(callbacks);
+      request.setEngineCallbacks(callbacks);
     }
-
     this.requestProcessQueueMicrotask();
   }
 
@@ -125,6 +124,73 @@ export class HybridLoader {
     });
   };
 
+  private processRequests(queueSegmentIds: Set<string>) {
+    const { stream } = this.lastRequestedSegment;
+    const { maxHttpFailedDownloadAttempts } = this.settings;
+    for (const request of this.requests.items()) {
+      const {
+        type,
+        status,
+        segment,
+        isCheckedByProcessQueue,
+        isSegmentRequestedByEngine,
+      } = request;
+
+      if (!type) continue;
+
+      switch (status) {
+        case "loading":
+          if (
+            !isSegmentRequestedByEngine &&
+            !queueSegmentIds.has(segment.localId)
+          ) {
+            request.abortFromProcessQueue();
+            this.requests.remove(request);
+          }
+          break;
+
+        case "succeed":
+          if (!request.data) break;
+          if (type === "http") {
+            this.p2pLoaders.currentLoader.broadcastAnnouncement();
+          }
+          request.resolveEngineCallbacksSuccessfully();
+          void this.segmentStorage.storeSegment(request.segment, request.data);
+          this.eventHandlers?.onSegmentLoaded?.(request.data.byteLength, type);
+          this.requests.remove(request);
+          break;
+
+        case "failed":
+          if (type === "http" && !isCheckedByProcessQueue) {
+            this.p2pLoaders.currentLoader.broadcastAnnouncement();
+          }
+          if (
+            !isSegmentRequestedByEngine &&
+            !stream.segments.has(request.segment.localId)
+          ) {
+            this.requests.remove(request);
+          }
+          if (
+            request.failedAttempts.httpAttemptsCount >=
+              maxHttpFailedDownloadAttempts &&
+            isSegmentRequestedByEngine
+          ) {
+            request.resolveEngineCallbacksWithError();
+          }
+          break;
+
+        case "not-started":
+          this.requests.remove(request);
+          break;
+
+        case "aborted":
+          this.requests.remove(request);
+          break;
+      }
+      request.markCheckedByProcessQueue();
+    }
+  }
+
   private processQueue() {
     const { queue, queueSegmentIds } = QueueUtils.generateQueue({
       lastRequestedSegment: this.lastRequestedSegment,
@@ -137,48 +203,13 @@ export class HybridLoader {
         );
       },
     });
+    this.processRequests(queueSegmentIds);
 
-    for (const request of this.requests.items()) {
-      if (request.status === "loading") {
-        if (
-          !request.isSegmentRequestedByEngine &&
-          !queueSegmentIds.has(request.segment.localId)
-        ) {
-          request.abortFromProcessQueue();
-          this.requests.remove(request);
-        }
-        continue;
-      }
-
-      if (request.status === "succeed") {
-        const { type, data } = request;
-        if (!type || !data) continue;
-        if (type === "http") {
-          this.p2pLoaders.currentLoader.broadcastAnnouncement();
-        }
-        void this.segmentStorage.storeSegment(request.segment, data);
-        this.eventHandlers?.onSegmentLoaded?.(data.byteLength, type);
-        this.requests.remove(request);
-        continue;
-      }
-
-      if (request.status === "failed") {
-        if (request.type === "http") {
-          this.p2pLoaders.currentLoader.broadcastAnnouncement();
-        }
-        continue;
-      }
-
-      if (
-        (request.status === "not-started" || request.status === "aborted") &&
-        !request.isSegmentRequestedByEngine
-      ) {
-        this.requests.remove(request);
-      }
-    }
-
-    const { simultaneousHttpDownloads, simultaneousP2PDownloads } =
-      this.settings;
+    const {
+      simultaneousHttpDownloads,
+      simultaneousP2PDownloads,
+      maxHttpFailedDownloadAttempts,
+    } = this.settings;
 
     for (const item of queue) {
       const { statuses, segment } = item;
@@ -186,6 +217,14 @@ export class HybridLoader {
 
       if (statuses.isHighDemand) {
         if (request?.type === "http" && request.status === "loading") continue;
+        if (
+          request?.type === "http" &&
+          request.status === "failed" &&
+          request.failedAttempts.httpAttemptsCount >=
+            maxHttpFailedDownloadAttempts
+        ) {
+          break;
+        }
 
         if (this.requests.executingHttpCount < simultaneousHttpDownloads) {
           void this.loadThroughHttp(segment);

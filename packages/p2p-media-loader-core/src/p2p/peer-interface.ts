@@ -5,7 +5,9 @@ import { Settings } from "../types";
 
 export type PeerSettings = Pick<
   Settings,
-  "p2pNotReceivingBytesTimeoutMs" | "webRtcMaxMessageSize"
+  | "p2pNotReceivingBytesTimeoutMs"
+  | "webRtcMaxMessageSize"
+  | "maxPeerNotReceivingBytesTimeoutErrors"
 >;
 
 export class PeerInterface {
@@ -36,6 +38,7 @@ export class PeerInterface {
 
   private onPeerClosed = () => {
     this.destroy();
+    this.eventHandlers.onDestroy();
   };
 
   private onConnectionError = (error: { code: string }) => {
@@ -121,7 +124,6 @@ export class PeerInterface {
 
   destroy() {
     this.connection.destroy();
-    this.eventHandlers.onDestroy();
   }
 }
 

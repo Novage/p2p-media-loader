@@ -59,6 +59,8 @@ export type Settings = {
   p2pNotReceivingBytesTimeoutMs: number;
   p2pLoaderDestroyTimeoutMs: number;
   httpNotReceivingBytesTimeoutMs: number;
+  maxHttpFailedDownloadAttempts: number;
+  maxPeerNotReceivingBytesTimeoutErrors: number;
 };
 
 export type CoreEventHandlers = {

@@ -53,7 +53,7 @@ export class Request {
   readonly id: string;
   private _engineCallbacks?: EngineCallbacks;
   private currentAttempt?: RequestAttempt;
-  private _failedAttempts: RequestAttempt[] = [];
+  private _failedAttempts = new FailedRequestAttempts();
   private finalData?: ArrayBuffer;
   private bytes: Uint8Array[] = [];
   private _loadedBytes = 0;
@@ -61,8 +61,11 @@ export class Request {
   private _status: RequestStatus = "not-started";
   private progress?: LoadProgress;
   private notReceivingBytesTimeout: Timeout;
-  private _abortRequestCallback?: (errorType: RequestInnerErrorType) => void;
+  private _abortRequestCallback?: (
+    error: RequestError<RequestInnerErrorType>
+  ) => void;
   private readonly _logger: debug.Debugger;
+  private _isCheckedByProcessQueue = false;
 
   constructor(
     readonly segment: Segment,
@@ -93,6 +96,11 @@ export class Request {
     return this._status;
   }
 
+  private setStatus(status: RequestStatus) {
+    this._status = status;
+    this._isCheckedByProcessQueue = false;
+  }
+
   get isSegmentRequestedByEngine(): boolean {
     return !!this._engineCallbacks;
   }
@@ -115,21 +123,24 @@ export class Request {
     return this.finalData;
   }
 
-  get loadedPercent() {
-    if (!this._totalBytes) return;
-    return Utils.getPercent(this.loadedBytes, this._totalBytes);
-  }
-
-  get failedAttempts(): ReadonlyArray<Readonly<RequestAttempt>> {
+  get failedAttempts() {
     return this._failedAttempts;
   }
 
-  setOrResolveEngineCallbacks(callbacks: EngineCallbacks) {
+  get isCheckedByProcessQueue() {
+    return this._isCheckedByProcessQueue;
+  }
+
+  markCheckedByProcessQueue() {
+    this._isCheckedByProcessQueue = true;
+  }
+
+  setEngineCallbacks(callbacks: EngineCallbacks) {
     if (this._engineCallbacks) {
       throw new Error("Segment is already requested by engine");
     }
+    this._isCheckedByProcessQueue = false;
     this._engineCallbacks = callbacks;
-    if (this.finalData) this.resolveEngineCallbacksSuccessfully(this.finalData);
   }
 
   setTotalBytes(value: number) {
@@ -143,7 +154,7 @@ export class Request {
     requestData: StartRequestParameters,
     controls: {
       notReceivingBytesTimeoutMs?: number;
-      abort: (errorType: RequestInnerErrorType) => void;
+      abort: (errorType: RequestError<RequestInnerErrorType>) => void;
     }
   ): RequestControls {
     if (this._status === "succeed") {
@@ -157,7 +168,7 @@ export class Request {
       );
     }
 
-    this._status = "loading";
+    this.setStatus("loading");
     this.currentAttempt = { ...requestData };
     this.progress = {
       startFromByte: this._loadedBytes,
@@ -190,15 +201,22 @@ export class Request {
     };
   }
 
-  private resolveEngineCallbacksSuccessfully(data: ArrayBuffer) {
+  resolveEngineCallbacksSuccessfully() {
+    if (!this.finalData) return;
     this._engineCallbacks?.onSuccess({
-      data,
+      data: this.finalData,
       bandwidth: this.bandwidthApproximator.getBandwidth(),
     });
     this._engineCallbacks = undefined;
   }
 
+  resolveEngineCallbacksWithError() {
+    this._engineCallbacks?.onError(new CoreRequestError("failed"));
+    this._engineCallbacks = undefined;
+  }
+
   abortFromEngine() {
+    if (this._status !== "loading") return;
     this._engineCallbacks?.onError(new CoreRequestError("aborted"));
     this._engineCallbacks = undefined;
     this.requestProcessQueueCallback();
@@ -206,8 +224,8 @@ export class Request {
 
   abortFromProcessQueue() {
     this.throwErrorIfNotLoadingStatus();
-    this._status = "aborted";
-    this._abortRequestCallback?.("abort");
+    this.setStatus("aborted");
+    this._abortRequestCallback?.(new RequestError("abort"));
     this._abortRequestCallback = undefined;
     this.currentAttempt = undefined;
     this.notReceivingBytesTimeout.clear();
@@ -217,12 +235,12 @@ export class Request {
     this.throwErrorIfNotLoadingStatus();
     if (!this.currentAttempt) return;
 
-    this._status = "failed";
+    this.setStatus("failed");
     const error = new RequestError("bytes-receiving-timeout");
-    this._abortRequestCallback?.(error.type);
+    this._abortRequestCallback?.(error);
 
     this.currentAttempt.error = error;
-    this._failedAttempts.push(this.currentAttempt);
+    this._failedAttempts.add(this.currentAttempt);
     this.notReceivingBytesTimeout.clear();
     this.requestProcessQueueCallback();
   };
@@ -231,9 +249,9 @@ export class Request {
     this.throwErrorIfNotLoadingStatus();
     if (!this.currentAttempt) return;
 
-    this._status = "failed";
+    this.setStatus("failed");
     this.currentAttempt.error = error;
-    this._failedAttempts.push(this.currentAttempt);
+    this._failedAttempts.add(this.currentAttempt);
     this.notReceivingBytesTimeout.clear();
     this.requestProcessQueueCallback();
   };
@@ -244,10 +262,10 @@ export class Request {
 
     this.notReceivingBytesTimeout.clear();
     this.finalData = Utils.joinChunks(this.bytes);
-    this._status = "succeed";
+    this.setStatus("succeed");
     this._totalBytes = this._loadedBytes;
 
-    this.resolveEngineCallbacksSuccessfully(this.finalData);
+    this.resolveEngineCallbacksSuccessfully();
     this.logger(
       `${this.currentAttempt.type} ${this.segment.externalId} succeed`
     );
@@ -287,6 +305,32 @@ export class Request {
   }
 }
 
+class FailedRequestAttempts {
+  private readonly attempts: RequestAttempt[] = [];
+  private _httpAttemptsCount = 0;
+  private _p2pAttemptsCount = 0;
+
+  add(attempt: RequestAttempt) {
+    this.attempts.push(attempt);
+    if (attempt.type === "http") this._httpAttemptsCount++;
+    else this._p2pAttemptsCount++;
+  }
+
+  get httpAttemptsCount() {
+    return this._httpAttemptsCount;
+  }
+
+  get p2pAttemptsCount() {
+    return this._p2pAttemptsCount;
+  }
+
+  *p2pAttempts(): Generator<Required<P2PRequestAttempt>, void> {
+    for (const attempt of this.attempts) {
+      if (attempt.type === "p2p") yield attempt as Required<P2PRequestAttempt>;
+    }
+  }
+}
+
 const requestInnerErrorTypes = ["abort", "bytes-receiving-timeout"] as const;
 
 const httpRequestErrorTypes = ["fetch-error"] as const;
@@ -311,13 +355,6 @@ export class RequestError<
 > extends Error {
   constructor(readonly type: T, message?: string) {
     super(message);
-  }
-
-  static isRequestInnerErrorType(
-    error: RequestError
-  ): error is RequestError<RequestInnerErrorType> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return requestInnerErrorTypes.includes(error.type as any);
   }
 }
 
