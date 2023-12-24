@@ -99,14 +99,12 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     const { segmentManager } = this;
     if (!segmentManager) return;
 
-    const createSegmentIndexOriginal = stream.createSegmentIndex;
-    stream.createSegmentIndex = async () => {
-      const result = await createSegmentIndexOriginal.call(stream);
-      const { segmentIndex } = stream;
+    const substituteSegmentIndexGet = (
+      segmentIndex: shaka.media.SegmentIndex
+    ) => {
       let prevReference: shaka.media.SegmentReference | null = null;
       let prevFirstItemReference: shaka.media.SegmentReference;
       let prevLastItemReference: shaka.media.SegmentReference;
-      if (!segmentIndex) return result;
 
       const originalGet = segmentIndex.get;
       const customGet = (position: number) => {
@@ -142,6 +140,18 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       };
 
       segmentIndex.get = customGet;
+    };
+
+    if (stream.segmentIndex) {
+      substituteSegmentIndexGet(stream.segmentIndex);
+      return;
+    }
+
+    const createSegmentIndexOriginal = stream.createSegmentIndex;
+    stream.createSegmentIndex = async () => {
+      const result = await createSegmentIndexOriginal.call(stream);
+      if (!stream.segmentIndex) return result;
+      substituteSegmentIndexGet(stream.segmentIndex);
       return result;
     };
   }

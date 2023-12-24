@@ -26,7 +26,6 @@ export class SegmentManager {
       index,
       shakaStream,
     });
-
     if (shakaStream.segmentIndex) this.updateStreamSegments(shakaStream);
   }
 
