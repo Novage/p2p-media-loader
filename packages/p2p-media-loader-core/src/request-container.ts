@@ -1,5 +1,5 @@
 import { Segment, Settings, Playback } from "./types";
-import { BandwidthApproximator } from "./bandwidth-approximator";
+import { BandwidthApproximator } from "./bandwidth-calculator";
 import { Request } from "./request";
 
 export class RequestsContainer {

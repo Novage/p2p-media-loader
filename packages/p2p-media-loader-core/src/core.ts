@@ -9,7 +9,7 @@ import {
 } from "./types";
 import * as StreamUtils from "./utils/stream";
 import { LinkedMap } from "./linked-map";
-import { BandwidthApproximator } from "./bandwidth-approximator";
+import { BandwidthApproximator } from "./bandwidth-calculator";
 import { EngineCallbacks } from "./request";
 import { SegmentsMemoryStorage } from "./segments-storage";
 

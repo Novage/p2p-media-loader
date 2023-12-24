@@ -2,7 +2,7 @@ import { Segment, StreamWithSegments } from "./index";
 import { fulfillHttpSegmentRequest } from "./http-loader";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import { Settings, CoreEventHandlers, Playback } from "./types";
-import { BandwidthApproximator } from "./bandwidth-approximator";
+import { BandwidthApproximator } from "./bandwidth-calculator";
 import { P2PLoadersContainer } from "./p2p/loaders-container";
 import { RequestsContainer } from "./request-container";
 import { EngineCallbacks } from "./request";
