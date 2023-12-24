@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "dplayer": "^1.27.1",
-    "hls.js": "^1.4.5",
+    "hls.js": "^1.4.14",
     "mux.js": "^6.3.0",
     "p2p-media-loader-hlsjs": "workspace:*",
     "p2p-media-loader-shaka": "workspace:*",
@@ -21,12 +21,12 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "@types/dplayer": "^1.25.2",
-    "@types/react": "^18.2.9",
-    "@types/react-dom": "^18.2.4",
-    "@vitejs/plugin-react": "^4.0.0",
+    "@types/dplayer": "^1.25.5",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "@vitejs/plugin-react": "^4.2.1",
     "eslint-plugin-react-hooks": "^4.6.0",
-    "eslint-plugin-react-refresh": "^0.4.1",
-    "vite-plugin-node-polyfills": "^0.14.1"
+    "eslint-plugin-react-refresh": "^0.4.5",
+    "vite-plugin-node-polyfills": "^0.18.0"
   }
 }
