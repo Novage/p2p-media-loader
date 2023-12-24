@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Engine as HlsJsEngine } from "p2p-media-loader-hlsjs";
 import { Engine as ShakaEngine } from "p2p-media-loader-shaka";
-import Hls from "hls.js";
 import DPlayer from "dplayer";
 import muxjs from "mux.js";
 import debug from "debug";
@@ -54,7 +53,7 @@ function App() {
   );
   const [streamUrl, setStreamUrl] = useState<string>(localStorage.streamUrl);
   const shakaInstance = useRef<shaka.Player>();
-  const hlsInstance = useRef<Hls>();
+  const hlsInstance = useRef<any>();
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [httpLoaded, setHttpLoaded] = useState<number>(0);
@@ -97,7 +96,7 @@ function App() {
 
   useEffect(() => {
     if (
-      !Hls.isSupported() ||
+      !window.Hls.isSupported() ||
       (window as unknown as ExtendedWindow).videoPlayer
     ) {
       return;
@@ -113,14 +112,16 @@ function App() {
     createNewPlayer();
   }, [playerType]);
 
-  const setPlayerToWindow = (player: DPlayer | ShakaPlayer | Hls) => {
+  const setPlayerToWindow = (
+    player: DPlayer | ShakaPlayer | typeof window.Hls,
+  ) => {
     (window as unknown as ExtendedWindow).videoPlayer = player;
   };
 
   const initHlsJsPlayer = (url: string) => {
     if (!videoRef.current || !hlsEngine.current) return;
     const engine = hlsEngine.current;
-    const hls = new Hls({
+    const hls = new window.Hls({
       ...engine.getConfig(),
     });
     engine.setHls(hls);
@@ -140,7 +141,7 @@ function App() {
         type: "customHls",
         customType: {
           customHls: (video: HTMLVideoElement) => {
-            const hls = new Hls({
+            const hls = new window.Hls({
               ...engine.getConfig(),
               liveSyncDurationCount: 7,
             });

@@ -5,6 +5,7 @@ declare global {
     DashShakaPlayback: any;
     shaka: any;
     muxjs: any;
+    Hls: any;
   }
 }
 

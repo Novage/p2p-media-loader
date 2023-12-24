@@ -41,9 +41,6 @@ importers:
       dplayer:
         specifier: ^1.27.1
         version: 1.27.1(debug@4.3.4)
-      hls.js:
-        specifier: ^1.4.14
-        version: 1.4.14
       mux.js:
         specifier: ^6.3.0
         version: 6.3.0
