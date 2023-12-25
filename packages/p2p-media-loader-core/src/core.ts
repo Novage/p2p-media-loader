@@ -9,7 +9,7 @@ import {
 } from "./types";
 import * as StreamUtils from "./utils/stream";
 import { LinkedMap } from "./linked-map";
-import { BandwidthApproximator } from "./bandwidth-calculator";
+import { BandwidthCalculator } from "./bandwidth-calculator";
 import { EngineCallbacks } from "./request";
 import { SegmentsMemoryStorage } from "./segments-storage";
 
@@ -29,7 +29,7 @@ export class Core<TStream extends Stream = Stream> {
     p2pLoaderDestroyTimeoutMs: 30 * 1000,
     httpNotReceivingBytesTimeoutMs: 1000,
   };
-  private readonly bandwidthApproximator = new BandwidthApproximator();
+  private readonly bandwidthApproximator = new BandwidthCalculator();
   private segmentStorage?: SegmentsMemoryStorage;
   private mainStreamLoader?: HybridLoader;
   private secondaryStreamLoader?: HybridLoader;

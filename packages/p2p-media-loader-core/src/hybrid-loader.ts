@@ -2,7 +2,7 @@ import { Segment, StreamWithSegments } from "./index";
 import { fulfillHttpSegmentRequest } from "./http-loader";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import { Settings, CoreEventHandlers, Playback } from "./types";
-import { BandwidthApproximator } from "./bandwidth-calculator";
+import { BandwidthCalculator } from "./bandwidth-calculator";
 import { P2PLoadersContainer } from "./p2p/loaders-container";
 import { RequestsContainer } from "./request-container";
 import { EngineCallbacks } from "./request";
@@ -28,7 +28,7 @@ export class HybridLoader {
     private streamManifestUrl: string,
     requestedSegment: Segment,
     private readonly settings: Settings,
-    private readonly bandwidthApproximator: BandwidthApproximator,
+    private readonly bandwidthApproximator: BandwidthCalculator,
     private readonly segmentStorage: SegmentsMemoryStorage,
     private readonly eventHandlers?: Pick<CoreEventHandlers, "onSegmentLoaded">
   ) {

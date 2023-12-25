@@ -1,5 +1,5 @@
 import { Segment, SegmentResponse, Playback } from "./types";
-import { BandwidthApproximator } from "./bandwidth-calculator";
+import { BandwidthCalculator } from "./bandwidth-calculator";
 import * as StreamUtils from "./utils/stream";
 import * as Utils from "./utils/utils";
 import * as LoggerUtils from "./utils/logger";
@@ -67,7 +67,7 @@ export class Request {
   constructor(
     readonly segment: Segment,
     private readonly requestProcessQueueCallback: () => void,
-    private readonly bandwidthApproximator: BandwidthApproximator,
+    private readonly bandwidthApproximator: BandwidthCalculator,
     private readonly playback: Playback,
     private readonly settings: StreamUtils.PlaybackTimeWindowsSettings
   ) {

@@ -1,6 +1,6 @@
 import { LoadProgress } from "./request";
 
-export class BandwidthApproximator {
+export class BandwidthCalculator {
   private readonly loadings: LoadProgress[] = [];
 
   addLoading(progress: LoadProgress) {
@@ -54,4 +54,30 @@ function getBandwidthByProgressList(loadings: LoadProgress[]) {
   }
 
   return (totalBytes * 8000) / totalLoadingTime;
+}
+
+class BandwidthCalculator1 {
+  private simultaneousLoadingsCount = 0;
+  private readonly bytes: number[] = [];
+  private readonly timestamps: number[] = [];
+
+  addBytes(bytesLength: number) {
+    this.bytes.push(bytesLength);
+    this.timestamps.push(performance.now());
+  }
+
+  startLoading() {
+    this.simultaneousLoadingsCount++;
+  }
+
+  stopLoading() {
+    if (this.simultaneousLoadingsCount === 0) return;
+    this.simultaneousLoadingsCount--;
+  }
+
+  private clearStale() {
+    const length = this.bytes.length;
+
+    for (let i = 0; i < length; i++) {}
+  }
 }
