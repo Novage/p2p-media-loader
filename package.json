@@ -14,22 +14,17 @@
     "type-check": "pnpm --recursive run type-check"
   },
   "devDependencies": {
-    "@types/debug": "^4.1.8",
-    "@typescript-eslint/eslint-plugin": "^5.59.2",
-    "@typescript-eslint/parser": "^5.59.2",
-    "eslint": "^8.39.0",
-    "eslint-plugin-prettier": "^4.2.1",
-    "prettier": "^2.8.8",
-    "rimraf": "^5.0.0",
-    "typescript": "^5.0.2",
-    "vite": "^4.3.2"
+    "@types/debug": "^4.1.12",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "eslint": "^8.56.0",
+    "eslint-plugin-prettier": "^5.1.2",
+    "prettier": "^3.1.1",
+    "rimraf": "^5.0.5",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10"
   },
   "dependencies": {
     "debug": "^4.3.4"
-  },
-  "pnpm": {
-    "patchedDependencies": {
-      "bittorrent-tracker@10.0.12": "patches/bittorrent-tracker@10.0.12.patch"
-    }
   }
 }

@@ -292,9 +292,12 @@ type RequestErrorType =
   | HttpRequestErrorType;
 
 export class RequestError<
-  T extends RequestErrorType = RequestErrorType
+  T extends RequestErrorType = RequestErrorType,
 > extends Error {
-  constructor(readonly type: T, message?: string) {
+  constructor(
+    readonly type: T,
+    message?: string
+  ) {
     super(message);
   }
 
