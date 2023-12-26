@@ -8,7 +8,11 @@ import {
   ReadonlyLinkedMap,
 } from "p2p-media-loader-core";
 
-const SEGMENT_ID_SCALING_DURATION = 0.5;
+// The minimum time interval (in seconds) between segments to assign unique IDs.
+// If two segments in the same playlist start within a time frame shorter than this interval,
+// they risk being assigned the same ID.
+// Such overlapping IDs can lead to potential conflicts or issues in segment processing.
+const SEGMENT_ID_RESOLUTION_IN_SECONDS = 0.5;
 
 export class SegmentManager {
   private readonly core: Core<Stream>;
@@ -61,7 +65,7 @@ export class SegmentManager {
     const newSegments: SegmentBase[] = [];
     for (const reference of segmentReferences) {
       const externalId = Math.trunc(
-        reference.getStartTime() / SEGMENT_ID_SCALING_DURATION
+        reference.getStartTime() / SEGMENT_ID_RESOLUTION_IN_SECONDS
       );
 
       const segmentLocalId = Utils.getSegmentLocalIdFromReference(reference);

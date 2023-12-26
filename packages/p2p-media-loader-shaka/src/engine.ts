@@ -35,6 +35,11 @@ export class Engine {
     if (this.player === player) return;
     if (this.player) this.destroy();
     this.player = player;
+    this.player.configure("manifest.defaultPresentationDelay", LIVE_EDGE_DELAY);
+    this.player.configure(
+      "manifest.dash.ignoreSuggestedPresentationDelay",
+      true
+    );
     this.updatePlayerEventHandlers("register");
   }
 
@@ -42,9 +47,8 @@ export class Engine {
     const { player } = this;
     if (!player) return;
 
-    if (!this.player) return;
     const networkingEngine =
-      this.player.getNetworkingEngine() as HookedNetworkingEngine | null;
+      player.getNetworkingEngine() as HookedNetworkingEngine | null;
     if (networkingEngine) {
       if (type === "register") {
         const p2pml: P2PMLShakaData = {
@@ -70,14 +74,6 @@ export class Engine {
     player[method]("loaded", this.handlePlayerLoaded);
     player[method]("loading", this.destroyCurrentStreamContext);
     player[method]("unloading", this.handlePlayerUnloading);
-    player[method]("manifestparsed", this.handleManifestParsed);
-  };
-
-  private handleManifestParsed = () => {
-    const manifest = this.player?.getManifest();
-    if (!manifest) return;
-    const { presentationTimeline } = manifest;
-    presentationTimeline.setDelay(LIVE_EDGE_DELAY);
   };
 
   private handlePlayerLoaded = () => {
