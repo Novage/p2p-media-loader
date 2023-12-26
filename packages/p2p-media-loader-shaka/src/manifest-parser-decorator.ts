@@ -24,6 +24,14 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     return this.originalManifestParser.configure(config);
   }
 
+  banLocation(uri: string): unknown {
+    return this.originalManifestParser.banLocation(uri);
+  }
+
+  onInitialVariantChosen(variant: shaka.extern.Variant): unknown {
+    return this.originalManifestParser.onInitialVariantChosen(variant);
+  }
+
   private setP2PMediaLoaderData(p2pml?: P2PMLShakaData) {
     if (!p2pml) return;
     this.segmentManager = p2pml.segmentManager;

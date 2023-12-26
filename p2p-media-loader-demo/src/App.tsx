@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Engine as HlsJsEngine } from "p2p-media-loader-hlsjs";
 import { Engine as ShakaEngine } from "p2p-media-loader-shaka";
-import Hls from "hls.js";
 import DPlayer from "dplayer";
 import muxjs from "mux.js";
 import debug from "debug";
@@ -48,11 +47,11 @@ const streamUrls = {
 
 function App() {
   const [playerType, setPlayerType] = useState<Player | undefined>(
-    localStorage.player
+    localStorage.player,
   );
   const [streamUrl, setStreamUrl] = useState<string>(localStorage.streamUrl);
   const shakaInstance = useRef<shaka.Player>();
-  const hlsInstance = useRef<Hls>();
+  const hlsInstance = useRef<any>();
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [httpLoaded, setHttpLoaded] = useState<number>(0);
@@ -61,13 +60,13 @@ function App() {
     "httpLoaded",
     0,
     (v) => v.toString(),
-    (v) => (v !== null ? +v : 0)
+    (v) => (v !== null ? +v : 0),
   );
   const [p2pLoadedGlob, setP2PLoadedGlob] = useLocalStorageItem<number>(
     "p2pLoaded",
     0,
     (v) => v.toString(),
-    (v) => (v !== null ? +v : 0)
+    (v) => (v !== null ? +v : 0),
   );
 
   const hlsEngine = useRef<HlsJsEngine>();
@@ -95,7 +94,7 @@ function App() {
 
   useEffect(() => {
     if (
-      !Hls.isSupported() ||
+      !window.Hls.isSupported() ||
       (window as unknown as ExtendedWindow).videoPlayer
     ) {
       return;
@@ -111,15 +110,16 @@ function App() {
     createNewPlayer();
   }, [playerType]);
 
-  const setPlayerToWindow = (player: DPlayer | ShakaPlayer | Hls) => {
+  const setPlayerToWindow = (
+    player: DPlayer | ShakaPlayer | typeof window.Hls,
+  ) => {
     (window as unknown as ExtendedWindow).videoPlayer = player;
   };
 
   const initHlsJsPlayer = (url: string) => {
-    if (!videoRef.current) return;
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const engine = hlsEngine.current!;
-    const hls = new Hls({
+    if (!videoRef.current || !hlsEngine.current) return;
+    const engine = hlsEngine.current;
+    const hls = new window.Hls({
       ...engine.getConfig(),
     });
     engine.setHls(hls);
@@ -130,7 +130,7 @@ function App() {
   };
 
   const initHlsDPlayer = (url: string) => {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    if (!hlsEngine.current) return;
     const engine = hlsEngine.current!;
     const player = new DPlayer({
       container: containerRef.current,
@@ -139,7 +139,7 @@ function App() {
         type: "customHls",
         customType: {
           customHls: (video: HTMLVideoElement) => {
-            const hls = new Hls(engine.getConfig());
+            const hls = new window.Hls(engine.getConfig());
             engine.setHls(hls);
             hls.loadSource(video.src);
             hls.attachMedia(video);
@@ -406,12 +406,12 @@ function LoggersSelect() {
       setTimeout(() => debug.enable(localStorage.debug), 0);
       if (!storageItem) return [];
       return storageItem.split(",");
-    }
+    },
   );
 
   const onChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     setActiveLoggers(
-      Array.from(event.target.selectedOptions, (option) => option.value)
+      Array.from(event.target.selectedOptions, (option) => option.value),
     );
   };
 
@@ -452,10 +452,10 @@ function useLocalStorageItem<T>(
   prop: string,
   initValue: T,
   valueToStorageItem: (value: T) => string | null,
-  storageItemToValue: (storageItem: string | null) => T
+  storageItemToValue: (storageItem: string | null) => T,
 ): [T, React.Dispatch<React.SetStateAction<T>>] {
   const [value, setValue] = useState<T>(
-    storageItemToValue(localStorage[prop]) ?? initValue
+    storageItemToValue(localStorage[prop]) ?? initValue,
   );
   const setValueExternal = useCallback((value: T | ((prev: T) => T)) => {
     setValue(value);
