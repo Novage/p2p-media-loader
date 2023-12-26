@@ -31,7 +31,7 @@ export class Engine {
     this.segmentManager = new SegmentManager(this.streamInfo, this.core);
   }
 
-  initShakaPlayer(player: shaka.Player) {
+  configureAndInitShakaPlayer(player: shaka.Player) {
     if (this.player === player) return;
     if (this.player) this.destroy();
     this.player = player;

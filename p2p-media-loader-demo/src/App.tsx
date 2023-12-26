@@ -192,7 +192,7 @@ function App() {
             shakaPlayer.addEventListener("error", (event: { code: number }) => {
               onError(event);
             });
-            engine.initShakaPlayer(shakaPlayer);
+            engine.configureAndInitShakaPlayer(shakaPlayer);
             shakaPlayer.load(src).catch(onError);
 
             shakaInstance.current = shakaPlayer;
@@ -215,7 +215,7 @@ function App() {
     player.addEventListener("error", (event: { detail: { code: unknown } }) => {
       onError(event.detail);
     });
-    engine.initShakaPlayer(player);
+    engine.configureAndInitShakaPlayer(player);
     player.load(url).catch(onError);
     shakaInstance.current = player;
     setPlayerToWindow(player);
@@ -230,7 +230,7 @@ function App() {
       source: url,
       plugins: [window.DashShakaPlayback, window.LevelSelector],
       shakaOnBeforeLoad: (shakaPlayerInstance: any) => {
-        engine.initShakaPlayer(shakaPlayerInstance);
+        engine.configureAndInitShakaPlayer(shakaPlayerInstance);
       },
     });
     setPlayerToWindow(clapprPlayer);
