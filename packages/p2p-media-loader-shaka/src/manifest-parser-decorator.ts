@@ -107,46 +107,59 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     const { segmentManager } = this;
     if (!segmentManager) return;
 
-    const createSegmentIndexOriginal = stream.createSegmentIndex;
-    stream.createSegmentIndex = async () => {
-      const result = await createSegmentIndexOriginal.call(stream);
-      const { segmentIndex } = stream;
+    const substituteSegmentIndexGet = (
+      segmentIndex: shaka.media.SegmentIndex
+    ) => {
       let prevReference: shaka.media.SegmentReference | null = null;
       let prevFirstItemReference: shaka.media.SegmentReference;
       let prevLastItemReference: shaka.media.SegmentReference;
 
-      if (!segmentIndex) return result;
-      const segmentReferencesPropName =
-        getReferencesListPropertyOfSegmentIndex(segmentIndex);
-      if (!segmentReferencesPropName) return result;
-
-      const getOriginal = segmentIndex.get;
-      segmentIndex.get = (position) => {
-        const reference = getOriginal.call(segmentIndex, position);
+      const originalGet = segmentIndex.get;
+      const customGet = (position: number) => {
+        const reference = originalGet.call(segmentIndex, position);
         if (reference === prevReference) return reference;
         prevReference = reference;
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const referencesList = (segmentIndex as any)[
-          segmentReferencesPropName
-        ] as shaka.media.SegmentReference[];
-        const firstItemReference = referencesList[0];
-        const lastItemReference = referencesList[referencesList.length - 1];
+        segmentIndex.get = originalGet;
+        try {
+          const references = [...segmentIndex];
+          const firstItemReference = references[0];
+          const lastItemReference = references[references.length - 1];
 
-        if (
-          firstItemReference === prevFirstItemReference &&
-          lastItemReference === prevLastItemReference
-        ) {
-          return reference;
+          if (
+            firstItemReference === prevFirstItemReference &&
+            lastItemReference === prevLastItemReference
+          ) {
+            return reference;
+          }
+          prevFirstItemReference = firstItemReference;
+          prevLastItemReference = lastItemReference;
+
+          // Segment index have been updated
+          segmentManager.updateStreamSegments(stream, references);
+          this.debug(`Stream ${stream.id} is updated`);
+        } catch (err) {
+          // This catch is intentionally left blank.
+          // [...segmentIndex] throws an error when segmentIndex inner array is empty
+        } finally {
+          segmentIndex.get = customGet;
         }
-
-        // Segment index have been updated
-        segmentManager.updateStreamSegments(stream, referencesList);
-        this.debug(`Stream ${stream.id} is updated`);
-        prevFirstItemReference = firstItemReference;
-        prevLastItemReference = lastItemReference;
         return reference;
       };
+
+      segmentIndex.get = customGet;
+    };
+
+    if (stream.segmentIndex) {
+      substituteSegmentIndexGet(stream.segmentIndex);
+      return;
+    }
+
+    const createSegmentIndexOriginal = stream.createSegmentIndex;
+    stream.createSegmentIndex = async () => {
+      const result = await createSegmentIndexOriginal.call(stream);
+      if (!stream.segmentIndex) return result;
+      substituteSegmentIndexGet(stream.segmentIndex);
       return result;
     };
   }
@@ -229,12 +242,4 @@ export class DashManifestParser extends ManifestParserDecorator {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getMapPropertiesFromObject(object: object): Map<any, any>[] {
   return Object.values(object).filter((property) => property instanceof Map);
-}
-
-function getReferencesListPropertyOfSegmentIndex(
-  segmentIndex: shaka.media.SegmentIndex
-): string | undefined {
-  return Object.entries(segmentIndex).find(
-    ([, value]) => value instanceof Array
-  )?.[0];
 }

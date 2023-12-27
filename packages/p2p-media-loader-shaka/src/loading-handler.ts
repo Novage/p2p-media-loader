@@ -1,5 +1,4 @@
 import * as Utils from "./stream-utils";
-import { SegmentManager } from "./segment-manager";
 import { StreamInfo } from "./types";
 import { Shaka, Stream } from "./types";
 import {
@@ -19,8 +18,7 @@ export class Loader {
   constructor(
     private readonly shaka: Shaka,
     private readonly core: Core<Stream>,
-    readonly streamInfo: StreamInfo,
-    private readonly segmentManager: SegmentManager
+    readonly streamInfo: StreamInfo
   ) {}
 
   private defaultLoad() {

@@ -192,6 +192,9 @@ export class Request {
   abortFromProcessQueue() {
     this.throwErrorIfNotLoadingStatus();
     this._status = "aborted";
+    this.logger(
+      `${this.currentAttempt?.type} ${this.segment.externalId} aborted`
+    );
     this._abortRequestCallback?.("abort");
     this._abortRequestCallback = undefined;
     this.currentAttempt = undefined;
@@ -205,6 +208,7 @@ export class Request {
     this._status = "failed";
     const error = new RequestError("bytes-receiving-timeout");
     this._abortRequestCallback?.(error.type);
+    this.logger(`${this.type} ${this.segment.externalId} failed ${error.type}`);
 
     this.currentAttempt.error = error;
     this._failedAttempts.push(this.currentAttempt);
@@ -217,6 +221,7 @@ export class Request {
     if (!this.currentAttempt) return;
 
     this._status = "failed";
+    this.logger(`${this.type} ${this.segment.externalId} failed ${error.type}`);
     this.currentAttempt.error = error;
     this._failedAttempts.push(this.currentAttempt);
     this.notReceivingBytesTimeout.clear();
