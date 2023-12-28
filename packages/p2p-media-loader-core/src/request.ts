@@ -225,6 +225,9 @@ export class Request {
   abortFromProcessQueue() {
     this.throwErrorIfNotLoadingStatus();
     this.setStatus("aborted");
+    this.logger(
+      `${this.currentAttempt?.type} ${this.segment.externalId} aborted`
+    );
     this._abortRequestCallback?.(new RequestError("abort"));
     this._abortRequestCallback = undefined;
     this.currentAttempt = undefined;
@@ -238,6 +241,7 @@ export class Request {
     this.setStatus("failed");
     const error = new RequestError("bytes-receiving-timeout");
     this._abortRequestCallback?.(error);
+    this.logger(`${this.type} ${this.segment.externalId} failed ${error.type}`);
 
     this.currentAttempt.error = error;
     this._failedAttempts.add(this.currentAttempt);
@@ -250,6 +254,7 @@ export class Request {
     if (!this.currentAttempt) return;
 
     this.setStatus("failed");
+    this.logger(`${this.type} ${this.segment.externalId} failed ${error.type}`);
     this.currentAttempt.error = error;
     this._failedAttempts.add(this.currentAttempt);
     this.notReceivingBytesTimeout.clear();
@@ -351,9 +356,12 @@ type RequestErrorType =
   | HttpRequestErrorType;
 
 export class RequestError<
-  T extends RequestErrorType = RequestErrorType
+  T extends RequestErrorType = RequestErrorType,
 > extends Error {
-  constructor(readonly type: T, message?: string) {
+  constructor(
+    readonly type: T,
+    message?: string
+  ) {
     super(message);
   }
 }

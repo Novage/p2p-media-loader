@@ -91,17 +91,25 @@ export function getSegmentPlaybackStatuses(
   } = timeWindowsSettings;
 
   return {
-    isHighDemand: isInTimeWindow(segment, playback, highDemandTimeWindow),
-    isHttpDownloadable: isInTimeWindow(
+    isHighDemand: isSegmentInTimeWindow(
+      segment,
+      playback,
+      highDemandTimeWindow
+    ),
+    isHttpDownloadable: isSegmentInTimeWindow(
       segment,
       playback,
       httpDownloadTimeWindow
     ),
-    isP2PDownloadable: isInTimeWindow(segment, playback, p2pDownloadTimeWindow),
+    isP2PDownloadable: isSegmentInTimeWindow(
+      segment,
+      playback,
+      p2pDownloadTimeWindow
+    ),
   };
 }
 
-function isInTimeWindow(
+function isSegmentInTimeWindow(
   segment: Segment,
   playback: Playback,
   timeWindowLength: number

@@ -4,6 +4,8 @@ declare global {
     LevelSelector: any;
     DashShakaPlayback: any;
     shaka: any;
+    muxjs: any;
+    Hls: any;
   }
 }
 

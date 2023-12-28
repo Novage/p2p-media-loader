@@ -81,10 +81,9 @@ export function getStreamLastMediaSequence(
 ): number | undefined {
   const { shakaStream } = stream;
   const map = shakaStream.mediaSequenceTimeMap;
+  if (!map) return;
 
-  if (map) {
-    const firstMediaSequence = map.keys().next().value as number | undefined;
-    if (firstMediaSequence === undefined) return;
-    return firstMediaSequence + map.size - 1;
-  }
+  const firstMediaSequence = map.keys().next().value as number | undefined;
+  if (firstMediaSequence === undefined) return;
+  return firstMediaSequence + map.size - 1;
 }

@@ -1,5 +1,4 @@
 import { Segment, Stream } from "../types";
-import { QueueItem } from "./queue";
 import { SegmentPlaybackStatuses } from "./stream";
 
 export function getStreamString(stream: Stream) {
@@ -20,10 +19,4 @@ export function getSegmentPlaybackStatusesString(
   if (isHttpDownloadable) return "http-window";
   if (isP2PDownloadable) return "p2p-window";
   return "-";
-}
-
-export function getQueueItemString(item: QueueItem) {
-  const { segment, statuses } = item;
-  const statusString = getSegmentPlaybackStatusesString(statuses);
-  return `${segment.externalId} ${statusString}`;
 }

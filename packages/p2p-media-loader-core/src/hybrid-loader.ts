@@ -226,7 +226,11 @@ export class HybridLoader {
           break;
         }
 
+        const isP2PLoadingRequest =
+          request?.status === "loading" && request.type === "p2p";
+
         if (this.requests.executingHttpCount < simultaneousHttpDownloads) {
+          if (isP2PLoadingRequest) request.abortFromEngine();
           void this.loadThroughHttp(segment);
           continue;
         }
@@ -235,11 +239,12 @@ export class HybridLoader {
           this.abortLastHttpLoadingInQueueAfterItem(queue, segment) &&
           this.requests.executingHttpCount < simultaneousHttpDownloads
         ) {
+          if (isP2PLoadingRequest) request.abortFromEngine();
           void this.loadThroughHttp(segment);
           continue;
         }
 
-        if (request?.type === "p2p" && request.status === "loading") continue;
+        if (isP2PLoadingRequest) continue;
 
         if (this.requests.executingP2PCount < simultaneousP2PDownloads) {
           void this.loadThroughP2P(segment);

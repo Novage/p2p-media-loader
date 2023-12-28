@@ -34,7 +34,7 @@ export type StreamWithSegments<
   TMap extends ReadonlyLinkedMap<string, SegmentBase> = LinkedMap<
     string,
     Segment
-  >
+  >,
 > = TStream & {
   readonly segments: TMap;
 };
