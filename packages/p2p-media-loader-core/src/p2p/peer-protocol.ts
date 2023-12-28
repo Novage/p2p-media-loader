@@ -10,7 +10,7 @@ export type PeerSettings = Pick<
   | "maxPeerNotReceivingBytesTimeoutErrors"
 >;
 
-export class PeerInterface {
+export class PeerProtocol {
   private commandChunks?: Command.BinaryCommandChunksJoiner;
   private uploadingContext?: { stopUploading: () => void };
 
