@@ -19,6 +19,7 @@ export function createSegment({
   return {
     localId: localId ?? getSegmentLocalId(url, byteRange),
     externalId,
+    byteRange,
     url,
     startTime,
     endTime,

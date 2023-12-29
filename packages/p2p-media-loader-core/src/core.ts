@@ -28,6 +28,8 @@ export class Core<TStream extends Stream = Stream> {
     p2pNotReceivingBytesTimeoutMs: 1000,
     p2pLoaderDestroyTimeoutMs: 30 * 1000,
     httpNotReceivingBytesTimeoutMs: 1000,
+    httpErrorRetries: 3,
+    p2pErrorRetries: 3,
   };
   private readonly bandwidthApproximator = new BandwidthApproximator();
   private segmentStorage?: SegmentsMemoryStorage;

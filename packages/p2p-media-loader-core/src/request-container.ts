@@ -72,9 +72,6 @@ export class RequestsContainer {
       if (request.type === "p2p") yield request;
     }
   }
-  isHybridLoaderRequested(segment: Segment): boolean {
-    return !!this.requests.get(segment)?.type;
-  }
 
   destroy() {
     for (const request of this.requests.values()) {
