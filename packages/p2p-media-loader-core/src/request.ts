@@ -139,6 +139,7 @@ export class Request {
     if (this._engineCallbacks) {
       throw new Error("Segment is already requested by engine");
     }
+    this.failedAttempts.clear();
     this._isHandledByProcessQueue = false;
     this._engineCallbacks = callbacks;
   }
@@ -311,7 +312,12 @@ export class Request {
 }
 
 class FailedRequestAttempts {
-  private readonly attempts: RequestAttempt[] = [];
+  private attempts: RequestAttempt[] = [];
+  private _lastClearTimestamp = performance.now();
+
+  get lastClearTimestamp() {
+    return this._lastClearTimestamp;
+  }
 
   add(attempt: RequestAttempt) {
     this.attempts.push(attempt);
@@ -322,6 +328,11 @@ class FailedRequestAttempts {
       (sum, attempt) => (attempt.type === "http" ? sum + 1 : sum),
       0
     );
+  }
+
+  clear() {
+    this.attempts = [];
+    this._lastClearTimestamp = performance.now();
   }
 }
 

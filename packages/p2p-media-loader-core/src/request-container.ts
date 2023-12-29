@@ -73,10 +73,6 @@ export class RequestsContainer {
     }
   }
 
-  isHybridLoaderRequested(segment: Segment): boolean {
-    return !!this.requests.get(segment)?.type;
-  }
-
   destroy() {
     for (const request of this.requests.values()) {
       request.abortFromProcessQueue();

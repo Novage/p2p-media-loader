@@ -12,6 +12,8 @@ import * as StreamUtils from "./utils/stream";
 import * as Utils from "./utils/utils";
 import debug from "debug";
 
+const FAILED_ATTEMPTS_CLEAR_INTERVAL = 60000;
+
 export class HybridLoader {
   private readonly requests: RequestsContainer;
   private readonly p2pLoaders: P2PLoadersContainer;
@@ -127,6 +129,7 @@ export class HybridLoader {
   private processRequests(queueSegmentIds: Set<string>) {
     const { stream } = this.lastRequestedSegment;
     const { httpErrorRetries } = this.settings;
+    const now = performance.now();
     for (const request of this.requests.items()) {
       const {
         type,
@@ -187,6 +190,12 @@ export class HybridLoader {
           break;
       }
       request.markHandledByProcessQueue();
+      if (
+        now - request.failedAttempts.lastClearTimestamp >
+        FAILED_ATTEMPTS_CLEAR_INTERVAL
+      ) {
+        request.failedAttempts.clear();
+      }
     }
   }
 
@@ -294,7 +303,7 @@ export class HybridLoader {
   }
 
   private loadRandomThroughHttp() {
-    const { simultaneousHttpDownloads } = this.settings;
+    const { simultaneousHttpDownloads, httpErrorRetries } = this.settings;
     const p2pLoader = this.p2pLoaders.currentLoader;
     const connectedPeersAmount = p2pLoader.connectedPeersAmount;
     if (
@@ -307,11 +316,17 @@ export class HybridLoader {
       lastRequestedSegment: this.lastRequestedSegment,
       playback: this.playback,
       settings: this.settings,
-      skipSegment: (segment, statuses) =>
-        !statuses.isHttpDownloadable ||
-        this.segmentStorage.hasSegment(segment) ||
-        this.requests.isHybridLoaderRequested(segment) ||
-        p2pLoader.isLoadingOrLoadedBySomeone(segment),
+      skipSegment: (segment, statuses) => {
+        const request = this.requests.get(segment);
+        return (
+          !statuses.isHttpDownloadable ||
+          this.segmentStorage.hasSegment(segment) ||
+          request?.type !== undefined ||
+          (request?.failedAttempts.httpAttemptsCount ?? 0) >=
+            httpErrorRetries ||
+          p2pLoader.isLoadingOrLoadedBySomeone(segment)
+        );
+      },
     });
     if (!queue.length) return;
     const peersAmount = connectedPeersAmount + 1;
