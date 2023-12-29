@@ -337,7 +337,7 @@ class FailedRequestAttempts {
     );
   }
 
-  get lastAttempt(): Readonly<Required<RequestAttempt>> {
+  get lastAttempt(): Readonly<Required<RequestAttempt>> | undefined {
     return this.attempts[this.attempts.length - 1];
   }
 
