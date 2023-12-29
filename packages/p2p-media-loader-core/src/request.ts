@@ -338,7 +338,11 @@ class FailedRequestAttempts {
 
 const requestInnerErrorTypes = ["abort", "bytes-receiving-timeout"] as const;
 
-const httpRequestErrorTypes = ["http-error", "http-bytes-mismatch"] as const;
+const httpRequestErrorTypes = [
+  "http-error",
+  "http-bytes-mismatch",
+  "http-unexpected-status-code",
+] as const;
 
 const peerRequestErrorTypes = [
   "peer-response-bytes-mismatch",

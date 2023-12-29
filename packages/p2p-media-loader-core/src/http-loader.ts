@@ -83,15 +83,22 @@ export class HttpRequestExecutor {
     const { byteRange } = this;
     if (byteRange) {
       if (response.status === 200) {
-        this.request.clearLoadedBytes();
+        if (this.request.segment.byteRange) {
+          throw new RequestError("http-unexpected-status-code");
+        } else {
+          this.request.clearLoadedBytes();
+        }
       } else {
         if (response.status !== 206) {
-          this.request.clearLoadedBytes();
-          throw new RequestError("http-bytes-mismatch", response.statusText);
+          throw new RequestError(
+            "http-unexpected-status-code",
+            response.statusText
+          );
         }
         const contentLengthHeader = response.headers.get("Content-Length");
         if (
           contentLengthHeader &&
+          this.expectedBytesLength !== undefined &&
           this.expectedBytesLength !== +contentLengthHeader
         ) {
           this.request.clearLoadedBytes();
