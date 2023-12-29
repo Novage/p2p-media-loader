@@ -191,7 +191,6 @@ export class HybridLoader {
   }
 
   private processQueue() {
-    console.log("process queue");
     const { queue, queueSegmentIds } = QueueUtils.generateQueue({
       lastRequestedSegment: this.lastRequestedSegment,
       playback: this.playback,

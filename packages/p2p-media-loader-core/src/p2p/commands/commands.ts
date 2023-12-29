@@ -61,6 +61,7 @@ export function serializePeerCommand(
   switch (command.c) {
     case PeerCommandType.CancelSegmentRequest:
     case PeerCommandType.SegmentAbsent:
+    case PeerCommandType.SegmentDataSendingCompleted:
       return serializePeerSegmentCommand(command, maxChunkSize);
     case PeerCommandType.SegmentRequest:
       return serializePeerSegmentRequestCommand(command, maxChunkSize);
