@@ -1,10 +1,14 @@
 import { arrayBackwards } from "./utils/utils";
 
+type Interval = { start: number; end?: number };
+
+const CLEAR_THRESHOLD_MS = 3000;
+
 export class BandwidthCalculator {
   private simultaneousLoadingsCount = 0;
   private readonly bytes: number[] = [];
   private readonly timestamps: number[] = [];
-  private loadingIntervals: { start: number; end?: number }[] = [];
+  private loadingIntervals: Interval[] = [];
 
   addBytes(bytesLength: number) {
     this.bytes.push(bytesLength);
@@ -30,45 +34,57 @@ export class BandwidthCalculator {
 
   // in bits per second
   getBandwidthForLastNSeconds(seconds: number) {
-    this.clearStale();
-    const { bytes, timestamps, loadingIntervals } = this;
-    const samplesLength = bytes.length;
+    const { bytes, timestamps } = this;
+    if (!bytes.length) return 0;
+    const milliseconds = seconds * 1000;
     const now = performance.now();
-    const threshold = now - seconds * 1000;
+    let totalTime = 0;
 
-    let loadedBytes = 0;
-    for (let i = samplesLength - 1; i >= 0; i--) {
-      if (timestamps[i] < threshold) break;
-      loadedBytes += bytes[i];
+    let firstIntervalStart = Number.POSITIVE_INFINITY;
+    for (const { start, end = now } of arrayBackwards(this.loadingIntervals)) {
+      const duration = end - start;
+      if (totalTime + duration < milliseconds) {
+        totalTime += duration;
+        firstIntervalStart = start;
+        continue;
+      }
+      firstIntervalStart = end - (milliseconds - totalTime);
+      totalTime = milliseconds;
+      break;
+    }
+    if (totalTime === 0) return 0;
+
+    let totalBytes = 0;
+    for (let i = bytes.length - 1; i >= 0; i--) {
+      if (timestamps[i] < firstIntervalStart) break;
+      totalBytes += bytes[i];
     }
 
-    let clearLoadingTime = 0;
-    for (const { start, end } of arrayBackwards(loadingIntervals)) {
-      if (start < threshold && end !== undefined && end < threshold) break;
-      const from = Math.max(start, threshold);
-      const to = end ?? now;
-      clearLoadingTime += to - from;
-    }
-
-    if (clearLoadingTime === 0) return 0;
-    return (loadedBytes * 8000) / clearLoadingTime;
+    return (totalBytes * 8000) / totalTime;
   }
 
-  private clearStale() {
-    const { timestamps, bytes, loadingIntervals } = this;
-    const samplesLength = bytes.length;
-    const threshold = performance.now() - 15000;
+  clearStale() {
+    if (!this.loadingIntervals.length) return;
+    const now = performance.now();
+    let totalTime = 0;
 
-    let count = 0;
-    while (count < samplesLength && timestamps[count] < threshold) count++;
-    bytes.splice(0, count);
-    timestamps.splice(0, count);
-
-    count = 0;
-    for (const { start, end } of loadingIntervals) {
-      if (!(start < threshold && end !== undefined && end <= threshold)) break;
-      count++;
+    let intervalsToLeave = 0;
+    for (const { start, end = now } of arrayBackwards(this.loadingIntervals)) {
+      const duration = end - start;
+      intervalsToLeave++;
+      if (totalTime + duration >= CLEAR_THRESHOLD_MS) break;
+      totalTime += duration;
     }
-    loadingIntervals.splice(0, count);
+    const intervalsToRemove = this.loadingIntervals.length - intervalsToLeave;
+    this.loadingIntervals.splice(0, intervalsToRemove);
+
+    const { start: firstIntervalStart } = this.loadingIntervals[0];
+    let samplesToRemove = 0;
+    for (const timestamp of this.timestamps) {
+      if (timestamp >= firstIntervalStart) break;
+      samplesToRemove++;
+    }
+    this.bytes.splice(0, samplesToRemove);
+    this.timestamps.splice(0, samplesToRemove);
   }
 }
