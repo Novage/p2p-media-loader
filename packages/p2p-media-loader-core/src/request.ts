@@ -65,7 +65,7 @@ export class Request {
     error: RequestError<RequestInnerErrorType>
   ) => void;
   private readonly _logger: debug.Debugger;
-  private _isCheckedByProcessQueue = false;
+  private _isHandledByProcessQueue = false;
 
   constructor(
     readonly segment: Segment,
@@ -98,7 +98,7 @@ export class Request {
 
   private setStatus(status: RequestStatus) {
     this._status = status;
-    this._isCheckedByProcessQueue = false;
+    this._isHandledByProcessQueue = false;
   }
 
   get isSegmentRequestedByEngine(): boolean {
@@ -127,19 +127,19 @@ export class Request {
     return this._failedAttempts;
   }
 
-  get isCheckedByProcessQueue() {
-    return this._isCheckedByProcessQueue;
+  get isHandledByProcessQueue() {
+    return this._isHandledByProcessQueue;
   }
 
-  markCheckedByProcessQueue() {
-    this._isCheckedByProcessQueue = true;
+  markHandledByProcessQueue() {
+    this._isHandledByProcessQueue = true;
   }
 
   setEngineCallbacks(callbacks: EngineCallbacks) {
     if (this._engineCallbacks) {
       throw new Error("Segment is already requested by engine");
     }
-    this._isCheckedByProcessQueue = false;
+    this._isHandledByProcessQueue = false;
     this._engineCallbacks = callbacks;
   }
 
@@ -312,33 +312,22 @@ export class Request {
 
 class FailedRequestAttempts {
   private readonly attempts: RequestAttempt[] = [];
-  private _httpAttemptsCount = 0;
-  private _p2pAttemptsCount = 0;
 
   add(attempt: RequestAttempt) {
     this.attempts.push(attempt);
-    if (attempt.type === "http") this._httpAttemptsCount++;
-    else this._p2pAttemptsCount++;
   }
 
   get httpAttemptsCount() {
-    return this._httpAttemptsCount;
-  }
-
-  get p2pAttemptsCount() {
-    return this._p2pAttemptsCount;
-  }
-
-  *p2pAttempts(): Generator<Required<P2PRequestAttempt>, void> {
-    for (const attempt of this.attempts) {
-      if (attempt.type === "p2p") yield attempt as Required<P2PRequestAttempt>;
-    }
+    return this.attempts.reduce(
+      (sum, attempt) => (attempt.type === "http" ? sum + 1 : sum),
+      0
+    );
   }
 }
 
 const requestInnerErrorTypes = ["abort", "bytes-receiving-timeout"] as const;
 
-const httpRequestErrorTypes = ["fetch-error"] as const;
+const httpRequestErrorTypes = ["http-error", "http-bytes-mismatch"] as const;
 
 const peerRequestErrorTypes = [
   "peer-response-bytes-mismatch",

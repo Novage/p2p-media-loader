@@ -1,5 +1,5 @@
 import { Segment, StreamWithSegments } from "./index";
-import { fulfillHttpSegmentRequest } from "./http-loader";
+import { HttpRequestExecutor } from "./http-loader";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import { Settings, CoreEventHandlers, Playback } from "./types";
 import { BandwidthApproximator } from "./bandwidth-approximator";
@@ -126,13 +126,13 @@ export class HybridLoader {
 
   private processRequests(queueSegmentIds: Set<string>) {
     const { stream } = this.lastRequestedSegment;
-    const { maxHttpFailedDownloadAttempts } = this.settings;
+    const { httpErrorRetries } = this.settings;
     for (const request of this.requests.items()) {
       const {
         type,
         status,
         segment,
-        isCheckedByProcessQueue,
+        isHandledByProcessQueue,
         isSegmentRequestedByEngine,
       } = request;
 
@@ -161,7 +161,7 @@ export class HybridLoader {
           break;
 
         case "failed":
-          if (type === "http" && !isCheckedByProcessQueue) {
+          if (type === "http" && !isHandledByProcessQueue) {
             this.p2pLoaders.currentLoader.broadcastAnnouncement();
           }
           if (
@@ -171,8 +171,7 @@ export class HybridLoader {
             this.requests.remove(request);
           }
           if (
-            request.failedAttempts.httpAttemptsCount >=
-              maxHttpFailedDownloadAttempts &&
+            request.failedAttempts.httpAttemptsCount >= httpErrorRetries &&
             isSegmentRequestedByEngine
           ) {
             request.resolveEngineCallbacksWithError();
@@ -187,11 +186,12 @@ export class HybridLoader {
           this.requests.remove(request);
           break;
       }
-      request.markCheckedByProcessQueue();
+      request.markHandledByProcessQueue();
     }
   }
 
   private processQueue() {
+    console.log("process queue");
     const { queue, queueSegmentIds } = QueueUtils.generateQueue({
       lastRequestedSegment: this.lastRequestedSegment,
       playback: this.playback,
@@ -208,7 +208,7 @@ export class HybridLoader {
     const {
       simultaneousHttpDownloads,
       simultaneousP2PDownloads,
-      maxHttpFailedDownloadAttempts,
+      httpErrorRetries,
     } = this.settings;
 
     for (const item of queue) {
@@ -220,8 +220,7 @@ export class HybridLoader {
         if (
           request?.type === "http" &&
           request.status === "failed" &&
-          request.failedAttempts.httpAttemptsCount >=
-            maxHttpFailedDownloadAttempts
+          request.failedAttempts.httpAttemptsCount >= httpErrorRetries
         ) {
           break;
         }
@@ -287,7 +286,7 @@ export class HybridLoader {
 
   private async loadThroughHttp(segment: Segment) {
     const request = this.requests.getOrCreateRequest(segment);
-    void fulfillHttpSegmentRequest(request, this.settings);
+    new HttpRequestExecutor(request, this.settings);
     this.p2pLoaders.currentLoader.broadcastAnnouncement();
   }
 

@@ -5,9 +5,7 @@ import { Settings } from "../types";
 
 export type PeerSettings = Pick<
   Settings,
-  | "p2pNotReceivingBytesTimeoutMs"
-  | "webRtcMaxMessageSize"
-  | "maxPeerNotReceivingBytesTimeoutErrors"
+  "p2pNotReceivingBytesTimeoutMs" | "webRtcMaxMessageSize" | "p2pErrorRetries"
 >;
 
 export class PeerProtocol {

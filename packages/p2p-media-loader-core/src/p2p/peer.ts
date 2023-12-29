@@ -1,5 +1,5 @@
 import { PeerConnection } from "bittorrent-tracker";
-import { PeerInterface, PeerSettings } from "./peer-interface";
+import { PeerProtocol, PeerSettings } from "./peer-protocol";
 import {
   Request,
   RequestControls,
@@ -24,7 +24,7 @@ type PeerEventHandlers = {
 
 export class Peer {
   readonly id: string;
-  private readonly peerInterface;
+  private readonly peerProtocol;
   private downloadingContext?: {
     request: Request;
     controls: RequestControls;
@@ -43,7 +43,7 @@ export class Peer {
     private readonly settings: PeerSettings
   ) {
     this.id = Peer.getPeerIdFromConnection(connection);
-    this.peerInterface = new PeerInterface(connection, settings, {
+    this.peerProtocol = new PeerProtocol(connection, settings, {
       onSegmentChunkReceived: this.onSegmentChunkReceived,
       onCommandReceived: this.onCommandReceived,
       onDestroy: this.destroy,
@@ -68,20 +68,18 @@ export class Peer {
         break;
 
       case PeerCommandType.SegmentRequest:
-        this.peerInterface.stopUploadingSegmentData();
+        this.peerProtocol.stopUploadingSegmentData();
         this.eventHandlers.onSegmentRequested(this, command.i, command.b);
         break;
 
       case PeerCommandType.SegmentData:
         {
           if (!this.downloadingContext) break;
-          this.downloadingContext.isSegmentDataCommandReceived = true;
           const { request, controls } = this.downloadingContext;
+          if (request.segment.externalId !== command.i) break;
+          this.downloadingContext.isSegmentDataCommandReceived = true;
           controls.firstBytesReceived();
-          if (
-            request.segment.externalId === command.i &&
-            request.totalBytes === undefined
-          ) {
+          if (request.totalBytes === undefined) {
             request.setTotalBytes(command.s);
           }
         }
@@ -95,7 +93,7 @@ export class Peer {
         break;
 
       case PeerCommandType.CancelSegmentRequest:
-        this.peerInterface.stopUploadingSegmentData();
+        this.peerProtocol.stopUploadingSegmentData();
         break;
     }
   };
@@ -137,9 +135,9 @@ export class Peer {
             const timeoutErrors = this.downloadingErrors.filter(
               (error) => error.type === "bytes-receiving-timeout"
             );
-            const { maxPeerNotReceivingBytesTimeoutErrors } = this.settings;
-            if (timeoutErrors.length >= maxPeerNotReceivingBytesTimeoutErrors) {
-              this.peerInterface.destroy();
+            const { p2pErrorRetries } = this.settings;
+            if (timeoutErrors.length >= p2pErrorRetries) {
+              this.peerProtocol.destroy();
             }
           },
         }
@@ -150,7 +148,7 @@ export class Peer {
       i: segmentRequest.segment.externalId,
     };
     if (segmentRequest.loadedBytes) command.b = segmentRequest.loadedBytes;
-    this.peerInterface.sendCommand(command);
+    this.peerProtocol.sendCommand(command);
   }
 
   async uploadSegmentData(segmentExternalId: number, data: ArrayBuffer) {
@@ -160,9 +158,9 @@ export class Peer {
       i: segmentExternalId,
       s: data.byteLength,
     };
-    this.peerInterface.sendCommand(command);
+    this.peerProtocol.sendCommand(command);
     try {
-      await this.peerInterface.splitSegmentDataToChunksAndUploadAsync(
+      await this.peerProtocol.splitSegmentDataToChunksAndUploadAsync(
         data as Uint8Array
       );
       this.logger(`segment ${segmentExternalId} has been sent to ${this.id}`);
@@ -194,18 +192,18 @@ export class Peer {
       p: httpLoadingSegmentsIds,
       l: loadedSegmentsIds,
     };
-    this.peerInterface.sendCommand(command);
+    this.peerProtocol.sendCommand(command);
   }
 
   sendSegmentAbsentCommand(segmentExternalId: number) {
-    this.peerInterface.sendCommand({
+    this.peerProtocol.sendCommand({
       c: PeerCommandType.SegmentAbsent,
       i: segmentExternalId,
     });
   }
 
   private sendCancelSegmentRequestCommand(segment: Segment) {
-    this.peerInterface.sendCommand({
+    this.peerProtocol.sendCommand({
       c: PeerCommandType.CancelSegmentRequest,
       i: segment.externalId,
     });
