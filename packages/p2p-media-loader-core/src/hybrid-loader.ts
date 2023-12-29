@@ -191,7 +191,7 @@ export class HybridLoader {
       }
       request.markHandledByProcessQueue();
       if (
-        now - request.failedAttempts.lastClearTimestamp >
+        now - request.failedAttempts.lastAttempt.error.timestamp >
         FAILED_ATTEMPTS_CLEAR_INTERVAL
       ) {
         request.failedAttempts.clear();

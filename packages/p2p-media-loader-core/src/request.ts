@@ -37,7 +37,10 @@ export type RequestControls = Readonly<{
   abortOnError: Request["abortOnError"];
 }>;
 
-type OmitEncapsulated<T extends RequestAttempt> = Omit<T, "error">;
+type OmitEncapsulated<T extends RequestAttempt> = Omit<
+  T,
+  "error" | "errorTimestamp"
+>;
 type StartRequestParameters =
   | OmitEncapsulated<HttpRequestAttempt>
   | OmitEncapsulated<P2PRequestAttempt>;
@@ -244,8 +247,10 @@ export class Request {
     this._abortRequestCallback?.(error);
     this.logger(`${this.type} ${this.segment.externalId} failed ${error.type}`);
 
-    this.currentAttempt.error = error;
-    this._failedAttempts.add(this.currentAttempt);
+    this._failedAttempts.add({
+      ...this.currentAttempt,
+      error,
+    });
     this.notReceivingBytesTimeout.clear();
     this.requestProcessQueueCallback();
   };
@@ -256,8 +261,10 @@ export class Request {
 
     this.setStatus("failed");
     this.logger(`${this.type} ${this.segment.externalId} failed ${error.type}`);
-    this.currentAttempt.error = error;
-    this._failedAttempts.add(this.currentAttempt);
+    this._failedAttempts.add({
+      ...this.currentAttempt,
+      error,
+    });
     this.notReceivingBytesTimeout.clear();
     this.requestProcessQueueCallback();
   };
@@ -312,14 +319,14 @@ export class Request {
 }
 
 class FailedRequestAttempts {
-  private attempts: RequestAttempt[] = [];
+  private attempts: Required<RequestAttempt>[] = [];
   private _lastClearTimestamp = performance.now();
 
   get lastClearTimestamp() {
     return this._lastClearTimestamp;
   }
 
-  add(attempt: RequestAttempt) {
+  add(attempt: Required<RequestAttempt>) {
     this.attempts.push(attempt);
   }
 
@@ -328,6 +335,10 @@ class FailedRequestAttempts {
       (sum, attempt) => (attempt.type === "http" ? sum + 1 : sum),
       0
     );
+  }
+
+  get lastAttempt(): Readonly<Required<RequestAttempt>> {
+    return this.attempts[this.attempts.length - 1];
   }
 
   clear() {
@@ -362,11 +373,14 @@ type RequestErrorType =
 export class RequestError<
   T extends RequestErrorType = RequestErrorType,
 > extends Error {
+  readonly timestamp: number;
+
   constructor(
     readonly type: T,
     message?: string
   ) {
     super(message);
+    this.timestamp = performance.now();
   }
 }
 
