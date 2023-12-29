@@ -120,7 +120,7 @@ export class P2PLoader {
       return;
     }
     void peer.uploadSegmentData(
-      segmentExternalId,
+      segment,
       byteFrom !== undefined ? segmentData.slice(byteFrom) : segmentData
     );
   };

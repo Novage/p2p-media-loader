@@ -22,29 +22,29 @@ const streamUrls = {
   hlsBigBunnyBuck: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
   hlsByteRangeVideo:
     "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8",
+  hlsOneLevelByteRangeVideo:
+    "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/gear1/prog_index.m3u8",
+  hlsBasicExample:
+    "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8",
   hlsAdvancedVideo:
     "https://devstreaming-cdn.apple.com/videos/streaming/examples/adv_dv_atmos/main.m3u8",
   hlsAdvancedVideo2:
     "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_adv_example_hevc/master.m3u8",
-  hlsAdvancedVideo3:
-    "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8",
-  hlsAdvancedVideo4:
-    "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_fmp4/master.m3u8",
-  hlsBasicExample:
-    "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8",
   hlsLive1:
     "https://fcc3ddae59ed.us-west-2.playback.live-video.net/api/video/v1/us-west-2.893648527354.channel.DmumNckWFTqz.m3u8",
   hlsLive2:
     "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8",
-  live2OnlyLevel4:
+  hlsLive2Level4Only:
     "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/level_4.m3u8",
-  audioOnly:
+  hlsAudioOnly:
     "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/a1/prog_index.m3u8",
   bigBunnyBuckDash: "https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd",
   dashLiveBigBunnyBuck:
     "https://livesim.dashif.org/livesim/testpic_2s/Manifest.mpd",
   dashVODBigBunnyBuck:
     "https://dash.akamaized.net/dash264/TestCases/5b/nomor/6.mpd",
+  dashLiveHokey:
+    "https://d24rwxnt7vw9qb.cloudfront.net/v1/dash/e6d234965645b411ad572802b6c9d5a10799c9c1/All_Reference_Streams/4577dca5f8a44756875ab5cc913cd1f1/index.mpd",
 };
 
 function App() {
@@ -141,10 +141,7 @@ function App() {
         type: "customHls",
         customType: {
           customHls: (video: HTMLVideoElement) => {
-            const hls = new window.Hls({
-              ...engine.getConfig(),
-              liveSyncDurationCount: 7,
-            });
+            const hls = new window.Hls(engine.getConfig());
             engine.setHls(hls);
             hls.loadSource(video.src);
             hls.attachMedia(video);
@@ -197,7 +194,7 @@ function App() {
             shakaPlayer.addEventListener("error", (event: { code: number }) => {
               onError(event);
             });
-            engine.initShakaPlayer(shakaPlayer);
+            engine.configureAndInitShakaPlayer(shakaPlayer);
             shakaPlayer.load(src).catch(onError);
 
             shakaInstance.current = shakaPlayer;
@@ -220,7 +217,7 @@ function App() {
     player.addEventListener("error", (event: { detail: { code: unknown } }) => {
       onError(event.detail);
     });
-    engine.initShakaPlayer(player);
+    engine.configureAndInitShakaPlayer(player);
     player.load(url).catch(onError);
     shakaInstance.current = player;
     setPlayerToWindow(player);
@@ -235,7 +232,7 @@ function App() {
       source: url,
       plugins: [window.DashShakaPlayback, window.LevelSelector],
       shakaOnBeforeLoad: (shakaPlayerInstance: any) => {
-        engine.initShakaPlayer(shakaPlayerInstance);
+        engine.configureAndInitShakaPlayer(shakaPlayerInstance);
       },
     });
     setPlayerToWindow(clapprPlayer);
@@ -302,6 +299,10 @@ function App() {
     }
   };
 
+  const createInNewTab = () => {
+    window.open(window.location.href, "_blank");
+  };
+
   return (
     <div style={{ width: 1000, margin: "auto" }}>
       <div style={{ textAlign: "center" }}>
@@ -338,6 +339,7 @@ function App() {
             <button onClick={loadStreamWithExistingInstance}>
               Load stream with existing hls/shaka instance
             </button>
+            <button onClick={createInNewTab}>Create in new tab</button>
           </div>
         </div>
         <div style={{ display: "flex", justifyContent: "center" }}>

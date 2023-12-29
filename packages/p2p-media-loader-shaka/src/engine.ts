@@ -15,6 +15,8 @@ import {
 import { Loader } from "./loading-handler";
 import { Core, CoreEventHandlers } from "p2p-media-loader-core";
 
+const LIVE_EDGE_DELAY = 25;
+
 export class Engine {
   private player?: shaka.Player;
   private readonly shaka: Shaka;
@@ -29,10 +31,15 @@ export class Engine {
     this.segmentManager = new SegmentManager(this.streamInfo, this.core);
   }
 
-  initShakaPlayer(player: shaka.Player) {
+  configureAndInitShakaPlayer(player: shaka.Player) {
     if (this.player === player) return;
     if (this.player) this.destroy();
     this.player = player;
+    this.player.configure("manifest.defaultPresentationDelay", LIVE_EDGE_DELAY);
+    this.player.configure(
+      "manifest.dash.ignoreSuggestedPresentationDelay",
+      true
+    );
     this.updatePlayerEventHandlers("register");
   }
 
@@ -40,9 +47,8 @@ export class Engine {
     const { player } = this;
     if (!player) return;
 
-    if (!this.player) return;
     const networkingEngine =
-      this.player.getNetworkingEngine() as HookedNetworkingEngine | null;
+      player.getNetworkingEngine() as HookedNetworkingEngine | null;
     if (networkingEngine) {
       if (type === "register") {
         const p2pml: P2PMLShakaData = {
@@ -78,6 +84,7 @@ export class Engine {
     this.destroyCurrentStreamContext();
     this.updateMediaElementEventHandlers("unregister");
   };
+
   private destroyCurrentStreamContext = () => {
     this.streamInfo.protocol = undefined;
     this.streamInfo.manifestResponseUrl = undefined;
@@ -140,12 +147,7 @@ export class Engine {
       const { p2pml } = request;
       if (!p2pml) return shaka.net.HttpFetchPlugin.parse(...args);
 
-      const loader = new Loader(
-        p2pml.shaka,
-        p2pml.core,
-        p2pml.streamInfo,
-        p2pml.segmentManager
-      );
+      const loader = new Loader(p2pml.shaka, p2pml.core, p2pml.streamInfo);
       return loader.load(...args);
     };
     NetworkingEngine.registerScheme("http", handleLoading);
