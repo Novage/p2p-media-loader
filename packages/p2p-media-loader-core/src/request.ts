@@ -73,7 +73,7 @@ export class Request {
   constructor(
     readonly segment: Segment,
     private readonly requestProcessQueueCallback: () => void,
-    private readonly bandwidthApproximator: BandwidthCalculator,
+    private readonly bandwidthCalculator: BandwidthCalculator,
     private readonly playback: Playback,
     private readonly settings: StreamUtils.PlaybackTimeWindowsSettings
   ) {
@@ -179,7 +179,7 @@ export class Request {
       loadedBytes: 0,
       startTimestamp: performance.now(),
     };
-    this.bandwidthApproximator.addLoading(this.progress);
+    this.bandwidthCalculator.startLoading();
     const { notReceivingBytesTimeoutMs, abort } = controls;
     this._abortRequestCallback = abort;
 
@@ -207,10 +207,11 @@ export class Request {
 
   resolveEngineCallbacksSuccessfully() {
     if (!this.finalData) return;
-    this._engineCallbacks?.onSuccess({
-      data: this.finalData,
-      bandwidth: this.bandwidthApproximator.getBandwidth(),
-    });
+    const bandwidth = this.bandwidthCalculator.getBandwidthForLastNSeconds(3);
+    const bandwidth6 = this.bandwidthCalculator.getBandwidthForLastNSeconds(6);
+    console.log("bandwidth", bandwidth / 1000);
+    console.log("bandwidth6", bandwidth6 / 1000);
+    this._engineCallbacks?.onSuccess({ data: this.finalData, bandwidth });
     this._engineCallbacks = undefined;
   }
 
@@ -236,6 +237,7 @@ export class Request {
     this._abortRequestCallback = undefined;
     this.currentAttempt = undefined;
     this.notReceivingBytesTimeout.clear();
+    this.bandwidthCalculator.stopLoading();
   }
 
   private abortOnTimeout = () => {
@@ -252,6 +254,7 @@ export class Request {
       error,
     });
     this.notReceivingBytesTimeout.clear();
+    this.bandwidthCalculator.stopLoading();
     this.requestProcessQueueCallback();
   };
 
@@ -266,6 +269,7 @@ export class Request {
       error,
     });
     this.notReceivingBytesTimeout.clear();
+    this.bandwidthCalculator.stopLoading();
     this.requestProcessQueueCallback();
   };
 
@@ -273,12 +277,12 @@ export class Request {
     this.throwErrorIfNotLoadingStatus();
     if (!this.currentAttempt) return;
 
+    this.bandwidthCalculator.stopLoading();
     this.notReceivingBytesTimeout.clear();
     this.finalData = Utils.joinChunks(this.bytes);
     this.setStatus("succeed");
     this._totalBytes = this._loadedBytes;
 
-    this.resolveEngineCallbacksSuccessfully();
     this.logger(
       `${this.currentAttempt.type} ${this.segment.externalId} succeed`
     );
@@ -290,6 +294,7 @@ export class Request {
     if (!this.currentAttempt || !this.progress) return;
     this.notReceivingBytesTimeout.restart();
 
+    this.bandwidthCalculator.addBytes(chunk.length);
     this.bytes.push(chunk);
     this.progress.lastLoadedChunkTimestamp = performance.now();
     this.progress.loadedBytes += chunk.length;

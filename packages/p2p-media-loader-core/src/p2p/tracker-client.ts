@@ -31,8 +31,9 @@ export class P2PTrackerClient {
     private readonly settings: Settings
   ) {
     const { string: peerId, bytes: peerIdBytes } = PeerUtil.generatePeerId();
-    const { bytes: streamIdBytes, string: streamHash } =
-      PeerUtil.getStreamHash(streamId);
+    const { bytes: streamIdBytes, string: streamHash } = PeerUtil.getStreamHash(
+      streamId + "a"
+    );
     this.peerId = peerId;
     this.streamShortId = LoggerUtils.getStreamString(stream);
 

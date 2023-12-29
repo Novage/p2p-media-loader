@@ -31,7 +31,7 @@ export class Core<TStream extends Stream = Stream> {
     httpErrorRetries: 3,
     p2pErrorRetries: 3,
   };
-  private readonly bandwidthApproximator = new BandwidthCalculator();
+  private readonly bandwidthCalculator = new BandwidthCalculator();
   private segmentStorage?: SegmentsMemoryStorage;
   private mainStreamLoader?: HybridLoader;
   private secondaryStreamLoader?: HybridLoader;
@@ -113,7 +113,6 @@ export class Core<TStream extends Stream = Stream> {
     this.mainStreamLoader = undefined;
     this.secondaryStreamLoader = undefined;
     this.segmentStorage = undefined;
-    this.bandwidthApproximator.destroy();
     this.manifestResponseUrl = undefined;
   }
 
@@ -145,7 +144,7 @@ export class Core<TStream extends Stream = Stream> {
         manifestResponseUrl,
         segment,
         this.settings,
-        this.bandwidthApproximator,
+        this.bandwidthCalculator,
         this.segmentStorage,
         this.eventHandlers
       );

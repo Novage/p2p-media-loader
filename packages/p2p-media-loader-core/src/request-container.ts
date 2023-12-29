@@ -7,7 +7,7 @@ export class RequestsContainer {
 
   constructor(
     private readonly requestProcessQueueCallback: () => void,
-    private readonly bandwidthApproximator: BandwidthCalculator,
+    private readonly bandwidthCalculator: BandwidthCalculator,
     private readonly playback: Playback,
     private readonly settings: Settings
   ) {}
@@ -44,7 +44,7 @@ export class RequestsContainer {
       request = new Request(
         segment,
         this.requestProcessQueueCallback,
-        this.bandwidthApproximator,
+        this.bandwidthCalculator,
         this.playback,
         this.settings
       );
