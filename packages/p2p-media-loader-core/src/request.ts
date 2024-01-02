@@ -208,7 +208,6 @@ export class Request {
   resolveEngineCallbacksSuccessfully() {
     if (!this.finalData) return;
     const bandwidth = this.bandwidthCalculator.getBandwidthForLastNSeconds(3);
-    console.log("bandwidth", bandwidth / 1000);
     this._engineCallbacks?.onSuccess({ data: this.finalData, bandwidth });
     this._engineCallbacks = undefined;
   }
@@ -323,11 +322,6 @@ export class Request {
 
 class FailedRequestAttempts {
   private attempts: Required<RequestAttempt>[] = [];
-  private _lastClearTimestamp = performance.now();
-
-  get lastClearTimestamp() {
-    return this._lastClearTimestamp;
-  }
 
   add(attempt: Required<RequestAttempt>) {
     this.attempts.push(attempt);
@@ -346,7 +340,6 @@ class FailedRequestAttempts {
 
   clear() {
     this.attempts = [];
-    this._lastClearTimestamp = performance.now();
   }
 }
 
