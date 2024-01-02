@@ -56,3 +56,9 @@ export function hexToUtf8(hexString: string) {
   const decoder = new TextDecoder();
   return decoder.decode(bytes);
 }
+
+export function* arrayBackwards<T>(arr: T[]) {
+  for (let i = arr.length - 1; i >= 0; i--) {
+    yield arr[i];
+  }
+}

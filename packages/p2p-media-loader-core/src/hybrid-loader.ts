@@ -2,7 +2,7 @@ import { Segment, StreamWithSegments } from "./index";
 import { HttpRequestExecutor } from "./http-loader";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import { Settings, CoreEventHandlers, Playback } from "./types";
-import { BandwidthApproximator } from "./bandwidth-approximator";
+import { BandwidthCalculator } from "./bandwidth-calculator";
 import { P2PLoadersContainer } from "./p2p/loaders-container";
 import { RequestsContainer } from "./request-container";
 import { EngineCallbacks } from "./request";
@@ -30,7 +30,7 @@ export class HybridLoader {
     private streamManifestUrl: string,
     requestedSegment: Segment,
     private readonly settings: Settings,
-    private readonly bandwidthApproximator: BandwidthApproximator,
+    private readonly bandwidthCalculator: BandwidthCalculator,
     private readonly segmentStorage: SegmentsMemoryStorage,
     private readonly eventHandlers?: Pick<CoreEventHandlers, "onSegmentLoaded">
   ) {
@@ -40,7 +40,7 @@ export class HybridLoader {
     this.segmentAvgDuration = StreamUtils.getSegmentAvgDuration(activeStream);
     this.requests = new RequestsContainer(
       this.requestProcessQueueMicrotask,
-      this.bandwidthApproximator,
+      this.bandwidthCalculator,
       this.playback,
       this.settings
     );
@@ -94,7 +94,7 @@ export class HybridLoader {
       if (data) {
         callbacks.onSuccess({
           data,
-          bandwidth: this.bandwidthApproximator.getBandwidth(),
+          bandwidth: this.bandwidthCalculator.getBandwidthForLastNSeconds(3),
         });
       }
     } else {
@@ -344,7 +344,7 @@ export class HybridLoader {
     queue: QueueUtils.QueueItem[],
     segment: Segment
   ): boolean {
-    for (const { segment: itemSegment } of arrayBackwards(queue)) {
+    for (const { segment: itemSegment } of Utils.arrayBackwards(queue)) {
       if (itemSegment === segment) break;
       const request = this.requests.get(itemSegment);
       if (request?.type === "http" && request.status === "loading") {
@@ -359,7 +359,7 @@ export class HybridLoader {
     queue: QueueUtils.QueueItem[],
     segment: Segment
   ): boolean {
-    for (const { segment: itemSegment } of arrayBackwards(queue)) {
+    for (const { segment: itemSegment } of Utils.arrayBackwards(queue)) {
       if (itemSegment === segment) break;
       const request = this.requests.get(itemSegment);
       if (request?.type === "p2p" && request.status === "loading") {
@@ -401,11 +401,5 @@ export class HybridLoader {
     this.requests.destroy();
     this.p2pLoaders.destroy();
     this.logger.destroy();
-  }
-}
-
-function* arrayBackwards<T>(arr: T[]) {
-  for (let i = arr.length - 1; i >= 0; i--) {
-    yield arr[i];
   }
 }

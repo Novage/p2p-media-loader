@@ -1,5 +1,5 @@
 import { Segment, Settings, Playback } from "./types";
-import { BandwidthApproximator } from "./bandwidth-approximator";
+import { BandwidthCalculator } from "./bandwidth-calculator";
 import { Request } from "./request";
 
 export class RequestsContainer {
@@ -7,7 +7,7 @@ export class RequestsContainer {
 
   constructor(
     private readonly requestProcessQueueCallback: () => void,
-    private readonly bandwidthApproximator: BandwidthApproximator,
+    private readonly bandwidthCalculator: BandwidthCalculator,
     private readonly playback: Playback,
     private readonly settings: Settings
   ) {}
@@ -44,7 +44,7 @@ export class RequestsContainer {
       request = new Request(
         segment,
         this.requestProcessQueueCallback,
-        this.bandwidthApproximator,
+        this.bandwidthCalculator,
         this.playback,
         this.settings
       );

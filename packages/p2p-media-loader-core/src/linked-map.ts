@@ -9,14 +9,6 @@ export class LinkedMap<K, V extends object> {
   private _first?: LinkedObject<K, V>;
   private _last?: LinkedObject<K, V>;
 
-  get first() {
-    return this._first?.item;
-  }
-
-  get last() {
-    return this._last?.item;
-  }
-
   get size() {
     return this.map.size;
   }
@@ -51,12 +43,6 @@ export class LinkedMap<K, V extends object> {
     if (prev) prev.next = next;
     if (next) next.prev = prev;
     this.map.delete(key);
-  }
-
-  clear() {
-    this._first = undefined;
-    this._last = undefined;
-    this.map.clear();
   }
 
   *values(key?: K) {
