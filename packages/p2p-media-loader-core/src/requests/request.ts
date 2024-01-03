@@ -1,14 +1,9 @@
-import { Segment, SegmentResponse, Playback } from "./types";
-import { BandwidthCalculator } from "./bandwidth-calculator";
-import * as StreamUtils from "./utils/stream";
-import * as Utils from "./utils/utils";
-import * as LoggerUtils from "./utils/logger";
+import { Segment, Playback } from "../types";
+import { BandwidthCalculator } from "../bandwidth-calculator";
+import * as StreamUtils from "../utils/stream";
+import * as Utils from "../utils/utils";
+import * as LoggerUtils from "../utils/logger";
 import debug from "debug";
-
-export type EngineCallbacks = {
-  onSuccess: (response: SegmentResponse) => void;
-  onError: (reason: CoreRequestError) => void;
-};
 
 export type LoadProgress = {
   startTimestamp: number;
@@ -54,7 +49,6 @@ export type RequestStatus =
 
 export class Request {
   readonly id: string;
-  private _engineCallbacks?: EngineCallbacks;
   private currentAttempt?: RequestAttempt;
   private _failedAttempts = new FailedRequestAttempts();
   private finalData?: ArrayBuffer;
@@ -104,10 +98,6 @@ export class Request {
     this._isHandledByProcessQueue = false;
   }
 
-  get isSegmentRequestedByEngine(): boolean {
-    return !!this._engineCallbacks;
-  }
-
   get type() {
     return this.currentAttempt?.type;
   }
@@ -136,15 +126,6 @@ export class Request {
 
   markHandledByProcessQueue() {
     this._isHandledByProcessQueue = true;
-  }
-
-  setEngineCallbacks(callbacks: EngineCallbacks) {
-    if (this._engineCallbacks) {
-      throw new Error("Segment is already requested by engine");
-    }
-    this.failedAttempts.clear();
-    this._isHandledByProcessQueue = false;
-    this._engineCallbacks = callbacks;
   }
 
   setTotalBytes(value: number) {
@@ -203,25 +184,6 @@ export class Request {
       completeOnSuccess: this.completeOnSuccess,
       abortOnError: this.abortOnError,
     };
-  }
-
-  resolveEngineCallbacksSuccessfully() {
-    if (!this.finalData) return;
-    const bandwidth = this.bandwidthCalculator.getBandwidthForLastNSeconds(3);
-    this._engineCallbacks?.onSuccess({ data: this.finalData, bandwidth });
-    this._engineCallbacks = undefined;
-  }
-
-  resolveEngineCallbacksWithError() {
-    this._engineCallbacks?.onError(new CoreRequestError("failed"));
-    this._engineCallbacks = undefined;
-  }
-
-  abortFromEngine() {
-    if (this._status !== "loading") return;
-    this._engineCallbacks?.onError(new CoreRequestError("aborted"));
-    this._engineCallbacks = undefined;
-    this.requestProcessQueueCallback();
   }
 
   abortFromProcessQueue() {
@@ -377,12 +339,6 @@ export class RequestError<
   ) {
     super(message);
     this.timestamp = performance.now();
-  }
-}
-
-export class CoreRequestError extends Error {
-  constructor(readonly type: "failed" | "aborted") {
-    super();
   }
 }
 
