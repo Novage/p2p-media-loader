@@ -6,7 +6,7 @@ import {
   RequestError,
   PeerRequestErrorType,
   RequestInnerErrorType,
-} from "../request";
+} from "../requests/request";
 import * as Command from "./commands";
 import { Segment } from "../types";
 import * as Utils from "../utils/utils";

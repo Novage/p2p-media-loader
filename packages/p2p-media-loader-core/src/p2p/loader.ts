@@ -1,8 +1,8 @@
 import { Peer } from "./peer";
 import { Segment, Settings, StreamWithSegments } from "../types";
 import { SegmentsMemoryStorage } from "../segments-storage";
-import { RequestsContainer } from "../request-container";
-import { Request } from "../request";
+import { RequestsContainer } from "../requests/request-container";
+import { Request } from "../requests/request";
 import { P2PTrackerClient } from "./tracker-client";
 import * as StreamUtils from "../utils/stream";
 import * as Utils from "../utils/utils";

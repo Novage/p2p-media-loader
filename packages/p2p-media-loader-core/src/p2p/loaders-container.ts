@@ -1,7 +1,7 @@
 import { P2PLoader } from "./loader";
 import debug from "debug";
 import { Settings, Stream, StreamWithSegments } from "../index";
-import { RequestsContainer } from "../request-container";
+import { RequestsContainer } from "../requests/request-container";
 import { SegmentsMemoryStorage } from "../segments-storage";
 import * as LoggerUtils from "../utils/logger";
 

@@ -1,5 +1,5 @@
 import { LinkedMap } from "./linked-map";
-import { RequestAttempt } from "./request";
+import { RequestAttempt } from "./requests/request";
 
 export type StreamType = "main" | "secondary";
 
