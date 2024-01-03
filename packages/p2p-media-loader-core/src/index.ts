@@ -2,4 +2,5 @@
 
 export { Core } from "./core";
 export type * from "./types";
-export { CoreRequestError, EngineRequest } from "./requests/engine-request";
+export { CoreRequestError } from "./requests/engine-request";
+export type { EngineCallbacks } from "./requests/engine-request";
