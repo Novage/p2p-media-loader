@@ -94,7 +94,8 @@ export class HybridLoader {
       if (data) {
         callbacks.onSuccess({
           data,
-          bandwidth: this.bandwidthCalculator.getBandwidthForLastNSeconds(3),
+          bandwidth:
+            this.bandwidthCalculator.getBandwidthForLastNSplicedSeconds(3),
         });
       }
     } else {

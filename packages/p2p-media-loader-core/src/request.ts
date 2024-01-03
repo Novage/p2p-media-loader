@@ -207,7 +207,8 @@ export class Request {
 
   resolveEngineCallbacksSuccessfully() {
     if (!this.finalData) return;
-    const bandwidth = this.bandwidthCalculator.getBandwidthForLastNSeconds(3);
+    const bandwidth =
+      this.bandwidthCalculator.getBandwidthForLastNSplicedSeconds(3);
     this._engineCallbacks?.onSuccess({ data: this.finalData, bandwidth });
     this._engineCallbacks = undefined;
   }
