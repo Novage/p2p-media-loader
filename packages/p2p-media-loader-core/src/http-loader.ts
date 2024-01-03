@@ -4,7 +4,7 @@ import {
   RequestError,
   HttpRequestErrorType,
   RequestControls,
-} from "./request";
+} from "./requests/request";
 
 type HttpSettings = Pick<Settings, "httpNotReceivingBytesTimeoutMs">;
 

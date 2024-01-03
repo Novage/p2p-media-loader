@@ -1,5 +1,5 @@
-import { Segment, Settings, Playback } from "./types";
-import { BandwidthCalculator } from "./bandwidth-calculator";
+import { Segment, Settings, Playback } from "../types";
+import { BandwidthCalculator } from "../bandwidth-calculator";
 import { Request } from "./request";
 
 export class RequestsContainer {
@@ -30,12 +30,6 @@ export class RequestsContainer {
 
   get(segment: Segment) {
     return this.requests.get(segment);
-  }
-
-  getBySegmentLocalId(id: string) {
-    for (const request of this.requests.values()) {
-      if (request.segment.localId === id) return request;
-    }
   }
 
   getOrCreateRequest(segment: Segment) {
@@ -76,7 +70,6 @@ export class RequestsContainer {
   destroy() {
     for (const request of this.requests.values()) {
       request.abortFromProcessQueue();
-      request.abortFromEngine();
     }
     this.requests.clear();
   }
