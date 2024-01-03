@@ -35,6 +35,8 @@ export class Core<TStream extends Stream = Stream> {
   private segmentStorage?: SegmentsMemoryStorage;
   private mainStreamLoader?: HybridLoader;
   private secondaryStreamLoader?: HybridLoader;
+  private activeLevelBitrate?: number;
+  private isLive = false;
 
   constructor(private readonly eventHandlers?: CoreEventHandlers) {}
 
@@ -93,6 +95,7 @@ export class Core<TStream extends Stream = Stream> {
     const segment = this.identifySegment(segmentLocalId);
     const loader = this.getStreamHybridLoader(segment);
     void loader.loadSegment(segment, callbacks);
+    console.log(this.isLive, this.activeLevelBitrate);
   }
 
   abortSegmentLoading(segmentLocalId: string): void {
@@ -103,6 +106,14 @@ export class Core<TStream extends Stream = Stream> {
   updatePlayback(position: number, rate: number): void {
     this.mainStreamLoader?.updatePlayback(position, rate);
     this.secondaryStreamLoader?.updatePlayback(position, rate);
+  }
+
+  setActiveLevelBitrate(bitrate: number) {
+    this.activeLevelBitrate = bitrate;
+  }
+
+  setIsLive(isLive: boolean) {
+    this.isLive = isLive;
   }
 
   destroy(): void {

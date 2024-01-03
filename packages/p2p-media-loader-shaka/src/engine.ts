@@ -74,9 +74,23 @@ export class Engine {
     player[method]("loaded", this.handlePlayerLoaded);
     player[method]("loading", this.destroyCurrentStreamContext);
     player[method]("unloading", this.handlePlayerUnloading);
+    player[method]("adaptation", this.onVariantChanged);
+    player[method]("variantchanged", this.onVariantChanged);
+  };
+
+  private onVariantChanged = () => {
+    if (!this.player) return;
+    const activeTrack = this.player
+      .getVariantTracks()
+      .find((track) => track.active);
+
+    if (!activeTrack) return;
+    this.core.setActiveLevelBitrate(activeTrack.bandwidth);
   };
 
   private handlePlayerLoaded = () => {
+    if (!this.player) return;
+    this.core.setIsLive(this.player.isLive());
     this.updateMediaElementEventHandlers("register");
   };
 
