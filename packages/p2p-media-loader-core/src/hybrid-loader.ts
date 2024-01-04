@@ -15,6 +15,7 @@ import * as LoggerUtils from "./utils/logger";
 import * as StreamUtils from "./utils/stream";
 import * as Utils from "./utils/utils";
 import debug from "debug";
+import { QueueItem } from "./utils/queue";
 
 const FAILED_ATTEMPTS_CLEAR_INTERVAL = 60000;
 
@@ -199,17 +200,7 @@ export class HybridLoader {
   }
 
   private processQueue() {
-    const { queue, queueSegmentIds } = QueueUtils.generateQueue({
-      lastRequestedSegment: this.lastRequestedSegment,
-      playback: this.playback,
-      settings: this.settings,
-      skipSegment: (segment) => {
-        return (
-          this.requests.get(segment)?.status === "succeed" ||
-          this.segmentStorage.hasSegment(segment)
-        );
-      },
-    });
+    const { queue, queueSegmentIds } = this.generateQueue();
     this.processRequests(queueSegmentIds);
 
     const {
@@ -217,22 +208,6 @@ export class HybridLoader {
       simultaneousP2PDownloads,
       httpErrorRetries,
     } = this.settings;
-
-    for (const engineRequest of this.engineRequests.values()) {
-      if (this.requests.executingHttpCount >= simultaneousHttpDownloads) break;
-      const request = this.requests.get(engineRequest.segment);
-      if (
-        !queueSegmentIds.has(engineRequest.segment.localId) &&
-        engineRequest.status === "pending" &&
-        (!request ||
-          request.status === "not-started" ||
-          (request.status === "failed" &&
-            request.failedAttempts.httpAttemptsCount <
-              this.settings.httpErrorRetries))
-      ) {
-        void this.loadThroughHttp(engineRequest.segment);
-      }
-    }
 
     for (const item of queue) {
       const { statuses, segment } = item;
@@ -328,36 +303,46 @@ export class HybridLoader {
     const { simultaneousHttpDownloads, httpErrorRetries } = this.settings;
     const p2pLoader = this.p2pLoaders.currentLoader;
     const connectedPeersAmount = p2pLoader.connectedPeersAmount;
+
     if (
       this.requests.executingHttpCount >= simultaneousHttpDownloads ||
       !connectedPeersAmount
     ) {
       return;
     }
-    const { queue } = QueueUtils.generateQueue({
-      lastRequestedSegment: this.lastRequestedSegment,
-      playback: this.playback,
-      settings: this.settings,
-      skipSegment: (segment, statuses) => {
-        const request = this.requests.get(segment);
-        return (
-          !statuses.isHttpDownloadable ||
-          this.segmentStorage.hasSegment(segment) ||
-          request?.type !== undefined ||
-          (request?.failedAttempts.httpAttemptsCount ?? 0) >=
-            httpErrorRetries ||
-          p2pLoader.isLoadingOrLoadedBySomeone(segment)
-        );
-      },
-    });
-    if (!queue.length) return;
+
+    const segmentsToLoad: Segment[] = [];
+    for (const { segment, statuses } of QueueUtils.generateQueue(
+      this.lastRequestedSegment,
+      this.playback,
+      this.settings
+    )) {
+      if (
+        !statuses.isHttpDownloadable ||
+        p2pLoader.isLoadingOrLoadedBySomeone(segment) ||
+        this.segmentStorage.hasSegment(segment)
+      ) {
+        continue;
+      }
+      const request = this.requests.get(segment);
+      if (
+        request &&
+        (request.status === "succeed" ||
+          (request.failedAttempts.httpAttemptsCount ?? 0) >= httpErrorRetries)
+      ) {
+        continue;
+      }
+      segmentsToLoad.push(segment);
+    }
+
+    if (!segmentsToLoad.length) return;
     const peersAmount = connectedPeersAmount + 1;
-    const probability = Math.min(queue.length / peersAmount, 1);
+    const probability = Math.min(segmentsToLoad.length / peersAmount, 1);
     const shouldLoad = Math.random() < probability;
 
     if (!shouldLoad) return;
-    const item = Utils.getRandomItem(queue);
-    void this.loadThroughHttp(item.segment);
+    const segment = Utils.getRandomItem(segmentsToLoad);
+    void this.loadThroughHttp(segment);
   }
 
   private abortLastHttpLoadingInQueueAfterItem(
@@ -388,6 +373,38 @@ export class HybridLoader {
       }
     }
     return false;
+  }
+
+  private generateQueue() {
+    const queue: QueueItem[] = [];
+    const queueSegmentIds = new Set<string>();
+    let maxPossibleLength = 0;
+    let alreadyLoadedAmount = 0;
+    for (const item of QueueUtils.generateQueue(
+      this.lastRequestedSegment,
+      this.playback,
+      this.settings
+    )) {
+      maxPossibleLength++;
+      const { segment } = item;
+      if (
+        this.segmentStorage.hasSegment(segment) ||
+        this.requests.get(segment)?.status === "succeed"
+      ) {
+        alreadyLoadedAmount++;
+        continue;
+      }
+      queue.push(item);
+      queueSegmentIds.add(segment.localId);
+    }
+
+    return {
+      queue,
+      queueSegmentIds,
+      maxPossibleLength,
+      alreadyLoadedAmount,
+      loadedPercent: (alreadyLoadedAmount / maxPossibleLength) * 100,
+    };
   }
 
   updatePlayback(position: number, rate: number) {

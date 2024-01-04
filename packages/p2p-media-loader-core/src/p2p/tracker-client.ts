@@ -42,9 +42,9 @@ export class P2PTrackerClient {
       port: 6881,
       announce: [
         // "wss://tracker.novage.com.ua",
-        "wss://tracker.openwebtorrent.com",
         "wss://tracker.webtorrent.dev",
         "wss://tracker.files.fm:7073/announce",
+        "wss://tracker.openwebtorrent.com",
       ],
       rtcConfig: {
         iceServers: [
