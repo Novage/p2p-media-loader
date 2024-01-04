@@ -6,6 +6,7 @@ import {
   Settings,
   SegmentBase,
   CoreEventHandlers,
+  BandwidthCalculators,
 } from "./types";
 import * as StreamUtils from "./utils/stream";
 import { LinkedMap } from "./linked-map";
@@ -31,7 +32,10 @@ export class Core<TStream extends Stream = Stream> {
     httpErrorRetries: 3,
     p2pErrorRetries: 3,
   };
-  private readonly bandwidthCalculator = new BandwidthCalculator();
+  private readonly bandwidthCalculators: BandwidthCalculators = {
+    all: new BandwidthCalculator(),
+    http: new BandwidthCalculator(),
+  };
   private segmentStorage?: SegmentsMemoryStorage;
   private mainStreamLoader?: HybridLoader;
   private secondaryStreamLoader?: HybridLoader;
@@ -95,7 +99,7 @@ export class Core<TStream extends Stream = Stream> {
     const segment = this.identifySegment(segmentLocalId);
     const loader = this.getStreamHybridLoader(segment);
     void loader.loadSegment(segment, callbacks);
-    console.log(this.isLive, this.activeLevelBitrate);
+    // console.log(this.isLive, this.activeLevelBitrate);
   }
 
   abortSegmentLoading(segmentLocalId: string): void {
@@ -155,7 +159,7 @@ export class Core<TStream extends Stream = Stream> {
         manifestResponseUrl,
         segment,
         this.settings,
-        this.bandwidthCalculator,
+        this.bandwidthCalculators,
         this.segmentStorage,
         this.eventHandlers
       );

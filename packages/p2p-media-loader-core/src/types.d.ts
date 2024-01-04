@@ -1,5 +1,6 @@
 import { LinkedMap } from "./linked-map";
 import { RequestAttempt } from "./requests/request";
+import { BandwidthCalculator } from "./bandwidth-calculator";
 
 export type StreamType = "main" | "secondary";
 
@@ -71,3 +72,8 @@ export type Playback = {
   position: number;
   rate: number;
 };
+
+export type BandwidthCalculators = Readonly<{
+  all: BandwidthCalculator;
+  http: BandwidthCalculator;
+}>;

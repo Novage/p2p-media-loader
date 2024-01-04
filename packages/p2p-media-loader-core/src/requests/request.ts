@@ -1,5 +1,4 @@
-import { Segment, Playback } from "../types";
-import { BandwidthCalculator } from "../bandwidth-calculator";
+import { Segment, Playback, BandwidthCalculators } from "../types";
 import * as StreamUtils from "../utils/stream";
 import * as Utils from "../utils/utils";
 import * as LoggerUtils from "../utils/logger";
@@ -67,7 +66,7 @@ export class Request {
   constructor(
     readonly segment: Segment,
     private readonly requestProcessQueueCallback: () => void,
-    private readonly bandwidthCalculator: BandwidthCalculator,
+    private readonly bandwidthCalculators: BandwidthCalculators,
     private readonly playback: Playback,
     private readonly settings: StreamUtils.PlaybackTimeWindowsSettings
   ) {
@@ -160,7 +159,8 @@ export class Request {
       loadedBytes: 0,
       startTimestamp: performance.now(),
     };
-    this.bandwidthCalculator.startLoading();
+    this.manageBandwidthCalculatorsState("start");
+
     const { notReceivingBytesTimeoutMs, abort } = controls;
     this._abortRequestCallback = abort;
 
@@ -194,9 +194,8 @@ export class Request {
     );
     this._abortRequestCallback?.(new RequestError("abort"));
     this._abortRequestCallback = undefined;
-    this.currentAttempt = undefined;
+    this.manageBandwidthCalculatorsState("stop");
     this.notReceivingBytesTimeout.clear();
-    this.bandwidthCalculator.stopLoading();
   }
 
   private abortOnTimeout = () => {
@@ -213,7 +212,7 @@ export class Request {
       error,
     });
     this.notReceivingBytesTimeout.clear();
-    this.bandwidthCalculator.stopLoading();
+    this.manageBandwidthCalculatorsState("stop");
     this.requestProcessQueueCallback();
   };
 
@@ -228,7 +227,7 @@ export class Request {
       error,
     });
     this.notReceivingBytesTimeout.clear();
-    this.bandwidthCalculator.stopLoading();
+    this.manageBandwidthCalculatorsState("stop");
     this.requestProcessQueueCallback();
   };
 
@@ -236,7 +235,7 @@ export class Request {
     this.throwErrorIfNotLoadingStatus();
     if (!this.currentAttempt) return;
 
-    this.bandwidthCalculator.stopLoading();
+    this.manageBandwidthCalculatorsState("stop");
     this.notReceivingBytesTimeout.clear();
     this.finalData = Utils.joinChunks(this.bytes);
     this.setStatus("succeed");
@@ -253,11 +252,15 @@ export class Request {
     if (!this.currentAttempt || !this.progress) return;
     this.notReceivingBytesTimeout.restart();
 
-    this.bandwidthCalculator.addBytes(chunk.length);
+    const byteLength = chunk.byteLength;
+    const { all: allBC, http: httpBC } = this.bandwidthCalculators;
+    allBC.addBytes(byteLength);
+    if (this.currentAttempt.type === "http") httpBC.addBytes(byteLength);
+
     this.bytes.push(chunk);
     this.progress.lastLoadedChunkTimestamp = performance.now();
-    this.progress.loadedBytes += chunk.length;
-    this._loadedBytes += chunk.length;
+    this.progress.loadedBytes += byteLength;
+    this._loadedBytes += byteLength;
   };
 
   private firstBytesReceived = () => {
@@ -275,6 +278,13 @@ export class Request {
     this._logger.color = this.currentAttempt?.type === "http" ? "green" : "red";
     this._logger(message);
     this._logger.color = "";
+  }
+
+  private manageBandwidthCalculatorsState(state: "start" | "stop") {
+    const { all, http } = this.bandwidthCalculators;
+    const method = state === "start" ? "startLoading" : "stopLoading";
+    if (this.currentAttempt?.type === "http") http[method]();
+    all[method]();
   }
 
   static getRequestItemId(segment: Segment) {

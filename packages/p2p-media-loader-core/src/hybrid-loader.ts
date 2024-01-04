@@ -1,8 +1,12 @@
 import { Segment, StreamWithSegments } from "./index";
 import { HttpRequestExecutor } from "./http-loader";
 import { SegmentsMemoryStorage } from "./segments-storage";
-import { Settings, CoreEventHandlers, Playback } from "./types";
-import { BandwidthCalculator } from "./bandwidth-calculator";
+import {
+  Settings,
+  CoreEventHandlers,
+  Playback,
+  BandwidthCalculators,
+} from "./types";
 import { P2PLoadersContainer } from "./p2p/loaders-container";
 import { RequestsContainer } from "./requests/request-container";
 import { EngineRequest, EngineCallbacks } from "./requests/engine-request";
@@ -16,22 +20,22 @@ const FAILED_ATTEMPTS_CLEAR_INTERVAL = 60000;
 
 export class HybridLoader {
   private readonly requests: RequestsContainer;
-  private readonly p2pLoaders: P2PLoadersContainer;
-  private storageCleanUpIntervalId?: number;
-  private lastRequestedSegment: Readonly<Segment>;
-  private readonly playback: Playback;
-  private lastQueueProcessingTimeStamp?: number;
-  private readonly segmentAvgDuration: number;
-  private randomHttpDownloadInterval!: number;
-  private readonly logger: debug.Debugger;
-  private isProcessQueueMicrotaskCreated = false;
   private readonly engineRequests = new Map<Segment, EngineRequest>();
+  private readonly p2pLoaders: P2PLoadersContainer;
+  private readonly playback: Playback;
+  private readonly segmentAvgDuration: number;
+  private readonly logger: debug.Debugger;
+  private lastRequestedSegment: Readonly<Segment>;
+  private storageCleanUpIntervalId?: number;
+  private lastQueueProcessingTimeStamp?: number;
+  private randomHttpDownloadInterval!: number;
+  private isProcessQueueMicrotaskCreated = false;
 
   constructor(
     private streamManifestUrl: string,
     requestedSegment: Segment,
     private readonly settings: Settings,
-    private readonly bandwidthCalculator: BandwidthCalculator,
+    private readonly bandwidthCalculators: BandwidthCalculators,
     private readonly segmentStorage: SegmentsMemoryStorage,
     private readonly eventHandlers?: Pick<CoreEventHandlers, "onSegmentLoaded">
   ) {
@@ -41,7 +45,7 @@ export class HybridLoader {
     this.segmentAvgDuration = StreamUtils.getSegmentAvgDuration(activeStream);
     this.requests = new RequestsContainer(
       this.requestProcessQueueMicrotask,
-      this.bandwidthCalculator,
+      this.bandwidthCalculators,
       this.playback,
       this.settings
     );
@@ -96,7 +100,7 @@ export class HybridLoader {
       if (data) {
         engineRequest.resolve(
           data,
-          this.bandwidthCalculator.getBandwidthForLastNSplicedSeconds(3),
+          this.bandwidthCalculators.all.getBandwidthForLastNSplicedSeconds(3)
         );
       }
     } else {
@@ -150,7 +154,7 @@ export class HybridLoader {
           }
           engineRequest?.resolve(
             request.data,
-            this.bandwidthCalculator.getBandwidthForLastNSeconds(3)
+            this.bandwidthCalculators.all.getBandwidthForLastNSeconds(3)
           );
           this.engineRequests.delete(segment);
           this.requests.remove(request);

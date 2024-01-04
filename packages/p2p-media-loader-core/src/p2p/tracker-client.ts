@@ -43,15 +43,13 @@ export class P2PTrackerClient {
       announce: [
         // "wss://tracker.novage.com.ua",
         "wss://tracker.openwebtorrent.com",
+        "wss://tracker.webtorrent.dev",
+        "wss://tracker.files.fm:7073/announce",
       ],
       rtcConfig: {
         iceServers: [
-          {
-            urls: [
-              "stun:stun.l.google.com:19302",
-              "stun:global.stun.twilio.com:3478",
-            ],
-          },
+          { urls: "stun:stun.l.google.com:19302" },
+          { urls: "stun:global.stun.twilio.com:3478" },
         ],
       },
     });
