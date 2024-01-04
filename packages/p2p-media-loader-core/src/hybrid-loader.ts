@@ -29,7 +29,7 @@ export class HybridLoader {
   private lastRequestedSegment: Readonly<Segment>;
   private storageCleanUpIntervalId?: number;
   private lastQueueProcessingTimeStamp?: number;
-  private randomHttpDownloadInterval!: number;
+  private randomHttpDownloadInterval?: number;
   private isProcessQueueMicrotaskCreated = false;
 
   constructor(

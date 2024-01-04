@@ -52,6 +52,7 @@ export class Engine {
     if (networkingEngine) {
       if (type === "register") {
         const p2pml: P2PMLShakaData = {
+          player: this.player,
           shaka: this.shaka,
           core: this.core,
           streamInfo: this.streamInfo,

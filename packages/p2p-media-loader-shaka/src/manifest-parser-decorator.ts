@@ -12,6 +12,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   private readonly debug = Debug("p2pml-shaka:manifest-parser");
   private readonly isHls: boolean;
   private segmentManager?: SegmentManager;
+  private player?: shaka.Player;
 
   constructor(
     shaka: Readonly<Shaka>,
@@ -35,6 +36,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   private setP2PMediaLoaderData(p2pml?: P2PMLShakaData) {
     if (!p2pml) return;
     this.segmentManager = p2pml.segmentManager;
+    this.player = p2pml.player;
     p2pml.streamInfo.protocol = this.isHls ? "hls" : "dash";
   }
 
@@ -103,7 +105,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     }
   }
 
-  private hookSegmentIndex(stream: shaka.extern.Stream): void {
+  private hookSegmentIndex(stream: HookedStream): void {
     const { segmentManager } = this;
     if (!segmentManager) return;
 
@@ -117,7 +119,12 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       const originalGet = segmentIndex.get;
       const customGet = (position: number) => {
         const reference = originalGet.call(segmentIndex, position);
-        if (reference === prevReference) return reference;
+        if (
+          reference === prevReference ||
+          (!this.player?.isLive() && stream.isSegmentIndexAlreadyRead)
+        ) {
+          return reference;
+        }
         prevReference = reference;
 
         segmentIndex.get = originalGet;
@@ -137,12 +144,16 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
 
           // Segment index have been updated
           segmentManager.updateStreamSegments(stream, references);
+          stream.isSegmentIndexAlreadyRead = true;
           this.debug(`Stream ${stream.id} is updated`);
         } catch (err) {
           // This catch is intentionally left blank.
           // [...segmentIndex] throws an error when segmentIndex inner array is empty
         } finally {
-          segmentIndex.get = customGet;
+          // do not read VOD segment index again if it has been already read
+          if (!stream.isSegmentIndexAlreadyRead || !!this.player?.isLive()) {
+            segmentIndex.get = customGet;
+          }
         }
         return reference;
       };
