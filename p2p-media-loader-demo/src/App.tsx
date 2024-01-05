@@ -133,7 +133,7 @@ function App() {
 
   const initHlsDPlayer = (url: string) => {
     if (!hlsEngine.current) return;
-    const engine = hlsEngine.current!;
+    const engine = hlsEngine.current;
     const player = new DPlayer({
       container: containerRef.current,
       video: {
@@ -141,8 +141,12 @@ function App() {
         type: "customHls",
         customType: {
           customHls: (video: HTMLVideoElement) => {
-            const hls = new window.Hls(engine.getConfig());
-            engine.setHls(hls);
+            const hls = new window.Hls({
+              // ...engine.getConfig(),
+              maxBufferLength: 20,
+              maxBufferSize: 0.05 * 1000000,
+            });
+            // engine.setHls(hls);
             hls.loadSource(video.src);
             hls.attachMedia(video);
             hlsInstance.current = hls;

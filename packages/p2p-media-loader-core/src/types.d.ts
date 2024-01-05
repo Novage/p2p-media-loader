@@ -77,3 +77,8 @@ export type BandwidthCalculators = Readonly<{
   all: BandwidthCalculator;
   http: BandwidthCalculator;
 }>;
+
+export type StreamDetails = {
+  isLive: boolean;
+  activeLevelBitrate: number;
+};

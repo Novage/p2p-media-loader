@@ -110,7 +110,8 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     if (!segmentManager) return;
 
     const substituteSegmentIndexGet = (
-      segmentIndex: shaka.media.SegmentIndex
+      segmentIndex: shaka.media.SegmentIndex,
+      callFromCreateSegmentIndexMethod = false
     ) => {
       let prevReference: shaka.media.SegmentReference | null = null;
       let prevFirstItemReference: shaka.media.SegmentReference;
@@ -150,8 +151,12 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
           // This catch is intentionally left blank.
           // [...segmentIndex] throws an error when segmentIndex inner array is empty
         } finally {
-          // do not read VOD segment index again if it has been already read
-          if (!stream.isSegmentIndexAlreadyRead || !!this.player?.isLive()) {
+          // do not set custom get again is segment index is already read and stream is VOD
+          if (
+            !stream.isSegmentIndexAlreadyRead ||
+            !!this.player?.isLive() ||
+            !callFromCreateSegmentIndexMethod
+          ) {
             segmentIndex.get = customGet;
           }
         }
@@ -170,7 +175,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     stream.createSegmentIndex = async () => {
       const result = await createSegmentIndexOriginal.call(stream);
       if (!stream.segmentIndex) return result;
-      substituteSegmentIndexGet(stream.segmentIndex);
+      substituteSegmentIndexGet(stream.segmentIndex, true);
       return result;
     };
   }

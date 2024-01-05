@@ -30,7 +30,10 @@ export class BandwidthCalculator {
     this.allLoadingsStoppedTimestamp = now;
   }
 
-  getBandwidthForLastNSplicedSeconds(seconds: number) {
+  getBandwidthForLastNSplicedSeconds(
+    seconds: number,
+    ignoreThresholdTimestamp = Number.NEGATIVE_INFINITY
+  ) {
     if (!this.shiftedTimestamps.length) return 0;
     const milliseconds = seconds * 1000;
     const lastItemTimestamp =
@@ -41,7 +44,12 @@ export class BandwidthCalculator {
 
     for (let i = this.bytes.length - 1; i >= 0; i--) {
       const timestamp = this.shiftedTimestamps[i];
-      if (timestamp < threshold) break;
+      if (
+        timestamp < threshold ||
+        this.timestamps[i] < ignoreThresholdTimestamp
+      ) {
+        break;
+      }
       lastCountedTimestamp = timestamp;
       totalBytes += this.bytes[i];
     }
@@ -49,7 +57,11 @@ export class BandwidthCalculator {
     return (totalBytes * 8000) / (lastItemTimestamp - lastCountedTimestamp);
   }
 
-  getBandwidthForLastNSeconds(seconds: number, now = performance.now()) {
+  getBandwidthForLastNSeconds(
+    seconds: number,
+    ignoreThresholdTimestamp = Number.NEGATIVE_INFINITY,
+    now = performance.now()
+  ) {
     if (!this.timestamps.length) return 0;
     const milliseconds = seconds * 1000;
     const threshold = now - milliseconds;
@@ -58,7 +70,7 @@ export class BandwidthCalculator {
 
     for (let i = this.bytes.length - 1; i >= 0; i--) {
       const timestamp = this.timestamps[i];
-      if (timestamp < threshold) break;
+      if (timestamp < threshold || timestamp < ignoreThresholdTimestamp) break;
       lastCountedTimestamp = timestamp;
       totalBytes += this.bytes[i];
     }

@@ -75,4 +75,8 @@ export class LinkedMap<K, V extends object> {
   getNextTo(key: K): [K, V] | undefined {
     return this.map.get(key)?.next?.item;
   }
+
+  getPrevTo(key: K): [K, V] | undefined {
+    return this.map.get(key)?.prev?.item;
+  }
 }

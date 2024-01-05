@@ -6,6 +6,7 @@ import {
   CoreEventHandlers,
   Playback,
   BandwidthCalculators,
+  StreamDetails,
 } from "./types";
 import { P2PLoadersContainer } from "./p2p/loaders-container";
 import { RequestsContainer } from "./requests/request-container";
@@ -26,23 +27,23 @@ export class HybridLoader {
   private readonly playback: Playback;
   private readonly segmentAvgDuration: number;
   private readonly logger: debug.Debugger;
-  private lastRequestedSegment: Readonly<Segment>;
   private storageCleanUpIntervalId?: number;
+  private levelChangedTimestamp?: number;
   private lastQueueProcessingTimeStamp?: number;
   private randomHttpDownloadInterval?: number;
   private isProcessQueueMicrotaskCreated = false;
 
   constructor(
     private streamManifestUrl: string,
-    requestedSegment: Segment,
+    private lastRequestedSegment: Readonly<Segment>,
+    private readonly streamDetails: Required<Readonly<StreamDetails>>,
     private readonly settings: Settings,
     private readonly bandwidthCalculators: BandwidthCalculators,
     private readonly segmentStorage: SegmentsMemoryStorage,
     private readonly eventHandlers?: Pick<CoreEventHandlers, "onSegmentLoaded">
   ) {
-    this.lastRequestedSegment = requestedSegment;
-    const activeStream = requestedSegment.stream;
-    this.playback = { position: requestedSegment.startTime, rate: 1 };
+    const activeStream = this.lastRequestedSegment.stream;
+    this.playback = { position: this.lastRequestedSegment.startTime, rate: 1 };
     this.segmentAvgDuration = StreamUtils.getSegmentAvgDuration(activeStream);
     this.requests = new RequestsContainer(
       this.requestProcessQueueMicrotask,
@@ -64,7 +65,7 @@ export class HybridLoader {
     });
     this.p2pLoaders = new P2PLoadersContainer(
       this.streamManifestUrl,
-      requestedSegment.stream,
+      this.lastRequestedSegment.stream,
       this.requests,
       this.segmentStorage,
       this.settings
@@ -132,7 +133,10 @@ export class HybridLoader {
     });
   };
 
-  private processRequests(queueSegmentIds: Set<string>) {
+  private processRequests(
+    queueSegmentIds: Set<string>,
+    loadedQueuePercent: number
+  ) {
     const { stream } = this.lastRequestedSegment;
     const { httpErrorRetries } = this.settings;
     const now = performance.now();
@@ -155,7 +159,7 @@ export class HybridLoader {
           }
           engineRequest?.resolve(
             request.data,
-            this.bandwidthCalculators.all.getBandwidthForLastNSeconds(3)
+            this.getBandwidth(loadedQueuePercent)
           );
           this.engineRequests.delete(segment);
           this.requests.remove(request);
@@ -200,14 +204,32 @@ export class HybridLoader {
   }
 
   private processQueue() {
-    const { queue, queueSegmentIds } = this.generateQueue();
-    this.processRequests(queueSegmentIds);
+    const { queue, queueSegmentIds, loadedPercent } = this.generateQueue();
+    this.processRequests(queueSegmentIds, loadedPercent);
+
+    console.log(queue.map((i) => i.segment.externalId));
 
     const {
       simultaneousHttpDownloads,
       simultaneousP2PDownloads,
       httpErrorRetries,
     } = this.settings;
+
+    // for (const engineRequest of this.engineRequests.values()) {
+    //   if (this.requests.executingHttpCount >= simultaneousHttpDownloads) break;
+    //   const request = this.requests.get(engineRequest.segment);
+    //   if (
+    //     !queueSegmentIds.has(engineRequest.segment.localId) &&
+    //     engineRequest.status === "pending" &&
+    //     (!request ||
+    //       request.status === "not-started" ||
+    //       (request.status === "failed" &&
+    //         request.failedAttempts.httpAttemptsCount <
+    //           this.settings.httpErrorRetries))
+    //   ) {
+    //     void this.loadThroughHttp(engineRequest.segment);
+    //   }
+    // }
 
     for (const item of queue) {
       const { statuses, segment } = item;
@@ -254,7 +276,6 @@ export class HybridLoader {
         ) {
           void this.loadThroughP2P(segment);
         }
-        break;
       }
       if (statuses.isP2PDownloadable) {
         if (request?.status === "loading") continue;
@@ -264,6 +285,7 @@ export class HybridLoader {
         }
 
         if (
+          this.p2pLoaders.currentLoader.isSegmentLoadedBySomeone(segment) &&
           this.abortLastP2PLoadingInQueueAfterItem(queue, segment) &&
           this.requests.executingP2PCount < simultaneousP2PDownloads
         ) {
@@ -319,7 +341,7 @@ export class HybridLoader {
     )) {
       if (
         !statuses.isHttpDownloadable ||
-        p2pLoader.isLoadingOrLoadedBySomeone(segment) ||
+        p2pLoader.isSegmentLoadingOrLoadedBySomeone(segment) ||
         this.segmentStorage.hasSegment(segment)
       ) {
         continue;
@@ -327,7 +349,8 @@ export class HybridLoader {
       const request = this.requests.get(segment);
       if (
         request &&
-        (request.status === "succeed" ||
+        (request.status === "loading" ||
+          request.status === "succeed" ||
           (request.failedAttempts.httpAttemptsCount ?? 0) >= httpErrorRetries)
       ) {
         continue;
@@ -403,8 +426,42 @@ export class HybridLoader {
       queueSegmentIds,
       maxPossibleLength,
       alreadyLoadedAmount,
-      loadedPercent: (alreadyLoadedAmount / maxPossibleLength) * 100,
+      loadedPercent:
+        maxPossibleLength !== 0
+          ? (alreadyLoadedAmount / maxPossibleLength) * 100
+          : 0,
     };
+  }
+
+  private getBandwidth(loadedPercentOfQueue: number) {
+    const { http, all } = this.bandwidthCalculators;
+    const { activeLevelBitrate } = this.streamDetails;
+    // console.log("activeLevelBitrate", Math.trunc(activeLevelBitrate / 1000));
+    if (this.streamDetails.activeLevelBitrate === 0) {
+      return all.getBandwidthForLastNSplicedSeconds(3);
+    }
+    const { levelChangedTimestamp } = this;
+
+    const bandwidth = all.getBandwidthForLastNSeconds(
+      30,
+      levelChangedTimestamp
+    );
+    const realBandwidth = all.getBandwidthForLastNSplicedSeconds(3);
+    if (loadedPercentOfQueue >= 80 || bandwidth >= activeLevelBitrate * 0.9) {
+      // console.log("realBandwidth", Math.trunc(realBandwidth / 1000));
+      // console.log("bandwidth", Math.trunc(bandwidth / 1000));
+      // console.log("percent", loadedPercentOfQueue);
+
+      return realBandwidth;
+    }
+    // console.log("bandwidth", loadedPercentOfQueue);
+    const httpRealBandwidth = http.getBandwidthForLastNSplicedSeconds(3);
+    return Math.max(bandwidth, httpRealBandwidth);
+  }
+
+  notifyLevelChanged() {
+    this.levelChangedTimestamp = performance.now();
+    console.log("LEVEL CHANGED");
   }
 
   updatePlayback(position: number, rate: number) {

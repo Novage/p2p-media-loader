@@ -58,9 +58,16 @@ export class P2PLoader {
     peer.downloadSegment(request);
   }
 
-  isLoadingOrLoadedBySomeone(segment: Segment): boolean {
+  isSegmentLoadingOrLoadedBySomeone(segment: Segment): boolean {
     for (const peer of this.trackerClient.peers()) {
       if (peer.getSegmentStatus(segment)) return true;
+    }
+    return false;
+  }
+
+  isSegmentLoadedBySomeone(segment: Segment): boolean {
+    for (const peer of this.trackerClient.peers()) {
+      if (peer.getSegmentStatus(segment) === "loaded") return true;
     }
     return false;
   }
