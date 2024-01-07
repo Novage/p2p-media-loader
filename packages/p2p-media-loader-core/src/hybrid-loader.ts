@@ -183,8 +183,8 @@ export class HybridLoader {
             request.failedAttempts.httpAttemptsCount >= httpErrorRetries &&
             engineRequest
           ) {
-            engineRequest.reject();
             this.engineRequest = undefined;
+            engineRequest.reject();
           }
           break;
 

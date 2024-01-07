@@ -23,31 +23,25 @@ export class EngineRequest {
   }
 
   resolve(data: ArrayBuffer, bandwidth: number) {
-    this.throwErrorIfNotPending();
+    if (this._status !== "pending") return;
     this._status = "succeed";
     this.engineCallbacks.onSuccess({ data, bandwidth });
   }
 
   reject() {
-    this.throwErrorIfNotPending();
+    if (this._status !== "pending") return;
     this._status = "failed";
     this.engineCallbacks.onError(new CoreRequestError("failed"));
   }
 
   abort() {
-    this.throwErrorIfNotPending();
+    if (this._status !== "pending") return;
     this._status = "aborted";
     this.engineCallbacks.onError(new CoreRequestError("aborted"));
   }
 
   markAsShouldBeStartedImmediately() {
-    return (this._shouldBeStartedImmediately = true);
-  }
-
-  private throwErrorIfNotPending() {
-    if (this._status !== "pending") {
-      throw new Error("Engine request has been already settled.");
-    }
+    this._shouldBeStartedImmediately = true;
   }
 }
 
