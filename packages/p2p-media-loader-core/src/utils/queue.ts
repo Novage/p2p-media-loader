@@ -19,20 +19,7 @@ export function* generateQueue(
   if (!first) return;
 
   const firstStatuses = getSegmentPlaybackStatuses(first, playback, settings);
-  // console.log("firstStatuses", firstStatuses, lastRequestedSegment.externalId);
   if (isNotActualStatuses(firstStatuses)) {
-    let isFirstYield = false;
-    const prev = stream.segments.getPrevTo(requestedSegmentId)?.[1];
-    if (prev) {
-      const prevStatuses = getSegmentPlaybackStatuses(prev, playback, settings);
-      // console.log(prevStatuses);
-      if (isNotActualStatuses(prevStatuses)) {
-        // console.log(prevStatuses);
-        firstStatuses.isHighDemand = true;
-        yield { segment: first, statuses: firstStatuses };
-        isFirstYield = true;
-      }
-    }
     // for cases when engine requests segment that is a little bit
     // earlier than current playhead position
     // it could happen when playhead position is significantly changed by user
@@ -45,10 +32,8 @@ export function* generateQueue(
     );
 
     if (isNotActualStatuses(secondStatuses)) return;
-    if (!isFirstYield) {
-      firstStatuses.isHighDemand = true;
-      yield { segment: first, statuses: firstStatuses };
-    }
+    firstStatuses.isHighDemand = true;
+    yield { segment: first, statuses: firstStatuses };
     yield { segment: second, statuses: secondStatuses };
   } else {
     yield { segment: first, statuses: firstStatuses };

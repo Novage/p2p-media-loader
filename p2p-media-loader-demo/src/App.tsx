@@ -141,12 +141,8 @@ function App() {
         type: "customHls",
         customType: {
           customHls: (video: HTMLVideoElement) => {
-            const hls = new window.Hls({
-              // ...engine.getConfig(),
-              maxBufferLength: 20,
-              maxBufferSize: 0.05 * 1000000,
-            });
-            // engine.setHls(hls);
+            const hls = new window.Hls(engine.getConfig());
+            engine.setHls(hls);
             hls.loadSource(video.src);
             hls.attachMedia(video);
             hlsInstance.current = hls;

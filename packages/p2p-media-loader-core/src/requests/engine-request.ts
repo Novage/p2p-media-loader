@@ -7,6 +7,7 @@ export type EngineCallbacks = {
 
 export class EngineRequest {
   private _status: "pending" | "succeed" | "failed" | "aborted" = "pending";
+  private _shouldBeStartedImmediately = false;
 
   constructor(
     readonly segment: Segment,
@@ -15,6 +16,10 @@ export class EngineRequest {
 
   get status() {
     return this._status;
+  }
+
+  get shouldBeStartedImmediately() {
+    return this._shouldBeStartedImmediately;
   }
 
   resolve(data: ArrayBuffer, bandwidth: number) {
@@ -33,6 +38,10 @@ export class EngineRequest {
     this.throwErrorIfNotPending();
     this._status = "aborted";
     this.engineCallbacks.onError(new CoreRequestError("aborted"));
+  }
+
+  markAsShouldBeStartedImmediately() {
+    return (this._shouldBeStartedImmediately = true);
   }
 
   private throwErrorIfNotPending() {

@@ -22,7 +22,7 @@ const FAILED_ATTEMPTS_CLEAR_INTERVAL = 60000;
 
 export class HybridLoader {
   private readonly requests: RequestsContainer;
-  private readonly engineRequests = new Map<Segment, EngineRequest>();
+  private engineRequest?: EngineRequest;
   private readonly p2pLoaders: P2PLoadersContainer;
   private readonly playback: Playback;
   private readonly segmentAvgDuration: number;
@@ -106,7 +106,7 @@ export class HybridLoader {
         );
       }
     } else {
-      this.engineRequests.set(segment, engineRequest);
+      this.engineRequest = engineRequest;
     }
     this.requestProcessQueueMicrotask();
   }
@@ -142,7 +142,10 @@ export class HybridLoader {
     const now = performance.now();
     for (const request of this.requests.items()) {
       const { type, status, segment, isHandledByProcessQueue } = request;
-      const engineRequest = this.engineRequests.get(segment);
+      const engineRequest =
+        this.engineRequest?.segment === segment
+          ? this.engineRequest
+          : undefined;
 
       switch (status) {
         case "loading":
@@ -157,11 +160,13 @@ export class HybridLoader {
           if (type === "http") {
             this.p2pLoaders.currentLoader.broadcastAnnouncement();
           }
-          engineRequest?.resolve(
-            request.data,
-            this.getBandwidth(loadedQueuePercent)
-          );
-          this.engineRequests.delete(segment);
+          if (engineRequest) {
+            engineRequest.resolve(
+              request.data,
+              this.getBandwidth(loadedQueuePercent)
+            );
+            this.engineRequest = undefined;
+          }
           this.requests.remove(request);
           void this.segmentStorage.storeSegment(request.segment, request.data);
           this.eventHandlers?.onSegmentLoaded?.(request.data.byteLength, type);
@@ -179,7 +184,7 @@ export class HybridLoader {
             engineRequest
           ) {
             engineRequest.reject();
-            this.engineRequests.delete(segment);
+            this.engineRequest = undefined;
           }
           break;
 
@@ -207,29 +212,30 @@ export class HybridLoader {
     const { queue, queueSegmentIds, loadedPercent } = this.generateQueue();
     this.processRequests(queueSegmentIds, loadedPercent);
 
-    console.log(queue.map((i) => i.segment.externalId));
-
     const {
       simultaneousHttpDownloads,
       simultaneousP2PDownloads,
       httpErrorRetries,
     } = this.settings;
 
-    // for (const engineRequest of this.engineRequests.values()) {
-    //   if (this.requests.executingHttpCount >= simultaneousHttpDownloads) break;
-    //   const request = this.requests.get(engineRequest.segment);
-    //   if (
-    //     !queueSegmentIds.has(engineRequest.segment.localId) &&
-    //     engineRequest.status === "pending" &&
-    //     (!request ||
-    //       request.status === "not-started" ||
-    //       (request.status === "failed" &&
-    //         request.failedAttempts.httpAttemptsCount <
-    //           this.settings.httpErrorRetries))
-    //   ) {
-    //     void this.loadThroughHttp(engineRequest.segment);
-    //   }
-    // }
+    if (
+      this.engineRequest?.shouldBeStartedImmediately &&
+      this.engineRequest.status === "pending" &&
+      this.requests.executingHttpCount < simultaneousHttpDownloads
+    ) {
+      const { engineRequest } = this;
+      const { segment } = engineRequest;
+      const request = this.requests.get(segment);
+      if (
+        !request ||
+        request.status === "not-started" ||
+        (request.status === "failed" &&
+          request.failedAttempts.httpAttemptsCount <
+            this.settings.httpErrorRetries)
+      ) {
+        void this.loadThroughHttp(segment);
+      }
+    }
 
     for (const item of queue) {
       const { statuses, segment } = item;
@@ -298,17 +304,13 @@ export class HybridLoader {
 
   // api method for engines
   abortSegmentRequest(segmentLocalId: string) {
-    for (const engineRequest of this.engineRequests.values()) {
-      if (segmentLocalId === engineRequest.segment.localId) {
-        engineRequest.abort();
-        this.engineRequests.delete(engineRequest.segment);
-        this.logger(
-          "abort: ",
-          LoggerUtils.getSegmentString(engineRequest.segment)
-        );
-        break;
-      }
-    }
+    if (this.engineRequest?.segment.localId !== segmentLocalId) return;
+    this.engineRequest.abort();
+    this.logger(
+      "abort: ",
+      LoggerUtils.getSegmentString(this.engineRequest.segment)
+    );
+    this.engineRequest = undefined;
   }
 
   private async loadThroughHttp(segment: Segment) {
@@ -461,7 +463,6 @@ export class HybridLoader {
 
   notifyLevelChanged() {
     this.levelChangedTimestamp = performance.now();
-    console.log("LEVEL CHANGED");
   }
 
   updatePlayback(position: number, rate: number) {
@@ -478,6 +479,7 @@ export class HybridLoader {
     if (isRateChanged && rate !== 0) this.playback.rate = rate;
     if (isPositionSignificantlyChanged) {
       this.logger("position significantly changed");
+      this.engineRequest?.markAsShouldBeStartedImmediately();
     }
     void this.requestProcessQueueMicrotask(isPositionSignificantlyChanged);
   }
