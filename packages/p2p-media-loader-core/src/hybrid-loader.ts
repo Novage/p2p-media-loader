@@ -438,26 +438,28 @@ export class HybridLoader {
   private getBandwidth(loadedPercentOfQueue: number) {
     const { http, all } = this.bandwidthCalculators;
     const { activeLevelBitrate } = this.streamDetails;
-    // console.log("activeLevelBitrate", Math.trunc(activeLevelBitrate / 1000));
     if (this.streamDetails.activeLevelBitrate === 0) {
       return all.getBandwidthForLastNSplicedSeconds(3);
     }
     const { levelChangedTimestamp } = this;
 
-    const bandwidth = all.getBandwidthForLastNSeconds(
-      30,
-      levelChangedTimestamp
+    const bandwidth = Math.max(
+      all.getBandwidthForLastNSeconds(30, levelChangedTimestamp),
+      all.getBandwidthForLastNSeconds(60, levelChangedTimestamp),
+      all.getBandwidthForLastNSeconds(90, levelChangedTimestamp)
     );
-    const realBandwidth = all.getBandwidthForLastNSplicedSeconds(3);
     if (loadedPercentOfQueue >= 80 || bandwidth >= activeLevelBitrate * 0.9) {
-      // console.log("realBandwidth", Math.trunc(realBandwidth / 1000));
-      // console.log("bandwidth", Math.trunc(bandwidth / 1000));
-      // console.log("percent", loadedPercentOfQueue);
-
-      return realBandwidth;
+      return Math.max(
+        all.getBandwidthForLastNSplicedSeconds(1),
+        all.getBandwidthForLastNSplicedSeconds(3),
+        all.getBandwidthForLastNSplicedSeconds(5)
+      );
     }
-    // console.log("bandwidth", loadedPercentOfQueue);
-    const httpRealBandwidth = http.getBandwidthForLastNSplicedSeconds(3);
+    const httpRealBandwidth = Math.max(
+      http.getBandwidthForLastNSplicedSeconds(1),
+      http.getBandwidthForLastNSplicedSeconds(3),
+      http.getBandwidthForLastNSplicedSeconds(5)
+    );
     return Math.max(bandwidth, httpRealBandwidth);
   }
 
