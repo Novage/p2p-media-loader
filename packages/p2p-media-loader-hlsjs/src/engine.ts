@@ -102,8 +102,6 @@ export class Engine {
 
   private handleManifestLoaded = (event: string, data: ManifestLoadedData) => {
     const { networkDetails } = data;
-
-    console.log(data.levels.map((i) => i.bitrate));
     if (networkDetails instanceof XMLHttpRequest) {
       this.core.setManifestResponseUrl(networkDetails.responseURL);
     } else if (networkDetails instanceof Response) {
