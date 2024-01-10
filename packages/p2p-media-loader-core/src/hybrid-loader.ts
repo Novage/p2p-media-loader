@@ -135,7 +135,7 @@ export class HybridLoader {
 
   private processRequests(
     queueSegmentIds: Set<string>,
-    downloadProgressRatio: number
+    queueDownloadRatio: number
   ) {
     const { stream } = this.lastRequestedSegment;
     const { httpErrorRetries } = this.settings;
@@ -163,7 +163,7 @@ export class HybridLoader {
           if (engineRequest) {
             engineRequest.resolve(
               request.data,
-              this.getBandwidth(downloadProgressRatio)
+              this.getBandwidth(queueDownloadRatio)
             );
             this.engineRequest = undefined;
           }
@@ -209,9 +209,8 @@ export class HybridLoader {
   }
 
   private processQueue() {
-    const { queue, queueSegmentIds, downloadProgressRatio } =
-      this.generateQueue();
-    this.processRequests(queueSegmentIds, downloadProgressRatio);
+    const { queue, queueSegmentIds, queueDownloadRatio } = this.generateQueue();
+    this.processRequests(queueSegmentIds, queueDownloadRatio);
 
     const {
       simultaneousHttpDownloads,
@@ -429,12 +428,12 @@ export class HybridLoader {
       queueSegmentIds,
       maxPossibleLength,
       alreadyLoadedAmount,
-      downloadProgressRatio:
+      queueDownloadRatio:
         maxPossibleLength !== 0 ? alreadyLoadedAmount / maxPossibleLength : 0,
     };
   }
 
-  private getBandwidth(downloadProgressRatio: number) {
+  private getBandwidth(queueDownloadRatio: number) {
     const { http, all } = this.bandwidthCalculators;
     const { activeLevelBitrate } = this.streamDetails;
     if (this.streamDetails.activeLevelBitrate === 0) {
@@ -447,7 +446,7 @@ export class HybridLoader {
       all.getBandwidth(60, levelChangedTimestamp),
       all.getBandwidth(90, levelChangedTimestamp)
     );
-    if (downloadProgressRatio >= 0.8 || bandwidth >= activeLevelBitrate * 0.9) {
+    if (queueDownloadRatio >= 0.8 || bandwidth >= activeLevelBitrate * 0.9) {
       return Math.max(
         all.getBandwidthLoadingOnly(1),
         all.getBandwidthLoadingOnly(3),
