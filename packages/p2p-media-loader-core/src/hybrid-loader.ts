@@ -135,7 +135,7 @@ export class HybridLoader {
 
   private processRequests(
     queueSegmentIds: Set<string>,
-    loadedQueuePercent: number
+    downloadProgressRatio: number
   ) {
     const { stream } = this.lastRequestedSegment;
     const { httpErrorRetries } = this.settings;
@@ -163,7 +163,7 @@ export class HybridLoader {
           if (engineRequest) {
             engineRequest.resolve(
               request.data,
-              this.getBandwidth(loadedQueuePercent)
+              this.getBandwidth(downloadProgressRatio)
             );
             this.engineRequest = undefined;
           }
@@ -209,8 +209,9 @@ export class HybridLoader {
   }
 
   private processQueue() {
-    const { queue, queueSegmentIds, loadedPercent } = this.generateQueue();
-    this.processRequests(queueSegmentIds, loadedPercent);
+    const { queue, queueSegmentIds, downloadProgressRatio } =
+      this.generateQueue();
+    this.processRequests(queueSegmentIds, downloadProgressRatio);
 
     const {
       simultaneousHttpDownloads,
@@ -428,14 +429,12 @@ export class HybridLoader {
       queueSegmentIds,
       maxPossibleLength,
       alreadyLoadedAmount,
-      loadedPercent:
-        maxPossibleLength !== 0
-          ? (alreadyLoadedAmount / maxPossibleLength) * 100
-          : 0,
+      downloadProgressRatio:
+        maxPossibleLength !== 0 ? alreadyLoadedAmount / maxPossibleLength : 0,
     };
   }
 
-  private getBandwidth(loadedPercentOfQueue: number) {
+  private getBandwidth(downloadProgressRatio: number) {
     const { http, all } = this.bandwidthCalculators;
     const { activeLevelBitrate } = this.streamDetails;
     if (this.streamDetails.activeLevelBitrate === 0) {
@@ -448,7 +447,7 @@ export class HybridLoader {
       all.getBandwidth(60, levelChangedTimestamp),
       all.getBandwidth(90, levelChangedTimestamp)
     );
-    if (loadedPercentOfQueue >= 80 || bandwidth >= activeLevelBitrate * 0.9) {
+    if (downloadProgressRatio >= 0.8 || bandwidth >= activeLevelBitrate * 0.9) {
       return Math.max(
         all.getBandwidthLoadingOnly(1),
         all.getBandwidthLoadingOnly(3),
