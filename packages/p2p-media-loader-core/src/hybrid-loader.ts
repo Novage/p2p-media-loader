@@ -1,8 +1,13 @@
 import { Segment, StreamWithSegments } from "./index";
 import { HttpRequestExecutor } from "./http-loader";
 import { SegmentsMemoryStorage } from "./segments-storage";
-import { Settings, CoreEventHandlers, Playback } from "./types";
-import { BandwidthCalculator } from "./bandwidth-calculator";
+import {
+  Settings,
+  CoreEventHandlers,
+  Playback,
+  BandwidthCalculators,
+  StreamDetails,
+} from "./types";
 import { P2PLoadersContainer } from "./p2p/loaders-container";
 import { RequestsContainer } from "./requests/request-container";
 import { EngineRequest, EngineCallbacks } from "./requests/engine-request";
@@ -11,37 +16,38 @@ import * as LoggerUtils from "./utils/logger";
 import * as StreamUtils from "./utils/stream";
 import * as Utils from "./utils/utils";
 import debug from "debug";
+import { QueueItem } from "./utils/queue";
 
 const FAILED_ATTEMPTS_CLEAR_INTERVAL = 60000;
 
 export class HybridLoader {
   private readonly requests: RequestsContainer;
+  private engineRequest?: EngineRequest;
   private readonly p2pLoaders: P2PLoadersContainer;
-  private storageCleanUpIntervalId?: number;
-  private lastRequestedSegment: Readonly<Segment>;
   private readonly playback: Playback;
-  private lastQueueProcessingTimeStamp?: number;
   private readonly segmentAvgDuration: number;
-  private randomHttpDownloadInterval!: number;
   private readonly logger: debug.Debugger;
+  private storageCleanUpIntervalId?: number;
+  private levelChangedTimestamp?: number;
+  private lastQueueProcessingTimeStamp?: number;
+  private randomHttpDownloadInterval?: number;
   private isProcessQueueMicrotaskCreated = false;
-  private readonly engineRequests = new Map<Segment, EngineRequest>();
 
   constructor(
     private streamManifestUrl: string,
-    requestedSegment: Segment,
+    private lastRequestedSegment: Readonly<Segment>,
+    private readonly streamDetails: Required<Readonly<StreamDetails>>,
     private readonly settings: Settings,
-    private readonly bandwidthCalculator: BandwidthCalculator,
+    private readonly bandwidthCalculators: BandwidthCalculators,
     private readonly segmentStorage: SegmentsMemoryStorage,
     private readonly eventHandlers?: Pick<CoreEventHandlers, "onSegmentLoaded">
   ) {
-    this.lastRequestedSegment = requestedSegment;
-    const activeStream = requestedSegment.stream;
-    this.playback = { position: requestedSegment.startTime, rate: 1 };
+    const activeStream = this.lastRequestedSegment.stream;
+    this.playback = { position: this.lastRequestedSegment.startTime, rate: 1 };
     this.segmentAvgDuration = StreamUtils.getSegmentAvgDuration(activeStream);
     this.requests = new RequestsContainer(
       this.requestProcessQueueMicrotask,
-      this.bandwidthCalculator,
+      this.bandwidthCalculators,
       this.playback,
       this.settings
     );
@@ -59,7 +65,7 @@ export class HybridLoader {
     });
     this.p2pLoaders = new P2PLoadersContainer(
       this.streamManifestUrl,
-      requestedSegment.stream,
+      this.lastRequestedSegment.stream,
       this.requests,
       this.segmentStorage,
       this.settings
@@ -96,11 +102,11 @@ export class HybridLoader {
       if (data) {
         engineRequest.resolve(
           data,
-          this.bandwidthCalculator.getBandwidthForLastNSeconds(3)
+          this.bandwidthCalculators.all.getBandwidthLoadingOnly(3)
         );
       }
     } else {
-      this.engineRequests.set(segment, engineRequest);
+      this.engineRequest = engineRequest;
     }
     this.requestProcessQueueMicrotask();
   }
@@ -127,13 +133,19 @@ export class HybridLoader {
     });
   };
 
-  private processRequests(queueSegmentIds: Set<string>) {
+  private processRequests(
+    queueSegmentIds: Set<string>,
+    queueDownloadRatio: number
+  ) {
     const { stream } = this.lastRequestedSegment;
     const { httpErrorRetries } = this.settings;
     const now = performance.now();
     for (const request of this.requests.items()) {
       const { type, status, segment, isHandledByProcessQueue } = request;
-      const engineRequest = this.engineRequests.get(segment);
+      const engineRequest =
+        this.engineRequest?.segment === segment
+          ? this.engineRequest
+          : undefined;
 
       switch (status) {
         case "loading":
@@ -148,11 +160,13 @@ export class HybridLoader {
           if (type === "http") {
             this.p2pLoaders.currentLoader.broadcastAnnouncement();
           }
-          engineRequest?.resolve(
-            request.data,
-            this.bandwidthCalculator.getBandwidthForLastNSeconds(3)
-          );
-          this.engineRequests.delete(segment);
+          if (engineRequest) {
+            engineRequest.resolve(
+              request.data,
+              this.getBandwidth(queueDownloadRatio)
+            );
+            this.engineRequest = undefined;
+          }
           this.requests.remove(request);
           void this.segmentStorage.storeSegment(request.segment, request.data);
           this.eventHandlers?.onSegmentLoaded?.(request.data.byteLength, type);
@@ -169,8 +183,8 @@ export class HybridLoader {
             request.failedAttempts.httpAttemptsCount >= httpErrorRetries &&
             engineRequest
           ) {
+            this.engineRequest = undefined;
             engineRequest.reject();
-            this.engineRequests.delete(segment);
           }
           break;
 
@@ -195,18 +209,8 @@ export class HybridLoader {
   }
 
   private processQueue() {
-    const { queue, queueSegmentIds } = QueueUtils.generateQueue({
-      lastRequestedSegment: this.lastRequestedSegment,
-      playback: this.playback,
-      settings: this.settings,
-      skipSegment: (segment) => {
-        return (
-          this.requests.get(segment)?.status === "succeed" ||
-          this.segmentStorage.hasSegment(segment)
-        );
-      },
-    });
-    this.processRequests(queueSegmentIds);
+    const { queue, queueSegmentIds, queueDownloadRatio } = this.generateQueue();
+    this.processRequests(queueSegmentIds, queueDownloadRatio);
 
     const {
       simultaneousHttpDownloads,
@@ -214,19 +218,22 @@ export class HybridLoader {
       httpErrorRetries,
     } = this.settings;
 
-    for (const engineRequest of this.engineRequests.values()) {
-      if (this.requests.executingHttpCount >= simultaneousHttpDownloads) break;
-      const request = this.requests.get(engineRequest.segment);
+    if (
+      this.engineRequest?.shouldBeStartedImmediately &&
+      this.engineRequest.status === "pending" &&
+      this.requests.executingHttpCount < simultaneousHttpDownloads
+    ) {
+      const { engineRequest } = this;
+      const { segment } = engineRequest;
+      const request = this.requests.get(segment);
       if (
-        !queueSegmentIds.has(engineRequest.segment.localId) &&
-        engineRequest.status === "pending" &&
-        (!request ||
-          request.status === "not-started" ||
-          (request.status === "failed" &&
-            request.failedAttempts.httpAttemptsCount <
-              this.settings.httpErrorRetries))
+        !request ||
+        request.status === "not-started" ||
+        (request.status === "failed" &&
+          request.failedAttempts.httpAttemptsCount <
+            this.settings.httpErrorRetries)
       ) {
-        void this.loadThroughHttp(engineRequest.segment);
+        void this.loadThroughHttp(segment);
       }
     }
 
@@ -275,7 +282,6 @@ export class HybridLoader {
         ) {
           void this.loadThroughP2P(segment);
         }
-        break;
       }
       if (statuses.isP2PDownloadable) {
         if (request?.status === "loading") continue;
@@ -285,6 +291,7 @@ export class HybridLoader {
         }
 
         if (
+          this.p2pLoaders.currentLoader.isSegmentLoadedBySomeone(segment) &&
           this.abortLastP2PLoadingInQueueAfterItem(queue, segment) &&
           this.requests.executingP2PCount < simultaneousP2PDownloads
         ) {
@@ -297,17 +304,13 @@ export class HybridLoader {
 
   // api method for engines
   abortSegmentRequest(segmentLocalId: string) {
-    for (const engineRequest of this.engineRequests.values()) {
-      if (segmentLocalId === engineRequest.segment.localId) {
-        engineRequest.abort();
-        this.engineRequests.delete(engineRequest.segment);
-        this.logger(
-          "abort: ",
-          LoggerUtils.getSegmentString(engineRequest.segment)
-        );
-        break;
-      }
-    }
+    if (this.engineRequest?.segment.localId !== segmentLocalId) return;
+    this.engineRequest.abort();
+    this.logger(
+      "abort: ",
+      LoggerUtils.getSegmentString(this.engineRequest.segment)
+    );
+    this.engineRequest = undefined;
   }
 
   private async loadThroughHttp(segment: Segment) {
@@ -324,36 +327,47 @@ export class HybridLoader {
     const { simultaneousHttpDownloads, httpErrorRetries } = this.settings;
     const p2pLoader = this.p2pLoaders.currentLoader;
     const connectedPeersAmount = p2pLoader.connectedPeersAmount;
+
     if (
       this.requests.executingHttpCount >= simultaneousHttpDownloads ||
       !connectedPeersAmount
     ) {
       return;
     }
-    const { queue } = QueueUtils.generateQueue({
-      lastRequestedSegment: this.lastRequestedSegment,
-      playback: this.playback,
-      settings: this.settings,
-      skipSegment: (segment, statuses) => {
-        const request = this.requests.get(segment);
-        return (
-          !statuses.isHttpDownloadable ||
-          this.segmentStorage.hasSegment(segment) ||
-          request?.type !== undefined ||
-          (request?.failedAttempts.httpAttemptsCount ?? 0) >=
-            httpErrorRetries ||
-          p2pLoader.isLoadingOrLoadedBySomeone(segment)
-        );
-      },
-    });
-    if (!queue.length) return;
+
+    const segmentsToLoad: Segment[] = [];
+    for (const { segment, statuses } of QueueUtils.generateQueue(
+      this.lastRequestedSegment,
+      this.playback,
+      this.settings
+    )) {
+      if (
+        !statuses.isHttpDownloadable ||
+        p2pLoader.isSegmentLoadingOrLoadedBySomeone(segment) ||
+        this.segmentStorage.hasSegment(segment)
+      ) {
+        continue;
+      }
+      const request = this.requests.get(segment);
+      if (
+        request &&
+        (request.status === "loading" ||
+          request.status === "succeed" ||
+          (request.failedAttempts.httpAttemptsCount ?? 0) >= httpErrorRetries)
+      ) {
+        continue;
+      }
+      segmentsToLoad.push(segment);
+    }
+
+    if (!segmentsToLoad.length) return;
     const peersAmount = connectedPeersAmount + 1;
-    const probability = Math.min(queue.length / peersAmount, 1);
+    const probability = Math.min(segmentsToLoad.length / peersAmount, 1);
     const shouldLoad = Math.random() < probability;
 
     if (!shouldLoad) return;
-    const item = Utils.getRandomItem(queue);
-    void this.loadThroughHttp(item.segment);
+    const segment = Utils.getRandomItem(segmentsToLoad);
+    void this.loadThroughHttp(segment);
   }
 
   private abortLastHttpLoadingInQueueAfterItem(
@@ -386,6 +400,71 @@ export class HybridLoader {
     return false;
   }
 
+  private generateQueue() {
+    const queue: QueueItem[] = [];
+    const queueSegmentIds = new Set<string>();
+    let maxPossibleLength = 0;
+    let alreadyLoadedAmount = 0;
+    for (const item of QueueUtils.generateQueue(
+      this.lastRequestedSegment,
+      this.playback,
+      this.settings
+    )) {
+      maxPossibleLength++;
+      const { segment } = item;
+      if (
+        this.segmentStorage.hasSegment(segment) ||
+        this.requests.get(segment)?.status === "succeed"
+      ) {
+        alreadyLoadedAmount++;
+        continue;
+      }
+      queue.push(item);
+      queueSegmentIds.add(segment.localId);
+    }
+
+    return {
+      queue,
+      queueSegmentIds,
+      maxPossibleLength,
+      alreadyLoadedAmount,
+      queueDownloadRatio:
+        maxPossibleLength !== 0 ? alreadyLoadedAmount / maxPossibleLength : 0,
+    };
+  }
+
+  private getBandwidth(queueDownloadRatio: number) {
+    const { http, all } = this.bandwidthCalculators;
+    const { activeLevelBitrate } = this.streamDetails;
+    if (this.streamDetails.activeLevelBitrate === 0) {
+      return all.getBandwidthLoadingOnly(3);
+    }
+    const { levelChangedTimestamp } = this;
+
+    const bandwidth = Math.max(
+      all.getBandwidth(30, levelChangedTimestamp),
+      all.getBandwidth(60, levelChangedTimestamp),
+      all.getBandwidth(90, levelChangedTimestamp)
+    );
+    if (queueDownloadRatio >= 0.8 || bandwidth >= activeLevelBitrate * 0.9) {
+      return Math.max(
+        all.getBandwidthLoadingOnly(1),
+        all.getBandwidthLoadingOnly(3),
+        all.getBandwidthLoadingOnly(5)
+      );
+    }
+    const httpRealBandwidth = Math.max(
+      http.getBandwidthLoadingOnly(1),
+      http.getBandwidthLoadingOnly(3),
+      http.getBandwidthLoadingOnly(5)
+    );
+    return Math.max(bandwidth, httpRealBandwidth);
+  }
+
+  notifyLevelChanged() {
+    this.levelChangedTimestamp = performance.now();
+  }
+
   updatePlayback(position: number, rate: number) {
     const isRateChanged = this.playback.rate !== rate;
     const isPositionChanged = this.playback.position !== position;
@@ -400,6 +479,7 @@ export class HybridLoader {
     if (isRateChanged && rate !== 0) this.playback.rate = rate;
     if (isPositionSignificantlyChanged) {
       this.logger("position significantly changed");
+      this.engineRequest?.markAsShouldBeStartedImmediately();
     }
     void this.requestProcessQueueMicrotask(isPositionSignificantlyChanged);
   }

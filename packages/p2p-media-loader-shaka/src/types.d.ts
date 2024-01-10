@@ -11,6 +11,7 @@ export type StreamInfo = {
 type HookedStream = shaka.extern.Stream & {
   streamUrl?: string;
   mediaSequenceTimeMap?: Map<number, number>;
+  isSegmentIndexAlreadyRead?: boolean;
 };
 
 export type Stream = CoreStream & {
@@ -20,6 +21,7 @@ export type Stream = CoreStream & {
 export type Shaka = typeof window.shaka;
 
 type P2PMLShakaData = {
+  player: Shaka.Player;
   core: Core<Stream>;
   shaka: Shaka;
   streamInfo: StreamInfo;

@@ -133,7 +133,7 @@ function App() {
 
   const initHlsDPlayer = (url: string) => {
     if (!hlsEngine.current) return;
-    const engine = hlsEngine.current!;
+    const engine = hlsEngine.current;
     const player = new DPlayer({
       container: containerRef.current,
       video: {

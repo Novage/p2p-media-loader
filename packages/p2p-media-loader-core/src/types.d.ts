@@ -1,5 +1,5 @@
-import { LinkedMap } from "./linked-map";
 import { RequestAttempt } from "./requests/request";
+import { BandwidthCalculator } from "./bandwidth-calculator";
 
 export type StreamType = "main" | "secondary";
 
@@ -24,23 +24,15 @@ export type Stream = {
   readonly index: number;
 };
 
-export type ReadonlyLinkedMap<K, V extends object> = Pick<
-  LinkedMap<K, V>,
-  "has" | "keys" | "values" | "valuesBackwards" | "size"
->;
-
 export type StreamWithSegments<
   TStream extends Stream = Stream,
-  TMap extends ReadonlyLinkedMap<string, SegmentBase> = LinkedMap<
-    string,
-    Segment
-  >,
+  TMap extends ReadonlyMap<string, SegmentBase> = Map<string, Segment>,
 > = TStream & {
   readonly segments: TMap;
 };
 
 export type StreamWithReadonlySegments<TStream extends Stream = Stream> =
-  StreamWithSegments<TStream, ReadonlyLinkedMap<string, SegmentBase>>;
+  StreamWithSegments<TStream, ReadonlyMap<string, SegmentBase>>;
 
 export type SegmentResponse = {
   data: ArrayBuffer;
@@ -70,4 +62,14 @@ export type CoreEventHandlers = {
 export type Playback = {
   position: number;
   rate: number;
+};
+
+export type BandwidthCalculators = Readonly<{
+  all: BandwidthCalculator;
+  http: BandwidthCalculator;
+}>;
+
+export type StreamDetails = {
+  isLive: boolean;
+  activeLevelBitrate: number;
 };

@@ -6,9 +6,10 @@ import {
   Settings,
   SegmentBase,
   CoreEventHandlers,
+  BandwidthCalculators,
+  StreamDetails,
 } from "./types";
 import * as StreamUtils from "./utils/stream";
-import { LinkedMap } from "./linked-map";
 import { BandwidthCalculator } from "./bandwidth-calculator";
 import { EngineCallbacks } from "./requests/engine-request";
 import { SegmentsMemoryStorage } from "./segments-storage";
@@ -31,10 +32,17 @@ export class Core<TStream extends Stream = Stream> {
     httpErrorRetries: 3,
     p2pErrorRetries: 3,
   };
-  private readonly bandwidthCalculator = new BandwidthCalculator();
+  private readonly bandwidthCalculators: BandwidthCalculators = {
+    all: new BandwidthCalculator(),
+    http: new BandwidthCalculator(),
+  };
   private segmentStorage?: SegmentsMemoryStorage;
   private mainStreamLoader?: HybridLoader;
   private secondaryStreamLoader?: HybridLoader;
+  private streamDetails: StreamDetails = {
+    isLive: false,
+    activeLevelBitrate: 0,
+  };
 
   constructor(private readonly eventHandlers?: CoreEventHandlers) {}
 
@@ -58,7 +66,7 @@ export class Core<TStream extends Stream = Stream> {
     if (this.streams.has(stream.localId)) return;
     this.streams.set(stream.localId, {
       ...stream,
-      segments: new LinkedMap<string, Segment>(),
+      segments: new Map<string, Segment>(),
     });
   }
 
@@ -72,7 +80,7 @@ export class Core<TStream extends Stream = Stream> {
 
     addSegments?.forEach((s) => {
       const segment = { ...s, stream };
-      stream.segments.addToEnd(segment.localId, segment);
+      stream.segments.set(segment.localId, segment);
     });
     removeSegmentIds?.forEach((id) => stream.segments.delete(id));
     this.mainStreamLoader?.updateStream(stream);
@@ -105,6 +113,18 @@ export class Core<TStream extends Stream = Stream> {
     this.secondaryStreamLoader?.updatePlayback(position, rate);
   }
 
+  setActiveLevelBitrate(bitrate: number) {
+    if (bitrate !== this.streamDetails.activeLevelBitrate) {
+      this.streamDetails.activeLevelBitrate = bitrate;
+      this.mainStreamLoader?.notifyLevelChanged();
+      this.secondaryStreamLoader?.notifyLevelChanged();
+    }
+  }
+
+  setIsLive(isLive: boolean) {
+    this.streamDetails.isLive = isLive;
+  }
+
   destroy(): void {
     this.streams.clear();
     this.mainStreamLoader?.destroy();
@@ -114,6 +134,7 @@ export class Core<TStream extends Stream = Stream> {
     this.secondaryStreamLoader = undefined;
     this.segmentStorage = undefined;
     this.manifestResponseUrl = undefined;
+    this.streamDetails = { isLive: false, activeLevelBitrate: 0 };
   }
 
   private identifySegment(segmentId: string): Segment {
@@ -143,8 +164,9 @@ export class Core<TStream extends Stream = Stream> {
       return new HybridLoader(
         manifestResponseUrl,
         segment,
+        this.streamDetails as Required<StreamDetails>,
         this.settings,
-        this.bandwidthCalculator,
+        this.bandwidthCalculators,
         this.segmentStorage,
         this.eventHandlers
       );

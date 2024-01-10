@@ -7,47 +7,59 @@ import {
 
 export type QueueItem = { segment: Segment; statuses: SegmentPlaybackStatuses };
 
-export function generateQueue({
-  lastRequestedSegment,
-  playback,
-  settings,
-  skipSegment,
-}: {
-  lastRequestedSegment: Readonly<Segment>;
-  playback: Readonly<Playback>;
-  skipSegment: (segment: Segment, statuses: SegmentPlaybackStatuses) => boolean;
-  settings: PlaybackTimeWindowsSettings;
-}): { queue: QueueItem[]; queueSegmentIds: Set<string> } {
+export function* generateQueue(
+  lastRequestedSegment: Readonly<Segment>,
+  playback: Readonly<Playback>,
+  settings: PlaybackTimeWindowsSettings
+): Generator<QueueItem, void> {
   const { localId: requestedSegmentId, stream } = lastRequestedSegment;
 
-  const queue: QueueItem[] = [];
-  const queueSegmentIds = new Set<string>();
+  const requestedSegment = stream.segments.get(requestedSegmentId);
+  if (!requestedSegment) return;
 
-  const { segments } = stream;
-  const isNextNotActual = (segmentId: string) => {
-    const next = segments.getNextTo(segmentId)?.[1];
-    if (!next) return true;
-    const statuses = getSegmentPlaybackStatuses(next, playback, settings);
-    return isNotActualStatuses(statuses);
-  };
+  const queueSegments = stream.segments.values();
 
-  let i = 0;
-  for (const segment of segments.values(requestedSegmentId)) {
-    const statuses = getSegmentPlaybackStatuses(segment, playback, settings);
-    const isNotActual = isNotActualStatuses(statuses);
-    if (isNotActual && (i !== 0 || isNextNotActual(requestedSegmentId))) break;
-    i++;
-    if (skipSegment(segment, statuses)) continue;
+  let first: Segment | undefined;
 
-    if (isNotActual) statuses.isHighDemand = true;
-    queue.push({ segment, statuses });
-    queueSegmentIds.add(segment.localId);
+  while (first !== requestedSegment) {
+    first = queueSegments.next().value;
   }
 
-  return { queue, queueSegmentIds };
+  if (!first) return; // should never happen
+
+  const firstStatuses = getSegmentPlaybackStatuses(first, playback, settings);
+  if (isNotActualStatuses(firstStatuses)) {
+    // for cases when engine requests segment that is a little bit
+    // earlier than current playhead position
+    // it could happen when playhead position is significantly changed by user
+    const second = queueSegments.next().value;
+    if (!second) return;
+    const secondStatuses = getSegmentPlaybackStatuses(
+      second,
+      playback,
+      settings
+    );
+
+    if (isNotActualStatuses(secondStatuses)) return;
+    firstStatuses.isHighDemand = true;
+    yield { segment: first, statuses: firstStatuses };
+    yield { segment: second, statuses: secondStatuses };
+  } else {
+    yield { segment: first, statuses: firstStatuses };
+  }
+
+  for (const segment of queueSegments) {
+    const statuses = getSegmentPlaybackStatuses(segment, playback, settings);
+    if (isNotActualStatuses(statuses)) break;
+    yield { segment, statuses };
+  }
 }
 
 function isNotActualStatuses(statuses: SegmentPlaybackStatuses) {
-  const { isHighDemand, isHttpDownloadable, isP2PDownloadable } = statuses;
+  const {
+    isHighDemand = false,
+    isHttpDownloadable = false,
+    isP2PDownloadable = false,
+  } = statuses;
   return !isHighDemand && !isHttpDownloadable && !isP2PDownloadable;
 }

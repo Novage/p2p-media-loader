@@ -3,6 +3,7 @@ import type {
   AudioTrackLoadedData,
   LevelUpdatedData,
   ManifestLoadedData,
+  LevelSwitchingData,
 } from "hls.js";
 import type { HlsConfig, Events } from "hls.js";
 import { FragmentLoaderBase } from "./fragment-loader";
@@ -57,6 +58,10 @@ export class Engine {
       this.handleManifestLoaded
     );
     hls[method](
+      "hlsLevelSwitching" as Events.LEVEL_SWITCHING,
+      this.handleLevelSwitching
+    );
+    hls[method](
       "hlsLevelUpdated" as Events.LEVEL_UPDATED,
       this.handleLevelUpdated
     );
@@ -105,10 +110,15 @@ export class Engine {
     this.segmentManager.processMasterManifest(data);
   };
 
+  private handleLevelSwitching = (event: string, data: LevelSwitchingData) => {
+    if (data.bitrate) this.core.setActiveLevelBitrate(data.bitrate);
+  };
+
   private handleLevelUpdated = (
     event: string,
     data: LevelUpdatedData | AudioTrackLoadedData
   ) => {
+    this.core.setIsLive(data.details.live);
     this.segmentManager.updatePlaylist(data);
   };
 

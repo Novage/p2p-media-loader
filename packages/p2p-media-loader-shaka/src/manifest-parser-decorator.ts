@@ -12,6 +12,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   private readonly debug = Debug("p2pml-shaka:manifest-parser");
   private readonly isHls: boolean;
   private segmentManager?: SegmentManager;
+  private player?: shaka.Player;
 
   constructor(
     shaka: Readonly<Shaka>,
@@ -35,6 +36,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   private setP2PMediaLoaderData(p2pml?: P2PMLShakaData) {
     if (!p2pml) return;
     this.segmentManager = p2pml.segmentManager;
+    this.player = p2pml.player;
     p2pml.streamInfo.protocol = this.isHls ? "hls" : "dash";
   }
 
@@ -103,12 +105,13 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     }
   }
 
-  private hookSegmentIndex(stream: shaka.extern.Stream): void {
+  private hookSegmentIndex(stream: HookedStream): void {
     const { segmentManager } = this;
     if (!segmentManager) return;
 
     const substituteSegmentIndexGet = (
-      segmentIndex: shaka.media.SegmentIndex
+      segmentIndex: shaka.media.SegmentIndex,
+      callFromCreateSegmentIndexMethod = false
     ) => {
       let prevReference: shaka.media.SegmentReference | null = null;
       let prevFirstItemReference: shaka.media.SegmentReference;
@@ -117,7 +120,12 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       const originalGet = segmentIndex.get;
       const customGet = (position: number) => {
         const reference = originalGet.call(segmentIndex, position);
-        if (reference === prevReference) return reference;
+        if (
+          reference === prevReference ||
+          (!this.player?.isLive() && stream.isSegmentIndexAlreadyRead)
+        ) {
+          return reference;
+        }
         prevReference = reference;
 
         segmentIndex.get = originalGet;
@@ -137,12 +145,20 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
 
           // Segment index have been updated
           segmentManager.updateStreamSegments(stream, references);
+          stream.isSegmentIndexAlreadyRead = true;
           this.debug(`Stream ${stream.id} is updated`);
         } catch (err) {
           // This catch is intentionally left blank.
           // [...segmentIndex] throws an error when segmentIndex inner array is empty
         } finally {
-          segmentIndex.get = customGet;
+          // do not set custom get again is segment index is already read and stream is VOD
+          if (
+            !stream.isSegmentIndexAlreadyRead ||
+            !!this.player?.isLive() ||
+            !callFromCreateSegmentIndexMethod
+          ) {
+            segmentIndex.get = customGet;
+          }
         }
         return reference;
       };
@@ -159,7 +175,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     stream.createSegmentIndex = async () => {
       const result = await createSegmentIndexOriginal.call(stream);
       if (!stream.segmentIndex) return result;
-      substituteSegmentIndexGet(stream.segmentIndex);
+      substituteSegmentIndexGet(stream.segmentIndex, true);
       return result;
     };
   }

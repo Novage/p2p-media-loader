@@ -7,9 +7,9 @@ import {
 } from "../types";
 
 export type SegmentPlaybackStatuses = {
-  isHighDemand: boolean;
-  isHttpDownloadable: boolean;
-  isP2PDownloadable: boolean;
+  isHighDemand?: boolean;
+  isHttpDownloadable?: boolean;
+  isP2PDownloadable?: boolean;
 };
 
 export type PlaybackTimeWindowsSettings = Pick<
@@ -66,17 +66,13 @@ export function isSegmentActualInPlayback(
   segment: Readonly<Segment>,
   playback: Playback,
   timeWindowsSettings: PlaybackTimeWindowsSettings
-) {
-  const statuses = getSegmentPlaybackStatuses(
-    segment,
-    playback,
-    timeWindowsSettings
-  );
-  return (
-    statuses.isHighDemand ||
-    statuses.isHttpDownloadable ||
-    statuses.isP2PDownloadable
-  );
+): boolean {
+  const {
+    isHighDemand = false,
+    isHttpDownloadable = false,
+    isP2PDownloadable = false,
+  } = getSegmentPlaybackStatuses(segment, playback, timeWindowsSettings);
+  return isHighDemand || isHttpDownloadable || isP2PDownloadable;
 }
 
 export function getSegmentPlaybackStatuses(
@@ -90,23 +86,18 @@ export function getSegmentPlaybackStatuses(
     p2pDownloadTimeWindow,
   } = timeWindowsSettings;
 
-  return {
-    isHighDemand: isSegmentInTimeWindow(
-      segment,
-      playback,
-      highDemandTimeWindow
-    ),
-    isHttpDownloadable: isSegmentInTimeWindow(
-      segment,
-      playback,
-      httpDownloadTimeWindow
-    ),
-    isP2PDownloadable: isSegmentInTimeWindow(
-      segment,
-      playback,
-      p2pDownloadTimeWindow
-    ),
-  };
+  const statuses: SegmentPlaybackStatuses = {};
+  if (isSegmentInTimeWindow(segment, playback, highDemandTimeWindow)) {
+    statuses.isHighDemand = true;
+  }
+  if (isSegmentInTimeWindow(segment, playback, httpDownloadTimeWindow)) {
+    statuses.isHttpDownloadable = true;
+  }
+  if (isSegmentInTimeWindow(segment, playback, p2pDownloadTimeWindow)) {
+    statuses.isP2PDownloadable = true;
+  }
+
+  return statuses;
 }
 
 function isSegmentInTimeWindow(

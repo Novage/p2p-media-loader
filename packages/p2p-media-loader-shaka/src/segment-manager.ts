@@ -5,7 +5,6 @@ import {
   StreamWithReadonlySegments,
   SegmentBase,
   StreamType,
-  ReadonlyLinkedMap,
 } from "p2p-media-loader-core";
 
 // The minimum time interval (in seconds) between segments to assign unique IDs.
@@ -143,7 +142,7 @@ function* itemsBackwards<T>(items: T[]) {
 }
 
 function* nSegmentsBackwards(
-  segments: ReadonlyLinkedMap<string, SegmentBase>,
+  segments: ReadonlyMap<string, SegmentBase>,
   amount: number
 ) {
   let i = 0;

@@ -29,4 +29,4 @@ jobs:
       - run: pnpm lint
       - run: pnpm build
       - run: npx tsc
-        working-directory: ./p2p-media-loader-demo
+        working-directory: ./demo
