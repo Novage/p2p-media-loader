@@ -101,7 +101,6 @@ export class Core<TStream extends Stream = Stream> {
     const segment = this.identifySegment(segmentLocalId);
     const loader = this.getStreamHybridLoader(segment);
     void loader.loadSegment(segment, callbacks);
-    // console.log(this.isLive, this.activeLevelBitrate);
   }
 
   abortSegmentLoading(segmentLocalId: string): void {
