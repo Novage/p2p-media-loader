@@ -21,11 +21,11 @@
   },
   "devDependencies": {
     "@types/dplayer": "^1.25.5",
-    "@types/react": "^18.2.45",
+    "@types/react": "^18.2.47",
     "@types/react-dom": "^18.2.18",
     "@vitejs/plugin-react": "^4.2.1",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
-    "vite-plugin-node-polyfills": "^0.18.0"
+    "vite-plugin-node-polyfills": "^0.19.0"
   }
 }
