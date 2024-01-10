@@ -10,7 +10,6 @@ import {
   StreamDetails,
 } from "./types";
 import * as StreamUtils from "./utils/stream";
-import { LinkedMap } from "./linked-map";
 import { BandwidthCalculator } from "./bandwidth-calculator";
 import { EngineCallbacks } from "./requests/engine-request";
 import { SegmentsMemoryStorage } from "./segments-storage";
@@ -67,7 +66,7 @@ export class Core<TStream extends Stream = Stream> {
     if (this.streams.has(stream.localId)) return;
     this.streams.set(stream.localId, {
       ...stream,
-      segments: new LinkedMap<string, Segment>(),
+      segments: new Map<string, Segment>(),
     });
   }
 
@@ -81,7 +80,7 @@ export class Core<TStream extends Stream = Stream> {
 
     addSegments?.forEach((s) => {
       const segment = { ...s, stream };
-      stream.segments.addToEnd(segment.localId, segment);
+      stream.segments.set(segment.localId, segment);
     });
     removeSegmentIds?.forEach((id) => stream.segments.delete(id));
     this.mainStreamLoader?.updateStream(stream);

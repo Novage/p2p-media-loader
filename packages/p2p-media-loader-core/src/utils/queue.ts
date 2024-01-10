@@ -13,10 +13,19 @@ export function* generateQueue(
   settings: PlaybackTimeWindowsSettings
 ): Generator<QueueItem, void> {
   const { localId: requestedSegmentId, stream } = lastRequestedSegment;
-  const queueSegments = stream.segments.values(requestedSegmentId);
 
-  const first = queueSegments.next().value;
-  if (!first) return;
+  const requestedSegment = stream.segments.get(requestedSegmentId);
+  if (!requestedSegment) return;
+
+  const queueSegments = stream.segments.values();
+
+  let first: Segment | undefined;
+
+  while (first !== requestedSegment) {
+    first = queueSegments.next().value;
+  }
+
+  if (!first) return; // should never happen
 
   const firstStatuses = getSegmentPlaybackStatuses(first, playback, settings);
   if (isNotActualStatuses(firstStatuses)) {
