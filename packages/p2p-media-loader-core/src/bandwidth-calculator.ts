@@ -1,5 +1,3 @@
-const CLEAR_THRESHOLD_MS = 10000;
-
 export class BandwidthCalculator {
   private simultaneousLoadingsCount = 0;
   private readonly bytes: number[] = [];
@@ -7,6 +5,8 @@ export class BandwidthCalculator {
   private readonly timestamps: number[] = [];
   private noLoadingsTotalTime = 0;
   private allLoadingsStoppedTimestamp = 0;
+
+  constructor(private readonly clearThresholdMs = 10000) {}
 
   addBytes(bytesLength: number, now = performance.now()) {
     this.bytes.push(bytesLength);
@@ -82,7 +82,7 @@ export class BandwidthCalculator {
     if (!this.shiftedTimestamps.length) return;
     const threshold =
       this.shiftedTimestamps[this.shiftedTimestamps.length - 1] -
-      CLEAR_THRESHOLD_MS;
+      this.clearThresholdMs;
 
     let samplesToRemove = 0;
     for (const timestamp of this.shiftedTimestamps) {
