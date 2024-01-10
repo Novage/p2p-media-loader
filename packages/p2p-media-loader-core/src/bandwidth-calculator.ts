@@ -1,7 +1,7 @@
 export class BandwidthCalculator {
   private simultaneousLoadingsCount = 0;
   private readonly bytes: number[] = [];
-  private readonly shiftedTimestamps: number[] = [];
+  private readonly loadingOnlyTimestamps: number[] = [];
   private readonly timestamps: number[] = [];
   private noLoadingsTotalTime = 0;
   private allLoadingsStoppedTimestamp = 0;
@@ -10,7 +10,7 @@ export class BandwidthCalculator {
 
   addBytes(bytesLength: number, now = performance.now()) {
     this.bytes.push(bytesLength);
-    this.shiftedTimestamps.push(now - this.noLoadingsTotalTime);
+    this.loadingOnlyTimestamps.push(now - this.noLoadingsTotalTime);
     this.timestamps.push(now);
   }
 
@@ -30,20 +30,20 @@ export class BandwidthCalculator {
     this.allLoadingsStoppedTimestamp = now;
   }
 
-  getBandwidthForLastNSplicedSeconds(
+  getBandwidthLoadingOnly(
     seconds: number,
     ignoreThresholdTimestamp = Number.NEGATIVE_INFINITY
   ) {
-    if (!this.shiftedTimestamps.length) return 0;
+    if (!this.loadingOnlyTimestamps.length) return 0;
     const milliseconds = seconds * 1000;
     const lastItemTimestamp =
-      this.shiftedTimestamps[this.shiftedTimestamps.length - 1];
+      this.loadingOnlyTimestamps[this.loadingOnlyTimestamps.length - 1];
     let lastCountedTimestamp = lastItemTimestamp;
     const threshold = lastItemTimestamp - milliseconds;
     let totalBytes = 0;
 
     for (let i = this.bytes.length - 1; i >= 0; i--) {
-      const timestamp = this.shiftedTimestamps[i];
+      const timestamp = this.loadingOnlyTimestamps[i];
       if (
         timestamp < threshold ||
         this.timestamps[i] < ignoreThresholdTimestamp
@@ -57,7 +57,7 @@ export class BandwidthCalculator {
     return (totalBytes * 8000) / (lastItemTimestamp - lastCountedTimestamp);
   }
 
-  getBandwidthForLastNSeconds(
+  getBandwidth(
     seconds: number,
     ignoreThresholdTimestamp = Number.NEGATIVE_INFINITY,
     now = performance.now()
@@ -79,19 +79,19 @@ export class BandwidthCalculator {
   }
 
   clearStale() {
-    if (!this.shiftedTimestamps.length) return;
+    if (!this.loadingOnlyTimestamps.length) return;
     const threshold =
-      this.shiftedTimestamps[this.shiftedTimestamps.length - 1] -
+      this.loadingOnlyTimestamps[this.loadingOnlyTimestamps.length - 1] -
       this.clearThresholdMs;
 
     let samplesToRemove = 0;
-    for (const timestamp of this.shiftedTimestamps) {
+    for (const timestamp of this.loadingOnlyTimestamps) {
       if (timestamp > threshold) break;
       samplesToRemove++;
     }
 
     this.bytes.splice(0, samplesToRemove);
-    this.shiftedTimestamps.splice(0, samplesToRemove);
+    this.loadingOnlyTimestamps.splice(0, samplesToRemove);
     this.timestamps.splice(0, samplesToRemove);
   }
 }

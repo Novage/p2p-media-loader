@@ -102,7 +102,7 @@ export class HybridLoader {
       if (data) {
         engineRequest.resolve(
           data,
-          this.bandwidthCalculators.all.getBandwidthForLastNSplicedSeconds(3)
+          this.bandwidthCalculators.all.getBandwidthLoadingOnly(3)
         );
       }
     } else {
@@ -439,26 +439,26 @@ export class HybridLoader {
     const { http, all } = this.bandwidthCalculators;
     const { activeLevelBitrate } = this.streamDetails;
     if (this.streamDetails.activeLevelBitrate === 0) {
-      return all.getBandwidthForLastNSplicedSeconds(3);
+      return all.getBandwidthLoadingOnly(3);
     }
     const { levelChangedTimestamp } = this;
 
     const bandwidth = Math.max(
-      all.getBandwidthForLastNSeconds(30, levelChangedTimestamp),
-      all.getBandwidthForLastNSeconds(60, levelChangedTimestamp),
-      all.getBandwidthForLastNSeconds(90, levelChangedTimestamp)
+      all.getBandwidth(30, levelChangedTimestamp),
+      all.getBandwidth(60, levelChangedTimestamp),
+      all.getBandwidth(90, levelChangedTimestamp)
     );
     if (loadedPercentOfQueue >= 80 || bandwidth >= activeLevelBitrate * 0.9) {
       return Math.max(
-        all.getBandwidthForLastNSplicedSeconds(1),
-        all.getBandwidthForLastNSplicedSeconds(3),
-        all.getBandwidthForLastNSplicedSeconds(5)
+        all.getBandwidthLoadingOnly(1),
+        all.getBandwidthLoadingOnly(3),
+        all.getBandwidthLoadingOnly(5)
       );
     }
     const httpRealBandwidth = Math.max(
-      http.getBandwidthForLastNSplicedSeconds(1),
-      http.getBandwidthForLastNSplicedSeconds(3),
-      http.getBandwidthForLastNSplicedSeconds(5)
+      http.getBandwidthLoadingOnly(1),
+      http.getBandwidthLoadingOnly(3),
+      http.getBandwidthLoadingOnly(5)
     );
     return Math.max(bandwidth, httpRealBandwidth);
   }
