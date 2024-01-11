@@ -137,13 +137,13 @@ function App() {
     const player = new DPlayer({
       container: containerRef.current,
       video: {
-        url,
+        url: "",
         type: "customHls",
         customType: {
           customHls: (video: HTMLVideoElement) => {
             const hls = new window.Hls(engine.getConfig());
             engine.setHls(hls);
-            hls.loadSource(video.src);
+            hls.loadSource(url);
             hls.attachMedia(video);
             hlsInstance.current = hls;
           },
