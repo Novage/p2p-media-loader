@@ -40,6 +40,7 @@ export class Engine {
       "manifest.dash.ignoreSuggestedPresentationDelay",
       true
     );
+    this.player.configure("streaming.useNativeHlsOnSafari", false);
     this.updatePlayerEventHandlers("register");
   }
 

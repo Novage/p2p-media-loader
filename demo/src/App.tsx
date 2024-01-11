@@ -179,12 +179,10 @@ function App() {
     const player = new DPlayer({
       container: containerRef.current,
       video: {
-        url,
+        url: "",
         type: "customHlsOrDash",
         customType: {
           customHlsOrDash: (video: HTMLVideoElement) => {
-            video.autoplay = true;
-            const src = video.src;
             const shakaPlayer = new window.shaka.Player();
             shakaPlayer.attach(video);
             const onError = (error: { code: number }) => {
@@ -195,7 +193,7 @@ function App() {
               onError(event);
             });
             engine.configureAndInitShakaPlayer(shakaPlayer);
-            shakaPlayer.load(src).catch(onError);
+            shakaPlayer.load(url).catch(onError);
 
             shakaInstance.current = shakaPlayer;
           },
