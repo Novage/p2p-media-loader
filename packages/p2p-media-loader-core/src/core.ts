@@ -164,7 +164,7 @@ export class Core<TStream extends Stream = Stream> {
       return new HybridLoader(
         manifestResponseUrl,
         segment,
-        this.streamDetails as Required<StreamDetails>,
+        this.streamDetails,
         this.settings,
         this.bandwidthCalculators,
         this.segmentStorage,
