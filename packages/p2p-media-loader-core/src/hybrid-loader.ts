@@ -496,6 +496,5 @@ export class HybridLoader {
     this.storageCleanUpIntervalId = undefined;
     this.requests.destroy();
     this.p2pLoaders.destroy();
-    this.logger.destroy();
   }
 }

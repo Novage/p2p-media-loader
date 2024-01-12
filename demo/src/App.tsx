@@ -348,7 +348,13 @@ function App() {
           />
         </div>
         {!!playerType && ["hlsjs", "shaka-player"].includes(playerType) && (
-          <video ref={videoRef} controls muted style={{ width: 800 }} />
+          <video
+            ref={videoRef}
+            controls
+            muted
+            playsInline
+            style={{ width: 800 }}
+          />
         )}
       </div>
       <div style={{ display: "flex" }}>
