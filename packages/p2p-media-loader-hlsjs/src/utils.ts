@@ -2,7 +2,7 @@ import { ByteRange } from "p2p-media-loader-core";
 
 export function getSegmentLocalId(
   segmentRequestUrl: string,
-  byteRange?: ByteRange
+  byteRange?: ByteRange,
 ) {
   if (!byteRange) return segmentRequestUrl;
   return `${segmentRequestUrl}|${byteRange.start}-${byteRange.end}`;
@@ -10,7 +10,7 @@ export function getSegmentLocalId(
 
 export function getByteRange(
   rangeStart: number | undefined,
-  rangeEnd: number | undefined
+  rangeEnd: number | undefined,
 ): ByteRange | undefined {
   if (
     rangeStart !== undefined &&

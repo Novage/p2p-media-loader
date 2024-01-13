@@ -22,7 +22,7 @@ export class P2PLoadersContainer {
     stream: StreamWithSegments,
     private readonly requests: RequestsContainer,
     private readonly segmentStorage: SegmentsMemoryStorage,
-    private readonly settings: Settings
+    private readonly settings: Settings,
   ) {
     this.changeCurrentLoader(stream);
   }
@@ -36,7 +36,7 @@ export class P2PLoadersContainer {
       stream,
       this.requests,
       this.segmentStorage,
-      this.settings
+      this.settings,
     );
     const loggerInfo = LoggerUtils.getStreamString(stream);
     this.logger(`created new loader: ${loggerInfo}`);
@@ -51,7 +51,7 @@ export class P2PLoadersContainer {
     const loaderItem = this.loaders.get(stream.localId);
     if (this._currentLoaderItem) {
       const ids = this.segmentStorage.getStoredSegmentExternalIdsOfStream(
-        this._currentLoaderItem.stream
+        this._currentLoaderItem.stream,
       );
       if (!ids.length) this.destroyAndRemoveLoader(this._currentLoaderItem);
       else this.setLoaderDestroyTimeout(this._currentLoaderItem);
@@ -66,14 +66,14 @@ export class P2PLoadersContainer {
       this._currentLoaderItem = loader;
     }
     this.logger(
-      `change current p2p loader: ${LoggerUtils.getStreamString(stream)}`
+      `change current p2p loader: ${LoggerUtils.getStreamString(stream)}`,
     );
   }
 
   private setLoaderDestroyTimeout(item: P2PLoaderContainerItem) {
     item.destroyTimeoutId = window.setTimeout(
       () => this.destroyAndRemoveLoader(item),
-      this.settings.p2pLoaderDestroyTimeoutMs
+      this.settings.p2pLoaderDestroyTimeoutMs,
     );
   }
 

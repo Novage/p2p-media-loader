@@ -16,7 +16,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
 
   constructor(
     shaka: Readonly<Shaka>,
-    private readonly originalManifestParser: shaka.extern.ManifestParser
+    private readonly originalManifestParser: shaka.extern.ManifestParser,
   ) {
     this.isHls = this.originalManifestParser instanceof shaka.hls.HlsParser;
   }
@@ -42,14 +42,14 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
 
   async start(
     uri: string,
-    playerInterface: shaka.extern.ManifestParser.PlayerInterface
+    playerInterface: shaka.extern.ManifestParser.PlayerInterface,
   ): Promise<shaka.extern.Manifest> {
     const { p2pml } =
       playerInterface.networkingEngine as HookedNetworkingEngine;
     this.setP2PMediaLoaderData(p2pml);
     const manifest = await this.originalManifestParser.start(
       uri,
-      playerInterface
+      playerInterface,
     );
     if (!p2pml) return manifest;
 
@@ -71,7 +71,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   onExpirationUpdated(sessionId: string, expiration: number) {
     return this.originalManifestParser.onExpirationUpdated(
       sessionId,
-      expiration
+      expiration,
     );
   }
 
@@ -83,7 +83,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     const processStream = (
       stream: shaka.extern.Stream,
       type: StreamType,
-      order: number
+      order: number,
     ) => {
       this.hookSegmentIndex(stream);
       segmentManager.setStream(stream as HookedStream, type, order);
@@ -111,7 +111,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
 
     const substituteSegmentIndexGet = (
       segmentIndex: shaka.media.SegmentIndex,
-      callFromCreateSegmentIndexMethod = false
+      callFromCreateSegmentIndexMethod = false,
     ) => {
       let prevReference: shaka.media.SegmentReference | null = null;
       let prevFirstItemReference: shaka.media.SegmentReference;
@@ -232,7 +232,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
         (map) => {
           const [key, value] = map.entries().next().value ?? [];
           return typeof key === "number" && typeof value === "number";
-        }
+        },
       );
       if (!mediaSequenceTimeMap) continue;
       variant.stream.mediaSequenceTimeMap = mediaSequenceTimeMap as Map<

@@ -15,10 +15,10 @@ export function isCommandChunk(buffer: Uint8Array) {
   const bufferEndingToCompare = buffer.slice(-length);
   return (
     startFrames.some((frame) =>
-      areBuffersEqual(buffer, frame, FRAME_PART_LENGTH)
+      areBuffersEqual(buffer, frame, FRAME_PART_LENGTH),
     ) &&
     endFrames.some((frame) =>
-      areBuffersEqual(bufferEndingToCompare, frame, FRAME_PART_LENGTH)
+      areBuffersEqual(bufferEndingToCompare, frame, FRAME_PART_LENGTH),
     )
   );
 }
@@ -31,7 +31,7 @@ function isLastCommandChunk(buffer: Uint8Array) {
   return areBuffersEqual(
     buffer.slice(-FRAME_PART_LENGTH),
     commandFrameEnd,
-    FRAME_PART_LENGTH
+    FRAME_PART_LENGTH,
   );
 }
 
@@ -46,7 +46,7 @@ export class BinaryCommandChunksJoiner {
   private status: "joining" | "completed" = "joining";
 
   constructor(
-    private readonly onComplete: (commandBuffer: Uint8Array) => void
+    private readonly onComplete: (commandBuffer: Uint8Array) => void,
   ) {}
 
   addCommandChunk(chunk: Uint8Array) {
@@ -78,7 +78,7 @@ export class BinaryCommandCreator {
 
   constructor(
     commandType: PeerCommandType,
-    private readonly maxChunkLength: number
+    private readonly maxChunkLength: number,
   ) {
     this.bytes.push(commandType);
   }
@@ -92,7 +92,7 @@ export class BinaryCommandCreator {
   addSimilarIntArr(name: string, arr: number[]) {
     this.bytes.push(name.charCodeAt(0));
     const bytes = Serialization.serializeSimilarIntArray(
-      arr.map((num) => BigInt(num))
+      arr.map((num) => BigInt(num)),
     );
     this.bytes.push(bytes);
   }
@@ -111,7 +111,7 @@ export class BinaryCommandCreator {
     const unframedBuffer = this.bytes.getBuffer();
     if (unframedBuffer.length + commandFramesLength <= this.maxChunkLength) {
       this.resultBuffers.push(
-        frameBuffer(unframedBuffer, commandFrameStart, commandFrameEnd)
+        frameBuffer(unframedBuffer, commandFrameStart, commandFrameEnd),
       );
       return;
     }
@@ -126,19 +126,19 @@ export class BinaryCommandCreator {
 
     for (const [i, chunk] of splitBufferToEqualChunks(
       unframedBuffer,
-      chunksAmount
+      chunksAmount,
     )) {
       if (i === 0) {
         this.resultBuffers.push(
-          frameBuffer(chunk, commandFrameStart, commandDivFrameEnd)
+          frameBuffer(chunk, commandFrameStart, commandDivFrameEnd),
         );
       } else if (i === chunksAmount - 1) {
         this.resultBuffers.push(
-          frameBuffer(chunk, commandDivFrameStart, commandFrameEnd)
+          frameBuffer(chunk, commandDivFrameStart, commandFrameEnd),
         );
       } else {
         this.resultBuffers.push(
-          frameBuffer(chunk, commandDivFrameStart, commandDivFrameEnd)
+          frameBuffer(chunk, commandDivFrameStart, commandDivFrameEnd),
         );
       }
     }
@@ -169,7 +169,7 @@ export function deserializeCommand(bytes: Uint8Array): PeerCommand {
       case Serialization.SerializedItem.Int:
         {
           const { number, byteLength } = Serialization.deserializeInt(
-            bytes.slice(offset)
+            bytes.slice(offset),
           );
           deserializedCommand[name] = Number(number);
           offset += byteLength;
@@ -186,7 +186,7 @@ export function deserializeCommand(bytes: Uint8Array): PeerCommand {
       case Serialization.SerializedItem.String:
         {
           const { string, byteLength } = Serialization.deserializeString(
-            bytes.slice(offset)
+            bytes.slice(offset),
           );
           deserializedCommand[name] = string;
           offset += byteLength;
@@ -217,7 +217,7 @@ function stringToUtf8CodesBuffer(string: string, length?: number): Uint8Array {
 
 function* splitBufferToEqualChunks(
   buffer: Uint8Array,
-  chunksAmount: number
+  chunksAmount: number,
 ): Generator<[number, Uint8Array], void> {
   const chunkLength = Math.ceil(buffer.length / chunksAmount);
   for (let i = 0; i < chunksAmount; i++) {
@@ -228,10 +228,10 @@ function* splitBufferToEqualChunks(
 function frameBuffer(
   buffer: Uint8Array,
   frameStart: Uint8Array,
-  frameEnd: Uint8Array
+  frameEnd: Uint8Array,
 ) {
   const result = new Uint8Array(
-    buffer.length + frameStart.length + frameEnd.length
+    buffer.length + frameStart.length + frameEnd.length,
   );
   result.set(frameStart);
   result.set(buffer, frameStart.length);
@@ -243,7 +243,7 @@ function frameBuffer(
 function areBuffersEqual(
   buffer1: Uint8Array,
   buffer2: Uint8Array,
-  length: number
+  length: number,
 ) {
   for (let i = 0; i < length; i++) {
     if (buffer1[i] !== buffer2[i]) return false;

@@ -55,41 +55,41 @@ export class Engine {
 
     hls[method](
       "hlsManifestLoaded" as Events.MANIFEST_LOADED,
-      this.handleManifestLoaded
+      this.handleManifestLoaded,
     );
     hls[method](
       "hlsLevelSwitching" as Events.LEVEL_SWITCHING,
-      this.handleLevelSwitching
+      this.handleLevelSwitching,
     );
     hls[method](
       "hlsLevelUpdated" as Events.LEVEL_UPDATED,
-      this.handleLevelUpdated
+      this.handleLevelUpdated,
     );
     hls[method](
       "hlsAudioTrackLoaded" as Events.AUDIO_TRACK_LOADED,
-      this.handleLevelUpdated
+      this.handleLevelUpdated,
     );
     hls[method]("hlsDestroying" as Events.DESTROYING, this.destroy);
     hls[method](
       "hlsMediaAttaching" as Events.MEDIA_ATTACHING,
-      this.destroyCore
+      this.destroyCore,
     );
     hls[method](
       "hlsManifestLoading" as Events.MANIFEST_LOADING,
-      this.destroyCore
+      this.destroyCore,
     );
     hls[method](
       "hlsMediaDetached" as Events.MEDIA_DETACHED,
-      this.handleMediaDetached
+      this.handleMediaDetached,
     );
     hls[method](
       "hlsMediaAttached" as Events.MEDIA_ATTACHED,
-      this.handleMediaAttached
+      this.handleMediaAttached,
     );
   }
 
   private updateMediaElementEventHandlers = (
-    type: "register" | "unregister"
+    type: "register" | "unregister",
   ) => {
     const media = this.currentHlsInstance?.media;
     if (!media) return;
@@ -116,7 +116,7 @@ export class Engine {
 
   private handleLevelUpdated = (
     event: string,
-    data: LevelUpdatedData | AudioTrackLoadedData
+    data: LevelUpdatedData | AudioTrackLoadedData,
   ) => {
     this.core.setIsLive(data.details.live);
     this.segmentManager.updatePlaylist(data);

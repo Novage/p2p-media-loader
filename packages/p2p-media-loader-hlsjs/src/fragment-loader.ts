@@ -44,7 +44,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   async load(
     context: FragmentLoaderContext,
     config: LoaderConfiguration,
-    callbacks: LoaderCallbacks<LoaderContext>
+    callbacks: LoaderCallbacks<LoaderContext>,
   ) {
     this.context = context;
     this.config = config;
@@ -54,7 +54,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     const { rangeStart: start, rangeEnd: end } = context;
     const byteRange = Utils.getByteRange(
       start,
-      end !== undefined ? end - 1 : undefined
+      end !== undefined ? end - 1 : undefined,
     );
     this.segmentId = Utils.getSegmentLocalId(context.url, byteRange);
 
@@ -71,7 +71,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       stats.loading = getLoadingStat(
         this.response.bandwidth,
         loadedBytes,
-        performance.now()
+        performance.now(),
       );
       stats.total = stats.loaded = loadedBytes;
 
@@ -80,14 +80,14 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
           this.stats,
           context,
           this.response.data,
-          undefined
+          undefined,
         );
       }
       callbacks.onSuccess(
         { data: this.response.data, url: context.url },
         this.stats,
         context,
-        undefined
+        undefined,
       );
     };
 
@@ -149,7 +149,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
 function getLoadingStat(
   targetBitrate: number,
   loadedBytes: number,
-  loadingEndTime: number
+  loadingEndTime: number,
 ) {
   const bits = loadedBytes * 8;
   const timeForLoading = (bits / targetBitrate) * 1000;

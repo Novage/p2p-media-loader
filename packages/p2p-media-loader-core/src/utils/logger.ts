@@ -11,7 +11,7 @@ export function getSegmentString(segment: Segment) {
 }
 
 export function getSegmentPlaybackStatusesString(
-  statuses: SegmentPlaybackStatuses
+  statuses: SegmentPlaybackStatuses,
 ): string {
   const { isHighDemand, isHttpDownloadable, isP2PDownloadable } = statuses;
   if (isHighDemand) return "high-demand";

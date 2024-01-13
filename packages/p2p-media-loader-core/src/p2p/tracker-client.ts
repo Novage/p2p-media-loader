@@ -28,7 +28,7 @@ export class P2PTrackerClient {
     streamId: string,
     stream: StreamWithSegments,
     private readonly eventHandlers: P2PTrackerClientEventHandlers,
-    private readonly settings: Settings
+    private readonly settings: Settings,
   ) {
     const { string: peerId, bytes: peerIdBytes } = PeerUtil.generatePeerId();
     const { bytes: streamIdBytes, string: streamHash } =
@@ -57,7 +57,7 @@ export class P2PTrackerClient {
     this.client.on("warning", this.onTrackerClientWarning);
     this.client.on("error", this.onTrackerClientError);
     this.logger(
-      `create new client; \nstream: ${this.streamShortId}; hash: ${streamHash}; \npeer id: ${this.peerId}`
+      `create new client; \nstream: ${this.streamShortId}; hash: ${streamHash}; \npeer id: ${this.peerId}`,
     );
   }
 
@@ -78,7 +78,7 @@ export class P2PTrackerClient {
   }
 
   private onReceivePeerConnection: TrackerClientEvents["peer"] = (
-    peerConnection
+    peerConnection,
   ) => {
     const itemId = Peer.getPeerIdFromConnection(peerConnection);
     let peerItem = this._peers.get(itemId);
@@ -104,17 +104,17 @@ export class P2PTrackerClient {
           onPeerClosed: this.onPeerClosed,
           onSegmentRequested: this.eventHandlers.onSegmentRequested,
         },
-        this.settings
+        this.settings,
       );
       this.logger(
-        `connected with peer: ${peerItem.peer.id} ${this.streamShortId}`
+        `connected with peer: ${peerItem.peer.id} ${this.streamShortId}`,
       );
       this.eventHandlers.onPeerConnected(peerItem.peer);
     });
   };
 
   private onTrackerClientWarning: TrackerClientEvents["warning"] = (
-    warning
+    warning,
   ) => {
     this.logger(`tracker warning (${this.streamShortId}: ${warning})`);
   };

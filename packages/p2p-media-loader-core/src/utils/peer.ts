@@ -26,7 +26,7 @@ export function generatePeerId(): {
 
   for (let i = 0; i < randomCharsAmount; i++) {
     peerId += HASH_SYMBOLS.charAt(
-      Math.floor(Math.random() * HASH_SYMBOLS.length)
+      Math.floor(Math.random() * HASH_SYMBOLS.length),
     );
   }
 

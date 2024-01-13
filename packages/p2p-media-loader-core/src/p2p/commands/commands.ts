@@ -10,7 +10,7 @@ import {
 
 function serializeSegmentAnnouncementCommand(
   command: PeerSegmentAnnouncementCommand,
-  maxChunkSize: number
+  maxChunkSize: number,
 ) {
   const { c: commandCode, p: loadingByHttp, l: loaded } = command;
   const creator = new BinaryCommandCreator(commandCode, maxChunkSize);
@@ -24,7 +24,7 @@ function serializeSegmentAnnouncementCommand(
 
 function serializePeerSegmentCommand(
   command: PeerSegmentCommand,
-  maxChunkSize: number
+  maxChunkSize: number,
 ) {
   const creator = new BinaryCommandCreator(command.c, maxChunkSize);
   creator.addInteger("i", command.i);
@@ -34,7 +34,7 @@ function serializePeerSegmentCommand(
 
 function serializePeerSendSegmentCommand(
   command: PeerSendSegmentCommand,
-  maxChunkSize: number
+  maxChunkSize: number,
 ) {
   const creator = new BinaryCommandCreator(command.c, maxChunkSize);
   creator.addInteger("i", command.i);
@@ -45,7 +45,7 @@ function serializePeerSendSegmentCommand(
 
 function serializePeerSegmentRequestCommand(
   command: PeerRequestSegmentCommand,
-  maxChunkSize: number
+  maxChunkSize: number,
 ) {
   const creator = new BinaryCommandCreator(command.c, maxChunkSize);
   creator.addInteger("i", command.i);
@@ -56,7 +56,7 @@ function serializePeerSegmentRequestCommand(
 
 export function serializePeerCommand(
   command: PeerCommand,
-  maxChunkSize: number
+  maxChunkSize: number,
 ) {
   switch (command.c) {
     case PeerCommandType.CancelSegmentRequest:

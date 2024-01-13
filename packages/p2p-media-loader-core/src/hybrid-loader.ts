@@ -40,7 +40,7 @@ export class HybridLoader {
     private readonly settings: Settings,
     private readonly bandwidthCalculators: BandwidthCalculators,
     private readonly segmentStorage: SegmentsMemoryStorage,
-    private readonly eventHandlers?: Pick<CoreEventHandlers, "onSegmentLoaded">
+    private readonly eventHandlers?: Pick<CoreEventHandlers, "onSegmentLoaded">,
   ) {
     const activeStream = this.lastRequestedSegment.stream;
     this.playback = { position: this.lastRequestedSegment.startTime, rate: 1 };
@@ -49,7 +49,7 @@ export class HybridLoader {
       this.requestProcessQueueMicrotask,
       this.bandwidthCalculators,
       this.playback,
-      this.settings
+      this.settings,
     );
 
     if (!this.segmentStorage.isInitialized) {
@@ -60,7 +60,7 @@ export class HybridLoader {
       return StreamUtils.isSegmentActualInPlayback(
         segment,
         this.playback,
-        this.settings
+        this.settings,
       );
     });
     this.p2pLoaders = new P2PLoadersContainer(
@@ -68,7 +68,7 @@ export class HybridLoader {
       this.lastRequestedSegment.stream,
       this.requests,
       this.segmentStorage,
-      this.settings
+      this.settings,
     );
 
     this.logger = debug(`core:hybrid-loader-${activeStream.type}`);
@@ -102,7 +102,7 @@ export class HybridLoader {
       if (data) {
         engineRequest.resolve(
           data,
-          this.bandwidthCalculators.all.getBandwidthLoadingOnly(3)
+          this.bandwidthCalculators.all.getBandwidthLoadingOnly(3),
         );
       }
     } else {
@@ -135,7 +135,7 @@ export class HybridLoader {
 
   private processRequests(
     queueSegmentIds: Set<string>,
-    queueDownloadRatio: number
+    queueDownloadRatio: number,
   ) {
     const { stream } = this.lastRequestedSegment;
     const { httpErrorRetries } = this.settings;
@@ -163,7 +163,7 @@ export class HybridLoader {
           if (engineRequest) {
             engineRequest.resolve(
               request.data,
-              this.getBandwidth(queueDownloadRatio)
+              this.getBandwidth(queueDownloadRatio),
             );
             this.engineRequest = undefined;
           }
@@ -308,7 +308,7 @@ export class HybridLoader {
     this.engineRequest.abort();
     this.logger(
       "abort: ",
-      LoggerUtils.getSegmentString(this.engineRequest.segment)
+      LoggerUtils.getSegmentString(this.engineRequest.segment),
     );
     this.engineRequest = undefined;
   }
@@ -339,7 +339,7 @@ export class HybridLoader {
     for (const { segment, statuses } of QueueUtils.generateQueue(
       this.lastRequestedSegment,
       this.playback,
-      this.settings
+      this.settings,
     )) {
       if (
         !statuses.isHttpDownloadable ||
@@ -372,7 +372,7 @@ export class HybridLoader {
 
   private abortLastHttpLoadingInQueueAfterItem(
     queue: QueueUtils.QueueItem[],
-    segment: Segment
+    segment: Segment,
   ): boolean {
     for (const { segment: itemSegment } of Utils.arrayBackwards(queue)) {
       if (itemSegment === segment) break;
@@ -387,7 +387,7 @@ export class HybridLoader {
 
   private abortLastP2PLoadingInQueueAfterItem(
     queue: QueueUtils.QueueItem[],
-    segment: Segment
+    segment: Segment,
   ): boolean {
     for (const { segment: itemSegment } of Utils.arrayBackwards(queue)) {
       if (itemSegment === segment) break;
@@ -408,7 +408,7 @@ export class HybridLoader {
     for (const item of QueueUtils.generateQueue(
       this.lastRequestedSegment,
       this.playback,
-      this.settings
+      this.settings,
     )) {
       maxPossibleLength++;
       const { segment } = item;
@@ -444,19 +444,19 @@ export class HybridLoader {
     const bandwidth = Math.max(
       all.getBandwidth(30, levelChangedTimestamp),
       all.getBandwidth(60, levelChangedTimestamp),
-      all.getBandwidth(90, levelChangedTimestamp)
+      all.getBandwidth(90, levelChangedTimestamp),
     );
     if (queueDownloadRatio >= 0.8 || bandwidth >= activeLevelBitrate * 0.9) {
       return Math.max(
         all.getBandwidthLoadingOnly(1),
         all.getBandwidthLoadingOnly(3),
-        all.getBandwidthLoadingOnly(5)
+        all.getBandwidthLoadingOnly(5),
       );
     }
     const httpRealBandwidth = Math.max(
       http.getBandwidthLoadingOnly(1),
       http.getBandwidthLoadingOnly(3),
-      http.getBandwidthLoadingOnly(5)
+      http.getBandwidthLoadingOnly(5),
     );
     return Math.max(bandwidth, httpRealBandwidth);
   }

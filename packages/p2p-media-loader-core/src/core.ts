@@ -53,7 +53,7 @@ export class Core<TStream extends Stream = Stream> {
   hasSegment(segmentLocalId: string): boolean {
     const segment = StreamUtils.getSegmentFromStreamsMap(
       this.streams,
-      segmentLocalId
+      segmentLocalId,
     );
     return !!segment;
   }
@@ -73,7 +73,7 @@ export class Core<TStream extends Stream = Stream> {
   updateStream(
     streamLocalId: string,
     addSegments?: SegmentBase[],
-    removeSegmentIds?: string[]
+    removeSegmentIds?: string[],
   ): void {
     const stream = this.streams.get(streamLocalId);
     if (!stream) return;
@@ -94,7 +94,7 @@ export class Core<TStream extends Stream = Stream> {
     if (!this.segmentStorage) {
       this.segmentStorage = new SegmentsMemoryStorage(
         this.manifestResponseUrl,
-        this.settings
+        this.settings,
       );
       await this.segmentStorage.initialize();
     }
@@ -144,7 +144,7 @@ export class Core<TStream extends Stream = Stream> {
 
     const segment = StreamUtils.getSegmentFromStreamsMap(
       this.streams,
-      segmentId
+      segmentId,
     );
     if (!segment) {
       throw new Error(`Not found segment with id: ${segmentId}`);
@@ -168,7 +168,7 @@ export class Core<TStream extends Stream = Stream> {
         this.settings,
         this.bandwidthCalculators,
         this.segmentStorage,
-        this.eventHandlers
+        this.eventHandlers,
       );
     };
     const streamTypeLoaderKeyMap = {

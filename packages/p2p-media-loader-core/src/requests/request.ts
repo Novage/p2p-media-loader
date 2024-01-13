@@ -58,7 +58,7 @@ export class Request {
   private progress?: LoadProgress;
   private notReceivingBytesTimeout: Timeout;
   private _abortRequestCallback?: (
-    error: RequestError<RequestInnerErrorType>
+    error: RequestError<RequestInnerErrorType>,
   ) => void;
   private readonly _logger: debug.Debugger;
   private _isHandledByProcessQueue = false;
@@ -68,7 +68,7 @@ export class Request {
     private readonly requestProcessQueueCallback: () => void,
     private readonly bandwidthCalculators: BandwidthCalculators,
     private readonly playback: Playback,
-    private readonly settings: StreamUtils.PlaybackTimeWindowsSettings
+    private readonly settings: StreamUtils.PlaybackTimeWindowsSettings,
   ) {
     this.id = Request.getRequestItemId(this.segment);
     const { byteRange } = this.segment;
@@ -139,16 +139,16 @@ export class Request {
     controls: {
       notReceivingBytesTimeoutMs?: number;
       abort: (errorType: RequestError<RequestInnerErrorType>) => void;
-    }
+    },
   ): RequestControls {
     if (this._status === "succeed") {
       throw new Error(
-        `Request ${this.segment.externalId} has been already succeed.`
+        `Request ${this.segment.externalId} has been already succeed.`,
       );
     }
     if (this._status === "loading") {
       throw new Error(
-        `Request ${this.segment.externalId} has been already started.`
+        `Request ${this.segment.externalId} has been already started.`,
       );
     }
 
@@ -171,11 +171,11 @@ export class Request {
     const statuses = StreamUtils.getSegmentPlaybackStatuses(
       this.segment,
       this.playback,
-      this.settings
+      this.settings,
     );
     const statusString = LoggerUtils.getSegmentPlaybackStatusesString(statuses);
     this.logger(
-      `${requestData.type} ${this.segment.externalId} ${statusString} started`
+      `${requestData.type} ${this.segment.externalId} ${statusString} started`,
     );
 
     return {
@@ -190,7 +190,7 @@ export class Request {
     this.throwErrorIfNotLoadingStatus();
     this.setStatus("aborted");
     this.logger(
-      `${this.currentAttempt?.type} ${this.segment.externalId} aborted`
+      `${this.currentAttempt?.type} ${this.segment.externalId} aborted`,
     );
     this._abortRequestCallback?.(new RequestError("abort"));
     this._abortRequestCallback = undefined;
@@ -242,7 +242,7 @@ export class Request {
     this._totalBytes = this._loadedBytes;
 
     this.logger(
-      `${this.currentAttempt.type} ${this.segment.externalId} succeed`
+      `${this.currentAttempt.type} ${this.segment.externalId} succeed`,
     );
     this.requestProcessQueueCallback();
   };
@@ -302,7 +302,7 @@ class FailedRequestAttempts {
   get httpAttemptsCount() {
     return this.attempts.reduce(
       (sum, attempt) => (attempt.type === "http" ? sum + 1 : sum),
-      0
+      0,
     );
   }
 
@@ -345,7 +345,7 @@ export class RequestError<
 
   constructor(
     readonly type: T,
-    message?: string
+    message?: string,
   ) {
     super(message);
     this.timestamp = performance.now();

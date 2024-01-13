@@ -8,7 +8,7 @@ export class RequestsContainer {
     private readonly requestProcessQueueCallback: () => void,
     private readonly bandwidthCalculators: BandwidthCalculators,
     private readonly playback: Playback,
-    private readonly settings: Settings
+    private readonly settings: Settings,
   ) {}
 
   get executingHttpCount() {
@@ -39,7 +39,7 @@ export class RequestsContainer {
         this.requestProcessQueueCallback,
         this.bandwidthCalculators,
         this.playback,
-        this.settings
+        this.settings,
       );
       this.requests.set(segment, request);
     }

@@ -18,7 +18,7 @@ export class Loader {
   constructor(
     private readonly shaka: Shaka,
     private readonly core: Core<Stream>,
-    readonly streamInfo: StreamInfo
+    readonly streamInfo: StreamInfo,
   ) {}
 
   private defaultLoad() {
@@ -51,7 +51,7 @@ export class Loader {
 
   private loadSegment(
     segmentUrl: string,
-    byteRangeString: string
+    byteRangeString: string,
   ): LoadingHandlerResult {
     const segmentId = Utils.getSegmentLocalId(segmentUrl, byteRangeString);
     if (!this.core.hasSegment(segmentId)) return this.defaultLoad();
@@ -68,7 +68,7 @@ export class Loader {
           originalUri: segmentUrl,
           timeMs: getLoadingDurationBasedOnBandwidth(
             bandwidth,
-            data.byteLength
+            data.byteLength,
           ),
         };
       } catch (error) {
@@ -79,7 +79,7 @@ export class Loader {
             throw new ShakaError(
               ShakaError.Severity.RECOVERABLE,
               ShakaError.Category.NETWORK,
-              this.shaka.util.Error.Code.OPERATION_ABORTED
+              this.shaka.util.Error.Code.OPERATION_ABORTED,
             );
           }
         }
@@ -88,7 +88,7 @@ export class Loader {
     };
 
     return new this.shaka.util.AbortableOperation(loadSegment(), async () =>
-      this.core.abortSegmentLoading(segmentId)
+      this.core.abortSegmentLoading(segmentId),
     );
   }
 
@@ -100,7 +100,7 @@ export class Loader {
 
 function getLoadingDurationBasedOnBandwidth(
   bandwidth: number,
-  bytesLoaded: number
+  bytesLoaded: number,
 ) {
   const bits = bytesLoaded * 8;
   return Math.round(bits / bandwidth) * 1000;

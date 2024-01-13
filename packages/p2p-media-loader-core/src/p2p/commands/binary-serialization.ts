@@ -64,7 +64,7 @@ export function deserializeInt(bytes: Uint8Array) {
   const code = metadata >> 4;
   if (code !== SerializedItem.Int) {
     throw new Error(
-      "Trying to deserialize integer with invalid serialized item code"
+      "Trying to deserialize integer with invalid serialized item code",
     );
   }
   const numberBytesLength = metadata & 0b1111;
@@ -105,7 +105,7 @@ export function deserializeSimilarIntArray(bytes: Uint8Array) {
   const code = codeByte >> 4;
   if (code !== SerializedItem.SimilarIntArray) {
     throw new Error(
-      "Trying to deserialize similar int array with invalid serialized item code"
+      "Trying to deserialize similar int array with invalid serialized item code",
     );
   }
 
@@ -113,7 +113,7 @@ export function deserializeSimilarIntArray(bytes: Uint8Array) {
   const originalIntArr: bigint[] = [];
   for (let i = 0; i < commonPartArraysAmount; i++) {
     const { number: commonPartWithLength, byteLength } = deserializeInt(
-      bytes.slice(offset)
+      bytes.slice(offset),
     );
     offset += byteLength;
     const arrayLength = commonPartWithLength & 0xffn;
@@ -145,7 +145,7 @@ export function deserializeString(bytes: Uint8Array) {
   const code = codeByte >> 4;
   if (code !== SerializedItem.String) {
     throw new Error(
-      "Trying to deserialize bytes (sting) with invalid serialized item code."
+      "Trying to deserialize bytes (sting) with invalid serialized item code.",
     );
   }
   const length = ((codeByte & 0x0f) << 8) | lengthByte;
@@ -168,7 +168,7 @@ export class ResizableUint8Array {
 
   private addBytes(
     bytes: Uint8Array | number | number[],
-    position: "start" | "end"
+    position: "start" | "end",
   ) {
     let bytesToAdd: Uint8Array;
     if (bytes instanceof Uint8Array) {

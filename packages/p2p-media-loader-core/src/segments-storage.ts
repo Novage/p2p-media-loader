@@ -27,14 +27,14 @@ export class SegmentsMemoryStorage {
   private cache = new Map<string, StorageItem>();
   private _isInitialized = false;
   private readonly isSegmentLockedPredicates: ((
-    segment: Segment
+    segment: Segment,
   ) => boolean)[] = [];
   private readonly logger: Debug.Debugger;
   private readonly events = new EventDispatcher<StorageEventHandlers>();
 
   constructor(
     private readonly masterManifestUrl: string,
-    private readonly settings: StorageSettings
+    private readonly settings: StorageSettings,
   ) {
     this.logger = Debug("core:segment-memory-storage");
     this.logger.color = "RebeccaPurple";
@@ -143,7 +143,7 @@ export class SegmentsMemoryStorage {
 
   subscribeOnUpdate(
     stream: Stream,
-    listener: StorageEventHandlers["onStorageUpdated"]
+    listener: StorageEventHandlers["onStorageUpdated"],
   ) {
     const localId = StreamUtils.getStreamShortId(stream);
     this.events.subscribe(`onStorageUpdated-${localId}`, listener);
@@ -151,7 +151,7 @@ export class SegmentsMemoryStorage {
 
   unsubscribeFromUpdate(
     stream: Stream,
-    listener: StorageEventHandlers["onStorageUpdated"]
+    listener: StorageEventHandlers["onStorageUpdated"],
   ) {
     const localId = StreamUtils.getStreamShortId(stream);
     this.events.unsubscribe(`onStorageUpdated-${localId}`, listener);
@@ -160,7 +160,7 @@ export class SegmentsMemoryStorage {
   private dispatchStorageUpdatedEvent(stream: Stream) {
     this.events.dispatch(
       `onStorageUpdated${StreamUtils.getStreamShortId(stream)}`,
-      stream
+      stream,
     );
   }
 

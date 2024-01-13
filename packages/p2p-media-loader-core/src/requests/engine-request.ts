@@ -11,7 +11,7 @@ export class EngineRequest {
 
   constructor(
     readonly segment: Segment,
-    readonly engineCallbacks: EngineCallbacks
+    readonly engineCallbacks: EngineCallbacks,
   ) {}
 
   get status() {

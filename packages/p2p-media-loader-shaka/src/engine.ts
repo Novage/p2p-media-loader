@@ -38,7 +38,7 @@ export class Engine {
     this.player.configure("manifest.defaultPresentationDelay", LIVE_EDGE_DELAY);
     this.player.configure(
       "manifest.dash.ignoreSuggestedPresentationDelay",
-      true
+      true,
     );
     this.player.configure("streaming.useNativeHlsOnSafari", false);
     this.updatePlayerEventHandlers("register");
@@ -108,7 +108,7 @@ export class Engine {
   };
 
   private updateMediaElementEventHandlers = (
-    type: "register" | "unregister"
+    type: "register" | "unregister",
   ) => {
     const media = this.player?.getMediaElement();
     if (!media) return;
@@ -142,7 +142,7 @@ export class Engine {
     Parser.registerParserByMime("application/x-mpegurl", hlsParserFactory);
     Parser.registerParserByMime(
       "application/vnd.apple.mpegurl",
-      hlsParserFactory
+      hlsParserFactory,
     );
   }
 

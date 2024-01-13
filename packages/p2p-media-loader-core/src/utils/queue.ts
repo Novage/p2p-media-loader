@@ -10,7 +10,7 @@ export type QueueItem = { segment: Segment; statuses: SegmentPlaybackStatuses };
 export function* generateQueue(
   lastRequestedSegment: Readonly<Segment>,
   playback: Readonly<Playback>,
-  settings: PlaybackTimeWindowsSettings
+  settings: PlaybackTimeWindowsSettings,
 ): Generator<QueueItem, void> {
   const { localId: requestedSegmentId, stream } = lastRequestedSegment;
 
@@ -37,7 +37,7 @@ export function* generateQueue(
     const secondStatuses = getSegmentPlaybackStatuses(
       second,
       playback,
-      settings
+      settings,
     );
 
     if (isNotActualStatuses(secondStatuses)) return;

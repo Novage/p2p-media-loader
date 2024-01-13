@@ -32,7 +32,7 @@ export class BandwidthCalculator {
 
   getBandwidthLoadingOnly(
     seconds: number,
-    ignoreThresholdTimestamp = Number.NEGATIVE_INFINITY
+    ignoreThresholdTimestamp = Number.NEGATIVE_INFINITY,
   ) {
     if (!this.loadingOnlyTimestamps.length) return 0;
     const milliseconds = seconds * 1000;
@@ -60,7 +60,7 @@ export class BandwidthCalculator {
   getBandwidth(
     seconds: number,
     ignoreThresholdTimestamp = Number.NEGATIVE_INFINITY,
-    now = performance.now()
+    now = performance.now(),
   ) {
     if (!this.timestamps.length) return 0;
     const milliseconds = seconds * 1000;

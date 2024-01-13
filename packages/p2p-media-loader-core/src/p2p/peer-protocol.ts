@@ -19,7 +19,7 @@ export class PeerProtocol {
       onCommandReceived: (command: Command.PeerCommand) => void;
       onSegmentChunkReceived: (data: Uint8Array) => void;
       onDestroy: () => void;
-    }
+    },
   ) {
     connection.on("data", this.onDataReceived);
     connection.on("close", this.onPeerClosed);
@@ -49,7 +49,7 @@ export class PeerProtocol {
   sendCommand(command: Command.PeerCommand) {
     const binaryCommandBuffers = Command.serializePeerCommand(
       command,
-      this.settings.webRtcMaxMessageSize
+      this.settings.webRtcMaxMessageSize,
     );
     for (const buffer of binaryCommandBuffers) {
       this.connection.send(buffer);
@@ -109,7 +109,7 @@ export class PeerProtocol {
           this.commandChunks = undefined;
           const command = Command.deserializeCommand(commandBuffer);
           this.eventHandlers.onCommandReceived(command);
-        }
+        },
       );
     }
     try {
@@ -127,7 +127,7 @@ export class PeerProtocol {
 
 function* getBufferChunks(
   data: ArrayBuffer,
-  maxChunkSize: number
+  maxChunkSize: number,
 ): Generator<ArrayBuffer, void> {
   let bytesLeft = data.byteLength;
   while (bytesLeft > 0) {

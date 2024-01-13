@@ -27,7 +27,7 @@ export function createSegment({
 }
 
 export function getSegmentLocalIdFromReference(
-  segmentReference: shaka.media.SegmentReference
+  segmentReference: shaka.media.SegmentReference,
 ) {
   const { url, byteRange } = getSegmentInfoFromReference(segmentReference);
   return getSegmentLocalId(url, byteRange);
@@ -46,7 +46,7 @@ export function getSegmentLocalId(url: string, byteRange?: ByteRange | string) {
 }
 
 export function getByteRangeFromHeaderString(
-  rangeStr: string | undefined
+  rangeStr: string | undefined,
 ): ByteRange | undefined {
   if (!rangeStr || !rangeStr.includes("bytes=")) return undefined;
 
@@ -59,7 +59,7 @@ export function getByteRangeFromHeaderString(
 }
 
 export function getSegmentInfoFromReference(
-  segmentReference: shaka.media.SegmentReference
+  segmentReference: shaka.media.SegmentReference,
 ) {
   const uris = segmentReference.getUris();
   const responseUrl = uris[1] ?? uris[0];
@@ -77,7 +77,7 @@ export function getSegmentInfoFromReference(
 }
 
 export function getStreamLastMediaSequence(
-  stream: StreamWithReadonlySegments<Stream>
+  stream: StreamWithReadonlySegments<Stream>,
 ): number | undefined {
   const { shakaStream } = stream;
   const map = shakaStream.mediaSequenceTimeMap;

@@ -17,7 +17,7 @@ export class HttpRequestExecutor {
 
   constructor(
     private readonly request: Request,
-    private readonly settings: HttpSettings
+    private readonly settings: HttpSettings,
   ) {
     const { byteRange } = this.request.segment;
     if (byteRange) this.byteRange = { ...byteRange };
@@ -42,7 +42,7 @@ export class HttpRequestExecutor {
       {
         abort: () => this.abortController.abort("abort"),
         notReceivingBytesTimeoutMs: httpNotReceivingBytesTimeoutMs,
-      }
+      },
     );
     void this.fetch();
   }
@@ -92,7 +92,7 @@ export class HttpRequestExecutor {
         if (response.status !== 206) {
           throw new RequestError(
             "http-unexpected-status-code",
-            response.statusText
+            response.statusText,
           );
         }
         const contentLengthHeader = response.headers.get("Content-Length");
@@ -146,7 +146,7 @@ export class HttpRequestExecutor {
 }
 
 async function* readStream(
-  reader: ReadableStreamDefaultReader<Uint8Array>
+  reader: ReadableStreamDefaultReader<Uint8Array>,
 ): AsyncGenerator<Uint8Array> {
   while (true) {
     const { done, value } = await reader.read();

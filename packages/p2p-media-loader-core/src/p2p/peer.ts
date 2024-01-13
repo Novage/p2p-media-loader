@@ -18,7 +18,7 @@ type PeerEventHandlers = {
   onSegmentRequested: (
     peer: Peer,
     segmentId: number,
-    byteFrom?: number
+    byteFrom?: number,
   ) => void;
 };
 
@@ -40,7 +40,7 @@ export class Peer {
   constructor(
     connection: PeerConnection,
     private readonly eventHandlers: PeerEventHandlers,
-    private readonly settings: PeerSettings
+    private readonly settings: PeerSettings,
   ) {
     this.id = Peer.getPeerIdFromConnection(connection);
     this.peerProtocol = new PeerProtocol(connection, settings, {
@@ -149,14 +149,14 @@ export class Peer {
             this.downloadingErrors.push(error);
 
             const timeoutErrors = this.downloadingErrors.filter(
-              (error) => error.type === "bytes-receiving-timeout"
+              (error) => error.type === "bytes-receiving-timeout",
             );
             const { p2pErrorRetries } = this.settings;
             if (timeoutErrors.length >= p2pErrorRetries) {
               this.peerProtocol.destroy();
             }
           },
-        }
+        },
       ),
     };
     const command: Command.PeerRequestSegmentCommand = {
@@ -178,7 +178,7 @@ export class Peer {
     this.peerProtocol.sendCommand(command);
     try {
       await this.peerProtocol.splitSegmentDataToChunksAndUploadAsync(
-        data as Uint8Array
+        data as Uint8Array,
       );
       this.sendSegmentDataSendingCompletedCommand(segment);
       this.logger(`segment ${externalId} has been sent to ${this.id}`);
@@ -203,7 +203,7 @@ export class Peer {
 
   sendSegmentsAnnouncementCommand(
     loadedSegmentsIds: number[],
-    httpLoadingSegmentsIds: number[]
+    httpLoadingSegmentsIds: number[],
   ) {
     const command: Command.PeerSegmentAnnouncementCommand = {
       c: PeerCommandType.SegmentsAnnouncement,

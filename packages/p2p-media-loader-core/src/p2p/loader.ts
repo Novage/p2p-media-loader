@@ -16,11 +16,11 @@ export class P2PLoader {
     private readonly stream: StreamWithSegments,
     private readonly requests: RequestsContainer,
     private readonly segmentStorage: SegmentsMemoryStorage,
-    private readonly settings: Settings
+    private readonly settings: Settings,
   ) {
     const streamExternalId = StreamUtils.getStreamExternalId(
       this.streamManifestUrl,
-      this.stream
+      this.stream,
     );
 
     this.trackerClient = new P2PTrackerClient(
@@ -30,12 +30,12 @@ export class P2PLoader {
         onPeerConnected: this.onPeerConnected,
         onSegmentRequested: this.onSegmentRequested,
       },
-      this.settings
+      this.settings,
     );
 
     this.segmentStorage.subscribeOnUpdate(
       this.stream,
-      this.broadcastAnnouncement
+      this.broadcastAnnouncement,
     );
     this.trackerClient.start();
   }
@@ -114,11 +114,11 @@ export class P2PLoader {
   private onSegmentRequested = async (
     peer: Peer,
     segmentExternalId: number,
-    byteFrom?: number
+    byteFrom?: number,
   ) => {
     const segment = StreamUtils.getSegmentFromStreamByExternalId(
       this.stream,
-      segmentExternalId
+      segmentExternalId,
     );
     if (!segment) return;
     const segmentData = await this.segmentStorage.getSegmentData(segment);
@@ -128,14 +128,14 @@ export class P2PLoader {
     }
     void peer.uploadSegmentData(
       segment,
-      byteFrom !== undefined ? segmentData.slice(byteFrom) : segmentData
+      byteFrom !== undefined ? segmentData.slice(byteFrom) : segmentData,
     );
   };
 
   destroy() {
     this.segmentStorage.unsubscribeFromUpdate(
       this.stream,
-      this.broadcastAnnouncement
+      this.broadcastAnnouncement,
     );
     this.trackerClient.destroy();
   }

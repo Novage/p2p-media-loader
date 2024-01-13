@@ -34,7 +34,7 @@ export class SegmentManager {
 
   updateStreamSegments(
     shakaStream: HookedStream,
-    segmentReferences?: shaka.media.SegmentReference[]
+    segmentReferences?: shaka.media.SegmentReference[],
   ) {
     const stream = this.core.getStream(shakaStream.id.toString());
     if (!stream) return;
@@ -58,13 +58,13 @@ export class SegmentManager {
 
   private processDashSegmentReferences(
     managerStream: StreamWithReadonlySegments<Stream>,
-    segmentReferences: shaka.media.SegmentReference[]
+    segmentReferences: shaka.media.SegmentReference[],
   ) {
     const staleSegmentsIds = new Set(managerStream.segments.keys());
     const newSegments: SegmentBase[] = [];
     for (const reference of segmentReferences) {
       const externalId = Math.trunc(
-        reference.getStartTime() / SEGMENT_ID_RESOLUTION_IN_SECONDS
+        reference.getStartTime() / SEGMENT_ID_RESOLUTION_IN_SECONDS,
       );
 
       const segmentLocalId = Utils.getSegmentLocalIdFromReference(reference);
@@ -87,7 +87,7 @@ export class SegmentManager {
 
   private processHlsSegmentReferences(
     managerStream: StreamWithReadonlySegments<Stream>,
-    segmentReferences: shaka.media.SegmentReference[]
+    segmentReferences: shaka.media.SegmentReference[],
   ) {
     const { segments } = managerStream;
     const lastMediaSequence = Utils.getStreamLastMediaSequence(managerStream);
@@ -143,7 +143,7 @@ function* itemsBackwards<T>(items: T[]) {
 
 function* nSegmentsBackwards(
   segments: ReadonlyMap<string, SegmentBase>,
-  amount: number
+  amount: number,
 ) {
   let i = 0;
   for (const segment of segments.values()) {

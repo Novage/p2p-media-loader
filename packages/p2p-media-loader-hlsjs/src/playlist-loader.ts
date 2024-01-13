@@ -22,7 +22,7 @@ export class PlaylistLoaderBase implements Loader<PlaylistLoaderContext> {
   async load(
     context: LoaderContext,
     config: LoaderConfiguration,
-    callbacks: LoaderCallbacks<LoaderContext>
+    callbacks: LoaderCallbacks<LoaderContext>,
   ) {
     this.defaultLoader.load(context, config, callbacks);
   }

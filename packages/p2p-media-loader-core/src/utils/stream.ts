@@ -21,7 +21,7 @@ const PEER_PROTOCOL_VERSION = "V1";
 
 export function getStreamExternalId(
   manifestResponseUrl: string,
-  stream: Readonly<Stream>
+  stream: Readonly<Stream>,
 ): string {
   const { type, index } = stream;
   return `${PEER_PROTOCOL_VERSION}:${manifestResponseUrl}-${type}-${index}`;
@@ -29,7 +29,7 @@ export function getStreamExternalId(
 
 export function getSegmentFromStreamsMap(
   streams: Map<string, StreamWithSegments>,
-  segmentId: string
+  segmentId: string,
 ): Segment | undefined {
   for (const stream of streams.values()) {
     const segment = stream.segments.get(segmentId);
@@ -39,7 +39,7 @@ export function getSegmentFromStreamsMap(
 
 export function getSegmentFromStreamByExternalId(
   stream: StreamWithSegments,
-  segmentExternalId: number
+  segmentExternalId: number,
 ): Segment | undefined {
   for (const segment of stream.segments.values()) {
     if (segment.externalId === segmentExternalId) return segment;
@@ -65,7 +65,7 @@ export function getSegmentAvgDuration(stream: StreamWithSegments) {
 export function isSegmentActualInPlayback(
   segment: Readonly<Segment>,
   playback: Playback,
-  timeWindowsSettings: PlaybackTimeWindowsSettings
+  timeWindowsSettings: PlaybackTimeWindowsSettings,
 ): boolean {
   const {
     isHighDemand = false,
@@ -78,7 +78,7 @@ export function isSegmentActualInPlayback(
 export function getSegmentPlaybackStatuses(
   segment: Segment,
   playback: Playback,
-  timeWindowsSettings: PlaybackTimeWindowsSettings
+  timeWindowsSettings: PlaybackTimeWindowsSettings,
 ): SegmentPlaybackStatuses {
   const {
     highDemandTimeWindow,
@@ -103,7 +103,7 @@ export function getSegmentPlaybackStatuses(
 function isSegmentInTimeWindow(
   segment: Segment,
   playback: Playback,
-  timeWindowLength: number
+  timeWindowLength: number,
 ) {
   const { startTime, endTime } = segment;
   const { position, rate } = playback;

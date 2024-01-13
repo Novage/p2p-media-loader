@@ -60,7 +60,7 @@ export class SegmentManager {
       const [start, end] = fragByteRange;
       const byteRange = Utils.getByteRange(
         start,
-        end !== undefined ? end - 1 : undefined
+        end !== undefined ? end - 1 : undefined,
       );
       const segmentLocalId = Utils.getSegmentLocalId(responseUrl, byteRange);
       segmentToRemoveIds.delete(segmentLocalId);

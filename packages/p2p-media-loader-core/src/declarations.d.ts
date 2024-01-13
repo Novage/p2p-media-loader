@@ -11,7 +11,7 @@ declare module "bittorrent-tracker" {
 
     on<E extends keyof TrackerClientEvents>(
       event: E,
-      handler: TrackerClientEvents[E]
+      handler: TrackerClientEvents[E],
     ): void;
 
     start(): void;
