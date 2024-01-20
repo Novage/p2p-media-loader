@@ -11,7 +11,8 @@
     "pack-packages": "pnpm --filter './packages/**' exec -- pnpm pack",
     "lint": "pnpm --recursive run lint",
     "prettier": "pnpm --recursive run prettier",
-    "type-check": "pnpm --recursive run type-check"
+    "type-check": "pnpm --recursive run type-check",
+    "dev": "pnpm --filter './demo' run dev"
   },
   "devDependencies": {
     "@types/debug": "^4.1.12",
