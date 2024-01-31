@@ -16,8 +16,8 @@
   },
   "devDependencies": {
     "@types/debug": "^4.1.12",
-    "@typescript-eslint/eslint-plugin": "^6.19.0",
-    "@typescript-eslint/parser": "^6.19.0",
+    "@typescript-eslint/eslint-plugin": "^6.20.0",
+    "@typescript-eslint/parser": "^6.20.0",
     "eslint": "^8.56.0",
     "prettier": "^3.2.4",
     "rimraf": "^5.0.5",
