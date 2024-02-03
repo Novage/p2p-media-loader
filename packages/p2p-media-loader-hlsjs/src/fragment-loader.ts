@@ -151,8 +151,7 @@ function getLoadingStat(
   loadedBytes: number,
   loadingEndTime: number,
 ) {
-  const bits = loadedBytes * 8;
-  const timeForLoading = (bits / targetBitrate) * 1000;
+  const timeForLoading = (loadedBytes * 8000) / targetBitrate;
   const first = loadingEndTime - timeForLoading;
   const start = first - DEFAULT_DOWNLOAD_LATENCY;
 

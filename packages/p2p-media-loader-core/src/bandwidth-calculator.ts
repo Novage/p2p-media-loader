@@ -1,33 +1,32 @@
 export class BandwidthCalculator {
-  private simultaneousLoadingsCount = 0;
+  private loadingsCount = 0;
   private readonly bytes: number[] = [];
   private readonly loadingOnlyTimestamps: number[] = [];
   private readonly timestamps: number[] = [];
-  private noLoadingsTotalTime = 0;
-  private allLoadingsStoppedTimestamp = 0;
+  private noLoadingsTime = 0;
+  private loadingsStoppedAt = 0;
 
-  constructor(private readonly clearThresholdMs = 10000) {}
+  constructor(private readonly clearThresholdMs = 20000) {}
 
   addBytes(bytesLength: number, now = performance.now()) {
     this.bytes.push(bytesLength);
-    this.loadingOnlyTimestamps.push(now - this.noLoadingsTotalTime);
+    this.loadingOnlyTimestamps.push(now - this.noLoadingsTime);
     this.timestamps.push(now);
   }
 
   startLoading(now = performance.now()) {
     this.clearStale();
-    if (this.simultaneousLoadingsCount === 0) {
-      this.noLoadingsTotalTime += now - this.allLoadingsStoppedTimestamp;
+    if (this.loadingsCount === 0 && this.loadingsStoppedAt !== 0) {
+      this.noLoadingsTime += now - this.loadingsStoppedAt;
     }
-    this.simultaneousLoadingsCount++;
+    this.loadingsCount++;
   }
 
-  // in bits per second
   stopLoading(now = performance.now()) {
-    if (this.simultaneousLoadingsCount <= 0) return;
-    this.simultaneousLoadingsCount--;
-    if (this.simultaneousLoadingsCount !== 0) return;
-    this.allLoadingsStoppedTimestamp = now;
+    if (this.loadingsCount > 0) {
+      this.loadingsCount--;
+      if (this.loadingsCount === 0) this.loadingsStoppedAt = now;
+    }
   }
 
   getBandwidthLoadingOnly(

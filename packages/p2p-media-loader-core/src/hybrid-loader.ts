@@ -100,10 +100,8 @@ export class HybridLoader {
       // TODO: error handling
       const data = await this.segmentStorage.getSegmentData(segment);
       if (data) {
-        engineRequest.resolve(
-          data,
-          this.bandwidthCalculators.all.getBandwidthLoadingOnly(3),
-        );
+        const { queueDownloadRatio } = this.generateQueue();
+        engineRequest.resolve(data, this.getBandwidth(queueDownloadRatio));
       }
     } else {
       this.engineRequest = engineRequest;
@@ -439,13 +437,13 @@ export class HybridLoader {
     if (this.streamDetails.activeLevelBitrate === 0) {
       return all.getBandwidthLoadingOnly(3);
     }
-    const { levelChangedTimestamp } = this;
 
     const bandwidth = Math.max(
-      all.getBandwidth(30, levelChangedTimestamp),
-      all.getBandwidth(60, levelChangedTimestamp),
-      all.getBandwidth(90, levelChangedTimestamp),
+      all.getBandwidth(30, this.levelChangedTimestamp),
+      all.getBandwidth(60, this.levelChangedTimestamp),
+      all.getBandwidth(90, this.levelChangedTimestamp),
     );
+
     if (queueDownloadRatio >= 0.8 || bandwidth >= activeLevelBitrate * 0.9) {
       return Math.max(
         all.getBandwidthLoadingOnly(1),
@@ -453,11 +451,13 @@ export class HybridLoader {
         all.getBandwidthLoadingOnly(5),
       );
     }
+
     const httpRealBandwidth = Math.max(
       http.getBandwidthLoadingOnly(1),
       http.getBandwidthLoadingOnly(3),
       http.getBandwidthLoadingOnly(5),
     );
+
     return Math.max(bandwidth, httpRealBandwidth);
   }
 
