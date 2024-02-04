@@ -2,7 +2,7 @@ type BasePeerCommand<T extends PeerCommandType = PeerCommandType> = {
   c: T;
 };
 
-export enum PeerCommandType {
+export const enum PeerCommandType {
   SegmentsAnnouncement,
   SegmentRequest,
   SegmentData,

@@ -1,13 +1,13 @@
 import { joinChunks } from "../../utils/utils";
 
 // restricted up to 16 item types (4 bits to type definition)
-export enum SerializedItem {
+export const enum SerializedItem {
+  Min = -1,
   Int,
   SimilarIntArray,
   String,
+  Max,
 }
-
-export const serializedItemTypes = Object.values(SerializedItem);
 
 function abs(num: bigint): bigint {
   return num < 0 ? -num : num;
