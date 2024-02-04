@@ -51,11 +51,7 @@ export class Core<TStream extends Stream = Stream> {
   }
 
   hasSegment(segmentLocalId: string): boolean {
-    const segment = StreamUtils.getSegmentFromStreamsMap(
-      this.streams,
-      segmentLocalId,
-    );
-    return !!segment;
+    return !!StreamUtils.getSegmentFromStreamsMap(this.streams, segmentLocalId);
   }
 
   getStream(streamLocalId: string): StreamWithSegments<TStream> | undefined {
@@ -64,6 +60,7 @@ export class Core<TStream extends Stream = Stream> {
 
   addStreamIfNoneExists(stream: TStream): void {
     if (this.streams.has(stream.localId)) return;
+
     this.streams.set(stream.localId, {
       ...stream,
       segments: new Map<string, Segment>(),
@@ -82,7 +79,9 @@ export class Core<TStream extends Stream = Stream> {
       const segment = { ...s, stream };
       stream.segments.set(segment.localId, segment);
     });
+
     removeSegmentIds?.forEach((id) => stream.segments.delete(id));
+
     this.mainStreamLoader?.updateStream(stream);
     this.secondaryStreamLoader?.updateStream(stream);
   }
@@ -91,6 +90,7 @@ export class Core<TStream extends Stream = Stream> {
     if (!this.manifestResponseUrl) {
       throw new Error("Manifest response url is not defined");
     }
+
     if (!this.segmentStorage) {
       this.segmentStorage = new SegmentsMemoryStorage(
         this.manifestResponseUrl,
@@ -98,6 +98,7 @@ export class Core<TStream extends Stream = Stream> {
       );
       await this.segmentStorage.initialize();
     }
+
     const segment = this.identifySegment(segmentLocalId);
     const loader = this.getStreamHybridLoader(segment);
     void loader.loadSegment(segment, callbacks);
@@ -157,6 +158,7 @@ export class Core<TStream extends Stream = Stream> {
     if (!this.manifestResponseUrl) {
       throw new Error("Manifest response url is not defined");
     }
+
     const createNewHybridLoader = (manifestResponseUrl: string) => {
       if (!this.segmentStorage?.isInitialized) {
         throw new Error("Segment storage is not initialized");
@@ -171,14 +173,15 @@ export class Core<TStream extends Stream = Stream> {
         this.eventHandlers,
       );
     };
-    const streamTypeLoaderKeyMap = {
-      main: "mainStreamLoader",
-      secondary: "secondaryStreamLoader",
-    } as const;
-    const { type } = segment.stream;
-    const loaderKey = streamTypeLoaderKeyMap[type];
 
-    return (this[loaderKey] =
-      this[loaderKey] ?? createNewHybridLoader(this.manifestResponseUrl));
+    if (segment.stream.type === "main") {
+      this.mainStreamLoader ??= createNewHybridLoader(this.manifestResponseUrl);
+      return this.mainStreamLoader;
+    } else {
+      this.secondaryStreamLoader ??= createNewHybridLoader(
+        this.manifestResponseUrl,
+      );
+      return this.secondaryStreamLoader;
+    }
   }
 }

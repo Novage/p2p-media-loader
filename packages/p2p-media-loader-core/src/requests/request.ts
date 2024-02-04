@@ -315,23 +315,15 @@ class FailedRequestAttempts {
   }
 }
 
-const requestInnerErrorTypes = ["abort", "bytes-receiving-timeout"] as const;
-
-const httpRequestErrorTypes = [
-  "http-error",
-  "http-bytes-mismatch",
-  "http-unexpected-status-code",
-] as const;
-
-const peerRequestErrorTypes = [
-  "peer-response-bytes-mismatch",
-  "peer-segment-absent",
-  "peer-closed",
-] as const;
-
-export type RequestInnerErrorType = (typeof requestInnerErrorTypes)[number];
-export type HttpRequestErrorType = (typeof httpRequestErrorTypes)[number];
-export type PeerRequestErrorType = (typeof peerRequestErrorTypes)[number];
+export type RequestInnerErrorType = "abort" | "bytes-receiving-timeout";
+export type HttpRequestErrorType =
+  | "http-error"
+  | "http-bytes-mismatch"
+  | "http-unexpected-status-code";
+export type PeerRequestErrorType =
+  | "peer-response-bytes-mismatch"
+  | "peer-segment-absent"
+  | "peer-closed";
 
 type RequestErrorType =
   | RequestInnerErrorType
