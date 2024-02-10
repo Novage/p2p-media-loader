@@ -316,12 +316,15 @@ class FailedRequestAttempts {
 }
 
 export type RequestInnerErrorType = "abort" | "bytes-receiving-timeout";
+
 export type HttpRequestErrorType =
   | "http-error"
   | "http-bytes-mismatch"
   | "http-unexpected-status-code";
+
 export type PeerRequestErrorType =
   | "peer-response-bytes-mismatch"
+  | "peer-protocol-violation"
   | "peer-segment-absent"
   | "peer-closed";
 

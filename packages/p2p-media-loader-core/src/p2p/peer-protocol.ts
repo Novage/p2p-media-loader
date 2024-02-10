@@ -18,12 +18,9 @@ export class PeerProtocol {
     private readonly eventHandlers: {
       onCommandReceived: (command: Command.PeerCommand) => void;
       onSegmentChunkReceived: (data: Uint8Array) => void;
-      onDestroy: () => void;
     },
   ) {
     connection.on("data", this.onDataReceived);
-    connection.on("close", this.onPeerClosed);
-    connection.on("error", this.onConnectionError);
   }
 
   private onDataReceived = (data: Uint8Array) => {
@@ -31,18 +28,6 @@ export class PeerProtocol {
       this.receivingCommandBytes(data);
     } else {
       this.eventHandlers.onSegmentChunkReceived(data);
-    }
-  };
-
-  private onPeerClosed = () => {
-    this.destroy();
-    this.eventHandlers.onDestroy();
-  };
-
-  private onConnectionError = (error: { code: string }) => {
-    if (error.code === "ERR_DATA_CHANNEL") {
-      this.destroy();
-      this.eventHandlers.onDestroy();
     }
   };
 
@@ -118,10 +103,6 @@ export class PeerProtocol {
       if (!(err instanceof Command.BinaryCommandJoiningError)) return;
       this.commandChunks = undefined;
     }
-  }
-
-  destroy() {
-    this.connection.destroy();
   }
 }
 
