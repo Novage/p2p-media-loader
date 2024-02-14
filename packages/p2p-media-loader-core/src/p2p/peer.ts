@@ -115,6 +115,7 @@ export class Peer {
           return;
         }
 
+        this.downloadingErrors = [];
         controls.completeOnSuccess();
         this.downloadingContext = undefined;
         break;
