@@ -41,7 +41,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     };
   }
 
-  async load(
+  load(
     context: FragmentLoaderContext,
     config: LoaderConfiguration,
     callbacks: LoaderCallbacks<LoaderContext>,

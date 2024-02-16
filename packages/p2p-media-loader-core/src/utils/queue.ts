@@ -19,21 +19,25 @@ export function* generateQueue(
 
   const queueSegments = stream.segments.values();
 
-  let first: Segment | undefined;
+  let first: Segment;
 
-  while (first !== requestedSegment) {
-    first = queueSegments.next().value;
-  }
-
-  if (!first) return; // should never happen
+  do {
+    const next = queueSegments.next();
+    if (next.done) return; // should never happen
+    first = next.value;
+  } while (first !== requestedSegment);
 
   const firstStatuses = getSegmentPlaybackStatuses(first, playback, settings);
   if (isNotActualStatuses(firstStatuses)) {
+    const next = queueSegments.next();
+
     // for cases when engine requests segment that is a little bit
     // earlier than current playhead position
     // it could happen when playhead position is significantly changed by user
-    const second = queueSegments.next().value;
-    if (!second) return;
+    if (next.done) return;
+
+    const second = next.value;
+
     const secondStatuses = getSegmentPlaybackStatuses(
       second,
       playback,

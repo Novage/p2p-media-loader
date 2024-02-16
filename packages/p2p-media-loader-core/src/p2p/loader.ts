@@ -28,6 +28,7 @@ export class P2PLoader {
       this.stream,
       {
         onPeerConnected: this.onPeerConnected,
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises
         onSegmentRequested: this.onSegmentRequested,
       },
       this.settings,
@@ -72,7 +73,7 @@ export class P2PLoader {
     return false;
   }
 
-  get connectedPeersAmount() {
+  get connectedPeerCount() {
     let count = 0;
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     for (const peer of this.trackerClient.peers()) count++;

@@ -116,10 +116,12 @@ export class P2PTrackerClient {
   private onTrackerClientWarning: TrackerClientEvents["warning"] = (
     warning,
   ) => {
+    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
     this.logger(`tracker warning (${this.streamShortId}: ${warning})`);
   };
 
   private onTrackerClientError: TrackerClientEvents["error"] = (error) => {
+    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
     this.logger(`tracker error (${this.streamShortId}: ${error})`);
   };
 
