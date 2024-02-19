@@ -101,7 +101,7 @@ export class Engine {
   };
 
   private handleManifestLoaded = (event: string, data: ManifestLoadedData) => {
-    const { networkDetails } = data;
+    const networkDetails: unknown = data.networkDetails;
     if (networkDetails instanceof XMLHttpRequest) {
       this.core.setManifestResponseUrl(networkDetails.responseURL);
     } else if (networkDetails instanceof Response) {
@@ -139,6 +139,7 @@ export class Engine {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   initClapprPlayer(clapprPlayer: any) {
+    // eslint-disable-next-line
     this.setHls(() => clapprPlayer.core.getCurrentPlayback()?._hls);
   }
 
