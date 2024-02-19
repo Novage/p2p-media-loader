@@ -29,10 +29,10 @@ export class P2PTrackerClient {
     stream: StreamWithSegments,
     private readonly eventHandlers: P2PTrackerClientEventHandlers,
     private readonly settings: Settings,
-    private readonly clientAzId: string = "PM",
+    private readonly customPeerId?: string,
   ) {
     const { string: peerId, bytes: peerIdBytes } =
-      PeerUtil.generatePeerId(clientAzId);
+      PeerUtil.generatePeerId(customPeerId);
     const { bytes: streamIdBytes, string: streamHash } =
       PeerUtil.getStreamHash(streamId);
     this.peerId = peerId;

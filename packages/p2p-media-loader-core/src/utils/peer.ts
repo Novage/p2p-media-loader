@@ -1,6 +1,5 @@
 import md5 from "nano-md5";
 import { utf8ToUintArray } from "./utils";
-import packageJson from "../../../../package.json";
 
 const HASH_SYMBOLS =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -18,13 +17,20 @@ export function getStreamHash(streamId: string): {
   return { string: btoa(binary15BytesHashString), bytes: hashBytes };
 }
 
-export function generatePeerId(clientAzId: string): {
+export function generatePeerId(customPeerId?: string): {
   string: string;
   bytes: Uint8Array;
 } {
-  const clientVersion = formatVersion(packageJson.version);
+  let peerId = "";
 
-  let peerId = `-${clientAzId}${clientVersion}-`;
+  if (customPeerId && customPeerId.trim() !== "" && customPeerId.length <= 6) {
+    peerId = customPeerId;
+  } else {
+    const clientVersion = formatVersion(__VERSION__);
+
+    peerId = `-PM${clientVersion}-`;
+  }
+
   const randomCharsAmount = PEER_ID_LENGTH - peerId.length;
   for (let i = 0; i < randomCharsAmount; i++) {
     peerId += HASH_SYMBOLS.charAt(
@@ -36,7 +42,12 @@ export function generatePeerId(clientAzId: string): {
 }
 
 function formatVersion(versionString: string) {
-  const replacedString = versionString.replace(/\./g, "");
+  const splitedVersion = versionString.split(".");
+  let version = "";
 
-  return replacedString.length < 4 ? replacedString + "0" : replacedString;
+  for (let i = 0; i < 2; i++) {
+    version += splitedVersion[i].padStart(2, "0");
+  }
+
+  return version;
 }
