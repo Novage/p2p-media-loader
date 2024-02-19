@@ -261,9 +261,8 @@ function App() {
   };
 
   const destroyAndWindowPlayer = () => {
-    const extendedWindow = window;
-    extendedWindow.videoPlayer?.destroy?.();
-    extendedWindow.videoPlayer = undefined;
+    window.videoPlayer?.destroy?.();
+    window.videoPlayer = undefined;
   };
 
   const onPlayerTypeChange = (newPlayer: Player) => {
