@@ -21,15 +21,10 @@ export function generatePeerId(customPeerId?: string): {
   string: string;
   bytes: Uint8Array;
 } {
-  let peerId = "";
-
-  if (customPeerId && customPeerId.trim() !== "" && customPeerId.length <= 6) {
-    peerId = customPeerId;
-  } else {
-    const clientVersion = formatVersion(__VERSION__);
-
-    peerId = `-PM${clientVersion}-`;
-  }
+  let peerId =
+    customPeerId && customPeerId.trim() !== "" && customPeerId.length <= 6
+      ? customPeerId
+      : `-PM${formatVersion(__VERSION__)}-`;
 
   const randomCharsAmount = PEER_ID_LENGTH - peerId.length;
   for (let i = 0; i < randomCharsAmount; i++) {
@@ -43,11 +38,6 @@ export function generatePeerId(customPeerId?: string): {
 
 function formatVersion(versionString: string) {
   const splitedVersion = versionString.split(".");
-  let version = "";
 
-  for (let i = 0; i < 2; i++) {
-    version += splitedVersion[i].padStart(2, "0");
-  }
-
-  return version;
+  return `${splitedVersion[0].padStart(2, "0")}${splitedVersion[1].padStart(2, "0")}`;
 }
