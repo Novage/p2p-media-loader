@@ -8,7 +8,7 @@ module.exports = {
     "plugin:@typescript-eslint/recommended-type-checked",
   ],
   plugins: ["@typescript-eslint"],
-  ignorePatterns: ["/.eslintrc.cjs", "/lib", "/dist", "/vite.config.ts"],
+  ignorePatterns: ["/lib", "/dist", "/vite.config.ts"],
   rules: {
     "no-console": "warn",
     "@typescript-eslint/prefer-nullish-coalescing": "error",
