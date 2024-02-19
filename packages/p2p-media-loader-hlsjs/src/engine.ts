@@ -137,10 +137,9 @@ export class Engine {
 
   private destroyCore = () => this.core.destroy();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  initClapprPlayer(clapprPlayer: any) {
+  initClapprPlayer(clapprPlayer: unknown) {
     // eslint-disable-next-line
-    this.setHls(() => clapprPlayer.core.getCurrentPlayback()?._hls);
+    this.setHls(() => (clapprPlayer as any).core.getCurrentPlayback()?._hls);
   }
 
   destroy = () => {

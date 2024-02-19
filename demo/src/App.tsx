@@ -4,8 +4,19 @@ import { Engine as ShakaEngine } from "p2p-media-loader-shaka";
 import DPlayer from "dplayer";
 import muxjs from "mux.js";
 import debug from "debug";
+import type Hls from "hls.js";
 
+declare global {
+  interface Window {
+    muxjs: typeof muxjs;
+    Hls: typeof Hls;
+    videoPlayer?: { destroy?: () => void };
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 window.muxjs = muxjs;
+
 const players = [
   "hlsjs",
   "hls-dplayer",
@@ -14,9 +25,8 @@ const players = [
   "shaka-player",
   "shaka-clappr",
 ] as const;
+
 type Player = (typeof players)[number];
-type ShakaPlayer = shaka.Player;
-type ExtendedWindow = Window & { videoPlayer?: { destroy?: () => void } };
 
 const streamUrls = {
   hlsBigBunnyBuck: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
@@ -48,12 +58,12 @@ const streamUrls = {
 };
 
 function App() {
-  const [playerType, setPlayerType] = useState<Player | undefined>(
-    localStorage.player,
+  const [playerType, setPlayerType] = useState(
+    localStorage.player as Player | undefined,
   );
-  const [streamUrl, setStreamUrl] = useState<string>(localStorage.streamUrl);
+  const [streamUrl, setStreamUrl] = useState(localStorage.streamUrl as string);
   const shakaInstance = useRef<shaka.Player>();
-  const hlsInstance = useRef<any>();
+  const hlsInstance = useRef<Hls>();
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [httpLoaded, setHttpLoaded] = useState<number>(0);
@@ -95,10 +105,7 @@ function App() {
   }
 
   useEffect(() => {
-    if (
-      !window.Hls.isSupported() ||
-      (window as unknown as ExtendedWindow).videoPlayer
-    ) {
+    if (!window.Hls.isSupported() || window.videoPlayer) {
       return;
     }
     if (!localStorage.player) {
@@ -112,12 +119,6 @@ function App() {
     createNewPlayer();
   }, [playerType]);
 
-  const setPlayerToWindow = (
-    player: DPlayer | ShakaPlayer | typeof window.Hls,
-  ) => {
-    (window as unknown as ExtendedWindow).videoPlayer = player;
-  };
-
   const initHlsJsPlayer = (url: string) => {
     if (!videoRef.current || !hlsEngine.current) return;
     const engine = hlsEngine.current;
@@ -128,7 +129,7 @@ function App() {
     hls.attachMedia(videoRef.current);
     hls.loadSource(url);
     hlsInstance.current = hls;
-    setPlayerToWindow(hls);
+    window.videoPlayer = hls;
   };
 
   const initHlsDPlayer = (url: string) => {
@@ -151,14 +152,16 @@ function App() {
       },
     });
     player.play();
-    setPlayerToWindow(player);
+    window.videoPlayer = player;
   };
 
   const initHlsClapprPlayer = (url: string) => {
     const engine = hlsEngine.current;
     if (!engine) return;
 
-    const clapprPlayer: any = new window.Clappr.Player({
+    /* eslint-disable */
+
+    const clapprPlayer = new window.Clappr.Player({
       parentId: "#player-container",
       source: url,
       playback: {
@@ -168,8 +171,12 @@ function App() {
       },
       plugins: [window.LevelSelector],
     });
+
     engine.initClapprPlayer(clapprPlayer);
-    setPlayerToWindow(clapprPlayer);
+
+    window.videoPlayer = clapprPlayer;
+
+    /* eslint-enable */
   };
 
   const initShakaDPlayer = (url: string) => {
@@ -183,47 +190,61 @@ function App() {
         type: "customHlsOrDash",
         customType: {
           customHlsOrDash: (video: HTMLVideoElement) => {
+            /* eslint-disable */
+
             const shakaPlayer = new window.shaka.Player();
             shakaPlayer.attach(video);
+
             const onError = (error: { code: number }) => {
-              // eslint-disable-next-line no-console
               console.error("Error code", error.toString(), "object", error);
             };
+
             shakaPlayer.addEventListener("error", (event: { code: number }) => {
               onError(event);
             });
+
             engine.configureAndInitShakaPlayer(shakaPlayer);
             shakaPlayer.load(url).catch(onError);
 
             shakaInstance.current = shakaPlayer;
+
+            /* eslint-enable */
           },
         },
       },
     });
-    setPlayerToWindow(player);
+    window.videoPlayer = player;
   };
 
   const initShakaPlayer = (url: string) => {
     const engine = shakaEngine.current;
     if (!videoRef.current || !engine) return;
 
+    /* eslint-disable */
+
     const player = new window.shaka.Player(videoRef.current);
+
     const onError = (error: { code: unknown }) => {
-      // eslint-disable-next-line no-console
       console.error("Error code", error.code, "object", error);
     };
+
     player.addEventListener("error", (event: { detail: { code: unknown } }) => {
       onError(event.detail);
     });
+
     engine.configureAndInitShakaPlayer(player);
     player.load(url).catch(onError);
     shakaInstance.current = player;
-    setPlayerToWindow(player);
+    window.videoPlayer = player;
+
+    /* eslint-enable */
   };
 
   const initShakaClapprPlayer = (url: string) => {
     const engine = shakaEngine.current;
     if (!engine) return;
+
+    /* eslint-disable */
 
     const clapprPlayer = new window.Clappr.Player({
       parentId: "#player-container",
@@ -233,11 +254,14 @@ function App() {
         engine.configureAndInitShakaPlayer(shakaPlayerInstance);
       },
     });
-    setPlayerToWindow(clapprPlayer);
+
+    window.videoPlayer = clapprPlayer;
+
+    /* eslint-enable */
   };
 
   const destroyAndWindowPlayer = () => {
-    const extendedWindow = window as ExtendedWindow;
+    const extendedWindow = window;
     extendedWindow.videoPlayer?.destroy?.();
     extendedWindow.videoPlayer = undefined;
   };
@@ -257,9 +281,10 @@ function App() {
     setHttpLoadedGlob(0);
     setP2PLoadedGlob(0);
 
-    (window as unknown as ExtendedWindow).videoPlayer?.destroy?.();
+    window.videoPlayer?.destroy?.();
     hlsInstance.current?.destroy();
     void shakaInstance.current?.destroy();
+
     switch (playerType) {
       case "hls-dplayer":
         initHlsDPlayer(streamUrl);
@@ -404,12 +429,12 @@ function LoggersSelect() {
     "debug",
     [],
     (list) => {
-      setTimeout(() => debug.enable(localStorage.debug), 0);
+      setTimeout(() => debug.enable(localStorage.debug as string), 0);
       if (list.length === 0) return null;
       return list.join(",");
     },
     (storageItem) => {
-      setTimeout(() => debug.enable(localStorage.debug), 0);
+      setTimeout(() => debug.enable(localStorage.debug as string), 0);
       if (!storageItem) return [];
       return storageItem.split(",");
     },
@@ -461,7 +486,7 @@ function useLocalStorageItem<T>(
   storageItemToValue: (storageItem: string | null) => T,
 ): [T, React.Dispatch<React.SetStateAction<T>>] {
   const [value, setValue] = useState<T>(
-    storageItemToValue(localStorage[prop]) ?? initValue,
+    storageItemToValue(localStorage[prop] as string | null) ?? initValue,
   );
   const setValueExternal = useCallback((value: T | ((prev: T) => T)) => {
     setValue(value);
