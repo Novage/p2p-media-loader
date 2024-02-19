@@ -1,8 +1,12 @@
 import { defineConfig } from "vite";
 import type { UserConfig } from "vite";
+import packageJson from "./package.json";
 
 const getUMDConfig = ({ minify }: { minify: boolean }): UserConfig => {
   return {
+    define: {
+      __VERSION__: JSON.stringify(packageJson.version),
+    },
     build: {
       emptyOutDir: false,
       minify: minify ? "esbuild" : false,

@@ -17,13 +17,16 @@ export function getStreamHash(streamId: string): {
   return { string: btoa(binary15BytesHashString), bytes: hashBytes };
 }
 
-export function generatePeerId(): {
+export function generatePeerId(customPeerId?: string): {
   string: string;
   bytes: Uint8Array;
 } {
-  let peerId = "PEER:";
-  const randomCharsAmount = PEER_ID_LENGTH - peerId.length;
+  let peerId =
+    customPeerId && customPeerId.trim() !== "" && customPeerId.length <= 6
+      ? customPeerId
+      : `-PM${formatVersion(__VERSION__)}-`;
 
+  const randomCharsAmount = PEER_ID_LENGTH - peerId.length;
   for (let i = 0; i < randomCharsAmount; i++) {
     peerId += HASH_SYMBOLS.charAt(
       Math.floor(Math.random() * HASH_SYMBOLS.length),
@@ -31,4 +34,10 @@ export function generatePeerId(): {
   }
 
   return { string: peerId, bytes: utf8ToUintArray(peerId) };
+}
+
+function formatVersion(versionString: string) {
+  const splitedVersion = versionString.split(".");
+
+  return `${splitedVersion[0].padStart(2, "0")}${splitedVersion[1].padStart(2, "0")}`;
 }
