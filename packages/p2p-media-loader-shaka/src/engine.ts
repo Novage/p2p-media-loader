@@ -53,7 +53,7 @@ export class Engine {
     if (networkingEngine) {
       if (type === "register") {
         const p2pml: P2PMLShakaData = {
-          player: this.player,
+          player,
           shaka: this.shaka,
           core: this.core,
           streamInfo: this.streamInfo,
@@ -161,7 +161,11 @@ export class Engine {
     const handleLoading: shaka.extern.SchemePlugin = (...args) => {
       const request = args[1] as HookedRequest;
       const { p2pml } = request;
-      if (!p2pml) return shaka.net.HttpFetchPlugin.parse(...args);
+      if (!p2pml) {
+        return shaka.net.HttpFetchPlugin.parse(
+          ...args,
+        ) as shaka.extern.IAbortableOperation<shaka.extern.Response>;
+      }
 
       const loader = new Loader(p2pml.shaka, p2pml.core, p2pml.streamInfo);
       return loader.load(...args);

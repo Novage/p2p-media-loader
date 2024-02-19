@@ -34,7 +34,7 @@ export class Loader {
       return this.loadSegment(url, request.headers.Range);
     }
 
-    const loading = this.defaultLoad();
+    const loading = this.defaultLoad() as LoadingHandlerResult;
     if (requestType === RequestType.MANIFEST) {
       void this.handleManifestLoading(loading.promise);
     }
@@ -54,7 +54,9 @@ export class Loader {
     byteRangeString: string,
   ): LoadingHandlerResult {
     const segmentId = Utils.getSegmentLocalId(segmentUrl, byteRangeString);
-    if (!this.core.hasSegment(segmentId)) return this.defaultLoad();
+    if (!this.core.hasSegment(segmentId)) {
+      return this.defaultLoad() as LoadingHandlerResult;
+    }
 
     const loadSegment = async (): Promise<Response> => {
       const { request, callbacks } = getSegmentRequest();
@@ -87,8 +89,8 @@ export class Loader {
       }
     };
 
-    return new this.shaka.util.AbortableOperation(loadSegment(), async () =>
-      this.core.abortSegmentLoading(segmentId),
+    return new this.shaka.util.AbortableOperation(loadSegment(), () =>
+      Promise.resolve(this.core.abortSegmentLoading(segmentId)),
     );
   }
 

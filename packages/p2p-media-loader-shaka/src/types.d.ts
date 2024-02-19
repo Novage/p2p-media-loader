@@ -21,7 +21,7 @@ export type Stream = CoreStream & {
 export type Shaka = typeof window.shaka;
 
 type P2PMLShakaData = {
-  player: Shaka.Player;
+  player: shaka.Player;
   core: Core<Stream>;
   shaka: Shaka;
   streamInfo: StreamInfo;

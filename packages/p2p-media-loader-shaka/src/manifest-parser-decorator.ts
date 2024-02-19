@@ -22,7 +22,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   }
 
   configure(config: shaka.extern.ManifestConfiguration) {
-    return this.originalManifestParser.configure(config);
+    return this.originalManifestParser.configure(config) as unknown;
   }
 
   banLocation(uri: string): unknown {
@@ -65,14 +65,14 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   }
 
   update() {
-    return this.originalManifestParser.update();
+    return this.originalManifestParser.update() as unknown;
   }
 
   onExpirationUpdated(sessionId: string, expiration: number) {
     return this.originalManifestParser.onExpirationUpdated(
       sessionId,
       expiration,
-    );
+    ) as unknown;
   }
 
   private processStreams(variants: shaka.extern.Variant[]) {
@@ -117,6 +117,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       let prevFirstItemReference: shaka.media.SegmentReference;
       let prevLastItemReference: shaka.media.SegmentReference;
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       const originalGet = segmentIndex.get;
       const customGet = (position: number) => {
         const reference = originalGet.call(segmentIndex, position);
@@ -173,25 +174,28 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
 
     const createSegmentIndexOriginal = stream.createSegmentIndex;
     stream.createSegmentIndex = async () => {
-      const result = await createSegmentIndexOriginal.call(stream);
-      if (!stream.segmentIndex) return result;
-      substituteSegmentIndexGet(stream.segmentIndex, true);
+      const result: unknown = await createSegmentIndexOriginal.call(stream);
+      if (stream.segmentIndex) {
+        substituteSegmentIndexGet(stream.segmentIndex, true);
+      }
       return result;
     };
   }
 
   private hookHlsStreamMediaSequenceTimeMaps(variants: shaka.extern.Variant[]) {
-    const maps = getMapPropertiesFromObject(this.originalManifestParser);
+    const maps = getMapPropertiesFromObject(
+      this.originalManifestParser as unknown as Record<string, unknown>,
+    );
 
     // For version 4.3 and above
-    let videoMap: Map<number, number> | undefined = undefined;
-    let audioMap: Map<number, number> | undefined = undefined;
+    let videoMap: Map<number, number> | undefined;
+    let audioMap: Map<number, number> | undefined;
     const keysToCheck = ["video", "audio", "text", "image"];
     for (const map of maps) {
       if (!keysToCheck.every((key) => map.has(key))) continue;
 
-      videoMap = map.get("video");
-      audioMap = map.get("audio");
+      videoMap = map.get("video") as Map<number, number> | undefined;
+      audioMap = map.get("audio") as Map<number, number> | undefined;
     }
 
     if (videoMap && audioMap) {
@@ -209,36 +213,35 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
 
     // For version 4.2; Retrieving mediaSequence map for each HLS playlist
     const manifestVariantsMap = maps.find((map) => {
-      const item = map.values().next().value;
-      return typeof item === "object" && item.streams?.createSegmentIndex;
+      const item = map.values().next().value as unknown;
+
+      return (
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+        typeof item === "object" && (item as any)?.streams?.createSegmentIndex
+      );
     });
 
     if (!manifestVariantsMap) return;
 
-    const manifestVariantMapValues: {
-      stream: {
-        createSegmentIndex: () => void;
-        type: string;
-        streamUrl?: string;
-        mediaSequenceTimeMap?: Map<number, number>;
-      };
-      [key: string]: unknown;
-    }[] = [...manifestVariantsMap.values()];
+    const manifestVariantMapValues = [...manifestVariantsMap.values()];
 
     for (const variant of manifestVariantMapValues) {
-      if (variant.stream.mediaSequenceTimeMap) continue;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+      if ((variant as any)?.stream?.mediaSequenceTimeMap) continue;
 
-      const mediaSequenceTimeMap = getMapPropertiesFromObject(variant).find(
-        (map) => {
-          const [key, value] = map.entries().next().value ?? [];
-          return typeof key === "number" && typeof value === "number";
-        },
-      );
+      const mediaSequenceTimeMap = getMapPropertiesFromObject(
+        variant as Record<string, unknown>,
+      ).find((map) => {
+        const [key, value] =
+          (map.entries().next().value as [unknown, unknown] | undefined) ?? [];
+        return typeof key === "number" && typeof value === "number";
+      });
+
       if (!mediaSequenceTimeMap) continue;
-      variant.stream.mediaSequenceTimeMap = mediaSequenceTimeMap as Map<
-        number,
-        number
-      >;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+      (variant as any).stream.mediaSequenceTimeMap =
+        mediaSequenceTimeMap as Map<number, number>;
     }
   }
 }
@@ -255,7 +258,8 @@ export class DashManifestParser extends ManifestParserDecorator {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getMapPropertiesFromObject(object: object): Map<any, any>[] {
-  return Object.values(object).filter((property) => property instanceof Map);
+function getMapPropertiesFromObject(object: Record<string, unknown>) {
+  return Object.values(object).filter(
+    (property): property is Map<unknown, unknown> => property instanceof Map,
+  );
 }
