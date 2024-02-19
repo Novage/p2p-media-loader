@@ -311,24 +311,23 @@ export class HybridLoader {
     this.engineRequest = undefined;
   }
 
-  private async loadThroughHttp(segment: Segment) {
+  private loadThroughHttp(segment: Segment) {
     const request = this.requests.getOrCreateRequest(segment);
     new HttpRequestExecutor(request, this.settings);
     this.p2pLoaders.currentLoader.broadcastAnnouncement();
   }
 
-  private async loadThroughP2P(segment: Segment) {
+  private loadThroughP2P(segment: Segment) {
     this.p2pLoaders.currentLoader.downloadSegment(segment);
   }
 
   private loadRandomThroughHttp() {
     const { simultaneousHttpDownloads, httpErrorRetries } = this.settings;
     const p2pLoader = this.p2pLoaders.currentLoader;
-    const connectedPeersAmount = p2pLoader.connectedPeersAmount;
 
     if (
       this.requests.executingHttpCount >= simultaneousHttpDownloads ||
-      !connectedPeersAmount
+      !p2pLoader.connectedPeerCount
     ) {
       return;
     }
@@ -359,7 +358,7 @@ export class HybridLoader {
     }
 
     if (!segmentsToLoad.length) return;
-    const peersAmount = connectedPeersAmount + 1;
+    const peersAmount = p2pLoader.connectedPeerCount + 1;
     const probability = Math.min(segmentsToLoad.length / peersAmount, 1);
     const shouldLoad = Math.random() < probability;
 

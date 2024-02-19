@@ -130,7 +130,7 @@ export class Core<TStream extends Stream = Stream> {
     this.streams.clear();
     this.mainStreamLoader?.destroy();
     this.secondaryStreamLoader?.destroy();
-    this.segmentStorage?.destroy();
+    void this.segmentStorage?.destroy();
     this.mainStreamLoader = undefined;
     this.secondaryStreamLoader = undefined;
     this.segmentStorage = undefined;

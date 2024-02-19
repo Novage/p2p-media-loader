@@ -40,6 +40,7 @@ export class SegmentsMemoryStorage {
     this.logger.color = "RebeccaPurple";
   }
 
+  // eslint-disable-next-line @typescript-eslint/require-await
   async initialize() {
     this._isInitialized = true;
     this.logger("initialized");
@@ -57,6 +58,7 @@ export class SegmentsMemoryStorage {
     return this.isSegmentLockedPredicates.some((p) => p(segment));
   }
 
+  // eslint-disable-next-line @typescript-eslint/require-await
   async storeSegment(segment: Segment, data: ArrayBuffer) {
     const id = getStorageItemId(segment);
     this.cache.set(id, {
@@ -69,6 +71,7 @@ export class SegmentsMemoryStorage {
     void this.clear();
   }
 
+  // eslint-disable-next-line @typescript-eslint/require-await
   async getSegmentData(segment: Segment): Promise<ArrayBuffer | undefined> {
     const itemId = getStorageItemId(segment);
     const cacheItem = this.cache.get(itemId);
@@ -93,6 +96,7 @@ export class SegmentsMemoryStorage {
     return externalIds;
   }
 
+  // eslint-disable-next-line @typescript-eslint/require-await
   private async clear(): Promise<boolean> {
     const itemsToDelete: string[] = [];
     const remainingItems: [string, StorageItem][] = [];
@@ -164,6 +168,7 @@ export class SegmentsMemoryStorage {
     );
   }
 
+  // eslint-disable-next-line @typescript-eslint/require-await
   public async destroy() {
     this.cache.clear();
     this._isInitialized = false;

@@ -19,7 +19,7 @@ export class PlaylistLoaderBase implements Loader<PlaylistLoaderContext> {
     this.context = this.defaultLoader.context as PlaylistLoaderContext;
   }
 
-  async load(
+  load(
     context: LoaderContext,
     config: LoaderConfiguration,
     callbacks: LoaderCallbacks<LoaderContext>,

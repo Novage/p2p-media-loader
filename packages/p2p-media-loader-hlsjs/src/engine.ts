@@ -101,7 +101,7 @@ export class Engine {
   };
 
   private handleManifestLoaded = (event: string, data: ManifestLoadedData) => {
-    const { networkDetails } = data;
+    const networkDetails: unknown = data.networkDetails;
     if (networkDetails instanceof XMLHttpRequest) {
       this.core.setManifestResponseUrl(networkDetails.responseURL);
     } else if (networkDetails instanceof Response) {
@@ -137,9 +137,9 @@ export class Engine {
 
   private destroyCore = () => this.core.destroy();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  initClapprPlayer(clapprPlayer: any) {
-    this.setHls(() => clapprPlayer.core.getCurrentPlayback()?._hls);
+  initClapprPlayer(clapprPlayer: unknown) {
+    // eslint-disable-next-line
+    this.setHls(() => (clapprPlayer as any).core.getCurrentPlayback()?._hls);
   }
 
   destroy = () => {

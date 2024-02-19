@@ -198,7 +198,7 @@ export function deserializeCommand(bytes: Uint8Array): PeerCommand {
 }
 
 function getDataTypeFromByte(byte: number): Serialization.SerializedItem {
-  const typeCode = byte >> 4;
+  const typeCode: Serialization.SerializedItem = byte >> 4;
   if (
     typeCode <= Serialization.SerializedItem.Min ||
     typeCode >= Serialization.SerializedItem.Max

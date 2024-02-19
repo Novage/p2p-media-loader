@@ -135,11 +135,11 @@ export class HttpRequestExecutor {
     if (error instanceof Error) {
       if (error.name !== "abort") return;
 
-      const httpLoaderError: RequestError<HttpRequestErrorType> = !(
+      const httpLoaderError =
         error instanceof RequestError
-      )
-        ? new RequestError("http-error", error.message)
-        : error;
+          ? (error as RequestError<HttpRequestErrorType>)
+          : new RequestError("http-error", error.message);
+
       this.requestControls.abortOnError(httpLoaderError);
     }
   }

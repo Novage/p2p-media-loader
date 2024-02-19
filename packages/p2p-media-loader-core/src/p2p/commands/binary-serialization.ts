@@ -61,7 +61,7 @@ export function serializeInt(num: bigint): Uint8Array {
 
 export function deserializeInt(bytes: Uint8Array) {
   const metadata = bytes[0];
-  const code = metadata >> 4;
+  const code: SerializedItem = metadata >> 4;
   if (code !== SerializedItem.Int) {
     throw new Error(
       "Trying to deserialize integer with invalid serialized item code",
@@ -102,7 +102,7 @@ export function serializeSimilarIntArray(numbers: bigint[]) {
 
 export function deserializeSimilarIntArray(bytes: Uint8Array) {
   const [codeByte, commonPartArraysAmount] = bytes;
-  const code = codeByte >> 4;
+  const code: SerializedItem = codeByte >> 4;
   if (code !== SerializedItem.SimilarIntArray) {
     throw new Error(
       "Trying to deserialize similar int array with invalid serialized item code",
@@ -142,7 +142,7 @@ export function serializeString(string: string) {
 
 export function deserializeString(bytes: Uint8Array) {
   const [codeByte, lengthByte] = bytes;
-  const code = codeByte >> 4;
+  const code: SerializedItem = codeByte >> 4;
   if (code !== SerializedItem.String) {
     throw new Error(
       "Trying to deserialize bytes (sting) with invalid serialized item code.",

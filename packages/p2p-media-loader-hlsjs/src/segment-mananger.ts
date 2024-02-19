@@ -20,7 +20,7 @@ export class SegmentManager {
     for (const [index, level] of levels.entries()) {
       const { url } = level;
       this.core.addStreamIfNoneExists({
-        localId: Array.isArray(url) ? url[0] : url,
+        localId: Array.isArray(url) ? (url as string[])[0] : url,
         type: "main",
         index,
       });
@@ -29,7 +29,7 @@ export class SegmentManager {
     for (const [index, track] of audioTracks.entries()) {
       const { url } = track;
       this.core.addStreamIfNoneExists({
-        localId: Array.isArray(url) ? url[0] : url,
+        localId: Array.isArray(url) ? (url as string[])[0] : url,
         type: "secondary",
         index,
       });
