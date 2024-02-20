@@ -222,14 +222,15 @@ function App() {
 
     /* eslint-disable */
 
-    const player = new window.shaka.Player(videoRef.current);
+    const player = new shaka.Player();
+    player.attach(videoRef.current);
 
-    const onError = (error: { code: unknown }) => {
+    const onError = (error: shaka.util.Error) => {
       console.error("Error code", error.code, "object", error);
     };
 
-    player.addEventListener("error", (event: { detail: { code: unknown } }) => {
-      onError(event.detail);
+    player.addEventListener("error", (event) => {
+      onError((event as any).detail);
     });
 
     engine.configureAndInitShakaPlayer(player);

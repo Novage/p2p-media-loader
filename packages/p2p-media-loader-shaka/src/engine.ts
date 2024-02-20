@@ -136,9 +136,7 @@ export class Engine {
     const dashParserFactory = () => new DashManifestParser(shaka);
 
     const Parser = shaka.media.ManifestParser;
-    Parser.registerParserByExtension("mpd", dashParserFactory);
     Parser.registerParserByMime("application/dash+xml", dashParserFactory);
-    Parser.registerParserByExtension("m3u8", hlsParserFactory);
     Parser.registerParserByMime("application/x-mpegurl", hlsParserFactory);
     Parser.registerParserByMime(
       "application/vnd.apple.mpegurl",
