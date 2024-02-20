@@ -14,6 +14,9 @@ declare global {
   }
 }
 
+interface CustomEvent extends Event {
+  detail: { code: unknown };
+}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 window.muxjs = muxjs;
 
@@ -222,14 +225,15 @@ function App() {
 
     /* eslint-disable */
 
-    const player = new window.shaka.Player(videoRef.current);
+    const player = new shaka.Player();
+    player.attach(videoRef.current);
 
     const onError = (error: { code: unknown }) => {
       console.error("Error code", error.code, "object", error);
     };
 
-    player.addEventListener("error", (event: { detail: { code: unknown } }) => {
-      onError(event.detail);
+    player.addEventListener("error", (event: Event) => {
+      onError((event as CustomEvent).detail);
     });
 
     engine.configureAndInitShakaPlayer(player);
