@@ -116,23 +116,23 @@ export class BinaryCommandCreator {
       return;
     }
 
-    let chunksAmount = Math.ceil(unframedBuffer.length / this.maxChunkLength);
+    let chunksCount = Math.ceil(unframedBuffer.length / this.maxChunkLength);
     if (
-      Math.ceil(unframedBuffer.length / chunksAmount) + commandFramesLength >
+      Math.ceil(unframedBuffer.length / chunksCount) + commandFramesLength >
       this.maxChunkLength
     ) {
-      chunksAmount++;
+      chunksCount++;
     }
 
     for (const [i, chunk] of splitBufferToEqualChunks(
       unframedBuffer,
-      chunksAmount,
+      chunksCount,
     )) {
       if (i === 0) {
         this.resultBuffers.push(
           frameBuffer(chunk, commandFrameStart, commandDivFrameEnd),
         );
-      } else if (i === chunksAmount - 1) {
+      } else if (i === chunksCount - 1) {
         this.resultBuffers.push(
           frameBuffer(chunk, commandDivFrameStart, commandFrameEnd),
         );
@@ -220,10 +220,10 @@ function stringToUtf8CodesBuffer(string: string, length?: number): Uint8Array {
 
 function* splitBufferToEqualChunks(
   buffer: Uint8Array,
-  chunksAmount: number,
+  chunksCount: number,
 ): Generator<[number, Uint8Array], void> {
-  const chunkLength = Math.ceil(buffer.length / chunksAmount);
-  for (let i = 0; i < chunksAmount; i++) {
+  const chunkLength = Math.ceil(buffer.length / chunksCount);
+  for (let i = 0; i < chunksCount; i++) {
     yield [i, buffer.slice(i * chunkLength, (i + 1) * chunkLength)];
   }
 }

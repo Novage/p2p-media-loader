@@ -127,8 +127,8 @@ export class SegmentManager {
     newSegments.reverse();
 
     const staleSegmentIds: string[] = [];
-    const amountToDelete = newSegments.length;
-    for (const segment of nSegmentsBackwards(segments, amountToDelete)) {
+    const countToDelete = newSegments.length;
+    for (const segment of nSegmentsBackwards(segments, countToDelete)) {
       staleSegmentIds.push(segment.localId);
     }
 
@@ -143,11 +143,11 @@ function* itemsBackwards<T>(items: T[]) {
 
 function* nSegmentsBackwards(
   segments: ReadonlyMap<string, SegmentBase>,
-  amount: number,
+  count: number,
 ) {
   let i = 0;
   for (const segment of segments.values()) {
-    if (i >= amount) break;
+    if (i >= count) break;
     yield segment;
     i++;
   }
