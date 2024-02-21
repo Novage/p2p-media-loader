@@ -358,8 +358,8 @@ export class HybridLoader {
     }
 
     if (!segmentsToLoad.length) return;
-    const peersAmount = p2pLoader.connectedPeerCount + 1;
-    const probability = Math.min(segmentsToLoad.length / peersAmount, 1);
+    const peersCount = p2pLoader.connectedPeerCount + 1;
+    const probability = Math.min(segmentsToLoad.length / peersCount, 1);
     const shouldLoad = Math.random() < probability;
 
     if (!shouldLoad) return;
@@ -401,7 +401,7 @@ export class HybridLoader {
     const queue: QueueItem[] = [];
     const queueSegmentIds = new Set<string>();
     let maxPossibleLength = 0;
-    let alreadyLoadedAmount = 0;
+    let alreadyLoadedCount = 0;
     for (const item of QueueUtils.generateQueue(
       this.lastRequestedSegment,
       this.playback,
@@ -413,7 +413,7 @@ export class HybridLoader {
         this.segmentStorage.hasSegment(segment) ||
         this.requests.get(segment)?.status === "succeed"
       ) {
-        alreadyLoadedAmount++;
+        alreadyLoadedCount++;
         continue;
       }
       queue.push(item);
@@ -424,9 +424,9 @@ export class HybridLoader {
       queue,
       queueSegmentIds,
       maxPossibleLength,
-      alreadyLoadedAmount,
+      alreadyLoadedCount: alreadyLoadedCount,
       queueDownloadRatio:
-        maxPossibleLength !== 0 ? alreadyLoadedAmount / maxPossibleLength : 0,
+        maxPossibleLength !== 0 ? alreadyLoadedCount / maxPossibleLength : 0,
     };
   }
 

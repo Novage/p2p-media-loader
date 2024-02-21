@@ -26,8 +26,8 @@ export function generatePeerId(customPeerId?: string): {
       ? customPeerId
       : `-PM${formatVersion(__VERSION__)}-`;
 
-  const randomCharsAmount = PEER_ID_LENGTH - peerId.length;
-  for (let i = 0; i < randomCharsAmount; i++) {
+  const randomCharsCount = PEER_ID_LENGTH - peerId.length;
+  for (let i = 0; i < randomCharsCount; i++) {
     peerId += HASH_SYMBOLS.charAt(
       Math.floor(Math.random() * HASH_SYMBOLS.length),
     );
