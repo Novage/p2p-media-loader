@@ -29,6 +29,8 @@ const players = [
 type Player = (typeof players)[number];
 
 const streamUrls = {
+  radioStream:
+    "https://streamvideo.luxnet.ua/maximum/smil:maximum.stream.smil/playlist.m3u8",
   hlsBigBunnyBuck: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
   hlsByteRangeVideo:
     "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8",

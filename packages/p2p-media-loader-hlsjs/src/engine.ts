@@ -115,6 +115,8 @@ export class Engine {
     if (
       this.currentHlsInstance &&
       data.details.live &&
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
+      data.details.fragments[0].type === "main" &&
       !this.currentHlsInstance.userConfig.liveSyncDuration &&
       !this.currentHlsInstance.userConfig.liveSyncDurationCount &&
       data.details.fragments.length > 4
