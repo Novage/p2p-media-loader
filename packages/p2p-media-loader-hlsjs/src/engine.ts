@@ -4,14 +4,13 @@ import type {
   LevelUpdatedData,
   ManifestLoadedData,
   LevelSwitchingData,
+  PlaylistLevelType,
 } from "hls.js";
 import type { HlsConfig, Events } from "hls.js";
 import { FragmentLoaderBase } from "./fragment-loader";
 import { PlaylistLoaderBase } from "./playlist-loader";
 import { SegmentManager } from "./segment-mananger";
 import { Core, CoreEventHandlers } from "p2p-media-loader-core";
-
-const LIVE_EDGE_DELAY = 25;
 
 export class Engine {
   private readonly core: Core;
@@ -24,14 +23,10 @@ export class Engine {
     this.segmentManager = new SegmentManager(this.core);
   }
 
-  public getConfig(): Pick<
-    HlsConfig,
-    "fLoader" | "pLoader" | "liveSyncDuration"
-  > {
+  public getConfig(): Partial<HlsConfig> {
     return {
       fLoader: this.createFragmentLoaderClass(),
       pLoader: this.createPlaylistLoaderClass(),
-      liveSyncDuration: LIVE_EDGE_DELAY,
     };
   }
 
@@ -118,6 +113,18 @@ export class Engine {
     event: string,
     data: LevelUpdatedData | AudioTrackLoadedData,
   ) => {
+    if (
+      this.currentHlsInstance &&
+      data.details.live &&
+      data.details.fragments[0].type === ("main" as PlaylistLevelType) &&
+      !this.currentHlsInstance.userConfig.liveSyncDuration &&
+      !this.currentHlsInstance.userConfig.liveSyncDurationCount &&
+      data.details.fragments.length > 4
+    ) {
+      this.currentHlsInstance.config.liveSyncDurationCount =
+        data.details.fragments.length - 1;
+    }
+
     this.core.setIsLive(data.details.live);
     this.segmentManager.updatePlaylist(data);
   };
