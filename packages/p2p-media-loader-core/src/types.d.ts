@@ -53,6 +53,7 @@ export type Settings = {
   httpNotReceivingBytesTimeoutMs: number;
   httpErrorRetries: number;
   p2pErrorRetries: number;
+  validateP2Psegment?: (url: string, byteRange?: ByteRange) => Promise<boolean>;
 };
 
 export type CoreEventHandlers = {

@@ -45,6 +45,7 @@ export class Peer {
     this.id = Peer.getPeerIdFromConnection(connection);
     this.peerProtocol = new PeerProtocol(connection, settings, {
       onSegmentChunkReceived: this.onSegmentChunkReceived,
+      // eslint-disable-next-line @typescript-eslint/no-misused-promises
       onCommandReceived: this.onCommandReceived,
     });
 
@@ -62,7 +63,7 @@ export class Peer {
     if (this.httpLoadingSegments.has(externalId)) return "http-loading";
   }
 
-  private onCommandReceived = (command: Command.PeerCommand) => {
+  private onCommandReceived = async (command: Command.PeerCommand) => {
     switch (command.c) {
       case PeerCommandType.SegmentsAnnouncement:
         this.loadedSegments = new Set(command.l);
@@ -106,9 +107,15 @@ export class Peer {
           return;
         }
 
-        const isWrongBytes = request.loadedBytes !== request.totalBytes;
+        let isValid = true;
+        if (this.settings.validateP2Psegment) {
+          isValid = await this.settings.validateP2Psegment(
+            request.segment.url,
+            request.segment.byteRange,
+          );
+        }
 
-        if (isWrongBytes) {
+        if (!isValid) {
           request.clearLoadedBytes();
           this.cancelSegmentDownloading("peer-response-bytes-mismatch");
           this.destroy();
