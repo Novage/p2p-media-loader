@@ -1,8 +1,8 @@
-import { Segment, Playback, BandwidthCalculators } from "../types";
+import debug from "debug";
+import { BandwidthCalculators, Playback, Segment } from "../types";
+import * as LoggerUtils from "../utils/logger";
 import * as StreamUtils from "../utils/stream";
 import * as Utils from "../utils/utils";
-import * as LoggerUtils from "../utils/logger";
-import debug from "debug";
 
 export type LoadProgress = {
   startTimestamp: number;
@@ -323,10 +323,11 @@ export type HttpRequestErrorType =
   | "http-unexpected-status-code";
 
 export type PeerRequestErrorType =
-  | "peer-response-bytes-mismatch"
+  | "peer-response-bytes-length-mismatch"
   | "peer-protocol-violation"
   | "peer-segment-absent"
-  | "peer-closed";
+  | "peer-closed"
+  | "p2p-segment-validation-failed";
 
 type RequestErrorType =
   | RequestInnerErrorType

@@ -1,16 +1,16 @@
 import { PeerConnection } from "bittorrent-tracker";
-import { PeerProtocol, PeerSettings } from "./peer-protocol";
+import debug from "debug";
 import {
+  PeerRequestErrorType,
   Request,
   RequestControls,
   RequestError,
-  PeerRequestErrorType,
   RequestInnerErrorType,
 } from "../requests/request";
-import * as Command from "./commands";
 import { Segment } from "../types";
 import * as Utils from "../utils/utils";
-import debug from "debug";
+import * as Command from "./commands";
+import { PeerProtocol, PeerSettings } from "./peer-protocol";
 
 const { PeerCommandType } = Command;
 type PeerEventHandlers = {
@@ -86,7 +86,9 @@ export class Peer {
             request.setTotalBytes(command.s);
           } else if (request.totalBytes - request.loadedBytes !== command.s) {
             request.clearLoadedBytes();
-            this.cancelSegmentDownloading("peer-response-bytes-mismatch");
+            this.cancelSegmentDownloading(
+              "peer-response-bytes-length-mismatch",
+            );
             this.destroy();
           }
         }
@@ -107,17 +109,24 @@ export class Peer {
           return;
         }
 
-        let isValid = true;
-        if (this.settings.validateP2Psegment) {
-          isValid = await this.settings.validateP2Psegment(
+        const isWrongBytes = request.loadedBytes !== request.totalBytes;
+
+        if (isWrongBytes) {
+          request.clearLoadedBytes();
+          this.cancelSegmentDownloading("peer-response-bytes-length-mismatch");
+          this.destroy();
+          return;
+        }
+
+        const isValid =
+          (await this.settings.validateP2PSegment?.(
             request.segment.url,
             request.segment.byteRange,
-          );
-        }
+          )) ?? true;
 
         if (!isValid) {
           request.clearLoadedBytes();
-          this.cancelSegmentDownloading("peer-response-bytes-mismatch");
+          this.cancelSegmentDownloading("p2p-segment-validation-failed");
           this.destroy();
           return;
         }
@@ -152,7 +161,7 @@ export class Peer {
 
     if (isOverflow) {
       request.clearLoadedBytes();
-      this.cancelSegmentDownloading("peer-response-bytes-mismatch");
+      this.cancelSegmentDownloading("peer-response-bytes-length-mismatch");
       this.destroy();
       return;
     }
