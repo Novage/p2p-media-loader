@@ -16,9 +16,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "pnpm run build:es && pnpm run build:umd && pnpm run build:umd-min",
-    "build:umd": "vite build --mode umd",
-    "build:umd-min": "vite build --mode umd-min",
+    "build": "pnpm run build:es && pnpm run build:esm && pnpm run build:esm-min",
+    "build:esm": "vite build --mode esm",
+    "build:esm-min": "vite build --mode esm-min",
     "build:es": "tsc",
     "preview": "vite preview",
     "prettier": "prettier --write .",

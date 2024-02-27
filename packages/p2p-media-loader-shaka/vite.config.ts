@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 import type { UserConfig } from "vite";
 
-const getUMDConfig = ({ minify }: { minify: boolean }): UserConfig => {
+const getESMConfig = ({ minify }: { minify: boolean }): UserConfig => {
   return {
     build: {
       emptyOutDir: false,
@@ -11,7 +11,7 @@ const getUMDConfig = ({ minify }: { minify: boolean }): UserConfig => {
         name: "p2pml.shaka",
         fileName: (format) =>
           `p2p-media-loader-shaka.${format}${minify ? ".min" : ""}.js`,
-        formats: ["umd"],
+        formats: ["es"],
         entry: "src/index.ts",
       },
       rollupOptions: {
@@ -28,11 +28,11 @@ const getUMDConfig = ({ minify }: { minify: boolean }): UserConfig => {
 
 export default defineConfig(({ mode }) => {
   switch (mode) {
-    case "umd":
-      return getUMDConfig({ minify: false });
+    case "esm":
+      return getESMConfig({ minify: false });
 
-    case "umd-min":
+    case "esm-min":
     default:
-      return getUMDConfig({ minify: true });
+      return getESMConfig({ minify: true });
   }
 });
