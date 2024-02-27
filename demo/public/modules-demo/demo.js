@@ -5,8 +5,8 @@ const manifestUri = "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8";
 
 function initApp() {
   if (shaka.Player.isBrowserSupported()) {
-    initShakaPlayer();
     initHlsPlayer();
+    initShakaPlayer();
   } else {
     console.error("Browser not supported!");
   }
@@ -15,10 +15,8 @@ function initApp() {
 async function initHlsPlayer() {
   const engine = new HlsEngine();
 
-  const video = document.getElementById("video2");
-  const player = new Hls();
-  player.attachMedia(video);
-
+  const player = new Hls({ ...engine.getConfig() });
+  player.attachMedia(document.getElementById("video1"));
   player.on(Hls.Events.ERROR, function (event, data) {
     console.error("Error code", data.details, "object", data);
   });
@@ -27,7 +25,6 @@ async function initHlsPlayer() {
 
   try {
     player.loadSource(manifestUri);
-    console.log("The video has now been loaded!", engine, Hls, HlsEngine);
   } catch (e) {
     onError(e);
   }
@@ -37,19 +34,14 @@ async function initShakaPlayer() {
   ShakaEngine.setGlobalSettings();
   const engine = new ShakaEngine();
 
-  const video = document.getElementById("video");
   const player = new shaka.Player();
-  await player.attach(video);
-
-  window.player = player;
-
+  await player.attach(document.getElementById("video2"));
   player.addEventListener("error", onErrorEvent);
 
   engine.configureAndInitShakaPlayer(player);
 
   try {
     await player.load(manifestUri);
-    console.log("The video has now been loaded!", engine, shaka, ShakaEngine);
   } catch (e) {
     onError(e);
   }
