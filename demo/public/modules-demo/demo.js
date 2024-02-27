@@ -5,7 +5,7 @@ const manifestUri = "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8";
 
 function initApp() {
   if (shaka.Player.isBrowserSupported()) {
-    initPlayer();
+    initShakaPlayer();
     initHlsPlayer();
   } else {
     console.error("Browser not supported!");
@@ -33,7 +33,7 @@ async function initHlsPlayer() {
   }
 }
 
-async function initPlayer() {
+async function initShakaPlayer() {
   ShakaEngine.setGlobalSettings();
   const engine = new ShakaEngine();
 
