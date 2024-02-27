@@ -397,6 +397,7 @@ function App() {
           <LoggersSelect />
         </div>
       </div>
+      <a href="modules-demo/index.html">ES modules demo</a>
     </div>
   );
 }

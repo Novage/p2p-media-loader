@@ -1,8 +1,9 @@
 import { defineConfig } from "vite";
 import type { UserConfig } from "vite";
 import packageJson from "./package.json";
+import { nodePolyfills } from "vite-plugin-node-polyfills";
 
-const getUMDConfig = ({ minify }: { minify: boolean }): UserConfig => {
+const getESMConfig = ({ minify }: { minify: boolean }): UserConfig => {
   return {
     define: {
       __VERSION__: JSON.stringify(packageJson.version),
@@ -15,20 +16,21 @@ const getUMDConfig = ({ minify }: { minify: boolean }): UserConfig => {
         name: "p2pml.core",
         fileName: (format) =>
           `p2p-media-loader-core.${format}${minify ? ".min" : ""}.js`,
-        formats: ["umd"],
+        formats: ["es"],
         entry: "src/index.ts",
       },
     },
+    plugins: [nodePolyfills()],
   };
 };
 
 export default defineConfig(({ mode }) => {
   switch (mode) {
-    case "umd":
-      return getUMDConfig({ minify: false });
+    case "esm":
+      return getESMConfig({ minify: false });
 
-    case "umd-min":
+    case "esm-min":
     default:
-      return getUMDConfig({ minify: true });
+      return getESMConfig({ minify: true });
   }
 });
