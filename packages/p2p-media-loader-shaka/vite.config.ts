@@ -16,11 +16,6 @@ const getESMConfig = ({ minify }: { minify: boolean }): UserConfig => {
       },
       rollupOptions: {
         external: ["p2p-media-loader-core"],
-        output: {
-          globals: {
-            "p2p-media-loader-core": "p2pml.core",
-          },
-        },
       },
     },
   };

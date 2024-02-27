@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+  <head>
+    <script type="importmap">
+      {
+        "imports": {
+          "p2p-media-loader-core": "/modules-demo/core/p2p-media-loader-core.es.js",
+          "p2p-media-loader-shaka": "/modules-demo/shaka/p2p-media-loader-shaka.es.js",
+          "p2p-media-loader-hls": "/modules-demo/hlsjs/p2p-media-loader-hlsjs.es.js"
+        }
+      }
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/shaka-player@~4/dist/shaka-player.compiled.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@~1/dist/hls.min.js"></script>
+
+    <script type="module" src="demo.js"></script>
+  </head>
+  <body>
+    <video
+      id="video"
+      width="640"
+      poster="//shaka-player-demo.appspot.com/assets/poster.jpg"
+      controls
+      autoplay
+    ></video>
+    <video id="video2" width="640" controls autoplay></video>
+  </body>
+</html>
