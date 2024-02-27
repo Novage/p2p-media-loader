@@ -8,6 +8,7 @@ import {
   CoreEventHandlers,
   BandwidthCalculators,
   StreamDetails,
+  ByteRange,
 } from "./types";
 import * as StreamUtils from "./utils/stream";
 import { BandwidthCalculator } from "./bandwidth-calculator";
@@ -31,6 +32,17 @@ export class Core<TStream extends Stream = Stream> {
     httpNotReceivingBytesTimeoutMs: 1000,
     httpErrorRetries: 3,
     p2pErrorRetries: 3,
+    validateP2PSegment: async (
+      url: string,
+      byteRange?: ByteRange | undefined,
+    ) => {
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+
+      console.log("validateP2PSegment", url, byteRange);
+
+      //return Math.random() > 0.5;
+      return true;
+    },
   };
   private readonly bandwidthCalculators: BandwidthCalculators = {
     all: new BandwidthCalculator(),
