@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "bittorrent-tracker": "^11.0.0",
-    "nano-md5": "^1.0.5"
+    "nano-md5": "^1.0.5",
+    "vite-plugin-node-polyfills": "^0.19.0"
   }
 }

@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import type { UserConfig } from "vite";
 import packageJson from "./package.json";
+import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 const getESMConfig = ({ minify }: { minify: boolean }): UserConfig => {
   return {
@@ -19,6 +20,7 @@ const getESMConfig = ({ minify }: { minify: boolean }): UserConfig => {
         entry: "src/index.ts",
       },
     },
+    plugins: [nodePolyfills()],
   };
 };
 
