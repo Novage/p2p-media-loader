@@ -86,6 +86,7 @@ export class Peer {
             request.setTotalBytes(command.s);
           } else if (request.totalBytes - request.loadedBytes !== command.s) {
             request.clearLoadedBytes();
+            this.sendCancelSegmentRequestCommand(request.segment);
             this.cancelSegmentDownloading(
               "peer-response-bytes-length-mismatch",
             );
@@ -95,12 +96,14 @@ export class Peer {
         break;
 
       case PeerCommandType.SegmentDataSendingCompleted: {
-        if (!this.downloadingContext?.isSegmentDataCommandReceived) return;
+        const downloadingContext = this.downloadingContext;
 
-        const { request, controls } = this.downloadingContext;
+        if (!downloadingContext?.isSegmentDataCommandReceived) return;
+
+        const { request, controls } = downloadingContext;
 
         const isWrongSegment =
-          this.downloadingContext.request.segment.externalId !== command.i;
+          downloadingContext.request.segment.externalId !== command.i;
 
         if (isWrongSegment) {
           request.clearLoadedBytes();
@@ -123,6 +126,8 @@ export class Peer {
             request.segment.url,
             request.segment.byteRange,
           )) ?? true;
+
+        if (this.downloadingContext !== downloadingContext) return;
 
         if (!isValid) {
           request.clearLoadedBytes();
@@ -184,11 +189,10 @@ export class Peer {
           abort: (error) => {
             if (!this.downloadingContext) return;
             const { request } = this.downloadingContext;
-            if (error.type !== "p2p-segment-validation-failed") {
-              this.sendCancelSegmentRequestCommand(request.segment);
-            }
-            this.downloadingContext = undefined;
+
+            this.sendCancelSegmentRequestCommand(request.segment);
             this.downloadingErrors.push(error);
+            this.downloadingContext = undefined;
 
             const timeoutErrors = this.downloadingErrors.filter(
               (error) => error.type === "bytes-receiving-timeout",
