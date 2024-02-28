@@ -184,7 +184,9 @@ export class Peer {
           abort: (error) => {
             if (!this.downloadingContext) return;
             const { request } = this.downloadingContext;
-            this.sendCancelSegmentRequestCommand(request.segment);
+            if (error.type !== "p2p-segment-validation-failed") {
+              this.sendCancelSegmentRequestCommand(request.segment);
+            }
             this.downloadingContext = undefined;
             this.downloadingErrors.push(error);
 
