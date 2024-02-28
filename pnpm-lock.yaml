@@ -7,10 +7,6 @@ settings:
 importers:
 
   .:
-    dependencies:
-      debug:
-        specifier: ^4.3.4
-        version: 4.3.4
     devDependencies:
       '@types/debug':
         specifier: ^4.1.12
@@ -38,10 +34,13 @@ importers:
     dependencies:
       dplayer:
         specifier: ^1.27.1
-        version: 1.27.1(debug@4.3.4)
+        version: 1.27.1
       mux.js:
         specifier: ^6.3.0
         version: 6.3.0
+      p2p-media-loader-core:
+        specifier: workspace:*
+        version: link:../packages/p2p-media-loader-core
       p2p-media-loader-hlsjs:
         specifier: workspace:*
         version: link:../packages/p2p-media-loader-hlsjs
@@ -85,6 +84,9 @@ importers:
       bittorrent-tracker:
         specifier: ^11.0.0
         version: 11.0.0
+      debug:
+        specifier: ^4.3.4
+        version: 4.3.4
       nano-md5:
         specifier: ^1.0.5
         version: 1.0.5
@@ -1172,10 +1174,10 @@ packages:
     engines: {node: '>= 0.4'}
     dev: true
 
-  /axios@1.2.3(debug@4.3.4):
+  /axios@1.2.3:
     resolution: {integrity: sha512-pdDkMYJeuXLZ6Xj/Q5J3Phpe+jbGdsSzlQaFVkMQzRUL05+6+tetX8TV3p4HrU4kzuO9bt+io/yGQxuyxA/xcw==}
     dependencies:
-      follow-redirects: 1.15.5(debug@4.3.4)
+      follow-redirects: 1.15.5
       form-data: 4.0.0
       proxy-from-env: 1.1.0
     transitivePeerDependencies:
@@ -1624,10 +1626,10 @@ packages:
     engines: {node: '>=10'}
     dev: true
 
-  /dplayer@1.27.1(debug@4.3.4):
+  /dplayer@1.27.1:
     resolution: {integrity: sha512-2laBMXs5V1B9zPwJ7eAIw/OBo+Xjvy03i4GHTk3Cg+IWbrq8rKMFO0fFr6ClAYotYOCcFGOvaJDkOZcgKllsCA==}
     dependencies:
-      axios: 1.2.3(debug@4.3.4)
+      axios: 1.2.3
       balloon-css: 1.2.0
       promise-polyfill: 8.3.0
     transitivePeerDependencies:
@@ -1923,7 +1925,7 @@ packages:
     resolution: {integrity: sha512-X8cqMLLie7KsNUDSdzeN8FYK9rEt4Dt67OsG/DNGnYTSDBG4uFAJFBnUeiV+zCVAvwFy56IjM9sH51jVaEhNxw==}
     dev: true
 
-  /follow-redirects@1.15.5(debug@4.3.4):
+  /follow-redirects@1.15.5:
     resolution: {integrity: sha512-vSFWUON1B+yAw1VN4xMfxgn5fTUiaOzAJCKBwIIgT/+7CuGy9+r+5gITvP62j3RmaD5Ph65UaERdOSRGUzZtgw==}
     engines: {node: '>=4.0'}
     peerDependencies:
@@ -1931,8 +1933,6 @@ packages:
     peerDependenciesMeta:
       debug:
         optional: true
-    dependencies:
-      debug: 4.3.4
     dev: false
 
   /for-each@0.3.3:

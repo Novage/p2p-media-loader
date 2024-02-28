@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "bittorrent-tracker": "^11.0.0",
+    "debug": "^4.3.4",
     "nano-md5": "^1.0.5"
   },
   "devDependencies": {
