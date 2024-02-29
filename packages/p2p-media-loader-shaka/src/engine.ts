@@ -44,14 +44,14 @@ export class Engine {
     this.updatePlayerEventHandlers("register");
   }
 
-  public addCoreEventListener<K extends keyof CoreEventMap>(
+  public addEventListener<K extends keyof CoreEventMap>(
     eventName: K,
     listener: CoreEventMap[K],
   ) {
     this.core.addEventListener(eventName, listener);
   }
 
-  public removeCoreEventListener<K extends keyof CoreEventMap>(
+  public removeEventListener<K extends keyof CoreEventMap>(
     eventName: K,
     listener: CoreEventMap[K],
   ) {

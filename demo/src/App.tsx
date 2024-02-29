@@ -237,7 +237,7 @@ function App() {
       onError((event as any).detail);
     });
 
-    engine.addCoreEventListener("onSegmentLoaded", onSegmentLoaded);
+    engine.addEventListener("onSegmentLoaded", onSegmentLoaded);
 
     engine.configureAndInitShakaPlayer(player);
     player.load(url).catch(onError);

@@ -16,8 +16,7 @@ import { SegmentsMemoryStorage } from "./segments-storage";
 import { EventEmitter } from "./utils/event-emitter";
 
 export class Core<TStream extends Stream = Stream> {
-  private readonly eventEmitter: EventEmitter<CoreEventMap> =
-    new EventEmitter();
+  private readonly eventEmitter = new EventEmitter<CoreEventMap>();
   private manifestResponseUrl?: string;
   private readonly streams = new Map<string, StreamWithSegments<TStream>>();
   private readonly settings: Settings = {

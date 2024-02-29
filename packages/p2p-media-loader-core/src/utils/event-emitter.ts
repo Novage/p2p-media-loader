@@ -18,6 +18,22 @@ export class EventEmitter<
     }
   }
 
+  public getEventDispatcher<K extends keyof EventTypesMap>(eventName: K) {
+    let listeners = this.events.get(eventName);
+    if (!listeners) {
+      listeners = [];
+      this.events.set(eventName, listeners);
+    }
+
+    const definedListeners = listeners;
+
+    return (...args: Parameters<EventTypesMap[K]>) => {
+      for (const listener of definedListeners) {
+        listener(...args);
+      }
+    };
+  }
+
   public addEventListener<K extends keyof EventTypesMap>(
     eventName: K,
     listener: EventTypesMap[K],
