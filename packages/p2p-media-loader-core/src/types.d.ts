@@ -1,5 +1,5 @@
-import { RequestAttempt } from "./requests/request";
 import { BandwidthCalculator } from "./bandwidth-calculator";
+import { RequestAttempt } from "./requests/request";
 
 export type StreamType = "main" | "secondary";
 
@@ -53,6 +53,7 @@ export type Settings = {
   httpNotReceivingBytesTimeoutMs: number;
   httpErrorRetries: number;
   p2pErrorRetries: number;
+  validateP2PSegment?: (url: string, byteRange?: ByteRange) => Promise<boolean>;
 };
 
 export type CoreEventHandlers = {

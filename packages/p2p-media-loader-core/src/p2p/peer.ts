@@ -1,16 +1,16 @@
 import { PeerConnection } from "bittorrent-tracker";
-import { PeerProtocol, PeerSettings } from "./peer-protocol";
+import debug from "debug";
 import {
+  PeerRequestErrorType,
   Request,
   RequestControls,
   RequestError,
-  PeerRequestErrorType,
   RequestInnerErrorType,
 } from "../requests/request";
-import * as Command from "./commands";
 import { Segment } from "../types";
 import * as Utils from "../utils/utils";
-import debug from "debug";
+import * as Command from "./commands";
+import { PeerProtocol, PeerSettings } from "./peer-protocol";
 
 const { PeerCommandType } = Command;
 type PeerEventHandlers = {
@@ -45,6 +45,7 @@ export class Peer {
     this.id = Peer.getPeerIdFromConnection(connection);
     this.peerProtocol = new PeerProtocol(connection, settings, {
       onSegmentChunkReceived: this.onSegmentChunkReceived,
+      // eslint-disable-next-line @typescript-eslint/no-misused-promises
       onCommandReceived: this.onCommandReceived,
     });
 
@@ -62,7 +63,7 @@ export class Peer {
     if (this.httpLoadingSegments.has(externalId)) return "http-loading";
   }
 
-  private onCommandReceived = (command: Command.PeerCommand) => {
+  private onCommandReceived = async (command: Command.PeerCommand) => {
     switch (command.c) {
       case PeerCommandType.SegmentsAnnouncement:
         this.loadedSegments = new Set(command.l);
@@ -85,19 +86,24 @@ export class Peer {
             request.setTotalBytes(command.s);
           } else if (request.totalBytes - request.loadedBytes !== command.s) {
             request.clearLoadedBytes();
-            this.cancelSegmentDownloading("peer-response-bytes-mismatch");
+            this.sendCancelSegmentRequestCommand(request.segment);
+            this.cancelSegmentDownloading(
+              "peer-response-bytes-length-mismatch",
+            );
             this.destroy();
           }
         }
         break;
 
       case PeerCommandType.SegmentDataSendingCompleted: {
-        if (!this.downloadingContext?.isSegmentDataCommandReceived) return;
+        const downloadingContext = this.downloadingContext;
 
-        const { request, controls } = this.downloadingContext;
+        if (!downloadingContext?.isSegmentDataCommandReceived) return;
+
+        const { request, controls } = downloadingContext;
 
         const isWrongSegment =
-          this.downloadingContext.request.segment.externalId !== command.i;
+          downloadingContext.request.segment.externalId !== command.i;
 
         if (isWrongSegment) {
           request.clearLoadedBytes();
@@ -110,7 +116,22 @@ export class Peer {
 
         if (isWrongBytes) {
           request.clearLoadedBytes();
-          this.cancelSegmentDownloading("peer-response-bytes-mismatch");
+          this.cancelSegmentDownloading("peer-response-bytes-length-mismatch");
+          this.destroy();
+          return;
+        }
+
+        const isValid =
+          (await this.settings.validateP2PSegment?.(
+            request.segment.url,
+            request.segment.byteRange,
+          )) ?? true;
+
+        if (this.downloadingContext !== downloadingContext) return;
+
+        if (!isValid) {
+          request.clearLoadedBytes();
+          this.cancelSegmentDownloading("p2p-segment-validation-failed");
           this.destroy();
           return;
         }
@@ -145,7 +166,7 @@ export class Peer {
 
     if (isOverflow) {
       request.clearLoadedBytes();
-      this.cancelSegmentDownloading("peer-response-bytes-mismatch");
+      this.cancelSegmentDownloading("peer-response-bytes-length-mismatch");
       this.destroy();
       return;
     }
@@ -168,9 +189,10 @@ export class Peer {
           abort: (error) => {
             if (!this.downloadingContext) return;
             const { request } = this.downloadingContext;
+
             this.sendCancelSegmentRequestCommand(request.segment);
-            this.downloadingContext = undefined;
             this.downloadingErrors.push(error);
+            this.downloadingContext = undefined;
 
             const timeoutErrors = this.downloadingErrors.filter(
               (error) => error.type === "bytes-receiving-timeout",

@@ -1,11 +1,14 @@
 import { PeerConnection } from "bittorrent-tracker";
-import * as Command from "./commands";
-import * as Utils from "../utils/utils";
 import { Settings } from "../types";
+import * as Utils from "../utils/utils";
+import * as Command from "./commands";
 
 export type PeerSettings = Pick<
   Settings,
-  "p2pNotReceivingBytesTimeoutMs" | "webRtcMaxMessageSize" | "p2pErrorRetries"
+  | "p2pNotReceivingBytesTimeoutMs"
+  | "webRtcMaxMessageSize"
+  | "p2pErrorRetries"
+  | "validateP2PSegment"
 >;
 
 export class PeerProtocol {
