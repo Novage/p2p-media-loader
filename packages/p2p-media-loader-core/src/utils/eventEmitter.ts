@@ -1,19 +1,27 @@
 export class EventEmitter<
-  T extends Record<K, (...args: unknown[]) => never>,
-  K extends string = string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  EventTypesMap extends { [key: string]: (...args: any[]) => unknown },
 > {
-  private events: Map<K, ((...args: unknown[]) => never)[]> = new Map();
+  private events = new Map<
+    keyof EventTypesMap,
+    EventTypesMap[keyof EventTypesMap][]
+  >();
 
-  dispatchEvent(eventName: K, ...args: Parameters<T[K]>) {
+  public dispatchEvent<K extends keyof EventTypesMap>(
+    eventName: K,
+    ...args: Parameters<EventTypesMap[K]>
+  ) {
     const listeners = this.events.get(eventName);
     if (!listeners) return;
-
     for (const listener of listeners) {
       listener(...args);
     }
   }
 
-  addEventListener(eventName: K, listener: T[K]) {
+  public addEventListener<K extends keyof EventTypesMap>(
+    eventName: K,
+    listener: EventTypesMap[K],
+  ) {
     const listeners = this.events.get(eventName);
     if (!listeners) {
       this.events.set(eventName, [listener]);
@@ -22,7 +30,10 @@ export class EventEmitter<
     }
   }
 
-  removeEventListener(eventName: K, listener: T[K]) {
+  public removeEventListener<K extends keyof EventTypesMap>(
+    eventName: K,
+    listener: EventTypesMap[K],
+  ) {
     const listeners = this.events.get(eventName);
     if (listeners) {
       const index = listeners.indexOf(listener);
