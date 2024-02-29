@@ -138,9 +138,7 @@ export class Request {
     requestData: StartRequestParameters,
     controls: {
       notReceivingBytesTimeoutMs?: number;
-      abort: (
-        errorType: RequestError<RequestInnerErrorType | PeerRequestErrorType>,
-      ) => void;
+      abort: (errorType: RequestError<RequestInnerErrorType>) => void;
     },
   ): RequestControls {
     if (this._status === "succeed") {
