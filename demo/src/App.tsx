@@ -99,11 +99,13 @@ function App() {
 
   if (!hlsEngine.current) {
     hlsEngine.current = new HlsJsEngine();
+    hlsEngine.current.addEventListener("onSegmentLoaded", onSegmentLoaded);
   }
 
   if (!shakaEngine.current) {
     ShakaEngine.setGlobalSettings();
     shakaEngine.current = new ShakaEngine(window.shaka);
+    shakaEngine.current.addEventListener("onSegmentLoaded", onSegmentLoaded);
   }
 
   useEffect(() => {
@@ -127,7 +129,6 @@ function App() {
     const hls = new window.Hls({
       ...engine.getConfig(),
     });
-    engine.addEventListener("onSegmentLoaded", onSegmentLoaded);
 
     engine.setHls(hls);
     hls.attachMedia(videoRef.current);
@@ -236,8 +237,6 @@ function App() {
     player.addEventListener("error", (event) => {
       onError((event as any).detail);
     });
-
-    engine.addEventListener("onSegmentLoaded", onSegmentLoaded);
 
     engine.configureAndInitShakaPlayer(player);
     player.load(url).catch(onError);
