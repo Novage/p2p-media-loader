@@ -13,7 +13,7 @@ import * as StreamUtils from "./utils/stream";
 import { BandwidthCalculator } from "./bandwidth-calculator";
 import { EngineCallbacks } from "./requests/engine-request";
 import { SegmentsMemoryStorage } from "./segments-storage";
-import { EventEmitter } from "./utils/eventEmitter";
+import { EventEmitter } from "./utils/event-emitter";
 
 export class Core<TStream extends Stream = Stream> {
   private readonly eventEmitter: EventEmitter<CoreEventMap> =

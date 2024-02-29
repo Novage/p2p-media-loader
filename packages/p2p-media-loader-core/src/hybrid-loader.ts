@@ -17,7 +17,7 @@ import * as StreamUtils from "./utils/stream";
 import * as Utils from "./utils/utils";
 import debug from "debug";
 import { QueueItem } from "./utils/queue";
-import { EventEmitter } from "./utils/eventEmitter";
+import { EventEmitter } from "./utils/event-emitter";
 
 const FAILED_ATTEMPTS_CLEAR_INTERVAL = 60000;
 
