@@ -1,7 +1,7 @@
 import { Segment, Settings, Stream } from "./types";
 import { EventDispatcher } from "./event-dispatcher";
 import * as StreamUtils from "./utils/stream";
-import Debug from "debug";
+import debug from "debug";
 
 type StorageSettings = Pick<
   Settings,
@@ -29,14 +29,14 @@ export class SegmentsMemoryStorage {
   private readonly isSegmentLockedPredicates: ((
     segment: Segment,
   ) => boolean)[] = [];
-  private readonly logger: Debug.Debugger;
+  private readonly logger: debug.Debugger;
   private readonly events = new EventDispatcher<StorageEventHandlers>();
 
   constructor(
     private readonly masterManifestUrl: string,
     private readonly settings: StorageSettings,
   ) {
-    this.logger = Debug("core:segment-memory-storage");
+    this.logger = debug("core:segment-memory-storage");
     this.logger.color = "RebeccaPurple";
   }
 
