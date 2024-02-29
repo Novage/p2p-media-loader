@@ -10,7 +10,7 @@ import type { HlsConfig, Events } from "hls.js";
 import { FragmentLoaderBase } from "./fragment-loader";
 import { PlaylistLoaderBase } from "./playlist-loader";
 import { SegmentManager } from "./segment-mananger";
-import { Core, CoreEventHandlers } from "p2p-media-loader-core";
+import { Core, CoreEventMap } from "p2p-media-loader-core";
 
 export class Engine {
   private readonly core: Core;
@@ -18,9 +18,23 @@ export class Engine {
   private hlsInstanceGetter?: () => Hls;
   private currentHlsInstance?: Hls;
 
-  constructor(eventHandlers?: CoreEventHandlers) {
-    this.core = new Core(eventHandlers);
+  constructor() {
+    this.core = new Core();
     this.segmentManager = new SegmentManager(this.core);
+  }
+
+  public addEventListener<K extends keyof CoreEventMap>(
+    eventName: K,
+    listener: CoreEventMap[K],
+  ) {
+    this.core.addEventListener(eventName, listener);
+  }
+
+  public removeEventListener<K extends keyof CoreEventMap>(
+    eventName: K,
+    listener: CoreEventMap[K],
+  ) {
+    this.core.removeEventListener(eventName, listener);
   }
 
   public getConfig(): Partial<HlsConfig> {

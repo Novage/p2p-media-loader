@@ -5,16 +5,18 @@ import {
   Segment,
   Settings,
   SegmentBase,
-  CoreEventHandlers,
   BandwidthCalculators,
   StreamDetails,
+  CoreEventMap,
 } from "./types";
 import * as StreamUtils from "./utils/stream";
 import { BandwidthCalculator } from "./bandwidth-calculator";
 import { EngineCallbacks } from "./requests/engine-request";
 import { SegmentsMemoryStorage } from "./segments-storage";
+import { EventEmitter } from "./utils/event-emitter";
 
 export class Core<TStream extends Stream = Stream> {
+  private readonly eventEmitter = new EventEmitter<CoreEventMap>();
   private manifestResponseUrl?: string;
   private readonly streams = new Map<string, StreamWithSegments<TStream>>();
   private readonly settings: Settings = {
@@ -44,7 +46,21 @@ export class Core<TStream extends Stream = Stream> {
     activeLevelBitrate: 0,
   };
 
-  constructor(private readonly eventHandlers?: CoreEventHandlers) {}
+  constructor() {}
+
+  addEventListener<K extends keyof CoreEventMap>(
+    eventName: K,
+    listener: CoreEventMap[K],
+  ) {
+    this.eventEmitter.addEventListener(eventName, listener);
+  }
+
+  removeEventListener<K extends keyof CoreEventMap>(
+    eventName: K,
+    listener: CoreEventMap[K],
+  ) {
+    this.eventEmitter.removeEventListener(eventName, listener);
+  }
 
   setManifestResponseUrl(url: string): void {
     this.manifestResponseUrl = url.split("?")[0];
@@ -170,7 +186,7 @@ export class Core<TStream extends Stream = Stream> {
         this.settings,
         this.bandwidthCalculators,
         this.segmentStorage,
-        this.eventHandlers,
+        this.eventEmitter,
       );
     };
 

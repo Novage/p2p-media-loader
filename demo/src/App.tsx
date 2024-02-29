@@ -98,12 +98,14 @@ function App() {
   };
 
   if (!hlsEngine.current) {
-    hlsEngine.current = new HlsJsEngine({ onSegmentLoaded });
+    hlsEngine.current = new HlsJsEngine();
+    hlsEngine.current.addEventListener("onSegmentLoaded", onSegmentLoaded);
   }
 
   if (!shakaEngine.current) {
     ShakaEngine.setGlobalSettings();
-    shakaEngine.current = new ShakaEngine(window.shaka, { onSegmentLoaded });
+    shakaEngine.current = new ShakaEngine(window.shaka);
+    shakaEngine.current.addEventListener("onSegmentLoaded", onSegmentLoaded);
   }
 
   useEffect(() => {
@@ -127,6 +129,7 @@ function App() {
     const hls = new window.Hls({
       ...engine.getConfig(),
     });
+
     engine.setHls(hls);
     hls.attachMedia(videoRef.current);
     hls.loadSource(url);
