@@ -1,15 +1,14 @@
 import { SegmentManager } from "./segment-manager";
-import Debug from "debug";
 import {
   HookedStream,
   Shaka,
   HookedNetworkingEngine,
   P2PMLShakaData,
 } from "./types";
-import { StreamType } from "p2p-media-loader-core";
+import { StreamType, debug } from "p2p-media-loader-core";
 
 export class ManifestParserDecorator implements shaka.extern.ManifestParser {
-  private readonly debug = Debug("p2pml-shaka:manifest-parser");
+  private readonly debug = debug("p2pml-shaka:manifest-parser");
   private readonly isHls: boolean;
   private segmentManager?: SegmentManager;
   private player?: shaka.Player;

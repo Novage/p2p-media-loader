@@ -3,7 +3,7 @@ import { Engine as HlsJsEngine } from "p2p-media-loader-hlsjs";
 import { Engine as ShakaEngine } from "p2p-media-loader-shaka";
 import DPlayer from "dplayer";
 import muxjs from "mux.js";
-import debug from "debug";
+import { debug } from "p2p-media-loader-core";
 import type Hls from "hls.js";
 
 declare global {
