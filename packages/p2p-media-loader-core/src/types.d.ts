@@ -56,8 +56,8 @@ export type Settings = {
   validateP2PSegment?: (url: string, byteRange?: ByteRange) => Promise<boolean>;
 };
 
-export type CoreEventHandlers = {
-  onSegmentLoaded?: (byteLength: number, type: RequestAttempt["type"]) => void;
+export type CoreEventMap = Record<string, (...args: unknown[]) => never> & {
+  onSegmentLoaded: (byteLength: number, type: RequestAttempt["type"]) => void;
 };
 
 export type Playback = {

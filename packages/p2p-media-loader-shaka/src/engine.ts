@@ -13,7 +13,7 @@ import {
   P2PMLShakaData,
 } from "./types";
 import { Loader } from "./loading-handler";
-import { Core, CoreEventHandlers } from "p2p-media-loader-core";
+import { Core, CoreEventMap } from "p2p-media-loader-core";
 
 const LIVE_EDGE_DELAY = 25;
 
@@ -25,9 +25,9 @@ export class Engine {
   private readonly segmentManager: SegmentManager;
   private requestFilter?: shaka.extern.RequestFilter;
 
-  constructor(shaka?: unknown, eventHandlers?: CoreEventHandlers) {
+  constructor(shaka?: unknown) {
     this.shaka = (shaka as Shaka | undefined) ?? window.shaka;
-    this.core = new Core(eventHandlers);
+    this.core = new Core();
     this.segmentManager = new SegmentManager(this.streamInfo, this.core);
   }
 
@@ -42,6 +42,20 @@ export class Engine {
     );
     this.player.configure("streaming.useNativeHlsOnSafari", false);
     this.updatePlayerEventHandlers("register");
+  }
+
+  public addCoreEventListener<K extends keyof CoreEventMap>(
+    eventName: K,
+    listener: CoreEventMap[K],
+  ) {
+    this.core.addEventListener(eventName, listener);
+  }
+
+  public removeCoreEventListener<K extends keyof CoreEventMap>(
+    eventName: K,
+    listener: CoreEventMap[K],
+  ) {
+    this.core.removeEventListener(eventName, listener);
   }
 
   private updatePlayerEventHandlers = (type: "register" | "unregister") => {

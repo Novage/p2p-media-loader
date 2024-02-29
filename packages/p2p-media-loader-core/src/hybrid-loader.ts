@@ -3,10 +3,10 @@ import { HttpRequestExecutor } from "./http-loader";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import {
   Settings,
-  CoreEventHandlers,
   Playback,
   BandwidthCalculators,
   StreamDetails,
+  CoreEventMap,
 } from "./types";
 import { P2PLoadersContainer } from "./p2p/loaders-container";
 import { RequestsContainer } from "./requests/request-container";
@@ -17,6 +17,7 @@ import * as StreamUtils from "./utils/stream";
 import * as Utils from "./utils/utils";
 import debug from "debug";
 import { QueueItem } from "./utils/queue";
+import { EventEmitter } from "./utils/eventEmitter";
 
 const FAILED_ATTEMPTS_CLEAR_INTERVAL = 60000;
 
@@ -40,7 +41,7 @@ export class HybridLoader {
     private readonly settings: Settings,
     private readonly bandwidthCalculators: BandwidthCalculators,
     private readonly segmentStorage: SegmentsMemoryStorage,
-    private readonly eventHandlers?: Pick<CoreEventHandlers, "onSegmentLoaded">,
+    private readonly eventEmmiter: EventEmitter<CoreEventMap>,
   ) {
     const activeStream = this.lastRequestedSegment.stream;
     this.playback = { position: this.lastRequestedSegment.startTime, rate: 1 };
@@ -167,7 +168,11 @@ export class HybridLoader {
           }
           this.requests.remove(request);
           void this.segmentStorage.storeSegment(request.segment, request.data);
-          this.eventHandlers?.onSegmentLoaded?.(request.data.byteLength, type);
+          this.eventEmmiter.dispatchEvent(
+            "onSegmentLoaded",
+            request.data.byteLength,
+            type,
+          );
           break;
 
         case "failed":
