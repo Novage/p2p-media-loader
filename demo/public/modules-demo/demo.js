@@ -1,5 +1,5 @@
 import { Engine as ShakaEngine } from "p2p-media-loader-shaka";
-import { Engine as HlsEngine } from "p2p-media-loader-hls";
+import { Engine as HlsEngine } from "p2p-media-loader-hlsjs";
 
 const manifestUri = "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8";
 

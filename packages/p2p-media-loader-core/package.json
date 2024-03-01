@@ -23,7 +23,8 @@
     "preview": "vite preview",
     "prettier": "prettier --write .",
     "lint": "eslint . --ext .ts",
-    "clean": "rimraf lib dist build",
+    "clean": "rimraf lib dist build p2p-media-loader-core-*.tgz",
+    "clean-with-modules": "rimraf node_modules lib dist build p2p-media-loader-core-*.tgz",
     "type-check": "npx tsc --noEmit"
   },
   "dependencies": {
