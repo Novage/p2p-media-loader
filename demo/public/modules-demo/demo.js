@@ -3,16 +3,16 @@ import { Engine as HlsEngine } from "p2p-media-loader-hlsjs";
 
 const manifestUri = "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8";
 
-function initApp() {
+async function initApp() {
   if (shaka.Player.isBrowserSupported()) {
     initHlsPlayer();
-    initShakaPlayer();
+    await initShakaPlayer();
   } else {
     console.error("Browser not supported!");
   }
 }
 
-async function initHlsPlayer() {
+function initHlsPlayer() {
   const engine = new HlsEngine();
 
   const player = new Hls({ ...engine.getConfig() });

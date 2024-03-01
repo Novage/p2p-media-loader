@@ -1,10 +1,10 @@
 {
-  "extends": "../tsconfig.base.json",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "resolveJsonModule": true,
     "outDir": "lib",
     "rootDir": "src",
     "tsBuildInfoFile": "./build/.tsbuildinfo"
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "references": [{ "path": "./tsconfig.node.json" }]
 }
