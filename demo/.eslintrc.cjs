@@ -1,18 +1,26 @@
 module.exports = {
   env: { es2020: true },
-  extends: ["../.eslintrc.common.cjs", "plugin:react-hooks/recommended"],
   parser: "@typescript-eslint/parser",
   parserOptions: {
     ecmaVersion: "latest",
     sourceType: "module",
-    project: "tsconfig.json",
+    ecmaFeatures: {
+      jsx: true,
+    },
+    project: ["tsconfig.json", "tsconfig.node.json"],
     tsconfigRootDir: __dirname,
   },
-  plugins: ["react-refresh"],
-  rules: {
-    "react-refresh/only-export-components": "warn",
-    "@typescript-eslint/ban-ts-comment": 0,
-    "react-hooks/exhaustive-deps": 0,
-    "@typescript-eslint/no-explicit-any": 0,
+  plugins: ["react", "react-hooks", "react-refresh"],
+  extends: [
+    "../.eslintrc.common.cjs",
+    "plugin:react/recommended",
+    "plugin:react/jsx-runtime",
+    "plugin:react-hooks/recommended",
+  ],
+  ignorePatterns: ["public/*"],
+  settings: {
+    react: {
+      version: "detect",
+    },
   },
 };

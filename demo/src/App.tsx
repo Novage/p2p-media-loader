@@ -73,14 +73,14 @@ function App() {
   const [httpLoadedGlob, setHttpLoadedGlob] = useLocalStorageItem<number>(
     "httpLoaded",
     0,
-    (v) => v.toString(),
-    (v) => (v !== null ? +v : 0),
+    numberToStorageItem,
+    storageItemToNumber,
   );
   const [p2pLoadedGlob, setP2PLoadedGlob] = useLocalStorageItem<number>(
     "p2pLoaded",
     0,
-    (v) => v.toString(),
-    (v) => (v !== null ? +v : 0),
+    numberToStorageItem,
+    storageItemToNumber,
   );
 
   const hlsEngine = useRef<HlsJsEngine>();
@@ -108,6 +108,36 @@ function App() {
     shakaEngine.current.addEventListener("onSegmentLoaded", onSegmentLoaded);
   }
 
+  const createNewPlayer = useCallback(() => {
+    setHttpLoadedGlob(0);
+    setP2PLoadedGlob(0);
+
+    window.videoPlayer?.destroy?.();
+    hlsInstance.current?.destroy();
+    void shakaInstance.current?.destroy();
+
+    switch (playerType) {
+      case "hls-dplayer":
+        initHlsDPlayer(streamUrl);
+        break;
+      case "hlsjs":
+        initHlsJsPlayer(streamUrl);
+        break;
+      case "hls-clappr":
+        initHlsClapprPlayer(streamUrl);
+        break;
+      case "shaka-dplayer":
+        initShakaDPlayer(streamUrl);
+        break;
+      case "shaka-player":
+        initShakaPlayer(streamUrl);
+        break;
+      case "shaka-clappr":
+        initShakaClapprPlayer(streamUrl);
+        break;
+    }
+  }, [playerType, setHttpLoadedGlob, setP2PLoadedGlob, streamUrl]);
+
   useEffect(() => {
     if (!window.Hls.isSupported() || window.videoPlayer) {
       return;
@@ -121,7 +151,7 @@ function App() {
       setStreamUrl(streamUrls.hlsLive2);
     }
     createNewPlayer();
-  }, [playerType]);
+  }, [createNewPlayer]);
 
   const initHlsJsPlayer = (url: string) => {
     if (!videoRef.current || !hlsEngine.current) return;
@@ -200,13 +230,11 @@ function App() {
             const shakaPlayer = new window.shaka.Player();
             shakaPlayer.attach(video);
 
-            const onError = (error: { code: number }) => {
-              console.error("Error code", error.toString(), "object", error);
+            const onError = (error: unknown) => {
+              console.error("Shaka error", error);
             };
 
-            shakaPlayer.addEventListener("error", (event: { code: number }) => {
-              onError(event);
-            });
+            shakaPlayer.addEventListener("error", onError);
 
             engine.configureAndInitShakaPlayer(shakaPlayer);
             shakaPlayer.load(url).catch(onError);
@@ -280,36 +308,6 @@ function App() {
   const onVideoUrlChange = (streamUrl: string) => {
     localStorage.streamUrl = streamUrl;
     setStreamUrl(streamUrl);
-  };
-
-  const createNewPlayer = () => {
-    setHttpLoadedGlob(0);
-    setP2PLoadedGlob(0);
-
-    window.videoPlayer?.destroy?.();
-    hlsInstance.current?.destroy();
-    void shakaInstance.current?.destroy();
-
-    switch (playerType) {
-      case "hls-dplayer":
-        initHlsDPlayer(streamUrl);
-        break;
-      case "hlsjs":
-        initHlsJsPlayer(streamUrl);
-        break;
-      case "hls-clappr":
-        initHlsClapprPlayer(streamUrl);
-        break;
-      case "shaka-dplayer":
-        initShakaDPlayer(streamUrl);
-        break;
-      case "shaka-player":
-        initShakaPlayer(streamUrl);
-        break;
-      case "shaka-clappr":
-        initShakaClapprPlayer(streamUrl);
-        break;
-    }
   };
 
   const loadStreamWithExistingInstance = () => {
@@ -434,16 +432,8 @@ function LoggersSelect() {
   const [activeLoggers, setActiveLoggers] = useLocalStorageItem<string[]>(
     "debug",
     [],
-    (list) => {
-      setTimeout(() => debug.enable(localStorage.debug as string), 0);
-      if (list.length === 0) return null;
-      return list.join(",");
-    },
-    (storageItem) => {
-      setTimeout(() => debug.enable(localStorage.debug as string), 0);
-      if (!storageItem) return [];
-      return storageItem.split(",");
-    },
+    loggersToStorageItem,
+    storageItemToLoggers,
   );
 
   const onChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
@@ -494,20 +484,23 @@ function useLocalStorageItem<T>(
   const [value, setValue] = useState<T>(
     storageItemToValue(localStorage[prop] as string | null) ?? initValue,
   );
-  const setValueExternal = useCallback((value: T | ((prev: T) => T)) => {
-    setValue(value);
-    if (typeof value === "function") {
-      const prev = storageItemToValue(localStorage.getItem(prop));
-      const next = (value as (prev: T) => T)(prev);
-      const result = valueToStorageItem(next);
-      if (result !== null) localStorage.setItem(prop, result);
-      else localStorage.removeItem(prop);
-    } else {
-      const result = valueToStorageItem(value);
-      if (result !== null) localStorage.setItem(prop, result);
-      else localStorage.removeItem(prop);
-    }
-  }, []);
+  const setValueExternal = useCallback(
+    (value: T | ((prev: T) => T)) => {
+      setValue(value);
+      if (typeof value === "function") {
+        const prev = storageItemToValue(localStorage.getItem(prop));
+        const next = (value as (prev: T) => T)(prev);
+        const result = valueToStorageItem(next);
+        if (result !== null) localStorage.setItem(prop, result);
+        else localStorage.removeItem(prop);
+      } else {
+        const result = valueToStorageItem(value);
+        if (result !== null) localStorage.setItem(prop, result);
+        else localStorage.removeItem(prop);
+      }
+    },
+    [prop, storageItemToValue, valueToStorageItem],
+  );
 
   useEffect(() => {
     const eventHandler = (event: StorageEvent) => {
@@ -519,7 +512,7 @@ function useLocalStorageItem<T>(
     return () => {
       window.removeEventListener("storage", eventHandler);
     };
-  }, []);
+  }, [prop, storageItemToValue]);
 
   return [value, setValueExternal];
 }
@@ -534,3 +527,18 @@ const loggers = [
   "core:request-secondary",
   "core:segment-memory-storage",
 ] as const;
+
+const numberToStorageItem = (v: number) => v.toString();
+const storageItemToNumber = (v: string | null) => (v !== null ? +v : 0);
+
+const loggersToStorageItem = (list: string[]) => {
+  setTimeout(() => debug.enable(localStorage.debug as string), 0);
+  if (list.length === 0) return null;
+  return list.join(",");
+};
+
+const storageItemToLoggers = (storageItem: string | null) => {
+  setTimeout(() => debug.enable(localStorage.debug as string), 0);
+  if (!storageItem) return [];
+  return storageItem.split(",");
+};

@@ -7,7 +7,7 @@
     "skipLibCheck": true,
     "moduleResolution": "Bundler",
     "allowImportingTsExtensions": false,
-    "resolveJsonModule": false,
+    "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": false,
     "declaration": true,
@@ -22,5 +22,5 @@
     "noFallthroughCasesInSwitch": true,
     "composite": true,
     "allowSyntheticDefaultImports": true
-  },
+  }
 }

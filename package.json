@@ -3,16 +3,17 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "pnpm --recursive run build",
-    "build:es": "pnpm --filter './packages/**' run build:es",
-    "build:umd": "pnpm --filter './packages/**' run build:umd",
-    "build:umd-min": "pnpm --filter './packages/**' run build:umd-min",
-    "clean": "pnpm --filter './packages/**' run clean",
+    "build": "pnpm --recursive build",
+    "build:es": "pnpm --filter './packages/**' build:es",
+    "build:esm": "pnpm --filter './packages/**' build:esm",
+    "build:esm-min": "pnpm --filter './packages/**' build:esm-min",
+    "clean": "pnpm --recursive clean",
+    "clean-with-modules": "pnpm --recursive clean-with-modules",
     "pack-packages": "pnpm --filter './packages/**' exec -- pnpm pack",
-    "lint": "pnpm --recursive run lint",
-    "prettier": "pnpm --recursive run prettier",
-    "type-check": "pnpm --recursive run type-check",
-    "dev": "pnpm --filter './demo' run dev"
+    "lint": "pnpm --recursive lint",
+    "prettier": "pnpm --recursive prettier",
+    "type-check": "pnpm --recursive type-check",
+    "dev": "pnpm --filter './demo' dev"
   },
   "devDependencies": {
     "@types/debug": "^4.1.12",
