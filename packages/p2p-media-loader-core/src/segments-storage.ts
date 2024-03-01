@@ -1,7 +1,7 @@
 import { Segment, Settings, Stream } from "./types";
-import { EventDispatcher } from "./event-dispatcher";
 import * as StreamUtils from "./utils/stream";
 import debug from "debug";
+import { EventEmitter } from "./utils/event-emitter";
 
 type StorageSettings = Pick<
   Settings,
@@ -30,7 +30,9 @@ export class SegmentsMemoryStorage {
     segment: Segment,
   ) => boolean)[] = [];
   private readonly logger: debug.Debugger;
-  private readonly events = new EventDispatcher<StorageEventHandlers>();
+  private readonly eventEmitter = new EventEmitter<StorageEventHandlers>();
+  private readonly onStorageUpdated =
+    this.eventEmitter.getEventDispatcher("onStorageUpdated");
 
   constructor(
     private readonly masterManifestUrl: string,
@@ -67,7 +69,7 @@ export class SegmentsMemoryStorage {
       lastAccessed: performance.now(),
     });
     this.logger(`add segment: ${id}`);
-    this.dispatchStorageUpdatedEvent(segment.stream);
+    this.onStorageUpdated(segment.stream);
     void this.clear();
   }
 
@@ -138,7 +140,7 @@ export class SegmentsMemoryStorage {
       this.logger(`cleared ${itemsToDelete.length} segments`);
       itemsToDelete.forEach((id) => this.cache.delete(id));
       for (const stream of streamsOfChangedItems) {
-        this.dispatchStorageUpdatedEvent(stream);
+        this.onStorageUpdated(stream);
       }
     }
 
@@ -150,7 +152,7 @@ export class SegmentsMemoryStorage {
     listener: StorageEventHandlers["onStorageUpdated"],
   ) {
     const localId = StreamUtils.getStreamShortId(stream);
-    this.events.subscribe(`onStorageUpdated-${localId}`, listener);
+    this.eventEmitter.addEventListener(`onStorageUpdated-${localId}`, listener);
   }
 
   unsubscribeFromUpdate(
@@ -158,13 +160,9 @@ export class SegmentsMemoryStorage {
     listener: StorageEventHandlers["onStorageUpdated"],
   ) {
     const localId = StreamUtils.getStreamShortId(stream);
-    this.events.unsubscribe(`onStorageUpdated-${localId}`, listener);
-  }
-
-  private dispatchStorageUpdatedEvent(stream: Stream) {
-    this.events.dispatch(
-      `onStorageUpdated${StreamUtils.getStreamShortId(stream)}`,
-      stream,
+    this.eventEmitter.removeEventListener(
+      `onStorageUpdated-${localId}`,
+      listener,
     );
   }
 
