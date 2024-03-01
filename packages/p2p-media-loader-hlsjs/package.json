@@ -25,7 +25,7 @@
     "prettier": "prettier --write .",
     "lint": "eslint . --ext .ts",
     "clean": "rimraf lib dist build p2p-media-loader-hlsjs-*.tgz",
-    "clean-with-modules": "rimraf node_modules lib dist build p2p-media-loader-hlsjs-*.tgz",
+    "clean-with-modules": "rimraf node_modules && pnpm clean",
     "type-check": "npx tsc --noEmit"
   },
   "dependencies": {

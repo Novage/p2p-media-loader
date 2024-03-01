@@ -11,7 +11,7 @@
     "prettier": "prettier --write .",
     "type-check": "npx tsc --noEmit",
     "clean": "rimraf dist",
-    "clean-with-modules": "rimraf dist node_modules"
+    "clean-with-modules": "rimraf node_modules && pnpm clean"
   },
   "dependencies": {
     "dplayer": "^1.27.1",
