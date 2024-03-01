@@ -17,7 +17,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "pnpm run build:es && pnpm run build:esm && pnpm run build:esm-min",
+    "build": "pnpm build:es && pnpm build:esm && pnpm build:esm-min",
     "build:esm": "vite build --mode esm",
     "build:esm-min": "vite build --mode esm-min",
     "build:es": "tsc",
