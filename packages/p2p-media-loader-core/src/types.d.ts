@@ -54,6 +54,11 @@ export type Settings = {
   httpErrorRetries: number;
   p2pErrorRetries: number;
   validateP2PSegment?: (url: string, byteRange?: ByteRange) => Promise<boolean>;
+  httpRequestSetup?: (
+    url: string,
+    request: Request,
+    byteRange?: ByteRange,
+  ) => void;
 };
 
 export type CoreEventMap = {

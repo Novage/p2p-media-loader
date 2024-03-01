@@ -1,12 +1,15 @@
-import { Settings } from "./types";
+import { ByteRange, Settings } from "./types";
 import {
-  Request,
+  Request as SegmentRequest,
   RequestError,
   HttpRequestErrorType,
   RequestControls,
 } from "./requests/request";
 
-type HttpSettings = Pick<Settings, "httpNotReceivingBytesTimeoutMs">;
+type HttpSettings = Pick<
+  Settings,
+  "httpNotReceivingBytesTimeoutMs" | "httpRequestSetup"
+>;
 
 export class HttpRequestExecutor {
   private readonly requestControls: RequestControls;
@@ -16,7 +19,7 @@ export class HttpRequestExecutor {
   private readonly byteRange?: { start: number; end?: number };
 
   constructor(
-    private readonly request: Request,
+    private readonly request: SegmentRequest,
     private readonly settings: HttpSettings,
   ) {
     const { byteRange } = this.request.segment;
@@ -50,10 +53,18 @@ export class HttpRequestExecutor {
   private async fetch() {
     const { segment } = this.request;
     try {
-      const response = await window.fetch(segment.url, {
+      const request = new Request(segment.url, {
         headers: this.requestHeaders,
         signal: this.abortController.signal,
       });
+
+      this.settings.httpRequestSetup?.(
+        segment.url,
+        request,
+        this.byteRange as ByteRange,
+      );
+      const response = await window.fetch(request);
+
       this.handleResponseHeaders(response);
 
       if (!response.body) return;
