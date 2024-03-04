@@ -1,4 +1,4 @@
-import { ByteRange, Settings } from "./types";
+import { Settings } from "./types";
 import {
   Request as SegmentRequest,
   RequestError,
@@ -13,30 +13,25 @@ type HttpSettings = Pick<
 
 export class HttpRequestExecutor {
   private readonly requestControls: RequestControls;
-  private readonly requestHeaders = new Headers();
   private readonly abortController = new AbortController();
   private readonly expectedBytesLength?: number;
-  private readonly byteRange?: { start: number; end?: number };
+  private readonly requestByteRange?: { start: number; end?: number };
 
   constructor(
     private readonly request: SegmentRequest,
     private readonly settings: HttpSettings,
   ) {
     const { byteRange } = this.request.segment;
-    if (byteRange) this.byteRange = { ...byteRange };
+    if (byteRange) this.requestByteRange = { ...byteRange };
 
     if (request.loadedBytes !== 0) {
-      this.byteRange = this.byteRange ?? { start: 0 };
-      this.byteRange.start = this.byteRange.start + request.loadedBytes;
+      this.requestByteRange = this.requestByteRange ?? { start: 0 };
+      this.requestByteRange.start =
+        this.requestByteRange.start + request.loadedBytes;
     }
     if (this.request.totalBytes) {
       this.expectedBytesLength =
         this.request.totalBytes - this.request.loadedBytes;
-    }
-
-    if (this.byteRange) {
-      const { start, end } = this.byteRange;
-      this.requestHeaders.set("Range", `bytes=${start}-${end ?? ""}`);
     }
 
     const { httpNotReceivingBytesTimeoutMs } = this.settings;
@@ -53,16 +48,27 @@ export class HttpRequestExecutor {
   private async fetch() {
     const { segment } = this.request;
     try {
-      const request = new Request(segment.url, {
-        headers: this.requestHeaders,
-        signal: this.abortController.signal,
-      });
-
-      this.settings.httpRequestSetup?.(
-        segment.url,
-        request,
-        this.byteRange as ByteRange,
+      const headers = new Headers(
+        this.requestByteRange
+          ? {
+              Range: `bytes=${this.requestByteRange.start}-${
+                this.requestByteRange.end ?? ""
+              }`,
+            }
+          : undefined,
       );
+
+      const request =
+        this.settings.httpRequestSetup?.(
+          segment.url,
+          this.requestByteRange,
+          segment.byteRange,
+        ) ??
+        new Request(segment.url, {
+          headers,
+          signal: this.abortController.signal,
+        });
+
       const response = await window.fetch(request);
 
       this.handleResponseHeaders(response);
@@ -91,7 +97,7 @@ export class HttpRequestExecutor {
       }
     }
 
-    const { byteRange } = this;
+    const { requestByteRange: byteRange } = this;
     if (byteRange) {
       if (response.status === 200) {
         if (this.request.segment.byteRange) {
