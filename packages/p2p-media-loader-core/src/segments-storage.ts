@@ -31,8 +31,6 @@ export class SegmentsMemoryStorage {
   ) => boolean)[] = [];
   private readonly logger: debug.Debugger;
   private readonly eventEmitter = new EventEmitter<StorageEventHandlers>();
-  private readonly onStorageUpdated =
-    this.eventEmitter.getEventDispatcher("onStorageUpdated");
 
   constructor(
     private readonly masterManifestUrl: string,
@@ -69,7 +67,7 @@ export class SegmentsMemoryStorage {
       lastAccessed: performance.now(),
     });
     this.logger(`add segment: ${id}`);
-    this.onStorageUpdated(segment.stream);
+    this.dispatchStorageUpdatedEvent(segment.stream);
     void this.clear();
   }
 
@@ -140,7 +138,7 @@ export class SegmentsMemoryStorage {
       this.logger(`cleared ${itemsToDelete.length} segments`);
       itemsToDelete.forEach((id) => this.cache.delete(id));
       for (const stream of streamsOfChangedItems) {
-        this.onStorageUpdated(stream);
+        this.dispatchStorageUpdatedEvent(stream);
       }
     }
 
@@ -163,6 +161,13 @@ export class SegmentsMemoryStorage {
     this.eventEmitter.removeEventListener(
       `onStorageUpdated-${localId}`,
       listener,
+    );
+  }
+
+  private dispatchStorageUpdatedEvent(stream: Stream) {
+    this.eventEmitter.dispatchEvent(
+      `onStorageUpdated${StreamUtils.getStreamShortId(stream)}`,
+      stream,
     );
   }
 
