@@ -48,26 +48,28 @@ export class HttpRequestExecutor {
   private async fetch() {
     const { segment } = this.request;
     try {
-      const headers = new Headers(
-        this.requestByteRange
-          ? {
-              Range: `bytes=${this.requestByteRange.start}-${
-                this.requestByteRange.end ?? ""
-              }`,
-            }
-          : undefined,
+      let request = await this.settings.httpRequestSetup?.(
+        segment.url,
+        segment.byteRange,
+        this.requestByteRange,
       );
 
-      const request =
-        this.settings.httpRequestSetup?.(
-          segment.url,
-          this.requestByteRange,
-          segment.byteRange,
-        ) ??
-        new Request(segment.url, {
+      if (!request) {
+        const headers = new Headers(
+          this.requestByteRange
+            ? {
+                Range: `bytes=${this.requestByteRange.start}-${
+                  this.requestByteRange.end ?? ""
+                }`,
+              }
+            : undefined,
+        );
+
+        request = new Request(segment.url, {
           headers,
           signal: this.abortController.signal,
         });
+      }
 
       const response = await window.fetch(request);
 
@@ -97,8 +99,8 @@ export class HttpRequestExecutor {
       }
     }
 
-    const { requestByteRange: byteRange } = this;
-    if (byteRange) {
+    const { requestByteRange } = this;
+    if (requestByteRange) {
       if (response.status === 200) {
         if (this.request.segment.byteRange) {
           throw new RequestError("http-unexpected-status-code");
@@ -130,10 +132,10 @@ export class HttpRequestExecutor {
           const { from, to, total } = contentRange;
           if (
             (total !== undefined && this.request.totalBytes !== total) ||
-            (from !== undefined && byteRange.start !== from) ||
+            (from !== undefined && requestByteRange.start !== from) ||
             (to !== undefined &&
-              byteRange.end !== undefined &&
-              byteRange.end !== to)
+              requestByteRange.end !== undefined &&
+              requestByteRange.end !== to)
           ) {
             this.request.clearLoadedBytes();
             throw new RequestError("http-bytes-mismatch", response.statusText);
