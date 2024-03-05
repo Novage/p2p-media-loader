@@ -1,7 +1,7 @@
 import { Segment, Settings, Stream } from "./types";
-import { EventDispatcher } from "./event-dispatcher";
 import * as StreamUtils from "./utils/stream";
 import debug from "debug";
+import { EventEmitter } from "./utils/event-emitter";
 
 type StorageSettings = Pick<
   Settings,
@@ -20,7 +20,7 @@ type StorageItem = {
 };
 
 type StorageEventHandlers = {
-  [key in `onStorageUpdated${string}`]: (steam: Stream) => void;
+  [key in `onStorageUpdated-${string}`]: (steam: Stream) => void;
 };
 
 export class SegmentsMemoryStorage {
@@ -30,7 +30,7 @@ export class SegmentsMemoryStorage {
     segment: Segment,
   ) => boolean)[] = [];
   private readonly logger: debug.Debugger;
-  private readonly events = new EventDispatcher<StorageEventHandlers>();
+  private readonly eventEmitter = new EventEmitter<StorageEventHandlers>();
 
   constructor(
     private readonly masterManifestUrl: string,
@@ -147,23 +147,26 @@ export class SegmentsMemoryStorage {
 
   subscribeOnUpdate(
     stream: Stream,
-    listener: StorageEventHandlers["onStorageUpdated"],
+    listener: StorageEventHandlers["onStorageUpdated-"],
   ) {
     const localId = StreamUtils.getStreamShortId(stream);
-    this.events.subscribe(`onStorageUpdated-${localId}`, listener);
+    this.eventEmitter.addEventListener(`onStorageUpdated-${localId}`, listener);
   }
 
   unsubscribeFromUpdate(
     stream: Stream,
-    listener: StorageEventHandlers["onStorageUpdated"],
+    listener: StorageEventHandlers["onStorageUpdated-"],
   ) {
     const localId = StreamUtils.getStreamShortId(stream);
-    this.events.unsubscribe(`onStorageUpdated-${localId}`, listener);
+    this.eventEmitter.removeEventListener(
+      `onStorageUpdated-${localId}`,
+      listener,
+    );
   }
 
   private dispatchStorageUpdatedEvent(stream: Stream) {
-    this.events.dispatch(
-      `onStorageUpdated${StreamUtils.getStreamShortId(stream)}`,
+    this.eventEmitter.dispatchEvent(
+      `onStorageUpdated-${StreamUtils.getStreamShortId(stream)}`,
       stream,
     );
   }
