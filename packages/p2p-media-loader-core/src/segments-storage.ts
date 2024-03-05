@@ -20,7 +20,7 @@ type StorageItem = {
 };
 
 type StorageEventHandlers = {
-  [key in `onStorageUpdated${string}`]: (steam: Stream) => void;
+  [key in `onStorageUpdated-${string}`]: (steam: Stream) => void;
 };
 
 export class SegmentsMemoryStorage {
@@ -147,7 +147,7 @@ export class SegmentsMemoryStorage {
 
   subscribeOnUpdate(
     stream: Stream,
-    listener: StorageEventHandlers["onStorageUpdated"],
+    listener: StorageEventHandlers["onStorageUpdated-"],
   ) {
     const localId = StreamUtils.getStreamShortId(stream);
     this.eventEmitter.addEventListener(`onStorageUpdated-${localId}`, listener);
@@ -155,7 +155,7 @@ export class SegmentsMemoryStorage {
 
   unsubscribeFromUpdate(
     stream: Stream,
-    listener: StorageEventHandlers["onStorageUpdated"],
+    listener: StorageEventHandlers["onStorageUpdated-"],
   ) {
     const localId = StreamUtils.getStreamShortId(stream);
     this.eventEmitter.removeEventListener(
