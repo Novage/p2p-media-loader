@@ -51,6 +51,7 @@ export class HttpRequestExecutor {
       let request = await this.settings.httpRequestSetup?.(
         segment.url,
         segment.byteRange,
+        this.abortController.signal,
         this.requestByteRange,
       );
 
@@ -69,6 +70,13 @@ export class HttpRequestExecutor {
           headers,
           signal: this.abortController.signal,
         });
+      }
+
+      if (this.abortController.signal.aborted) {
+        throw new DOMException(
+          "Request aborted before request fetch",
+          "AbortError",
+        );
       }
 
       const response = await window.fetch(request);

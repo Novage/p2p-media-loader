@@ -57,6 +57,7 @@ export type Settings = {
   httpRequestSetup?: (
     segmentUrl: string,
     segmentByteRange: ByteRange | undefined,
+    requestAbortSignal: AbortSignal,
     requestByteRange: { start: number; end?: number } | undefined,
   ) => Promise<Request | undefined | null>;
 };
