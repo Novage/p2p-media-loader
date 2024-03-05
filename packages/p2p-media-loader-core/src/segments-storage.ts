@@ -166,7 +166,7 @@ export class SegmentsMemoryStorage {
 
   private dispatchStorageUpdatedEvent(stream: Stream) {
     this.eventEmitter.dispatchEvent(
-      `onStorageUpdated${StreamUtils.getStreamShortId(stream)}`,
+      `onStorageUpdated-${StreamUtils.getStreamShortId(stream)}`,
       stream,
     );
   }
