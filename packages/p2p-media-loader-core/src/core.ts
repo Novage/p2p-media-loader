@@ -8,6 +8,7 @@ import {
   BandwidthCalculators,
   StreamDetails,
   CoreEventMap,
+  Config,
 } from "./types";
 import * as StreamUtils from "./utils/stream";
 import { BandwidthCalculator } from "./bandwidth-calculator";
@@ -46,7 +47,9 @@ export class Core<TStream extends Stream = Stream> {
     activeLevelBitrate: 0,
   };
 
-  constructor() {}
+  constructor(config: Config) {
+    Object.assign(this.settings, config.coreSettings);
+  }
 
   addEventListener<K extends keyof CoreEventMap>(
     eventName: K,

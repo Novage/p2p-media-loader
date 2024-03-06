@@ -47,12 +47,14 @@ export class P2PTrackerClient {
         "wss://tracker.webtorrent.dev",
         "wss://tracker.files.fm:7073/announce",
         "wss://tracker.openwebtorrent.com",
+        ...(this.settings.announceTrackers ?? []),
       ],
       rtcConfig: {
         iceServers: [
           { urls: "stun:stun.l.google.com:19302" },
           { urls: "stun:global.stun.twilio.com:3478" },
         ],
+        ...this.settings.rtcConfig,
       },
     });
     this.client.on("peer", this.onReceivePeerConnection);
