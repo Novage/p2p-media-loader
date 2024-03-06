@@ -1,7 +1,8 @@
 import { PeerConnection } from "bittorrent-tracker";
-import { Settings } from "../types";
+import { CoreEventMap, Settings } from "../types";
 import * as Utils from "../utils/utils";
 import * as Command from "./commands";
+import { EventEmitter } from "../utils/event-emitter";
 
 export type PeerSettings = Pick<
   Settings,
@@ -14,6 +15,8 @@ export type PeerSettings = Pick<
 export class PeerProtocol {
   private commandChunks?: Command.BinaryCommandChunksJoiner;
   private uploadingContext?: { stopUploading: () => void };
+  private readonly onChunkDownloaded: CoreEventMap["onChunkDownloaded"];
+  private readonly onChunkUploaded: CoreEventMap["onChunkUploaded"];
 
   constructor(
     private readonly connection: PeerConnection,
@@ -22,7 +25,11 @@ export class PeerProtocol {
       onCommandReceived: (command: Command.PeerCommand) => void;
       onSegmentChunkReceived: (data: Uint8Array) => void;
     },
+    eventEmmiter: EventEmitter<CoreEventMap>,
   ) {
+    this.onChunkDownloaded =
+      eventEmmiter.getEventDispatcher("onChunkDownloaded");
+    this.onChunkUploaded = eventEmmiter.getEventDispatcher("onChunkUploaded");
     connection.on("data", this.onDataReceived);
   }
 
@@ -31,6 +38,7 @@ export class PeerProtocol {
       this.receivingCommandBytes(data);
     } else {
       this.eventHandlers.onSegmentChunkReceived(data);
+      this.onChunkDownloaded(data, "p2p", this.connection.id);
     }
   };
 
@@ -76,6 +84,7 @@ export class PeerProtocol {
           break;
         }
         this.connection.send(chunk);
+        this.onChunkUploaded(chunk, this.connection.id);
       }
     };
     try {

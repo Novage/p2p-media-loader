@@ -1,10 +1,11 @@
-import { Settings } from "./types";
+import { CoreEventMap, Settings } from "./types";
 import {
   Request as SegmentRequest,
   RequestError,
   HttpRequestErrorType,
   RequestControls,
 } from "./requests/request";
+import { EventEmitter } from "./utils/event-emitter";
 
 type HttpSettings = Pick<
   Settings,
@@ -16,11 +17,16 @@ export class HttpRequestExecutor {
   private readonly abortController = new AbortController();
   private readonly expectedBytesLength?: number;
   private readonly requestByteRange?: { start: number; end?: number };
+  private readonly onChunkDownloaded: CoreEventMap["onChunkDownloaded"];
 
   constructor(
     private readonly request: SegmentRequest,
     private readonly settings: HttpSettings,
+    eventEmitter: EventEmitter<CoreEventMap>,
   ) {
+    this.onChunkDownloaded =
+      eventEmitter.getEventDispatcher("onChunkDownloaded");
+
     const { byteRange } = this.request.segment;
     if (byteRange) this.requestByteRange = { ...byteRange };
 
@@ -90,6 +96,7 @@ export class HttpRequestExecutor {
       const reader = response.body.getReader();
       for await (const chunk of readStream(reader)) {
         this.requestControls.addLoadedChunk(chunk);
+        this.onChunkDownloaded(chunk, "http");
       }
       requestControls.completeOnSuccess();
     } catch (error) {

@@ -49,11 +49,16 @@ export class Peer {
     this.onPeerClosed = eventEmmiter.getEventDispatcher("onPeerClose");
 
     this.id = Peer.getPeerIdFromConnection(connection);
-    this.peerProtocol = new PeerProtocol(connection, settings, {
-      onSegmentChunkReceived: this.onSegmentChunkReceived,
-      // eslint-disable-next-line @typescript-eslint/no-misused-promises
-      onCommandReceived: this.onCommandReceived,
-    });
+    this.peerProtocol = new PeerProtocol(
+      connection,
+      settings,
+      {
+        onSegmentChunkReceived: this.onSegmentChunkReceived,
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises
+        onCommandReceived: this.onCommandReceived,
+      },
+      eventEmmiter,
+    );
 
     connection.on("close", this.onPeerConnectionClosed);
     connection.on("error", this.onConnectionError);

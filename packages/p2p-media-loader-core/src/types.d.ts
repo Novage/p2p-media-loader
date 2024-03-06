@@ -76,6 +76,12 @@ export type CoreEventMap = {
   onSegmentStart: (segment: Segment) => void;
   onPeerConnect: (peer: Peer) => void;
   onPeerClose: (peerId: string) => void;
+  onChunkDownloaded: (
+    chunk: Uint8Array,
+    type: RequestAttempt["type"],
+    peerId?: string,
+  ) => void;
+  onChunkUploaded: (chunk: ArrayBuffer, peerId: string) => void;
 };
 
 export type Playback = {

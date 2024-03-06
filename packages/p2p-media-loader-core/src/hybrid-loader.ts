@@ -42,7 +42,7 @@ export class HybridLoader {
     private readonly settings: Settings,
     private readonly bandwidthCalculators: BandwidthCalculators,
     private readonly segmentStorage: SegmentsMemoryStorage,
-    eventEmitter: EventEmitter<CoreEventMap>,
+    private readonly eventEmitter: EventEmitter<CoreEventMap>,
   ) {
     const activeStream = this.lastRequestedSegment.stream;
     this.playback = { position: this.lastRequestedSegment.startTime, rate: 1 };
@@ -52,7 +52,7 @@ export class HybridLoader {
       this.bandwidthCalculators,
       this.playback,
       this.settings,
-      eventEmitter,
+      this.eventEmitter,
     );
 
     this.onSegmentLoaded = eventEmitter.getEventDispatcher("onSegmentLoaded");
@@ -74,7 +74,7 @@ export class HybridLoader {
       this.requests,
       this.segmentStorage,
       this.settings,
-      eventEmitter,
+      this.eventEmitter,
     );
 
     this.logger = debug(`core:hybrid-loader-${activeStream.type}`);
@@ -319,7 +319,7 @@ export class HybridLoader {
 
   private loadThroughHttp(segment: Segment) {
     const request = this.requests.getOrCreateRequest(segment);
-    new HttpRequestExecutor(request, this.settings);
+    new HttpRequestExecutor(request, this.settings, this.eventEmitter);
     this.p2pLoaders.currentLoader.broadcastAnnouncement();
   }
 
