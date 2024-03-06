@@ -62,8 +62,18 @@ export type Settings = {
   ) => Promise<Request | undefined | null>;
 };
 
+interface onSegmentErrorParams {
+  segment: Segment;
+  error: RequestError;
+  requestSource: RequestAttempt["type"];
+  peerId?: string;
+}
+
 export type CoreEventMap = {
   onSegmentLoaded: (byteLength: number, type: RequestAttempt["type"]) => void;
+  onSegmentError: (params: onSegmentErrorParams) => void;
+  onSegmentAbort: (segment: Segment) => void;
+  onSegmentStart: (segment: Segment) => void;
 };
 
 export type Playback = {

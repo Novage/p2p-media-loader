@@ -1,8 +1,14 @@
 import debug from "debug";
-import { BandwidthCalculators, Playback, Segment } from "../types";
+import {
+  BandwidthCalculators,
+  CoreEventMap,
+  Playback,
+  Segment,
+} from "../types";
 import * as LoggerUtils from "../utils/logger";
 import * as StreamUtils from "../utils/stream";
 import * as Utils from "../utils/utils";
+import { EventEmitter } from "../utils/event-emitter";
 
 export type LoadProgress = {
   startTimestamp: number;
@@ -62,6 +68,9 @@ export class Request {
   ) => void;
   private readonly _logger: debug.Debugger;
   private _isHandledByProcessQueue = false;
+  private readonly onSegmentError: CoreEventMap["onSegmentError"];
+  private readonly onSegmentAbort: CoreEventMap["onSegmentAbort"];
+  private readonly onSegmentStart: CoreEventMap["onSegmentStart"];
 
   constructor(
     readonly segment: Segment,
@@ -69,7 +78,12 @@ export class Request {
     private readonly bandwidthCalculators: BandwidthCalculators,
     private readonly playback: Playback,
     private readonly settings: StreamUtils.PlaybackTimeWindowsSettings,
+    eventEmitter: EventEmitter<CoreEventMap>,
   ) {
+    this.onSegmentError = eventEmitter.getEventDispatcher("onSegmentError");
+    this.onSegmentAbort = eventEmitter.getEventDispatcher("onSegmentAbort");
+    this.onSegmentStart = eventEmitter.getEventDispatcher("onSegmentStart");
+
     this.id = Request.getRequestItemId(this.segment);
     const { byteRange } = this.segment;
     if (byteRange) {
@@ -152,6 +166,7 @@ export class Request {
       );
     }
 
+    this.onSegmentStart(this.segment);
     this.setStatus("loading");
     this.currentAttempt = { ...requestData };
     this.progress = {
@@ -193,6 +208,7 @@ export class Request {
       `${this.currentAttempt?.type} ${this.segment.externalId} aborted`,
     );
     this._abortRequestCallback?.(new RequestError("abort"));
+    this.onSegmentAbort(this.segment);
     this._abortRequestCallback = undefined;
     this.manageBandwidthCalculatorsState("stop");
     this.notReceivingBytesTimeout.clear();
@@ -206,10 +222,18 @@ export class Request {
     const error = new RequestError("bytes-receiving-timeout");
     this._abortRequestCallback?.(error);
     this.logger(`${this.type} ${this.segment.externalId} failed ${error.type}`);
-
     this._failedAttempts.add({
       ...this.currentAttempt,
       error,
+    });
+    this.onSegmentError({
+      segment: this.segment,
+      error,
+      requestSource: this.currentAttempt.type,
+      peerId:
+        this.currentAttempt.type === "p2p"
+          ? this.currentAttempt.peerId
+          : undefined,
     });
     this.notReceivingBytesTimeout.clear();
     this.manageBandwidthCalculatorsState("stop");
@@ -225,6 +249,15 @@ export class Request {
     this._failedAttempts.add({
       ...this.currentAttempt,
       error,
+    });
+    this.onSegmentError({
+      segment: this.segment,
+      error,
+      requestSource: this.currentAttempt.type,
+      peerId:
+        this.currentAttempt.type === "p2p"
+          ? this.currentAttempt.peerId
+          : undefined,
     });
     this.notReceivingBytesTimeout.clear();
     this.manageBandwidthCalculatorsState("stop");
