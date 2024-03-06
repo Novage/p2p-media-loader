@@ -313,6 +313,7 @@ export class HybridLoader {
       LoggerUtils.getSegmentString(this.engineRequest.segment),
     );
     this.engineRequest = undefined;
+    this.requestProcessQueueMicrotask();
   }
 
   private loadThroughHttp(segment: Segment) {

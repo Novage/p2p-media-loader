@@ -78,10 +78,13 @@ export class Peer {
       case PeerCommandType.SegmentData:
         {
           if (!this.downloadingContext) break;
+
           const { request, controls } = this.downloadingContext;
           if (request.segment.externalId !== command.i) break;
+
           this.downloadingContext.isSegmentDataCommandReceived = true;
           controls.firstBytesReceived();
+
           if (request.totalBytes === undefined) {
             request.setTotalBytes(command.s);
           } else if (request.totalBytes - request.loadedBytes !== command.s) {

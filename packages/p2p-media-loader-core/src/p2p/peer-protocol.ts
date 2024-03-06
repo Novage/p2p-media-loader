@@ -78,6 +78,7 @@ export class PeerProtocol {
         this.connection.send(chunk);
       }
     };
+
     try {
       channel.addEventListener("bufferedamountlow", sendChunk);
       isUploadingSegmentData = true;
