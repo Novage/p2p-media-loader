@@ -166,7 +166,6 @@ export class Request {
       );
     }
 
-    this.onSegmentStart(this.segment);
     this.setStatus("loading");
     this.currentAttempt = { ...requestData };
     this.progress = {
@@ -193,6 +192,14 @@ export class Request {
       `${requestData.type} ${this.segment.externalId} ${statusString} started`,
     );
 
+    this.onSegmentStart({
+      segment: this.segment,
+      loadedBytes: this.loadedBytes,
+      requestId: this.id,
+      requestSource: requestData.type,
+      peerId: requestData.type === "p2p" ? requestData.peerId : undefined,
+    });
+
     return {
       firstBytesReceived: this.firstBytesReceived,
       addLoadedChunk: this.addLoadedChunk,
@@ -208,7 +215,16 @@ export class Request {
       `${this.currentAttempt?.type} ${this.segment.externalId} aborted`,
     );
     this._abortRequestCallback?.(new RequestError("abort"));
-    this.onSegmentAbort(this.segment);
+    this.onSegmentAbort({
+      segment: this.segment,
+      loadedBytes: this.loadedBytes,
+      requestId: this.id,
+      requestSource: this.currentAttempt?.type,
+      peerId:
+        this.currentAttempt?.type === "p2p"
+          ? this.currentAttempt.peerId
+          : undefined,
+    });
     this._abortRequestCallback = undefined;
     this.manageBandwidthCalculatorsState("stop");
     this.notReceivingBytesTimeout.clear();
@@ -229,7 +245,9 @@ export class Request {
     this.onSegmentError({
       segment: this.segment,
       error,
+      loadedBytes: this.loadedBytes,
       requestSource: this.currentAttempt.type,
+      requestId: this.id,
       peerId:
         this.currentAttempt.type === "p2p"
           ? this.currentAttempt.peerId
@@ -252,7 +270,9 @@ export class Request {
     });
     this.onSegmentError({
       segment: this.segment,
+      loadedBytes: this.loadedBytes,
       error,
+      requestId: this.id,
       requestSource: this.currentAttempt.type,
       peerId:
         this.currentAttempt.type === "p2p"

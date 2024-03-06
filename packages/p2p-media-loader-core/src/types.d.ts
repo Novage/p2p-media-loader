@@ -62,18 +62,28 @@ export type Settings = {
   ) => Promise<Request | undefined | null>;
 };
 
-interface onSegmentErrorParams {
+interface OnSegmentErrorParams {
   segment: Segment;
+  loadedBytes: number | undefined;
   error: RequestError;
+  requestId: string;
   requestSource: RequestAttempt["type"];
-  peerId?: string;
+  peerId: string | undefined;
+}
+
+interface SegmenEventParams {
+  segment: Segment;
+  loadedBytes: number | undefined;
+  requestId: string;
+  requestSource: RequestAttempt["type"] | undefined;
+  peerId: string | undefined;
 }
 
 export type CoreEventMap = {
   onSegmentLoaded: (byteLength: number, type: RequestAttempt["type"]) => void;
-  onSegmentError: (params: onSegmentErrorParams) => void;
-  onSegmentAbort: (segment: Segment) => void;
-  onSegmentStart: (segment: Segment) => void;
+  onSegmentError: (params: OnSegmentErrorParams) => void;
+  onSegmentAbort: (params: SegmenEventParams) => void;
+  onSegmentStart: (params: SegmenEventParams) => void;
   onPeerConnect: (peer: Peer) => void;
   onPeerClose: (peerId: string) => void;
   onChunkDownloaded: (
