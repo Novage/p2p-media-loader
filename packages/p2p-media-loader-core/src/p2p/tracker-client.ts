@@ -2,11 +2,12 @@ import TrackerClient, {
   PeerConnection,
   TrackerClientEvents,
 } from "bittorrent-tracker";
-import { Settings, StreamWithSegments } from "../types";
+import { CoreEventMap, Settings, StreamWithSegments } from "../types";
 import debug from "debug";
 import * as PeerUtil from "../utils/peer";
 import * as LoggerUtils from "../utils/logger";
 import { Peer } from "./peer";
+import { EventEmitter } from "../utils/event-emitter";
 
 type PeerItem = {
   peer?: Peer;
@@ -29,6 +30,7 @@ export class P2PTrackerClient {
     stream: StreamWithSegments,
     private readonly eventHandlers: P2PTrackerClientEventHandlers,
     private readonly settings: Settings,
+    private readonly eventEmmiter: EventEmitter<CoreEventMap>,
     private readonly customPeerId?: string,
   ) {
     const { string: peerId, bytes: peerIdBytes } =
@@ -107,6 +109,7 @@ export class P2PTrackerClient {
           onSegmentRequested: this.eventHandlers.onSegmentRequested,
         },
         this.settings,
+        this.eventEmmiter,
       );
       this.logger(
         `connected with peer: ${peerItem.peer.id} ${this.streamShortId}`,

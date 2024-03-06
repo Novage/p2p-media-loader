@@ -52,6 +52,7 @@ export class HybridLoader {
       this.bandwidthCalculators,
       this.playback,
       this.settings,
+      eventEmitter,
     );
 
     this.onSegmentLoaded = eventEmitter.getEventDispatcher("onSegmentLoaded");
@@ -73,6 +74,7 @@ export class HybridLoader {
       this.requests,
       this.segmentStorage,
       this.settings,
+      eventEmitter,
     );
 
     this.logger = debug(`core:hybrid-loader-${activeStream.type}`);

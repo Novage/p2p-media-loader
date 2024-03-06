@@ -74,6 +74,8 @@ export type CoreEventMap = {
   onSegmentError: (params: onSegmentErrorParams) => void;
   onSegmentAbort: (segment: Segment) => void;
   onSegmentStart: (segment: Segment) => void;
+  onPeerConnect: (peer: Peer) => void;
+  onPeerClose: (peerId: string) => void;
 };
 
 export type Playback = {

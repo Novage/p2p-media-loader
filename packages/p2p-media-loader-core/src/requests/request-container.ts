@@ -1,4 +1,11 @@
-import { Segment, Settings, Playback, BandwidthCalculators } from "../types";
+import {
+  Segment,
+  Settings,
+  Playback,
+  BandwidthCalculators,
+  CoreEventMap,
+} from "../types";
+import { EventEmitter } from "../utils/event-emitter";
 import { Request } from "./request";
 
 export class RequestsContainer {
@@ -9,6 +16,7 @@ export class RequestsContainer {
     private readonly bandwidthCalculators: BandwidthCalculators,
     private readonly playback: Playback,
     private readonly settings: Settings,
+    private readonly eventEmmiter: EventEmitter<CoreEventMap>,
   ) {}
 
   get executingHttpCount() {
@@ -40,6 +48,7 @@ export class RequestsContainer {
         this.bandwidthCalculators,
         this.playback,
         this.settings,
+        this.eventEmmiter,
       );
       this.requests.set(segment, request);
     }
