@@ -1,5 +1,6 @@
 import debug from "debug";
-import { BandwidthCalculators, Playback, Segment } from "../types";
+import { Segment } from "../types";
+import { BandwidthCalculators, Playback } from "../internal-types";
 import * as LoggerUtils from "../utils/logger";
 import * as StreamUtils from "../utils/stream";
 import * as Utils from "../utils/utils";

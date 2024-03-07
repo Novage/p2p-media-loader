@@ -1,4 +1,3 @@
-import { BandwidthCalculator } from "./bandwidth-calculator";
 import { RequestAttempt } from "./requests/request";
 
 export type StreamType = "main" | "secondary";
@@ -64,19 +63,4 @@ export type Settings = {
 
 export type CoreEventMap = {
   onSegmentLoaded: (byteLength: number, type: RequestAttempt["type"]) => void;
-};
-
-export type Playback = {
-  position: number;
-  rate: number;
-};
-
-export type BandwidthCalculators = Readonly<{
-  all: BandwidthCalculator;
-  http: BandwidthCalculator;
-}>;
-
-export type StreamDetails = {
-  isLive: boolean;
-  activeLevelBitrate: number;
 };

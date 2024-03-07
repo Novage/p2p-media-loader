@@ -1,4 +1,5 @@
-import { Segment, Settings, Playback, BandwidthCalculators } from "../types";
+import { Segment, Settings } from "../types";
+import { Playback, BandwidthCalculators } from "../internal-types";
 import { Request } from "./request";
 
 export class RequestsContainer {

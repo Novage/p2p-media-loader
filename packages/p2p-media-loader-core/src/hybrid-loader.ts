@@ -1,13 +1,12 @@
 import { Segment, StreamWithSegments } from "./index";
 import { HttpRequestExecutor } from "./http-loader";
 import { SegmentsMemoryStorage } from "./segments-storage";
+import { Settings, CoreEventMap } from "./types";
 import {
-  Settings,
   Playback,
   BandwidthCalculators,
   StreamDetails,
-  CoreEventMap,
-} from "./types";
+} from "./internal-types";
 import { P2PLoadersContainer } from "./p2p/loaders-container";
 import { RequestsContainer } from "./requests/request-container";
 import { EngineRequest, EngineCallbacks } from "./requests/engine-request";

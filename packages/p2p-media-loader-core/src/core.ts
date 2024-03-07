@@ -5,10 +5,9 @@ import {
   Segment,
   Settings,
   SegmentBase,
-  BandwidthCalculators,
-  StreamDetails,
   CoreEventMap,
 } from "./types";
+import { BandwidthCalculators, StreamDetails } from "./internal-types";
 import * as StreamUtils from "./utils/stream";
 import { BandwidthCalculator } from "./bandwidth-calculator";
 import { EngineCallbacks } from "./requests/engine-request";
