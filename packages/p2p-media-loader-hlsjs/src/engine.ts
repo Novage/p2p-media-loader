@@ -12,16 +12,13 @@ import { PlaylistLoaderBase } from "./playlist-loader";
 import { SegmentManager } from "./segment-mananger";
 import { Config, Core, CoreEventMap } from "p2p-media-loader-core";
 
-export type HlsEngineConfig = {
-  hlsjsConfig: Partial<HlsConfig>;
-} & Config;
 export class Engine {
   private readonly core: Core;
   private readonly segmentManager: SegmentManager;
   private hlsInstanceGetter?: () => Hls;
   private currentHlsInstance?: Hls;
 
-  constructor(config: HlsEngineConfig) {
+  constructor(config: Config) {
     this.core = new Core(config);
     this.segmentManager = new SegmentManager(this.core);
   }
