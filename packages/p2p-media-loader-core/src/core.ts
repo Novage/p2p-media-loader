@@ -48,7 +48,11 @@ export class Core<TStream extends Stream = Stream> {
   };
 
   constructor(config: Config) {
-    Object.assign(this.settings, config.coreSettings);
+    this.applyConfig(config.coreSettings);
+  }
+
+  applyConfig(config: Partial<Settings>) {
+    Object.assign(this.settings, config);
   }
 
   addEventListener<K extends keyof CoreEventMap>(

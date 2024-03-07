@@ -43,6 +43,8 @@ export type Config = {
   coreSettings: Partial<
     Pick<
       Settings,
+      | "httpDownloadTimeWindow"
+      | "p2pDownloadTimeWindow"
       | "webRtcMaxMessageSize"
       | "p2pNotReceivingBytesTimeoutMs"
       | "httpNotReceivingBytesTimeoutMs"

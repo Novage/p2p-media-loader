@@ -10,7 +10,7 @@ import type { HlsConfig, Events } from "hls.js";
 import { FragmentLoaderBase } from "./fragment-loader";
 import { PlaylistLoaderBase } from "./playlist-loader";
 import { SegmentManager } from "./segment-mananger";
-import { Config, Core, CoreEventMap } from "p2p-media-loader-core";
+import { Config, Core, CoreEventMap, Settings } from "p2p-media-loader-core";
 
 export class Engine {
   private readonly core: Core;
@@ -42,6 +42,20 @@ export class Engine {
       fLoader: this.createFragmentLoaderClass(),
       pLoader: this.createPlaylistLoaderClass(),
     };
+  }
+
+  public applyConfig(
+    values: Partial<
+      Pick<
+        Settings,
+        | "httpDownloadTimeWindow"
+        | "p2pDownloadTimeWindow"
+        | "p2pNotReceivingBytesTimeoutMs"
+        | "httpNotReceivingBytesTimeoutMs"
+      >
+    >,
+  ) {
+    this.core.applyConfig(values);
   }
 
   setHls(hls: Hls | (() => Hls)) {
