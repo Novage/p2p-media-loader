@@ -19,11 +19,11 @@ const LIVE_EDGE_DELAY = 25;
 
 export type ShakaEngineConfig = {
   ShakaConfig: {
-    Streaming: {
+    Streaming?: {
       useNativeHlsOnSafari: boolean;
     };
-    Manifest: {
-      dash: {
+    Manifest?: {
+      dash?: {
         ignoreSuggestedPresentationDelay: boolean;
       };
       defaultPresentationDelay: number;
@@ -57,15 +57,15 @@ export class Engine {
     this.player = player;
     this.player.configure(
       "manifest.defaultPresentationDelay",
-      shakaConfig.Manifest.defaultPresentationDelay ?? LIVE_EDGE_DELAY,
+      shakaConfig.Manifest?.defaultPresentationDelay ?? LIVE_EDGE_DELAY,
     );
     this.player.configure(
       "manifest.dash.ignoreSuggestedPresentationDelay",
-      shakaConfig.Manifest.dash.ignoreSuggestedPresentationDelay ?? true,
+      shakaConfig.Manifest?.dash?.ignoreSuggestedPresentationDelay ?? true,
     );
     this.player.configure(
       "streaming.useNativeHlsOnSafari",
-      shakaConfig.Streaming.useNativeHlsOnSafari ?? true,
+      shakaConfig.Streaming?.useNativeHlsOnSafari ?? true,
     );
 
     this.updatePlayerEventHandlers("register");

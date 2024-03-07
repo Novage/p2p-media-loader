@@ -98,13 +98,28 @@ function App() {
   };
 
   if (!hlsEngine.current) {
-    hlsEngine.current = new HlsJsEngine();
+    hlsEngine.current = new HlsJsEngine({
+      coreSettings: {},
+    });
     hlsEngine.current.addEventListener("onSegmentLoaded", onSegmentLoaded);
   }
 
   if (!shakaEngine.current) {
     ShakaEngine.setGlobalSettings();
-    shakaEngine.current = new ShakaEngine(window.shaka);
+    shakaEngine.current = new ShakaEngine(window.shaka, {
+      coreSettings: {},
+      ShakaConfig: {
+        Streaming: {
+          useNativeHlsOnSafari: true,
+        },
+        Manifest: {
+          dash: {
+            ignoreSuggestedPresentationDelay: true,
+          },
+          defaultPresentationDelay: 25,
+        },
+      },
+    });
     shakaEngine.current.addEventListener("onSegmentLoaded", onSegmentLoaded);
   }
 
