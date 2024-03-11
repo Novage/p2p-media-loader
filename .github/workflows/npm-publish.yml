@@ -1,0 +1,49 @@
+name: NPM Publish
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package:
+          - p2p-media-loader-core
+          - p2p-media-loader-hlsjs
+          - p2p-media-loader-shaka
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          registry-url: "https://registry.npmjs.org/"
+
+      - name: Install pnpm
+        run: npm install pnpm -g
+
+      - name: Install Dependencies
+        run: pnpm install
+        working-directory: ./
+
+      - name: Build
+        run: pnpm run build
+        working-directory: ./
+
+      - name: Pack Packages
+        run: pnpm run pack-packages
+        working-directory: ./
+
+      - name: Get package version
+        id: get_version
+        run: echo "PACKAGE_VERSION=$(jq -r '.version' ./packages/${{ matrix.package }}/package.json)" >> $GITHUB_ENV
+        working-directory: ./
+
+      - name: Publish Package
+        run: pnpm publish ./packages/${{ matrix.package }}-${{ env.PACKAGE_VERSION }}.tgz
+        working-directory: ./packages/${{ matrix.package }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
