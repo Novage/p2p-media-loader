@@ -87,7 +87,7 @@ function App() {
   const shakaEngine = useRef<ShakaEngine>();
 
   const onSegmentLoaded = (params: SegmentLoadDetails) => {
-    const { bytesLength, downloadSource, peerId } = params;
+    const { bytesLength, downloadSource } = params;
     const MBytes = getMBFromBytes(bytesLength);
     if (downloadSource === "http") {
       setHttpLoaded((prev) => round(prev + MBytes));
