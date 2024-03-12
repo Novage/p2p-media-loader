@@ -1,5 +1,4 @@
 import { BandwidthCalculator } from "./bandwidth-calculator";
-import { RequestAttempt } from "./requests/request";
 
 export type StreamType = "main" | "secondary";
 
@@ -78,7 +77,7 @@ export interface SegmentAbortDetails
 }
 
 export interface SegmentLoadDetails {
-  byteLength: number;
+  bytesLength: number;
   downloadSource: "p2p" | "http";
 }
 
@@ -90,11 +89,11 @@ export type CoreEventMap = {
   onPeerConnect: (peerId: string) => void;
   onPeerClose: (peerId: string) => void;
   onChunkDownloaded: (
-    chunk: Uint8Array,
-    type: RequestAttempt["type"],
+    bytesLength: number,
+    type: "http" | "p2p",
     peerId?: string,
   ) => void;
-  onChunkUploaded: (chunk: ArrayBuffer, peerId: string) => void;
+  onChunkUploaded: (bytesLength: number, peerId: string) => void;
 };
 
 export type Playback = {

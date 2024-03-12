@@ -96,7 +96,7 @@ export class HttpRequestExecutor {
       const reader = response.body.getReader();
       for await (const chunk of readStream(reader)) {
         this.requestControls.addLoadedChunk(chunk);
-        this.onChunkDownloaded(chunk, "http");
+        this.onChunkDownloaded(chunk.byteLength, "http");
       }
       requestControls.completeOnSuccess();
     } catch (error) {
