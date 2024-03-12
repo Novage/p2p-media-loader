@@ -173,7 +173,10 @@ export class HybridLoader {
           }
           this.requests.remove(request);
           void this.segmentStorage.storeSegment(request.segment, request.data);
-          this.onSegmentLoaded(request.data.byteLength, type);
+          this.onSegmentLoaded({
+            byteLength: request.data.byteLength,
+            downloadSource: type,
+          });
           break;
 
         case "failed":

@@ -62,29 +62,32 @@ export type Settings = {
   ) => Promise<Request | undefined | null>;
 };
 
-interface OnSegmentErrorParams {
+export interface SegmentEventDetails {
   segment: Segment;
-  loadedBytes: number | undefined;
-  error: RequestError;
-  requestId: string;
-  requestSource: RequestAttempt["type"];
+  downloadSource: "p2p" | "http";
   peerId: string | undefined;
 }
 
-interface SegmenEventParams {
-  segment: Segment;
-  loadedBytes: number | undefined;
-  requestId: string;
-  requestSource: RequestAttempt["type"] | undefined;
-  peerId: string | undefined;
+export interface SegmentErrorDetails extends SegmentEventDetails {
+  error: RequestError;
+}
+
+export interface SegmentAbortDetails
+  extends Pick<SegmentEventDetails, "segment" | "peerId"> {
+  downloadSource: "p2p" | "http" | undefined;
+}
+
+export interface SegmentLoadDetails {
+  byteLength: number;
+  downloadSource: "p2p" | "http";
 }
 
 export type CoreEventMap = {
-  onSegmentLoaded: (byteLength: number, type: RequestAttempt["type"]) => void;
-  onSegmentError: (params: OnSegmentErrorParams) => void;
-  onSegmentAbort: (params: SegmenEventParams) => void;
-  onSegmentStart: (params: SegmenEventParams) => void;
-  onPeerConnect: (peer: Peer) => void;
+  onSegmentLoaded: (params: SegmentLoadDetails) => void;
+  onSegmentError: (params: SegmentErrorDetails) => void;
+  onSegmentAbort: (params: SegmentAbortDetails) => void;
+  onSegmentStart: (params: SegmentEventDetails) => void;
+  onPeerConnect: (peerId: string) => void;
   onPeerClose: (peerId: string) => void;
   onChunkDownloaded: (
     chunk: Uint8Array,
@@ -108,3 +111,36 @@ export type StreamDetails = {
   isLive: boolean;
   activeLevelBitrate: number;
 };
+
+export type RequestInnerErrorType = "abort" | "bytes-receiving-timeout";
+
+export type HttpRequestErrorType =
+  | "http-error"
+  | "http-bytes-mismatch"
+  | "http-unexpected-status-code";
+
+export type PeerRequestErrorType =
+  | "peer-response-bytes-length-mismatch"
+  | "peer-protocol-violation"
+  | "peer-segment-absent"
+  | "peer-closed"
+  | "p2p-segment-validation-failed";
+
+export type RequestErrorType =
+  | RequestInnerErrorType
+  | PeerRequestErrorType
+  | HttpRequestErrorType;
+
+class RequestError<
+  T extends RequestErrorType = RequestErrorType,
+> extends Error {
+  readonly timestamp: number;
+
+  constructor(
+    readonly type: T,
+    message?: string,
+  ) {
+    super(message);
+    this.timestamp = performance.now();
+  }
+}

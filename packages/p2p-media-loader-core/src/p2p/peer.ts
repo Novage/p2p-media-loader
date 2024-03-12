@@ -45,7 +45,6 @@ export class Peer {
     private readonly settings: PeerSettings,
     eventEmmiter: EventEmitter<CoreEventMap>,
   ) {
-    eventEmmiter.getEventDispatcher("onPeerConnect")(this);
     this.onPeerClosed = eventEmmiter.getEventDispatcher("onPeerClose");
 
     this.id = Peer.getPeerIdFromConnection(connection);
@@ -59,7 +58,7 @@ export class Peer {
       },
       eventEmmiter,
     );
-
+    eventEmmiter.getEventDispatcher("onPeerConnect")(this.id);
     connection.on("close", this.onPeerConnectionClosed);
     connection.on("error", this.onConnectionError);
   }

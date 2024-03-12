@@ -194,9 +194,7 @@ export class Request {
 
     this.onSegmentStart({
       segment: this.segment,
-      loadedBytes: this.loadedBytes,
-      requestId: this.id,
-      requestSource: requestData.type,
+      downloadSource: requestData.type,
       peerId: requestData.type === "p2p" ? requestData.peerId : undefined,
     });
 
@@ -217,9 +215,7 @@ export class Request {
     this._abortRequestCallback?.(new RequestError("abort"));
     this.onSegmentAbort({
       segment: this.segment,
-      loadedBytes: this.loadedBytes,
-      requestId: this.id,
-      requestSource: this.currentAttempt?.type,
+      downloadSource: this.currentAttempt?.type,
       peerId:
         this.currentAttempt?.type === "p2p"
           ? this.currentAttempt.peerId
@@ -245,9 +241,7 @@ export class Request {
     this.onSegmentError({
       segment: this.segment,
       error,
-      loadedBytes: this.loadedBytes,
-      requestSource: this.currentAttempt.type,
-      requestId: this.id,
+      downloadSource: this.currentAttempt.type,
       peerId:
         this.currentAttempt.type === "p2p"
           ? this.currentAttempt.peerId
@@ -270,10 +264,8 @@ export class Request {
     });
     this.onSegmentError({
       segment: this.segment,
-      loadedBytes: this.loadedBytes,
       error,
-      requestId: this.id,
-      requestSource: this.currentAttempt.type,
+      downloadSource: this.currentAttempt.type,
       peerId:
         this.currentAttempt.type === "p2p"
           ? this.currentAttempt.peerId

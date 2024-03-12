@@ -3,7 +3,7 @@ import { Engine as HlsJsEngine } from "p2p-media-loader-hlsjs";
 import { Engine as ShakaEngine } from "p2p-media-loader-shaka";
 import DPlayer from "dplayer";
 import muxjs from "mux.js";
-import { debug } from "p2p-media-loader-core";
+import { SegmentLoadDetails, debug } from "p2p-media-loader-core";
 import type Hls from "hls.js";
 
 declare global {
@@ -86,12 +86,13 @@ function App() {
   const hlsEngine = useRef<HlsJsEngine>();
   const shakaEngine = useRef<ShakaEngine>();
 
-  const onSegmentLoaded = (byteLength: number, type: "http" | "p2p") => {
+  const onSegmentLoaded = (params: SegmentLoadDetails) => {
+    const { byteLength, downloadSource } = params;
     const MBytes = getMBFromBytes(byteLength);
-    if (type === "http") {
+    if (downloadSource === "http") {
       setHttpLoaded((prev) => round(prev + MBytes));
       setHttpLoadedGlob((prev) => round(prev + MBytes));
-    } else if (type === "p2p") {
+    } else if (downloadSource === "p2p") {
       setP2PLoaded((prev) => round(prev + MBytes));
       setP2PLoadedGlob((prev) => round(prev + MBytes));
     }
