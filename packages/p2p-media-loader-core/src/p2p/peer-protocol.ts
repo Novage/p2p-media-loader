@@ -38,7 +38,8 @@ export class PeerProtocol {
       this.receivingCommandBytes(data);
     } else {
       this.eventHandlers.onSegmentChunkReceived(data);
-      this.onChunkDownloaded(data.length, "p2p", this.connection.id);
+
+      this.onChunkDownloaded(data.length, "p2p", this.connection.idUtf8);
     }
   };
 
@@ -84,7 +85,7 @@ export class PeerProtocol {
           break;
         }
         this.connection.send(chunk);
-        this.onChunkUploaded(chunk.byteLength, this.connection.id);
+        this.onChunkUploaded(chunk.byteLength, this.connection.idUtf8);
       }
     };
     try {

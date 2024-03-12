@@ -91,6 +91,7 @@ export class P2PTrackerClient {
       return;
     } else if (!peerItem) {
       peerItem = { potentialConnections: new Set() };
+      peerConnection.idUtf8 = itemId;
       peerItem.potentialConnections.add(peerConnection);
       this._peers.set(itemId, peerItem);
     }
