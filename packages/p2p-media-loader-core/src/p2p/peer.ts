@@ -192,7 +192,7 @@ export class Peer {
       request: segmentRequest,
       isSegmentDataCommandReceived: false,
       controls: segmentRequest.start(
-        { type: "p2p", peerId: this.id },
+        { downloadSource: "p2p", peerId: this.id },
         {
           notReceivingBytesTimeoutMs:
             this.settings.p2pNotReceivingBytesTimeoutMs,

@@ -142,7 +142,12 @@ export class HybridLoader {
     const { httpErrorRetries } = this.settings;
     const now = performance.now();
     for (const request of this.requests.items()) {
-      const { type, status, segment, isHandledByProcessQueue } = request;
+      const {
+        downloadSource: type,
+        status,
+        segment,
+        isHandledByProcessQueue,
+      } = request;
       const engineRequest =
         this.engineRequest?.segment === segment
           ? this.engineRequest
@@ -242,9 +247,14 @@ export class HybridLoader {
       const request = this.requests.get(segment);
 
       if (statuses.isHighDemand) {
-        if (request?.type === "http" && request.status === "loading") continue;
         if (
-          request?.type === "http" &&
+          request?.downloadSource === "http" &&
+          request.status === "loading"
+        ) {
+          continue;
+        }
+        if (
+          request?.downloadSource === "http" &&
           request.status === "failed" &&
           request.failedAttempts.httpAttemptsCount >= httpErrorRetries
         ) {
@@ -252,7 +262,7 @@ export class HybridLoader {
         }
 
         const isP2PLoadingRequest =
-          request?.status === "loading" && request.type === "p2p";
+          request?.status === "loading" && request.downloadSource === "p2p";
 
         if (this.requests.executingHttpCount < simultaneousHttpDownloads) {
           if (isP2PLoadingRequest) request.abortFromProcessQueue();
@@ -376,7 +386,7 @@ export class HybridLoader {
     for (const { segment: itemSegment } of Utils.arrayBackwards(queue)) {
       if (itemSegment === segment) break;
       const request = this.requests.get(itemSegment);
-      if (request?.type === "http" && request.status === "loading") {
+      if (request?.downloadSource === "http" && request.status === "loading") {
         request.abortFromProcessQueue();
         return true;
       }
@@ -391,7 +401,7 @@ export class HybridLoader {
     for (const { segment: itemSegment } of Utils.arrayBackwards(queue)) {
       if (itemSegment === segment) break;
       const request = this.requests.get(itemSegment);
-      if (request?.type === "p2p" && request.status === "loading") {
+      if (request?.downloadSource === "p2p" && request.status === "loading") {
         request.abortFromProcessQueue();
         return true;
       }

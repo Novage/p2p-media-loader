@@ -65,13 +65,13 @@ export class RequestsContainer {
 
   *httpRequests(): Generator<Request, void> {
     for (const request of this.requests.values()) {
-      if (request.type === "http") yield request;
+      if (request.downloadSource === "http") yield request;
     }
   }
 
   *p2pRequests(): Generator<Request, void> {
     for (const request of this.requests.values()) {
-      if (request.type === "p2p") yield request;
+      if (request.downloadSource === "p2p") yield request;
     }
   }
 

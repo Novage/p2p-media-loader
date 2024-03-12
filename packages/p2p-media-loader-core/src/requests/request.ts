@@ -20,12 +20,12 @@ export type LoadProgress = {
 };
 
 type HttpRequestAttempt = {
-  type: "http";
+  downloadSource: "http";
   error?: RequestError;
 };
 
 type P2PRequestAttempt = {
-  type: "p2p";
+  downloadSource: "p2p";
   peerId: string;
   error?: RequestError;
 };
@@ -115,8 +115,8 @@ export class Request {
     this._isHandledByProcessQueue = false;
   }
 
-  get type() {
-    return this.currentAttempt?.type;
+  get downloadSource() {
+    return this.currentAttempt?.downloadSource;
   }
 
   get loadedBytes() {
@@ -193,13 +193,14 @@ export class Request {
     );
     const statusString = LoggerUtils.getSegmentPlaybackStatusesString(statuses);
     this.logger(
-      `${requestData.type} ${this.segment.externalId} ${statusString} started`,
+      `${requestData.downloadSource} ${this.segment.externalId} ${statusString} started`,
     );
 
     this.onSegmentStart({
       segment: this.segment,
-      downloadSource: requestData.type,
-      peerId: requestData.type === "p2p" ? requestData.peerId : undefined,
+      downloadSource: requestData.downloadSource,
+      peerId:
+        requestData.downloadSource === "p2p" ? requestData.peerId : undefined,
     });
 
     return {
@@ -214,14 +215,14 @@ export class Request {
     this.throwErrorIfNotLoadingStatus();
     this.setStatus("aborted");
     this.logger(
-      `${this.currentAttempt?.type} ${this.segment.externalId} aborted`,
+      `${this.currentAttempt?.downloadSource} ${this.segment.externalId} aborted`,
     );
     this._abortRequestCallback?.(new RequestError("abort"));
     this.onSegmentAbort({
       segment: this.segment,
-      downloadSource: this.currentAttempt?.type,
+      downloadSource: this.currentAttempt?.downloadSource,
       peerId:
-        this.currentAttempt?.type === "p2p"
+        this.currentAttempt?.downloadSource === "p2p"
           ? this.currentAttempt.peerId
           : undefined,
     });
@@ -237,7 +238,9 @@ export class Request {
     this.setStatus("failed");
     const error = new RequestError("bytes-receiving-timeout");
     this._abortRequestCallback?.(error);
-    this.logger(`${this.type} ${this.segment.externalId} failed ${error.type}`);
+    this.logger(
+      `${this.downloadSource} ${this.segment.externalId} failed ${error.type}`,
+    );
     this._failedAttempts.add({
       ...this.currentAttempt,
       error,
@@ -245,9 +248,9 @@ export class Request {
     this.onSegmentError({
       segment: this.segment,
       error,
-      downloadSource: this.currentAttempt.type,
+      downloadSource: this.currentAttempt.downloadSource,
       peerId:
-        this.currentAttempt.type === "p2p"
+        this.currentAttempt.downloadSource === "p2p"
           ? this.currentAttempt.peerId
           : undefined,
     });
@@ -261,7 +264,9 @@ export class Request {
     if (!this.currentAttempt) return;
 
     this.setStatus("failed");
-    this.logger(`${this.type} ${this.segment.externalId} failed ${error.type}`);
+    this.logger(
+      `${this.downloadSource} ${this.segment.externalId} failed ${error.type}`,
+    );
     this._failedAttempts.add({
       ...this.currentAttempt,
       error,
@@ -269,9 +274,9 @@ export class Request {
     this.onSegmentError({
       segment: this.segment,
       error,
-      downloadSource: this.currentAttempt.type,
+      downloadSource: this.currentAttempt.downloadSource,
       peerId:
-        this.currentAttempt.type === "p2p"
+        this.currentAttempt.downloadSource === "p2p"
           ? this.currentAttempt.peerId
           : undefined,
     });
@@ -291,15 +296,15 @@ export class Request {
     this._totalBytes = this._loadedBytes;
     this.onSegmentLoaded({
       bytesLength: this.finalData.byteLength,
-      downloadSource: this.currentAttempt.type,
+      downloadSource: this.currentAttempt.downloadSource,
       peerId:
-        this.currentAttempt.type === "p2p"
+        this.currentAttempt.downloadSource === "p2p"
           ? this.currentAttempt.peerId
           : undefined,
     });
 
     this.logger(
-      `${this.currentAttempt.type} ${this.segment.externalId} succeed`,
+      `${this.currentAttempt.downloadSource} ${this.segment.externalId} succeed`,
     );
     this.requestProcessQueueCallback();
   };
@@ -312,7 +317,9 @@ export class Request {
     const byteLength = chunk.byteLength;
     const { all: allBC, http: httpBC } = this.bandwidthCalculators;
     allBC.addBytes(byteLength);
-    if (this.currentAttempt.type === "http") httpBC.addBytes(byteLength);
+    if (this.currentAttempt.downloadSource === "http") {
+      httpBC.addBytes(byteLength);
+    }
 
     this.bytes.push(chunk);
     this.progress.lastLoadedChunkTimestamp = performance.now();
@@ -332,7 +339,8 @@ export class Request {
   }
 
   private logger(message: string) {
-    this._logger.color = this.currentAttempt?.type === "http" ? "green" : "red";
+    this._logger.color =
+      this.currentAttempt?.downloadSource === "http" ? "green" : "red";
     this._logger(message);
     this._logger.color = "";
   }
@@ -340,7 +348,7 @@ export class Request {
   private manageBandwidthCalculatorsState(state: "start" | "stop") {
     const { all, http } = this.bandwidthCalculators;
     const method = state === "start" ? "startLoading" : "stopLoading";
-    if (this.currentAttempt?.type === "http") http[method]();
+    if (this.currentAttempt?.downloadSource === "http") http[method]();
     all[method]();
   }
 
@@ -358,7 +366,7 @@ class FailedRequestAttempts {
 
   get httpAttemptsCount() {
     return this.attempts.reduce(
-      (sum, attempt) => (attempt.type === "http" ? sum + 1 : sum),
+      (sum, attempt) => (attempt.downloadSource === "http" ? sum + 1 : sum),
       0,
     );
   }

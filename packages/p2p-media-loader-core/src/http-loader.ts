@@ -38,7 +38,7 @@ export class HttpRequestExecutor {
 
     const { httpNotReceivingBytesTimeoutMs } = this.settings;
     this.requestControls = this.request.start(
-      { type: "http" },
+      { downloadSource: "http" },
       {
         abort: () => this.abortController.abort("abort"),
         notReceivingBytesTimeoutMs: httpNotReceivingBytesTimeoutMs,
