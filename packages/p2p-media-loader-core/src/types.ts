@@ -61,15 +61,17 @@ export type Settings = {
   ) => Promise<Request | undefined | null>;
 };
 
+export type DownloadSource = "http" | "p2p";
+
 /**
  * Represents details about a segment event, including the segment itself, the source of download, and an optional peer ID.
  * @param {Segment} segment - The segment that the event is about.
- * @param {"p2p" | "http"} downloadSource - The source of the download, either "p2p" or "http".
+ * @param {DownloadSource} downloadSource - The source of the download, either "p2p" or "http".
  * @param {string | undefined} peerId - The peer ID of the peer that the event is about, if applicable.
  */
 export interface SegmentEventDetails {
   segment: Segment;
-  downloadSource: "p2p" | "http";
+  downloadSource: DownloadSource;
   peerId: string | undefined;
 }
 
@@ -77,7 +79,7 @@ export interface SegmentEventDetails {
  * Represents details about a segment error event with an error property to provide details about a segment download error.
  * @param {RequestError} error - The error that occurred during the segment download.
  * @param {Segment} segment - The segment that the event is about.
- * @param {"p2p" | "http"} downloadSource - The source of the download, either "p2p" or "http".
+ * @param {DownloadSource} downloadSource - The source of the download, either "p2p" or "http".
  * @param {string | undefined} peerId - The peer ID of the peer that the event is about, if applicable.
  */
 export interface SegmentErrorDetails extends SegmentEventDetails {
@@ -87,22 +89,22 @@ export interface SegmentErrorDetails extends SegmentEventDetails {
 /**
  * Represents details about a segment abort event, including the segment, the source of download, and an optional peer ID.
  * @param {Segment} segment - The segment that the event is about.
- * @param {"p2p" | "http"} downloadSource - The source of the download: "p2p" | "http" | undefined.
+ * @param {DownloadSource | undefined} downloadSource - The source of the download: "p2p" | "http" | undefined.
  * @param {string | undefined} peerId - The peer ID of the peer that the event is about, if applicable.
  */
 export interface SegmentAbortDetails
   extends Pick<SegmentEventDetails, "segment" | "peerId"> {
-  downloadSource: "p2p" | "http" | undefined;
+  downloadSource: DownloadSource | undefined;
 }
 
 /**
  * Represents the details about a loaded segment, including the length in bytes and the source of the download.
  * @param {number} bytesLength - The length of the segment in bytes.
- * @param {"p2p" | "http"} downloadSource - The source of the download, either "p2p" or "http".
+ * @param {DownloadSource} downloadSource - The source of the download, either "p2p" or "http".
  */
 export interface SegmentLoadDetails {
   bytesLength: number;
-  downloadSource: "p2p" | "http";
+  downloadSource: DownloadSource;
 }
 
 /**
@@ -175,13 +177,13 @@ export type CoreEventMap = {
    * the source of the chunk.
    *
    * @param {number} bytesLength - The size of the downloaded chunk in bytes, offering a measure of the download progress.
-   * @param {"http" | "p2p"} type - Indicates whether the chunk was downloaded via HTTP or peer-to-peer, which can inform
+   * @param {DownloadSource} type - Indicates whether the chunk was downloaded via HTTP or peer-to-peer, which can inform
    * decisions about network usage or peer selection.
    * @param {string} [peerId] - Optionally identifies the peer from which the chunk was downloaded, relevant for p2p downloads.
    */
   onChunkDownloaded: (
     bytesLength: number,
-    type: "http" | "p2p",
+    type: DownloadSource,
     peerId?: string,
   ) => void;
 
