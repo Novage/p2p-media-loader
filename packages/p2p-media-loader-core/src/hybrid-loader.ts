@@ -33,7 +33,6 @@ export class HybridLoader {
   private lastQueueProcessingTimeStamp?: number;
   private randomHttpDownloadInterval?: number;
   private isProcessQueueMicrotaskCreated = false;
-  private readonly onSegmentLoaded: CoreEventMap["onSegmentLoaded"];
 
   constructor(
     private streamManifestUrl: string,
@@ -54,8 +53,6 @@ export class HybridLoader {
       this.settings,
       this.eventEmitter,
     );
-
-    this.onSegmentLoaded = eventEmitter.getEventDispatcher("onSegmentLoaded");
 
     if (!this.segmentStorage.isInitialized) {
       throw new Error("Segment storage is not initialized.");
@@ -173,10 +170,6 @@ export class HybridLoader {
           }
           this.requests.remove(request);
           void this.segmentStorage.storeSegment(request.segment, request.data);
-          this.onSegmentLoaded({
-            bytesLength: request.data.byteLength,
-            downloadSource: type,
-          });
           break;
 
         case "failed":

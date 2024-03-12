@@ -73,6 +73,7 @@ export class Request {
   private readonly onSegmentError: CoreEventMap["onSegmentError"];
   private readonly onSegmentAbort: CoreEventMap["onSegmentAbort"];
   private readonly onSegmentStart: CoreEventMap["onSegmentStart"];
+  private readonly onSegmentLoaded: CoreEventMap["onSegmentLoaded"];
 
   constructor(
     readonly segment: Segment,
@@ -85,6 +86,7 @@ export class Request {
     this.onSegmentError = eventEmitter.getEventDispatcher("onSegmentError");
     this.onSegmentAbort = eventEmitter.getEventDispatcher("onSegmentAbort");
     this.onSegmentStart = eventEmitter.getEventDispatcher("onSegmentStart");
+    this.onSegmentLoaded = eventEmitter.getEventDispatcher("onSegmentLoaded");
 
     this.id = Request.getRequestItemId(this.segment);
     const { byteRange } = this.segment;
@@ -287,6 +289,14 @@ export class Request {
     this.finalData = Utils.joinChunks(this.bytes);
     this.setStatus("succeed");
     this._totalBytes = this._loadedBytes;
+    this.onSegmentLoaded({
+      bytesLength: this.finalData.byteLength,
+      downloadSource: this.currentAttempt.type,
+      peerId:
+        this.currentAttempt.type === "p2p"
+          ? this.currentAttempt.peerId
+          : undefined,
+    });
 
     this.logger(
       `${this.currentAttempt.type} ${this.segment.externalId} succeed`,

@@ -109,6 +109,7 @@ export interface SegmentAbortDetails {
 export interface SegmentLoadDetails {
   bytesLength: number;
   downloadSource: DownloadSource;
+  peerId: string | undefined;
 }
 
 /**
