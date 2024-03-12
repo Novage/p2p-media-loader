@@ -183,7 +183,7 @@ export type CoreEventMap = {
    */
   onChunkDownloaded: (
     bytesLength: number,
-    type: DownloadSource,
+    downloadSource: DownloadSource,
     peerId?: string,
   ) => void;
 
