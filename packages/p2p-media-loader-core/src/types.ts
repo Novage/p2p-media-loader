@@ -82,8 +82,11 @@ export interface SegmentEventDetails {
  * @param {DownloadSource} downloadSource - The source of the download.
  * @param {string | undefined} peerId - The peer ID of the peer that the event is about, if applicable.
  */
-export interface SegmentErrorDetails extends SegmentEventDetails {
+export interface SegmentErrorDetails {
   error: RequestError;
+  segment: Segment;
+  downloadSource: DownloadSource;
+  peerId: string | undefined;
 }
 
 /**
@@ -92,9 +95,10 @@ export interface SegmentErrorDetails extends SegmentEventDetails {
  * @param {DownloadSource | undefined} downloadSource - The source of the download.
  * @param {string | undefined} peerId - The peer ID of the peer that the event is about, if applicable.
  */
-export interface SegmentAbortDetails
-  extends Pick<SegmentEventDetails, "segment" | "peerId"> {
+export interface SegmentAbortDetails {
+  segment: Segment;
   downloadSource: DownloadSource | undefined;
+  peerId: string | undefined;
 }
 
 /**
