@@ -1,10 +1,6 @@
 import { CoreEventMap, Settings } from "./types";
-import {
-  Request as SegmentRequest,
-  RequestError,
-  HttpRequestErrorType,
-  RequestControls,
-} from "./requests/request";
+import { Request as SegmentRequest, RequestControls } from "./requests/request";
+import { RequestError, HttpRequestErrorType } from "./types";
 import { EventEmitter } from "./utils/event-emitter";
 
 type HttpSettings = Pick<
@@ -108,9 +104,12 @@ export class HttpRequestExecutor {
     if (!response.ok) {
       if (response.status === 406) {
         this.request.clearLoadedBytes();
-        throw new RequestError("http-bytes-mismatch", response.statusText);
+        throw new RequestError<"http-bytes-mismatch">(
+          "http-bytes-mismatch",
+          response.statusText,
+        );
       } else {
-        throw new RequestError("http-error", response.statusText);
+        throw new RequestError<"http-error">("http-error", response.statusText);
       }
     }
 

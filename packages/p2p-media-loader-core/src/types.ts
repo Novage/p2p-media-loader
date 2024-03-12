@@ -130,7 +130,7 @@ export type RequestErrorType =
   | PeerRequestErrorType
   | HttpRequestErrorType;
 
-class RequestError<
+export class RequestError<
   T extends RequestErrorType = RequestErrorType,
 > extends Error {
   readonly timestamp: number;

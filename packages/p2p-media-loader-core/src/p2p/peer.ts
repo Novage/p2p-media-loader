@@ -1,13 +1,13 @@
 import { PeerConnection } from "bittorrent-tracker";
 import debug from "debug";
+import { Request, RequestControls } from "../requests/request";
 import {
+  CoreEventMap,
+  Segment,
   PeerRequestErrorType,
-  Request,
-  RequestControls,
   RequestError,
   RequestInnerErrorType,
-} from "../requests/request";
-import { CoreEventMap, Segment } from "../types";
+} from "../types";
 import * as Utils from "../utils/utils";
 import * as Command from "./commands";
 import { PeerProtocol, PeerSettings } from "./peer-protocol";

@@ -3,6 +3,8 @@ import {
   BandwidthCalculators,
   CoreEventMap,
   Playback,
+  RequestError,
+  RequestInnerErrorType,
   Segment,
 } from "../types";
 import * as LoggerUtils from "../utils/logger";
@@ -357,39 +359,6 @@ class FailedRequestAttempts {
 
   clear() {
     this.attempts = [];
-  }
-}
-
-export type RequestInnerErrorType = "abort" | "bytes-receiving-timeout";
-
-export type HttpRequestErrorType =
-  | "http-error"
-  | "http-bytes-mismatch"
-  | "http-unexpected-status-code";
-
-export type PeerRequestErrorType =
-  | "peer-response-bytes-length-mismatch"
-  | "peer-protocol-violation"
-  | "peer-segment-absent"
-  | "peer-closed"
-  | "p2p-segment-validation-failed";
-
-type RequestErrorType =
-  | RequestInnerErrorType
-  | PeerRequestErrorType
-  | HttpRequestErrorType;
-
-export class RequestError<
-  T extends RequestErrorType = RequestErrorType,
-> extends Error {
-  readonly timestamp: number;
-
-  constructor(
-    readonly type: T,
-    message?: string,
-  ) {
-    super(message);
-    this.timestamp = performance.now();
   }
 }
 
