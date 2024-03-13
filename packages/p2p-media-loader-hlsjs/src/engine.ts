@@ -44,8 +44,8 @@ export class Engine {
     };
   }
 
-  public applyConfig(
-    values: Partial<
+  public applyDynamicCoreConfig(
+    dynamicConfig: Partial<
       Pick<
         Settings,
         | "httpDownloadTimeWindow"
@@ -55,7 +55,7 @@ export class Engine {
       >
     >,
   ) {
-    this.core.applyConfig(values);
+    this.core.applyDynamicConfig(dynamicConfig);
   }
 
   setHls(hls: Hls | (() => Hls)) {

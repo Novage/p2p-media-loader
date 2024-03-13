@@ -13,7 +13,7 @@ import {
   P2PMLShakaData,
 } from "./types";
 import { Loader } from "./loading-handler";
-import { Config, Core, CoreEventMap } from "p2p-media-loader-core";
+import { Config, Core, CoreEventMap, Settings } from "p2p-media-loader-core";
 
 const LIVE_EDGE_DELAY = 25;
 
@@ -44,6 +44,20 @@ export class Engine {
     this.player.configure("streaming.useNativeHlsOnSafari", true);
 
     this.updatePlayerEventHandlers("register");
+  }
+
+  public applyDynamicCoreConfig(
+    dynamicConfig: Partial<
+      Pick<
+        Settings,
+        | "httpDownloadTimeWindow"
+        | "p2pDownloadTimeWindow"
+        | "p2pNotReceivingBytesTimeoutMs"
+        | "httpNotReceivingBytesTimeoutMs"
+      >
+    >,
+  ) {
+    this.core.applyDynamicConfig(dynamicConfig);
   }
 
   public addEventListener<K extends keyof CoreEventMap>(

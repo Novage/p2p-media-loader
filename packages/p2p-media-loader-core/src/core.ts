@@ -57,6 +57,20 @@ export class Core<TStream extends Stream = Stream> {
     deepMerge(this.settings, config);
   }
 
+  public applyDynamicConfig(
+    dynamicConfig: Partial<
+      Pick<
+        Settings,
+        | "httpDownloadTimeWindow"
+        | "p2pDownloadTimeWindow"
+        | "p2pNotReceivingBytesTimeoutMs"
+        | "httpNotReceivingBytesTimeoutMs"
+      >
+    >,
+  ) {
+    deepMerge(this.settings, dynamicConfig);
+  }
+
   addEventListener<K extends keyof CoreEventMap>(
     eventName: K,
     listener: CoreEventMap[K],
