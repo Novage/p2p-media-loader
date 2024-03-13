@@ -1,10 +1,7 @@
-import { Settings } from "./types";
-import {
-  Request as SegmentRequest,
-  RequestError,
-  HttpRequestErrorType,
-  RequestControls,
-} from "./requests/request";
+import { CoreEventMap, Settings } from "./types";
+import { Request as SegmentRequest, RequestControls } from "./requests/request";
+import { RequestError, HttpRequestErrorType } from "./types";
+import { EventEmitter } from "./utils/event-emitter";
 
 type HttpSettings = Pick<
   Settings,
@@ -16,11 +13,16 @@ export class HttpRequestExecutor {
   private readonly abortController = new AbortController();
   private readonly expectedBytesLength?: number;
   private readonly requestByteRange?: { start: number; end?: number };
+  private readonly onChunkDownloaded: CoreEventMap["onChunkDownloaded"];
 
   constructor(
     private readonly request: SegmentRequest,
     private readonly settings: HttpSettings,
+    eventEmitter: EventEmitter<CoreEventMap>,
   ) {
+    this.onChunkDownloaded =
+      eventEmitter.getEventDispatcher("onChunkDownloaded");
+
     const { byteRange } = this.request.segment;
     if (byteRange) this.requestByteRange = { ...byteRange };
 
@@ -36,7 +38,7 @@ export class HttpRequestExecutor {
 
     const { httpNotReceivingBytesTimeoutMs } = this.settings;
     this.requestControls = this.request.start(
-      { type: "http" },
+      { downloadSource: "http" },
       {
         abort: () => this.abortController.abort("abort"),
         notReceivingBytesTimeoutMs: httpNotReceivingBytesTimeoutMs,
@@ -90,6 +92,7 @@ export class HttpRequestExecutor {
       const reader = response.body.getReader();
       for await (const chunk of readStream(reader)) {
         this.requestControls.addLoadedChunk(chunk);
+        this.onChunkDownloaded(chunk.byteLength, "http");
       }
       requestControls.completeOnSuccess();
     } catch (error) {
@@ -101,9 +104,12 @@ export class HttpRequestExecutor {
     if (!response.ok) {
       if (response.status === 406) {
         this.request.clearLoadedBytes();
-        throw new RequestError("http-bytes-mismatch", response.statusText);
+        throw new RequestError<"http-bytes-mismatch">(
+          "http-bytes-mismatch",
+          response.statusText,
+        );
       } else {
-        throw new RequestError("http-error", response.statusText);
+        throw new RequestError<"http-error">("http-error", response.statusText);
       }
     }
 
