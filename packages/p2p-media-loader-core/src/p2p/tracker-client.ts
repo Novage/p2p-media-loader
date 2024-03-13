@@ -44,15 +44,14 @@ export class P2PTrackerClient {
       infoHash: streamIdBytes,
       peerId: peerIdBytes,
       port: 6881,
-      announce: [
+      announce: this.settings.announceTrackers ?? [
         // "wss://tracker.novage.com.ua",
         "wss://tracker.webtorrent.dev",
         "wss://tracker.files.fm:7073/announce",
         "wss://tracker.openwebtorrent.com",
-        ...(this.settings.announceTrackers ?? []),
       ],
       rtcConfig: {
-        iceServers: [
+        iceServers: this.settings.rtcConfig?.iceServers ?? [
           { urls: "stun:stun.l.google.com:19302" },
           { urls: "stun:global.stun.twilio.com:3478" },
         ],
