@@ -40,19 +40,13 @@ export type SegmentResponse = {
 
 export type Config = {
   coreSettings: Partial<
-    Pick<
+    Omit<
       Settings,
-      | "httpDownloadTimeWindow"
-      | "p2pDownloadTimeWindow"
-      | "webRtcMaxMessageSize"
-      | "p2pNotReceivingBytesTimeoutMs"
-      | "httpNotReceivingBytesTimeoutMs"
-      | "httpErrorRetries"
-      | "p2pErrorRetries"
-      | "validateP2PSegment"
-      | "httpRequestSetup"
-      | "rtcConfig"
-      | "announceTrackers"
+      | "highDemandTimeWindow"
+      | "simultaneousHttpDownloads"
+      | "simultaneousP2PDownloads"
+      | "cachedSegmentExpiration"
+      | "cachedSegmentsCount"
     >
   >;
 };
