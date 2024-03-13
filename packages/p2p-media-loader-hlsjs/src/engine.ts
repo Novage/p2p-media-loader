@@ -18,7 +18,7 @@ export class Engine {
   private hlsInstanceGetter?: () => Hls;
   private currentHlsInstance?: Hls;
 
-  constructor(config: Config) {
+  constructor(config?: Config) {
     this.core = new Core(config);
     this.segmentManager = new SegmentManager(this.core);
   }

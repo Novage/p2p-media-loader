@@ -39,7 +39,7 @@ export type SegmentResponse = {
 };
 
 export type Config = {
-  coreSettings: Partial<
+  core: Partial<
     Omit<
       Settings,
       | "highDemandTimeWindow"

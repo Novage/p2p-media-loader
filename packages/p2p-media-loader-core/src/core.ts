@@ -47,11 +47,12 @@ export class Core<TStream extends Stream = Stream> {
     activeLevelBitrate: 0,
   };
 
-  constructor(config: Config) {
-    this.applyConfig(config.coreSettings);
+  constructor(config?: Config) {
+    this.applyConfig(config?.core);
   }
 
-  applyConfig(config: Partial<Settings>) {
+  applyConfig(config?: Partial<Settings>) {
+    if (!config) return;
     Object.assign(this.settings, config);
   }
 

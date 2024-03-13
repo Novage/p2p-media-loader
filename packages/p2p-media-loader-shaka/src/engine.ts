@@ -17,20 +17,6 @@ import { Config, Core, CoreEventMap } from "p2p-media-loader-core";
 
 const LIVE_EDGE_DELAY = 25;
 
-export type ShakaEngineConfig = {
-  ShakaConfig: {
-    Streaming?: {
-      useNativeHlsOnSafari: boolean;
-    };
-    Manifest?: {
-      dash?: {
-        ignoreSuggestedPresentationDelay: boolean;
-      };
-      defaultPresentationDelay: number;
-    };
-  };
-} & Config;
-
 export class Engine {
   private player?: shaka.Player;
   private readonly shaka: Shaka;
@@ -39,12 +25,9 @@ export class Engine {
   private readonly segmentManager: SegmentManager;
   private requestFilter?: shaka.extern.RequestFilter;
 
-  constructor(
-    shaka: unknown,
-    private readonly config: ShakaEngineConfig,
-  ) {
+  constructor(shaka: unknown, config?: Config) {
     this.shaka = (shaka as Shaka | undefined) ?? window.shaka;
-    this.core = new Core(this.config);
+    this.core = new Core(config);
     this.segmentManager = new SegmentManager(this.streamInfo, this.core);
   }
 
@@ -52,21 +35,13 @@ export class Engine {
     if (this.player === player) return;
     if (this.player) this.destroy();
 
-    const shakaConfig = this.config.ShakaConfig;
-
     this.player = player;
-    this.player.configure(
-      "manifest.defaultPresentationDelay",
-      shakaConfig.Manifest?.defaultPresentationDelay ?? LIVE_EDGE_DELAY,
-    );
+    this.player.configure("manifest.defaultPresentationDelay", LIVE_EDGE_DELAY);
     this.player.configure(
       "manifest.dash.ignoreSuggestedPresentationDelay",
-      shakaConfig.Manifest?.dash?.ignoreSuggestedPresentationDelay ?? true,
+      true,
     );
-    this.player.configure(
-      "streaming.useNativeHlsOnSafari",
-      shakaConfig.Streaming?.useNativeHlsOnSafari ?? true,
-    );
+    this.player.configure("streaming.useNativeHlsOnSafari", true);
 
     this.updatePlayerEventHandlers("register");
   }
