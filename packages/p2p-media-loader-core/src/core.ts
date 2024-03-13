@@ -15,6 +15,7 @@ import { BandwidthCalculator } from "./bandwidth-calculator";
 import { EngineCallbacks } from "./requests/engine-request";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import { EventEmitter } from "./utils/event-emitter";
+import { deepMerge } from "./utils/utils";
 
 export class Core<TStream extends Stream = Stream> {
   private readonly eventEmitter = new EventEmitter<CoreEventMap>();
@@ -51,9 +52,9 @@ export class Core<TStream extends Stream = Stream> {
     this.applyConfig(config?.core);
   }
 
-  applyConfig(config?: Partial<Settings>) {
+  private applyConfig(config?: Partial<Settings>) {
     if (!config) return;
-    Object.assign(this.settings, config);
+    deepMerge(this.settings, config);
   }
 
   addEventListener<K extends keyof CoreEventMap>(

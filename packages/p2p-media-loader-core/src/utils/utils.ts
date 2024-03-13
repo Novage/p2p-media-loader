@@ -62,3 +62,47 @@ export function* arrayBackwards<T>(arr: T[]) {
     yield arr[i];
   }
 }
+
+function isObject(item: unknown): item is Record<string, unknown> {
+  return !!item && typeof item === "object" && !Array.isArray(item);
+}
+
+function isArray(item: unknown): item is unknown[] {
+  return Array.isArray(item);
+}
+
+type DeepMergeResult<T, U> =
+  T extends Array<infer R1>
+    ? U extends Array<infer R2>
+      ? Array<R1 | R2>
+      : T & U
+    : T & U;
+
+export function deepMerge<T, U>(target: T, source: U): DeepMergeResult<T, U> {
+  if (isObject(target) && isObject(source)) {
+    const output: Record<string, unknown> = { ...target };
+
+    Object.keys(source).forEach((key) => {
+      const sourceValue = source[key];
+      const targetValue = target[key as keyof T];
+
+      if (isObject(sourceValue)) {
+        output[key] = isObject(targetValue)
+          ? deepMerge(targetValue as unknown, sourceValue)
+          : sourceValue;
+      } else if (isArray(sourceValue)) {
+        output[key] = isArray(targetValue)
+          ? [...targetValue, ...sourceValue]
+          : sourceValue;
+      } else {
+        output[key] = sourceValue;
+      }
+    });
+
+    return output as DeepMergeResult<T, U>;
+  } else if (isArray(target) && isArray(source)) {
+    return [...target, ...source] as DeepMergeResult<T, U>;
+  }
+
+  return source as DeepMergeResult<T, U>;
+}
