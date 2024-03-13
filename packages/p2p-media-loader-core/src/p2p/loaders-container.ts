@@ -1,9 +1,10 @@
 import { P2PLoader } from "./loader";
 import debug from "debug";
-import { Settings, Stream, StreamWithSegments } from "../index";
+import { CoreEventMap, Settings, Stream, StreamWithSegments } from "../index";
 import { RequestsContainer } from "../requests/request-container";
 import { SegmentsMemoryStorage } from "../segments-storage";
 import * as LoggerUtils from "../utils/logger";
+import { EventEmitter } from "../utils/event-emitter";
 
 type P2PLoaderContainerItem = {
   stream: Stream;
@@ -23,6 +24,7 @@ export class P2PLoadersContainer {
     private readonly requests: RequestsContainer,
     private readonly segmentStorage: SegmentsMemoryStorage,
     private readonly settings: Settings,
+    private readonly eventEmmiter: EventEmitter<CoreEventMap>,
   ) {
     this.changeCurrentLoader(stream);
   }
@@ -37,6 +39,7 @@ export class P2PLoadersContainer {
       this.requests,
       this.segmentStorage,
       this.settings,
+      this.eventEmmiter,
     );
     const loggerInfo = LoggerUtils.getStreamString(stream);
     this.logger(`created new loader: ${loggerInfo}`);

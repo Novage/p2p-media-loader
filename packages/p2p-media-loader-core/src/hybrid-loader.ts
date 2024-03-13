@@ -33,7 +33,6 @@ export class HybridLoader {
   private lastQueueProcessingTimeStamp?: number;
   private randomHttpDownloadInterval?: number;
   private isProcessQueueMicrotaskCreated = false;
-  private readonly onSegmentLoaded: CoreEventMap["onSegmentLoaded"];
 
   constructor(
     private streamManifestUrl: string,
@@ -42,7 +41,7 @@ export class HybridLoader {
     private readonly settings: Settings,
     private readonly bandwidthCalculators: BandwidthCalculators,
     private readonly segmentStorage: SegmentsMemoryStorage,
-    eventEmitter: EventEmitter<CoreEventMap>,
+    private readonly eventEmitter: EventEmitter<CoreEventMap>,
   ) {
     const activeStream = this.lastRequestedSegment.stream;
     this.playback = { position: this.lastRequestedSegment.startTime, rate: 1 };
@@ -52,9 +51,8 @@ export class HybridLoader {
       this.bandwidthCalculators,
       this.playback,
       this.settings,
+      this.eventEmitter,
     );
-
-    this.onSegmentLoaded = eventEmitter.getEventDispatcher("onSegmentLoaded");
 
     if (!this.segmentStorage.isInitialized) {
       throw new Error("Segment storage is not initialized.");
@@ -73,6 +71,7 @@ export class HybridLoader {
       this.requests,
       this.segmentStorage,
       this.settings,
+      this.eventEmitter,
     );
 
     this.logger = debug(`core:hybrid-loader-${activeStream.type}`);
@@ -143,7 +142,12 @@ export class HybridLoader {
     const { httpErrorRetries } = this.settings;
     const now = performance.now();
     for (const request of this.requests.items()) {
-      const { type, status, segment, isHandledByProcessQueue } = request;
+      const {
+        downloadSource: type,
+        status,
+        segment,
+        isHandledByProcessQueue,
+      } = request;
       const engineRequest =
         this.engineRequest?.segment === segment
           ? this.engineRequest
@@ -171,7 +175,6 @@ export class HybridLoader {
           }
           this.requests.remove(request);
           void this.segmentStorage.storeSegment(request.segment, request.data);
-          this.onSegmentLoaded(request.data.byteLength, type);
           break;
 
         case "failed":
@@ -244,9 +247,14 @@ export class HybridLoader {
       const request = this.requests.get(segment);
 
       if (statuses.isHighDemand) {
-        if (request?.type === "http" && request.status === "loading") continue;
         if (
-          request?.type === "http" &&
+          request?.downloadSource === "http" &&
+          request.status === "loading"
+        ) {
+          continue;
+        }
+        if (
+          request?.downloadSource === "http" &&
           request.status === "failed" &&
           request.failedAttempts.httpAttemptsCount >= httpErrorRetries
         ) {
@@ -254,7 +262,7 @@ export class HybridLoader {
         }
 
         const isP2PLoadingRequest =
-          request?.status === "loading" && request.type === "p2p";
+          request?.status === "loading" && request.downloadSource === "p2p";
 
         if (this.requests.executingHttpCount < simultaneousHttpDownloads) {
           if (isP2PLoadingRequest) request.abortFromProcessQueue();
@@ -317,7 +325,7 @@ export class HybridLoader {
 
   private loadThroughHttp(segment: Segment) {
     const request = this.requests.getOrCreateRequest(segment);
-    new HttpRequestExecutor(request, this.settings);
+    new HttpRequestExecutor(request, this.settings, this.eventEmitter);
     this.p2pLoaders.currentLoader.broadcastAnnouncement();
   }
 
@@ -378,7 +386,7 @@ export class HybridLoader {
     for (const { segment: itemSegment } of Utils.arrayBackwards(queue)) {
       if (itemSegment === segment) break;
       const request = this.requests.get(itemSegment);
-      if (request?.type === "http" && request.status === "loading") {
+      if (request?.downloadSource === "http" && request.status === "loading") {
         request.abortFromProcessQueue();
         return true;
       }
@@ -393,7 +401,7 @@ export class HybridLoader {
     for (const { segment: itemSegment } of Utils.arrayBackwards(queue)) {
       if (itemSegment === segment) break;
       const request = this.requests.get(itemSegment);
-      if (request?.type === "p2p" && request.status === "loading") {
+      if (request?.downloadSource === "p2p" && request.status === "loading") {
         request.abortFromProcessQueue();
         return true;
       }
