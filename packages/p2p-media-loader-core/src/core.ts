@@ -21,7 +21,7 @@ export class Core<TStream extends Stream = Stream> {
   private readonly eventEmitter = new EventEmitter<CoreEventMap>();
   private manifestResponseUrl?: string;
   private readonly streams = new Map<string, StreamWithSegments<TStream>>();
-  private readonly settings: Settings = {
+  private settings: Settings = {
     simultaneousHttpDownloads: 3,
     simultaneousP2PDownloads: 3,
     highDemandTimeWindow: 15,
@@ -54,7 +54,7 @@ export class Core<TStream extends Stream = Stream> {
 
   private applyConfig(config?: Partial<Settings>) {
     if (!config) return;
-    deepMerge(this.settings, config);
+    this.settings = deepMerge(this.settings, config);
   }
 
   getConfig() {
@@ -72,7 +72,7 @@ export class Core<TStream extends Stream = Stream> {
       >
     >,
   ) {
-    deepMerge(this.settings, dynamicConfig);
+    this.settings = deepMerge(this.settings, dynamicConfig);
   }
 
   addEventListener<K extends keyof CoreEventMap>(
