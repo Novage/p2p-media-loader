@@ -57,7 +57,11 @@ export class Core<TStream extends Stream = Stream> {
     deepMerge(this.settings, config);
   }
 
-  public applyDynamicConfig(
+  getConfig() {
+    return deepMerge({}, this.settings);
+  }
+
+  applyDynamicConfig(
     dynamicConfig: Partial<
       Pick<
         Settings,

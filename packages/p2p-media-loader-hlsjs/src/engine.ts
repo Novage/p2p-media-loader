@@ -44,6 +44,10 @@ export class Engine {
     };
   }
 
+  public getCoreConfig() {
+    return this.core.getConfig();
+  }
+
   public applyDynamicCoreConfig(
     dynamicConfig: Partial<
       Pick<

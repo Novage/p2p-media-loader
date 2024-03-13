@@ -60,6 +60,10 @@ export class Engine {
     this.core.applyDynamicConfig(dynamicConfig);
   }
 
+  public getCoreConfig() {
+    return this.core.getConfig();
+  }
+
   public addEventListener<K extends keyof CoreEventMap>(
     eventName: K,
     listener: CoreEventMap[K],
