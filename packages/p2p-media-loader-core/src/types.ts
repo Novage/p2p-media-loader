@@ -38,7 +38,7 @@ export type SegmentResponse = {
   bandwidth: number;
 };
 
-export type DynamicConfig = Partial<
+export type DynamicCoreConfig = Partial<
   Pick<
     CoreConfig,
     | "httpDownloadTimeWindow"

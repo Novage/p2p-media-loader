@@ -8,7 +8,7 @@ import {
   BandwidthCalculators,
   StreamDetails,
   CoreEventMap,
-  DynamicConfig,
+  DynamicCoreConfig,
 } from "./types";
 import * as StreamUtils from "./utils/stream";
 import { BandwidthCalculator } from "./bandwidth-calculator";
@@ -57,7 +57,11 @@ export class Core<TStream extends Stream = Stream> {
     this.config = deepConfigMerge(this.config, config);
   }
 
-  applyDynamicConfig(dynamicConfig: DynamicConfig) {
+  getConfig() {
+    return deepConfigMerge({}, this.config);
+  }
+
+  applyDynamicConfig(dynamicConfig: DynamicCoreConfig) {
     this.config = deepConfigMerge(this.config, dynamicConfig);
   }
 
