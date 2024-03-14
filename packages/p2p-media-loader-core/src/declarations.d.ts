@@ -39,6 +39,7 @@ declare module "bittorrent-tracker" {
 
   export type PeerConnection = {
     id: string;
+    idUtf8: string;
     initiator: boolean;
     _channel: RTCDataChannel;
     on<E extends keyof PeerEvents>(event: E, handler: PeerEvents[E]): void;

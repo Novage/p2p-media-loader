@@ -1,11 +1,16 @@
 import { Peer } from "./peer";
-import { Segment, Settings, StreamWithSegments } from "../types";
+import {
+  CoreEventMap,
+  Segment,
+  CoreConfig,
+  StreamWithSegments,
+} from "../types";
 import { SegmentsMemoryStorage } from "../segments-storage";
 import { RequestsContainer } from "../requests/request-container";
-import { Request } from "../requests/request";
 import { P2PTrackerClient } from "./tracker-client";
 import * as StreamUtils from "../utils/stream";
 import * as Utils from "../utils/utils";
+import { EventEmitter } from "../utils/event-emitter";
 
 export class P2PLoader {
   private readonly trackerClient: P2PTrackerClient;
@@ -16,7 +21,8 @@ export class P2PLoader {
     private readonly stream: StreamWithSegments,
     private readonly requests: RequestsContainer,
     private readonly segmentStorage: SegmentsMemoryStorage,
-    private readonly settings: Settings,
+    private readonly config: CoreConfig,
+    eventEmmiter: EventEmitter<CoreEventMap>,
   ) {
     const streamExternalId = StreamUtils.getStreamExternalId(
       this.streamManifestUrl,
@@ -31,17 +37,19 @@ export class P2PLoader {
         // eslint-disable-next-line @typescript-eslint/no-misused-promises
         onSegmentRequested: this.onSegmentRequested,
       },
-      this.settings,
+      this.config,
+      eventEmmiter,
     );
 
     this.segmentStorage.subscribeOnUpdate(
       this.stream,
       this.broadcastAnnouncement,
     );
+
     this.trackerClient.start();
   }
 
-  downloadSegment(segment: Segment): Request | undefined {
+  downloadSegment(segment: Segment) {
     const peersWithSegment: Peer[] = [];
     for (const peer of this.trackerClient.peers()) {
       if (

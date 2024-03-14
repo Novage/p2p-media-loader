@@ -2,11 +2,12 @@ import TrackerClient, {
   PeerConnection,
   TrackerClientEvents,
 } from "bittorrent-tracker";
-import { Settings, StreamWithSegments } from "../types";
+import { CoreEventMap, CoreConfig, StreamWithSegments } from "../types";
 import debug from "debug";
 import * as PeerUtil from "../utils/peer";
 import * as LoggerUtils from "../utils/logger";
 import { Peer } from "./peer";
+import { EventEmitter } from "../utils/event-emitter";
 
 type PeerItem = {
   peer?: Peer;
@@ -28,7 +29,8 @@ export class P2PTrackerClient {
     streamId: string,
     stream: StreamWithSegments,
     private readonly eventHandlers: P2PTrackerClientEventHandlers,
-    private readonly settings: Settings,
+    private readonly config: CoreConfig,
+    private readonly eventEmmiter: EventEmitter<CoreEventMap>,
     private readonly customPeerId?: string,
   ) {
     const { string: peerId, bytes: peerIdBytes } =
@@ -42,17 +44,18 @@ export class P2PTrackerClient {
       infoHash: streamIdBytes,
       peerId: peerIdBytes,
       port: 6881,
-      announce: [
+      announce: this.config.announceTrackers ?? [
         // "wss://tracker.novage.com.ua",
         "wss://tracker.webtorrent.dev",
         "wss://tracker.files.fm:7073/announce",
         "wss://tracker.openwebtorrent.com",
       ],
       rtcConfig: {
-        iceServers: [
+        iceServers: this.config.rtcConfig?.iceServers ?? [
           { urls: "stun:stun.l.google.com:19302" },
           { urls: "stun:global.stun.twilio.com:3478" },
         ],
+        ...this.config.rtcConfig,
       },
     });
     this.client.on("peer", this.onReceivePeerConnection);
@@ -89,6 +92,7 @@ export class P2PTrackerClient {
       return;
     } else if (!peerItem) {
       peerItem = { potentialConnections: new Set() };
+      peerConnection.idUtf8 = itemId;
       peerItem.potentialConnections.add(peerConnection);
       this._peers.set(itemId, peerItem);
     }
@@ -106,7 +110,8 @@ export class P2PTrackerClient {
           onPeerClosed: this.onPeerClosed,
           onSegmentRequested: this.eventHandlers.onSegmentRequested,
         },
-        this.settings,
+        this.config,
+        this.eventEmmiter,
       );
       this.logger(
         `connected with peer: ${peerItem.peer.id} ${this.streamShortId}`,

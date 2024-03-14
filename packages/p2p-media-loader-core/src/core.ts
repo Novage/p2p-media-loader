@@ -3,9 +3,10 @@ import {
   Stream,
   StreamWithSegments,
   Segment,
-  Settings,
+  CoreConfig,
   SegmentBase,
   CoreEventMap,
+  DynamicCoreConfig,
 } from "./types";
 import { BandwidthCalculators, StreamDetails } from "./internal-types";
 import * as StreamUtils from "./utils/stream";
@@ -13,12 +14,13 @@ import { BandwidthCalculator } from "./bandwidth-calculator";
 import { EngineCallbacks } from "./requests/engine-request";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import { EventEmitter } from "./utils/event-emitter";
+import { deepConfigMerge } from "./utils/utils";
 
 export class Core<TStream extends Stream = Stream> {
   private readonly eventEmitter = new EventEmitter<CoreEventMap>();
   private manifestResponseUrl?: string;
   private readonly streams = new Map<string, StreamWithSegments<TStream>>();
-  private readonly settings: Settings = {
+  private config: CoreConfig = {
     simultaneousHttpDownloads: 3,
     simultaneousP2PDownloads: 3,
     highDemandTimeWindow: 15,
@@ -45,7 +47,22 @@ export class Core<TStream extends Stream = Stream> {
     activeLevelBitrate: 0,
   };
 
-  constructor() {}
+  constructor(config?: CoreConfig) {
+    this.applyConfig(config);
+  }
+
+  private applyConfig(config?: CoreConfig) {
+    if (!config) return;
+    this.config = deepConfigMerge(this.config, config);
+  }
+
+  getConfig() {
+    return deepConfigMerge({}, this.config);
+  }
+
+  applyDynamicConfig(dynamicConfig: DynamicCoreConfig) {
+    this.config = deepConfigMerge(this.config, dynamicConfig);
+  }
 
   addEventListener<K extends keyof CoreEventMap>(
     eventName: K,
@@ -84,18 +101,24 @@ export class Core<TStream extends Stream = Stream> {
 
   updateStream(
     streamLocalId: string,
-    addSegments?: SegmentBase[],
-    removeSegmentIds?: string[],
+    addSegments?: Iterable<SegmentBase>,
+    removeSegmentIds?: Iterable<string>,
   ): void {
     const stream = this.streams.get(streamLocalId);
     if (!stream) return;
 
-    addSegments?.forEach((s) => {
-      const segment = { ...s, stream };
-      stream.segments.set(segment.localId, segment);
-    });
+    if (addSegments) {
+      for (const segment of addSegments) {
+        if (stream.segments.has(segment.localId)) continue; // should not happen
+        stream.segments.set(segment.localId, { ...segment, stream });
+      }
+    }
 
-    removeSegmentIds?.forEach((id) => stream.segments.delete(id));
+    if (removeSegmentIds) {
+      for (const id of removeSegmentIds) {
+        stream.segments.delete(id);
+      }
+    }
 
     this.mainStreamLoader?.updateStream(stream);
     this.secondaryStreamLoader?.updateStream(stream);
@@ -109,7 +132,7 @@ export class Core<TStream extends Stream = Stream> {
     if (!this.segmentStorage) {
       this.segmentStorage = new SegmentsMemoryStorage(
         this.manifestResponseUrl,
-        this.settings,
+        this.config,
       );
       await this.segmentStorage.initialize();
     }
@@ -182,7 +205,7 @@ export class Core<TStream extends Stream = Stream> {
         manifestResponseUrl,
         segment,
         this.streamDetails,
-        this.settings,
+        this.config,
         this.bandwidthCalculators,
         this.segmentStorage,
         this.eventEmitter,

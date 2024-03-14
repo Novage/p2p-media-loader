@@ -80,9 +80,11 @@ export class SegmentManager {
     }
 
     if (!newSegments.length && !staleSegmentsIds.size) return;
-    this.core.updateStream(managerStream.localId, newSegments, [
-      ...staleSegmentsIds,
-    ]);
+    this.core.updateStream(
+      managerStream.localId,
+      newSegments,
+      staleSegmentsIds.values(),
+    );
   }
 
   private processHlsSegmentReferences(

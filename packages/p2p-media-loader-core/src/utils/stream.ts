@@ -1,4 +1,4 @@
-import { Segment, Settings, Stream, StreamWithSegments } from "../types";
+import { Segment, CoreConfig, Stream, StreamWithSegments } from "../types";
 import { Playback } from "../internal-types";
 
 export type SegmentPlaybackStatuses = {
@@ -7,8 +7,8 @@ export type SegmentPlaybackStatuses = {
   isP2PDownloadable?: boolean;
 };
 
-export type PlaybackTimeWindowsSettings = Pick<
-  Settings,
+export type PlaybackTimeWindowsConfig = Pick<
+  CoreConfig,
   "highDemandTimeWindow" | "httpDownloadTimeWindow" | "p2pDownloadTimeWindow"
 >;
 
@@ -60,26 +60,26 @@ export function getSegmentAvgDuration(stream: StreamWithSegments) {
 export function isSegmentActualInPlayback(
   segment: Readonly<Segment>,
   playback: Playback,
-  timeWindowsSettings: PlaybackTimeWindowsSettings,
+  timeWindowsConfig: PlaybackTimeWindowsConfig,
 ): boolean {
   const {
     isHighDemand = false,
     isHttpDownloadable = false,
     isP2PDownloadable = false,
-  } = getSegmentPlaybackStatuses(segment, playback, timeWindowsSettings);
+  } = getSegmentPlaybackStatuses(segment, playback, timeWindowsConfig);
   return isHighDemand || isHttpDownloadable || isP2PDownloadable;
 }
 
 export function getSegmentPlaybackStatuses(
   segment: Segment,
   playback: Playback,
-  timeWindowsSettings: PlaybackTimeWindowsSettings,
+  timeWindowsConfig: PlaybackTimeWindowsConfig,
 ): SegmentPlaybackStatuses {
   const {
     highDemandTimeWindow,
     httpDownloadTimeWindow,
     p2pDownloadTimeWindow,
-  } = timeWindowsSettings;
+  } = timeWindowsConfig;
 
   const statuses: SegmentPlaybackStatuses = {};
   if (isSegmentInTimeWindow(segment, playback, highDemandTimeWindow)) {
