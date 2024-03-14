@@ -102,18 +102,24 @@ export class Core<TStream extends Stream = Stream> {
 
   updateStream(
     streamLocalId: string,
-    addSegments?: SegmentBase[],
-    removeSegmentIds?: string[],
+    addSegments?: Iterable<SegmentBase>,
+    removeSegmentIds?: Iterable<string>,
   ): void {
     const stream = this.streams.get(streamLocalId);
     if (!stream) return;
 
-    addSegments?.forEach((s) => {
-      const segment = { ...s, stream };
-      stream.segments.set(segment.localId, segment);
-    });
+    if (addSegments) {
+      for (const segment of addSegments) {
+        if (stream.segments.has(segment.localId)) continue; // should not happen
+        stream.segments.set(segment.localId, { ...segment, stream });
+      }
+    }
 
-    removeSegmentIds?.forEach((id) => stream.segments.delete(id));
+    if (removeSegmentIds) {
+      for (const id of removeSegmentIds) {
+        stream.segments.delete(id);
+      }
+    }
 
     this.mainStreamLoader?.updateStream(stream);
     this.secondaryStreamLoader?.updateStream(stream);

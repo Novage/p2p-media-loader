@@ -7,7 +7,6 @@ import {
 } from "../types";
 import { SegmentsMemoryStorage } from "../segments-storage";
 import { RequestsContainer } from "../requests/request-container";
-import { Request } from "../requests/request";
 import { P2PTrackerClient } from "./tracker-client";
 import * as StreamUtils from "../utils/stream";
 import * as Utils from "../utils/utils";
@@ -46,10 +45,11 @@ export class P2PLoader {
       this.stream,
       this.broadcastAnnouncement,
     );
+
     this.trackerClient.start();
   }
 
-  downloadSegment(segment: Segment): Request | undefined {
+  downloadSegment(segment: Segment) {
     const peersWithSegment: Peer[] = [];
     for (const peer of this.trackerClient.peers()) {
       if (
