@@ -110,8 +110,6 @@ export function deepConfigMerge<T, U>(
     });
 
     return output as DeepMergeResult<T, U>;
-  } else if (isArray(target) && isArray(source)) {
-    return deepCopy(source) as DeepMergeResult<T, U>;
   }
 
   return source as DeepMergeResult<T, U>;
