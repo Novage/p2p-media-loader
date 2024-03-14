@@ -15,7 +15,7 @@ import { BandwidthCalculator } from "./bandwidth-calculator";
 import { EngineCallbacks } from "./requests/engine-request";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import { EventEmitter } from "./utils/event-emitter";
-import { deepMerge } from "./utils/utils";
+import { deepConfigMerge } from "./utils/utils";
 
 export class Core<TStream extends Stream = Stream> {
   private readonly eventEmitter = new EventEmitter<CoreEventMap>();
@@ -54,11 +54,11 @@ export class Core<TStream extends Stream = Stream> {
 
   private applyConfig(config?: Partial<Settings>) {
     if (!config) return;
-    this.settings = deepMerge(this.settings, config);
+    this.settings = deepConfigMerge(this.settings, config);
   }
 
   getConfig() {
-    return deepMerge({}, this.settings);
+    return deepConfigMerge({}, this.settings);
   }
 
   applyDynamicConfig(
@@ -72,7 +72,7 @@ export class Core<TStream extends Stream = Stream> {
       >
     >,
   ) {
-    this.settings = deepMerge(this.settings, dynamicConfig);
+    this.settings = deepConfigMerge(this.settings, dynamicConfig);
   }
 
   addEventListener<K extends keyof CoreEventMap>(
