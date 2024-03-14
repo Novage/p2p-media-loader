@@ -6,14 +6,8 @@ on:
       - main
 
 jobs:
-  publish:
+  setup_and_build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        package:
-          - p2p-media-loader-core
-          - p2p-media-loader-hlsjs
-          - p2p-media-loader-shaka
     steps:
       - uses: actions/checkout@v4
 
@@ -27,23 +21,31 @@ jobs:
 
       - name: Install Dependencies
         run: pnpm install
-        working-directory: ./
 
       - name: Build
         run: pnpm run build
-        working-directory: ./
 
       - name: Pack Packages
         run: pnpm run pack-packages
-        working-directory: ./
+
+  publish:
+    needs: setup_and_build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package:
+          - p2p-media-loader-core
+          - p2p-media-loader-hlsjs
+          - p2p-media-loader-shaka
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Get package version
         id: get_version
-        run: echo "PACKAGE_VERSION=$(jq -r '.version' ./packages/${{ matrix.package }}/package.json)" >> $GITHUB_ENV
-        working-directory: ./
+        run: |
+          echo "PACKAGE_VERSION=$(jq -r '.version' ./packages/${{ matrix.package }}/package.json)" >> $GITHUB_ENV
 
       - name: Publish Package
         run: pnpm publish ./packages/${{ matrix.package }}-${{ env.PACKAGE_VERSION }}.tgz
-        working-directory: ./packages/${{ matrix.package }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
