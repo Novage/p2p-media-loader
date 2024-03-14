@@ -38,7 +38,17 @@ export type SegmentResponse = {
   bandwidth: number;
 };
 
-export type Settings = {
+export type DynamicCoreConfig = Partial<
+  Pick<
+    CoreConfig,
+    | "httpDownloadTimeWindow"
+    | "p2pDownloadTimeWindow"
+    | "p2pNotReceivingBytesTimeoutMs"
+    | "httpNotReceivingBytesTimeoutMs"
+  >
+>;
+
+export type CoreConfig = {
   highDemandTimeWindow: number;
   httpDownloadTimeWindow: number;
   p2pDownloadTimeWindow: number;
@@ -52,6 +62,8 @@ export type Settings = {
   httpNotReceivingBytesTimeoutMs: number;
   httpErrorRetries: number;
   p2pErrorRetries: number;
+  announceTrackers?: string[];
+  rtcConfig?: RTCConfiguration;
   validateP2PSegment?: (url: string, byteRange?: ByteRange) => Promise<boolean>;
   httpRequestSetup?: (
     segmentUrl: string,

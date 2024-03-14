@@ -2,7 +2,7 @@ import { Segment, StreamWithSegments } from "./index";
 import { HttpRequestExecutor } from "./http-loader";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import {
-  Settings,
+  CoreConfig,
   Playback,
   BandwidthCalculators,
   StreamDetails,
@@ -38,7 +38,7 @@ export class HybridLoader {
     private streamManifestUrl: string,
     private lastRequestedSegment: Readonly<Segment>,
     private readonly streamDetails: Required<Readonly<StreamDetails>>,
-    private readonly settings: Settings,
+    private readonly config: CoreConfig,
     private readonly bandwidthCalculators: BandwidthCalculators,
     private readonly segmentStorage: SegmentsMemoryStorage,
     private readonly eventEmitter: EventEmitter<CoreEventMap>,
@@ -50,7 +50,7 @@ export class HybridLoader {
       this.requestProcessQueueMicrotask,
       this.bandwidthCalculators,
       this.playback,
-      this.settings,
+      this.config,
       this.eventEmitter,
     );
 
@@ -62,7 +62,7 @@ export class HybridLoader {
       return StreamUtils.isSegmentActualInPlayback(
         segment,
         this.playback,
-        this.settings,
+        this.config,
       );
     });
     this.p2pLoaders = new P2PLoadersContainer(
@@ -70,7 +70,7 @@ export class HybridLoader {
       this.lastRequestedSegment.stream,
       this.requests,
       this.segmentStorage,
-      this.settings,
+      this.config,
       this.eventEmitter,
     );
 
@@ -139,7 +139,7 @@ export class HybridLoader {
     queueDownloadRatio: number,
   ) {
     const { stream } = this.lastRequestedSegment;
-    const { httpErrorRetries } = this.settings;
+    const { httpErrorRetries } = this.config;
     const now = performance.now();
     for (const request of this.requests.items()) {
       const {
@@ -221,7 +221,7 @@ export class HybridLoader {
       simultaneousHttpDownloads,
       simultaneousP2PDownloads,
       httpErrorRetries,
-    } = this.settings;
+    } = this.config;
 
     if (
       this.engineRequest?.shouldBeStartedImmediately &&
@@ -236,7 +236,7 @@ export class HybridLoader {
         request.status === "not-started" ||
         (request.status === "failed" &&
           request.failedAttempts.httpAttemptsCount <
-            this.settings.httpErrorRetries)
+            this.config.httpErrorRetries)
       ) {
         void this.loadThroughHttp(segment);
       }
@@ -325,7 +325,7 @@ export class HybridLoader {
 
   private loadThroughHttp(segment: Segment) {
     const request = this.requests.getOrCreateRequest(segment);
-    new HttpRequestExecutor(request, this.settings, this.eventEmitter);
+    new HttpRequestExecutor(request, this.config, this.eventEmitter);
     this.p2pLoaders.currentLoader.broadcastAnnouncement();
   }
 
@@ -334,7 +334,7 @@ export class HybridLoader {
   }
 
   private loadRandomThroughHttp() {
-    const { simultaneousHttpDownloads, httpErrorRetries } = this.settings;
+    const { simultaneousHttpDownloads, httpErrorRetries } = this.config;
     const p2pLoader = this.p2pLoaders.currentLoader;
 
     if (
@@ -348,7 +348,7 @@ export class HybridLoader {
     for (const { segment, statuses } of QueueUtils.generateQueue(
       this.lastRequestedSegment,
       this.playback,
-      this.settings,
+      this.config,
     )) {
       if (
         !statuses.isHttpDownloadable ||
@@ -417,7 +417,7 @@ export class HybridLoader {
     for (const item of QueueUtils.generateQueue(
       this.lastRequestedSegment,
       this.playback,
-      this.settings,
+      this.config,
     )) {
       maxPossibleLength++;
       const { segment } = item;

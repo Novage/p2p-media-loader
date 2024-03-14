@@ -10,7 +10,20 @@ import type { HlsConfig, Events } from "hls.js";
 import { FragmentLoaderBase } from "./fragment-loader";
 import { PlaylistLoaderBase } from "./playlist-loader";
 import { SegmentManager } from "./segment-mananger";
-import { Core, CoreEventMap } from "p2p-media-loader-core";
+import {
+  CoreConfig,
+  Core,
+  CoreEventMap,
+  DynamicCoreConfig,
+} from "p2p-media-loader-core";
+
+export type HlsjsConfig = {
+  core: CoreConfig;
+};
+
+export type DynamicHlsConfig = {
+  core: DynamicCoreConfig;
+};
 
 export class Engine {
   private readonly core: Core;
@@ -18,30 +31,38 @@ export class Engine {
   private hlsInstanceGetter?: () => Hls;
   private currentHlsInstance?: Hls;
 
-  constructor() {
-    this.core = new Core();
+  constructor(config?: HlsjsConfig) {
+    this.core = new Core(config?.core);
     this.segmentManager = new SegmentManager(this.core);
   }
 
-  public addEventListener<K extends keyof CoreEventMap>(
+  addEventListener<K extends keyof CoreEventMap>(
     eventName: K,
     listener: CoreEventMap[K],
   ) {
     this.core.addEventListener(eventName, listener);
   }
 
-  public removeEventListener<K extends keyof CoreEventMap>(
+  removeEventListener<K extends keyof CoreEventMap>(
     eventName: K,
     listener: CoreEventMap[K],
   ) {
     this.core.removeEventListener(eventName, listener);
   }
 
-  public getConfig(): Partial<HlsConfig> {
+  getHlsConfig(): Partial<HlsConfig> {
     return {
       fLoader: this.createFragmentLoaderClass(),
       pLoader: this.createPlaylistLoaderClass(),
     };
+  }
+
+  getConfig(): HlsjsConfig {
+    return { core: this.core.getConfig() };
+  }
+
+  applyDynamicConfig(dynamicConfig: DynamicHlsConfig) {
+    this.core.applyDynamicConfig(dynamicConfig.core);
   }
 
   setHls(hls: Hls | (() => Hls)) {

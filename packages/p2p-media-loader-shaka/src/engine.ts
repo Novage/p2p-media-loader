@@ -13,7 +13,20 @@ import {
   P2PMLShakaData,
 } from "./types";
 import { Loader } from "./loading-handler";
-import { Core, CoreEventMap } from "p2p-media-loader-core";
+import {
+  CoreConfig,
+  Core,
+  CoreEventMap,
+  DynamicCoreConfig,
+} from "p2p-media-loader-core";
+
+export type DynamicShakaConfig = {
+  core: DynamicCoreConfig;
+};
+
+export type ShakaConfig = {
+  core: CoreConfig;
+};
 
 const LIVE_EDGE_DELAY = 25;
 
@@ -25,15 +38,16 @@ export class Engine {
   private readonly segmentManager: SegmentManager;
   private requestFilter?: shaka.extern.RequestFilter;
 
-  constructor(shaka?: unknown) {
+  constructor(shaka: unknown, config?: ShakaConfig) {
     this.shaka = (shaka as Shaka | undefined) ?? window.shaka;
-    this.core = new Core();
+    this.core = new Core(config?.core);
     this.segmentManager = new SegmentManager(this.streamInfo, this.core);
   }
 
   configureAndInitShakaPlayer(player: shaka.Player) {
     if (this.player === player) return;
     if (this.player) this.destroy();
+
     this.player = player;
     this.player.configure("manifest.defaultPresentationDelay", LIVE_EDGE_DELAY);
     this.player.configure(
@@ -41,17 +55,26 @@ export class Engine {
       true,
     );
     this.player.configure("streaming.useNativeHlsOnSafari", false);
+
     this.updatePlayerEventHandlers("register");
   }
 
-  public addEventListener<K extends keyof CoreEventMap>(
+  applyDynamiConfig(dynamicConfig: DynamicShakaConfig) {
+    this.core.applyDynamicConfig(dynamicConfig.core);
+  }
+
+  getConfig(): ShakaConfig {
+    return { core: this.core.getConfig() };
+  }
+
+  addEventListener<K extends keyof CoreEventMap>(
     eventName: K,
     listener: CoreEventMap[K],
   ) {
     this.core.addEventListener(eventName, listener);
   }
 
-  public removeEventListener<K extends keyof CoreEventMap>(
+  removeEventListener<K extends keyof CoreEventMap>(
     eventName: K,
     listener: CoreEventMap[K],
   ) {

@@ -10,7 +10,7 @@ import {
 } from "../types";
 import * as Utils from "../utils/utils";
 import * as Command from "./commands";
-import { PeerProtocol, PeerSettings } from "./peer-protocol";
+import { PeerProtocol, PeerConfig } from "./peer-protocol";
 import { EventEmitter } from "../utils/event-emitter";
 
 const { PeerCommandType } = Command;
@@ -42,7 +42,7 @@ export class Peer {
   constructor(
     private readonly connection: PeerConnection,
     private readonly eventHandlers: PeerEventHandlers,
-    private readonly settings: PeerSettings,
+    private readonly peerConfig: PeerConfig,
     eventEmmiter: EventEmitter<CoreEventMap>,
   ) {
     this.onPeerClosed = eventEmmiter.getEventDispatcher("onPeerClose");
@@ -50,7 +50,7 @@ export class Peer {
     this.id = Peer.getPeerIdFromConnection(connection);
     this.peerProtocol = new PeerProtocol(
       connection,
-      settings,
+      peerConfig,
       {
         onSegmentChunkReceived: this.onSegmentChunkReceived,
         // eslint-disable-next-line @typescript-eslint/no-misused-promises
@@ -132,7 +132,7 @@ export class Peer {
         }
 
         const isValid =
-          (await this.settings.validateP2PSegment?.(
+          (await this.peerConfig.validateP2PSegment?.(
             request.segment.url,
             request.segment.byteRange,
           )) ?? true;
@@ -195,7 +195,7 @@ export class Peer {
         { downloadSource: "p2p", peerId: this.id },
         {
           notReceivingBytesTimeoutMs:
-            this.settings.p2pNotReceivingBytesTimeoutMs,
+            this.peerConfig.p2pNotReceivingBytesTimeoutMs,
           abort: (error) => {
             if (!this.downloadingContext) return;
             const { request } = this.downloadingContext;
@@ -208,7 +208,7 @@ export class Peer {
               (error) => error.type === "bytes-receiving-timeout",
             );
 
-            if (timeoutErrors.length >= this.settings.p2pErrorRetries) {
+            if (timeoutErrors.length >= this.peerConfig.p2pErrorRetries) {
               this.destroy();
             }
           },

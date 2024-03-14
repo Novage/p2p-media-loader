@@ -1,5 +1,10 @@
 import { Peer } from "./peer";
-import { CoreEventMap, Segment, Settings, StreamWithSegments } from "../types";
+import {
+  CoreEventMap,
+  Segment,
+  CoreConfig,
+  StreamWithSegments,
+} from "../types";
 import { SegmentsMemoryStorage } from "../segments-storage";
 import { RequestsContainer } from "../requests/request-container";
 import { Request } from "../requests/request";
@@ -17,7 +22,7 @@ export class P2PLoader {
     private readonly stream: StreamWithSegments,
     private readonly requests: RequestsContainer,
     private readonly segmentStorage: SegmentsMemoryStorage,
-    private readonly settings: Settings,
+    private readonly config: CoreConfig,
     eventEmmiter: EventEmitter<CoreEventMap>,
   ) {
     const streamExternalId = StreamUtils.getStreamExternalId(
@@ -33,7 +38,7 @@ export class P2PLoader {
         // eslint-disable-next-line @typescript-eslint/no-misused-promises
         onSegmentRequested: this.onSegmentRequested,
       },
-      this.settings,
+      this.config,
       eventEmmiter,
     );
 

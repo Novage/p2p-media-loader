@@ -1,10 +1,10 @@
-import { Segment, Settings, Stream } from "./types";
+import { Segment, CoreConfig, Stream } from "./types";
 import * as StreamUtils from "./utils/stream";
 import debug from "debug";
 import { EventEmitter } from "./utils/event-emitter";
 
-type StorageSettings = Pick<
-  Settings,
+type StorageConfig = Pick<
+  CoreConfig,
   "cachedSegmentExpiration" | "cachedSegmentsCount"
 >;
 
@@ -34,7 +34,7 @@ export class SegmentsMemoryStorage {
 
   constructor(
     private readonly masterManifestUrl: string,
-    private readonly settings: StorageSettings,
+    private readonly storageConfig: StorageConfig,
   ) {
     this.logger = debug("core:segment-memory-storage");
     this.logger.color = "RebeccaPurple";
@@ -108,7 +108,7 @@ export class SegmentsMemoryStorage {
     for (const entry of this.cache.entries()) {
       const [itemId, item] = entry;
       const { lastAccessed, segment } = item;
-      if (now - lastAccessed > this.settings.cachedSegmentExpiration) {
+      if (now - lastAccessed > this.storageConfig.cachedSegmentExpiration) {
         if (!this.isSegmentLocked(segment)) {
           itemsToDelete.push(itemId);
           streamsOfChangedItems.add(segment.stream);
@@ -120,7 +120,7 @@ export class SegmentsMemoryStorage {
 
     // Delete segments over cached count
     let countOverhead =
-      remainingItems.length - this.settings.cachedSegmentsCount;
+      remainingItems.length - this.storageConfig.cachedSegmentsCount;
     if (countOverhead > 0) {
       remainingItems.sort(([, a], [, b]) => a.lastAccessed - b.lastAccessed);
 

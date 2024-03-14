@@ -1,11 +1,11 @@
 import { PeerConnection } from "bittorrent-tracker";
-import { CoreEventMap, Settings } from "../types";
+import { CoreEventMap, CoreConfig } from "../types";
 import * as Utils from "../utils/utils";
 import * as Command from "./commands";
 import { EventEmitter } from "../utils/event-emitter";
 
-export type PeerSettings = Pick<
-  Settings,
+export type PeerConfig = Pick<
+  CoreConfig,
   | "p2pNotReceivingBytesTimeoutMs"
   | "webRtcMaxMessageSize"
   | "p2pErrorRetries"
@@ -20,7 +20,7 @@ export class PeerProtocol {
 
   constructor(
     private readonly connection: PeerConnection,
-    private readonly settings: PeerSettings,
+    private readonly peerConfig: PeerConfig,
     private readonly eventHandlers: {
       onCommandReceived: (command: Command.PeerCommand) => void;
       onSegmentChunkReceived: (data: Uint8Array) => void;
@@ -46,7 +46,7 @@ export class PeerProtocol {
   sendCommand(command: Command.PeerCommand) {
     const binaryCommandBuffers = Command.serializePeerCommand(
       command,
-      this.settings.webRtcMaxMessageSize,
+      this.peerConfig.webRtcMaxMessageSize,
     );
     for (const buffer of binaryCommandBuffers) {
       this.connection.send(buffer);
@@ -62,7 +62,7 @@ export class PeerProtocol {
     if (this.uploadingContext) {
       throw new Error(`Some segment data is already uploading.`);
     }
-    const chunks = getBufferChunks(data, this.settings.webRtcMaxMessageSize);
+    const chunks = getBufferChunks(data, this.peerConfig.webRtcMaxMessageSize);
     const channel = this.connection._channel;
     const { promise, resolve, reject } = Utils.getControlledPromise<void>();
 
