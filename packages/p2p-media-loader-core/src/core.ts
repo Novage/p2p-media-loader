@@ -3,12 +3,12 @@ import {
   Stream,
   StreamWithSegments,
   Segment,
-  Settings,
+  CoreConfig,
   SegmentBase,
   BandwidthCalculators,
   StreamDetails,
   CoreEventMap,
-  Config,
+  DynamicConfig,
 } from "./types";
 import * as StreamUtils from "./utils/stream";
 import { BandwidthCalculator } from "./bandwidth-calculator";
@@ -21,7 +21,7 @@ export class Core<TStream extends Stream = Stream> {
   private readonly eventEmitter = new EventEmitter<CoreEventMap>();
   private manifestResponseUrl?: string;
   private readonly streams = new Map<string, StreamWithSegments<TStream>>();
-  private settings: Settings = {
+  private config: CoreConfig = {
     simultaneousHttpDownloads: 3,
     simultaneousP2PDownloads: 3,
     highDemandTimeWindow: 15,
@@ -48,31 +48,17 @@ export class Core<TStream extends Stream = Stream> {
     activeLevelBitrate: 0,
   };
 
-  constructor(config?: Config) {
-    this.applyConfig(config?.core);
+  constructor(config?: CoreConfig) {
+    this.applyConfig(config);
   }
 
-  private applyConfig(config?: Partial<Settings>) {
+  private applyConfig(config?: CoreConfig) {
     if (!config) return;
-    this.settings = deepConfigMerge(this.settings, config);
+    this.config = deepConfigMerge(this.config, config);
   }
 
-  getConfig() {
-    return deepConfigMerge({}, this.settings);
-  }
-
-  applyDynamicConfig(
-    dynamicConfig: Partial<
-      Pick<
-        Settings,
-        | "httpDownloadTimeWindow"
-        | "p2pDownloadTimeWindow"
-        | "p2pNotReceivingBytesTimeoutMs"
-        | "httpNotReceivingBytesTimeoutMs"
-      >
-    >,
-  ) {
-    this.settings = deepConfigMerge(this.settings, dynamicConfig);
+  applyDynamicConfig(dynamicConfig: DynamicConfig) {
+    this.config = deepConfigMerge(this.config, dynamicConfig);
   }
 
   addEventListener<K extends keyof CoreEventMap>(
@@ -137,7 +123,7 @@ export class Core<TStream extends Stream = Stream> {
     if (!this.segmentStorage) {
       this.segmentStorage = new SegmentsMemoryStorage(
         this.manifestResponseUrl,
-        this.settings,
+        this.config,
       );
       await this.segmentStorage.initialize();
     }
@@ -210,7 +196,7 @@ export class Core<TStream extends Stream = Stream> {
         manifestResponseUrl,
         segment,
         this.streamDetails,
-        this.settings,
+        this.config,
         this.bandwidthCalculators,
         this.segmentStorage,
         this.eventEmitter,

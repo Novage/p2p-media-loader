@@ -10,7 +10,12 @@ import type { HlsConfig, Events } from "hls.js";
 import { FragmentLoaderBase } from "./fragment-loader";
 import { PlaylistLoaderBase } from "./playlist-loader";
 import { SegmentManager } from "./segment-mananger";
-import { Config, Core, CoreEventMap, Settings } from "p2p-media-loader-core";
+import {
+  CoreConfig,
+  Core,
+  CoreEventMap,
+  DynamicConfig,
+} from "p2p-media-loader-core";
 
 export class Engine {
   private readonly core: Core;
@@ -18,47 +23,37 @@ export class Engine {
   private hlsInstanceGetter?: () => Hls;
   private currentHlsInstance?: Hls;
 
-  constructor(config?: Config) {
+  constructor(private readonly config?: CoreConfig) {
     this.core = new Core(config);
     this.segmentManager = new SegmentManager(this.core);
   }
 
-  public addEventListener<K extends keyof CoreEventMap>(
+  addEventListener<K extends keyof CoreEventMap>(
     eventName: K,
     listener: CoreEventMap[K],
   ) {
     this.core.addEventListener(eventName, listener);
   }
 
-  public removeEventListener<K extends keyof CoreEventMap>(
+  removeEventListener<K extends keyof CoreEventMap>(
     eventName: K,
     listener: CoreEventMap[K],
   ) {
     this.core.removeEventListener(eventName, listener);
   }
 
-  public getConfig(): Partial<HlsConfig> {
+  getHlsConfig(): Partial<HlsConfig> {
     return {
       fLoader: this.createFragmentLoaderClass(),
       pLoader: this.createPlaylistLoaderClass(),
     };
   }
 
-  public getCoreConfig() {
-    return this.core.getConfig();
+  getConfig() {
+    return this.config;
   }
 
-  public applyDynamicCoreConfig(
-    dynamicConfig: Partial<
-      Pick<
-        Settings,
-        | "httpDownloadTimeWindow"
-        | "p2pDownloadTimeWindow"
-        | "p2pNotReceivingBytesTimeoutMs"
-        | "httpNotReceivingBytesTimeoutMs"
-      >
-    >,
-  ) {
+  applyDynamicConfig(dynamicConfig: DynamicConfig) {
     this.core.applyDynamicConfig(dynamicConfig);
   }
 

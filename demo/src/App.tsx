@@ -158,7 +158,7 @@ function App() {
     if (!videoRef.current || !hlsEngine.current) return;
     const engine = hlsEngine.current;
     const hls = new window.Hls({
-      ...engine.getConfig(),
+      ...engine.getHlsConfig(),
     });
 
     engine.setHls(hls);
@@ -178,7 +178,7 @@ function App() {
         type: "customHls",
         customType: {
           customHls: (video: HTMLVideoElement) => {
-            const hls = new window.Hls(engine.getConfig());
+            const hls = new window.Hls(engine.getHlsConfig());
             engine.setHls(hls);
             hls.loadSource(url);
             hls.attachMedia(video);
@@ -202,7 +202,7 @@ function App() {
       source: url,
       playback: {
         hlsjsConfig: {
-          ...engine.getConfig(),
+          ...engine.getHlsConfig(),
         },
       },
       plugins: [window.LevelSelector],

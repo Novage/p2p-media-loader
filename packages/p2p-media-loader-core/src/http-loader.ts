@@ -1,10 +1,10 @@
-import { CoreEventMap, Settings } from "./types";
+import { CoreEventMap, CoreConfig } from "./types";
 import { Request as SegmentRequest, RequestControls } from "./requests/request";
 import { RequestError, HttpRequestErrorType } from "./types";
 import { EventEmitter } from "./utils/event-emitter";
 
-type HttpSettings = Pick<
-  Settings,
+type HttpConfig = Pick<
+  CoreConfig,
   "httpNotReceivingBytesTimeoutMs" | "httpRequestSetup"
 >;
 
@@ -17,7 +17,7 @@ export class HttpRequestExecutor {
 
   constructor(
     private readonly request: SegmentRequest,
-    private readonly settings: HttpSettings,
+    private readonly httpConfig: HttpConfig,
     eventEmitter: EventEmitter<CoreEventMap>,
   ) {
     this.onChunkDownloaded =
@@ -36,7 +36,7 @@ export class HttpRequestExecutor {
         this.request.totalBytes - this.request.loadedBytes;
     }
 
-    const { httpNotReceivingBytesTimeoutMs } = this.settings;
+    const { httpNotReceivingBytesTimeoutMs } = this.httpConfig;
     this.requestControls = this.request.start(
       { downloadSource: "http" },
       {
@@ -50,7 +50,7 @@ export class HttpRequestExecutor {
   private async fetch() {
     const { segment } = this.request;
     try {
-      let request = await this.settings.httpRequestSetup?.(
+      let request = await this.httpConfig.httpRequestSetup?.(
         segment.url,
         segment.byteRange,
         this.abortController.signal,

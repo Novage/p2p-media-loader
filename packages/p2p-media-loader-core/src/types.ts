@@ -38,20 +38,17 @@ export type SegmentResponse = {
   bandwidth: number;
 };
 
-export type Config = {
-  core: Partial<
-    Omit<
-      Settings,
-      | "highDemandTimeWindow"
-      | "simultaneousHttpDownloads"
-      | "simultaneousP2PDownloads"
-      | "cachedSegmentExpiration"
-      | "cachedSegmentsCount"
-    >
-  >;
-};
+export type DynamicConfig = Partial<
+  Pick<
+    CoreConfig,
+    | "httpDownloadTimeWindow"
+    | "p2pDownloadTimeWindow"
+    | "p2pNotReceivingBytesTimeoutMs"
+    | "httpNotReceivingBytesTimeoutMs"
+  >
+>;
 
-export type Settings = {
+export type CoreConfig = {
   highDemandTimeWindow: number;
   httpDownloadTimeWindow: number;
   p2pDownloadTimeWindow: number;

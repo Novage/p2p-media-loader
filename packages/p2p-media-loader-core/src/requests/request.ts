@@ -80,7 +80,7 @@ export class Request {
     private readonly requestProcessQueueCallback: () => void,
     private readonly bandwidthCalculators: BandwidthCalculators,
     private readonly playback: Playback,
-    private readonly settings: StreamUtils.PlaybackTimeWindowsSettings,
+    private readonly playbackConfig: StreamUtils.PlaybackTimeWindowsConfig,
     eventEmitter: EventEmitter<CoreEventMap>,
   ) {
     this.onSegmentError = eventEmitter.getEventDispatcher("onSegmentError");
@@ -189,7 +189,7 @@ export class Request {
     const statuses = StreamUtils.getSegmentPlaybackStatuses(
       this.segment,
       this.playback,
-      this.settings,
+      this.playbackConfig,
     );
     const statusString = LoggerUtils.getSegmentPlaybackStatusesString(statuses);
     this.logger(

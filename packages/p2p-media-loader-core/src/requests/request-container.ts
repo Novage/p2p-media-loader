@@ -1,6 +1,6 @@
 import {
   Segment,
-  Settings,
+  CoreConfig,
   Playback,
   BandwidthCalculators,
   CoreEventMap,
@@ -15,7 +15,7 @@ export class RequestsContainer {
     private readonly requestProcessQueueCallback: () => void,
     private readonly bandwidthCalculators: BandwidthCalculators,
     private readonly playback: Playback,
-    private readonly settings: Settings,
+    private readonly config: CoreConfig,
     private readonly eventEmmiter: EventEmitter<CoreEventMap>,
   ) {}
 
@@ -47,7 +47,7 @@ export class RequestsContainer {
         this.requestProcessQueueCallback,
         this.bandwidthCalculators,
         this.playback,
-        this.settings,
+        this.config,
         this.eventEmmiter,
       );
       this.requests.set(segment, request);
