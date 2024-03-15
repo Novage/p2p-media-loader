@@ -26,10 +26,12 @@ jobs:
 
       - name: Extract version from tag
         id: get_version
-        run: echo "::set-output name=VERSION::${GITHUB_REF#refs/tags/}"
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
       - name: Update package.json version
-        run: node scripts/update-version.js ${{ steps.get_version.outputs.VERSION }}
+        run: |
+          export TAG=$VERSION
+          node scripts/update-versions.js
 
       - name: Commit and push
         run: |
