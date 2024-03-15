@@ -1,10 +1,5 @@
-import {
-  Segment,
-  CoreConfig,
-  Stream,
-  StreamWithSegments,
-  Playback,
-} from "../types";
+import { Segment, CoreConfig, Stream, StreamWithSegments } from "../types";
+import { Playback } from "../internal-types";
 
 export type SegmentPlaybackStatuses = {
   isHighDemand?: boolean;

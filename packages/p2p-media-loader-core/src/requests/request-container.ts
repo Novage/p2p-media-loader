@@ -1,10 +1,5 @@
-import {
-  Segment,
-  CoreConfig,
-  Playback,
-  BandwidthCalculators,
-  CoreEventMap,
-} from "../types";
+import { Playback, BandwidthCalculators } from "../internal-types";
+import { Segment, CoreConfig, CoreEventMap } from "../types";
 import { EventEmitter } from "../utils/event-emitter";
 import { Request } from "./request";
 

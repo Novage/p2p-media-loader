@@ -1,12 +1,12 @@
 import debug from "debug";
+import { BandwidthCalculators, Playback } from "../internal-types";
 import {
-  BandwidthCalculators,
   CoreEventMap,
-  Playback,
   RequestError,
   RequestInnerErrorType,
   Segment,
 } from "../types";
+
 import * as LoggerUtils from "../utils/logger";
 import * as StreamUtils from "../utils/stream";
 import * as Utils from "../utils/utils";

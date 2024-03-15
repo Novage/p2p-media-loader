@@ -1,5 +1,3 @@
-import { BandwidthCalculator } from "./bandwidth-calculator";
-
 export type StreamType = "main" | "secondary";
 
 export type ByteRange = { start: number; end: number };
@@ -185,21 +183,6 @@ export type CoreEventMap = {
    * @param {string} peerId - The peer ID of the peer that the event is about, if applicable.
    */
   onChunkUploaded: (bytesLength: number, peerId: string) => void;
-};
-
-export type Playback = {
-  position: number;
-  rate: number;
-};
-
-export type BandwidthCalculators = Readonly<{
-  all: BandwidthCalculator;
-  http: BandwidthCalculator;
-}>;
-
-export type StreamDetails = {
-  isLive: boolean;
-  activeLevelBitrate: number;
 };
 
 export type RequestInnerErrorType = "abort" | "bytes-receiving-timeout";
