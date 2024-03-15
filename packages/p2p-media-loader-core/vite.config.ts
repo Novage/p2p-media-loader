@@ -6,7 +6,7 @@ import { nodePolyfills } from "vite-plugin-node-polyfills";
 const getESMConfig = ({ minify }: { minify: boolean }): UserConfig => {
   return {
     define: {
-      __VERSION__: JSON.stringify(packageJson.version),
+      __VERSION__: JSON.stringify(packageJson.version.slice(0, 7)),
     },
     build: {
       emptyOutDir: false,

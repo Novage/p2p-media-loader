@@ -2,8 +2,8 @@ name: NPM Publish
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - "*"
 
 jobs:
   setup_and_build:
@@ -16,11 +16,28 @@ jobs:
           node-version: "20"
           registry-url: "https://registry.npmjs.org/"
 
-      - name: Install pnpm
-        run: npm install pnpm -g
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
 
       - name: Install Dependencies
         run: pnpm install
+
+      - name: Extract version from tag
+        id: get_version
+        run: echo "::set-output name=VERSION::${GITHUB_REF#refs/tags/}"
+
+      - name: Update package.json version
+        run: node scripts/update-version.js ${{ steps.get_version.outputs.VERSION }}
+
+      - name: Commit and push
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          git add package.json
+          git commit -m "Update version to ${{ steps.get_version.outputs.VERSION }}"
+          git push
 
       - name: Build
         run: pnpm run build
@@ -45,7 +62,6 @@ jobs:
         run: |
           echo "PACKAGE_VERSION=$(jq -r '.version' ./packages/${{ matrix.package }}/package.json)" >> $GITHUB_ENV
 
-      - name: Publish Package
-        run: pnpm publish ./packages/${{ matrix.package }}-${{ env.PACKAGE_VERSION }}.tgz
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Verify .tgz File Path
+        run: echo "./packages/${{ matrix.package }}-${{ env.PACKAGE_VERSION }}.tgz"
+        working-directory: ./packages/${{ matrix.package }}
