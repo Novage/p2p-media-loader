@@ -1,17 +1,20 @@
 import { HybridLoader } from "./hybrid-loader";
 import {
   Stream,
-  StreamWithSegments,
-  Segment,
   CoreConfig,
-  SegmentBase,
+  Segment as SegmentBase,
   CoreEventMap,
   DynamicCoreConfig,
+  EngineCallbacks,
 } from "./types";
-import { BandwidthCalculators, StreamDetails } from "./internal-types";
+import {
+  BandwidthCalculators,
+  Segment,
+  StreamDetails,
+  StreamWithSegments,
+} from "./internal-types";
 import * as StreamUtils from "./utils/stream";
 import { BandwidthCalculator } from "./bandwidth-calculator";
-import { EngineCallbacks } from "./requests/engine-request";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import { EventTarget } from "./utils/event-target";
 import { deepConfigMerge } from "./utils/utils";

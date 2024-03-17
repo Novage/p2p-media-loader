@@ -1,5 +1,4 @@
-import { Segment } from "../types";
-import { Playback } from "../internal-types";
+import { Playback, Segment } from "../internal-types";
 import {
   getSegmentPlaybackStatuses,
   SegmentPlaybackStatuses,

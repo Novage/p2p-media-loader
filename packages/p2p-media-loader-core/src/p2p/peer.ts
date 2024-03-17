@@ -3,15 +3,15 @@ import debug from "debug";
 import { Request, RequestControls } from "../requests/request";
 import {
   CoreEventMap,
-  Segment,
   PeerRequestErrorType,
   RequestError,
-  RequestInnerErrorType,
+  RequestAbortErrorType,
 } from "../types";
 import * as Utils from "../utils/utils";
 import * as Command from "./commands";
 import { PeerProtocol, PeerConfig } from "./peer-protocol";
 import { EventTarget } from "../utils/event-target";
+import { Segment } from "../internal-types";
 
 const { PeerCommandType } = Command;
 type PeerEventHandlers = {
@@ -34,7 +34,7 @@ export class Peer {
   private loadedSegments = new Set<number>();
   private httpLoadingSegments = new Set<number>();
   private downloadingErrors: RequestError<
-    PeerRequestErrorType | RequestInnerErrorType
+    PeerRequestErrorType | RequestAbortErrorType
   >[] = [];
   private logger = debug("core:peer");
   private readonly onPeerClosed: CoreEventMap["onPeerClose"];

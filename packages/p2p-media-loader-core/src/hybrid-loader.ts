@@ -1,15 +1,16 @@
-import { Segment, StreamWithSegments } from "./index";
 import { HttpRequestExecutor } from "./http-loader";
 import { SegmentsMemoryStorage } from "./segments-storage";
-import { CoreConfig, CoreEventMap } from "./types";
+import { CoreConfig, CoreEventMap, EngineCallbacks } from "./types";
 import {
   Playback,
   BandwidthCalculators,
   StreamDetails,
+  Segment,
+  StreamWithSegments,
 } from "./internal-types";
 import { P2PLoadersContainer } from "./p2p/loaders-container";
 import { RequestsContainer } from "./requests/request-container";
-import { EngineRequest, EngineCallbacks } from "./requests/engine-request";
+import { EngineRequest } from "./requests/engine-request";
 import * as QueueUtils from "./utils/queue";
 import * as LoggerUtils from "./utils/logger";
 import * as StreamUtils from "./utils/stream";

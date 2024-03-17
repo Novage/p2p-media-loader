@@ -1,16 +1,12 @@
 import { Peer } from "./peer";
-import {
-  CoreEventMap,
-  Segment,
-  CoreConfig,
-  StreamWithSegments,
-} from "../types";
+import { CoreEventMap, CoreConfig } from "../types";
 import { SegmentsMemoryStorage } from "../segments-storage";
 import { RequestsContainer } from "../requests/request-container";
 import { P2PTrackerClient } from "./tracker-client";
 import * as StreamUtils from "../utils/stream";
 import * as Utils from "../utils/utils";
 import { EventTarget } from "../utils/event-target";
+import { Segment, StreamWithSegments } from "../internal-types";
 
 export class P2PLoader {
   private readonly trackerClient: P2PTrackerClient;

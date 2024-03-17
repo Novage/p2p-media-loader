@@ -1,11 +1,11 @@
 import * as Utils from "./stream-utils";
-import { HookedStream, StreamInfo, Stream } from "./types";
 import {
-  Core,
+  HookedStream,
+  StreamInfo,
+  Stream,
   StreamWithReadonlySegments,
-  SegmentBase,
-  StreamType,
-} from "p2p-media-loader-core";
+} from "./types";
+import { Core, Segment, StreamType } from "p2p-media-loader-core";
 
 // The minimum time interval (in seconds) between segments to assign unique IDs.
 // If two segments in the same playlist start within a time frame shorter than this interval,
@@ -57,11 +57,11 @@ export class SegmentManager {
   }
 
   private processDashSegmentReferences(
-    managerStream: StreamWithReadonlySegments<Stream>,
+    managerStream: StreamWithReadonlySegments,
     segmentReferences: shaka.media.SegmentReference[],
   ) {
     const staleSegmentsIds = new Set(managerStream.segments.keys());
-    const newSegments: SegmentBase[] = [];
+    const newSegments: Segment[] = [];
     for (const reference of segmentReferences) {
       const externalId = Math.trunc(
         reference.getStartTime() / SEGMENT_ID_RESOLUTION_IN_SECONDS,
@@ -88,13 +88,13 @@ export class SegmentManager {
   }
 
   private processHlsSegmentReferences(
-    managerStream: StreamWithReadonlySegments<Stream>,
+    managerStream: StreamWithReadonlySegments,
     segmentReferences: shaka.media.SegmentReference[],
   ) {
     const { segments } = managerStream;
     const lastMediaSequence = Utils.getStreamLastMediaSequence(managerStream);
 
-    const newSegments: SegmentBase[] = [];
+    const newSegments: Segment[] = [];
     if (segments.size === 0) {
       const firstReferenceMediaSequence =
         lastMediaSequence === undefined
@@ -144,7 +144,7 @@ function* itemsBackwards<T>(items: T[]) {
 }
 
 function* nSegmentsBackwards(
-  segments: ReadonlyMap<string, SegmentBase>,
+  segments: ReadonlyMap<string, Segment>,
   count: number,
 ) {
   let i = 0;

@@ -1,7 +1,8 @@
-import { Segment, CoreConfig, Stream } from "./types";
+import { CoreConfig, Stream } from "./types";
 import * as StreamUtils from "./utils/stream";
 import debug from "debug";
 import { EventTarget } from "./utils/event-target";
+import { Segment } from "./internal-types";
 
 type StorageConfig = Pick<
   CoreConfig,

@@ -1,5 +1,5 @@
-import { Playback, BandwidthCalculators } from "../internal-types";
-import { Segment, CoreConfig, CoreEventMap } from "../types";
+import { Playback, BandwidthCalculators, Segment } from "../internal-types";
+import { CoreConfig, CoreEventMap } from "../types";
 import { EventTarget } from "../utils/event-target";
 import { Request } from "./request";
 

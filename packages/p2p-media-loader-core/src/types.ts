@@ -2,7 +2,7 @@ export type StreamType = "main" | "secondary";
 
 export type ByteRange = { start: number; end: number };
 
-export type SegmentBase = {
+export type Segment = {
   readonly localId: string;
   readonly externalId: number;
   readonly url: string;
@@ -11,29 +11,10 @@ export type SegmentBase = {
   readonly endTime: number;
 };
 
-export type Segment = SegmentBase & {
-  readonly stream: StreamWithSegments;
-};
-
 export type Stream = {
   readonly localId: string;
   readonly type: StreamType;
   readonly index: number;
-};
-
-export type StreamWithSegments<
-  TStream extends Stream = Stream,
-  TMap extends ReadonlyMap<string, SegmentBase> = Map<string, Segment>,
-> = TStream & {
-  readonly segments: TMap;
-};
-
-export type StreamWithReadonlySegments<TStream extends Stream = Stream> =
-  StreamWithSegments<TStream, ReadonlyMap<string, SegmentBase>>;
-
-export type SegmentResponse = {
-  data: ArrayBuffer;
-  bandwidth: number;
 };
 
 export type DynamicCoreConfig = Partial<
@@ -80,7 +61,7 @@ export type DownloadSource = "http" | "p2p";
  * @param {DownloadSource} downloadSource - The source of the download.
  * @param {string | undefined} peerId - The peer ID of the peer that the event is about, if applicable.
  */
-export interface SegmentEventDetails {
+export interface SegmentStartDetails {
   segment: Segment;
   downloadSource: DownloadSource;
   peerId: string | undefined;
@@ -127,7 +108,6 @@ export interface SegmentLoadDetails {
  * The CoreEventMap defines a comprehensive suite of event handlers crucial for monitoring and controlling the lifecycle
  * of segment downloading and uploading processes.
  */
-
 export type CoreEventMap = {
   /**
    * Invoked when a segment is fully downloaded and available for use.
@@ -135,36 +115,42 @@ export type CoreEventMap = {
    * @param {SegmentLoadDetails} params - Contains information about the loaded segment.
    */
   onSegmentLoaded: (params: SegmentLoadDetails) => void;
+
   /**
    * Triggered when an error occurs during the download of a segment.
    *
    * @param {SegmentErrorDetails} params - Contains information about the errored segment.
    */
   onSegmentError: (params: SegmentErrorDetails) => void;
+
   /**
    * Called if the download of a segment is aborted before completion.
    *
    * @param {SegmentAbortDetails} params - Contains information about the aborted segment.
    */
   onSegmentAbort: (params: SegmentAbortDetails) => void;
+
   /**
    * Fired at the beginning of a segment download process.
    *
-   * @param {SegmentEventDetails} params - Provides details about the segment being downloaded.
+   * @param {SegmentStartDetails} params - Provides details about the segment being downloaded.
    */
-  onSegmentStart: (params: SegmentEventDetails) => void;
+  onSegmentStart: (params: SegmentStartDetails) => void;
+
   /**
    * Occurs when a new peer-to-peer connection is established.
    *
    * @param {string} peerId - The unique identifier of the peer that has just connected.
    */
   onPeerConnect: (peerId: string) => void;
+
   /**
    * Triggered when an existing peer-to-peer connection is closed.
    *
    * @param {string} peerId - The unique identifier of the peer whose connection has been closed.
    */
   onPeerClose: (peerId: string) => void;
+
   /**
    * Invoked after a chunk of data from a segment has been successfully downloaded.
    *
@@ -177,6 +163,7 @@ export type CoreEventMap = {
     downloadSource: DownloadSource,
     peerId?: string,
   ) => void;
+
   /**
    * Called when a chunk of data has been successfully uploaded to a peer.
    *
@@ -186,7 +173,7 @@ export type CoreEventMap = {
   onChunkUploaded: (bytesLength: number, peerId: string) => void;
 };
 
-export type RequestInnerErrorType = "abort" | "bytes-receiving-timeout";
+export type RequestAbortErrorType = "abort" | "bytes-receiving-timeout";
 
 export type HttpRequestErrorType =
   | "http-error"
@@ -201,7 +188,7 @@ export type PeerRequestErrorType =
   | "p2p-segment-validation-failed";
 
 export type RequestErrorType =
-  | RequestInnerErrorType
+  | RequestAbortErrorType
   | PeerRequestErrorType
   | HttpRequestErrorType;
 
@@ -218,3 +205,19 @@ export class RequestError<
     this.timestamp = performance.now();
   }
 }
+
+export type SegmentResponse = {
+  data: ArrayBuffer;
+  bandwidth: number;
+};
+
+export class CoreRequestError extends Error {
+  constructor(readonly type: "failed" | "aborted") {
+    super();
+  }
+}
+
+export type EngineCallbacks = {
+  onSuccess: (response: SegmentResponse) => void;
+  onError: (reason: CoreRequestError) => void;
+};

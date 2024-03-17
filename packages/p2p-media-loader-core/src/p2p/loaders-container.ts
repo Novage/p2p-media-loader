@@ -1,10 +1,11 @@
 import { P2PLoader } from "./loader";
 import debug from "debug";
-import { CoreEventMap, CoreConfig, Stream, StreamWithSegments } from "../index";
+import { CoreEventMap, CoreConfig, Stream } from "../index";
 import { RequestsContainer } from "../requests/request-container";
 import { SegmentsMemoryStorage } from "../segments-storage";
 import * as LoggerUtils from "../utils/logger";
 import { EventTarget } from "../utils/event-target";
+import { StreamWithSegments } from "../internal-types";
 
 type P2PLoaderContainerItem = {
   stream: Stream;

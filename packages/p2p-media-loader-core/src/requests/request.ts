@@ -1,11 +1,6 @@
 import debug from "debug";
-import { BandwidthCalculators, Playback } from "../internal-types";
-import {
-  CoreEventMap,
-  RequestError,
-  RequestInnerErrorType,
-  Segment,
-} from "../types";
+import { BandwidthCalculators, Playback, Segment } from "../internal-types";
+import { CoreEventMap, RequestError, RequestAbortErrorType } from "../types";
 
 import * as LoggerUtils from "../utils/logger";
 import * as StreamUtils from "../utils/stream";
@@ -66,7 +61,7 @@ export class Request {
   private progress?: LoadProgress;
   private notReceivingBytesTimeout: Timeout;
   private _abortRequestCallback?: (
-    error: RequestError<RequestInnerErrorType>,
+    error: RequestError<RequestAbortErrorType>,
   ) => void;
   private readonly _logger: debug.Debugger;
   private _isHandledByProcessQueue = false;
@@ -156,7 +151,7 @@ export class Request {
     requestData: StartRequestParameters,
     controls: {
       notReceivingBytesTimeoutMs?: number;
-      abort: (errorType: RequestError<RequestInnerErrorType>) => void;
+      abort: (errorType: RequestError<RequestAbortErrorType>) => void;
     },
   ): RequestControls {
     if (this._status === "succeed") {
