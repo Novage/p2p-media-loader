@@ -1,40 +1,29 @@
 import md5 from "nano-md5";
-import { utf8ToUintArray } from "./utils";
+
+export const TRACKER_CLIENT_VERSION_PREFIX = `-PM${formatVersion(__VERSION__)}-`;
 
 const HASH_SYMBOLS =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 const PEER_ID_LENGTH = 20;
 
-export function getStreamHash(streamId: string): {
-  string: string;
-  bytes: Uint8Array;
-} {
+export function getStreamHash(streamId: string): string {
   // slice one byte to have 15 bytes binary string
   const binary15BytesHashString = md5.fromUtf8(streamId).slice(1);
-  const base64Hash20BytesString = btoa(binary15BytesHashString);
-  const hashBytes = utf8ToUintArray(base64Hash20BytesString);
-
-  return { string: btoa(binary15BytesHashString), bytes: hashBytes };
+  const base64Hash20CharsString = btoa(binary15BytesHashString);
+  return base64Hash20CharsString;
 }
 
-export function generateTrackerClientId(
-  customTrackerClientId?: string,
-): Uint8Array {
-  let trackerClientId =
-    customTrackerClientId &&
-    customTrackerClientId.trim() !== "" &&
-    customTrackerClientId.length <= 6
-      ? customTrackerClientId
-      : `-PM${formatVersion(__VERSION__)}-`;
+export function generatePeerId(trackerClientVersionPrefix: string): string {
+  const trackerClientId = [trackerClientVersionPrefix];
+  const randomCharsCount = PEER_ID_LENGTH - trackerClientVersionPrefix.length;
 
-  const randomCharsCount = PEER_ID_LENGTH - trackerClientId.length;
   for (let i = 0; i < randomCharsCount; i++) {
-    trackerClientId += HASH_SYMBOLS.charAt(
-      Math.floor(Math.random() * HASH_SYMBOLS.length),
+    trackerClientId.push(
+      HASH_SYMBOLS[Math.floor(Math.random() * HASH_SYMBOLS.length)],
     );
   }
 
-  return utf8ToUintArray(trackerClientId);
+  return trackerClientId.join("");
 }
 
 function formatVersion(versionString: string) {

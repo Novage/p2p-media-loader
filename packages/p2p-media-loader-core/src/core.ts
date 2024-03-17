@@ -18,6 +18,7 @@ import { BandwidthCalculator } from "./bandwidth-calculator";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import { EventTarget } from "./utils/event-target";
 import { deepConfigMerge } from "./utils/utils";
+import { TRACKER_CLIENT_VERSION_PREFIX } from "./utils/peer";
 
 export class Core<TStream extends Stream = Stream> {
   private readonly eventTarget = new EventTarget<CoreEventMap>();
@@ -37,6 +38,7 @@ export class Core<TStream extends Stream = Stream> {
     httpNotReceivingBytesTimeoutMs: 1000,
     httpErrorRetries: 3,
     p2pErrorRetries: 3,
+    trackerClientVersionPrefix: TRACKER_CLIENT_VERSION_PREFIX,
     announceTrackers: [
       "wss://tracker.webtorrent.dev",
       "wss://tracker.files.fm:7073/announce",

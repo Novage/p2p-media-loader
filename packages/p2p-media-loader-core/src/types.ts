@@ -43,7 +43,8 @@ export type CoreConfig = {
   p2pErrorRetries: number;
   announceTrackers: string[];
   rtcConfig: RTCConfiguration;
-  trackerClientId?: string;
+  trackerClientVersionPrefix: string;
+  swarmId?: string;
   validateP2PSegment?: (url: string, byteRange?: ByteRange) => Promise<boolean>;
   httpRequestSetup?: (
     segmentUrl: string,
@@ -61,11 +62,11 @@ export type DownloadSource = "http" | "p2p";
  * @param {DownloadSource} downloadSource - The source of the download.
  * @param {string | undefined} peerId - The peer ID of the peer that the event is about, if applicable.
  */
-export interface SegmentStartDetails {
+export type SegmentStartDetails = {
   segment: Segment;
   downloadSource: DownloadSource;
   peerId: string | undefined;
-}
+};
 
 /**
  * Represents details about a segment error event with an error property to provide details about a segment download error.
@@ -74,12 +75,12 @@ export interface SegmentStartDetails {
  * @param {DownloadSource} downloadSource - The source of the download.
  * @param {string | undefined} peerId - The peer ID of the peer that the event is about, if applicable.
  */
-export interface SegmentErrorDetails {
+export type SegmentErrorDetails = {
   error: RequestError;
   segment: Segment;
   downloadSource: DownloadSource;
   peerId: string | undefined;
-}
+};
 
 /**
  * Represents details about a segment abort event, including the segment, the source of download, and an optional peer ID.
@@ -87,22 +88,22 @@ export interface SegmentErrorDetails {
  * @param {DownloadSource | undefined} downloadSource - The source of the download.
  * @param {string | undefined} peerId - The peer ID of the peer that the event is about, if applicable.
  */
-export interface SegmentAbortDetails {
+export type SegmentAbortDetails = {
   segment: Segment;
   downloadSource: DownloadSource | undefined;
   peerId: string | undefined;
-}
+};
 
 /**
  * Represents the details about a loaded segment, including the length in bytes and the source of the download.
  * @param {number} bytesLength - The length of the segment in bytes.
  * @param {DownloadSource} downloadSource - The source of the download.
  */
-export interface SegmentLoadDetails {
+export type SegmentLoadDetails = {
   bytesLength: number;
   downloadSource: DownloadSource;
   peerId: string | undefined;
-}
+};
 
 /**
  * The CoreEventMap defines a comprehensive suite of event handlers crucial for monitoring and controlling the lifecycle

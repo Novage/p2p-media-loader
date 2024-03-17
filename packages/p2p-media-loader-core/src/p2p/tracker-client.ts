@@ -9,11 +9,13 @@ import * as LoggerUtils from "../utils/logger";
 import { Peer } from "./peer";
 import { EventTarget } from "../utils/event-target";
 import { StreamWithSegments } from "../internal-types";
+import { utf8ToUintArray } from "../utils/utils";
 
 type PeerItem = {
   peer?: Peer;
   potentialConnections: Set<PeerConnection>;
 };
+
 type P2PTrackerClientEventHandlers = {
   onPeerConnected: (peer: Peer) => void;
   onSegmentRequested: (peer: Peer, segmentExternalId: number) => void;
@@ -32,16 +34,14 @@ export class P2PTrackerClient {
     private readonly config: CoreConfig,
     private readonly eventTarget: EventTarget<CoreEventMap>,
   ) {
-    const trackerClientId = PeerUtil.generateTrackerClientId(
-      config.trackerClientId,
-    );
-    const { bytes: streamIdBytes, string: streamHash } =
-      PeerUtil.getStreamHash(streamId);
+    const streamHash = PeerUtil.getStreamHash(streamId);
     this.streamShortId = LoggerUtils.getStreamString(stream);
 
+    const peerId = PeerUtil.generatePeerId(config.trackerClientVersionPrefix);
+
     this.client = new TrackerClient({
-      infoHash: streamIdBytes,
-      peerId: trackerClientId,
+      infoHash: utf8ToUintArray(streamHash),
+      peerId: utf8ToUintArray(peerId),
       announce: this.config.announceTrackers,
       rtcConfig: this.config.rtcConfig,
     });
@@ -49,7 +49,7 @@ export class P2PTrackerClient {
     this.client.on("warning", this.onTrackerClientWarning);
     this.client.on("error", this.onTrackerClientError);
     this.logger(
-      `create new client; \nstream: ${this.streamShortId}; hash: ${streamHash}}`,
+      `create new client; \nstream: ${this.streamShortId}; hash: ${streamHash}\npeerId: ${peerId}`,
     );
   }
 

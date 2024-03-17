@@ -21,7 +21,7 @@ export class P2PLoader {
     eventTarget: EventTarget<CoreEventMap>,
   ) {
     const streamExternalId = StreamUtils.getStreamExternalId(
-      this.streamManifestUrl,
+      this.config.swarmId ?? this.streamManifestUrl,
       this.stream,
     );
 
