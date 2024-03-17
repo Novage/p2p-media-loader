@@ -17,11 +17,11 @@ import {
   DynamicCoreConfig,
 } from "p2p-media-loader-core";
 
-export type HlsjsConfig = {
+export type HlsjsEngineConfig = {
   core: CoreConfig;
 };
 
-export type DynamicHlsConfig = {
+export type DynamicHlsjsEngineConfig = {
   core: DynamicCoreConfig;
 };
 
@@ -31,7 +31,7 @@ export class Engine {
   private hlsInstanceGetter?: () => Hls;
   private currentHlsInstance?: Hls;
 
-  constructor(config?: HlsjsConfig) {
+  constructor(config?: HlsjsEngineConfig) {
     this.core = new Core(config?.core);
     this.segmentManager = new SegmentManager(this.core);
   }
@@ -57,11 +57,11 @@ export class Engine {
     };
   }
 
-  getConfig(): HlsjsConfig {
+  getConfig(): HlsjsEngineConfig {
     return { core: this.core.getConfig() };
   }
 
-  applyDynamicConfig(dynamicConfig: DynamicHlsConfig) {
+  applyDynamicConfig(dynamicConfig: DynamicHlsjsEngineConfig) {
     this.core.applyDynamicConfig(dynamicConfig.core);
   }
 

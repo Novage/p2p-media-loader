@@ -2,7 +2,7 @@ import { PeerConnection } from "bittorrent-tracker";
 import { CoreEventMap, CoreConfig } from "../types";
 import * as Utils from "../utils/utils";
 import * as Command from "./commands";
-import { EventEmitter } from "../utils/event-emitter";
+import { EventTarget } from "../utils/event-target";
 
 export type PeerConfig = Pick<
   CoreConfig,
@@ -25,11 +25,11 @@ export class PeerProtocol {
       onCommandReceived: (command: Command.PeerCommand) => void;
       onSegmentChunkReceived: (data: Uint8Array) => void;
     },
-    eventEmmiter: EventEmitter<CoreEventMap>,
+    eventTarget: EventTarget<CoreEventMap>,
   ) {
     this.onChunkDownloaded =
-      eventEmmiter.getEventDispatcher("onChunkDownloaded");
-    this.onChunkUploaded = eventEmmiter.getEventDispatcher("onChunkUploaded");
+      eventTarget.getEventDispatcher("onChunkDownloaded");
+    this.onChunkUploaded = eventTarget.getEventDispatcher("onChunkUploaded");
     connection.on("data", this.onDataReceived);
   }
 

@@ -62,6 +62,7 @@ export type CoreConfig = {
   p2pErrorRetries: number;
   announceTrackers?: string[];
   rtcConfig?: RTCConfiguration;
+  trackerClientId?: string;
   validateP2PSegment?: (url: string, byteRange?: ByteRange) => Promise<boolean>;
   httpRequestSetup?: (
     segmentUrl: string,

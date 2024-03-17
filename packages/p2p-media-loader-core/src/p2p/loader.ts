@@ -10,7 +10,7 @@ import { RequestsContainer } from "../requests/request-container";
 import { P2PTrackerClient } from "./tracker-client";
 import * as StreamUtils from "../utils/stream";
 import * as Utils from "../utils/utils";
-import { EventEmitter } from "../utils/event-emitter";
+import { EventTarget } from "../utils/event-target";
 
 export class P2PLoader {
   private readonly trackerClient: P2PTrackerClient;
@@ -22,7 +22,7 @@ export class P2PLoader {
     private readonly requests: RequestsContainer,
     private readonly segmentStorage: SegmentsMemoryStorage,
     private readonly config: CoreConfig,
-    eventEmmiter: EventEmitter<CoreEventMap>,
+    eventTarget: EventTarget<CoreEventMap>,
   ) {
     const streamExternalId = StreamUtils.getStreamExternalId(
       this.streamManifestUrl,
@@ -38,7 +38,7 @@ export class P2PLoader {
         onSegmentRequested: this.onSegmentRequested,
       },
       this.config,
-      eventEmmiter,
+      eventTarget,
     );
 
     this.segmentStorage.subscribeOnUpdate(

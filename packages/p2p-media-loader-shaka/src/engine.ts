@@ -20,11 +20,11 @@ import {
   DynamicCoreConfig,
 } from "p2p-media-loader-core";
 
-export type DynamicShakaConfig = {
+export type DynamicShakaEngineConfig = {
   core: DynamicCoreConfig;
 };
 
-export type ShakaConfig = {
+export type ShakaEngineConfig = {
   core: CoreConfig;
 };
 
@@ -38,7 +38,7 @@ export class Engine {
   private readonly segmentManager: SegmentManager;
   private requestFilter?: shaka.extern.RequestFilter;
 
-  constructor(shaka: unknown, config?: ShakaConfig) {
+  constructor(shaka: unknown, config?: ShakaEngineConfig) {
     this.shaka = (shaka as Shaka | undefined) ?? window.shaka;
     this.core = new Core(config?.core);
     this.segmentManager = new SegmentManager(this.streamInfo, this.core);
@@ -59,11 +59,11 @@ export class Engine {
     this.updatePlayerEventHandlers("register");
   }
 
-  applyDynamiConfig(dynamicConfig: DynamicShakaConfig) {
+  applyDynamiConfig(dynamicConfig: DynamicShakaEngineConfig) {
     this.core.applyDynamicConfig(dynamicConfig.core);
   }
 
-  getConfig(): ShakaConfig {
+  getConfig(): ShakaEngineConfig {
     return { core: this.core.getConfig() };
   }
 

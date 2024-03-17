@@ -13,11 +13,11 @@ import * as StreamUtils from "./utils/stream";
 import { BandwidthCalculator } from "./bandwidth-calculator";
 import { EngineCallbacks } from "./requests/engine-request";
 import { SegmentsMemoryStorage } from "./segments-storage";
-import { EventEmitter } from "./utils/event-emitter";
+import { EventTarget } from "./utils/event-target";
 import { deepConfigMerge } from "./utils/utils";
 
 export class Core<TStream extends Stream = Stream> {
-  private readonly eventEmitter = new EventEmitter<CoreEventMap>();
+  private readonly eventTarget = new EventTarget<CoreEventMap>();
   private manifestResponseUrl?: string;
   private readonly streams = new Map<string, StreamWithSegments<TStream>>();
   private config: CoreConfig = {
@@ -68,14 +68,14 @@ export class Core<TStream extends Stream = Stream> {
     eventName: K,
     listener: CoreEventMap[K],
   ) {
-    this.eventEmitter.addEventListener(eventName, listener);
+    this.eventTarget.addEventListener(eventName, listener);
   }
 
   removeEventListener<K extends keyof CoreEventMap>(
     eventName: K,
     listener: CoreEventMap[K],
   ) {
-    this.eventEmitter.removeEventListener(eventName, listener);
+    this.eventTarget.removeEventListener(eventName, listener);
   }
 
   setManifestResponseUrl(url: string): void {
@@ -208,7 +208,7 @@ export class Core<TStream extends Stream = Stream> {
         this.config,
         this.bandwidthCalculators,
         this.segmentStorage,
-        this.eventEmitter,
+        this.eventTarget,
       );
     };
 

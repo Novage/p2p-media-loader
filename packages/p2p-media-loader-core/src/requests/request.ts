@@ -10,7 +10,7 @@ import {
 import * as LoggerUtils from "../utils/logger";
 import * as StreamUtils from "../utils/stream";
 import * as Utils from "../utils/utils";
-import { EventEmitter } from "../utils/event-emitter";
+import { EventTarget } from "../utils/event-target";
 
 export type LoadProgress = {
   startTimestamp: number;
@@ -81,12 +81,12 @@ export class Request {
     private readonly bandwidthCalculators: BandwidthCalculators,
     private readonly playback: Playback,
     private readonly playbackConfig: StreamUtils.PlaybackTimeWindowsConfig,
-    eventEmitter: EventEmitter<CoreEventMap>,
+    eventTarget: EventTarget<CoreEventMap>,
   ) {
-    this.onSegmentError = eventEmitter.getEventDispatcher("onSegmentError");
-    this.onSegmentAbort = eventEmitter.getEventDispatcher("onSegmentAbort");
-    this.onSegmentStart = eventEmitter.getEventDispatcher("onSegmentStart");
-    this.onSegmentLoaded = eventEmitter.getEventDispatcher("onSegmentLoaded");
+    this.onSegmentError = eventTarget.getEventDispatcher("onSegmentError");
+    this.onSegmentAbort = eventTarget.getEventDispatcher("onSegmentAbort");
+    this.onSegmentStart = eventTarget.getEventDispatcher("onSegmentStart");
+    this.onSegmentLoaded = eventTarget.getEventDispatcher("onSegmentLoaded");
 
     this.id = Request.getRequestItemId(this.segment);
     const { byteRange } = this.segment;

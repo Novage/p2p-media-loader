@@ -1,7 +1,7 @@
 import { CoreEventMap, CoreConfig } from "./types";
 import { Request as SegmentRequest, RequestControls } from "./requests/request";
 import { RequestError, HttpRequestErrorType } from "./types";
-import { EventEmitter } from "./utils/event-emitter";
+import { EventTarget } from "./utils/event-target";
 
 type HttpConfig = Pick<
   CoreConfig,
@@ -18,10 +18,10 @@ export class HttpRequestExecutor {
   constructor(
     private readonly request: SegmentRequest,
     private readonly httpConfig: HttpConfig,
-    eventEmitter: EventEmitter<CoreEventMap>,
+    eventTarget: EventTarget<CoreEventMap>,
   ) {
     this.onChunkDownloaded =
-      eventEmitter.getEventDispatcher("onChunkDownloaded");
+      eventTarget.getEventDispatcher("onChunkDownloaded");
 
     const { byteRange } = this.request.segment;
     if (byteRange) this.requestByteRange = { ...byteRange };

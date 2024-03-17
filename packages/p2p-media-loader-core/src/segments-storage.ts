@@ -1,7 +1,7 @@
 import { Segment, CoreConfig, Stream } from "./types";
 import * as StreamUtils from "./utils/stream";
 import debug from "debug";
-import { EventEmitter } from "./utils/event-emitter";
+import { EventTarget } from "./utils/event-target";
 
 type StorageConfig = Pick<
   CoreConfig,
@@ -30,7 +30,7 @@ export class SegmentsMemoryStorage {
     segment: Segment,
   ) => boolean)[] = [];
   private readonly logger: debug.Debugger;
-  private readonly eventEmitter = new EventEmitter<StorageEventHandlers>();
+  private readonly eventTarget = new EventTarget<StorageEventHandlers>();
 
   constructor(
     private readonly masterManifestUrl: string,
@@ -150,7 +150,7 @@ export class SegmentsMemoryStorage {
     listener: StorageEventHandlers["onStorageUpdated-"],
   ) {
     const localId = StreamUtils.getStreamShortId(stream);
-    this.eventEmitter.addEventListener(`onStorageUpdated-${localId}`, listener);
+    this.eventTarget.addEventListener(`onStorageUpdated-${localId}`, listener);
   }
 
   unsubscribeFromUpdate(
@@ -158,14 +158,14 @@ export class SegmentsMemoryStorage {
     listener: StorageEventHandlers["onStorageUpdated-"],
   ) {
     const localId = StreamUtils.getStreamShortId(stream);
-    this.eventEmitter.removeEventListener(
+    this.eventTarget.removeEventListener(
       `onStorageUpdated-${localId}`,
       listener,
     );
   }
 
   private dispatchStorageUpdatedEvent(stream: Stream) {
-    this.eventEmitter.dispatchEvent(
+    this.eventTarget.dispatchEvent(
       `onStorageUpdated-${StreamUtils.getStreamShortId(stream)}`,
       stream,
     );

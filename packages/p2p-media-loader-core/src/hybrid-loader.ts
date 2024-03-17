@@ -16,7 +16,7 @@ import * as StreamUtils from "./utils/stream";
 import * as Utils from "./utils/utils";
 import debug from "debug";
 import { QueueItem } from "./utils/queue";
-import { EventEmitter } from "./utils/event-emitter";
+import { EventTarget } from "./utils/event-target";
 
 const FAILED_ATTEMPTS_CLEAR_INTERVAL = 60000;
 
@@ -40,7 +40,7 @@ export class HybridLoader {
     private readonly config: CoreConfig,
     private readonly bandwidthCalculators: BandwidthCalculators,
     private readonly segmentStorage: SegmentsMemoryStorage,
-    private readonly eventEmitter: EventEmitter<CoreEventMap>,
+    private readonly eventTarget: EventTarget<CoreEventMap>,
   ) {
     const activeStream = this.lastRequestedSegment.stream;
     this.playback = { position: this.lastRequestedSegment.startTime, rate: 1 };
@@ -50,7 +50,7 @@ export class HybridLoader {
       this.bandwidthCalculators,
       this.playback,
       this.config,
-      this.eventEmitter,
+      this.eventTarget,
     );
 
     if (!this.segmentStorage.isInitialized) {
@@ -70,7 +70,7 @@ export class HybridLoader {
       this.requests,
       this.segmentStorage,
       this.config,
-      this.eventEmitter,
+      this.eventTarget,
     );
 
     this.logger = debug(`core:hybrid-loader-${activeStream.type}`);
@@ -325,7 +325,7 @@ export class HybridLoader {
 
   private loadThroughHttp(segment: Segment) {
     const request = this.requests.getOrCreateRequest(segment);
-    new HttpRequestExecutor(request, this.config, this.eventEmitter);
+    new HttpRequestExecutor(request, this.config, this.eventTarget);
     this.p2pLoaders.currentLoader.broadcastAnnouncement();
   }
 

@@ -17,27 +17,28 @@ export function getStreamHash(streamId: string): {
   return { string: btoa(binary15BytesHashString), bytes: hashBytes };
 }
 
-export function generatePeerId(customPeerId?: string): {
-  string: string;
-  bytes: Uint8Array;
-} {
-  let peerId =
-    customPeerId && customPeerId.trim() !== "" && customPeerId.length <= 6
-      ? customPeerId
+export function generateTrackerClientId(
+  customTrackerClientId?: string,
+): Uint8Array {
+  let trackerClientId =
+    customTrackerClientId &&
+    customTrackerClientId.trim() !== "" &&
+    customTrackerClientId.length <= 6
+      ? customTrackerClientId
       : `-PM${formatVersion(__VERSION__)}-`;
 
-  const randomCharsCount = PEER_ID_LENGTH - peerId.length;
+  const randomCharsCount = PEER_ID_LENGTH - trackerClientId.length;
   for (let i = 0; i < randomCharsCount; i++) {
-    peerId += HASH_SYMBOLS.charAt(
+    trackerClientId += HASH_SYMBOLS.charAt(
       Math.floor(Math.random() * HASH_SYMBOLS.length),
     );
   }
 
-  return { string: peerId, bytes: utf8ToUintArray(peerId) };
+  return utf8ToUintArray(trackerClientId);
 }
 
 function formatVersion(versionString: string) {
-  const splitedVersion = versionString.split(".");
+  const splittedVersion = versionString.split(".");
 
-  return `${splitedVersion[0].padStart(2, "0")}${splitedVersion[1].padStart(2, "0")}`;
+  return `${splittedVersion[0].padStart(2, "0")}${splittedVersion[1].padStart(2, "0")}`;
 }

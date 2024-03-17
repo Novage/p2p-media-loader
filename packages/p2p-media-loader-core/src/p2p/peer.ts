@@ -11,7 +11,7 @@ import {
 import * as Utils from "../utils/utils";
 import * as Command from "./commands";
 import { PeerProtocol, PeerConfig } from "./peer-protocol";
-import { EventEmitter } from "../utils/event-emitter";
+import { EventTarget } from "../utils/event-target";
 
 const { PeerCommandType } = Command;
 type PeerEventHandlers = {
@@ -43,9 +43,9 @@ export class Peer {
     private readonly connection: PeerConnection,
     private readonly eventHandlers: PeerEventHandlers,
     private readonly peerConfig: PeerConfig,
-    eventEmmiter: EventEmitter<CoreEventMap>,
+    eventTarget: EventTarget<CoreEventMap>,
   ) {
-    this.onPeerClosed = eventEmmiter.getEventDispatcher("onPeerClose");
+    this.onPeerClosed = eventTarget.getEventDispatcher("onPeerClose");
 
     this.id = Peer.getPeerIdFromConnection(connection);
     this.peerProtocol = new PeerProtocol(
@@ -56,9 +56,9 @@ export class Peer {
         // eslint-disable-next-line @typescript-eslint/no-misused-promises
         onCommandReceived: this.onCommandReceived,
       },
-      eventEmmiter,
+      eventTarget,
     );
-    eventEmmiter.getEventDispatcher("onPeerConnect")(this.id);
+    eventTarget.getEventDispatcher("onPeerConnect")(this.id);
     connection.on("close", this.onPeerConnectionClosed);
     connection.on("error", this.onConnectionError);
   }

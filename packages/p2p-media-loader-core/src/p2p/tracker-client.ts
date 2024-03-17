@@ -7,7 +7,7 @@ import debug from "debug";
 import * as PeerUtil from "../utils/peer";
 import * as LoggerUtils from "../utils/logger";
 import { Peer } from "./peer";
-import { EventEmitter } from "../utils/event-emitter";
+import { EventTarget } from "../utils/event-target";
 
 type PeerItem = {
   peer?: Peer;
@@ -19,7 +19,6 @@ type P2PTrackerClientEventHandlers = {
 };
 
 export class P2PTrackerClient {
-  private readonly peerId: string;
   private readonly streamShortId: string;
   private readonly client: TrackerClient;
   private readonly _peers = new Map<string, PeerItem>();
@@ -30,19 +29,18 @@ export class P2PTrackerClient {
     stream: StreamWithSegments,
     private readonly eventHandlers: P2PTrackerClientEventHandlers,
     private readonly config: CoreConfig,
-    private readonly eventEmmiter: EventEmitter<CoreEventMap>,
-    private readonly customPeerId?: string,
+    private readonly eventTarget: EventTarget<CoreEventMap>,
   ) {
-    const { string: peerId, bytes: peerIdBytes } =
-      PeerUtil.generatePeerId(customPeerId);
+    const trackerClientId = PeerUtil.generateTrackerClientId(
+      config.trackerClientId,
+    );
     const { bytes: streamIdBytes, string: streamHash } =
       PeerUtil.getStreamHash(streamId);
-    this.peerId = peerId;
     this.streamShortId = LoggerUtils.getStreamString(stream);
 
     this.client = new TrackerClient({
       infoHash: streamIdBytes,
-      peerId: peerIdBytes,
+      peerId: trackerClientId,
       port: 6881,
       announce: this.config.announceTrackers ?? [
         // "wss://tracker.novage.com.ua",
@@ -62,7 +60,7 @@ export class P2PTrackerClient {
     this.client.on("warning", this.onTrackerClientWarning);
     this.client.on("error", this.onTrackerClientError);
     this.logger(
-      `create new client; \nstream: ${this.streamShortId}; hash: ${streamHash}; \npeer id: ${this.peerId}`,
+      `create new client; \nstream: ${this.streamShortId}; hash: ${streamHash}}`,
     );
   }
 
@@ -111,7 +109,7 @@ export class P2PTrackerClient {
           onSegmentRequested: this.eventHandlers.onSegmentRequested,
         },
         this.config,
-        this.eventEmmiter,
+        this.eventTarget,
       );
       this.logger(
         `connected with peer: ${peerItem.peer.id} ${this.streamShortId}`,

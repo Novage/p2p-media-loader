@@ -1,4 +1,4 @@
-export class EventEmitter<
+export class EventTarget<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   EventTypesMap extends { [key: string]: (...args: any[]) => unknown },
 > {
