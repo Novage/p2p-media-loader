@@ -42,20 +42,8 @@ export class P2PTrackerClient {
     this.client = new TrackerClient({
       infoHash: streamIdBytes,
       peerId: trackerClientId,
-      port: 6881,
-      announce: this.config.announceTrackers ?? [
-        // "wss://tracker.novage.com.ua",
-        "wss://tracker.webtorrent.dev",
-        "wss://tracker.files.fm:7073/announce",
-        "wss://tracker.openwebtorrent.com",
-      ],
-      rtcConfig: {
-        iceServers: this.config.rtcConfig?.iceServers ?? [
-          { urls: "stun:stun.l.google.com:19302" },
-          { urls: "stun:global.stun.twilio.com:3478" },
-        ],
-        ...this.config.rtcConfig,
-      },
+      announce: this.config.announceTrackers,
+      rtcConfig: this.config.rtcConfig,
     });
     this.client.on("peer", this.onReceivePeerConnection);
     this.client.on("warning", this.onTrackerClientWarning);

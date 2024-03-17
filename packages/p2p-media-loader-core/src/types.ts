@@ -41,8 +41,8 @@ export type CoreConfig = {
   httpNotReceivingBytesTimeoutMs: number;
   httpErrorRetries: number;
   p2pErrorRetries: number;
-  announceTrackers?: string[];
-  rtcConfig?: RTCConfiguration;
+  announceTrackers: string[];
+  rtcConfig: RTCConfiguration;
   trackerClientId?: string;
   validateP2PSegment?: (url: string, byteRange?: ByteRange) => Promise<boolean>;
   httpRequestSetup?: (

@@ -4,7 +4,6 @@ declare module "bittorrent-tracker" {
       infoHash: Uint8Array;
       peerId: Uint8Array;
       announce: string[];
-      port: number;
       rtcConfig?: RTCConfiguration;
       getAnnounceOpts?: () => object;
     });

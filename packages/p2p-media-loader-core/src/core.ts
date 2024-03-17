@@ -37,6 +37,18 @@ export class Core<TStream extends Stream = Stream> {
     httpNotReceivingBytesTimeoutMs: 1000,
     httpErrorRetries: 3,
     p2pErrorRetries: 3,
+    announceTrackers: [
+      "wss://tracker.webtorrent.dev",
+      "wss://tracker.files.fm:7073/announce",
+      "wss://tracker.openwebtorrent.com",
+      // "wss://tracker.novage.com.ua",
+    ],
+    rtcConfig: {
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:global.stun.twilio.com:3478" },
+      ],
+    },
   };
   private readonly bandwidthCalculators: BandwidthCalculators = {
     all: new BandwidthCalculator(),
