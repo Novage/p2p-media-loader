@@ -1,9 +1,11 @@
 import { P2PLoader } from "./loader";
 import debug from "debug";
-import { Settings, Stream, StreamWithSegments } from "../index";
+import { CoreEventMap, Stream } from "../index";
 import { RequestsContainer } from "../requests/request-container";
 import { SegmentsMemoryStorage } from "../segments-storage";
 import * as LoggerUtils from "../utils/logger";
+import { EventTarget } from "../utils/event-target";
+import { ReadonlyCoreConfig, StreamWithSegments } from "../internal-types";
 
 type P2PLoaderContainerItem = {
   stream: Stream;
@@ -15,14 +17,15 @@ type P2PLoaderContainerItem = {
 export class P2PLoadersContainer {
   private readonly loaders = new Map<string, P2PLoaderContainerItem>();
   private _currentLoaderItem!: P2PLoaderContainerItem;
-  private readonly logger = debug("core:p2p-loaders-container");
+  private readonly logger = debug("p2pml-core:p2p-loaders-container");
 
   constructor(
     private readonly streamManifestUrl: string,
     stream: StreamWithSegments,
     private readonly requests: RequestsContainer,
     private readonly segmentStorage: SegmentsMemoryStorage,
-    private readonly settings: Settings,
+    private readonly config: ReadonlyCoreConfig,
+    private readonly eventTarget: EventTarget<CoreEventMap>,
   ) {
     this.changeCurrentLoader(stream);
   }
@@ -36,7 +39,8 @@ export class P2PLoadersContainer {
       stream,
       this.requests,
       this.segmentStorage,
-      this.settings,
+      this.config,
+      this.eventTarget,
     );
     const loggerInfo = LoggerUtils.getStreamString(stream);
     this.logger(`created new loader: ${loggerInfo}`);
@@ -73,7 +77,7 @@ export class P2PLoadersContainer {
   private setLoaderDestroyTimeout(item: P2PLoaderContainerItem) {
     item.destroyTimeoutId = window.setTimeout(
       () => this.destroyAndRemoveLoader(item),
-      this.settings.p2pLoaderDestroyTimeoutMs,
+      this.config.p2pLoaderDestroyTimeoutMs,
     );
   }
 

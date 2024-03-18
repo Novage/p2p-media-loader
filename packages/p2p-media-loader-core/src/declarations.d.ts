@@ -4,7 +4,6 @@ declare module "bittorrent-tracker" {
       infoHash: Uint8Array;
       peerId: Uint8Array;
       announce: string[];
-      port: number;
       rtcConfig?: RTCConfiguration;
       getAnnounceOpts?: () => object;
     });
@@ -39,6 +38,7 @@ declare module "bittorrent-tracker" {
 
   export type PeerConnection = {
     id: string;
+    idUtf8: string;
     initiator: boolean;
     _channel: RTCDataChannel;
     on<E extends keyof PeerEvents>(event: E, handler: PeerEvents[E]): void;

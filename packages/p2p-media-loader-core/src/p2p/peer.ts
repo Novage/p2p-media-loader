@@ -1,16 +1,17 @@
 import { PeerConnection } from "bittorrent-tracker";
 import debug from "debug";
+import { Request, RequestControls } from "../requests/request";
 import {
+  CoreEventMap,
   PeerRequestErrorType,
-  Request,
-  RequestControls,
   RequestError,
-  RequestInnerErrorType,
-} from "../requests/request";
-import { Segment } from "../types";
+  RequestAbortErrorType,
+} from "../types";
 import * as Utils from "../utils/utils";
 import * as Command from "./commands";
-import { PeerProtocol, PeerSettings } from "./peer-protocol";
+import { PeerProtocol, PeerConfig } from "./peer-protocol";
+import { EventTarget } from "../utils/event-target";
+import { Segment } from "../internal-types";
 
 const { PeerCommandType } = Command;
 type PeerEventHandlers = {
@@ -33,22 +34,31 @@ export class Peer {
   private loadedSegments = new Set<number>();
   private httpLoadingSegments = new Set<number>();
   private downloadingErrors: RequestError<
-    PeerRequestErrorType | RequestInnerErrorType
+    PeerRequestErrorType | RequestAbortErrorType
   >[] = [];
-  private logger = debug("core:peer");
+  private logger = debug("p2pml-core:peer");
+  private readonly onPeerClosed: CoreEventMap["onPeerClose"];
 
   constructor(
     private readonly connection: PeerConnection,
     private readonly eventHandlers: PeerEventHandlers,
-    private readonly settings: PeerSettings,
+    private readonly peerConfig: PeerConfig,
+    eventTarget: EventTarget<CoreEventMap>,
   ) {
-    this.id = Peer.getPeerIdFromConnection(connection);
-    this.peerProtocol = new PeerProtocol(connection, settings, {
-      onSegmentChunkReceived: this.onSegmentChunkReceived,
-      // eslint-disable-next-line @typescript-eslint/no-misused-promises
-      onCommandReceived: this.onCommandReceived,
-    });
+    this.onPeerClosed = eventTarget.getEventDispatcher("onPeerClose");
 
+    this.id = Peer.getPeerIdFromConnection(connection);
+    this.peerProtocol = new PeerProtocol(
+      connection,
+      peerConfig,
+      {
+        onSegmentChunkReceived: this.onSegmentChunkReceived,
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises
+        onCommandReceived: this.onCommandReceived,
+      },
+      eventTarget,
+    );
+    eventTarget.getEventDispatcher("onPeerConnect")(this.id);
     connection.on("close", this.onPeerConnectionClosed);
     connection.on("error", this.onConnectionError);
   }
@@ -78,10 +88,13 @@ export class Peer {
       case PeerCommandType.SegmentData:
         {
           if (!this.downloadingContext) break;
+
           const { request, controls } = this.downloadingContext;
           if (request.segment.externalId !== command.i) break;
+
           this.downloadingContext.isSegmentDataCommandReceived = true;
           controls.firstBytesReceived();
+
           if (request.totalBytes === undefined) {
             request.setTotalBytes(command.s);
           } else if (request.totalBytes - request.loadedBytes !== command.s) {
@@ -122,7 +135,7 @@ export class Peer {
         }
 
         const isValid =
-          (await this.settings.validateP2PSegment?.(
+          (await this.peerConfig.validateP2PSegment?.(
             request.segment.url,
             request.segment.byteRange,
           )) ?? true;
@@ -182,10 +195,10 @@ export class Peer {
       request: segmentRequest,
       isSegmentDataCommandReceived: false,
       controls: segmentRequest.start(
-        { type: "p2p", peerId: this.id },
+        { downloadSource: "p2p", peerId: this.id },
         {
           notReceivingBytesTimeoutMs:
-            this.settings.p2pNotReceivingBytesTimeoutMs,
+            this.peerConfig.p2pNotReceivingBytesTimeoutMs,
           abort: (error) => {
             if (!this.downloadingContext) return;
             const { request } = this.downloadingContext;
@@ -198,7 +211,7 @@ export class Peer {
               (error) => error.type === "bytes-receiving-timeout",
             );
 
-            if (timeoutErrors.length >= this.settings.p2pErrorRetries) {
+            if (timeoutErrors.length >= this.peerConfig.p2pErrorRetries) {
               this.destroy();
             }
           },
@@ -293,6 +306,7 @@ export class Peer {
     this.cancelSegmentDownloading("peer-closed");
     this.connection.destroy();
     this.eventHandlers.onPeerClosed(this);
+    this.onPeerClosed(this.id);
     this.logger(`peer closed ${this.id}`);
   };
 

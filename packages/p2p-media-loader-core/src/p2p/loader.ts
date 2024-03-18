@@ -1,11 +1,16 @@
 import { Peer } from "./peer";
-import { Segment, Settings, StreamWithSegments } from "../types";
+import { CoreEventMap } from "../types";
 import { SegmentsMemoryStorage } from "../segments-storage";
 import { RequestsContainer } from "../requests/request-container";
-import { Request } from "../requests/request";
 import { P2PTrackerClient } from "./tracker-client";
 import * as StreamUtils from "../utils/stream";
 import * as Utils from "../utils/utils";
+import { EventTarget } from "../utils/event-target";
+import {
+  ReadonlyCoreConfig,
+  Segment,
+  StreamWithSegments,
+} from "../internal-types";
 
 export class P2PLoader {
   private readonly trackerClient: P2PTrackerClient;
@@ -16,10 +21,11 @@ export class P2PLoader {
     private readonly stream: StreamWithSegments,
     private readonly requests: RequestsContainer,
     private readonly segmentStorage: SegmentsMemoryStorage,
-    private readonly settings: Settings,
+    private readonly config: ReadonlyCoreConfig,
+    eventTarget: EventTarget<CoreEventMap>,
   ) {
     const streamExternalId = StreamUtils.getStreamExternalId(
-      this.streamManifestUrl,
+      this.config.swarmId ?? this.streamManifestUrl,
       this.stream,
     );
 
@@ -31,17 +37,19 @@ export class P2PLoader {
         // eslint-disable-next-line @typescript-eslint/no-misused-promises
         onSegmentRequested: this.onSegmentRequested,
       },
-      this.settings,
+      this.config,
+      eventTarget,
     );
 
     this.segmentStorage.subscribeOnUpdate(
       this.stream,
       this.broadcastAnnouncement,
     );
+
     this.trackerClient.start();
   }
 
-  downloadSegment(segment: Segment): Request | undefined {
+  downloadSegment(segment: Segment) {
     const peersWithSegment: Peer[] = [];
     for (const peer of this.trackerClient.peers()) {
       if (

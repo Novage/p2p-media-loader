@@ -1,4 +1,11 @@
-import { Segment, Settings, Playback, BandwidthCalculators } from "../types";
+import {
+  Playback,
+  BandwidthCalculators,
+  Segment,
+  ReadonlyCoreConfig,
+} from "../internal-types";
+import { CoreEventMap } from "../types";
+import { EventTarget } from "../utils/event-target";
 import { Request } from "./request";
 
 export class RequestsContainer {
@@ -8,7 +15,8 @@ export class RequestsContainer {
     private readonly requestProcessQueueCallback: () => void,
     private readonly bandwidthCalculators: BandwidthCalculators,
     private readonly playback: Playback,
-    private readonly settings: Settings,
+    private readonly config: ReadonlyCoreConfig,
+    private readonly eventTarget: EventTarget<CoreEventMap>,
   ) {}
 
   get executingHttpCount() {
@@ -39,7 +47,8 @@ export class RequestsContainer {
         this.requestProcessQueueCallback,
         this.bandwidthCalculators,
         this.playback,
-        this.settings,
+        this.config,
+        this.eventTarget,
       );
       this.requests.set(segment, request);
     }
@@ -56,13 +65,13 @@ export class RequestsContainer {
 
   *httpRequests(): Generator<Request, void> {
     for (const request of this.requests.values()) {
-      if (request.type === "http") yield request;
+      if (request.downloadSource === "http") yield request;
     }
   }
 
   *p2pRequests(): Generator<Request, void> {
     for (const request of this.requests.values()) {
-      if (request.type === "p2p") yield request;
+      if (request.downloadSource === "p2p") yield request;
     }
   }
 

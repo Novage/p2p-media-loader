@@ -42,9 +42,9 @@ export function getRandomItem<T>(items: T[]): T {
 
 export function utf8ToUintArray(utf8String: string): Uint8Array {
   const encoder = new TextEncoder();
-  const hashBytes = new Uint8Array(utf8String.length);
-  encoder.encodeInto(utf8String, hashBytes);
-  return hashBytes;
+  const bytes = new Uint8Array(utf8String.length);
+  encoder.encodeInto(utf8String, bytes);
+  return bytes;
 }
 
 export function hexToUtf8(hexString: string) {
@@ -60,5 +60,27 @@ export function hexToUtf8(hexString: string) {
 export function* arrayBackwards<T>(arr: T[]) {
   for (let i = arr.length - 1; i >= 0; i--) {
     yield arr[i];
+  }
+}
+
+function isObject(item: unknown): item is Record<string, unknown> {
+  return !!item && typeof item === "object" && !Array.isArray(item);
+}
+
+function isArray(item: unknown): item is unknown[] {
+  return Array.isArray(item);
+}
+
+export function deepCopy<T>(item: T): T {
+  if (isArray(item)) {
+    return item.map((element) => deepCopy(element)) as T;
+  } else if (isObject(item)) {
+    const copy = {} as Record<string, unknown>;
+    for (const key of Object.keys(item)) {
+      copy[key] = deepCopy(item[key]);
+    }
+    return copy as T;
+  } else {
+    return item;
   }
 }

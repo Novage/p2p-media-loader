@@ -1,4 +1,8 @@
-import type { Stream as CoreStream, Core } from "p2p-media-loader-core";
+import type {
+  Stream as CoreStream,
+  Core,
+  Segment,
+} from "p2p-media-loader-core";
 import { SegmentManager } from "./segment-manager";
 
 export type StreamProtocol = "hls" | "dash";
@@ -8,7 +12,7 @@ export type StreamInfo = {
   manifestResponseUrl?: string;
 };
 
-type HookedStream = shaka.extern.Stream & {
+export type HookedStream = shaka.extern.Stream & {
   streamUrl?: string;
   mediaSequenceTimeMap?: Map<number, number>;
   isSegmentIndexAlreadyRead?: boolean;
@@ -20,7 +24,7 @@ export type Stream = CoreStream & {
 
 export type Shaka = typeof window.shaka;
 
-type P2PMLShakaData = {
+export type P2PMLShakaData = {
   player: shaka.Player;
   core: Core<Stream>;
   shaka: Shaka;
@@ -34,4 +38,8 @@ export type HookedRequest = shaka.extern.Request & {
 
 export type HookedNetworkingEngine = shaka.net.NetworkingEngine & {
   p2pml?: P2PMLShakaData;
+};
+
+export type StreamWithReadonlySegments = Stream & {
+  segments: ReadonlyMap<string, Segment>;
 };

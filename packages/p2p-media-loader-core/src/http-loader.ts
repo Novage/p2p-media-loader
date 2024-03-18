@@ -1,13 +1,11 @@
-import { Settings } from "./types";
-import {
-  Request as SegmentRequest,
-  RequestError,
-  HttpRequestErrorType,
-  RequestControls,
-} from "./requests/request";
+import { CoreEventMap } from "./types";
+import { Request as SegmentRequest, RequestControls } from "./requests/request";
+import { RequestError, HttpRequestErrorType } from "./types";
+import { EventTarget } from "./utils/event-target";
+import { ReadonlyCoreConfig } from "./internal-types";
 
-type HttpSettings = Pick<
-  Settings,
+type HttpConfig = Pick<
+  ReadonlyCoreConfig,
   "httpNotReceivingBytesTimeoutMs" | "httpRequestSetup"
 >;
 
@@ -16,11 +14,16 @@ export class HttpRequestExecutor {
   private readonly abortController = new AbortController();
   private readonly expectedBytesLength?: number;
   private readonly requestByteRange?: { start: number; end?: number };
+  private readonly onChunkDownloaded: CoreEventMap["onChunkDownloaded"];
 
   constructor(
     private readonly request: SegmentRequest,
-    private readonly settings: HttpSettings,
+    private readonly httpConfig: HttpConfig,
+    eventTarget: EventTarget<CoreEventMap>,
   ) {
+    this.onChunkDownloaded =
+      eventTarget.getEventDispatcher("onChunkDownloaded");
+
     const { byteRange } = this.request.segment;
     if (byteRange) this.requestByteRange = { ...byteRange };
 
@@ -34,12 +37,12 @@ export class HttpRequestExecutor {
         this.request.totalBytes - this.request.loadedBytes;
     }
 
-    const { httpNotReceivingBytesTimeoutMs } = this.settings;
     this.requestControls = this.request.start(
-      { type: "http" },
+      { downloadSource: "http" },
       {
         abort: () => this.abortController.abort("abort"),
-        notReceivingBytesTimeoutMs: httpNotReceivingBytesTimeoutMs,
+        notReceivingBytesTimeoutMs:
+          this.httpConfig.httpNotReceivingBytesTimeoutMs,
       },
     );
     void this.fetch();
@@ -48,7 +51,7 @@ export class HttpRequestExecutor {
   private async fetch() {
     const { segment } = this.request;
     try {
-      let request = await this.settings.httpRequestSetup?.(
+      let request = await this.httpConfig.httpRequestSetup?.(
         segment.url,
         segment.byteRange,
         this.abortController.signal,
@@ -90,6 +93,7 @@ export class HttpRequestExecutor {
       const reader = response.body.getReader();
       for await (const chunk of readStream(reader)) {
         this.requestControls.addLoadedChunk(chunk);
+        this.onChunkDownloaded(chunk.byteLength, "http");
       }
       requestControls.completeOnSuccess();
     } catch (error) {
@@ -101,9 +105,12 @@ export class HttpRequestExecutor {
     if (!response.ok) {
       if (response.status === 406) {
         this.request.clearLoadedBytes();
-        throw new RequestError("http-bytes-mismatch", response.statusText);
+        throw new RequestError<"http-bytes-mismatch">(
+          "http-bytes-mismatch",
+          response.statusText,
+        );
       } else {
-        throw new RequestError("http-error", response.statusText);
+        throw new RequestError<"http-error">("http-error", response.statusText);
       }
     }
 

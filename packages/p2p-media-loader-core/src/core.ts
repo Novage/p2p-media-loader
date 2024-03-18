@@ -1,25 +1,28 @@
 import { HybridLoader } from "./hybrid-loader";
 import {
   Stream,
-  StreamWithSegments,
-  Segment,
-  Settings,
-  SegmentBase,
-  BandwidthCalculators,
-  StreamDetails,
+  CoreConfig,
+  Segment as SegmentBase,
   CoreEventMap,
+  DynamicCoreConfig,
+  EngineCallbacks,
 } from "./types";
+import {
+  BandwidthCalculators,
+  Segment,
+  StreamDetails,
+  StreamWithSegments,
+} from "./internal-types";
 import * as StreamUtils from "./utils/stream";
 import { BandwidthCalculator } from "./bandwidth-calculator";
-import { EngineCallbacks } from "./requests/engine-request";
 import { SegmentsMemoryStorage } from "./segments-storage";
-import { EventEmitter } from "./utils/event-emitter";
+import { EventTarget } from "./utils/event-target";
+import { deepCopy } from "./utils/utils";
+import { TRACKER_CLIENT_VERSION_PREFIX } from "./utils/peer";
+import { DeepReadonly } from "ts-essentials";
 
 export class Core<TStream extends Stream = Stream> {
-  private readonly eventEmitter = new EventEmitter<CoreEventMap>();
-  private manifestResponseUrl?: string;
-  private readonly streams = new Map<string, StreamWithSegments<TStream>>();
-  private readonly settings: Settings = {
+  static readonly DEFAULT_CONFIG: DeepReadonly<CoreConfig> = {
     simultaneousHttpDownloads: 3,
     simultaneousP2PDownloads: 3,
     highDemandTimeWindow: 15,
@@ -33,7 +36,25 @@ export class Core<TStream extends Stream = Stream> {
     httpNotReceivingBytesTimeoutMs: 1000,
     httpErrorRetries: 3,
     p2pErrorRetries: 3,
+    trackerClientVersionPrefix: TRACKER_CLIENT_VERSION_PREFIX,
+    announceTrackers: [
+      "wss://tracker.webtorrent.dev",
+      "wss://tracker.files.fm:7073/announce",
+      "wss://tracker.openwebtorrent.com",
+      // "wss://tracker.novage.com.ua",
+    ],
+    rtcConfig: {
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:global.stun.twilio.com:3478" },
+      ],
+    },
   };
+
+  private readonly eventTarget = new EventTarget<CoreEventMap>();
+  private manifestResponseUrl?: string;
+  private readonly streams = new Map<string, StreamWithSegments<TStream>>();
+  private config: DeepReadonly<CoreConfig>;
   private readonly bandwidthCalculators: BandwidthCalculators = {
     all: new BandwidthCalculator(),
     http: new BandwidthCalculator(),
@@ -46,20 +67,30 @@ export class Core<TStream extends Stream = Stream> {
     activeLevelBitrate: 0,
   };
 
-  constructor() {}
+  constructor(config?: DeepReadonly<Partial<CoreConfig>>) {
+    this.config = deepCopy({ ...Core.DEFAULT_CONFIG, ...config });
+  }
+
+  getConfig(): DeepReadonly<CoreConfig> {
+    return this.config;
+  }
+
+  applyDynamicConfig(dynamicConfig: DeepReadonly<DynamicCoreConfig>) {
+    this.config = deepCopy({ ...this.config, ...dynamicConfig });
+  }
 
   addEventListener<K extends keyof CoreEventMap>(
     eventName: K,
     listener: CoreEventMap[K],
   ) {
-    this.eventEmitter.addEventListener(eventName, listener);
+    this.eventTarget.addEventListener(eventName, listener);
   }
 
   removeEventListener<K extends keyof CoreEventMap>(
     eventName: K,
     listener: CoreEventMap[K],
   ) {
-    this.eventEmitter.removeEventListener(eventName, listener);
+    this.eventTarget.removeEventListener(eventName, listener);
   }
 
   setManifestResponseUrl(url: string): void {
@@ -85,18 +116,24 @@ export class Core<TStream extends Stream = Stream> {
 
   updateStream(
     streamLocalId: string,
-    addSegments?: SegmentBase[],
-    removeSegmentIds?: string[],
+    addSegments?: Iterable<SegmentBase>,
+    removeSegmentIds?: Iterable<string>,
   ): void {
     const stream = this.streams.get(streamLocalId);
     if (!stream) return;
 
-    addSegments?.forEach((s) => {
-      const segment = { ...s, stream };
-      stream.segments.set(segment.localId, segment);
-    });
+    if (addSegments) {
+      for (const segment of addSegments) {
+        if (stream.segments.has(segment.localId)) continue; // should not happen
+        stream.segments.set(segment.localId, { ...segment, stream });
+      }
+    }
 
-    removeSegmentIds?.forEach((id) => stream.segments.delete(id));
+    if (removeSegmentIds) {
+      for (const id of removeSegmentIds) {
+        stream.segments.delete(id);
+      }
+    }
 
     this.mainStreamLoader?.updateStream(stream);
     this.secondaryStreamLoader?.updateStream(stream);
@@ -110,7 +147,7 @@ export class Core<TStream extends Stream = Stream> {
     if (!this.segmentStorage) {
       this.segmentStorage = new SegmentsMemoryStorage(
         this.manifestResponseUrl,
-        this.settings,
+        this.config,
       );
       await this.segmentStorage.initialize();
     }
@@ -171,33 +208,32 @@ export class Core<TStream extends Stream = Stream> {
   }
 
   private getStreamHybridLoader(segment: Segment) {
+    if (segment.stream.type === "main") {
+      this.mainStreamLoader ??= this.createNewHybridLoader(segment);
+      return this.mainStreamLoader;
+    } else {
+      this.secondaryStreamLoader ??= this.createNewHybridLoader(segment);
+      return this.secondaryStreamLoader;
+    }
+  }
+
+  private createNewHybridLoader(segment: Segment) {
     if (!this.manifestResponseUrl) {
       throw new Error("Manifest response url is not defined");
     }
 
-    const createNewHybridLoader = (manifestResponseUrl: string) => {
-      if (!this.segmentStorage?.isInitialized) {
-        throw new Error("Segment storage is not initialized");
-      }
-      return new HybridLoader(
-        manifestResponseUrl,
-        segment,
-        this.streamDetails,
-        this.settings,
-        this.bandwidthCalculators,
-        this.segmentStorage,
-        this.eventEmitter,
-      );
-    };
-
-    if (segment.stream.type === "main") {
-      this.mainStreamLoader ??= createNewHybridLoader(this.manifestResponseUrl);
-      return this.mainStreamLoader;
-    } else {
-      this.secondaryStreamLoader ??= createNewHybridLoader(
-        this.manifestResponseUrl,
-      );
-      return this.secondaryStreamLoader;
+    if (!this.segmentStorage?.isInitialized) {
+      throw new Error("Segment storage is not initialized");
     }
+
+    return new HybridLoader(
+      this.manifestResponseUrl,
+      segment,
+      this.streamDetails,
+      this.config,
+      this.bandwidthCalculators,
+      this.segmentStorage,
+      this.eventTarget,
+    );
   }
 }

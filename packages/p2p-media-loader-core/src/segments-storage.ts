@@ -1,10 +1,11 @@
-import { Segment, Settings, Stream } from "./types";
+import { Stream } from "./types";
 import * as StreamUtils from "./utils/stream";
 import debug from "debug";
-import { EventEmitter } from "./utils/event-emitter";
+import { EventTarget } from "./utils/event-target";
+import { ReadonlyCoreConfig, Segment } from "./internal-types";
 
-type StorageSettings = Pick<
-  Settings,
+type StorageConfig = Pick<
+  ReadonlyCoreConfig,
   "cachedSegmentExpiration" | "cachedSegmentsCount"
 >;
 
@@ -30,13 +31,13 @@ export class SegmentsMemoryStorage {
     segment: Segment,
   ) => boolean)[] = [];
   private readonly logger: debug.Debugger;
-  private readonly eventEmitter = new EventEmitter<StorageEventHandlers>();
+  private readonly eventTarget = new EventTarget<StorageEventHandlers>();
 
   constructor(
     private readonly masterManifestUrl: string,
-    private readonly settings: StorageSettings,
+    private readonly storageConfig: StorageConfig,
   ) {
-    this.logger = debug("core:segment-memory-storage");
+    this.logger = debug("p2pml-core:segment-memory-storage");
     this.logger.color = "RebeccaPurple";
   }
 
@@ -108,7 +109,7 @@ export class SegmentsMemoryStorage {
     for (const entry of this.cache.entries()) {
       const [itemId, item] = entry;
       const { lastAccessed, segment } = item;
-      if (now - lastAccessed > this.settings.cachedSegmentExpiration) {
+      if (now - lastAccessed > this.storageConfig.cachedSegmentExpiration) {
         if (!this.isSegmentLocked(segment)) {
           itemsToDelete.push(itemId);
           streamsOfChangedItems.add(segment.stream);
@@ -120,7 +121,7 @@ export class SegmentsMemoryStorage {
 
     // Delete segments over cached count
     let countOverhead =
-      remainingItems.length - this.settings.cachedSegmentsCount;
+      remainingItems.length - this.storageConfig.cachedSegmentsCount;
     if (countOverhead > 0) {
       remainingItems.sort(([, a], [, b]) => a.lastAccessed - b.lastAccessed);
 
@@ -150,7 +151,7 @@ export class SegmentsMemoryStorage {
     listener: StorageEventHandlers["onStorageUpdated-"],
   ) {
     const localId = StreamUtils.getStreamShortId(stream);
-    this.eventEmitter.addEventListener(`onStorageUpdated-${localId}`, listener);
+    this.eventTarget.addEventListener(`onStorageUpdated-${localId}`, listener);
   }
 
   unsubscribeFromUpdate(
@@ -158,14 +159,14 @@ export class SegmentsMemoryStorage {
     listener: StorageEventHandlers["onStorageUpdated-"],
   ) {
     const localId = StreamUtils.getStreamShortId(stream);
-    this.eventEmitter.removeEventListener(
+    this.eventTarget.removeEventListener(
       `onStorageUpdated-${localId}`,
       listener,
     );
   }
 
   private dispatchStorageUpdatedEvent(stream: Stream) {
-    this.eventEmitter.dispatchEvent(
+    this.eventTarget.dispatchEvent(
       `onStorageUpdated-${StreamUtils.getStreamShortId(stream)}`,
       stream,
     );

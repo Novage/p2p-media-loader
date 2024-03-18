@@ -1,10 +1,12 @@
 import { PeerConnection } from "bittorrent-tracker";
-import { Settings } from "../types";
+import { CoreEventMap } from "../types";
 import * as Utils from "../utils/utils";
 import * as Command from "./commands";
+import { EventTarget } from "../utils/event-target";
+import { ReadonlyCoreConfig } from "../internal-types";
 
-export type PeerSettings = Pick<
-  Settings,
+export type PeerConfig = Pick<
+  ReadonlyCoreConfig,
   | "p2pNotReceivingBytesTimeoutMs"
   | "webRtcMaxMessageSize"
   | "p2pErrorRetries"
@@ -14,15 +16,21 @@ export type PeerSettings = Pick<
 export class PeerProtocol {
   private commandChunks?: Command.BinaryCommandChunksJoiner;
   private uploadingContext?: { stopUploading: () => void };
+  private readonly onChunkDownloaded: CoreEventMap["onChunkDownloaded"];
+  private readonly onChunkUploaded: CoreEventMap["onChunkUploaded"];
 
   constructor(
     private readonly connection: PeerConnection,
-    private readonly settings: PeerSettings,
+    private readonly peerConfig: PeerConfig,
     private readonly eventHandlers: {
       onCommandReceived: (command: Command.PeerCommand) => void;
       onSegmentChunkReceived: (data: Uint8Array) => void;
     },
+    eventTarget: EventTarget<CoreEventMap>,
   ) {
+    this.onChunkDownloaded =
+      eventTarget.getEventDispatcher("onChunkDownloaded");
+    this.onChunkUploaded = eventTarget.getEventDispatcher("onChunkUploaded");
     connection.on("data", this.onDataReceived);
   }
 
@@ -31,13 +39,15 @@ export class PeerProtocol {
       this.receivingCommandBytes(data);
     } else {
       this.eventHandlers.onSegmentChunkReceived(data);
+
+      this.onChunkDownloaded(data.length, "p2p", this.connection.idUtf8);
     }
   };
 
   sendCommand(command: Command.PeerCommand) {
     const binaryCommandBuffers = Command.serializePeerCommand(
       command,
-      this.settings.webRtcMaxMessageSize,
+      this.peerConfig.webRtcMaxMessageSize,
     );
     for (const buffer of binaryCommandBuffers) {
       this.connection.send(buffer);
@@ -53,7 +63,7 @@ export class PeerProtocol {
     if (this.uploadingContext) {
       throw new Error(`Some segment data is already uploading.`);
     }
-    const chunks = getBufferChunks(data, this.settings.webRtcMaxMessageSize);
+    const chunks = getBufferChunks(data, this.peerConfig.webRtcMaxMessageSize);
     const channel = this.connection._channel;
     const { promise, resolve, reject } = Utils.getControlledPromise<void>();
 
@@ -76,8 +86,10 @@ export class PeerProtocol {
           break;
         }
         this.connection.send(chunk);
+        this.onChunkUploaded(chunk.byteLength, this.connection.idUtf8);
       }
     };
+
     try {
       channel.addEventListener("bufferedamountlow", sendChunk);
       isUploadingSegmentData = true;

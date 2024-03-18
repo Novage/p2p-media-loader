@@ -29,7 +29,8 @@
     "type-check": "npx tsc --noEmit"
   },
   "dependencies": {
-    "hls.js": "^1.5.0",
-    "p2p-media-loader-core": "workspace:*"
+    "hls.js": "^1.5.7",
+    "p2p-media-loader-core": "workspace:*",
+    "ts-essentials": "^9.4.1"
   }
 }

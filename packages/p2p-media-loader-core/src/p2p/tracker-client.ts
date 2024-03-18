@@ -2,64 +2,54 @@ import TrackerClient, {
   PeerConnection,
   TrackerClientEvents,
 } from "bittorrent-tracker";
-import { Settings, StreamWithSegments } from "../types";
+import { CoreEventMap } from "../types";
 import debug from "debug";
 import * as PeerUtil from "../utils/peer";
 import * as LoggerUtils from "../utils/logger";
 import { Peer } from "./peer";
+import { EventTarget } from "../utils/event-target";
+import { ReadonlyCoreConfig, StreamWithSegments } from "../internal-types";
+import { utf8ToUintArray } from "../utils/utils";
 
 type PeerItem = {
   peer?: Peer;
   potentialConnections: Set<PeerConnection>;
 };
+
 type P2PTrackerClientEventHandlers = {
   onPeerConnected: (peer: Peer) => void;
   onSegmentRequested: (peer: Peer, segmentExternalId: number) => void;
 };
 
 export class P2PTrackerClient {
-  private readonly peerId: string;
   private readonly streamShortId: string;
   private readonly client: TrackerClient;
   private readonly _peers = new Map<string, PeerItem>();
-  private readonly logger = debug("core:p2p-tracker-client");
+  private readonly logger = debug("p2pml-core:p2p-tracker-client");
 
   constructor(
     streamId: string,
     stream: StreamWithSegments,
     private readonly eventHandlers: P2PTrackerClientEventHandlers,
-    private readonly settings: Settings,
-    private readonly customPeerId?: string,
+    private readonly config: ReadonlyCoreConfig,
+    private readonly eventTarget: EventTarget<CoreEventMap>,
   ) {
-    const { string: peerId, bytes: peerIdBytes } =
-      PeerUtil.generatePeerId(customPeerId);
-    const { bytes: streamIdBytes, string: streamHash } =
-      PeerUtil.getStreamHash(streamId);
-    this.peerId = peerId;
+    const streamHash = PeerUtil.getStreamHash(streamId);
     this.streamShortId = LoggerUtils.getStreamString(stream);
 
+    const peerId = PeerUtil.generatePeerId(config.trackerClientVersionPrefix);
+
     this.client = new TrackerClient({
-      infoHash: streamIdBytes,
-      peerId: peerIdBytes,
-      port: 6881,
-      announce: [
-        // "wss://tracker.novage.com.ua",
-        "wss://tracker.webtorrent.dev",
-        "wss://tracker.files.fm:7073/announce",
-        "wss://tracker.openwebtorrent.com",
-      ],
-      rtcConfig: {
-        iceServers: [
-          { urls: "stun:stun.l.google.com:19302" },
-          { urls: "stun:global.stun.twilio.com:3478" },
-        ],
-      },
+      infoHash: utf8ToUintArray(streamHash),
+      peerId: utf8ToUintArray(peerId),
+      announce: this.config.announceTrackers as string[],
+      rtcConfig: this.config.rtcConfig as RTCConfiguration,
     });
     this.client.on("peer", this.onReceivePeerConnection);
     this.client.on("warning", this.onTrackerClientWarning);
     this.client.on("error", this.onTrackerClientError);
     this.logger(
-      `create new client; \nstream: ${this.streamShortId}; hash: ${streamHash}; \npeer id: ${this.peerId}`,
+      `create new client; \nstream: ${this.streamShortId}; hash: ${streamHash}\npeerId: ${peerId}`,
     );
   }
 
@@ -89,6 +79,7 @@ export class P2PTrackerClient {
       return;
     } else if (!peerItem) {
       peerItem = { potentialConnections: new Set() };
+      peerConnection.idUtf8 = itemId;
       peerItem.potentialConnections.add(peerConnection);
       this._peers.set(itemId, peerItem);
     }
@@ -106,7 +97,8 @@ export class P2PTrackerClient {
           onPeerClosed: this.onPeerClosed,
           onSegmentRequested: this.eventHandlers.onSegmentRequested,
         },
-        this.settings,
+        this.config,
+        this.eventTarget,
       );
       this.logger(
         `connected with peer: ${peerItem.peer.id} ${this.streamShortId}`,

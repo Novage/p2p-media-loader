@@ -1,8 +1,8 @@
-import { Segment, Playback } from "../types";
+import { Playback, Segment } from "../internal-types";
 import {
   getSegmentPlaybackStatuses,
   SegmentPlaybackStatuses,
-  PlaybackTimeWindowsSettings,
+  PlaybackTimeWindowsConfig,
 } from "./stream";
 
 export type QueueItem = { segment: Segment; statuses: SegmentPlaybackStatuses };
@@ -10,7 +10,7 @@ export type QueueItem = { segment: Segment; statuses: SegmentPlaybackStatuses };
 export function* generateQueue(
   lastRequestedSegment: Readonly<Segment>,
   playback: Readonly<Playback>,
-  settings: PlaybackTimeWindowsSettings,
+  playbackConfig: PlaybackTimeWindowsConfig,
 ): Generator<QueueItem, void> {
   const { localId: requestedSegmentId, stream } = lastRequestedSegment;
 
@@ -27,7 +27,11 @@ export function* generateQueue(
     first = next.value;
   } while (first !== requestedSegment);
 
-  const firstStatuses = getSegmentPlaybackStatuses(first, playback, settings);
+  const firstStatuses = getSegmentPlaybackStatuses(
+    first,
+    playback,
+    playbackConfig,
+  );
   if (isNotActualStatuses(firstStatuses)) {
     const next = queueSegments.next();
 
@@ -41,7 +45,7 @@ export function* generateQueue(
     const secondStatuses = getSegmentPlaybackStatuses(
       second,
       playback,
-      settings,
+      playbackConfig,
     );
 
     if (isNotActualStatuses(secondStatuses)) return;
@@ -53,7 +57,11 @@ export function* generateQueue(
   }
 
   for (const segment of queueSegments) {
-    const statuses = getSegmentPlaybackStatuses(segment, playback, settings);
+    const statuses = getSegmentPlaybackStatuses(
+      segment,
+      playback,
+      playbackConfig,
+    );
     if (isNotActualStatuses(statuses)) break;
     yield { segment, statuses };
   }

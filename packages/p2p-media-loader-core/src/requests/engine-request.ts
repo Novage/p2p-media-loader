@@ -1,9 +1,5 @@
-import { Segment, SegmentResponse } from "../types";
-
-export type EngineCallbacks = {
-  onSuccess: (response: SegmentResponse) => void;
-  onError: (reason: CoreRequestError) => void;
-};
+import { Segment } from "../internal-types";
+import { CoreRequestError, EngineCallbacks } from "../types";
 
 export class EngineRequest {
   private _status: "pending" | "succeed" | "failed" | "aborted" = "pending";
@@ -42,11 +38,5 @@ export class EngineRequest {
 
   markAsShouldBeStartedImmediately() {
     this._shouldBeStartedImmediately = true;
-  }
-}
-
-export class CoreRequestError extends Error {
-  constructor(readonly type: "failed" | "aborted") {
-    super();
   }
 }

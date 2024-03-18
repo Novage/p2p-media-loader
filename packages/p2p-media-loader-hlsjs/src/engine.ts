@@ -10,38 +10,68 @@ import type { HlsConfig, Events } from "hls.js";
 import { FragmentLoaderBase } from "./fragment-loader";
 import { PlaylistLoaderBase } from "./playlist-loader";
 import { SegmentManager } from "./segment-mananger";
-import { Core, CoreEventMap } from "p2p-media-loader-core";
+import {
+  CoreConfig,
+  Core,
+  CoreEventMap,
+  DynamicCoreConfig,
+  debug,
+} from "p2p-media-loader-core";
+import { DeepReadonly } from "ts-essentials";
+
+export type HlsJsEngineConfig = {
+  core: CoreConfig;
+};
+
+export type PartialHlsJsEngineConfig = Partial<
+  Omit<HlsJsEngineConfig, "core">
+> & {
+  core?: Partial<CoreConfig>;
+};
+
+export type DynamicHlsJsEngineConfig = {
+  core?: DynamicCoreConfig;
+};
 
 export class Engine {
   private readonly core: Core;
   private readonly segmentManager: SegmentManager;
   private hlsInstanceGetter?: () => Hls;
   private currentHlsInstance?: Hls;
+  private readonly debug = debug("p2pml-hlsjs:engine");
 
-  constructor() {
-    this.core = new Core();
+  constructor(config?: DeepReadonly<PartialHlsJsEngineConfig>) {
+    this.core = new Core(config?.core);
     this.segmentManager = new SegmentManager(this.core);
   }
 
-  public addEventListener<K extends keyof CoreEventMap>(
+  addEventListener<K extends keyof CoreEventMap>(
     eventName: K,
     listener: CoreEventMap[K],
   ) {
     this.core.addEventListener(eventName, listener);
   }
 
-  public removeEventListener<K extends keyof CoreEventMap>(
+  removeEventListener<K extends keyof CoreEventMap>(
     eventName: K,
     listener: CoreEventMap[K],
   ) {
     this.core.removeEventListener(eventName, listener);
   }
 
-  public getConfig(): Partial<HlsConfig> {
+  getHlsConfig(): Partial<HlsConfig> {
     return {
       fLoader: this.createFragmentLoaderClass(),
       pLoader: this.createPlaylistLoaderClass(),
     };
+  }
+
+  getConfig(): DeepReadonly<HlsJsEngineConfig> {
+    return { core: this.core.getConfig() };
+  }
+
+  applyDynamicConfig(dynamicConfig: DeepReadonly<DynamicHlsJsEngineConfig>) {
+    if (dynamicConfig.core) this.core.applyDynamicConfig(dynamicConfig.core);
   }
 
   setHls(hls: Hls | (() => Hls)) {
@@ -129,12 +159,17 @@ export class Engine {
   ) => {
     if (
       this.currentHlsInstance &&
+      this.currentHlsInstance.config.liveSyncDurationCount !==
+        data.details.fragments.length - 1 &&
       data.details.live &&
       data.details.fragments[0].type === ("main" as PlaylistLevelType) &&
       !this.currentHlsInstance.userConfig.liveSyncDuration &&
       !this.currentHlsInstance.userConfig.liveSyncDurationCount &&
       data.details.fragments.length > 4
     ) {
+      this.debug(
+        `set liveSyncDurationCount ${data.details.fragments.length - 1}`,
+      );
       this.currentHlsInstance.config.liveSyncDurationCount =
         data.details.fragments.length - 1;
     }

@@ -3,7 +3,7 @@ import { Engine as HlsJsEngine } from "p2p-media-loader-hlsjs";
 import { Engine as ShakaEngine } from "p2p-media-loader-shaka";
 import DPlayer from "dplayer";
 import muxjs from "mux.js";
-import { debug } from "p2p-media-loader-core";
+import { SegmentLoadDetails, debug } from "p2p-media-loader-core";
 import type Hls from "hls.js";
 
 declare global {
@@ -86,12 +86,13 @@ function App() {
   const hlsEngine = useRef<HlsJsEngine>();
   const shakaEngine = useRef<ShakaEngine>();
 
-  const onSegmentLoaded = (byteLength: number, type: "http" | "p2p") => {
-    const MBytes = getMBFromBytes(byteLength);
-    if (type === "http") {
+  const onSegmentLoaded = (params: SegmentLoadDetails) => {
+    const { bytesLength, downloadSource } = params;
+    const MBytes = getMBFromBytes(bytesLength);
+    if (downloadSource === "http") {
       setHttpLoaded((prev) => round(prev + MBytes));
       setHttpLoadedGlob((prev) => round(prev + MBytes));
-    } else if (type === "p2p") {
+    } else if (downloadSource === "p2p") {
       setP2PLoaded((prev) => round(prev + MBytes));
       setP2PLoadedGlob((prev) => round(prev + MBytes));
     }
@@ -104,7 +105,7 @@ function App() {
 
   if (!shakaEngine.current) {
     ShakaEngine.setGlobalSettings();
-    shakaEngine.current = new ShakaEngine(window.shaka);
+    shakaEngine.current = new ShakaEngine();
     shakaEngine.current.addEventListener("onSegmentLoaded", onSegmentLoaded);
   }
 
@@ -157,7 +158,7 @@ function App() {
     if (!videoRef.current || !hlsEngine.current) return;
     const engine = hlsEngine.current;
     const hls = new window.Hls({
-      ...engine.getConfig(),
+      ...engine.getHlsConfig(),
     });
 
     engine.setHls(hls);
@@ -177,7 +178,7 @@ function App() {
         type: "customHls",
         customType: {
           customHls: (video: HTMLVideoElement) => {
-            const hls = new window.Hls(engine.getConfig());
+            const hls = new window.Hls(engine.getHlsConfig());
             engine.setHls(hls);
             hls.loadSource(url);
             hls.attachMedia(video);
@@ -201,7 +202,7 @@ function App() {
       source: url,
       playback: {
         hlsjsConfig: {
-          ...engine.getConfig(),
+          ...engine.getHlsConfig(),
         },
       },
       plugins: [window.LevelSelector],
@@ -518,14 +519,16 @@ function useLocalStorageItem<T>(
 }
 
 const loggers = [
-  "core:hybrid-loader-main",
-  "core:hybrid-loader-secondary",
-  "core:p2p-tracker-client",
-  "core:peer",
-  "core:p2p-loaders-container",
-  "core:request-main",
-  "core:request-secondary",
-  "core:segment-memory-storage",
+  "p2pml-core:hybrid-loader-main",
+  "p2pml-core:hybrid-loader-secondary",
+  "p2pml-core:p2p-tracker-client",
+  "p2pml-core:peer",
+  "p2pml-core:p2p-loaders-container",
+  "p2pml-core:request-main",
+  "p2pml-core:request-secondary",
+  "p2pml-core:segment-memory-storage",
+  "p2pml-hlsjs:*",
+  "p2pml-shaka:*",
 ] as const;
 
 const numberToStorageItem = (v: number) => v.toString();

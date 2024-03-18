@@ -13,7 +13,27 @@ import {
   P2PMLShakaData,
 } from "./types";
 import { Loader } from "./loading-handler";
-import { Core, CoreEventMap } from "p2p-media-loader-core";
+import {
+  CoreConfig,
+  Core,
+  CoreEventMap,
+  DynamicCoreConfig,
+} from "p2p-media-loader-core";
+import { DeepReadonly } from "ts-essentials";
+
+export type DynamicShakaEngineConfig = {
+  core?: DynamicCoreConfig;
+};
+
+export type ShakaEngineConfig = {
+  core: CoreConfig;
+};
+
+export type PartialShakaEngineConfig = Partial<
+  Omit<ShakaEngineConfig, "core">
+> & {
+  core?: Partial<CoreConfig>;
+};
 
 const LIVE_EDGE_DELAY = 25;
 
@@ -25,15 +45,16 @@ export class Engine {
   private readonly segmentManager: SegmentManager;
   private requestFilter?: shaka.extern.RequestFilter;
 
-  constructor(shaka?: unknown) {
-    this.shaka = (shaka as Shaka | undefined) ?? window.shaka;
-    this.core = new Core();
+  constructor(config?: DeepReadonly<PartialShakaEngineConfig>, shaka?: Shaka) {
+    this.shaka = shaka ?? window.shaka;
+    this.core = new Core(config?.core);
     this.segmentManager = new SegmentManager(this.streamInfo, this.core);
   }
 
   configureAndInitShakaPlayer(player: shaka.Player) {
     if (this.player === player) return;
     if (this.player) this.destroy();
+
     this.player = player;
     this.player.configure("manifest.defaultPresentationDelay", LIVE_EDGE_DELAY);
     this.player.configure(
@@ -41,17 +62,26 @@ export class Engine {
       true,
     );
     this.player.configure("streaming.useNativeHlsOnSafari", false);
+
     this.updatePlayerEventHandlers("register");
   }
 
-  public addEventListener<K extends keyof CoreEventMap>(
+  applyDynamicConfig(dynamicConfig: DeepReadonly<DynamicShakaEngineConfig>) {
+    if (dynamicConfig.core) this.core.applyDynamicConfig(dynamicConfig.core);
+  }
+
+  getConfig(): DeepReadonly<ShakaEngineConfig> {
+    return { core: this.core.getConfig() };
+  }
+
+  addEventListener<K extends keyof CoreEventMap>(
     eventName: K,
     listener: CoreEventMap[K],
   ) {
     this.core.addEventListener(eventName, listener);
   }
 
-  public removeEventListener<K extends keyof CoreEventMap>(
+  removeEventListener<K extends keyof CoreEventMap>(
     eventName: K,
     listener: CoreEventMap[K],
   ) {
