@@ -1,6 +1,29 @@
 {
   "name": "p2p-media-loader-shaka",
   "version": "1.0.0",
+  "description": "P2P Media Loader Shaka Player integration",
+  "license": "Apache-2.0",
+  "author": "Novage",
+  "homepage": "https://github.com/Novage/p2p-media-loader",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Novage/p2p-media-loader/tree/v1",
+    "directory": "packages/p2p-media-loader-shaka"
+  },
+  "keywords": [
+    "p2p",
+    "peer-to-peer",
+    "hls",
+    "dash",
+    "webrtc",
+    "video",
+    "mse",
+    "player",
+    "torrent",
+    "bittorrent",
+    "webtorrent",
+    "shaka player"
+  ],
   "files": [
     "dist",
     "lib",
