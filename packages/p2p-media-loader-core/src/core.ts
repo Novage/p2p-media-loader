@@ -17,14 +17,12 @@ import * as StreamUtils from "./utils/stream";
 import { BandwidthCalculator } from "./bandwidth-calculator";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import { EventTarget } from "./utils/event-target";
-import { deepConfigMerge } from "./utils/utils";
+import { deepCopy } from "./utils/utils";
 import { TRACKER_CLIENT_VERSION_PREFIX } from "./utils/peer";
+import { DeepReadonly } from "ts-essentials";
 
 export class Core<TStream extends Stream = Stream> {
-  private readonly eventTarget = new EventTarget<CoreEventMap>();
-  private manifestResponseUrl?: string;
-  private readonly streams = new Map<string, StreamWithSegments<TStream>>();
-  private config: CoreConfig = {
+  static DEFAULT_CONFIG: CoreConfig = {
     simultaneousHttpDownloads: 3,
     simultaneousP2PDownloads: 3,
     highDemandTimeWindow: 15,
@@ -52,6 +50,11 @@ export class Core<TStream extends Stream = Stream> {
       ],
     },
   };
+
+  private readonly eventTarget = new EventTarget<CoreEventMap>();
+  private manifestResponseUrl?: string;
+  private readonly streams = new Map<string, StreamWithSegments<TStream>>();
+  private config: DeepReadonly<CoreConfig>;
   private readonly bandwidthCalculators: BandwidthCalculators = {
     all: new BandwidthCalculator(),
     http: new BandwidthCalculator(),
@@ -64,21 +67,16 @@ export class Core<TStream extends Stream = Stream> {
     activeLevelBitrate: 0,
   };
 
-  constructor(config?: CoreConfig) {
-    this.applyConfig(config);
+  constructor(config?: DeepReadonly<Partial<CoreConfig>>) {
+    this.config = deepCopy({ ...Core.DEFAULT_CONFIG, ...config });
   }
 
-  private applyConfig(config?: CoreConfig) {
-    if (!config) return;
-    this.config = deepConfigMerge(this.config, config);
+  getConfig(): DeepReadonly<CoreConfig> {
+    return this.config;
   }
 
-  getConfig() {
-    return deepConfigMerge({}, this.config);
-  }
-
-  applyDynamicConfig(dynamicConfig: DynamicCoreConfig) {
-    this.config = deepConfigMerge(this.config, dynamicConfig);
+  applyDynamicConfig(dynamicConfig: DeepReadonly<DynamicCoreConfig>) {
+    this.config = deepCopy({ ...this.config, ...dynamicConfig });
   }
 
   addEventListener<K extends keyof CoreEventMap>(
@@ -210,33 +208,32 @@ export class Core<TStream extends Stream = Stream> {
   }
 
   private getStreamHybridLoader(segment: Segment) {
+    if (segment.stream.type === "main") {
+      this.mainStreamLoader ??= this.createNewHybridLoader(segment);
+      return this.mainStreamLoader;
+    } else {
+      this.secondaryStreamLoader ??= this.createNewHybridLoader(segment);
+      return this.secondaryStreamLoader;
+    }
+  }
+
+  private createNewHybridLoader(segment: Segment) {
     if (!this.manifestResponseUrl) {
       throw new Error("Manifest response url is not defined");
     }
 
-    const createNewHybridLoader = (manifestResponseUrl: string) => {
-      if (!this.segmentStorage?.isInitialized) {
-        throw new Error("Segment storage is not initialized");
-      }
-      return new HybridLoader(
-        manifestResponseUrl,
-        segment,
-        this.streamDetails,
-        this.config,
-        this.bandwidthCalculators,
-        this.segmentStorage,
-        this.eventTarget,
-      );
-    };
-
-    if (segment.stream.type === "main") {
-      this.mainStreamLoader ??= createNewHybridLoader(this.manifestResponseUrl);
-      return this.mainStreamLoader;
-    } else {
-      this.secondaryStreamLoader ??= createNewHybridLoader(
-        this.manifestResponseUrl,
-      );
-      return this.secondaryStreamLoader;
+    if (!this.segmentStorage?.isInitialized) {
+      throw new Error("Segment storage is not initialized");
     }
+
+    return new HybridLoader(
+      this.manifestResponseUrl,
+      segment,
+      this.streamDetails,
+      this.config,
+      this.bandwidthCalculators,
+      this.segmentStorage,
+      this.eventTarget,
+    );
   }
 }

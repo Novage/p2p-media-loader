@@ -30,7 +30,8 @@
   "dependencies": {
     "bittorrent-tracker": "^11.0.0",
     "debug": "^4.3.4",
-    "nano-md5": "^1.0.5"
+    "nano-md5": "^1.0.5",
+    "ts-essentials": "^9.4.1"
   },
   "devDependencies": {
     "vite-plugin-node-polyfills": "^0.19.0"

@@ -93,6 +93,9 @@ importers:
       nano-md5:
         specifier: ^1.0.5
         version: 1.0.5
+      ts-essentials:
+        specifier: ^9.4.1
+        version: 9.4.1(typescript@5.4.2)
     devDependencies:
       vite-plugin-node-polyfills:
         specifier: ^0.19.0
@@ -106,6 +109,9 @@ importers:
       p2p-media-loader-core:
         specifier: workspace:*
         version: link:../p2p-media-loader-core
+      ts-essentials:
+        specifier: ^9.4.1
+        version: 9.4.1(typescript@5.4.2)
 
   packages/p2p-media-loader-shaka:
     dependencies:
@@ -115,6 +121,9 @@ importers:
       shaka-player:
         specifier: ^4.7.3
         version: 4.7.4
+      ts-essentials:
+        specifier: ^9.4.1
+        version: 9.4.1(typescript@5.4.2)
 
 packages:
 
@@ -3728,6 +3737,17 @@ packages:
       typescript: 5.4.2
     dev: true
 
+  /ts-essentials@9.4.1(typescript@5.4.2):
+    resolution: {integrity: sha512-oke0rI2EN9pzHsesdmrOrnqv1eQODmJpd/noJjwj2ZPC3Z4N2wbjrOEqnsEgmvlO2+4fBb0a794DCna2elEVIQ==}
+    peerDependencies:
+      typescript: '>=4.1.0'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+    dependencies:
+      typescript: 5.4.2
+    dev: false
+
   /tty-browserify@0.0.1:
     resolution: {integrity: sha512-C3TaO7K81YvjCgQH9Q1S3R3P3BtN3RIM8n+OvX4il1K1zgE8ZhI0op7kClgkxtutIE8hQrcrHBXvIheqKUUCxw==}
     dev: true
@@ -3810,7 +3830,6 @@ packages:
     resolution: {integrity: sha512-+2/g0Fds1ERlP6JsakQQDXjZdZMM+rqpamFZJEKh4kwTIn3iDkgKtby0CeNd5ATNZ4Ry1ax15TMx0W2V+miizQ==}
     engines: {node: '>=14.17'}
     hasBin: true
-    dev: true
 
   /uint8-util@2.2.4:
     resolution: {integrity: sha512-uEI5lLozmKQPYEevfEhP9LY3Je5ZmrQhaWXrzTVqrLNQl36xsRh8NiAxYwB9J+2BAt99TRbmCkROQB2ZKhx4UA==}

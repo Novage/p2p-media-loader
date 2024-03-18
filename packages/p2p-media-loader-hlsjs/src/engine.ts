@@ -16,13 +16,20 @@ import {
   CoreEventMap,
   DynamicCoreConfig,
 } from "p2p-media-loader-core";
+import { DeepReadonly } from "ts-essentials";
 
 export type HlsjsEngineConfig = {
   core: CoreConfig;
 };
 
+export type PartialHlsjsEngineConfig = Partial<
+  Omit<HlsjsEngineConfig, "core">
+> & {
+  core?: Partial<CoreConfig>;
+};
+
 export type DynamicHlsjsEngineConfig = {
-  core: DynamicCoreConfig;
+  core?: DynamicCoreConfig;
 };
 
 export class Engine {
@@ -31,7 +38,7 @@ export class Engine {
   private hlsInstanceGetter?: () => Hls;
   private currentHlsInstance?: Hls;
 
-  constructor(config?: HlsjsEngineConfig) {
+  constructor(config?: DeepReadonly<PartialHlsjsEngineConfig>) {
     this.core = new Core(config?.core);
     this.segmentManager = new SegmentManager(this.core);
   }
@@ -57,12 +64,12 @@ export class Engine {
     };
   }
 
-  getConfig(): HlsjsEngineConfig {
+  getConfig(): DeepReadonly<HlsjsEngineConfig> {
     return { core: this.core.getConfig() };
   }
 
-  applyDynamicConfig(dynamicConfig: DynamicHlsjsEngineConfig) {
-    this.core.applyDynamicConfig(dynamicConfig.core);
+  applyDynamicConfig(dynamicConfig: DeepReadonly<DynamicHlsjsEngineConfig>) {
+    if (dynamicConfig.core) this.core.applyDynamicConfig(dynamicConfig.core);
   }
 
   setHls(hls: Hls | (() => Hls)) {

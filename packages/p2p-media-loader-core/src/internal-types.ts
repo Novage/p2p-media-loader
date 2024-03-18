@@ -1,7 +1,8 @@
 /// <reference types="./declarations.d.ts" />
 
+import { DeepReadonly } from "ts-essentials";
 import { BandwidthCalculator } from "./bandwidth-calculator";
-import { Segment as SegmentBase, Stream } from "./types";
+import { CoreConfig, Segment as SegmentBase, Stream } from "./types";
 
 export type Playback = {
   position: number;
@@ -25,3 +26,5 @@ export type Segment = SegmentBase & {
 export type StreamWithSegments<TStream = Stream> = TStream & {
   readonly segments: Map<string, Segment>;
 };
+
+export type ReadonlyCoreConfig = DeepReadonly<CoreConfig>;

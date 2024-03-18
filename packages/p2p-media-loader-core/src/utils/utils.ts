@@ -71,46 +71,16 @@ function isArray(item: unknown): item is unknown[] {
   return Array.isArray(item);
 }
 
-type DeepMergeResult<T, U> =
-  T extends Array<infer R1>
-    ? U extends Array<infer R2>
-      ? Array<R1 | R2>
-      : T & U
-    : T & U;
-
-function deepCopy<T>(item: T): T {
+export function deepCopy<T>(item: T): T {
   if (isArray(item)) {
-    return item.map((i) => deepCopy(i)) as unknown as T;
+    return item.map((element) => deepCopy(element)) as T;
   } else if (isObject(item)) {
     const copy = {} as Record<string, unknown>;
-    Object.keys(item).forEach((key) => {
+    for (const key of Object.keys(item)) {
       copy[key] = deepCopy(item[key]);
-    });
+    }
     return copy as T;
   } else {
     return item;
   }
-}
-
-export function deepConfigMerge<T, U>(
-  target: T,
-  source: U,
-): DeepMergeResult<T, U> {
-  if (isObject(target) && isObject(source)) {
-    const output: Record<string, unknown> = deepCopy(target);
-
-    Object.keys(source).forEach((key) => {
-      if (isObject(source[key])) {
-        output[key] = deepConfigMerge(output[key], source[key]);
-      } else if (isArray(source[key])) {
-        output[key] = deepCopy(source[key]);
-      } else {
-        output[key] = source[key];
-      }
-    });
-
-    return output as DeepMergeResult<T, U>;
-  }
-
-  return source as DeepMergeResult<T, U>;
 }

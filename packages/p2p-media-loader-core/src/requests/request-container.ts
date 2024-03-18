@@ -1,5 +1,10 @@
-import { Playback, BandwidthCalculators, Segment } from "../internal-types";
-import { CoreConfig, CoreEventMap } from "../types";
+import {
+  Playback,
+  BandwidthCalculators,
+  Segment,
+  ReadonlyCoreConfig,
+} from "../internal-types";
+import { CoreEventMap } from "../types";
 import { EventTarget } from "../utils/event-target";
 import { Request } from "./request";
 
@@ -10,7 +15,7 @@ export class RequestsContainer {
     private readonly requestProcessQueueCallback: () => void,
     private readonly bandwidthCalculators: BandwidthCalculators,
     private readonly playback: Playback,
-    private readonly config: CoreConfig,
+    private readonly config: ReadonlyCoreConfig,
     private readonly eventTarget: EventTarget<CoreEventMap>,
   ) {}
 
