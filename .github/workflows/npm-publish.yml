@@ -1,0 +1,50 @@
+on:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  setup_and_build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org/"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
+
+      - name: Install Dependencies
+        run: pnpm install
+
+      - name: Extract version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+
+      - name: Update package.json version
+        run: |
+          export TAG=$VERSION
+          node update-versions.js
+        working-directory: ./scripts
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Pack Packages
+        run: pnpm run pack-packages
+
+      - name: NPM Publish Packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          for package in p2p-media-loader-core p2p-media-loader-hlsjs p2p-media-loader-shaka; do
+            pnpm publish ./packages/$package/$package-$VERSION.tgz --access public
+          done
