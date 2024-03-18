@@ -36,12 +36,12 @@ export class HttpRequestExecutor {
         this.request.totalBytes - this.request.loadedBytes;
     }
 
-    const { httpNotReceivingBytesTimeoutMs } = this.httpConfig;
     this.requestControls = this.request.start(
       { downloadSource: "http" },
       {
         abort: () => this.abortController.abort("abort"),
-        notReceivingBytesTimeoutMs: httpNotReceivingBytesTimeoutMs,
+        notReceivingBytesTimeoutMs:
+          this.httpConfig.httpNotReceivingBytesTimeoutMs,
       },
     );
     void this.fetch();

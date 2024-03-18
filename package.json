@@ -20,8 +20,8 @@
     "eslint": "^8.57.0",
     "prettier": "^3.2.5",
     "rimraf": "^5.0.5",
-    "typescript": "^5.3.3",
-    "typescript-eslint": "^7.1.0",
-    "vite": "^5.1.4"
+    "typescript": "^5.4.2",
+    "typescript-eslint": "^7.2.0",
+    "vite": "^5.1.6"
   }
 }
