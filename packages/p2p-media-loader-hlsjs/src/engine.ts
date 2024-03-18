@@ -15,6 +15,7 @@ import {
   Core,
   CoreEventMap,
   DynamicCoreConfig,
+  debug,
 } from "p2p-media-loader-core";
 import { DeepReadonly } from "ts-essentials";
 
@@ -37,6 +38,7 @@ export class Engine {
   private readonly segmentManager: SegmentManager;
   private hlsInstanceGetter?: () => Hls;
   private currentHlsInstance?: Hls;
+  private readonly debug = debug("p2pml-hlsjs:engine");
 
   constructor(config?: DeepReadonly<PartialHlsJsEngineConfig>) {
     this.core = new Core(config?.core);
@@ -157,12 +159,17 @@ export class Engine {
   ) => {
     if (
       this.currentHlsInstance &&
+      this.currentHlsInstance.config.liveSyncDurationCount !==
+        data.details.fragments.length - 1 &&
       data.details.live &&
       data.details.fragments[0].type === ("main" as PlaylistLevelType) &&
       !this.currentHlsInstance.userConfig.liveSyncDuration &&
       !this.currentHlsInstance.userConfig.liveSyncDurationCount &&
       data.details.fragments.length > 4
     ) {
+      this.debug(
+        `set liveSyncDurationCount ${data.details.fragments.length - 1}`,
+      );
       this.currentHlsInstance.config.liveSyncDurationCount =
         data.details.fragments.length - 1;
     }

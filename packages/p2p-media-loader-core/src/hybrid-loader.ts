@@ -75,7 +75,7 @@ export class HybridLoader {
       this.eventTarget,
     );
 
-    this.logger = debug(`core:hybrid-loader-${activeStream.type}`);
+    this.logger = debug(`p2pml-core:hybrid-loader-${activeStream.type}`);
     this.logger.color = "coral";
 
     this.setIntervalLoading();

@@ -17,7 +17,7 @@ type P2PLoaderContainerItem = {
 export class P2PLoadersContainer {
   private readonly loaders = new Map<string, P2PLoaderContainerItem>();
   private _currentLoaderItem!: P2PLoaderContainerItem;
-  private readonly logger = debug("core:p2p-loaders-container");
+  private readonly logger = debug("p2pml-core:p2p-loaders-container");
 
   constructor(
     private readonly streamManifestUrl: string,

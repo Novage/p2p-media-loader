@@ -36,7 +36,7 @@ export class Peer {
   private downloadingErrors: RequestError<
     PeerRequestErrorType | RequestAbortErrorType
   >[] = [];
-  private logger = debug("core:peer");
+  private logger = debug("p2pml-core:peer");
   private readonly onPeerClosed: CoreEventMap["onPeerClose"];
 
   constructor(

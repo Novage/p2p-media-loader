@@ -92,7 +92,7 @@ export class Request {
     this.notReceivingBytesTimeout = new Timeout(this.abortOnTimeout);
 
     const { type } = this.segment.stream;
-    this._logger = debug(`core:request-${type}`);
+    this._logger = debug(`p2pml-core:request-${type}`);
   }
 
   clearLoadedBytes() {

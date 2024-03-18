@@ -37,7 +37,7 @@ export class SegmentsMemoryStorage {
     private readonly masterManifestUrl: string,
     private readonly storageConfig: StorageConfig,
   ) {
-    this.logger = debug("core:segment-memory-storage");
+    this.logger = debug("p2pml-core:segment-memory-storage");
     this.logger.color = "RebeccaPurple";
   }
 

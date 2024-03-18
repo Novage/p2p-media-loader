@@ -25,7 +25,7 @@ export class P2PTrackerClient {
   private readonly streamShortId: string;
   private readonly client: TrackerClient;
   private readonly _peers = new Map<string, PeerItem>();
-  private readonly logger = debug("core:p2p-tracker-client");
+  private readonly logger = debug("p2pml-core:p2p-tracker-client");
 
   constructor(
     streamId: string,
