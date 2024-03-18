@@ -22,7 +22,7 @@ import { TRACKER_CLIENT_VERSION_PREFIX } from "./utils/peer";
 import { DeepReadonly } from "ts-essentials";
 
 export class Core<TStream extends Stream = Stream> {
-  static DEFAULT_CONFIG: CoreConfig = {
+  static readonly DEFAULT_CONFIG: DeepReadonly<CoreConfig> = {
     simultaneousHttpDownloads: 3,
     simultaneousP2PDownloads: 3,
     highDemandTimeWindow: 15,

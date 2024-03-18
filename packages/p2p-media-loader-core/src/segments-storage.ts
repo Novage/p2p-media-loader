@@ -1,11 +1,11 @@
-import { CoreConfig, Stream } from "./types";
+import { Stream } from "./types";
 import * as StreamUtils from "./utils/stream";
 import debug from "debug";
 import { EventTarget } from "./utils/event-target";
-import { Segment } from "./internal-types";
+import { ReadonlyCoreConfig, Segment } from "./internal-types";
 
 type StorageConfig = Pick<
-  CoreConfig,
+  ReadonlyCoreConfig,
   "cachedSegmentExpiration" | "cachedSegmentsCount"
 >;
 

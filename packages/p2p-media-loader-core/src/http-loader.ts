@@ -1,10 +1,11 @@
-import { CoreEventMap, CoreConfig } from "./types";
+import { CoreEventMap } from "./types";
 import { Request as SegmentRequest, RequestControls } from "./requests/request";
 import { RequestError, HttpRequestErrorType } from "./types";
 import { EventTarget } from "./utils/event-target";
+import { ReadonlyCoreConfig } from "./internal-types";
 
 type HttpConfig = Pick<
-  CoreConfig,
+  ReadonlyCoreConfig,
   "httpNotReceivingBytesTimeoutMs" | "httpRequestSetup"
 >;
 

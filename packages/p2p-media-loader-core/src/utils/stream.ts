@@ -1,5 +1,10 @@
-import { CoreConfig, Stream } from "../types";
-import { Playback, Segment, StreamWithSegments } from "../internal-types";
+import { Stream } from "../types";
+import {
+  Playback,
+  ReadonlyCoreConfig,
+  Segment,
+  StreamWithSegments,
+} from "../internal-types";
 
 export type SegmentPlaybackStatuses = {
   isHighDemand?: boolean;
@@ -8,7 +13,7 @@ export type SegmentPlaybackStatuses = {
 };
 
 export type PlaybackTimeWindowsConfig = Pick<
-  CoreConfig,
+  ReadonlyCoreConfig,
   "highDemandTimeWindow" | "httpDownloadTimeWindow" | "p2pDownloadTimeWindow"
 >;
 

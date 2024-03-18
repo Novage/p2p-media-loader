@@ -18,17 +18,17 @@ import {
 } from "p2p-media-loader-core";
 import { DeepReadonly } from "ts-essentials";
 
-export type HlsjsEngineConfig = {
+export type HlsJsEngineConfig = {
   core: CoreConfig;
 };
 
-export type PartialHlsjsEngineConfig = Partial<
-  Omit<HlsjsEngineConfig, "core">
+export type PartialHlsJsEngineConfig = Partial<
+  Omit<HlsJsEngineConfig, "core">
 > & {
   core?: Partial<CoreConfig>;
 };
 
-export type DynamicHlsjsEngineConfig = {
+export type DynamicHlsJsEngineConfig = {
   core?: DynamicCoreConfig;
 };
 
@@ -38,7 +38,7 @@ export class Engine {
   private hlsInstanceGetter?: () => Hls;
   private currentHlsInstance?: Hls;
 
-  constructor(config?: DeepReadonly<PartialHlsjsEngineConfig>) {
+  constructor(config?: DeepReadonly<PartialHlsJsEngineConfig>) {
     this.core = new Core(config?.core);
     this.segmentManager = new SegmentManager(this.core);
   }
@@ -64,11 +64,11 @@ export class Engine {
     };
   }
 
-  getConfig(): DeepReadonly<HlsjsEngineConfig> {
+  getConfig(): DeepReadonly<HlsJsEngineConfig> {
     return { core: this.core.getConfig() };
   }
 
-  applyDynamicConfig(dynamicConfig: DeepReadonly<DynamicHlsjsEngineConfig>) {
+  applyDynamicConfig(dynamicConfig: DeepReadonly<DynamicHlsJsEngineConfig>) {
     if (dynamicConfig.core) this.core.applyDynamicConfig(dynamicConfig.core);
   }
 
