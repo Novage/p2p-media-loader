@@ -35,25 +35,6 @@ jobs:
           node update-versions.js
         working-directory: ./scripts
 
-      - name: Get branch name associated with tag
-        id: get-branch
-        run: |
-          TAG_COMMIT_SHA=$(git rev-list -n 1 ${{ github.ref }})
-          git fetch --prune 
-          BRANCH_NAME=$(git branch -r --contains $TAG_COMMIT_SHA | sed 's/origin\///' | sed '/HEAD/d' | xargs)
-          echo "BRANCH=$BRANCH_NAME" >> $GITHUB_ENV
-
-      - name: Commit and push
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"    
-          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
-          git add .
-          git commit -m "Update package.json version"
-          git push origin HEAD:"$BRANCH"
-
       - name: Build
         run: pnpm run build
 
