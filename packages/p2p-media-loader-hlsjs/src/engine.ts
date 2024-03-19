@@ -18,6 +18,7 @@ import {
   debug,
 } from "p2p-media-loader-core";
 import { DeepReadonly } from "ts-essentials";
+import { createP2PHlsClass } from "./p2p-hls";
 
 export type HlsJsEngineConfig = {
   core: CoreConfig;
@@ -40,6 +41,16 @@ export class Engine {
   private currentHlsInstance?: Hls;
   private readonly debug = debug("p2pml-hlsjs:engine");
 
+  static createP2PHlsClass = createP2PHlsClass;
+
+  static createP2PHlsInstance<HlsT, HlsConfigT>(
+    config?: HlsConfigT & { p2p?: DeepReadonly<PartialHlsJsEngineConfig> },
+    HlsJsBaseClass?: new (config: HlsConfigT | undefined) => HlsT,
+  ) {
+    const Hls = createP2PHlsClass<HlsT, HlsConfigT>(HlsJsBaseClass);
+    return new Hls(config);
+  }
+
   constructor(config?: DeepReadonly<PartialHlsJsEngineConfig>) {
     this.core = new Core(config?.core);
     this.segmentManager = new SegmentManager(this.core);
@@ -59,10 +70,10 @@ export class Engine {
     this.core.removeEventListener(eventName, listener);
   }
 
-  getHlsConfig(): Partial<HlsConfig> {
+  getHlsConfig<F = unknown, P = unknown>(): { fLoader: F; pLoader: P } {
     return {
-      fLoader: this.createFragmentLoaderClass(),
-      pLoader: this.createPlaylistLoaderClass(),
+      fLoader: this.createFragmentLoaderClass() as F,
+      pLoader: this.createPlaylistLoaderClass() as P,
     };
   }
 
@@ -74,8 +85,9 @@ export class Engine {
     if (dynamicConfig.core) this.core.applyDynamicConfig(dynamicConfig.core);
   }
 
-  setHls(hls: Hls | (() => Hls)) {
-    this.hlsInstanceGetter = typeof hls === "function" ? hls : () => hls;
+  setHls<T = unknown>(hls: T | (() => T)) {
+    this.hlsInstanceGetter =
+      typeof hls === "function" ? (hls as () => Hls) : () => hls as Hls;
   }
 
   private initHlsEvents() {
@@ -208,7 +220,7 @@ export class Engine {
   private createFragmentLoaderClass() {
     const core = this.core;
     // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const engine: Engine = this;
+    const engine = this;
 
     return class FragmentLoader extends FragmentLoaderBase {
       constructor(config: HlsConfig) {
