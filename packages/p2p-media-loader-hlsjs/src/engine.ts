@@ -18,7 +18,7 @@ import {
   debug,
 } from "p2p-media-loader-core";
 import { DeepReadonly } from "ts-essentials";
-import { createP2PHlsClass } from "./p2p-hls";
+import { injectP2PMixin } from "./engine-static";
 
 export type HlsJsEngineConfig = {
   core: CoreConfig;
@@ -41,15 +41,7 @@ export class Engine {
   private currentHlsInstance?: Hls;
   private readonly debug = debug("p2pml-hlsjs:engine");
 
-  static createP2PHlsClass = createP2PHlsClass;
-
-  static createP2PHlsInstance<HlsT, HlsConfigT>(
-    config?: HlsConfigT & { p2p?: DeepReadonly<PartialHlsJsEngineConfig> },
-    HlsJsBaseClass?: new (config: HlsConfigT | undefined) => HlsT,
-  ) {
-    const Hls = createP2PHlsClass<HlsT, HlsConfigT>(HlsJsBaseClass);
-    return new Hls(config);
-  }
+  static injectP2PMixin = injectP2PMixin;
 
   constructor(config?: DeepReadonly<PartialHlsJsEngineConfig>) {
     this.core = new Core(config?.core);
@@ -70,7 +62,7 @@ export class Engine {
     this.core.removeEventListener(eventName, listener);
   }
 
-  getHlsConfig<F = unknown, P = unknown>(): { fLoader: F; pLoader: P } {
+  getHlsJsConfig<F = unknown, P = unknown>(): { fLoader: F; pLoader: P } {
     return {
       fLoader: this.createFragmentLoaderClass() as F,
       pLoader: this.createPlaylistLoaderClass() as P,
@@ -235,7 +227,7 @@ export class Engine {
 
   private createPlaylistLoaderClass() {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const engine: Engine = this;
+    const engine = this;
     return class PlaylistLoader extends PlaylistLoaderBase {
       constructor(config: HlsConfig) {
         super(config);

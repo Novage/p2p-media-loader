@@ -1,6 +1,8 @@
 <!doctype html>
 <html>
   <head>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@~1/dist/hls.min.js"></script>
+
     <script type="importmap">
       {
         "imports": {
@@ -10,31 +12,28 @@
       }
     </script>
 
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@~1/dist/hls.min.js"></script>
-
     <script type="module">
       import { Engine as HlsEngine } from "p2p-media-loader-hlsjs";
 
-      // Override default Hls.js engine with P2P enabled engine
-      // This instance will be used by all <vm-hls> elements
-      window.Hls = HlsEngine.createP2PHlsClass();
+      // Override global Hls.js class with P2P enabled mixin
+      // It will be used by all <vm-hls> elements
+      window.Hls = HlsEngine.injectP2PMixin(window.Hls);
 
       // Configure Hls.js and P2P engine for all <vm-hls> elements
-      document.querySelectorAll("vm-hls").forEach(
-        (vmHls) =>
-          (vmHls.config = {
-            startLevel: 0, // example of Hls.js config value
+      for (const vmHls of document.querySelectorAll("vm-hls")) {
+        vmHls.config = {
+          startLevel: 0, // example of Hls.js config parameters
 
-            // ... other Hls.js config values go here
+          // ... other Hls.js config parameters go here
 
-            // example of P2P engine config section
-            p2p: {
-              core: {
-                swarmId: "custom swarm ID 959483 for stream x36xhzz",
-              },
+          // example of P2P engine config section
+          p2p: {
+            core: {
+              //swarmId: "custom swarm ID 959483 for stream x36xhzz",
             },
-          }),
-      );
+          },
+        };
+      }
     </script>
 
     <script
@@ -42,26 +41,33 @@
       type="module"
       src="https://cdn.jsdelivr.net/npm/@vime/core@^5/dist/vime/vime.esm.js"
     ></script>
+
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@vime/core@^5/themes/default.css"
+    />
   </head>
 
   <body>
     <div style="width: 600px">
-      <vm-player controls autopause="false">
+      <vm-player autopause="false">
         <vm-hls>
           <source
             data-src="https://Test-streams.mux.dev/x36xhzz/x36xhzz.m3u8"
             type="application/x-mpegURL"
           />
         </vm-hls>
+        <vm-default-ui> </vm-default-ui>
       </vm-player>
 
-      <vm-player controls autopause="false">
+      <vm-player autopause="false">
         <vm-hls>
           <source
             data-src="https://Test-streams.mux.dev/x36xhzz/x36xhzz.m3u8"
             type="application/x-mpegURL"
           />
         </vm-hls>
+        <vm-default-ui> </vm-default-ui>
       </vm-player>
     </div>
   </body>

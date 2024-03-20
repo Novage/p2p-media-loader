@@ -83,25 +83,22 @@ function App() {
     storageItemToNumber,
   );
 
-  const hlsEngine = useRef<HlsJsEngine>();
   const shakaEngine = useRef<ShakaEngine>();
 
-  const onSegmentLoaded = (params: SegmentLoadDetails) => {
-    const { bytesLength, downloadSource } = params;
-    const MBytes = getMBFromBytes(bytesLength);
-    if (downloadSource === "http") {
-      setHttpLoaded((prev) => round(prev + MBytes));
-      setHttpLoadedGlob((prev) => round(prev + MBytes));
-    } else if (downloadSource === "p2p") {
-      setP2PLoaded((prev) => round(prev + MBytes));
-      setP2PLoadedGlob((prev) => round(prev + MBytes));
-    }
-  };
-
-  if (!hlsEngine.current) {
-    hlsEngine.current = new HlsJsEngine();
-    hlsEngine.current.addEventListener("onSegmentLoaded", onSegmentLoaded);
-  }
+  const onSegmentLoaded = useCallback(
+    (params: SegmentLoadDetails) => {
+      const { bytesLength, downloadSource } = params;
+      const MBytes = getMBFromBytes(bytesLength);
+      if (downloadSource === "http") {
+        setHttpLoaded((prev) => round(prev + MBytes));
+        setHttpLoadedGlob((prev) => round(prev + MBytes));
+      } else if (downloadSource === "p2p") {
+        setP2PLoaded((prev) => round(prev + MBytes));
+        setP2PLoadedGlob((prev) => round(prev + MBytes));
+      }
+    },
+    [setHttpLoadedGlob, setP2PLoadedGlob],
+  );
 
   if (!shakaEngine.current) {
     ShakaEngine.setGlobalSettings();
@@ -110,6 +107,145 @@ function App() {
   }
 
   const createNewPlayer = useCallback(() => {
+    const initHlsJsPlayer = (url: string) => {
+      if (!videoRef.current) return;
+
+      const HlsP2P = HlsJsEngine.injectP2PMixin(window.Hls);
+      const hls = new HlsP2P();
+
+      hls.p2pEngine.addEventListener("onSegmentLoaded", onSegmentLoaded);
+      hls.attachMedia(videoRef.current);
+      hls.loadSource(url);
+      window.videoPlayer = hls;
+    };
+
+    const initHlsDPlayer = (url: string) => {
+      const player = new DPlayer({
+        container: containerRef.current,
+        video: {
+          url: "",
+          type: "customHls",
+          customType: {
+            customHls: (video: HTMLVideoElement) => {
+              const HlsP2P = HlsJsEngine.injectP2PMixin(window.Hls);
+              const hls = new HlsP2P();
+
+              hls.p2pEngine.addEventListener(
+                "onSegmentLoaded",
+                onSegmentLoaded,
+              );
+              hls.attachMedia(video);
+              hls.loadSource(url);
+            },
+          },
+        },
+      });
+      player.play();
+      window.videoPlayer = player;
+    };
+
+    const initHlsClapprPlayer = (url: string) => {
+      const engine = new HlsJsEngine();
+      /* eslint-disable */
+
+      const clapprPlayer = new window.Clappr.Player({
+        parentId: "#player-container",
+        source: url,
+        playback: {
+          hlsjsConfig: {
+            ...engine.getHlsJsConfig(),
+          },
+        },
+        plugins: [window.LevelSelector],
+      });
+
+      engine.initClapprPlayer(clapprPlayer);
+
+      window.videoPlayer = clapprPlayer;
+
+      /* eslint-enable */
+    };
+
+    const initShakaDPlayer = (url: string) => {
+      const engine = shakaEngine.current;
+      if (!engine) return;
+
+      const player = new DPlayer({
+        container: containerRef.current,
+        video: {
+          url: "",
+          type: "customHlsOrDash",
+          customType: {
+            customHlsOrDash: (video: HTMLVideoElement) => {
+              /* eslint-disable */
+
+              const shakaPlayer = new window.shaka.Player();
+              shakaPlayer.attach(video);
+
+              const onError = (error: unknown) => {
+                console.error("Shaka error", error);
+              };
+
+              shakaPlayer.addEventListener("error", onError);
+
+              engine.configureAndInitShakaPlayer(shakaPlayer);
+              shakaPlayer.load(url).catch(onError);
+
+              shakaInstance.current = shakaPlayer;
+
+              /* eslint-enable */
+            },
+          },
+        },
+      });
+      window.videoPlayer = player;
+    };
+
+    const initShakaPlayer = (url: string) => {
+      const engine = shakaEngine.current;
+      if (!videoRef.current || !engine) return;
+
+      /* eslint-disable */
+
+      const player = new shaka.Player();
+      player.attach(videoRef.current);
+
+      const onError = (error: shaka.util.Error) => {
+        console.error("Error code", error.code, "object", error);
+      };
+
+      player.addEventListener("error", (event) => {
+        onError((event as any).detail);
+      });
+
+      engine.configureAndInitShakaPlayer(player);
+      player.load(url).catch(onError);
+      shakaInstance.current = player;
+      window.videoPlayer = player;
+
+      /* eslint-enable */
+    };
+
+    const initShakaClapprPlayer = (url: string) => {
+      const engine = shakaEngine.current;
+      if (!engine) return;
+
+      /* eslint-disable */
+
+      const clapprPlayer = new window.Clappr.Player({
+        parentId: "#player-container",
+        source: url,
+        plugins: [window.DashShakaPlayback, window.LevelSelector],
+        shakaOnBeforeLoad: (shakaPlayerInstance: any) => {
+          engine.configureAndInitShakaPlayer(shakaPlayerInstance);
+        },
+      });
+
+      window.videoPlayer = clapprPlayer;
+
+      /* eslint-enable */
+    };
+
     setHttpLoadedGlob(0);
     setP2PLoadedGlob(0);
 
@@ -137,7 +273,13 @@ function App() {
         initShakaClapprPlayer(streamUrl);
         break;
     }
-  }, [playerType, setHttpLoadedGlob, setP2PLoadedGlob, streamUrl]);
+  }, [
+    onSegmentLoaded,
+    playerType,
+    setHttpLoadedGlob,
+    setP2PLoadedGlob,
+    streamUrl,
+  ]);
 
   useEffect(() => {
     if (!window.Hls.isSupported() || window.videoPlayer) {
@@ -154,148 +296,7 @@ function App() {
     createNewPlayer();
   }, [createNewPlayer]);
 
-  const initHlsJsPlayer = (url: string) => {
-    if (!videoRef.current || !hlsEngine.current) return;
-    const engine = hlsEngine.current;
-    const hls = new window.Hls({
-      ...engine.getHlsConfig(),
-    });
-
-    engine.setHls(hls);
-    hls.attachMedia(videoRef.current);
-    hls.loadSource(url);
-    hlsInstance.current = hls;
-    window.videoPlayer = hls;
-  };
-
-  const initHlsDPlayer = (url: string) => {
-    if (!hlsEngine.current) return;
-    const engine = hlsEngine.current;
-    const player = new DPlayer({
-      container: containerRef.current,
-      video: {
-        url: "",
-        type: "customHls",
-        customType: {
-          customHls: (video: HTMLVideoElement) => {
-            const hls = new window.Hls(engine.getHlsConfig());
-            engine.setHls(hls);
-            hls.loadSource(url);
-            hls.attachMedia(video);
-            hlsInstance.current = hls;
-          },
-        },
-      },
-    });
-    player.play();
-    window.videoPlayer = player;
-  };
-
-  const initHlsClapprPlayer = (url: string) => {
-    const engine = hlsEngine.current;
-    if (!engine) return;
-
-    /* eslint-disable */
-
-    const clapprPlayer = new window.Clappr.Player({
-      parentId: "#player-container",
-      source: url,
-      playback: {
-        hlsjsConfig: {
-          ...engine.getHlsConfig(),
-        },
-      },
-      plugins: [window.LevelSelector],
-    });
-
-    engine.initClapprPlayer(clapprPlayer);
-
-    window.videoPlayer = clapprPlayer;
-
-    /* eslint-enable */
-  };
-
-  const initShakaDPlayer = (url: string) => {
-    const engine = shakaEngine.current;
-    if (!engine) return;
-
-    const player = new DPlayer({
-      container: containerRef.current,
-      video: {
-        url: "",
-        type: "customHlsOrDash",
-        customType: {
-          customHlsOrDash: (video: HTMLVideoElement) => {
-            /* eslint-disable */
-
-            const shakaPlayer = new window.shaka.Player();
-            shakaPlayer.attach(video);
-
-            const onError = (error: unknown) => {
-              console.error("Shaka error", error);
-            };
-
-            shakaPlayer.addEventListener("error", onError);
-
-            engine.configureAndInitShakaPlayer(shakaPlayer);
-            shakaPlayer.load(url).catch(onError);
-
-            shakaInstance.current = shakaPlayer;
-
-            /* eslint-enable */
-          },
-        },
-      },
-    });
-    window.videoPlayer = player;
-  };
-
-  const initShakaPlayer = (url: string) => {
-    const engine = shakaEngine.current;
-    if (!videoRef.current || !engine) return;
-
-    /* eslint-disable */
-
-    const player = new shaka.Player();
-    player.attach(videoRef.current);
-
-    const onError = (error: shaka.util.Error) => {
-      console.error("Error code", error.code, "object", error);
-    };
-
-    player.addEventListener("error", (event) => {
-      onError((event as any).detail);
-    });
-
-    engine.configureAndInitShakaPlayer(player);
-    player.load(url).catch(onError);
-    shakaInstance.current = player;
-    window.videoPlayer = player;
-
-    /* eslint-enable */
-  };
-
-  const initShakaClapprPlayer = (url: string) => {
-    const engine = shakaEngine.current;
-    if (!engine) return;
-
-    /* eslint-disable */
-
-    const clapprPlayer = new window.Clappr.Player({
-      parentId: "#player-container",
-      source: url,
-      plugins: [window.DashShakaPlayback, window.LevelSelector],
-      shakaOnBeforeLoad: (shakaPlayerInstance: any) => {
-        engine.configureAndInitShakaPlayer(shakaPlayerInstance);
-      },
-    });
-
-    window.videoPlayer = clapprPlayer;
-
-    /* eslint-enable */
-  };
-
-  const destroyAndWindowPlayer = () => {
+  const destroyWindowPlayer = () => {
     window.videoPlayer?.destroy?.();
     window.videoPlayer = undefined;
   };
@@ -303,7 +304,7 @@ function App() {
   const onPlayerTypeChange = (newPlayer: Player) => {
     localStorage.player = newPlayer;
     setPlayerType(newPlayer);
-    destroyAndWindowPlayer();
+    destroyWindowPlayer();
   };
 
   const onVideoUrlChange = (streamUrl: string) => {
