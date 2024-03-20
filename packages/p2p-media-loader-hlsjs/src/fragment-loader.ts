@@ -15,8 +15,8 @@ const DEFAULT_DOWNLOAD_LATENCY = 10;
 export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   context!: FragmentLoaderContext;
   config!: LoaderConfiguration | null;
-  callbacks!: LoaderCallbacks<FragmentLoaderContext> | null;
   stats: LoaderStats;
+  #callbacks!: LoaderCallbacks<FragmentLoaderContext> | null;
   #createDefaultLoader: () => Loader<LoaderContext>;
   #defaultLoader?: Loader<LoaderContext>;
   #core: Core;
@@ -48,7 +48,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   ) {
     this.context = context;
     this.config = config;
-    this.callbacks = callbacks;
+    this.#callbacks = callbacks;
     const stats = this.stats;
 
     const { rangeStart: start, rangeEnd: end } = context;
@@ -116,7 +116,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     } else if (thrownError instanceof Error) {
       error.text = thrownError.message;
     }
-    this.callbacks?.onError(error, this.context, null, this.stats);
+    this.#callbacks?.onError(error, this.context, null, this.stats);
   }
 
   #abortInternal() {
@@ -131,7 +131,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       this.#defaultLoader.abort();
     } else {
       this.#abortInternal();
-      this.callbacks?.onAbort?.(this.stats, this.context, {});
+      this.#callbacks?.onAbort?.(this.stats, this.context, {});
     }
   }
 
@@ -140,7 +140,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       this.#defaultLoader.destroy();
     } else {
       if (!this.stats.aborted) this.#abortInternal();
-      this.callbacks = null;
+      this.#callbacks = null;
       this.config = null;
     }
   }
