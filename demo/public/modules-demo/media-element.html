@@ -31,7 +31,7 @@
 
       const engineMediaElement = new Engine();
 
-      window.hls = new window.Hls(engineMediaElement.getHlsConfig());
+      window.hls = new window.Hls(engineMediaElement.getHlsJsConfig());
 
       engineMediaElement.setHls(window.hls);
       window.hls.loadSource(

@@ -29,7 +29,7 @@
         controls: [],
       });
 
-      const hls = new window.Hls(engine.getHlsConfig());
+      const hls = new window.Hls(engine.getHlsJsConfig());
 
       engine.setHls(hls);
       hls.loadSource("https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8");

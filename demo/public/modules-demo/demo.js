@@ -15,7 +15,7 @@ async function initApp() {
 function initHlsPlayer() {
   const engine = new HlsEngine();
 
-  const player = new Hls({ ...engine.getHlsConfig() });
+  const player = new Hls({ ...engine.getHlsJsConfig() });
   player.attachMedia(document.getElementById("video1"));
   player.on(Hls.Events.ERROR, function (event, data) {
     console.error("Error code", data.details, "object", data);
