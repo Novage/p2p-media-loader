@@ -1,0 +1,39 @@
+<html>
+  <head>
+    <script type="importmap">
+      {
+        "imports": {
+          "p2p-media-loader-core": "./core/p2p-media-loader-core.es.js",
+          "p2p-media-loader-hlsjs": "./hlsjs/p2p-media-loader-hlsjs.es.js"
+        }
+      }
+    </script>
+
+    <!-- HLS -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@~1/dist/hls.min.js"></script>
+
+    <!-- Plyr -->
+    <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.min.js"></script>
+  </head>
+
+  <body>
+    <!-- Plyr Hls -->
+    <video width="640px" height="480px" id="plyr"></video>
+    <script type="module">
+      import { Engine } from "p2p-media-loader-hlsjs";
+
+      const engine = new Engine();
+
+      const playerPlyr = new Plyr("#plyr", {
+        debug: false,
+        controls: [],
+      });
+
+      const hls = new window.Hls(engine.getHlsConfig());
+
+      engine.setHls(hls);
+      hls.loadSource("https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8");
+      hls.attachMedia(playerPlyr.media);
+    </script>
+  </body>
+</html>

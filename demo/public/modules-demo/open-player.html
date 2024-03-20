@@ -1,0 +1,51 @@
+<html>
+  <head>
+    <link
+      rel="stylesheet"
+      href="//cdn.flowplayer.com/releases/native/3/stable/style/flowplayer.css"
+    />
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="https://cdn.jsdelivr.net/npm/mediaelement@latest/build/mediaelementplayer.min.css"
+    />
+    <script type="importmap">
+      {
+        "imports": {
+          "p2p-media-loader-core": "./core/p2p-media-loader-core.es.js",
+          "p2p-media-loader-shaka": "./shaka/p2p-media-loader-shaka.es.js",
+          "p2p-media-loader-hlsjs": "./hlsjs/p2p-media-loader-hlsjs.es.js"
+        }
+      }
+    </script>
+
+    <!-- HLS -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@~1/dist/hls.min.js"></script>
+
+    <!-- Import OpenPlayerJS -->
+    <script src="https://cdn.jsdelivr.net/npm/openplayerjs@latest/dist/openplayer.min.js"></script>
+  </head>
+
+  <body>
+    <!-- OpenPlayerJS -->
+    <video width="1280px" height="720px" controls id="openplayer"></video>
+
+    <script type="module">
+      import { Engine } from "p2p-media-loader-hlsjs";
+
+      const engine = new Engine();
+
+      const hls = new window.Hls(engine.getHlsConfig());
+
+      engine.setHls(hls);
+      hls.loadSource("https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8");
+      hls.attachMedia(document.getElementById("openplayer"));
+
+      const openplayer = new OpenPlayerJS({
+        id: "openplayer",
+      });
+
+      openplayer.init();
+    </script>
+  </body>
+</html>

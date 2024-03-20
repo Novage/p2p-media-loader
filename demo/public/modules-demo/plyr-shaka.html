@@ -1,0 +1,47 @@
+<html>
+  <head>
+    <script type="importmap">
+      {
+        "imports": {
+          "p2p-media-loader-core": "./core/p2p-media-loader-core.es.js",
+          "p2p-media-loader-shaka": "./shaka/p2p-media-loader-shaka.es.js"
+        }
+      }
+    </script>
+
+    <!-- Shaka -->
+    <script src="https://cdn.jsdelivr.net/npm/shaka-player@~4/dist/shaka-player.compiled.min.js"></script>
+
+    <!-- Plyr -->
+    <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.min.js"></script>
+  </head>
+
+  <body>
+    <!-- Plyr shaka -->
+    <video width="640px" height="480px" id="plyr"></video>
+    <script type="module">
+      import { Engine } from "p2p-media-loader-shaka";
+
+      Engine.setGlobalSettings();
+      const engine = new Engine();
+
+      const playerPlyr = new Plyr("#plyr", {
+        debug: false,
+        controls: [],
+      });
+
+      const shaka = window.shaka;
+      shaka.polyfill.installAll();
+      if (shaka.Player.isBrowserSupported()) {
+        const player = new shaka.Player();
+        player.attach(playerPlyr.media);
+        engine.configureAndInitShakaPlayer(player);
+        player.load(
+          "https://storage.googleapis.com/shaka-demo-assets/angel-one/dash.mpd",
+        );
+      } else {
+        console.error("Browser not supported!");
+      }
+    </script>
+  </body>
+</html>
