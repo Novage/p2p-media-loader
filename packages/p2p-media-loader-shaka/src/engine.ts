@@ -227,14 +227,14 @@ export class ShakaP2PEngine {
     NetworkingEngine.unregisterScheme("https");
   }
 
-  static registerP2PPlugins(shaka = window.shaka) {
+  static registerPlugins(shaka = window.shaka) {
     validateShaka(shaka);
 
     ShakaP2PEngine.registerManifestParsers(shaka);
     ShakaP2PEngine.registerNetworkingEngineSchemes(shaka);
   }
 
-  static unsetGlobalSettings(shaka = window.shaka) {
+  static unregisterPlugins(shaka = window.shaka) {
     validateShaka(shaka);
 
     ShakaP2PEngine.unregisterManifestParsers(shaka);

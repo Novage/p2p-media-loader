@@ -11,7 +11,7 @@ type P2PConfig<T> = {
   };
 };
 
-export function injectP2PMixin<
+export function injectMixin<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   HlsJsConstructor extends new (...args: any[]) => any,
 >(HlsJsClass: HlsJsConstructor) {

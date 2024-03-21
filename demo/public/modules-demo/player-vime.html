@@ -13,23 +13,28 @@
     </script>
 
     <script type="module">
-      import { Engine as HlsEngine } from "p2p-media-loader-hlsjs";
+      import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 
       // Override global Hls.js class with P2P enabled mixin
       // It will be used by all <vm-hls> elements
-      window.Hls = HlsEngine.injectP2PMixin(window.Hls);
+      window.Hls = HlsJsP2PEngine.injectMixin(window.Hls);
 
-      // Configure Hls.js and P2P engine for all <vm-hls> elements
+      // Configure all <vm-hls> elements
       for (const vmHls of document.querySelectorAll("vm-hls")) {
         vmHls.config = {
-          startLevel: 0, // example of Hls.js config parameters
+          startLevel: 0, // example of Hls.js config parameter
 
           // ... other Hls.js config parameters go here
 
           // example of P2P engine config section
           p2p: {
             onHlsJsCreated: (hls) => {
-              console.log(hls.p2pEngine.getConfig(), hls.config);
+              // Subscribe to P2P engine and Hls.js events here
+              console.log(
+                "Hls.js engine with P2P mixin created",
+                hls.p2pEngine.getConfig(),
+                hls.config,
+              );
             },
             core: {
               swarmId: "custom swarm ID for stream 2000341",

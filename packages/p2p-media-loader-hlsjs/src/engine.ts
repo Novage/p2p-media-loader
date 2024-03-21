@@ -18,7 +18,7 @@ import {
   debug,
 } from "p2p-media-loader-core";
 import { DeepReadonly } from "ts-essentials";
-import { injectP2PMixin } from "./engine-static";
+import { injectMixin } from "./engine-static";
 
 export type HlsJsP2PEngineConfig = {
   core: CoreConfig;
@@ -41,7 +41,7 @@ export class HlsJsP2PEngine {
   private currentHlsInstance?: Hls;
   private readonly debug = debug("p2pml-hlsjs:engine");
 
-  static injectP2PMixin = injectP2PMixin;
+  static injectMixin = injectMixin;
 
   constructor(config?: DeepReadonly<PartialHlsJsP2PEngineConfig>) {
     this.core = new Core(config?.core);

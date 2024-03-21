@@ -14,8 +14,8 @@ declare global {
   }
 }
 
-const HlsWithP2P = HlsJsP2PEngine.injectP2PMixin(window.Hls);
-ShakaP2PEngine.registerP2PPlugins();
+const HlsWithP2P = HlsJsP2PEngine.injectMixin(window.Hls);
+ShakaP2PEngine.registerPlugins();
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 window.muxjs = muxjs;
@@ -282,7 +282,7 @@ function App() {
       return;
     }
     if (!localStorage.player) {
-      localStorage.player = "hls-dplayer";
+      localStorage.player = "hlsjs-dplayer";
       setPlayerType("hlsjs-dplayer");
     }
     if (!localStorage.streamUrl) {
@@ -373,7 +373,7 @@ function App() {
             style={{ width: 1000 }}
           />
         </div>
-        {!!playerType && ["hlsjs", "shaka-player"].includes(playerType) && (
+        {!!playerType && ["hlsjs", "shaka"].includes(playerType) && (
           <video
             ref={videoRef}
             controls
