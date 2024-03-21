@@ -9,14 +9,14 @@ import {
 } from "hls.js";
 
 export class PlaylistLoaderBase implements Loader<PlaylistLoaderContext> {
-  defaultLoader: Loader<LoaderContext>;
+  #defaultLoader: Loader<LoaderContext>;
   context: PlaylistLoaderContext;
   stats: LoaderStats;
 
   constructor(config: HlsConfig) {
-    this.defaultLoader = new config.loader(config);
-    this.stats = this.defaultLoader.stats;
-    this.context = this.defaultLoader.context as PlaylistLoaderContext;
+    this.#defaultLoader = new config.loader(config);
+    this.stats = this.#defaultLoader.stats;
+    this.context = this.#defaultLoader.context as PlaylistLoaderContext;
   }
 
   load(
@@ -24,14 +24,14 @@ export class PlaylistLoaderBase implements Loader<PlaylistLoaderContext> {
     config: LoaderConfiguration,
     callbacks: LoaderCallbacks<LoaderContext>,
   ) {
-    this.defaultLoader.load(context, config, callbacks);
+    this.#defaultLoader.load(context, config, callbacks);
   }
 
   abort() {
-    this.defaultLoader.abort();
+    this.#defaultLoader.abort();
   }
 
   destroy() {
-    this.defaultLoader.destroy();
+    this.#defaultLoader.destroy();
   }
 }
