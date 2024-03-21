@@ -28,8 +28,11 @@
 
           // example of P2P engine config section
           p2p: {
+            onHlsJsCreated: (hls) => {
+              console.log(hls.p2pEngine.getConfig(), hls.config);
+            },
             core: {
-              //swarmId: "custom swarm ID 959483 for stream x36xhzz",
+              swarmId: "custom swarm ID for stream 2000341",
             },
           },
         };
@@ -53,7 +56,7 @@
       <vm-player autopause="false">
         <vm-hls>
           <source
-            data-src="https://Test-streams.mux.dev/x36xhzz/x36xhzz.m3u8"
+            data-src="https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8"
             type="application/x-mpegURL"
           />
         </vm-hls>
@@ -63,7 +66,7 @@
       <vm-player autopause="false">
         <vm-hls>
           <source
-            data-src="https://Test-streams.mux.dev/x36xhzz/x36xhzz.m3u8"
+            data-src="https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8"
             type="application/x-mpegURL"
           />
         </vm-hls>

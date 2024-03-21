@@ -114,8 +114,10 @@ function App() {
       const hls = new HlsP2P();
 
       hls.p2pEngine.addEventListener("onSegmentLoaded", onSegmentLoaded);
+
       hls.attachMedia(videoRef.current);
       hls.loadSource(url);
+
       window.videoPlayer = hls;
     };
 
