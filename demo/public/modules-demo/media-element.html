@@ -30,13 +30,7 @@
   <body>
     <!-- MediaElement HLS -->
     <div class="mejs_mediaelement">
-      <video controls width="640px" height="480px" id="mediaelement">
-        <!-- Quality Plugin -->
-        <source
-          src="https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8"
-          data-quality="Auto"
-        />
-      </video>
+      <video controls width="640px" height="480px" id="mediaelement"></video>
     </div>
     <script type="module">
       import { Engine as HlsEngine } from "p2p-media-loader-hlsjs";
@@ -44,6 +38,11 @@
       // Override global Hls.js class with P2P enabled mixin
       window.Hls = HlsEngine.injectP2PMixin(window.Hls);
       const hls = new window.Hls();
+
+      hls.loadSource(
+        "https://bitmovin-a.akamaihd.net/content/playhouse-vr/m3u8s/105560.m3u8",
+      );
+      hls.attachMedia(document.getElementById("mediaelement"));
 
       const player = new MediaElementPlayer("mediaelement", {
         iconSprite: "/modules-demo/mejs-controls.svg",

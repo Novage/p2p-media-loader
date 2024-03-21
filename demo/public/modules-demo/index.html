@@ -10,14 +10,22 @@
         }
       }
     </script>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/shaka-player@~4/dist/controls.css"
+    />
 
-    <script src="https://cdn.jsdelivr.net/npm/shaka-player@~4/dist/shaka-player.compiled.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/shaka-player@~4/dist/shaka-player.ui.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@~1/dist/hls.min.js"></script>
 
     <script type="module" src="./demo.js"></script>
   </head>
   <body>
-    <video id="video1" width="640" controls autoplay></video>
-    <video id="video2" width="640" controls autoplay></video>
+    <div>
+      <video id="hls-video" width="640" controls autoplay></video>
+    </div>
+    <div id="shaka-container" class="video-container" style="width: 640px">
+      <video class="shaka-video" id="shaka-video" width="640px"></video>
+    </div>
   </body>
 </html>

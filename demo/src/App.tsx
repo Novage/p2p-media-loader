@@ -212,6 +212,14 @@ function App() {
       const player = new shaka.Player();
       player.attach(videoRef.current);
 
+      //@ts-ignore
+      const ui = new shaka.ui.Overlay(
+        player,
+        containerRef.current,
+        videoRef.current,
+      );
+      ui.getControls();
+
       const onError = (error: shaka.util.Error) => {
         console.error("Error code", error.code, "object", error);
       };
@@ -373,21 +381,18 @@ function App() {
           </div>
         </div>
         <div style={{ display: "flex", justifyContent: "center" }}>
-          <div
-            ref={containerRef}
-            id="player-container"
-            style={{ width: 1000 }}
-          />
+          <div ref={containerRef} id="player-container">
+            {!!playerType && ["hlsjs", "shaka-player"].includes(playerType) && (
+              <video
+                ref={videoRef}
+                {...(playerType !== "shaka-player" && { controls: true })}
+                muted
+                playsInline
+                style={{ width: 800 }}
+              />
+            )}
+          </div>
         </div>
-        {!!playerType && ["hlsjs", "shaka-player"].includes(playerType) && (
-          <video
-            ref={videoRef}
-            controls
-            muted
-            playsInline
-            style={{ width: 800 }}
-          />
-        )}
       </div>
       <div style={{ display: "flex" }}>
         <div>

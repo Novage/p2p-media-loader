@@ -16,7 +16,7 @@ function initHlsPlayer() {
   const engine = new HlsEngine();
 
   const player = new Hls({ ...engine.getHlsJsConfig() });
-  player.attachMedia(document.getElementById("video1"));
+  player.attachMedia(document.getElementById("hls-video"));
   player.on(Hls.Events.ERROR, function (event, data) {
     console.error("Error code", data.details, "object", data);
   });
@@ -31,12 +31,18 @@ function initHlsPlayer() {
 }
 
 async function initShakaPlayer() {
+  const videoElement = document.getElementById("shaka-video");
+  const videoContainer = document.getElementById("shaka-container");
+
   ShakaEngine.setGlobalSettings();
   const engine = new ShakaEngine();
 
   const player = new shaka.Player();
-  await player.attach(document.getElementById("video2"));
+  await player.attach(videoElement);
   player.addEventListener("error", onErrorEvent);
+
+  const ui = new shaka.ui.Overlay(player, videoContainer, videoElement);
+  ui.getControls();
 
   engine.configureAndInitShakaPlayer(player);
 
