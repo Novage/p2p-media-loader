@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Engine as HlsJsEngine } from "p2p-media-loader-hlsjs";
+import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 import { Engine as ShakaEngine } from "p2p-media-loader-shaka";
 import DPlayer from "dplayer";
 import muxjs from "mux.js";
@@ -14,15 +14,17 @@ declare global {
   }
 }
 
+const HlsWithP2P = HlsJsP2PEngine.injectP2PMixin(window.Hls);
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 window.muxjs = muxjs;
 
 const players = [
   "hlsjs",
-  "hls-dplayer",
-  "hls-clappr",
+  "hlsjs-dplayer",
+  "hlsjs-clappr",
+  "shaka",
   "shaka-dplayer",
-  "shaka-player",
   "shaka-clappr",
 ] as const;
 
@@ -110,8 +112,7 @@ function App() {
     const initHlsJsPlayer = (url: string) => {
       if (!videoRef.current) return;
 
-      const HlsP2P = HlsJsEngine.injectP2PMixin(window.Hls);
-      const hls = new HlsP2P();
+      const hls = new HlsWithP2P();
 
       hls.p2pEngine.addEventListener("onSegmentLoaded", onSegmentLoaded);
 
@@ -129,8 +130,7 @@ function App() {
           type: "customHls",
           customType: {
             customHls: (video: HTMLVideoElement) => {
-              const HlsP2P = HlsJsEngine.injectP2PMixin(window.Hls);
-              const hls = new HlsP2P();
+              const hls = new HlsWithP2P();
 
               hls.p2pEngine.addEventListener(
                 "onSegmentLoaded",
@@ -147,7 +147,7 @@ function App() {
     };
 
     const initHlsClapprPlayer = (url: string) => {
-      const engine = new HlsJsEngine();
+      const p2pEngine = new HlsJsP2PEngine();
       /* eslint-disable */
 
       const clapprPlayer = new window.Clappr.Player({
@@ -155,13 +155,13 @@ function App() {
         source: url,
         playback: {
           hlsjsConfig: {
-            ...engine.getHlsJsConfig(),
+            ...p2pEngine.getHlsJsConfig(),
           },
         },
         plugins: [window.LevelSelector],
       });
 
-      engine.initClapprPlayer(clapprPlayer);
+      p2pEngine.initClapprPlayer(clapprPlayer);
 
       window.videoPlayer = clapprPlayer;
 
@@ -256,20 +256,20 @@ function App() {
     void shakaInstance.current?.destroy();
 
     switch (playerType) {
-      case "hls-dplayer":
+      case "hlsjs-dplayer":
         initHlsDPlayer(streamUrl);
         break;
       case "hlsjs":
         initHlsJsPlayer(streamUrl);
         break;
-      case "hls-clappr":
+      case "hlsjs-clappr":
         initHlsClapprPlayer(streamUrl);
+        break;
+      case "shaka":
+        initShakaPlayer(streamUrl);
         break;
       case "shaka-dplayer":
         initShakaDPlayer(streamUrl);
-        break;
-      case "shaka-player":
-        initShakaPlayer(streamUrl);
         break;
       case "shaka-clappr":
         initShakaClapprPlayer(streamUrl);
@@ -289,7 +289,7 @@ function App() {
     }
     if (!localStorage.player) {
       localStorage.player = "hls-dplayer";
-      setPlayerType("hls-dplayer");
+      setPlayerType("hlsjs-dplayer");
     }
     if (!localStorage.streamUrl) {
       localStorage.streamUrl = streamUrls.hlsLive2;
@@ -316,12 +316,12 @@ function App() {
 
   const loadStreamWithExistingInstance = () => {
     switch (playerType) {
-      case "hls-dplayer":
+      case "hlsjs-dplayer":
       case "hlsjs":
-      case "hls-clappr":
+      case "hlsjs-clappr":
         hlsInstance.current?.loadSource(streamUrl);
         break;
-      case "shaka-player":
+      case "shaka":
       case "shaka-dplayer":
       case "shaka-clappr":
         shakaInstance.current?.load(streamUrl).catch(() => undefined);

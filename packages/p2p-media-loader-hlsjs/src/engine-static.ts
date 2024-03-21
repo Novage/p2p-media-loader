@@ -1,11 +1,11 @@
-import { Engine, PartialHlsJsEngineConfig } from "./engine";
+import { HlsJsP2PEngine, PartialHlsJsP2PEngineConfig } from "./engine";
 import { DeepReadonly } from "ts-essentials";
 
 type P2PConfig<T> = {
-  p2p?: DeepReadonly<PartialHlsJsEngineConfig> & {
+  p2p?: DeepReadonly<PartialHlsJsP2PEngineConfig> & {
     onHlsJsCreated?: (
       hls: T & {
-        readonly p2pEngine: Engine;
+        readonly p2pEngine: HlsJsP2PEngine;
       },
     ) => void;
   };
@@ -15,8 +15,8 @@ export function injectP2PMixin<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   HlsJsConstructor extends new (...args: any[]) => any,
 >(HlsJsClass: HlsJsConstructor) {
-  return class P2PHlsJsClass extends HlsJsClass {
-    #p2pEngine: Engine;
+  return class HlsJsWithP2PClass extends HlsJsClass {
+    #p2pEngine: HlsJsP2PEngine;
 
     get p2pEngine() {
       return this.#p2pEngine;
@@ -25,9 +25,10 @@ export function injectP2PMixin<
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     constructor(...args: any[]) {
       const config = args[0] as P2PConfig<InstanceType<HlsJsConstructor>>;
+
       const { p2p, ...hlsJsConfig } = config ?? {};
 
-      const p2pEngine = new Engine(p2p);
+      const p2pEngine = new HlsJsP2PEngine(p2p);
 
       super({ ...hlsJsConfig, ...p2pEngine.getHlsJsConfig() });
 
@@ -40,6 +41,6 @@ export function injectP2PMixin<
     config?: ConstructorParameters<HlsJsConstructor>[0] &
       P2PConfig<InstanceType<HlsJsConstructor>>,
   ) => InstanceType<HlsJsConstructor> & {
-    readonly p2pEngine: Engine;
+    readonly p2pEngine: HlsJsP2PEngine;
   };
 }

@@ -20,21 +20,21 @@ import {
 import { DeepReadonly } from "ts-essentials";
 import { injectP2PMixin } from "./engine-static";
 
-export type HlsJsEngineConfig = {
+export type HlsJsP2PEngineConfig = {
   core: CoreConfig;
 };
 
-export type PartialHlsJsEngineConfig = Partial<
-  Omit<HlsJsEngineConfig, "core">
+export type PartialHlsJsP2PEngineConfig = Partial<
+  Omit<HlsJsP2PEngineConfig, "core">
 > & {
   core?: Partial<CoreConfig>;
 };
 
-export type DynamicHlsJsEngineConfig = {
+export type DynamicHlsJsP2PEngineConfig = {
   core?: DynamicCoreConfig;
 };
 
-export class Engine {
+export class HlsJsP2PEngine {
   private readonly core: Core;
   private readonly segmentManager: SegmentManager;
   private hlsInstanceGetter?: () => Hls;
@@ -43,7 +43,7 @@ export class Engine {
 
   static injectP2PMixin = injectP2PMixin;
 
-  constructor(config?: DeepReadonly<PartialHlsJsEngineConfig>) {
+  constructor(config?: DeepReadonly<PartialHlsJsP2PEngineConfig>) {
     this.core = new Core(config?.core);
     this.segmentManager = new SegmentManager(this.core);
   }
@@ -69,11 +69,11 @@ export class Engine {
     };
   }
 
-  getConfig(): DeepReadonly<HlsJsEngineConfig> {
+  getConfig(): DeepReadonly<HlsJsP2PEngineConfig> {
     return { core: this.core.getConfig() };
   }
 
-  applyDynamicConfig(dynamicConfig: DeepReadonly<DynamicHlsJsEngineConfig>) {
+  applyDynamicConfig(dynamicConfig: DeepReadonly<DynamicHlsJsP2PEngineConfig>) {
     if (dynamicConfig.core) this.core.applyDynamicConfig(dynamicConfig.core);
   }
 
@@ -219,7 +219,7 @@ export class Engine {
         super(config, core);
       }
 
-      static getEngine(): Engine {
+      static getEngine() {
         return engine;
       }
     };

@@ -1,6 +1,6 @@
-export { Engine } from "./engine";
+export { HlsJsP2PEngine } from "./engine";
 export type {
-  DynamicHlsJsEngineConfig,
-  HlsJsEngineConfig,
-  PartialHlsJsEngineConfig,
+  DynamicHlsJsP2PEngineConfig,
+  HlsJsP2PEngineConfig,
+  PartialHlsJsP2PEngineConfig,
 } from "./engine";
