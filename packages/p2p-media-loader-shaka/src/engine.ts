@@ -21,23 +21,23 @@ import {
 } from "p2p-media-loader-core";
 import { DeepReadonly } from "ts-essentials";
 
-export type DynamicShakaEngineConfig = {
+export type DynamicShakaP2PEngineConfig = {
   core?: DynamicCoreConfig;
 };
 
-export type ShakaEngineConfig = {
+export type ShakaP2PEngineConfig = {
   core: CoreConfig;
 };
 
 export type PartialShakaEngineConfig = Partial<
-  Omit<ShakaEngineConfig, "core">
+  Omit<ShakaP2PEngineConfig, "core">
 > & {
   core?: Partial<CoreConfig>;
 };
 
 const LIVE_EDGE_DELAY = 25;
 
-export class Engine {
+export class ShakaP2PEngine {
   private player?: shaka.Player;
   private readonly shaka: Shaka;
   private readonly streamInfo: StreamInfo = {};
@@ -71,11 +71,11 @@ export class Engine {
     this.updatePlayerEventHandlers("register");
   }
 
-  applyDynamicConfig(dynamicConfig: DeepReadonly<DynamicShakaEngineConfig>) {
+  applyDynamicConfig(dynamicConfig: DeepReadonly<DynamicShakaP2PEngineConfig>) {
     if (dynamicConfig.core) this.core.applyDynamicConfig(dynamicConfig.core);
   }
 
-  getConfig(): DeepReadonly<ShakaEngineConfig> {
+  getConfig(): DeepReadonly<ShakaP2PEngineConfig> {
     return { core: this.core.getConfig() };
   }
 
@@ -227,18 +227,18 @@ export class Engine {
     NetworkingEngine.unregisterScheme("https");
   }
 
-  static setGlobalSettings(shaka = window.shaka) {
+  static registerP2PPlugins(shaka = window.shaka) {
     validateShaka(shaka);
 
-    Engine.registerManifestParsers(shaka);
-    Engine.registerNetworkingEngineSchemes(shaka);
+    ShakaP2PEngine.registerManifestParsers(shaka);
+    ShakaP2PEngine.registerNetworkingEngineSchemes(shaka);
   }
 
   static unsetGlobalSettings(shaka = window.shaka) {
     validateShaka(shaka);
 
-    Engine.unregisterManifestParsers(shaka);
-    Engine.unregisterNetworkingEngineSchemes(shaka);
+    ShakaP2PEngine.unregisterManifestParsers(shaka);
+    ShakaP2PEngine.unregisterNetworkingEngineSchemes(shaka);
   }
 }
 

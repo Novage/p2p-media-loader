@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
-import { Engine as ShakaEngine } from "p2p-media-loader-shaka";
+import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 import DPlayer from "dplayer";
 import muxjs from "mux.js";
 import { SegmentLoadDetails, debug } from "p2p-media-loader-core";
@@ -15,6 +15,7 @@ declare global {
 }
 
 const HlsWithP2P = HlsJsP2PEngine.injectP2PMixin(window.Hls);
+ShakaP2PEngine.registerP2PPlugins();
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 window.muxjs = muxjs;
@@ -85,8 +86,6 @@ function App() {
     storageItemToNumber,
   );
 
-  const shakaEngine = useRef<ShakaEngine>();
-
   const onSegmentLoaded = useCallback(
     (params: SegmentLoadDetails) => {
       const { bytesLength, downloadSource } = params;
@@ -101,12 +100,6 @@ function App() {
     },
     [setHttpLoadedGlob, setP2PLoadedGlob],
   );
-
-  if (!shakaEngine.current) {
-    ShakaEngine.setGlobalSettings();
-    shakaEngine.current = new ShakaEngine();
-    shakaEngine.current.addEventListener("onSegmentLoaded", onSegmentLoaded);
-  }
 
   const createNewPlayer = useCallback(() => {
     const initHlsJsPlayer = (url: string) => {
@@ -169,8 +162,8 @@ function App() {
     };
 
     const initShakaDPlayer = (url: string) => {
-      const engine = shakaEngine.current;
-      if (!engine) return;
+      const shakaP2PEngine = new ShakaP2PEngine();
+      shakaP2PEngine.addEventListener("onSegmentLoaded", onSegmentLoaded);
 
       const player = new DPlayer({
         container: containerRef.current,
@@ -190,7 +183,7 @@ function App() {
 
               shakaPlayer.addEventListener("error", onError);
 
-              engine.configureAndInitShakaPlayer(shakaPlayer);
+              shakaP2PEngine.configureAndInitShakaPlayer(shakaPlayer);
               shakaPlayer.load(url).catch(onError);
 
               shakaInstance.current = shakaPlayer;
@@ -204,8 +197,10 @@ function App() {
     };
 
     const initShakaPlayer = (url: string) => {
-      const engine = shakaEngine.current;
-      if (!videoRef.current || !engine) return;
+      if (!videoRef.current) return;
+
+      const shakaP2PEngine = new ShakaP2PEngine();
+      shakaP2PEngine.addEventListener("onSegmentLoaded", onSegmentLoaded);
 
       /* eslint-disable */
 
@@ -220,7 +215,7 @@ function App() {
         onError((event as any).detail);
       });
 
-      engine.configureAndInitShakaPlayer(player);
+      shakaP2PEngine.configureAndInitShakaPlayer(player);
       player.load(url).catch(onError);
       shakaInstance.current = player;
       window.videoPlayer = player;
@@ -229,9 +224,8 @@ function App() {
     };
 
     const initShakaClapprPlayer = (url: string) => {
-      const engine = shakaEngine.current;
-      if (!engine) return;
-
+      const shakaP2PEngine = new ShakaP2PEngine();
+      shakaP2PEngine.addEventListener("onSegmentLoaded", onSegmentLoaded);
       /* eslint-disable */
 
       const clapprPlayer = new window.Clappr.Player({
@@ -239,7 +233,7 @@ function App() {
         source: url,
         plugins: [window.DashShakaPlayback, window.LevelSelector],
         shakaOnBeforeLoad: (shakaPlayerInstance: any) => {
-          engine.configureAndInitShakaPlayer(shakaPlayerInstance);
+          shakaP2PEngine.configureAndInitShakaPlayer(shakaPlayerInstance);
         },
       });
 
