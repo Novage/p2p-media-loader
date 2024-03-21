@@ -1,10 +1,15 @@
 <html>
   <head>
+    <!-- Import Mediaelement CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/mediaelement@latest/build/mediaelementplayer.min.css"
+      rel="stylesheet"
+    />
     <link
       rel="stylesheet"
-      type="text/css"
-      href="https://cdn.jsdelivr.net/npm/mediaelement@latest/build/mediaelementplayer.min.css"
+      href="https://cdn.jsdelivr.net/npm/mediaelement-plugins@latest/dist/quality/quality.min.css"
     />
+
     <script type="importmap">
       {
         "imports": {
@@ -19,35 +24,37 @@
 
     <!-- Import Mediaelement JS -->
     <script src="https://cdn.jsdelivr.net/npm/mediaelement@latest/build/mediaelement-and-player.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mediaelement-plugins@latest/dist/quality/quality.min.js"></script>
   </head>
 
   <body>
     <!-- MediaElement HLS -->
     <div class="mejs_mediaelement">
-      <video controls width="640px" height="480px" id="mediaelement"></video>
+      <video controls width="640px" height="480px" id="mediaelement">
+        <!-- Quality Plugin -->
+        <source
+          src="https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8"
+          data-quality="Auto"
+        />
+      </video>
     </div>
     <script type="module">
-      import { Engine } from "p2p-media-loader-hlsjs";
+      import { Engine as HlsEngine } from "p2p-media-loader-hlsjs";
 
-      const engineMediaElement = new Engine();
+      // Override global Hls.js class with P2P enabled mixin
+      window.Hls = HlsEngine.injectP2PMixin(window.Hls);
+      const hls = new window.Hls();
 
-      window.hls = new window.Hls(engineMediaElement.getHlsJsConfig());
-
-      engineMediaElement.setHls(window.hls);
-      window.hls.loadSource(
-        "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
-      );
-      window.hls.attachMedia(document.getElementById("mediaelement"));
-
-      var playerM = new MediaElementPlayer("mediaelement", {
+      const player = new MediaElementPlayer("mediaelement", {
+        iconSprite: "/modules-demo/mejs-controls.svg",
         features: [
           "playpause",
-          "progress",
           "current",
+          "progress",
           "duration",
-          "tracks",
           "volume",
           "fullscreen",
+          "quality",
         ],
       });
     </script>
