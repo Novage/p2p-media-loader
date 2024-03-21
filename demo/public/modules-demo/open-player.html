@@ -2,12 +2,7 @@
   <head>
     <link
       rel="stylesheet"
-      href="//cdn.flowplayer.com/releases/native/3/stable/style/flowplayer.css"
-    />
-    <link
-      rel="stylesheet"
-      type="text/css"
-      href="https://cdn.jsdelivr.net/npm/mediaelement@latest/build/mediaelementplayer.min.css"
+      href="https://cdn.jsdelivr.net/npm/openplayerjs@latest/dist/openplayer.min.css"
     />
     <script type="importmap">
       {
@@ -28,21 +23,31 @@
 
   <body>
     <!-- OpenPlayerJS -->
-    <video width="1280px" height="720px" controls id="openplayer"></video>
-
+    <video
+      id="openplayer"
+      class="op-player op-player__media"
+      controls
+      playsinline
+    ></video>
     <script type="module">
-      import { Engine } from "p2p-media-loader-hlsjs";
+      import { Engine as HlsEngine } from "p2p-media-loader-hlsjs";
 
-      const engine = new Engine();
+      window.Hls = HlsEngine.injectP2PMixin(window.Hls);
+      const hls = new window.Hls();
 
-      const hls = new window.Hls(engine.getHlsJsConfig());
-
-      engine.setHls(hls);
-      hls.loadSource("https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8");
+      hls.loadSource(
+        "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8",
+      );
       hls.attachMedia(document.getElementById("openplayer"));
-
-      const openplayer = new OpenPlayerJS({
-        id: "openplayer",
+      const openplayer = new OpenPlayerJS("openplayer", {
+        startVolume: 0.5,
+        controls: {
+          layers: {
+            left: ["play", "time", "volume"],
+            middle: ["progress"],
+            right: ["levels", "captions", "settings", "fullscreen"],
+          },
+        },
       });
 
       openplayer.init();
