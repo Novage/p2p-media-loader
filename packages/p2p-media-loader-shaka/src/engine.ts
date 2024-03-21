@@ -45,8 +45,13 @@ export class Engine {
   private readonly segmentManager: SegmentManager;
   private requestFilter?: shaka.extern.RequestFilter;
 
-  constructor(config?: DeepReadonly<PartialShakaEngineConfig>, shaka?: Shaka) {
-    this.shaka = shaka ?? window.shaka;
+  constructor(
+    config?: DeepReadonly<PartialShakaEngineConfig>,
+    shaka = window.shaka,
+  ) {
+    validateShaka(shaka);
+
+    this.shaka = shaka;
     this.core = new Core(config?.core);
     this.segmentManager = new SegmentManager(this.streamInfo, this.core);
   }
@@ -222,15 +227,25 @@ export class Engine {
     NetworkingEngine.unregisterScheme("https");
   }
 
-  static setGlobalSettings(shaka?: unknown) {
-    const shakaGlobal = (shaka as Shaka | undefined) ?? window.shaka;
-    Engine.registerManifestParsers(shakaGlobal);
-    Engine.registerNetworkingEngineSchemes(shakaGlobal);
+  static setGlobalSettings(shaka = window.shaka) {
+    validateShaka(shaka);
+
+    Engine.registerManifestParsers(shaka);
+    Engine.registerNetworkingEngineSchemes(shaka);
   }
 
-  static unsetGlobalSettings(shaka?: unknown) {
-    const shakaGlobal = (shaka as Shaka | undefined) ?? window.shaka;
-    Engine.unregisterManifestParsers(shakaGlobal);
-    Engine.unregisterNetworkingEngineSchemes(shakaGlobal);
+  static unsetGlobalSettings(shaka = window.shaka) {
+    validateShaka(shaka);
+
+    Engine.unregisterManifestParsers(shaka);
+    Engine.unregisterNetworkingEngineSchemes(shaka);
+  }
+}
+
+function validateShaka(shaka: unknown) {
+  if (!shaka) {
+    throw new Error(
+      "shaka namespace is not defined in global scope and not passed as an argument to Shaka P2P engine constructor",
+    );
   }
 }
