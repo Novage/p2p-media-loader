@@ -141,6 +141,8 @@ function App() {
 
     const initHlsClapprPlayer = (url: string) => {
       const p2pEngine = new HlsJsP2PEngine();
+      p2pEngine.addEventListener("onSegmentLoaded", onSegmentLoaded);
+
       /* eslint-disable */
 
       const clapprPlayer = new window.Clappr.Player({
