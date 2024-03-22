@@ -5,6 +5,7 @@ import DPlayer from "dplayer";
 import muxjs from "mux.js";
 import { SegmentLoadDetails, debug } from "p2p-media-loader-core";
 import type Hls from "hls.js";
+import { Demo } from "p2p-media-loader-demo";
 
 declare global {
   interface Window {
@@ -400,6 +401,7 @@ function App() {
         </div>
       </div>
       <a href="modules-demo/index.html">ES modules demo</a>
+      <Demo />
     </div>
   );
 }
