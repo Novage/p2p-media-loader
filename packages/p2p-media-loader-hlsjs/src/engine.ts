@@ -18,29 +18,32 @@ import {
   debug,
 } from "p2p-media-loader-core";
 import { DeepReadonly } from "ts-essentials";
+import { injectMixin } from "./engine-static";
 
-export type HlsJsEngineConfig = {
+export type HlsJsP2PEngineConfig = {
   core: CoreConfig;
 };
 
-export type PartialHlsJsEngineConfig = Partial<
-  Omit<HlsJsEngineConfig, "core">
+export type PartialHlsJsP2PEngineConfig = Partial<
+  Omit<HlsJsP2PEngineConfig, "core">
 > & {
   core?: Partial<CoreConfig>;
 };
 
-export type DynamicHlsJsEngineConfig = {
+export type DynamicHlsJsP2PEngineConfig = {
   core?: DynamicCoreConfig;
 };
 
-export class Engine {
+export class HlsJsP2PEngine {
   private readonly core: Core;
   private readonly segmentManager: SegmentManager;
   private hlsInstanceGetter?: () => Hls;
   private currentHlsInstance?: Hls;
   private readonly debug = debug("p2pml-hlsjs:engine");
 
-  constructor(config?: DeepReadonly<PartialHlsJsEngineConfig>) {
+  static injectMixin = injectMixin;
+
+  constructor(config?: DeepReadonly<PartialHlsJsP2PEngineConfig>) {
     this.core = new Core(config?.core);
     this.segmentManager = new SegmentManager(this.core);
   }
@@ -59,23 +62,24 @@ export class Engine {
     this.core.removeEventListener(eventName, listener);
   }
 
-  getHlsConfig(): Partial<HlsConfig> {
+  getHlsJsConfig<F = unknown, P = unknown>(): { fLoader: F; pLoader: P } {
     return {
-      fLoader: this.createFragmentLoaderClass(),
-      pLoader: this.createPlaylistLoaderClass(),
+      fLoader: this.createFragmentLoaderClass() as F,
+      pLoader: this.createPlaylistLoaderClass() as P,
     };
   }
 
-  getConfig(): DeepReadonly<HlsJsEngineConfig> {
+  getConfig(): DeepReadonly<HlsJsP2PEngineConfig> {
     return { core: this.core.getConfig() };
   }
 
-  applyDynamicConfig(dynamicConfig: DeepReadonly<DynamicHlsJsEngineConfig>) {
+  applyDynamicConfig(dynamicConfig: DeepReadonly<DynamicHlsJsP2PEngineConfig>) {
     if (dynamicConfig.core) this.core.applyDynamicConfig(dynamicConfig.core);
   }
 
-  setHls(hls: Hls | (() => Hls)) {
-    this.hlsInstanceGetter = typeof hls === "function" ? hls : () => hls;
+  setHls<T = unknown>(hls: T | (() => T)) {
+    this.hlsInstanceGetter =
+      typeof hls === "function" ? (hls as () => Hls) : () => hls as Hls;
   }
 
   private initHlsEvents() {
@@ -208,14 +212,14 @@ export class Engine {
   private createFragmentLoaderClass() {
     const core = this.core;
     // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const engine: Engine = this;
+    const engine = this;
 
     return class FragmentLoader extends FragmentLoaderBase {
       constructor(config: HlsConfig) {
         super(config, core);
       }
 
-      static getEngine(): Engine {
+      static getEngine() {
         return engine;
       }
     };
@@ -223,7 +227,7 @@ export class Engine {
 
   private createPlaylistLoaderClass() {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const engine: Engine = this;
+    const engine = this;
     return class PlaylistLoader extends PlaylistLoaderBase {
       constructor(config: HlsConfig) {
         super(config);

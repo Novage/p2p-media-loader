@@ -15,17 +15,17 @@ const DEFAULT_DOWNLOAD_LATENCY = 10;
 export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   context!: FragmentLoaderContext;
   config!: LoaderConfiguration | null;
-  callbacks!: LoaderCallbacks<FragmentLoaderContext> | null;
   stats: LoaderStats;
-  createDefaultLoader: () => Loader<LoaderContext>;
-  defaultLoader?: Loader<LoaderContext>;
-  core: Core;
-  response?: SegmentResponse;
-  segmentId?: string;
+  #callbacks!: LoaderCallbacks<FragmentLoaderContext> | null;
+  #createDefaultLoader: () => Loader<LoaderContext>;
+  #defaultLoader?: Loader<LoaderContext>;
+  #core: Core;
+  #response?: SegmentResponse;
+  #segmentId?: string;
 
   constructor(config: HlsConfig, core: Core) {
-    this.core = core;
-    this.createDefaultLoader = () => new config.loader(config);
+    this.#core = core;
+    this.#createDefaultLoader = () => new config.loader(config);
     this.stats = {
       aborted: false,
       chunkCount: 0,
@@ -48,7 +48,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   ) {
     this.context = context;
     this.config = config;
-    this.callbacks = callbacks;
+    this.#callbacks = callbacks;
     const stats = this.stats;
 
     const { rangeStart: start, rangeEnd: end } = context;
@@ -56,20 +56,20 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       start,
       end !== undefined ? end - 1 : undefined,
     );
-    this.segmentId = Utils.getSegmentLocalId(context.url, byteRange);
+    this.#segmentId = Utils.getSegmentLocalId(context.url, byteRange);
 
-    if (!this.core.hasSegment(this.segmentId)) {
-      this.defaultLoader = this.createDefaultLoader();
-      this.defaultLoader.stats = this.stats;
-      this.defaultLoader?.load(context, config, callbacks);
+    if (!this.#core.hasSegment(this.#segmentId)) {
+      this.#defaultLoader = this.#createDefaultLoader();
+      this.#defaultLoader.stats = this.stats;
+      this.#defaultLoader?.load(context, config, callbacks);
       return;
     }
 
     const onSuccess = (response: SegmentResponse) => {
-      this.response = response;
-      const loadedBytes = this.response.data.byteLength;
+      this.#response = response;
+      const loadedBytes = this.#response.data.byteLength;
       stats.loading = getLoadingStat(
-        this.response.bandwidth,
+        this.#response.bandwidth,
         loadedBytes,
         performance.now(),
       );
@@ -79,12 +79,12 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
         callbacks.onProgress(
           this.stats,
           context,
-          this.response.data,
+          this.#response.data,
           undefined,
         );
       }
       callbacks.onSuccess(
-        { data: this.response.data, url: context.url },
+        { data: this.#response.data, url: context.url },
         this.stats,
         context,
         undefined,
@@ -99,13 +99,13 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       ) {
         return;
       }
-      this.handleError(error);
+      this.#handleError(error);
     };
 
-    void this.core.loadSegment(this.segmentId, { onSuccess, onError });
+    void this.#core.loadSegment(this.#segmentId, { onSuccess, onError });
   }
 
-  private handleError(thrownError: unknown) {
+  #handleError(thrownError: unknown) {
     const error = { code: 0, text: "" };
     if (
       thrownError instanceof CoreRequestError &&
@@ -116,31 +116,31 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     } else if (thrownError instanceof Error) {
       error.text = thrownError.message;
     }
-    this.callbacks?.onError(error, this.context, null, this.stats);
+    this.#callbacks?.onError(error, this.context, null, this.stats);
   }
 
-  private abortInternal() {
-    if (!this.response && this.segmentId) {
+  #abortInternal() {
+    if (!this.#response && this.#segmentId) {
       this.stats.aborted = true;
-      this.core.abortSegmentLoading(this.segmentId);
+      this.#core.abortSegmentLoading(this.#segmentId);
     }
   }
 
   abort() {
-    if (this.defaultLoader) {
-      this.defaultLoader.abort();
+    if (this.#defaultLoader) {
+      this.#defaultLoader.abort();
     } else {
-      this.abortInternal();
-      this.callbacks?.onAbort?.(this.stats, this.context, {});
+      this.#abortInternal();
+      this.#callbacks?.onAbort?.(this.stats, this.context, {});
     }
   }
 
   destroy() {
-    if (this.defaultLoader) {
-      this.defaultLoader.destroy();
+    if (this.#defaultLoader) {
+      this.#defaultLoader.destroy();
     } else {
-      if (!this.stats.aborted) this.abortInternal();
-      this.callbacks = null;
+      if (!this.stats.aborted) this.#abortInternal();
+      this.#callbacks = null;
       this.config = null;
     }
   }

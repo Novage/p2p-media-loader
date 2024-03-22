@@ -21,23 +21,23 @@ import {
 } from "p2p-media-loader-core";
 import { DeepReadonly } from "ts-essentials";
 
-export type DynamicShakaEngineConfig = {
+export type DynamicShakaP2PEngineConfig = {
   core?: DynamicCoreConfig;
 };
 
-export type ShakaEngineConfig = {
+export type ShakaP2PEngineConfig = {
   core: CoreConfig;
 };
 
 export type PartialShakaEngineConfig = Partial<
-  Omit<ShakaEngineConfig, "core">
+  Omit<ShakaP2PEngineConfig, "core">
 > & {
   core?: Partial<CoreConfig>;
 };
 
 const LIVE_EDGE_DELAY = 25;
 
-export class Engine {
+export class ShakaP2PEngine {
   private player?: shaka.Player;
   private readonly shaka: Shaka;
   private readonly streamInfo: StreamInfo = {};
@@ -45,8 +45,13 @@ export class Engine {
   private readonly segmentManager: SegmentManager;
   private requestFilter?: shaka.extern.RequestFilter;
 
-  constructor(config?: DeepReadonly<PartialShakaEngineConfig>, shaka?: Shaka) {
-    this.shaka = shaka ?? window.shaka;
+  constructor(
+    config?: DeepReadonly<PartialShakaEngineConfig>,
+    shaka = window.shaka,
+  ) {
+    validateShaka(shaka);
+
+    this.shaka = shaka;
     this.core = new Core(config?.core);
     this.segmentManager = new SegmentManager(this.streamInfo, this.core);
   }
@@ -66,11 +71,11 @@ export class Engine {
     this.updatePlayerEventHandlers("register");
   }
 
-  applyDynamicConfig(dynamicConfig: DeepReadonly<DynamicShakaEngineConfig>) {
+  applyDynamicConfig(dynamicConfig: DeepReadonly<DynamicShakaP2PEngineConfig>) {
     if (dynamicConfig.core) this.core.applyDynamicConfig(dynamicConfig.core);
   }
 
-  getConfig(): DeepReadonly<ShakaEngineConfig> {
+  getConfig(): DeepReadonly<ShakaP2PEngineConfig> {
     return { core: this.core.getConfig() };
   }
 
@@ -222,15 +227,25 @@ export class Engine {
     NetworkingEngine.unregisterScheme("https");
   }
 
-  static setGlobalSettings(shaka?: unknown) {
-    const shakaGlobal = (shaka as Shaka | undefined) ?? window.shaka;
-    Engine.registerManifestParsers(shakaGlobal);
-    Engine.registerNetworkingEngineSchemes(shakaGlobal);
+  static registerPlugins(shaka = window.shaka) {
+    validateShaka(shaka);
+
+    ShakaP2PEngine.registerManifestParsers(shaka);
+    ShakaP2PEngine.registerNetworkingEngineSchemes(shaka);
   }
 
-  static unsetGlobalSettings(shaka?: unknown) {
-    const shakaGlobal = (shaka as Shaka | undefined) ?? window.shaka;
-    Engine.unregisterManifestParsers(shakaGlobal);
-    Engine.unregisterNetworkingEngineSchemes(shakaGlobal);
+  static unregisterPlugins(shaka = window.shaka) {
+    validateShaka(shaka);
+
+    ShakaP2PEngine.unregisterManifestParsers(shaka);
+    ShakaP2PEngine.unregisterNetworkingEngineSchemes(shaka);
+  }
+}
+
+function validateShaka(shaka: unknown) {
+  if (!shaka) {
+    throw new Error(
+      "shaka namespace is not defined in global scope and not passed as an argument to Shaka P2P engine constructor",
+    );
   }
 }

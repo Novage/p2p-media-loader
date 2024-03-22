@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Engine as HlsJsEngine } from "p2p-media-loader-hlsjs";
-import { Engine as ShakaEngine } from "p2p-media-loader-shaka";
+import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
+import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 import DPlayer from "dplayer";
 import muxjs from "mux.js";
 import { SegmentLoadDetails, debug } from "p2p-media-loader-core";
@@ -15,15 +15,18 @@ declare global {
   }
 }
 
+const HlsWithP2P = HlsJsP2PEngine.injectMixin(window.Hls);
+ShakaP2PEngine.registerPlugins();
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 window.muxjs = muxjs;
 
 const players = [
   "hlsjs",
-  "hls-dplayer",
-  "hls-clappr",
+  "hlsjs-dplayer",
+  "hlsjs-clappr",
+  "shaka",
   "shaka-dplayer",
-  "shaka-player",
   "shaka-clappr",
 ] as const;
 
@@ -84,33 +87,162 @@ function App() {
     storageItemToNumber,
   );
 
-  const hlsEngine = useRef<HlsJsEngine>();
-  const shakaEngine = useRef<ShakaEngine>();
-
-  const onSegmentLoaded = (params: SegmentLoadDetails) => {
-    const { bytesLength, downloadSource } = params;
-    const MBytes = getMBFromBytes(bytesLength);
-    if (downloadSource === "http") {
-      setHttpLoaded((prev) => round(prev + MBytes));
-      setHttpLoadedGlob((prev) => round(prev + MBytes));
-    } else if (downloadSource === "p2p") {
-      setP2PLoaded((prev) => round(prev + MBytes));
-      setP2PLoadedGlob((prev) => round(prev + MBytes));
-    }
-  };
-
-  if (!hlsEngine.current) {
-    hlsEngine.current = new HlsJsEngine();
-    hlsEngine.current.addEventListener("onSegmentLoaded", onSegmentLoaded);
-  }
-
-  if (!shakaEngine.current) {
-    ShakaEngine.setGlobalSettings();
-    shakaEngine.current = new ShakaEngine();
-    shakaEngine.current.addEventListener("onSegmentLoaded", onSegmentLoaded);
-  }
+  const onSegmentLoaded = useCallback(
+    (params: SegmentLoadDetails) => {
+      const { bytesLength, downloadSource } = params;
+      const MBytes = getMBFromBytes(bytesLength);
+      if (downloadSource === "http") {
+        setHttpLoaded((prev) => round(prev + MBytes));
+        setHttpLoadedGlob((prev) => round(prev + MBytes));
+      } else if (downloadSource === "p2p") {
+        setP2PLoaded((prev) => round(prev + MBytes));
+        setP2PLoadedGlob((prev) => round(prev + MBytes));
+      }
+    },
+    [setHttpLoadedGlob, setP2PLoadedGlob],
+  );
 
   const createNewPlayer = useCallback(() => {
+    const initHlsJsPlayer = (url: string) => {
+      if (!videoRef.current) return;
+
+      const hls = new HlsWithP2P();
+
+      hls.p2pEngine.addEventListener("onSegmentLoaded", onSegmentLoaded);
+
+      hls.attachMedia(videoRef.current);
+      hls.loadSource(url);
+
+      window.videoPlayer = hls;
+    };
+
+    const initHlsDPlayer = (url: string) => {
+      const player = new DPlayer({
+        container: containerRef.current,
+        video: {
+          url: "",
+          type: "customHls",
+          customType: {
+            customHls: (video: HTMLVideoElement) => {
+              const hls = new HlsWithP2P();
+
+              hls.p2pEngine.addEventListener(
+                "onSegmentLoaded",
+                onSegmentLoaded,
+              );
+              hls.attachMedia(video);
+              hls.loadSource(url);
+            },
+          },
+        },
+      });
+      player.play();
+      window.videoPlayer = player;
+    };
+
+    const initHlsClapprPlayer = (url: string) => {
+      const p2pEngine = new HlsJsP2PEngine();
+      /* eslint-disable */
+
+      const clapprPlayer = new window.Clappr.Player({
+        parentId: "#player-container",
+        source: url,
+        playback: {
+          hlsjsConfig: {
+            ...p2pEngine.getHlsJsConfig(),
+          },
+        },
+        plugins: [window.LevelSelector],
+      });
+
+      p2pEngine.initClapprPlayer(clapprPlayer);
+
+      window.videoPlayer = clapprPlayer;
+
+      /* eslint-enable */
+    };
+
+    const initShakaDPlayer = (url: string) => {
+      const shakaP2PEngine = new ShakaP2PEngine();
+      shakaP2PEngine.addEventListener("onSegmentLoaded", onSegmentLoaded);
+
+      const player = new DPlayer({
+        container: containerRef.current,
+        video: {
+          url: "",
+          type: "customHlsOrDash",
+          customType: {
+            customHlsOrDash: (video: HTMLVideoElement) => {
+              /* eslint-disable */
+
+              const shakaPlayer = new window.shaka.Player();
+              shakaPlayer.attach(video);
+
+              const onError = (error: unknown) => {
+                console.error("Shaka error", error);
+              };
+
+              shakaPlayer.addEventListener("error", onError);
+
+              shakaP2PEngine.configureAndInitShakaPlayer(shakaPlayer);
+              shakaPlayer.load(url).catch(onError);
+
+              shakaInstance.current = shakaPlayer;
+
+              /* eslint-enable */
+            },
+          },
+        },
+      });
+      window.videoPlayer = player;
+    };
+
+    const initShakaPlayer = (url: string) => {
+      if (!videoRef.current) return;
+
+      const shakaP2PEngine = new ShakaP2PEngine();
+      shakaP2PEngine.addEventListener("onSegmentLoaded", onSegmentLoaded);
+
+      /* eslint-disable */
+
+      const player = new shaka.Player();
+      player.attach(videoRef.current);
+
+      const onError = (error: shaka.util.Error) => {
+        console.error("Error code", error.code, "object", error);
+      };
+
+      player.addEventListener("error", (event) => {
+        onError((event as any).detail);
+      });
+
+      shakaP2PEngine.configureAndInitShakaPlayer(player);
+      player.load(url).catch(onError);
+      shakaInstance.current = player;
+      window.videoPlayer = player;
+
+      /* eslint-enable */
+    };
+
+    const initShakaClapprPlayer = (url: string) => {
+      const shakaP2PEngine = new ShakaP2PEngine();
+      shakaP2PEngine.addEventListener("onSegmentLoaded", onSegmentLoaded);
+      /* eslint-disable */
+
+      const clapprPlayer = new window.Clappr.Player({
+        parentId: "#player-container",
+        source: url,
+        plugins: [window.DashShakaPlayback, window.LevelSelector],
+        shakaOnBeforeLoad: (shakaPlayerInstance: any) => {
+          shakaP2PEngine.configureAndInitShakaPlayer(shakaPlayerInstance);
+        },
+      });
+
+      window.videoPlayer = clapprPlayer;
+
+      /* eslint-enable */
+    };
+
     setHttpLoadedGlob(0);
     setP2PLoadedGlob(0);
 
@@ -119,34 +251,40 @@ function App() {
     void shakaInstance.current?.destroy();
 
     switch (playerType) {
-      case "hls-dplayer":
+      case "hlsjs-dplayer":
         initHlsDPlayer(streamUrl);
         break;
       case "hlsjs":
         initHlsJsPlayer(streamUrl);
         break;
-      case "hls-clappr":
+      case "hlsjs-clappr":
         initHlsClapprPlayer(streamUrl);
+        break;
+      case "shaka":
+        initShakaPlayer(streamUrl);
         break;
       case "shaka-dplayer":
         initShakaDPlayer(streamUrl);
-        break;
-      case "shaka-player":
-        initShakaPlayer(streamUrl);
         break;
       case "shaka-clappr":
         initShakaClapprPlayer(streamUrl);
         break;
     }
-  }, [playerType, setHttpLoadedGlob, setP2PLoadedGlob, streamUrl]);
+  }, [
+    onSegmentLoaded,
+    playerType,
+    setHttpLoadedGlob,
+    setP2PLoadedGlob,
+    streamUrl,
+  ]);
 
   useEffect(() => {
     if (!window.Hls.isSupported() || window.videoPlayer) {
       return;
     }
     if (!localStorage.player) {
-      localStorage.player = "hls-dplayer";
-      setPlayerType("hls-dplayer");
+      localStorage.player = "hlsjs-dplayer";
+      setPlayerType("hlsjs-dplayer");
     }
     if (!localStorage.streamUrl) {
       localStorage.streamUrl = streamUrls.hlsLive2;
@@ -155,148 +293,7 @@ function App() {
     createNewPlayer();
   }, [createNewPlayer]);
 
-  const initHlsJsPlayer = (url: string) => {
-    if (!videoRef.current || !hlsEngine.current) return;
-    const engine = hlsEngine.current;
-    const hls = new window.Hls({
-      ...engine.getHlsConfig(),
-    });
-
-    engine.setHls(hls);
-    hls.attachMedia(videoRef.current);
-    hls.loadSource(url);
-    hlsInstance.current = hls;
-    window.videoPlayer = hls;
-  };
-
-  const initHlsDPlayer = (url: string) => {
-    if (!hlsEngine.current) return;
-    const engine = hlsEngine.current;
-    const player = new DPlayer({
-      container: containerRef.current,
-      video: {
-        url: "",
-        type: "customHls",
-        customType: {
-          customHls: (video: HTMLVideoElement) => {
-            const hls = new window.Hls(engine.getHlsConfig());
-            engine.setHls(hls);
-            hls.loadSource(url);
-            hls.attachMedia(video);
-            hlsInstance.current = hls;
-          },
-        },
-      },
-    });
-    player.play();
-    window.videoPlayer = player;
-  };
-
-  const initHlsClapprPlayer = (url: string) => {
-    const engine = hlsEngine.current;
-    if (!engine) return;
-
-    /* eslint-disable */
-
-    const clapprPlayer = new window.Clappr.Player({
-      parentId: "#player-container",
-      source: url,
-      playback: {
-        hlsjsConfig: {
-          ...engine.getHlsConfig(),
-        },
-      },
-      plugins: [window.LevelSelector],
-    });
-
-    engine.initClapprPlayer(clapprPlayer);
-
-    window.videoPlayer = clapprPlayer;
-
-    /* eslint-enable */
-  };
-
-  const initShakaDPlayer = (url: string) => {
-    const engine = shakaEngine.current;
-    if (!engine) return;
-
-    const player = new DPlayer({
-      container: containerRef.current,
-      video: {
-        url: "",
-        type: "customHlsOrDash",
-        customType: {
-          customHlsOrDash: (video: HTMLVideoElement) => {
-            /* eslint-disable */
-
-            const shakaPlayer = new window.shaka.Player();
-            shakaPlayer.attach(video);
-
-            const onError = (error: unknown) => {
-              console.error("Shaka error", error);
-            };
-
-            shakaPlayer.addEventListener("error", onError);
-
-            engine.configureAndInitShakaPlayer(shakaPlayer);
-            shakaPlayer.load(url).catch(onError);
-
-            shakaInstance.current = shakaPlayer;
-
-            /* eslint-enable */
-          },
-        },
-      },
-    });
-    window.videoPlayer = player;
-  };
-
-  const initShakaPlayer = (url: string) => {
-    const engine = shakaEngine.current;
-    if (!videoRef.current || !engine) return;
-
-    /* eslint-disable */
-
-    const player = new shaka.Player();
-    player.attach(videoRef.current);
-
-    const onError = (error: shaka.util.Error) => {
-      console.error("Error code", error.code, "object", error);
-    };
-
-    player.addEventListener("error", (event) => {
-      onError((event as any).detail);
-    });
-
-    engine.configureAndInitShakaPlayer(player);
-    player.load(url).catch(onError);
-    shakaInstance.current = player;
-    window.videoPlayer = player;
-
-    /* eslint-enable */
-  };
-
-  const initShakaClapprPlayer = (url: string) => {
-    const engine = shakaEngine.current;
-    if (!engine) return;
-
-    /* eslint-disable */
-
-    const clapprPlayer = new window.Clappr.Player({
-      parentId: "#player-container",
-      source: url,
-      plugins: [window.DashShakaPlayback, window.LevelSelector],
-      shakaOnBeforeLoad: (shakaPlayerInstance: any) => {
-        engine.configureAndInitShakaPlayer(shakaPlayerInstance);
-      },
-    });
-
-    window.videoPlayer = clapprPlayer;
-
-    /* eslint-enable */
-  };
-
-  const destroyAndWindowPlayer = () => {
+  const destroyWindowPlayer = () => {
     window.videoPlayer?.destroy?.();
     window.videoPlayer = undefined;
   };
@@ -304,7 +301,7 @@ function App() {
   const onPlayerTypeChange = (newPlayer: Player) => {
     localStorage.player = newPlayer;
     setPlayerType(newPlayer);
-    destroyAndWindowPlayer();
+    destroyWindowPlayer();
   };
 
   const onVideoUrlChange = (streamUrl: string) => {
@@ -314,12 +311,12 @@ function App() {
 
   const loadStreamWithExistingInstance = () => {
     switch (playerType) {
-      case "hls-dplayer":
+      case "hlsjs-dplayer":
       case "hlsjs":
-      case "hls-clappr":
+      case "hlsjs-clappr":
         hlsInstance.current?.loadSource(streamUrl);
         break;
-      case "shaka-player":
+      case "shaka":
       case "shaka-dplayer":
       case "shaka-clappr":
         shakaInstance.current?.load(streamUrl).catch(() => undefined);
@@ -377,7 +374,7 @@ function App() {
             style={{ width: 1000 }}
           />
         </div>
-        {!!playerType && ["hlsjs", "shaka-player"].includes(playerType) && (
+        {!!playerType && ["hlsjs", "shaka"].includes(playerType) && (
           <video
             ref={videoRef}
             controls
