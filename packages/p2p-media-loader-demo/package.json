@@ -6,17 +6,15 @@
   "exports": "./src/index.ts",
   "types": "./src/index.ts",
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
+  "publishConfig": {
+    "exports": "dist/index.js",
+    "types": "dist/index.d.ts"
+  },
   "scripts": {
-    "dev": "vite",
-    "build": "pnpm build:es && pnpm build:esm && pnpm build:esm-min",
-    "build:es": "tsc",
-    "build:esm": "vite build --mode esm",
-    "build:esm-min": "vite build --mode esm-min",
+    "build": "vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "clean": "rimraf lib dist build p2p-media-loader-demo-*.tgz",
     "clean-with-modules": "rimraf node_modules && pnpm clean"
@@ -27,8 +25,6 @@
     "p2p-media-loader-shaka": "workspace:*"
   },
   "devDependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
     "@types/dplayer": "^1.25.5",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
@@ -37,6 +33,9 @@
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.6",
     "hls.js": "^1.5.7",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "vite-plugin-dts": "^3.7.3",
     "vite-plugin-node-polyfills": "^0.21.0"
   },
   "peerDependencies": {
