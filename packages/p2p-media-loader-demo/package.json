@@ -11,7 +11,10 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "pnpm build:es && pnpm build:esm && pnpm build:esm-min",
+    "build:es": "tsc",
+    "build:esm": "vite build --mode esm",
+    "build:esm-min": "vite build --mode esm-min",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
