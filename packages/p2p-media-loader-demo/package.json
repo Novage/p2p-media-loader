@@ -1,20 +1,43 @@
 {
   "name": "p2p-media-loader-demo",
-  "private": "false",
+  "description": "P2P Media Loader demo",
+  "license": "Apache-2.0",
+  "author": "Novage",
+  "homepage": "https://github.com/Novage/p2p-media-loader",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Novage/p2p-media-loader/tree/v1",
+    "directory": "packages/p2p-media-loader-demo"
+  },
+  "keywords": [
+    "p2p",
+    "peer-to-peer",
+    "hls",
+    "dash",
+    "webrtc",
+    "video",
+    "mse",
+    "player",
+    "torrent",
+    "bittorrent",
+    "webtorrent",
+    "hlsjs",
+    "shaka player"
+  ],
   "version": "0.0.0",
   "type": "module",
   "exports": "./src/index.ts",
   "types": "./src/index.ts",
   "files": [
-    "dist"
+    "lib",
+    "src"
   ],
-  "main": "dist/index.js",
   "publishConfig": {
-    "exports": "dist/index.js",
-    "types": "dist/index.d.ts"
+    "exports": "lib/index.js",
+    "types": "lib/index.d.ts"
   },
   "scripts": {
-    "build": "vite build",
+    "build": "tsc",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "type-check": "tsc --noEmit",
     "clean": "rimraf lib dist build p2p-media-loader-demo-*.tgz",
@@ -36,11 +59,10 @@
     "hls.js": "^1.5.7",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "vite-plugin-dts": "^3.7.3",
     "vite-plugin-node-polyfills": "^0.21.0"
   },
   "peerDependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react": ">=16",
+    "react-dom": ">=16"
   }
 }

@@ -1,9 +1,9 @@
 import { defineConfig } from "vite";
-import dts from "vite-plugin-dts";
+
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
-  plugins: [react(), dts()],
+  plugins: [react()],
   build: {
     lib: {
       fileName: "index",
