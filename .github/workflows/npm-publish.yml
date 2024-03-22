@@ -43,8 +43,8 @@ jobs:
 
       - name: NPM Publish Packages
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          for package in p2p-media-loader-core p2p-media-loader-hlsjs p2p-media-loader-shaka; do
+          for package in p2p-media-loader-core p2p-media-loader-hlsjs p2p-media-loader-shaka p2p-media-loader-demo; do
             pnpm publish ./packages/$package/$package-$VERSION.tgz --access public
           done
