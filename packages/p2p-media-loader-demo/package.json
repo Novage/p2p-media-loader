@@ -19,13 +19,13 @@
     "clean-with-modules": "rimraf node_modules && pnpm clean"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
     "p2p-media-loader-core": "workspace:*",
     "p2p-media-loader-hlsjs": "workspace:*",
     "p2p-media-loader-shaka": "workspace:*"
   },
   "devDependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "@types/dplayer": "^1.25.5",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
@@ -35,5 +35,9 @@
     "eslint-plugin-react-refresh": "^0.4.6",
     "hls.js": "^1.5.7",
     "vite-plugin-node-polyfills": "^0.21.0"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   }
 }
