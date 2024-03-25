@@ -1,10 +1,15 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import type Hls from "hls.js";
 import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 import { GraphCanvas, GraphEdge, GraphNode } from "reagraph";
-import "./demo.css";
 import { PlaybackOptions } from "./PlaybackOptions";
-
+import {
+  PLAYERS,
+  DEFAULT_GRAPH_STATE,
+  DEFAULT_STREAM,
+  DEFAULT_PLAYER,
+} from "../constants";
+import "./demo.css";
 declare global {
   interface Window {
     Hls: typeof Hls;
@@ -12,8 +17,7 @@ declare global {
   }
 }
 
-const players = ["hlsjs", "hlsjs-dplayer"] as const;
-type Player = (typeof players)[number];
+type Player = (typeof PLAYERS)[number];
 
 type GraphState = {
   nodes: GraphNode[];
@@ -22,28 +26,21 @@ type GraphState = {
 
 const HlsWithP2P = HlsJsP2PEngine.injectMixin(window.Hls);
 
-const stream = "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8";
-const defaultGraphState: GraphState = {
-  nodes: [
-    {
-      id: "0",
-      label: "You",
-    },
-  ],
-  edges: [],
-};
-
 export const Demo = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const [player, setPlayer] = useState<Player | null>(null);
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
-  const [graphState, setGraphState] = useState<GraphState>(defaultGraphState);
+  const [graphState, setGraphState] = useState<GraphState>(DEFAULT_GRAPH_STATE);
+  const searchParams = useMemo(
+    () => new URLSearchParams(window.location.search),
+    [],
+  );
 
   const handlePlaybackOptionsUpdate = (url: string, player: string) => {
     const playerType = player as Player;
 
-    if (!players.includes(playerType)) return;
+    if (!PLAYERS.includes(playerType)) return;
 
     const newUrl = `${window.location.pathname}?streamUrl=${encodeURIComponent(url)}&player=${encodeURIComponent(player)}`;
 
@@ -54,56 +51,50 @@ export const Demo = () => {
   };
 
   useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
     const playerTypeParam = searchParams.get("player") as Player | null;
     const streamUrlParam = searchParams.get("streamUrl");
 
     setPlayer(
-      playerTypeParam && players.includes(playerTypeParam)
+      playerTypeParam && PLAYERS.includes(playerTypeParam)
         ? playerTypeParam
-        : "hlsjs",
+        : DEFAULT_PLAYER,
     );
-    setStreamUrl(streamUrlParam ? streamUrlParam : stream);
+    setStreamUrl(streamUrlParam ? streamUrlParam : DEFAULT_STREAM);
 
     const createNewPlayer = (url: string) => {
+      let cleanUpFn = () => {};
+
+      const onPeerConnect = (peerId: string) => {
+        setGraphState((prev) => ({
+          nodes: [...prev.nodes, { id: peerId, label: peerId }],
+          edges: [
+            ...prev.edges,
+            { id: `${peerId}`, source: "0", target: peerId },
+          ],
+        }));
+      };
+
+      const onPeerClose = (peerId: string) => {
+        setGraphState((prev) => ({
+          nodes: prev.nodes.filter((node) => node.id !== peerId),
+          edges: prev.edges.filter((edge) => edge.target !== peerId),
+        }));
+      };
+
       const initHlsJsPlayer = (url: string) => {
         if (!videoRef.current) return;
         const hls = new HlsWithP2P();
 
-        hls.p2pEngine.addEventListener("onPeerConnect", (peerId) => {
-          setGraphState((prev) => ({
-            nodes: [
-              ...prev.nodes,
-              {
-                id: peerId,
-                label: peerId,
-              },
-            ],
-            edges: [
-              ...prev.edges,
-              {
-                id: `${peerId}`,
-                source: "0",
-                target: peerId,
-              },
-            ],
-          }));
-        });
-
-        hls.p2pEngine.addEventListener("onPeerClose", (peerId) => {
-          setGraphState((prev) => ({
-            nodes: prev.nodes.filter((node) => node.id !== peerId),
-            edges: prev.edges.filter((edge) => edge.target !== peerId),
-          }));
-        });
+        hls.p2pEngine.addEventListener("onPeerConnect", onPeerConnect);
+        hls.p2pEngine.addEventListener("onPeerClose", onPeerClose);
 
         hls.attachMedia(videoRef.current);
         hls.loadSource(url);
 
-        window.videoPlayer = hls;
+        cleanUpFn = () => {
+          hls.destroy();
+        };
       };
-
-      window.videoPlayer?.destroy?.();
 
       switch (player) {
         case "hlsjs":
@@ -112,11 +103,15 @@ export const Demo = () => {
         default:
           break;
       }
+
+      return cleanUpFn;
     };
 
     if (!streamUrl) return;
-    createNewPlayer(streamUrl);
-  }, [player, streamUrl]);
+    const cleanUpFn = createNewPlayer(streamUrl);
+
+    return cleanUpFn;
+  }, [player, searchParams, streamUrl]);
 
   return (
     <>
