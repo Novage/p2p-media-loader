@@ -32,7 +32,7 @@ export const PlaybackOptions = ({ updatePlaybackOptions }: PlaybackOptions) => {
       <div>
         <label htmlFor="streamUrl">Stream URL:</label>
         <input
-          value={DEFAULT_STREAM}
+          defaultValue={DEFAULT_STREAM}
           id="streamUrl"
           ref={streamUrlInputRef}
         ></input>
