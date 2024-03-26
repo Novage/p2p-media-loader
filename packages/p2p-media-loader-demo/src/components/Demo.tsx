@@ -1,10 +1,9 @@
-import React, { useEffect, useRef } from "react";
 import type Hls from "hls.js";
-import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 import { PlaybackOptions } from "./PlaybackOptions";
 import { PLAYERS } from "../constants";
 import "./demo.css";
 import { useQueryParams } from "../hooks/useQueryParams";
+import { HlsjsPlayer } from "./players/Hlsjs";
 declare global {
   interface Window {
     Hls: typeof Hls;
@@ -14,11 +13,7 @@ declare global {
 
 export type Player = (typeof PLAYERS)[number];
 
-const HlsWithP2P = HlsJsP2PEngine.injectMixin(window.Hls);
-
 export const Demo = () => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const videoContainerRef = useRef<HTMLDivElement>(null);
   const { queryParams, setURLQueryParams } = useQueryParams<
     "player" | "streamUrl"
   >();
@@ -28,45 +23,18 @@ export const Demo = () => {
     setURLQueryParams({ streamUrl: url, player });
   };
 
-  useEffect(() => {
-    const createNewPlayer = (url: string) => {
-      let cleanUpFn = () => {};
-
-      const initHlsJsPlayer = (url: string) => {
-        if (!videoRef.current) return;
-        const hls = new HlsWithP2P();
-
-        hls.attachMedia(videoRef.current);
-        hls.loadSource(url);
-
-        cleanUpFn = () => {
-          hls.destroy();
-        };
-      };
-
-      switch (queryParams.player) {
-        case "hlsjs":
-          initHlsJsPlayer(url);
-          break;
-        default:
-          break;
-      }
-
-      return cleanUpFn;
-    };
-
-    if (!queryParams.streamUrl) return;
-
-    const cleanUpFn = createNewPlayer(queryParams.streamUrl);
-
-    return cleanUpFn;
-  }, [queryParams.player, queryParams.streamUrl]);
+  const renderPlayer = () => {
+    switch (queryParams.player) {
+      case "hlsjs":
+        return <HlsjsPlayer streamUrl={queryParams.streamUrl} />;
+      default:
+        return null;
+    }
+  };
 
   return (
     <>
-      <div ref={videoContainerRef} className="video-container">
-        <video ref={videoRef} autoPlay controls style={{ width: 800 }} />
-      </div>
+      {renderPlayer()}
       <div style={{ display: "flex" }}>
         <PlaybackOptions
           updatePlaybackOptions={handlePlaybackOptionsUpdate}
