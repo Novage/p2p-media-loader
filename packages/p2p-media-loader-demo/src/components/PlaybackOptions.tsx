@@ -1,10 +1,16 @@
 import { useRef } from "react";
-import { PLAYERS, DEFAULT_STREAM } from "../constants";
+import { PLAYERS } from "../constants";
 type PlaybackOptions = {
   updatePlaybackOptions: (url: string, player: string) => void;
+  currentPlayer: string;
+  streamUrl: string;
 };
 
-export const PlaybackOptions = ({ updatePlaybackOptions }: PlaybackOptions) => {
+export const PlaybackOptions = ({
+  updatePlaybackOptions,
+  currentPlayer,
+  streamUrl,
+}: PlaybackOptions) => {
   const playerSelectRef = useRef<HTMLSelectElement>(null);
   const streamUrlInputRef = useRef<HTMLInputElement>(null);
 
@@ -21,7 +27,13 @@ export const PlaybackOptions = ({ updatePlaybackOptions }: PlaybackOptions) => {
     <div>
       <div>
         <label htmlFor="player">Player:</label>
-        <select ref={playerSelectRef} id="player">
+
+        <select
+          key={currentPlayer}
+          ref={playerSelectRef}
+          id="player"
+          defaultValue={currentPlayer}
+        >
           {PLAYERS.map((player) => (
             <option key={player} value={player}>
               {player}
@@ -32,7 +44,7 @@ export const PlaybackOptions = ({ updatePlaybackOptions }: PlaybackOptions) => {
       <div>
         <label htmlFor="streamUrl">Stream URL:</label>
         <input
-          defaultValue={DEFAULT_STREAM}
+          defaultValue={streamUrl}
           id="streamUrl"
           ref={streamUrlInputRef}
         ></input>
