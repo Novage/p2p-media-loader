@@ -83,7 +83,7 @@ export const Demo = () => {
 
   return (
     <>
-      <div className="video-container">
+      <div ref={videoContainerRef} className="video-container">
         <video ref={videoRef} autoPlay controls style={{ width: 800 }} />
       </div>
       <div style={{ display: "flex" }}>
