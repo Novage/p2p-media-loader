@@ -45,8 +45,7 @@
   },
   "dependencies": {
     "p2p-media-loader-core": "workspace:*",
-    "p2p-media-loader-hlsjs": "workspace:*",
-    "reagraph": "^4.15.25"
+    "p2p-media-loader-hlsjs": "workspace:*"
   },
   "devDependencies": {
     "@types/dplayer": "^1.25.5",
