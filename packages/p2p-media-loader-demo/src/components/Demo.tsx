@@ -1,9 +1,9 @@
 import type Hls from "hls.js";
 import { PlaybackOptions } from "./PlaybackOptions";
-import { PLAYERS } from "../constants";
+import { DEFAULT_STREAM, PLAYERS } from "../constants";
 import "./demo.css";
-import { useQueryParams } from "../hooks/useQueryParams";
 import { HlsjsPlayer } from "./players/Hlsjs";
+import { useEffect, useState } from "react";
 declare global {
   interface Window {
     Hls: typeof Hls;
@@ -14,19 +14,29 @@ declare global {
 export type Player = (typeof PLAYERS)[number];
 
 export const Demo = () => {
-  const { queryParams, setURLQueryParams } = useQueryParams<
-    "player" | "streamUrl"
-  >();
+  const [urlSearchParams, setURLSearchParams] = useState(
+    new URLSearchParams(window.location.search),
+  );
+  const player = (urlSearchParams.get("player") as Player) || PLAYERS[0];
+  const streamUrl = urlSearchParams.get("streamUrl") || DEFAULT_STREAM;
 
-  const handlePlaybackOptionsUpdate = (url: string, player: string) => {
-    if (!PLAYERS.includes(player as Player)) return;
-    setURLQueryParams({ streamUrl: url, player });
-  };
+  useEffect(() => {
+    const onPopState = () => {
+      console.log("fired popstate");
+      setURLSearchParams(new URLSearchParams(window.location.search));
+    };
+
+    console.log("adding popstate listener");
+    window.addEventListener("popstate", onPopState);
+    return () => {
+      window.removeEventListener("popstate", onPopState);
+    };
+  }, []);
 
   const renderPlayer = () => {
-    switch (queryParams.player) {
+    switch (player) {
       case "hlsjs":
-        return <HlsjsPlayer streamUrl={queryParams.streamUrl} />;
+        return <HlsjsPlayer streamUrl={streamUrl} />;
       default:
         return null;
     }
@@ -36,11 +46,7 @@ export const Demo = () => {
     <>
       {renderPlayer()}
       <div style={{ display: "flex" }}>
-        <PlaybackOptions
-          updatePlaybackOptions={handlePlaybackOptionsUpdate}
-          currentPlayer={queryParams.player}
-          streamUrl={queryParams.streamUrl}
-        />
+        <PlaybackOptions currentPlayer={player} streamUrl={streamUrl} />
       </div>
     </>
   );

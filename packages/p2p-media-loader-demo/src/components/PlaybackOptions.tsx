@@ -1,13 +1,11 @@
 import { useRef } from "react";
 import { PLAYERS } from "../constants";
 type PlaybackOptions = {
-  updatePlaybackOptions: (url: string, player: string) => void;
   currentPlayer: string;
   streamUrl: string;
 };
 
 export const PlaybackOptions = ({
-  updatePlaybackOptions,
   currentPlayer,
   streamUrl,
 }: PlaybackOptions) => {
@@ -18,9 +16,8 @@ export const PlaybackOptions = ({
     const player = playerSelectRef.current?.value;
     const streamUrl = streamUrlInputRef.current?.value;
 
-    if (player && streamUrl) {
-      updatePlaybackOptions(streamUrl, player);
-    }
+    const newUrl = `${window.location.pathname}?player=${player}&streamUrl=${streamUrl}`;
+    window.history.pushState({}, "", newUrl);
   };
 
   return (
