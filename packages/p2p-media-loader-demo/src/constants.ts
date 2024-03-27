@@ -4,14 +4,15 @@ export const DEFAULT_STREAM =
 export const NETWORK_GRAPH_OPTIONS = {
   nodes: {
     shape: "dot",
-    size: 15,
+    size: 20,
     font: {
       size: 12,
     },
-    borderWidth: 0.5,
+    borderWidth: 1,
+    shadow: true,
   },
   edges: {
-    width: 0.15,
-    length: 10,
+    width: 1,
+    shadow: true,
   },
 };
