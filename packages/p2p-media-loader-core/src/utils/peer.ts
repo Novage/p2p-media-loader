@@ -1,6 +1,7 @@
 import md5 from "nano-md5";
+import { version as packageJsonVersion } from "../../package.json";
 
-export const TRACKER_CLIENT_VERSION_PREFIX = `-PM${formatVersion(__VERSION__)}-`;
+export const TRACKER_CLIENT_VERSION_PREFIX = `-PM${formatVersion(packageJsonVersion)}-`;
 
 const HASH_SYMBOLS =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
