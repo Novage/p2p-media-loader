@@ -1,28 +1,36 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Data, Network } from "vis-network";
-import { NETWORK_GRAPH_OPTIONS } from "../constants";
+import { DEFAULT_GRAPH_DATA, NETWORK_GRAPH_OPTIONS } from "../constants";
 
 type GraphNetworkProps = {
-  data: Data;
+  graphData: Data;
 };
 
-export const GraphNetwork = ({ data }: GraphNetworkProps) => {
+export const GraphNetwork = ({ graphData }: GraphNetworkProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const networkRef = useRef<Network | null>(null);
+  const [network, setNetwork] = useState<Network | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
 
-    if (!networkRef.current) {
-      networkRef.current = new Network(
-        containerRef.current,
-        data,
-        NETWORK_GRAPH_OPTIONS,
-      );
-    } else {
-      networkRef.current.setData(data);
-    }
-  }, [data]);
+    const network = new Network(
+      containerRef.current,
+      DEFAULT_GRAPH_DATA,
+      NETWORK_GRAPH_OPTIONS,
+    );
+    setNetwork(network);
+
+    return () => {
+      network.destroy();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!network) return;
+
+    network.setData(graphData);
+  }, [graphData, network]);
+
   return (
     <>
       <div className="graph-container" ref={containerRef} />

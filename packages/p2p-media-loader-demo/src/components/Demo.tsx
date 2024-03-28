@@ -1,11 +1,10 @@
 import type Hls from "hls.js";
 import { PlaybackOptions } from "./PlaybackOptions";
-import { PLAYERS } from "../constants";
+import { DEFAULT_GRAPH_DATA, PLAYERS } from "../constants";
 import { useQueryParams } from "../hooks/useQueryParams";
 import { HlsjsPlayer } from "./players/Hlsjs";
 import { GraphNetwork } from "./GraphNetwork";
 import "./demo.css";
-import { Data } from "vis-network";
 import { useCallback, useState } from "react";
 
 declare global {
@@ -17,24 +16,24 @@ declare global {
 
 export type Player = (typeof PLAYERS)[number];
 
+export type GraphData = {
+  nodes: { id: string | number; label: string; color: string }[];
+  edges: { from: string | number; to: string }[];
+};
+
 export const Demo = () => {
   const { queryParams, setURLQueryParams } = useQueryParams<
     "player" | "streamUrl"
   >();
-  const [graphData, setGraphData] = useState<Data>({
-    nodes: [{ id: 1, label: "You", color: "#5390e0" }],
-    edges: [],
-  });
+  const [graphData, setGraphData] = useState<GraphData>(DEFAULT_GRAPH_DATA);
 
   const onPeerConnect = useCallback((peerId: string) => {
     setGraphData((data) => {
       const newNode = { id: peerId, label: peerId, color: "#d8eb34" };
       const newEdge = { from: 1, to: peerId };
 
-      const updatedNodes =
-        data.nodes instanceof Array ? [...data.nodes, newNode] : data.nodes;
-      const updatedEdges =
-        data.edges instanceof Array ? [...data.edges, newEdge] : data.edges;
+      const updatedNodes = [...data.nodes, newNode];
+      const updatedEdges = [...data.edges, newEdge];
 
       return { ...data, nodes: updatedNodes, edges: updatedEdges };
     });
@@ -42,17 +41,10 @@ export const Demo = () => {
 
   const onPeerDisconnect = useCallback((peerId: string) => {
     setGraphData((data) => {
-      const updatedNodes =
-        data.nodes instanceof Array
-          ? data.nodes.filter((node) => node.id !== peerId)
-          : data.nodes;
-
-      const updatedEdges =
-        data.edges instanceof Array
-          ? data.edges.filter(
-              (edge) => edge.from !== peerId && edge.to !== peerId,
-            )
-          : data.edges;
+      const updatedNodes = data.nodes.filter((node) => node.id !== peerId);
+      const updatedEdges = data.edges.filter(
+        (edge) => edge.from !== peerId && edge.to !== peerId,
+      );
 
       return { ...data, nodes: updatedNodes, edges: updatedEdges };
     });
@@ -88,7 +80,7 @@ export const Demo = () => {
           streamUrl={queryParams.streamUrl}
         />
       </div>
-      <GraphNetwork data={graphData} />
+      <GraphNetwork graphData={graphData} />
     </>
   );
 };
