@@ -43,9 +43,5 @@ export const GraphNetwork = ({ peers }: GraphNetworkProps) => {
     network.setData(graphData);
   }, [network, peers]);
 
-  return (
-    <>
-      <div className="graph-container" ref={containerRef} />
-    </>
-  );
+  return <div className="graph-container" ref={containerRef} />;
 };
