@@ -106,6 +106,9 @@ importers:
 
   packages/p2p-media-loader-demo:
     dependencies:
+      hls.js:
+        specifier: ^1.5.7
+        version: 1.5.7
       p2p-media-loader-core:
         specifier: workspace:*
         version: link:../p2p-media-loader-core
@@ -134,9 +137,6 @@ importers:
       eslint-plugin-react-refresh:
         specifier: ^0.4.6
         version: 0.4.6(eslint@8.57.0)
-      hls.js:
-        specifier: ^1.5.7
-        version: 1.5.7
       react:
         specifier: ^18.2.0
         version: 18.2.0
