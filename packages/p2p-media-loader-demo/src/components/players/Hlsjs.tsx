@@ -1,12 +1,13 @@
 import { useEffect, useRef } from "react";
 import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
+import Hls from "hls.js";
 
 type HlsjsPlayerProps = {
   streamUrl: string;
   onPeerConnect?: (peerId: string) => void;
   onPeerDisconnect?: (peerId: string) => void;
 };
-const HlsWithP2P = HlsJsP2PEngine.injectMixin(window.Hls);
+const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
 
 export const HlsjsPlayer = ({
   streamUrl,

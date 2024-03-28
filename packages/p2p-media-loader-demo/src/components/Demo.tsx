@@ -1,6 +1,6 @@
 import type Hls from "hls.js";
 import { PlaybackOptions } from "./PlaybackOptions";
-import { DEFAULT_GRAPH_DATA, PLAYERS } from "../constants";
+import { PLAYERS } from "../constants";
 import { useQueryParams } from "../hooks/useQueryParams";
 import { HlsjsPlayer } from "./players/Hlsjs";
 import { GraphNetwork } from "./GraphNetwork";
@@ -16,37 +16,21 @@ declare global {
 
 export type Player = (typeof PLAYERS)[number];
 
-export type GraphData = {
-  nodes: { id: string | number; label: string; color: string }[];
-  edges: { from: string | number; to: string }[];
-};
-
 export const Demo = () => {
   const { queryParams, setURLQueryParams } = useQueryParams<
     "player" | "streamUrl"
   >();
-  const [graphData, setGraphData] = useState<GraphData>(DEFAULT_GRAPH_DATA);
+  const [peers, setPeers] = useState<string[]>([]);
 
   const onPeerConnect = useCallback((peerId: string) => {
-    setGraphData((data) => {
-      const newNode = { id: peerId, label: peerId, color: "#d8eb34" };
-      const newEdge = { from: 1, to: peerId };
-
-      const updatedNodes = [...data.nodes, newNode];
-      const updatedEdges = [...data.edges, newEdge];
-
-      return { ...data, nodes: updatedNodes, edges: updatedEdges };
+    setPeers((peers) => {
+      return [...peers, peerId];
     });
   }, []);
 
   const onPeerDisconnect = useCallback((peerId: string) => {
-    setGraphData((data) => {
-      const updatedNodes = data.nodes.filter((node) => node.id !== peerId);
-      const updatedEdges = data.edges.filter(
-        (edge) => edge.from !== peerId && edge.to !== peerId,
-      );
-
-      return { ...data, nodes: updatedNodes, edges: updatedEdges };
+    setPeers((peers) => {
+      return peers.filter((peer) => peer !== peerId);
     });
   }, []);
 
@@ -80,7 +64,7 @@ export const Demo = () => {
           streamUrl={queryParams.streamUrl}
         />
       </div>
-      <GraphNetwork graphData={graphData} />
+      <GraphNetwork peers={peers} />
     </>
   );
 };

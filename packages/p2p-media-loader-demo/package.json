@@ -46,6 +46,7 @@
   "dependencies": {
     "p2p-media-loader-core": "workspace:*",
     "p2p-media-loader-hlsjs": "workspace:*",
+    "hls.js": "^1.5.7",
     "vis-network": "^9.1.9"
   },
   "devDependencies": {
@@ -55,7 +56,6 @@
     "eslint-plugin-react": "^7.34.1",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.6",
-    "hls.js": "^1.5.7",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
