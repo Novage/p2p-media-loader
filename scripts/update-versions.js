@@ -5,6 +5,7 @@ const packages = [
   "../packages/p2p-media-loader-core/package.json",
   "../packages/p2p-media-loader-hlsjs/package.json",
   "../packages/p2p-media-loader-shaka/package.json",
+  "../packages/p2p-media-loader-demo/package.json",
 ];
 
 function updateVersion(packagePath, newVersion) {

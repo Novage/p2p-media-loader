@@ -44,7 +44,6 @@
     "build:esm": "vite build --mode esm",
     "build:esm-min": "vite build --mode esm-min",
     "build:es": "tsc",
-    "preview": "vite preview",
     "prettier": "prettier --write .",
     "lint": "eslint . --ext .ts --report-unused-disable-directives --max-warnings 0",
     "clean": "rimraf lib dist build p2p-media-loader-core-*.tgz",
