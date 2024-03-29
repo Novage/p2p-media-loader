@@ -6,7 +6,7 @@ import { HlsjsPlayer } from "./players/Hlsjs";
 import { GraphNetwork } from "./GraphNetwork";
 import "./demo.css";
 import { useCallback, useState } from "react";
-import { MovingLineChart } from "./StatsChart";
+import { MovingStackedAreaChart } from "./StatsChart";
 
 declare global {
   interface Window {
@@ -79,7 +79,7 @@ export const Demo = () => {
         />
       </div>
       <GraphNetwork peers={peers} />
-      <MovingLineChart />;
+      <MovingStackedAreaChart />;
     </>
   );
 };

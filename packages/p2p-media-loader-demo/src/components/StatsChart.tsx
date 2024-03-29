@@ -1,20 +1,38 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
+// @ts-nocheck - d3 is not typed
+
 import React, { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 
-interface DataItem {
-  value: number;
-}
+// Mock data generation for stacked area chart
+const generateInitialStackedData = () => {
+  return Array.from({ length: 120 }, (_, i) => ({
+    date: new Date(Date.now() - (19 - i) * 1000 * 60 * 60 * 24), // 20 days of data
+    series1: Math.random() * 100,
+    series2: Math.random() * 100,
+    series3: Math.random() * 100,
+  }));
+};
 
-export const MovingLineChart = () => {
-  const [data, setData] = useState<DataItem[]>(generateInitialData());
-  const svgRef = useRef<SVGSVGElement>(null);
+const generateNewStackedDataItem = (data) => {
+  const lastDate = data[data.length - 1].date;
+  return {
+    date: new Date(lastDate.getTime() + 1000 * 60 * 60 * 24),
+    series1: Math.random() * 100,
+    series2: Math.random() * 100,
+    series3: Math.random() * 100,
+  };
+};
+
+export const MovingStackedAreaChart = () => {
+  const [data, setData] = useState(generateInitialStackedData());
+  const svgRef = useRef(null);
 
   useEffect(() => {
     const intervalId = setInterval(() => {
       setData((currentData) => [
         ...currentData.slice(1),
-        generateNewDataItem(),
+        generateNewStackedDataItem(currentData),
       ]);
     }, 1000);
     return () => clearInterval(intervalId);
@@ -23,113 +41,99 @@ export const MovingLineChart = () => {
   useEffect(() => {
     if (!svgRef.current) return;
 
-    const margin = { top: 20, right: 30, bottom: 30, left: 50 };
-    const width = 710 - margin.left - margin.right;
-    const height = 250 - margin.top - margin.bottom;
+    const margin = { top: 20, right: 20, bottom: 30, left: 50 },
+      width = 960 - margin.left - margin.right,
+      height = 500 - margin.top - margin.bottom;
 
-    const xScale = d3
-      .scaleLinear()
-      .domain([0, data.length - 1])
-      .range([0, width]);
-
-    const yMaxValue = Math.max(1, d3.max(data, (d) => d.value) ?? 1);
-    const yTicksCount =
-      Math.round(yMaxValue / 2) % 2 === 0
-        ? Math.round(yMaxValue / 2)
-        : Math.round(yMaxValue / 2) + 1;
-
-    const yScale = d3
-      .scaleLinear()
-      .domain([0, yMaxValue])
-      .range([height, 0])
-      .nice();
-
-    d3.select(svgRef.current).selectAll("*").remove();
-
-    const svg = d3
-      .select(svgRef.current)
-      .attr("width", width + margin.left + margin.right)
-      .attr("height", height + margin.top + margin.bottom)
+    // Set up the SVG container if it's not already there
+    const svg = d3.select(svgRef.current);
+    svg
+      .selectAll("g")
+      .data([null])
+      .enter()
       .append("g")
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
+    const content = svg.select("g");
+
+    // Scales
+    const xScale = d3
+      .scaleTime()
+      .domain(d3.extent(data, (d) => d.date))
+      .range([0, width]);
+
+    const yScale = d3
+      .scaleLinear()
+      .domain([0, d3.max(data, (d) => d.series1 + d.series2 + d.series3)])
+      .range([height, 0]);
+
+    // Colors
+    const color = d3.scaleOrdinal(d3.schemeCategory10);
+
+    // Stack generator
+    const stack = d3.stack().keys(["series1", "series2", "series3"]);
+
+    const series = stack(data);
+
+    // Area generator
     const area = d3
-      .area<DataItem>()
-      .x((_, i) => xScale(i))
-      .y0(height)
-      .y1((d) => yScale(d.value))
+      .area()
+      .x((d) => xScale(d.data.date))
+      .y0((d) => yScale(d[0]))
+      .y1((d) => yScale(d[1]))
       .curve(d3.curveBasis);
 
-    // Create grid lines for the y-axis
-    svg
-      .append("g")
-      .attr("class", "grid")
-      // @ts-ignore
-      .call(
-        d3.axisLeft(yScale).tickSize(-width).ticks(yTicksCount).tickFormat(""),
-      )
-      .selectAll(".tick line")
-      .style("stroke", "#ddd")
-      .style("stroke-dasharray", "2,2");
+    // Define the line generator
+    const line = d3
+      .line()
+      .x((d) => xScale(d.data.date))
+      .y((d) => yScale(d[1])) // Use the y1 value for the line's y position
+      .curve(d3.curveBasis); // Ensure the line is smoothed
 
-    svg
+    // Clear previous areas
+    content.selectAll(".layer").remove();
+    // Axes - re-create axes on update to reflect new data
+    content.selectAll(".axis").remove(); // Clear previous axes
+
+    content
       .append("g")
-      .attr("class", "grid")
+      .attr("class", "axis axis--x")
       .attr("transform", `translate(0,${height})`)
-      // @ts-ignore
       .call(d3.axisBottom(xScale).tickSize(-height).tickFormat(""))
-      .selectAll(".tick line")
-      .style("stroke", "#ddd")
-      .style("stroke-dasharray", "2,2");
+      .selectAll("line")
+      .attr("stroke", "#ddd")
+      .attr("stroke-dasharray", "2,2");
 
-    // Add the area
-    svg
-      .append("path")
-      .datum(data)
-      .attr("class", "area")
-      .attr("fill", "steelblue")
-      .attr("fill-opacity", 0.5)
-      .attr("d", area);
+    content
+      .append("g")
+      .attr("class", "axis axis--y")
+      .call(d3.axisLeft(yScale).tickSize(-width))
+      .selectAll("line")
+      .attr("stroke", "#ddd")
+      .attr("stroke-dasharray", "2,2");
 
-    svg
+    // Drawing the layers
+    content
+      .selectAll(".layer")
+      .data(series)
+      .enter()
       .append("path")
-      .datum(data)
+      .attr("class", "layer")
+      .attr("d", area)
+      .style("fill", (d, i) => color(i))
+      .style("opacity", 0.7);
+
+    // Update lines
+    content
+      .selectAll(".line")
+      .data(series)
+      .join("path")
       .attr("class", "line")
-      .attr("fill", "none")
-      .attr("stroke", "darkblue")
-      .attr("stroke-width", 1.2)
-      .attr("d", area);
-
-    // Add the solid y-axis on the left
-    svg
-      .append("g")
-      .call(d3.axisLeft(yScale).ticks(yTicksCount))
-      .select(".domain")
-      .style("stroke", "#000")
-      .style("stroke-width", "2");
-
-    // Add the solid x-axis at the bottom
-    svg
-      .append("g")
-      .attr("transform", `translate(0,${height})`)
-      // @ts-ignore
-      .call(d3.axisBottom(xScale).tickFormat(""))
-      .select(".domain")
-      .style("stroke", "#000")
-      .style("stroke-width", "2");
+      .attr("d", line)
+      .style("fill", "none")
+      .style("stroke", (d, i) => color(i))
+      .style("stroke-width", 1.5);
   }, [data]);
 
-  return <svg ref={svgRef}></svg>;
+  return <svg ref={svgRef} width="960" height="500"></svg>;
 };
-
-function generateInitialData(): DataItem[] {
-  return Array.from({ length: 60 }, () => ({
-    value: Math.random() * 10,
-  }));
-}
-
-function generateNewDataItem(): DataItem {
-  return {
-    value: Math.random() * 10,
-  };
-}
