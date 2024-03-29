@@ -6,6 +6,7 @@ import { HlsjsPlayer } from "./players/Hlsjs";
 import { GraphNetwork } from "./GraphNetwork";
 import "./demo.css";
 import { useCallback, useState } from "react";
+import { MovingLineChart } from "./StatsChart";
 
 declare global {
   interface Window {
@@ -17,10 +18,23 @@ declare global {
 export type Player = (typeof PLAYERS)[number];
 
 export const Demo = () => {
+  //const [data, setData] = useState<DataItem[]>([]);
   const { queryParams, setURLQueryParams } = useQueryParams<
     "player" | "streamUrl"
   >();
   const [peers, setPeers] = useState<string[]>([]);
+
+  /*useEffect(() => {
+    const interval = setInterval(() => {
+      const newData: DataItem = {
+        date: new Date(),
+        value: Math.random() * 100,
+      };
+      setData((currentData) => [...currentData, newData].slice(-50)); // Keep last 50 data points
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);*/
 
   const onPeerConnect = useCallback((peerId: string) => {
     setPeers((peers) => {
@@ -65,6 +79,7 @@ export const Demo = () => {
         />
       </div>
       <GraphNetwork peers={peers} />
+      <MovingLineChart />;
     </>
   );
 };

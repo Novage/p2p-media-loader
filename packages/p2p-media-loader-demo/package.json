@@ -44,9 +44,12 @@
     "clean-with-modules": "rimraf node_modules && pnpm clean"
   },
   "dependencies": {
+    "@types/d3": "^7.4.3",
+    "d3": "^7.9.0",
+    "hls.js": "^1.5.7",
     "p2p-media-loader-core": "workspace:*",
     "p2p-media-loader-hlsjs": "workspace:*",
-    "hls.js": "^1.5.7",
+    "rickshaw": "^1.7.1",
     "vis-network": "^9.1.9"
   },
   "devDependencies": {
