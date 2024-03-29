@@ -32,9 +32,15 @@ export const MovingLineChart = () => {
       .domain([0, data.length - 1])
       .range([0, width]);
 
+    const yMaxValue = Math.max(1, d3.max(data, (d) => d.value) ?? 1);
+    const yTicksCount =
+      Math.round(yMaxValue / 2) % 2 === 0
+        ? Math.round(yMaxValue / 2)
+        : Math.round(yMaxValue / 2) + 1;
+
     const yScale = d3
       .scaleLinear()
-      .domain([0, d3.max(data, (d) => d.value) ?? 10])
+      .domain([0, yMaxValue])
       .range([height, 0])
       .nice();
 
@@ -59,7 +65,9 @@ export const MovingLineChart = () => {
       .append("g")
       .attr("class", "grid")
       // @ts-ignore
-      .call(d3.axisLeft(yScale).tickSize(-width).tickFormat(""))
+      .call(
+        d3.axisLeft(yScale).tickSize(-width).ticks(yTicksCount).tickFormat(""),
+      )
       .selectAll(".tick line")
       .style("stroke", "#ddd")
       .style("stroke-dasharray", "2,2");
@@ -95,7 +103,7 @@ export const MovingLineChart = () => {
     // Add the solid y-axis on the left
     svg
       .append("g")
-      .call(d3.axisLeft(yScale))
+      .call(d3.axisLeft(yScale).ticks(yTicksCount))
       .select(".domain")
       .style("stroke", "#000")
       .style("stroke-width", "2");
