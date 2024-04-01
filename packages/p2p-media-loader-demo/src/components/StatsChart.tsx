@@ -4,10 +4,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 import { DownloadStats } from "./Demo";
+import "./chart.css";
 
 const margin = { top: 20, right: 20, bottom: 30, left: 50 },
   width = 710 - margin.left - margin.right,
-  height = 250 - margin.top - margin.bottom;
+  height = 310 - margin.top - margin.bottom;
 
 type StatsChartProps = {
   downloadStatsRef: React.RefObject<DownloadStats>;
@@ -102,7 +103,10 @@ export const MovingStackedAreaChart = ({
       .domain([minSeries3Value, maxStackedValue])
       .range([height, 0]);
 
-    const color = d3.scaleOrdinal(d3.schemeCategory10);
+    const color = d3
+      .scaleOrdinal()
+      .domain(["series1", "series2"])
+      .range(["#faf21b", "#ff7f0e"]);
 
     const area = d3
       .area()
@@ -194,5 +198,30 @@ export const MovingStackedAreaChart = ({
     };
   }, [data]);
 
-  return <svg ref={svgRef} width={710} height={250}></svg>;
+  return (
+    <div className="chart-container">
+      <div className="chart-legend">
+        <div className="line">
+          <div className="swatch" style={{ backgroundColor: "#ff1745" }} />
+          <p>
+            Download - {(storedData.series1 + storedData.series2).toFixed(2)}{" "}
+            Mbps
+          </p>
+        </div>
+        <div className="line">
+          <div className="swatch" style={{ backgroundColor: "#faf21b" }} />
+          <p> - HTTP - {storedData.series1.toFixed(2)} Mbps</p>
+        </div>
+        <div className="line">
+          <div className="swatch" style={{ backgroundColor: "#ff7f0e" }} />
+          <p> - P2P - {storedData.series2.toFixed(2)} Mbps</p>
+        </div>
+        <div className="line">
+          <div className="swatch" style={{ backgroundColor: "#ff7f0e" }} />
+          <p>Upload P2P - {storedData.series3.toFixed(2)} Mbps</p>
+        </div>
+      </div>
+      <svg ref={svgRef} width={710} height={310} />
+    </div>
+  );
 };

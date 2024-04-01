@@ -1,6 +1,43 @@
 .chart-legend {
   position: absolute;
+  margin-top: 30px;
+  margin-left: 70px;
+  height: 70px;
+  font-family: Arial;
+  font-size: 12px;
+  color: #fff;
+  background: #404040;
+  display: inline-block;
+  padding: 12px 5px;
+  border-radius: 2px;
+  opacity: 0.8;
+}
+
+.chart-legend p {
+  margin: 0;
+  color: #fff;
+}
+
+.chart-legend .line {
+  margin-right: 3px;
+  margin-left: 4px;
+  border-radius: 2px;
+  clear: both;
+  line-height: 140%;
+  padding-right: 15px;
   display: flex;
-  justify-content: center;
-  margin-top: 10px;
+  align-items: center;
+}
+
+.chart-legend .swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.chart-legend .line .swatch {
+  display: inline-block;
+  margin-right: 3px;
+  border-radius: 2px;
 }
