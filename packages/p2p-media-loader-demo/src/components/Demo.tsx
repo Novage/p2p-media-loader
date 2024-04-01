@@ -6,7 +6,7 @@ import { HlsjsPlayer } from "./players/Hlsjs";
 import { GraphNetwork } from "./GraphNetwork";
 import "./demo.css";
 import { useCallback, useRef, useState } from "react";
-import { MovingStackedAreaChart } from "./StatsChart";
+import { MovingStackedAreaChart } from "./chart/StatsChart";
 
 declare global {
   interface Window {

@@ -3,9 +3,10 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
-import { DownloadStats } from "./Demo";
-import { COLORS } from "../constants";
+import { DownloadStats } from "../Demo";
+import { COLORS } from "../../constants";
 import "./chart.css";
+import { ChartLegend } from "./ChartLegend";
 
 const margin = { top: 20, right: 20, bottom: 30, left: 50 },
   width = 710 - margin.left - margin.right,
@@ -210,52 +211,35 @@ export const MovingStackedAreaChart = ({
 
   return (
     <div className="chart-container">
-      <div className="chart-legend">
-        <div className="line">
-          <div
-            className="swatch"
-            style={{ backgroundColor: COLORS.torchRed }}
-          />
-          <p>Download - {storedData.totalDownloaded.toFixed(2)} Mbps</p>
-        </div>
-        <div className="line">
-          <div className="swatch" style={{ backgroundColor: COLORS.yellow }} />
-          <p>
-            {" "}
-            - HTTP - {storedData.httpDownloaded.toFixed(2)} Mbps -{" "}
-            {(
-              (storedData.httpDownloaded / storedData.totalDownloaded) *
-              100
-            ).toFixed(2)}
-            %
-          </p>
-        </div>
-        <div className="line">
-          <div
-            className="swatch"
-            style={{ backgroundColor: COLORS.lightOrange }}
-          />
-          <p>
-            {" "}
-            - P2P - {storedData.p2pDownloaded.toFixed(2)} Mbps -{" "}
-            {storedData.p2pDownloaded
-              ? (
-                  (storedData.p2pDownloaded / storedData.totalDownloaded) *
-                  100
-                ).toFixed(2)
-              : 0}
-            %
-          </p>
-        </div>
-        <div className="line">
-          <div
-            className="swatch"
-            style={{ backgroundColor: COLORS.lightBlue }}
-          />
-          <p>Upload P2P - {storedData.p2pUploaded.toFixed(2)} Mbps</p>
-        </div>
-      </div>
+      <ChartLegend
+        legendItems={[
+          {
+            color: COLORS.torchRed,
+            content: `Download - ${storedData.totalDownloaded.toFixed(2)} Mb `,
+          },
+          {
+            color: COLORS.yellow,
+            content: `- HTTP - ${storedData.httpDownloaded.toFixed(2)} Mb - ${calculatePercentage(storedData.httpDownloaded, storedData.totalDownloaded)}%`,
+          },
+          {
+            color: COLORS.lightOrange,
+            content: `- P2P - ${storedData.p2pDownloaded.toFixed(2)} Mb - ${calculatePercentage(storedData.p2pDownloaded, storedData.totalDownloaded)}%`,
+          },
+          {
+            color: COLORS.lightBlue,
+            content: `Upload P2P - ${storedData.p2pUploaded.toFixed(2)} Mb`,
+          },
+        ]}
+      />
+
       <svg ref={svgRef} width={710} height={310} />
     </div>
   );
+};
+
+const calculatePercentage = (part: number, total: number): string => {
+  if (total === 0) {
+    return "0"; // Or any other default/fallback string you prefer
+  }
+  return ((part / total) * 100).toFixed(2);
 };
