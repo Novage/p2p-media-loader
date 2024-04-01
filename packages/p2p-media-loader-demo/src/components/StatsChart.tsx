@@ -32,14 +32,22 @@ const generateInitialStackedData = () => {
   }));
 };
 
+type StoredData = {
+  totalDownloaded: number;
+  httpDownloaded: number;
+  p2pDownloaded: number;
+  p2pUploaded: number;
+};
+
 export const MovingStackedAreaChart = ({
   downloadStatsRef,
 }: StatsChartProps) => {
   const [data, setData] = useState<ChartsData[]>(generateInitialStackedData());
-  const [storedData, setStoredData] = useState<Omit<ChartsData, "date">>({
-    series1: 0,
-    series2: 0,
-    series3: 0,
+  const [storedData, setStoredData] = useState<StoredData>({
+    totalDownloaded: 0,
+    httpDownloaded: 0,
+    p2pDownloaded: 0,
+    p2pUploaded: 0,
   });
   const svgRef = useRef(null);
 
@@ -48,6 +56,7 @@ export const MovingStackedAreaChart = ({
       if (!downloadStatsRef.current) return;
 
       const { series1, series2, series3 } = downloadStatsRef.current;
+
       setData((prevData) => {
         const newData = {
           date: Math.floor(performance.now() / 1000),
@@ -59,9 +68,10 @@ export const MovingStackedAreaChart = ({
       });
 
       setStoredData((prevData) => ({
-        series1: prevData.series1 + series1,
-        series2: prevData.series2 + series2,
-        series3: prevData.series3 + series3,
+        totalDownloaded: prevData.totalDownloaded + series1 + series2,
+        httpDownloaded: prevData.httpDownloaded + series1,
+        p2pDownloaded: prevData.p2pDownloaded + series2,
+        p2pUploaded: prevData.p2pUploaded + series3,
       }));
 
       downloadStatsRef.current = {
@@ -206,28 +216,43 @@ export const MovingStackedAreaChart = ({
             className="swatch"
             style={{ backgroundColor: COLORS.torchRed }}
           />
-          <p>
-            Download - {(storedData.series1 + storedData.series2).toFixed(2)}{" "}
-            Mbps
-          </p>
+          <p>Download - {storedData.totalDownloaded.toFixed(2)} Mbps</p>
         </div>
         <div className="line">
           <div className="swatch" style={{ backgroundColor: COLORS.yellow }} />
-          <p> - HTTP - {storedData.series1.toFixed(2)} Mbps</p>
+          <p>
+            {" "}
+            - HTTP - {storedData.httpDownloaded.toFixed(2)} Mbps -{" "}
+            {(
+              (storedData.httpDownloaded / storedData.totalDownloaded) *
+              100
+            ).toFixed(2)}
+            %
+          </p>
         </div>
         <div className="line">
           <div
             className="swatch"
             style={{ backgroundColor: COLORS.lightOrange }}
           />
-          <p> - P2P - {storedData.series2.toFixed(2)} Mbps</p>
+          <p>
+            {" "}
+            - P2P - {storedData.p2pDownloaded.toFixed(2)} Mbps -{" "}
+            {storedData.p2pDownloaded
+              ? (
+                  (storedData.p2pDownloaded / storedData.totalDownloaded) *
+                  100
+                ).toFixed(2)
+              : 0}
+            %
+          </p>
         </div>
         <div className="line">
           <div
             className="swatch"
             style={{ backgroundColor: COLORS.lightBlue }}
           />
-          <p>Upload P2P - {storedData.series3.toFixed(2)} Mbps</p>
+          <p>Upload P2P - {storedData.p2pUploaded.toFixed(2)} Mbps</p>
         </div>
       </div>
       <svg ref={svgRef} width={710} height={310} />
