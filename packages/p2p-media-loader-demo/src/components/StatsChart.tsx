@@ -4,6 +4,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 import { DownloadStats } from "./Demo";
+import { COLORS } from "../constants";
 import "./chart.css";
 
 const margin = { top: 20, right: 20, bottom: 30, left: 50 },
@@ -22,7 +23,7 @@ type ChartsData = {
 };
 
 const generateInitialStackedData = () => {
-  const nowInSeconds = Math.floor(Date.now() / 1000);
+  const nowInSeconds = Math.floor(performance.now() / 1000);
   return Array.from({ length: 120 }, (_, i) => ({
     date: nowInSeconds - (120 - i),
     series1: 0,
@@ -49,7 +50,7 @@ export const MovingStackedAreaChart = ({
       const { series1, series2, series3 } = downloadStatsRef.current;
       setData((prevData) => {
         const newData = {
-          date: Math.floor(Date.now() / 1000),
+          date: Math.floor(performance.now() / 1000),
           series1: series1,
           series2: series2,
           series3: series3 * -1,
@@ -92,7 +93,6 @@ export const MovingStackedAreaChart = ({
       d3.max(serie, (d) => d[1]),
     );
     const minSeries3Value = d3.min(data, (d) => d.series3);
-    const yTickValues = Math.round((maxStackedValue - minSeries3Value) / 5);
 
     const xScale = d3
       .scaleLinear()
@@ -106,7 +106,7 @@ export const MovingStackedAreaChart = ({
     const color = d3
       .scaleOrdinal()
       .domain(["series1", "series2"])
-      .range(["#faf21b", "#ff7f0e"]);
+      .range([COLORS.yellow, COLORS.lightOrange]);
 
     const area = d3
       .area()
@@ -148,7 +148,7 @@ export const MovingStackedAreaChart = ({
     content
       .append("g")
       .attr("class", "axis axis--y")
-      .call(d3.axisLeft(yScale).tickSize(-width).ticks(yTickValues))
+      .call(d3.axisLeft(yScale).tickSize(-width).ticks(5))
       .selectAll("line")
       .attr("stroke", "#ddd")
       .attr("stroke-dasharray", "2,2");
@@ -162,7 +162,7 @@ export const MovingStackedAreaChart = ({
       .join("path")
       .attr("class", "series3-area")
       .attr("d", areaSeries3)
-      .style("fill", "lightblue")
+      .style("fill", COLORS.lightBlue)
       .style("opacity", 0.7);
     content
       .selectAll(".series3-line")
@@ -202,22 +202,31 @@ export const MovingStackedAreaChart = ({
     <div className="chart-container">
       <div className="chart-legend">
         <div className="line">
-          <div className="swatch" style={{ backgroundColor: "#ff1745" }} />
+          <div
+            className="swatch"
+            style={{ backgroundColor: COLORS.torchRed }}
+          />
           <p>
             Download - {(storedData.series1 + storedData.series2).toFixed(2)}{" "}
             Mbps
           </p>
         </div>
         <div className="line">
-          <div className="swatch" style={{ backgroundColor: "#faf21b" }} />
+          <div className="swatch" style={{ backgroundColor: COLORS.yellow }} />
           <p> - HTTP - {storedData.series1.toFixed(2)} Mbps</p>
         </div>
         <div className="line">
-          <div className="swatch" style={{ backgroundColor: "#ff7f0e" }} />
+          <div
+            className="swatch"
+            style={{ backgroundColor: COLORS.lightOrange }}
+          />
           <p> - P2P - {storedData.series2.toFixed(2)} Mbps</p>
         </div>
         <div className="line">
-          <div className="swatch" style={{ backgroundColor: "#ff7f0e" }} />
+          <div
+            className="swatch"
+            style={{ backgroundColor: COLORS.lightBlue }}
+          />
           <p>Upload P2P - {storedData.series3.toFixed(2)} Mbps</p>
         </div>
       </div>
