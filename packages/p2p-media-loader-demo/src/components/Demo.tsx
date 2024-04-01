@@ -5,7 +5,7 @@ import { useQueryParams } from "../hooks/useQueryParams";
 import { HlsjsPlayer } from "./players/Hlsjs";
 import { GraphNetwork } from "./GraphNetwork";
 import "./demo.css";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { MovingStackedAreaChart } from "./StatsChart";
 
 declare global {
@@ -15,26 +15,46 @@ declare global {
   }
 }
 
+const convertToMB = (bytes: number) => bytes / 1024 / 1024;
+
+type DownloadStats = {
+  series1: number;
+  series2: number;
+  series3: number;
+};
+
 export type Player = (typeof PLAYERS)[number];
 
 export const Demo = () => {
-  //const [data, setData] = useState<DataItem[]>([]);
+  const data = useRef<DownloadStats>({
+    series1: 0,
+    series2: 0,
+    series3: 0,
+  });
   const { queryParams, setURLQueryParams } = useQueryParams<
     "player" | "streamUrl"
   >();
   const [peers, setPeers] = useState<string[]>([]);
 
-  /*useEffect(() => {
-    const interval = setInterval(() => {
-      const newData: DataItem = {
-        date: new Date(),
-        value: Math.random() * 100,
-      };
-      setData((currentData) => [...currentData, newData].slice(-50)); // Keep last 50 data points
-    }, 1000);
+  const onChunkDownloaded = useCallback(
+    (bytesLength: number, downloadSource: string) => {
+      switch (downloadSource) {
+        case "http":
+          data.current.series1 += convertToMB(bytesLength);
+          break;
+        case "p2p":
+          data.current.series2 += convertToMB(bytesLength);
+          break;
+        default:
+          break;
+      }
+    },
+    [],
+  );
 
-    return () => clearInterval(interval);
-  }, []);*/
+  const onChunkUploaded = useCallback((bytesLength: number) => {
+    data.current.series3 += convertToMB(bytesLength);
+  }, []);
 
   const onPeerConnect = useCallback((peerId: string) => {
     setPeers((peers) => {
@@ -61,6 +81,8 @@ export const Demo = () => {
             streamUrl={queryParams.streamUrl}
             onPeerConnect={onPeerConnect}
             onPeerDisconnect={onPeerDisconnect}
+            onChunkDownloaded={onChunkDownloaded}
+            onChunkUploaded={onChunkUploaded}
           />
         );
       default:
@@ -79,7 +101,7 @@ export const Demo = () => {
         />
       </div>
       <GraphNetwork peers={peers} />
-      <MovingStackedAreaChart />;
+      <MovingStackedAreaChart downloadStatsRef={data} />
     </>
   );
 };

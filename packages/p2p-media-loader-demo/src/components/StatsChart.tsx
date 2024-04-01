@@ -3,6 +3,22 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
+import { DownloadStats } from "./Demo";
+
+const margin = { top: 20, right: 20, bottom: 30, left: 50 },
+  width = 710 - margin.left - margin.right,
+  height = 250 - margin.top - margin.bottom;
+
+type StatsChartProps = {
+  downloadStatsRef: React.RefObject<DownloadStats>;
+};
+
+type ChartsData = {
+  date: number;
+  series1: number;
+  series2: number;
+  series3: number;
+};
 
 const generateInitialStackedData = () => {
   const nowInSeconds = Math.floor(Date.now() / 1000);
@@ -14,33 +30,47 @@ const generateInitialStackedData = () => {
   }));
 };
 
-const generateNewStackedDataItem = (data) => {
-  const lastSecond = data[data.length - 1].date;
-  return {
-    date: lastSecond + 1,
-    series1: Math.random() * 10,
-    series2: Math.random() * 10,
-    series3: Math.random() * -10,
-  };
-};
-
-const margin = { top: 20, right: 20, bottom: 30, left: 50 },
-  width = 710 - margin.left - margin.right,
-  height = 250 - margin.top - margin.bottom;
-
-export const MovingStackedAreaChart = () => {
-  const [data, setData] = useState(generateInitialStackedData());
+export const MovingStackedAreaChart = ({
+  downloadStatsRef,
+}: StatsChartProps) => {
+  const [data, setData] = useState<ChartsData[]>(generateInitialStackedData());
+  const [storedData, setStoredData] = useState<Omit<ChartsData, "date">>({
+    series1: 0,
+    series2: 0,
+    series3: 0,
+  });
   const svgRef = useRef(null);
 
   useEffect(() => {
-    const intervalId = setInterval(() => {
-      setData((currentData) => [
-        ...currentData.slice(1),
-        generateNewStackedDataItem(currentData),
-      ]);
+    const intervalID = setInterval(() => {
+      if (!downloadStatsRef.current) return;
+
+      const { series1, series2, series3 } = downloadStatsRef.current;
+      setData((prevData) => {
+        const newData = {
+          date: Math.floor(Date.now() / 1000),
+          series1: series1,
+          series2: series2,
+          series3: series3 * -1,
+        };
+        return [...prevData.slice(1), newData];
+      });
+
+      setStoredData((prevData) => ({
+        series1: prevData.series1 + series1,
+        series2: prevData.series2 + series2,
+        series3: prevData.series3 + series3,
+      }));
+
+      downloadStatsRef.current = {
+        series1: 0,
+        series2: 0,
+        series3: 0,
+      };
     }, 1000);
-    return () => clearInterval(intervalId);
-  }, []);
+
+    return () => clearInterval(intervalID);
+  }, [downloadStatsRef]);
 
   useEffect(() => {
     if (!svgRef.current) return;
@@ -111,7 +141,6 @@ export const MovingStackedAreaChart = () => {
       .attr("stroke", "#ddd")
       .attr("stroke-dasharray", "2,2");
 
-    console.log("yTickValues", yTickValues);
     content
       .append("g")
       .attr("class", "axis axis--y")
