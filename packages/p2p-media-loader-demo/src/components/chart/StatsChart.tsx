@@ -211,27 +211,48 @@ export const MovingStackedAreaChart = ({
 
   return (
     <div className="chart-container">
-      <ChartLegend
-        legendItems={[
-          {
-            color: COLORS.torchRed,
-            content: `Download - ${storedData.totalDownloaded.toFixed(2)} Mb `,
-          },
-          {
-            color: COLORS.yellow,
-            content: `- HTTP - ${storedData.httpDownloaded.toFixed(2)} Mb - ${calculatePercentage(storedData.httpDownloaded, storedData.totalDownloaded)}%`,
-          },
-          {
-            color: COLORS.lightOrange,
-            content: `- P2P - ${storedData.p2pDownloaded.toFixed(2)} Mb - ${calculatePercentage(storedData.p2pDownloaded, storedData.totalDownloaded)}%`,
-          },
-          {
-            color: COLORS.lightBlue,
-            content: `Upload P2P - ${storedData.p2pUploaded.toFixed(2)} Mb`,
-          },
-        ]}
-      />
-
+      <div className="legend-container">
+        <ChartLegend
+          legendItems={[
+            {
+              color: COLORS.torchRed,
+              content: `Download - ${storedData.totalDownloaded.toFixed(2)} Mb `,
+            },
+            {
+              color: COLORS.yellow,
+              content: `- HTTP - ${storedData.httpDownloaded.toFixed(2)} Mb - ${calculatePercentage(storedData.httpDownloaded, storedData.totalDownloaded)}%`,
+            },
+            {
+              color: COLORS.lightOrange,
+              content: `- P2P - ${storedData.p2pDownloaded.toFixed(2)} Mb - ${calculatePercentage(storedData.p2pDownloaded, storedData.totalDownloaded)}%`,
+            },
+            {
+              color: COLORS.lightBlue,
+              content: `Upload P2P - ${storedData.p2pUploaded.toFixed(2)} Mb`,
+            },
+          ]}
+        />
+        <ChartLegend
+          legendItems={[
+            {
+              color: COLORS.torchRed,
+              content: `Download - ${data[data.length - 1].series1.toFixed(2)} Mbps`,
+            },
+            {
+              color: COLORS.yellow,
+              content: `- HTTP - ${data[data.length - 1].series1.toFixed(2)} Mbps`,
+            },
+            {
+              color: COLORS.lightOrange,
+              content: `- P2P - ${data[data.length - 1].series2.toFixed(2)} Mbps`,
+            },
+            {
+              color: COLORS.lightBlue,
+              content: `Upload P2P - ${data[data.length - 1].series3.toFixed(2)} Mbps`,
+            },
+          ]}
+        />
+      </div>
       <svg ref={svgRef} width={710} height={310} />
     </div>
   );
@@ -239,7 +260,7 @@ export const MovingStackedAreaChart = ({
 
 const calculatePercentage = (part: number, total: number): string => {
   if (total === 0) {
-    return "0"; // Or any other default/fallback string you prefer
+    return 0;
   }
   return ((part / total) * 100).toFixed(2);
 };
