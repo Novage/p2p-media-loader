@@ -24,6 +24,12 @@
   color: #fff;
 }
 
+.chart-legend p::before {
+  content: "";
+  display: inline-block;
+  width: 4px;
+}
+
 .chart-legend .line {
   margin-right: 3px;
   margin-left: 4px;
