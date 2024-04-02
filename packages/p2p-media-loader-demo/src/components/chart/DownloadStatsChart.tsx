@@ -22,7 +22,7 @@ const calculatePercentage = (part: number, total: number) => {
   return ((part / total) * 100).toFixed(2);
 };
 
-const margin = { top: 20, right: 20, bottom: 30, left: 50 },
+const margin = { top: 20, right: 20, bottom: 30, left: 20 },
   width = 710 - margin.left - margin.right,
   height = 310 - margin.top - margin.bottom;
 
