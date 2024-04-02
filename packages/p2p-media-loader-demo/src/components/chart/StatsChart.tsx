@@ -105,6 +105,7 @@ export const MovingStackedAreaChart = ({
 
     const defaultDomain = [0, 1];
     const extentDomain = d3.extent(data, (d) => d.seconds) as [number, number];
+
     const xScale = d3
       .scaleLinear()
       .domain(
@@ -129,7 +130,7 @@ export const MovingStackedAreaChart = ({
       .y0((d) => yScale(d[0]))
       .y1((d) => yScale(d[1]))
       .curve(d3.curveBasis);
-    const downloadStatAreaLine = d3
+    const downloadStatsAreaLine = d3
       .line<d3.SeriesPoint<ChartsData>>()
       .x((d) => xScale(d.data.seconds))
       .y((d) => yScale(d[1]))
@@ -149,6 +150,7 @@ export const MovingStackedAreaChart = ({
 
     const content = svg.select("g");
     content.selectAll(".axis").remove();
+
     // Axes
     content
       .append("g")
@@ -163,7 +165,6 @@ export const MovingStackedAreaChart = ({
       .selectAll("line")
       .attr("stroke", "#ddd")
       .attr("stroke-dasharray", "2,2");
-
     content
       .append("g")
       .attr("class", "axis axis--y")
@@ -201,13 +202,12 @@ export const MovingStackedAreaChart = ({
       .attr("d", downloadStatsArea)
       .style("fill", (_d, i) => color(i.toString()) as string)
       .style("opacity", 0.7);
-
     content
       .selectAll(".line")
       .data(downloadStatsStack)
       .join("path")
       .attr("class", "line")
-      .attr("d", downloadStatAreaLine)
+      .attr("d", downloadStatsAreaLine)
       .style("fill", "none")
       .style("stroke", (_d, i) => color(i.toString()) as string)
       .style("stroke-width", 1.5);
