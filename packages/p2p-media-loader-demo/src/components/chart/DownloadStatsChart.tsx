@@ -130,7 +130,7 @@ export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
             },
             {
               color: COLORS.lightBlue,
-              content: `Upload P2P - ${(data[data.length - 1].p2pUploaded * -1).toFixed(2)} Mb/s`,
+              content: `Upload P2P - ${(data[data.length - 1].p2pUploaded * -1).toFixed(2)} Mbit/s`,
             },
           ]}
         />
