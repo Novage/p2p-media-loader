@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck - d3 is not typed
 
 import React, { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
@@ -17,19 +16,19 @@ type StatsChartProps = {
 };
 
 type ChartsData = {
-  date: number;
-  series1: number;
-  series2: number;
-  series3: number;
+  seconds: number;
+  httpDownloaded: number;
+  p2pDownloaded: number;
+  p2pUploaded: number;
 };
 
 const generateInitialStackedData = () => {
   const nowInSeconds = Math.floor(performance.now() / 1000);
   return Array.from({ length: 120 }, (_, i) => ({
-    date: nowInSeconds - (120 - i),
-    series1: 0,
-    series2: 0,
-    series3: 0,
+    seconds: nowInSeconds - (120 - i),
+    httpDownloaded: 0,
+    p2pDownloaded: 0,
+    p2pUploaded: 0,
   }));
 };
 
@@ -56,30 +55,30 @@ export const MovingStackedAreaChart = ({
     const intervalID = setInterval(() => {
       if (!downloadStatsRef.current) return;
 
-      const { series1, series2, series3 } = downloadStatsRef.current;
-
-      setData((prevData) => {
-        const newData = {
-          date: Math.floor(performance.now() / 1000),
-          series1: series1,
-          series2: series2,
-          series3: series3 * -1,
+      const { httpDownloaded, p2pDownloaded, p2pUploaded } =
+        downloadStatsRef.current;
+      console.log("httpDownloaded", httpDownloaded);
+      setData((prevData: ChartsData[]) => {
+        const newData: ChartsData = {
+          seconds: Math.floor(performance.now() / 1000),
+          httpDownloaded: httpDownloaded,
+          p2pDownloaded: p2pDownloaded,
+          p2pUploaded: p2pUploaded * -1,
         };
         return [...prevData.slice(1), newData];
       });
 
       setStoredData((prevData) => ({
-        totalDownloaded: prevData.totalDownloaded + series1 + series2,
-        httpDownloaded: prevData.httpDownloaded + series1,
-        p2pDownloaded: prevData.p2pDownloaded + series2,
-        p2pUploaded: prevData.p2pUploaded + series3,
+        totalDownloaded:
+          prevData.totalDownloaded + httpDownloaded + p2pDownloaded,
+        httpDownloaded: prevData.httpDownloaded + httpDownloaded,
+        p2pDownloaded: prevData.p2pDownloaded + p2pDownloaded,
+        p2pUploaded: prevData.p2pUploaded + p2pUploaded,
       }));
 
-      downloadStatsRef.current = {
-        series1: 0,
-        series2: 0,
-        series3: 0,
-      };
+      downloadStatsRef.current.httpDownloaded = 0;
+      downloadStatsRef.current.p2pDownloaded = 0;
+      downloadStatsRef.current.p2pUploaded = 0;
     }, 1000);
 
     return () => clearInterval(intervalID);
@@ -96,55 +95,54 @@ export const MovingStackedAreaChart = ({
       .append("g")
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
-    const content = svg.select("g");
+    const downloadStatsStack = d3
+      .stack()
+      .keys(["httpDownloaded", "p2pDownloaded"])(data);
 
-    const series = d3.stack().keys(["series1", "series2"])(data);
-
-    const maxStackedValue = d3.max(series, (serie) =>
-      d3.max(serie, (d) => d[1]),
+    const maxDownloadValue = d3.max(downloadStatsStack, (stack) =>
+      d3.max(stack, (d) => d[1]),
     );
-    const minSeries3Value = d3.min(data, (d) => d.series3);
+    const maxP2PUploadValue = d3.min(data, (d) => d.p2pUploaded);
 
     const xScale = d3
       .scaleLinear()
-      .domain(d3.extent(data, (d) => d.date))
+      .domain(d3.extent(data, (d) => d.seconds))
       .range([0, width]);
     const yScale = d3
       .scaleLinear()
-      .domain([minSeries3Value, maxStackedValue])
+      .domain([maxP2PUploadValue, maxDownloadValue])
       .range([height, 0]);
 
     const color = d3
       .scaleOrdinal()
-      .domain(["series1", "series2"])
+      .domain(["httpDownloaded", "p2pDownloaded"])
       .range([COLORS.yellow, COLORS.lightOrange]);
 
-    const area = d3
+    const downloadStatsArea = d3
       .area()
-      .x((d) => xScale(d.data.date))
+      .x((d) => xScale(d.data.seconds))
       .y0((d) => yScale(d[0]))
       .y1((d) => yScale(d[1]))
       .curve(d3.curveBasis);
-
-    const areaSeries3 = d3
-      .area()
-      .x((d) => xScale(d.date))
-      .y0(() => yScale(0))
-      .y1((d) => yScale(d.series3))
-      .curve(d3.curveBasis);
-
-    const line = d3
+    const downloadStatAreaLine = d3
       .line()
-      .x((d) => xScale(d.data.date))
+      .x((d) => xScale(d.data.seconds))
       .y((d) => yScale(d[1]))
       .curve(d3.curveBasis);
 
-    const lineSeries3 = d3
+    const p2pUploadArea = d3
+      .area()
+      .x((d) => xScale(d.seconds))
+      .y0(() => yScale(0))
+      .y1((d) => yScale(d.p2pUploaded))
+      .curve(d3.curveBasis);
+    const p2pUploadLineArea = d3
       .line()
-      .x((d) => xScale(d.date))
-      .y((d) => yScale(d.series3))
+      .x((d) => xScale(d.seconds))
+      .y((d) => yScale(d.p2pUploaded))
       .curve(d3.curveBasis);
 
+    const content = svg.select("g");
     content.selectAll(".axis").remove();
     // Axes
     content
@@ -172,7 +170,7 @@ export const MovingStackedAreaChart = ({
       .data([data])
       .join("path")
       .attr("class", "series3-area")
-      .attr("d", areaSeries3)
+      .attr("d", p2pUploadArea)
       .style("fill", COLORS.lightBlue)
       .style("opacity", 0.7);
     content
@@ -180,28 +178,28 @@ export const MovingStackedAreaChart = ({
       .data([data])
       .join("path")
       .attr("class", "series3-line")
-      .attr("d", lineSeries3)
+      .attr("d", p2pUploadLineArea)
       .style("fill", "none")
       .style("stroke", "blue")
       .style("stroke-width", 2);
 
     content
       .selectAll(".layer")
-      .data(series)
+      .data(downloadStatsStack)
       .enter()
       .append("path")
       .attr("class", "layer")
-      .attr("d", area)
-      .style("fill", (d, i) => color(i))
+      .attr("d", downloadStatsArea)
+      .style("fill", (i) => color(i))
       .style("opacity", 0.7);
     content
       .selectAll(".line")
-      .data(series)
+      .data(downloadStatsStack)
       .join("path")
       .attr("class", "line")
-      .attr("d", line)
+      .attr("d", downloadStatAreaLine)
       .style("fill", "none")
-      .style("stroke", (d, i) => color(i))
+      .style("stroke", (i) => color(i))
       .style("stroke-width", 1.5);
 
     return () => {
@@ -236,19 +234,19 @@ export const MovingStackedAreaChart = ({
           legendItems={[
             {
               color: COLORS.torchRed,
-              content: `Download - ${data[data.length - 1].series1.toFixed(2)} Mbps`,
+              content: `Download - ${data[data.length - 1].httpDownloaded.toFixed(2)} Mbps`,
             },
             {
               color: COLORS.yellow,
-              content: `- HTTP - ${data[data.length - 1].series1.toFixed(2)} Mbps`,
+              content: `- HTTP - ${data[data.length - 1].httpDownloaded.toFixed(2)} Mbps`,
             },
             {
               color: COLORS.lightOrange,
-              content: `- P2P - ${data[data.length - 1].series2.toFixed(2)} Mbps`,
+              content: `- P2P - ${data[data.length - 1].p2pDownloaded.toFixed(2)} Mbps`,
             },
             {
               color: COLORS.lightBlue,
-              content: `Upload P2P - ${data[data.length - 1].series3.toFixed(2)} Mbps`,
+              content: `Upload P2P - ${(data[data.length - 1].p2pUploaded * -1).toFixed(2)} Mbps`,
             },
           ]}
         />
@@ -258,7 +256,7 @@ export const MovingStackedAreaChart = ({
   );
 };
 
-const calculatePercentage = (part: number, total: number): string => {
+const calculatePercentage = (part: number, total: number) => {
   if (total === 0) {
     return 0;
   }

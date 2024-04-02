@@ -17,19 +17,19 @@ declare global {
 
 const convertToMB = (bytes: number) => bytes / 1024 / 1024;
 
-type DownloadStats = {
-  series1: number;
-  series2: number;
-  series3: number;
+export type DownloadStats = {
+  httpDownloaded: number;
+  p2pDownloaded: number;
+  p2pUploaded: number;
 };
 
 export type Player = (typeof PLAYERS)[number];
 
 export const Demo = () => {
   const data = useRef<DownloadStats>({
-    series1: 0,
-    series2: 0,
-    series3: 0,
+    httpDownloaded: 0,
+    p2pDownloaded: 0,
+    p2pUploaded: 0,
   });
   const { queryParams, setURLQueryParams } = useQueryParams<
     "player" | "streamUrl"
@@ -40,10 +40,10 @@ export const Demo = () => {
     (bytesLength: number, downloadSource: string) => {
       switch (downloadSource) {
         case "http":
-          data.current.series1 += convertToMB(bytesLength);
+          data.current.httpDownloaded += convertToMB(bytesLength);
           break;
         case "p2p":
-          data.current.series2 += convertToMB(bytesLength);
+          data.current.p2pDownloaded += convertToMB(bytesLength);
           break;
         default:
           break;
@@ -53,7 +53,7 @@ export const Demo = () => {
   );
 
   const onChunkUploaded = useCallback((bytesLength: number) => {
-    data.current.series3 += convertToMB(bytesLength);
+    data.current.p2pUploaded += convertToMB(bytesLength);
   }, []);
 
   const onPeerConnect = useCallback((peerId: string) => {
