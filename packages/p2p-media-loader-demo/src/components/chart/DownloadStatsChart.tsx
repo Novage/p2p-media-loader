@@ -38,9 +38,7 @@ type StoredData = {
   totalDownloaded: number;
 } & DownloadStats;
 
-export const MovingStackedAreaChart = ({
-  downloadStatsRef,
-}: StatsChartProps) => {
+export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
   const [data, setData] = useState<ChartsData[]>(generateInitialStackedData());
   const [storedData, setStoredData] = useState<StoredData>({
     totalDownloaded: 0,

@@ -4,10 +4,9 @@ import { PLAYERS } from "../constants";
 import { useQueryParams } from "../hooks/useQueryParams";
 import { HlsjsPlayer } from "./players/Hlsjs";
 import { GraphNetwork } from "./GraphNetwork";
-import "./demo.css";
 import { useCallback, useRef, useState } from "react";
-import { MovingStackedAreaChart } from "./chart/StatsChart";
-
+import { DownloadStatsChart } from "./chart/DownloadStatsChart";
+import "./demo.css";
 declare global {
   interface Window {
     Hls: typeof Hls;
@@ -101,7 +100,7 @@ export const Demo = () => {
         />
       </div>
       <GraphNetwork peers={peers} />
-      <MovingStackedAreaChart downloadStatsRef={data} />
+      <DownloadStatsChart downloadStatsRef={data} />
     </>
   );
 };
