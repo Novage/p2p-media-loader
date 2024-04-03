@@ -48,7 +48,6 @@
     "hls.js": "^1.5.7",
     "p2p-media-loader-core": "workspace:*",
     "p2p-media-loader-hlsjs": "workspace:*",
-    "rickshaw": "^1.7.1",
     "vis-network": "^9.1.9"
   },
   "devDependencies": {
