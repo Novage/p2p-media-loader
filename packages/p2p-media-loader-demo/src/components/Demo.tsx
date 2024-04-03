@@ -3,10 +3,10 @@ import { PlaybackOptions } from "./PlaybackOptions";
 import { PLAYERS } from "../constants";
 import { useQueryParams } from "../hooks/useQueryParams";
 import { HlsjsPlayer } from "./players/Hlsjs";
-import { GraphNetwork } from "./GraphNetwork";
 import { useCallback, useRef, useState } from "react";
 import { DownloadStatsChart } from "./chart/DownloadStatsChart";
 import "./demo.css";
+import { GraphNetwork } from "./GraphNetwork";
 declare global {
   interface Window {
     Hls: typeof Hls;
