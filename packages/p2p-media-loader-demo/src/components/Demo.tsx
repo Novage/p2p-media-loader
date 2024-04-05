@@ -99,7 +99,7 @@ export const Demo = () => {
           streamUrl={queryParams.streamUrl}
         />
       </div>
-      <GraphNetwork peers={peers} />
+      <GraphNetwork />
       <DownloadStatsChart downloadStatsRef={data} />
     </>
   );
