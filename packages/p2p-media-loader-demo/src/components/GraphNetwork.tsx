@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import React, { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 
@@ -33,7 +35,7 @@ const COLORS = {
 };
 
 export const GraphNetwork = ({ peers }: GraphNetworkProps) => {
-  const svgRef = useRef<SVGElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
   const [nodes, setNodes] = useState<GraphData>({
     nodes: [{ id: DEFAULT_PEER_ID, isMain: true }],
     links: [],
@@ -60,9 +62,10 @@ export const GraphNetwork = ({ peers }: GraphNetworkProps) => {
         "collide",
         d3
           .forceCollide()
-          .radius((d) => (d.isMain ? 20 : 15))
+          .radius((d) => ((d as Node).isMain ? 20 : 15))
           .iterations(2),
       );
+
     simulationRef.current = simulation;
 
     d3.select(svgRef.current).append("g").attr("class", "links");
@@ -122,12 +125,12 @@ export const GraphNetwork = ({ peers }: GraphNetworkProps) => {
       .select(svgRef.current)
       .select(".links")
       .selectAll("line")
-      .data(newLinks, (d) => `${d.source}-${d.target}`);
+      .data(newLinks, (d) => `${(d as Link).source}-${(d as Link).target}`);
 
     link
       .enter()
       .append("line")
-      .merge(link as any)
+      .merge(link as never)
       .attr("stroke", COLORS.links)
       .transition()
       .duration(500)
@@ -146,12 +149,12 @@ export const GraphNetwork = ({ peers }: GraphNetworkProps) => {
       .select(svgRef.current)
       .select(".nodes")
       .selectAll("circle")
-      .data(newNodes, (d) => d.id);
+      .data(newNodes, (d) => (d as Node).id);
 
     node
       .enter()
       .append("circle")
-      .merge(node as any)
+      .merge(node as never)
       .attr("r", (d) => (d.isMain ? 15 : 13))
       .attr("fill", (d) => COLORS.node(d))
       .on("mouseover", function () {
@@ -168,13 +171,13 @@ export const GraphNetwork = ({ peers }: GraphNetworkProps) => {
       .select(svgRef.current)
       .select(".nodes")
       .selectAll("text")
-      .data(newNodes, (d) => d.id);
+      .data(newNodes, (d) => (d as Node).id);
 
     text
       .enter()
       .append("text")
       .style("fill-opacity", 0)
-      .merge(text as any)
+      .merge(text as never)
       .text((d) => d.id)
       .style("text-anchor", "middle")
       .style("font-size", "12px")
@@ -264,27 +267,36 @@ export const GraphNetwork = ({ peers }: GraphNetworkProps) => {
 
 const drag = (
   simulation: d3.Simulation<Node, undefined>,
-): d3.DragBehavior<Element, Node, Node | d3.SubjectPosition> => {
-  const dragstarted = (event: d3.D3DragEvent<Element, Node, Node>, d: Node) => {
+): d3.DragBehavior<SVGCircleElement, Node, Node | d3.SubjectPosition> => {
+  const dragStarted = (
+    event: d3.D3DragEvent<SVGCircleElement, Node, Node>,
+    d: Node,
+  ) => {
     if (!event.active) simulation.alphaTarget(0.3).restart();
     d.fx = d.x;
     d.fy = d.y;
   };
 
-  const dragged = (event: d3.D3DragEvent<Element, Node, Node>, d: Node) => {
+  const dragged = (
+    event: d3.D3DragEvent<SVGCircleElement, Node, Node>,
+    d: Node,
+  ) => {
     d.fx = event.x;
     d.fy = event.y;
   };
 
-  const dragended = (event: d3.D3DragEvent<Element, Node, Node>, d: Node) => {
+  const dragEnded = (
+    event: d3.D3DragEvent<SVGCircleElement, Node, Node>,
+    d: Node,
+  ) => {
     if (!event.active) simulation.alphaTarget(0);
     d.fx = null;
     d.fy = null;
   };
 
   return d3
-    .drag<Element, Node>()
-    .on("start", dragstarted)
+    .drag<SVGCircleElement, Node>()
+    .on("start", dragStarted)
     .on("drag", dragged)
-    .on("end", dragended);
+    .on("end", dragEnded);
 };
