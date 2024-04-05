@@ -165,3 +165,30 @@ const drag = (
     .on("drag", dragged)
     .on("end", dragEnded);
 };
+
+export const prepareGroups = (svg: SVGElement) => {
+  d3.select(svg).append("g").attr("class", "links");
+
+  d3.select(svg).append("g").attr("class", "nodes");
+};
+
+export const createSimulation = (width: number, height: number) => {
+  return d3
+    .forceSimulation<Node, Link>()
+    .force(
+      "link",
+      d3
+        .forceLink<Node, Link>()
+        .id((d) => d.id)
+        .distance(100),
+    )
+    .force("charge", d3.forceManyBody())
+    .force("center", d3.forceCenter(width / 2, height / 2))
+    .force(
+      "collide",
+      d3
+        .forceCollide()
+        .radius((d) => ((d as Node).isMain ? 20 : 15))
+        .iterations(2),
+    );
+};

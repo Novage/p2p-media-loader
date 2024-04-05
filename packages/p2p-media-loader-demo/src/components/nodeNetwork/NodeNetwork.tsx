@@ -1,24 +1,31 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
-import { Link, updateGraph, Node } from "./nodeNetwork";
+import {
+  Link,
+  updateGraph,
+  Node,
+  prepareGroups,
+  createSimulation,
+} from "./network";
 
-interface GraphData {
+type GraphData = {
   nodes: Node[];
   links: Link[];
-}
+};
 
 type GraphNetworkProps = {
   peers: string[];
 };
 
 const DEFAULT_PEER_ID = "You";
+const DEFAULT_GRAPH_DATA = {
+  nodes: [{ id: DEFAULT_PEER_ID, isMain: true }],
+  links: [],
+};
 
-export const GraphNetwork = ({ peers }: GraphNetworkProps) => {
+export const NodeNetwork = ({ peers }: GraphNetworkProps) => {
   const svgRef = useRef<SVGSVGElement>(null);
-  const [nodes, setNodes] = useState<GraphData>({
-    nodes: [{ id: DEFAULT_PEER_ID, isMain: true }],
-    links: [],
-  });
+  const [networkData, setNetworkData] = useState<GraphData>(DEFAULT_GRAPH_DATA);
   const simulationRef = useRef<d3.Simulation<Node, Link> | null>(null);
 
   useEffect(() => {
@@ -26,30 +33,15 @@ export const GraphNetwork = ({ peers }: GraphNetworkProps) => {
 
     const width = svgRef.current.clientWidth;
     const height = svgRef.current.clientHeight;
-    const simulation = d3
-      .forceSimulation<Node, Link>()
-      .force(
-        "link",
-        d3
-          .forceLink<Node, Link>()
-          .id((d) => d.id)
-          .distance(100),
-      )
-      .force("charge", d3.forceManyBody())
-      .force("center", d3.forceCenter(width / 2, height / 2))
-      .force(
-        "collide",
-        d3
-          .forceCollide()
-          .radius((d) => ((d as Node).isMain ? 20 : 15))
-          .iterations(2),
-      );
+    const simulation = createSimulation(width, height);
 
     simulationRef.current = simulation;
 
-    d3.select(svgRef.current).append("g").attr("class", "links");
+    prepareGroups(svgRef.current);
 
-    d3.select(svgRef.current).append("g").attr("class", "nodes");
+    return () => {
+      simulation.stop();
+    };
   }, []);
 
   useEffect(() => {
@@ -63,7 +55,7 @@ export const GraphNetwork = ({ peers }: GraphNetworkProps) => {
       linkId: `${DEFAULT_PEER_ID}-${peerId}`,
     }));
 
-    setNodes((prevState) => {
+    setNetworkData((prevState) => {
       const nodesToAdd = allNodes.filter(
         (an) => !prevState.nodes.find((n) => n.id === an.id),
       );
@@ -92,8 +84,13 @@ export const GraphNetwork = ({ peers }: GraphNetworkProps) => {
   }, [peers]);
 
   useEffect(() => {
-    updateGraph(nodes.nodes, nodes.links, simulationRef.current, svgRef);
-  }, [nodes]);
+    updateGraph(
+      networkData.nodes,
+      networkData.links,
+      simulationRef.current,
+      svgRef,
+    );
+  }, [networkData]);
 
   return (
     <>

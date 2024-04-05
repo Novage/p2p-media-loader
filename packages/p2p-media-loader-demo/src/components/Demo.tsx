@@ -6,7 +6,7 @@ import { HlsjsPlayer } from "./players/Hlsjs";
 import { useCallback, useRef, useState } from "react";
 import { DownloadStatsChart } from "./chart/DownloadStatsChart";
 import "./demo.css";
-import { GraphNetwork } from "./nodeNetwork/GraphNetwork";
+import { NodeNetwork } from "./nodeNetwork/NodeNetwork";
 
 declare global {
   interface Window {
@@ -100,7 +100,7 @@ export const Demo = () => {
           streamUrl={queryParams.streamUrl}
         />
       </div>
-      <GraphNetwork peers={peers} />
+      <NodeNetwork peers={peers} />
       <DownloadStatsChart downloadStatsRef={data} />
     </>
   );
