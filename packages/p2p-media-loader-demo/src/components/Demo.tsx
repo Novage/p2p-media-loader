@@ -7,6 +7,7 @@ import { useCallback, useRef, useState } from "react";
 import { DownloadStatsChart } from "./chart/DownloadStatsChart";
 import "./demo.css";
 import { GraphNetwork } from "./nodeNetwork/GraphNetwork";
+
 declare global {
   interface Window {
     Hls: typeof Hls;
