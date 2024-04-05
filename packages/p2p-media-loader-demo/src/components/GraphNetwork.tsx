@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 
-// Assuming these interfaces are defined somewhere in your project
-interface Node {
+interface Node extends d3.SimulationNodeDatum {
   id: string;
   isMain?: boolean;
   group?: number;
@@ -16,8 +15,14 @@ interface GraphData {
 interface Link {
   source: string;
   target: string;
-  value?: number;
+  linkId: string;
 }
+
+type GraphNetworkProps = {
+  peers: string[];
+};
+
+const DEFAULT_PEER_ID = "You";
 
 const COLORS = {
   links: "#C8C8C8",
@@ -27,10 +32,10 @@ const COLORS = {
   },
 };
 
-export const GraphNetwork = () => {
+export const GraphNetwork = ({ peers }: GraphNetworkProps) => {
   const svgRef = useRef<SVGElement>(null);
   const [nodes, setNodes] = useState<GraphData>({
-    nodes: [{ id: "0", isMain: true }],
+    nodes: [{ id: DEFAULT_PEER_ID, isMain: true }],
     links: [],
   });
   const simulationRef = useRef<d3.Simulation<Node, Link> | null>(null);
@@ -50,7 +55,14 @@ export const GraphNetwork = () => {
           .distance(100),
       )
       .force("charge", d3.forceManyBody())
-      .force("center", d3.forceCenter(width / 2, height / 2));
+      .force("center", d3.forceCenter(width / 2, height / 2))
+      .force(
+        "collide",
+        d3
+          .forceCollide()
+          .radius((d) => (d.isMain ? 20 : 15))
+          .iterations(2),
+      );
     simulationRef.current = simulation;
 
     d3.select(svgRef.current).append("g").attr("class", "links");
@@ -58,18 +70,54 @@ export const GraphNetwork = () => {
     d3.select(svgRef.current).append("g").attr("class", "nodes");
   }, []);
 
-  // Update function to be called when nodes or links change
+  useEffect(() => {
+    const allNodes = [
+      ...peers.map((peerId) => ({ id: peerId, isMain: false })),
+      { id: DEFAULT_PEER_ID, isMain: true },
+    ];
+    const allLinks = peers.map((peerId) => ({
+      source: DEFAULT_PEER_ID,
+      target: peerId,
+      linkId: `${DEFAULT_PEER_ID}-${peerId}`,
+    }));
+
+    setNodes((prevState) => {
+      const nodesToAdd = allNodes.filter(
+        (an) => !prevState.nodes.find((n) => n.id === an.id),
+      );
+      const nodesToRemove = prevState.nodes.filter(
+        (n) => !allNodes.find((an) => an.id === n.id),
+      );
+      const linksToAdd = allLinks.filter(
+        (al) => !prevState.links.find((l) => l.linkId === al.linkId),
+      );
+      const linksToRemove = prevState.links.filter(
+        (l) => !allLinks.find((al) => al.linkId === l.linkId),
+      );
+
+      const updatedNodes = prevState.nodes.filter(
+        (n) => !nodesToRemove.find((rn) => rn.id === n.id),
+      );
+      const updatedLinks = prevState.links.filter(
+        (l) => !linksToRemove.find((rl) => rl.linkId === l.linkId),
+      );
+
+      return {
+        nodes: [...updatedNodes, ...nodesToAdd],
+        links: [...updatedLinks, ...linksToAdd],
+      };
+    });
+  }, [peers]);
+
   const updateGraph = (newNodes: Node[], newLinks: Link[]) => {
     if (!simulationRef.current || !svgRef.current) return;
 
     const simulation = simulationRef.current;
 
-    // Update the simulation with the new nodes and links
     simulation.nodes(newNodes);
     simulation.force<d3.ForceLink<Node, Link>>("link")?.links(newLinks);
     simulation.alpha(0.5).restart();
 
-    // Select and update the links
     const link = d3
       .select(svgRef.current)
       .select(".links")
@@ -79,13 +127,21 @@ export const GraphNetwork = () => {
     link
       .enter()
       .append("line")
-      .merge(link as any) // Merge enter and update selections
-      .attr("stroke-width", 0.5)
-      .attr("stroke", COLORS.links);
+      .merge(link as any)
+      .attr("stroke", COLORS.links)
+      .transition()
+      .duration(500)
+      .attr("stroke-width", 0.5);
 
-    link.exit().remove();
+    link
+      .exit()
+      .transition()
+      .duration(500)
+      .style("opacity", 0)
+      .on("end", function () {
+        d3.select(this).remove();
+      });
 
-    // Select and update the nodes
     const node = d3
       .select(svgRef.current)
       .select(".nodes")
@@ -95,8 +151,8 @@ export const GraphNetwork = () => {
     node
       .enter()
       .append("circle")
-      .merge(node as any) // Merge enter and update selections
-      .attr("r", (d) => (d.isMain ? 15 : 12))
+      .merge(node as any)
+      .attr("r", (d) => (d.isMain ? 15 : 13))
       .attr("fill", (d) => COLORS.node(d))
       .on("mouseover", function () {
         d3.select(this).style("fill", COLORS.nodeHover);
@@ -106,7 +162,7 @@ export const GraphNetwork = () => {
       })
       .call(drag(simulation));
 
-    node.exit().remove();
+    node.exit().transition().duration(500).attr("r", 0).remove();
 
     const text = d3
       .select(svgRef.current)
@@ -117,14 +173,25 @@ export const GraphNetwork = () => {
     text
       .enter()
       .append("text")
+      .style("fill-opacity", 0)
       .merge(text as any)
       .text((d) => d.id)
       .style("text-anchor", "middle")
       .style("font-size", "12px")
-      .style("font-family", "sans-serif");
+      .style("font-family", "sans-serif")
+      .transition()
+      .duration(500)
+      .style("fill-opacity", 1);
 
-    text.exit().remove();
-    // Update simulation on 'tick'
+    text
+      .exit()
+      .transition()
+      .duration(500)
+      .style("fill-opacity", 0)
+      .on("end", function () {
+        d3.select(this).remove();
+      });
+
     simulation.on("tick", () => {
       d3.select(svgRef.current)
         .select(".links")
@@ -144,12 +211,12 @@ export const GraphNetwork = () => {
         .select(".nodes")
         .selectAll("text")
         .attr("x", (d: any) => d.x)
-        .attr("y", (d: any) => d.y + (d.isMain ? -20 : -15));
+        .attr("y", (d: any) => d.y + -20);
     });
   };
 
   useEffect(() => {
-    updateGraph(nodes!.nodes, nodes!.links);
+    updateGraph(nodes.nodes, nodes.links);
   }, [nodes]);
 
   return (
@@ -161,7 +228,11 @@ export const GraphNetwork = () => {
               nodes: [...prev.nodes, { id: String(prev.nodes.length) }],
               links: [
                 ...prev.links,
-                { source: "0", target: String(prev.links.length + 1) },
+                {
+                  source: DEFAULT_PEER_ID,
+                  target: String(prev.links.length + 1),
+                  linkId: `${DEFAULT_PEER_ID}-${prev.links.length + 1}`,
+                },
               ],
             };
           });
@@ -192,8 +263,8 @@ export const GraphNetwork = () => {
 };
 
 const drag = (
-  simulation: Simulation<Node, undefined>,
-): DragBehavior<Element, Node, Node | d3.SubjectPosition> => {
+  simulation: d3.Simulation<Node, undefined>,
+): d3.DragBehavior<Element, Node, Node | d3.SubjectPosition> => {
   const dragstarted = (event: d3.D3DragEvent<Element, Node, Node>, d: Node) => {
     if (!event.active) simulation.alphaTarget(0.3).restart();
     d.fx = d.x;
