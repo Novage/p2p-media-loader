@@ -51,7 +51,7 @@ export const updateGraph = (
   link
     .exit()
     .transition()
-    .duration(500)
+    .duration(200)
     .style("opacity", 0)
     .on("end", function () {
       d3.select(this).remove();
@@ -77,7 +77,7 @@ export const updateGraph = (
     })
     .call(drag(simulation));
 
-  node.exit().transition().duration(500).attr("r", 0).remove();
+  node.exit().transition().duration(200).attr("r", 0).remove();
 
   const text = d3
     .select(svgRef.current)
@@ -101,7 +101,7 @@ export const updateGraph = (
   text
     .exit()
     .transition()
-    .duration(500)
+    .duration(200)
     .style("fill-opacity", 0)
     .on("end", function () {
       d3.select(this).remove();
