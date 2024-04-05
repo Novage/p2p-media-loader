@@ -7,12 +7,14 @@ import { GraphNetwork } from "./GraphNetwork";
 import { useCallback, useRef, useState } from "react";
 import { DownloadStatsChart } from "./chart/DownloadStatsChart";
 import "./demo.css";
+
 declare global {
   interface Window {
     Hls: typeof Hls;
     videoPlayer?: { destroy?: () => void };
   }
 }
+
 
 export type DownloadStats = {
   httpDownloaded: number;
@@ -54,6 +56,15 @@ export const Demo = () => {
   const onChunkUploaded = useCallback((bytesLength: number) => {
     data.current.p2pUploaded += bytesLength;
   }, []);
+
+export type Player = (typeof PLAYERS)[number];
+
+export const Demo = () => {
+  const { queryParams, setURLQueryParams } = useQueryParams<
+    "player" | "streamUrl"
+  >();
+  
+  const [peers, setPeers] = useState<string[]>([]);
 
   const onPeerConnect = useCallback((peerId: string) => {
     setPeers((peers) => {
