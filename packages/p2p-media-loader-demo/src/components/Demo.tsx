@@ -15,7 +15,6 @@ declare global {
   }
 }
 
-
 export type DownloadStats = {
   httpDownloaded: number;
   p2pDownloaded: number;
@@ -56,15 +55,6 @@ export const Demo = () => {
   const onChunkUploaded = useCallback((bytesLength: number) => {
     data.current.p2pUploaded += bytesLength;
   }, []);
-
-export type Player = (typeof PLAYERS)[number];
-
-export const Demo = () => {
-  const { queryParams, setURLQueryParams } = useQueryParams<
-    "player" | "streamUrl"
-  >();
-  
-  const [peers, setPeers] = useState<string[]>([]);
 
   const onPeerConnect = useCallback((peerId: string) => {
     setPeers((peers) => {

@@ -49,8 +49,6 @@ export const HlsjsPlayer = ({
     streamUrl,
   ]);
 
-  }, [onPeerConnect, onPeerDisconnect, streamUrl]);
-
   return (
     <div className="video-container">
       <video ref={videoRef} autoPlay controls style={{ width: 800 }} />
