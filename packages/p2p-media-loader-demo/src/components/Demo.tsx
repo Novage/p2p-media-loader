@@ -6,7 +6,7 @@ import { HlsjsPlayer } from "./players/Hlsjs";
 import { useCallback, useRef, useState } from "react";
 import { DownloadStatsChart } from "./chart/DownloadStatsChart";
 import "./demo.css";
-import { GraphNetwork } from "./GraphNetwork";
+import { GraphNetwork } from "./nodeNetwork/GraphNetwork";
 declare global {
   interface Window {
     Hls: typeof Hls;

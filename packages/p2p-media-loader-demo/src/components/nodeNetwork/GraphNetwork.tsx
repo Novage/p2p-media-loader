@@ -97,37 +97,6 @@ export const GraphNetwork = ({ peers }: GraphNetworkProps) => {
 
   return (
     <>
-      <button
-        onClick={() => {
-          setNodes((prev) => {
-            return {
-              nodes: [...prev.nodes, { id: String(prev.nodes.length) }],
-              links: [
-                ...prev.links,
-                {
-                  source: DEFAULT_PEER_ID,
-                  target: String(prev.links.length + 1),
-                  linkId: `${DEFAULT_PEER_ID}-${prev.links.length + 1}`,
-                },
-              ],
-            };
-          });
-        }}
-      >
-        Update Graph
-      </button>
-      <button
-        onClick={() => {
-          setNodes((prev) => {
-            return {
-              nodes: prev.nodes.slice(0, -1),
-              links: prev.links.slice(0, -1),
-            };
-          });
-        }}
-      >
-        Delete Graph
-      </button>
       <svg
         ref={svgRef}
         width="380"
