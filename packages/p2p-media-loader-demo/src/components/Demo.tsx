@@ -3,10 +3,10 @@ import { PlaybackOptions } from "./PlaybackOptions";
 import { PLAYERS } from "../constants";
 import { useQueryParams } from "../hooks/useQueryParams";
 import { HlsjsPlayer } from "./players/Hlsjs";
-import { GraphNetwork } from "./GraphNetwork";
 import { useCallback, useRef, useState } from "react";
 import { DownloadStatsChart } from "./chart/DownloadStatsChart";
 import "./demo.css";
+import { NodeNetwork } from "./nodeNetwork/NodeNetwork";
 
 declare global {
   interface Window {
@@ -100,7 +100,7 @@ export const Demo = () => {
           streamUrl={queryParams.streamUrl}
         />
       </div>
-      <GraphNetwork peers={peers} />
+      <NodeNetwork peers={peers} />
       <DownloadStatsChart downloadStatsRef={data} />
     </>
   );

@@ -50,6 +50,13 @@ export const PlaybackOptions = ({
         ></input>
       </div>
       <button onClick={handleApply}>Apply</button>
+      <button
+        onClick={() => {
+          window.open(window.location.href, "_blank");
+        }}
+      >
+        Create new peer
+      </button>
     </div>
   );
 };

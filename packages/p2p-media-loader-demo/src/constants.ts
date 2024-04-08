@@ -20,11 +20,9 @@ export const DEFAULT_GRAPH_DATA = {
   nodes: [{ id: 1, label: "You", color: "#5390e0" }],
   edges: [],
 };
-
 export const COLORS = {
   yellow: "#faf21b",
   lightOrange: "#ff7f0e",
   lightBlue: "#ADD8E6",
   torchRed: "#ff1745",
 };
-
