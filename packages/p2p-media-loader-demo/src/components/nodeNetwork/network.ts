@@ -4,7 +4,6 @@ export interface Node extends d3.SimulationNodeDatum {
   id: string;
   isMain?: boolean;
   group?: number;
-  name: string;
 }
 
 export interface Link extends d3.SimulationLinkDatum<Node> {
@@ -30,7 +29,7 @@ function handleNodeMouseOut(this: SVGCircleElement, _event: unknown, d: Node) {
 }
 
 function getLinkText(d: Link) {
-  return `${d.source.name}-${d.target.name}`;
+  return `${d.source.id}-${d.target.id}`;
 }
 
 function getNodeId(d: Node) {
@@ -184,7 +183,7 @@ export const prepareGroups = (svg: SVGElement) => {
 export const createSimulation = (width: number, height: number) => {
   return d3
     .forceSimulation<Node, Link>()
-    .force("link", d3.forceLink<Node, Link>().id(getNodeId).distance(100))
+    .force("link", d3.forceLink<Node, Link>().id(getNodeId).distance(110))
     .force("charge", d3.forceManyBody())
     .force("center", d3.forceCenter(width / 2, height / 2))
     .force(

@@ -13,8 +13,9 @@ type GraphNetworkProps = {
 };
 
 const DEFAULT_PEER_ID = "You";
+const DEFAULT_NODE: Node = { id: DEFAULT_PEER_ID, isMain: true };
 const DEFAULT_GRAPH_DATA = {
-  nodes: [{ id: DEFAULT_PEER_ID, isMain: true }],
+  nodes: [DEFAULT_NODE],
   links: [] as Link[],
 };
 
@@ -42,11 +43,12 @@ export const NodeNetwork = ({ peers }: GraphNetworkProps) => {
   useEffect(() => {
     const allNodes = [
       ...peers.map((peerId) => ({ id: peerId, isMain: false })),
-      { id: DEFAULT_PEER_ID, isMain: true },
+      DEFAULT_NODE,
     ];
+
     const allLinks = peers.map((peerId) => ({
-      source: DEFAULT_PEER_ID,
-      target: peerId,
+      source: DEFAULT_NODE,
+      target: allNodes.find((n) => n.id === peerId)!,
       linkId: `${DEFAULT_PEER_ID}-${peerId}`,
     }));
 
