@@ -1,15 +1,15 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import * as d3 from "d3";
 
 export interface Node extends d3.SimulationNodeDatum {
   id: string;
   isMain?: boolean;
   group?: number;
+  name: string;
 }
 
-export interface Link {
-  source: string;
-  target: string;
+export interface Link extends d3.SimulationLinkDatum<Node> {
+  source: Node;
+  target: Node;
   linkId: string;
 }
 
@@ -20,6 +20,26 @@ const COLORS = {
     return d.isMain ? "hsl(210, 70%, 72.5%)" : "hsl(55, 70%, 72.5%)";
   },
 };
+
+function handleNodeMouseOver(this: SVGCircleElement) {
+  d3.select(this).style("fill", COLORS.nodeHover);
+}
+
+function handleNodeMouseOut(this: SVGCircleElement, _event: unknown, d: Node) {
+  d3.select(this).style("fill", COLORS.node(d));
+}
+
+function getLinkText(d: Link) {
+  return `${d.source.name}-${d.target.name}`;
+}
+
+function getNodeId(d: Node) {
+  return d.id;
+}
+
+function removeD3Item(this: d3.BaseType) {
+  d3.select(this).remove();
+}
 
 export const updateGraph = (
   newNodes: Node[],
@@ -36,13 +56,13 @@ export const updateGraph = (
   const link = d3
     .select(svgRef.current)
     .select(".links")
-    .selectAll("line")
-    .data(newLinks, (d) => `${(d as Link).source}-${(d as Link).target}`);
+    .selectAll<SVGLineElement, Link>("line")
+    .data(newLinks, getLinkText);
 
   link
     .enter()
     .append("line")
-    .merge(link as never)
+    .merge(link)
     .attr("stroke", COLORS.links)
     .transition()
     .duration(500)
@@ -53,28 +73,22 @@ export const updateGraph = (
     .transition()
     .duration(200)
     .style("opacity", 0)
-    .on("end", function () {
-      d3.select(this).remove();
-    });
+    .on("end", removeD3Item);
 
   const node = d3
     .select(svgRef.current)
     .select(".nodes")
-    .selectAll("circle")
-    .data(newNodes, (d) => (d as Node).id);
+    .selectAll<SVGCircleElement, Node>("circle")
+    .data(newNodes, getNodeId);
 
   node
     .enter()
     .append("circle")
-    .merge(node as never)
+    .merge(node)
     .attr("r", (d) => (d.isMain ? 15 : 13))
     .attr("fill", (d) => COLORS.node(d))
-    .on("mouseover", function () {
-      d3.select(this).style("fill", COLORS.nodeHover);
-    })
-    .on("mouseout", function (event, d) {
-      d3.select(this).style("fill", COLORS.node(d));
-    })
+    .on("mouseover", handleNodeMouseOver)
+    .on("mouseout", handleNodeMouseOut)
     .call(drag(simulation));
 
   node.exit().transition().duration(200).attr("r", 0).remove();
@@ -82,15 +96,15 @@ export const updateGraph = (
   const text = d3
     .select(svgRef.current)
     .select(".nodes")
-    .selectAll("text")
-    .data(newNodes, (d) => (d as Node).id);
+    .selectAll<SVGTextElement, Node>("text")
+    .data(newNodes, getNodeId);
 
   text
     .enter()
     .append("text")
     .style("fill-opacity", 0)
-    .merge(text as never)
-    .text((d) => d.id)
+    .merge(text)
+    .text(getNodeId)
     .style("text-anchor", "middle")
     .style("font-size", "12px")
     .style("font-family", "sans-serif")
@@ -103,36 +117,32 @@ export const updateGraph = (
     .transition()
     .duration(200)
     .style("fill-opacity", 0)
-    .on("end", function () {
-      d3.select(this).remove();
-    });
+    .on("end", removeD3Item);
 
   simulation.on("tick", () => {
     d3.select(svgRef.current)
       .select(".links")
-      .selectAll("line")
-      .attr("x1", (d: any) => d.source.x)
-      .attr("y1", (d: any) => d.source.y)
-      .attr("x2", (d: any) => d.target.x)
-      .attr("y2", (d: any) => d.target.y);
+      .selectAll<SVGLineElement, Link>("line")
+      .attr("x1", (d) => d.source.x ?? 0)
+      .attr("y1", (d) => d.source.y ?? 0)
+      .attr("x2", (d) => d.target.x ?? 0)
+      .attr("y2", (d) => d.target.y ?? 0);
 
     d3.select(svgRef.current)
       .select(".nodes")
-      .selectAll("circle")
-      .attr("cx", (d: any) => d.x)
-      .attr("cy", (d: any) => d.y);
+      .selectAll<SVGCircleElement, Node>("circle")
+      .attr("cx", (d) => d.x ?? 0)
+      .attr("cy", (d) => d.y ?? 0);
 
     d3.select(svgRef.current)
       .select(".nodes")
-      .selectAll("text")
-      .attr("x", (d: any) => d.x)
-      .attr("y", (d: any) => d.y + -20);
+      .selectAll<SVGTextElement, Node>("text")
+      .attr("x", (d) => d.x ?? 0)
+      .attr("y", (d) => (d.y === undefined ? 0 : d.y - 20));
   });
 };
 
-const drag = (
-  simulation: d3.Simulation<Node, undefined>,
-): d3.DragBehavior<SVGCircleElement, Node, Node | d3.SubjectPosition> => {
+const drag = (simulation: d3.Simulation<Node, Link>) => {
   const dragStarted = (
     event: d3.D3DragEvent<SVGCircleElement, Node, Node>,
     d: Node,
@@ -168,27 +178,20 @@ const drag = (
 
 export const prepareGroups = (svg: SVGElement) => {
   d3.select(svg).append("g").attr("class", "links");
-
   d3.select(svg).append("g").attr("class", "nodes");
 };
 
 export const createSimulation = (width: number, height: number) => {
   return d3
     .forceSimulation<Node, Link>()
-    .force(
-      "link",
-      d3
-        .forceLink<Node, Link>()
-        .id((d) => d.id)
-        .distance(100),
-    )
+    .force("link", d3.forceLink<Node, Link>().id(getNodeId).distance(100))
     .force("charge", d3.forceManyBody())
     .force("center", d3.forceCenter(width / 2, height / 2))
     .force(
       "collide",
       d3
-        .forceCollide()
-        .radius((d) => ((d as Node).isMain ? 20 : 15))
+        .forceCollide<Node>()
+        .radius((d) => (d.isMain ? 20 : 15))
         .iterations(2),
     );
 };

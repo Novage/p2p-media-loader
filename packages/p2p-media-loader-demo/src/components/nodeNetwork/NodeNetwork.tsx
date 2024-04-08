@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import * as d3 from "d3";
 import {
   Link,
@@ -8,11 +8,6 @@ import {
   createSimulation,
 } from "./network";
 
-type GraphData = {
-  nodes: Node[];
-  links: Link[];
-};
-
 type GraphNetworkProps = {
   peers: string[];
 };
@@ -20,12 +15,12 @@ type GraphNetworkProps = {
 const DEFAULT_PEER_ID = "You";
 const DEFAULT_GRAPH_DATA = {
   nodes: [{ id: DEFAULT_PEER_ID, isMain: true }],
-  links: [],
+  links: [] as Link[],
 };
 
 export const NodeNetwork = ({ peers }: GraphNetworkProps) => {
   const svgRef = useRef<SVGSVGElement>(null);
-  const [networkData, setNetworkData] = useState<GraphData>(DEFAULT_GRAPH_DATA);
+  const networkDataRef = useRef(DEFAULT_GRAPH_DATA);
   const simulationRef = useRef<d3.Simulation<Node, Link> | null>(null);
 
   useEffect(() => {
@@ -55,42 +50,42 @@ export const NodeNetwork = ({ peers }: GraphNetworkProps) => {
       linkId: `${DEFAULT_PEER_ID}-${peerId}`,
     }));
 
-    setNetworkData((prevState) => {
-      const nodesToAdd = allNodes.filter(
-        (an) => !prevState.nodes.find((n) => n.id === an.id),
-      );
-      const nodesToRemove = prevState.nodes.filter(
-        (n) => !allNodes.find((an) => an.id === n.id),
-      );
-      const linksToAdd = allLinks.filter(
-        (al) => !prevState.links.find((l) => l.linkId === al.linkId),
-      );
-      const linksToRemove = prevState.links.filter(
-        (l) => !allLinks.find((al) => al.linkId === l.linkId),
-      );
+    const networkData = networkDataRef.current;
 
-      const updatedNodes = prevState.nodes.filter(
-        (n) => !nodesToRemove.find((rn) => rn.id === n.id),
-      );
-      const updatedLinks = prevState.links.filter(
-        (l) => !linksToRemove.find((rl) => rl.linkId === l.linkId),
-      );
+    const nodesToAdd = allNodes.filter(
+      (an) => !networkData.nodes.find((n) => n.id === an.id),
+    );
+    const nodesToRemove = networkData.nodes.filter(
+      (n) => !allNodes.find((an) => an.id === n.id),
+    );
+    const linksToAdd = allLinks.filter(
+      (al) => !networkData.links.find((l) => l.linkId === al.linkId),
+    );
+    const linksToRemove = networkData.links.filter(
+      (l) => !allLinks.find((al) => al.linkId === l.linkId),
+    );
 
-      return {
-        nodes: [...updatedNodes, ...nodesToAdd],
-        links: [...updatedLinks, ...linksToAdd],
-      };
-    });
-  }, [peers]);
+    const updatedNodes = networkData.nodes.filter(
+      (n) => !nodesToRemove.find((rn) => rn.id === n.id),
+    );
+    const updatedLinks = networkData.links.filter(
+      (l) => !linksToRemove.find((rl) => rl.linkId === l.linkId),
+    );
 
-  useEffect(() => {
+    const newNetworkData = {
+      nodes: [...updatedNodes, ...nodesToAdd],
+      links: [...updatedLinks, ...linksToAdd],
+    };
+
+    networkDataRef.current = newNetworkData;
+
     updateGraph(
-      networkData.nodes,
-      networkData.links,
+      newNetworkData.nodes,
+      newNetworkData.links,
       simulationRef.current,
       svgRef,
     );
-  }, [networkData]);
+  }, [peers]);
 
   return (
     <>
