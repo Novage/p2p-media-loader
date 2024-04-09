@@ -1,6 +1,7 @@
 export const PLAYERS = ["hlsjs", "hlsjs-dplayer"] as const;
 export const DEFAULT_STREAM =
-  "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8";
+  "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8";
+//"https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8";
 export const NETWORK_GRAPH_OPTIONS = {
   nodes: {
     shape: "dot",

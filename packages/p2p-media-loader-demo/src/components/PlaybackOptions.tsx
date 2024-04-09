@@ -14,6 +14,8 @@ export const PlaybackOptions = ({
   const playerSelectRef = useRef<HTMLSelectElement>(null);
   const streamUrlInputRef = useRef<HTMLInputElement>(null);
 
+  const isHttps = window.location.protocol === "https:";
+
   const handleApply = () => {
     const player = playerSelectRef.current?.value;
     const streamUrl = streamUrlInputRef.current?.value;
@@ -24,39 +26,48 @@ export const PlaybackOptions = ({
   };
 
   return (
-    <div>
-      <div>
-        <label htmlFor="player">Player:</label>
+    <>
+      <div className="playback-options">
+        <div className="option-group">
+          <label htmlFor="streamUrl">
+            Video URL{isHttps ? " (HTTPS only)" : ""}:
+          </label>
+          <input
+            className="item"
+            defaultValue={streamUrl}
+            id="streamUrl"
+            ref={streamUrlInputRef}
+          ></input>
+        </div>
 
-        <select
-          key={currentPlayer}
-          ref={playerSelectRef}
-          id="player"
-          defaultValue={currentPlayer}
-        >
-          {PLAYERS.map((player) => (
-            <option key={player} value={player}>
-              {player}
-            </option>
-          ))}
-        </select>
+        <div className="option-group">
+          <label htmlFor="player">Player:</label>
+          <select
+            className="item"
+            key={currentPlayer}
+            ref={playerSelectRef}
+            id="player"
+            defaultValue={currentPlayer}
+          >
+            {PLAYERS.map((player) => (
+              <option key={player} value={player}>
+                {player}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="button-group">
+          <button onClick={handleApply}>Apply</button>
+          <button
+            onClick={() => {
+              window.open(window.location.href, "_blank");
+            }}
+          >
+            Create new peer
+          </button>
+        </div>
       </div>
-      <div>
-        <label htmlFor="streamUrl">Stream URL:</label>
-        <input
-          defaultValue={streamUrl}
-          id="streamUrl"
-          ref={streamUrlInputRef}
-        ></input>
-      </div>
-      <button onClick={handleApply}>Apply</button>
-      <button
-        onClick={() => {
-          window.open(window.location.href, "_blank");
-        }}
-      >
-        Create new peer
-      </button>
-    </div>
+    </>
   );
 };

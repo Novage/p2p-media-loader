@@ -176,8 +176,13 @@ const drag = (simulation: d3.Simulation<Node, Link>) => {
 };
 
 export const prepareGroups = (svg: SVGElement) => {
-  d3.select(svg).append("g").attr("class", "links");
-  d3.select(svg).append("g").attr("class", "nodes");
+  if (d3.select(svg).select("g.links").empty()) {
+    d3.select(svg).append("g").attr("class", "links");
+  }
+
+  if (d3.select(svg).select("g.nodes").empty()) {
+    d3.select(svg).append("g").attr("class", "nodes");
+  }
 };
 
 export const createSimulation = (width: number, height: number) => {

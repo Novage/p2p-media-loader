@@ -34,6 +34,8 @@ export const Demo = () => {
     "player" | "streamUrl"
   >();
 
+  const [trackers, setTrackers] = useState<string[]>([]);
+
   const [peers, setPeers] = useState<string[]>([]);
 
   const onChunkDownloaded = useCallback(
@@ -73,6 +75,10 @@ export const Demo = () => {
     setURLQueryParams({ streamUrl: url, player });
   };
 
+  const handleTrackersUpdate = useCallback((trackers: string[]) => {
+    setTrackers(trackers);
+  }, []);
+
   const renderPlayer = () => {
     switch (queryParams.player) {
       case "hlsjs":
@@ -83,6 +89,7 @@ export const Demo = () => {
             onPeerDisconnect={onPeerDisconnect}
             onChunkDownloaded={onChunkDownloaded}
             onChunkUploaded={onChunkUploaded}
+            updateTrackers={handleTrackersUpdate}
           />
         );
       default:
@@ -91,17 +98,34 @@ export const Demo = () => {
   };
 
   return (
-    <>
-      {renderPlayer()}
-      <div style={{ display: "flex" }}>
-        <PlaybackOptions
-          updatePlaybackOptions={handlePlaybackOptionsUpdate}
-          currentPlayer={queryParams.player}
-          streamUrl={queryParams.streamUrl}
-        />
+    <div className="container">
+      <div className="column-1">
+        {renderPlayer()}
+        <DownloadStatsChart downloadStatsRef={data} />
       </div>
-      <NodeNetwork peers={peers} />
-      <DownloadStatsChart downloadStatsRef={data} />
-    </>
+
+      <div className="column-2">
+        <div style={{ display: "flex" }}>
+          <PlaybackOptions
+            updatePlaybackOptions={handlePlaybackOptionsUpdate}
+            currentPlayer={queryParams.player}
+            streamUrl={queryParams.streamUrl}
+          />
+        </div>
+
+        <NodeNetwork peers={peers} />
+
+        {trackers.length > 0 && (
+          <div className="trackers-container">
+            <span>Trackers:</span>
+            <ul className="trackers-list">
+              {trackers.map((tracker) => (
+                <li key={tracker}>{tracker}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
   );
 };

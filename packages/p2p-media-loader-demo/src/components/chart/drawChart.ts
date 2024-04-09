@@ -2,14 +2,16 @@ import { COLORS } from "../../constants";
 import { ChartsData } from "./DownloadStatsChart";
 import * as d3 from "d3";
 
-const margin = { top: 20, right: 20, bottom: 30, left: 25 },
-  width = 710 - margin.left - margin.right,
-  height = 310 - margin.top - margin.bottom;
-
 export const drawChart = (
   svgRef: React.RefObject<SVGSVGElement>,
   data: ChartsData[],
 ) => {
+  if (!svgRef.current) return;
+
+  const margin = { top: 20, right: 2, bottom: 30, left: 25 },
+    width = svgRef.current.clientWidth - margin.left - margin.right,
+    height = svgRef.current.clientHeight - margin.top - margin.bottom;
+
   const svg = d3.select(svgRef.current);
   svg
     .selectAll("g")

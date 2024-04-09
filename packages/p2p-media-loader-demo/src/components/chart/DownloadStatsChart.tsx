@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DownloadStats } from "../Demo";
 import { COLORS } from "../../constants";
 import "./chart.css";
@@ -37,17 +37,67 @@ type StoredData = {
   totalDownloaded: number;
 } & DownloadStats;
 
+const XL_CHART_DIMENSIONS = {
+  width: 730,
+  height: 310,
+};
+
+const L_CHART_DIMENSIONS = {
+  width: 610,
+  height: 310,
+};
+
+const MD_CHART_DIMENSIONS = {
+  width: 440,
+  height: 310,
+};
+
+const SM_CHART_DIMENSIONS = {
+  width: 540,
+  height: 310,
+};
+
 export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
   const [data, setData] = useState<ChartsData[]>(generateInitialStackedData());
+
   const [storedData, setStoredData] = useState<StoredData>({
     totalDownloaded: 0,
     httpDownloaded: 0,
     p2pDownloaded: 0,
     p2pUploaded: 0,
   });
+
+  const [svgDimensions, setSvgDimensions] = useState(XL_CHART_DIMENSIONS);
+
   const svgRef = useRef(null);
 
+  const updateSvgDimensions = useCallback(() => {
+    const clientWidth = document.documentElement.clientWidth;
+    let newDimensions;
+
+    if (clientWidth > 1200) {
+      newDimensions = XL_CHART_DIMENSIONS;
+    } else if (clientWidth > 992) {
+      newDimensions = L_CHART_DIMENSIONS;
+    } else if (clientWidth > 768) {
+      newDimensions = MD_CHART_DIMENSIONS;
+    } else if (clientWidth > 576) {
+      newDimensions = SM_CHART_DIMENSIONS;
+    } else {
+      newDimensions = {
+        width: clientWidth < 320 ? 320 : clientWidth - 30,
+        height: 310,
+      };
+    }
+
+    if (!newDimensions) return;
+
+    setSvgDimensions(newDimensions);
+  }, []);
+
   useEffect(() => {
+    updateSvgDimensions();
+
     const intervalID = setInterval(() => {
       if (!downloadStatsRef.current) return;
 
@@ -78,8 +128,13 @@ export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
       downloadStatsRef.current.p2pUploaded = 0;
     }, 1000);
 
-    return () => clearInterval(intervalID);
-  }, [downloadStatsRef]);
+    window.addEventListener("resize", updateSvgDimensions);
+
+    return () => {
+      clearInterval(intervalID);
+      window.removeEventListener("resize", updateSvgDimensions);
+    };
+  }, [downloadStatsRef, updateSvgDimensions]);
 
   useEffect(() => {
     if (!svgRef.current) return;
@@ -87,9 +142,9 @@ export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
     const svg = drawChart(svgRef, data);
 
     return () => {
-      svg.selectAll("*").remove();
+      svg?.selectAll("*").remove();
     };
-  }, [data]);
+  }, [data, svgDimensions]);
 
   return (
     <div className="chart-container">
@@ -135,7 +190,11 @@ export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
           ]}
         />
       </div>
-      <svg ref={svgRef} width={710} height={310} />
+      <svg
+        ref={svgRef}
+        width={svgDimensions.width}
+        height={svgDimensions.height}
+      />
     </div>
   );
 };

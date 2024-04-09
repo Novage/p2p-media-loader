@@ -8,6 +8,7 @@ type HlsjsPlayerProps = {
   onPeerDisconnect?: (peerId: string) => void;
   onChunkDownloaded?: (bytesLength: number, downloadSource: string) => void;
   onChunkUploaded?: (bytesLength: number) => void;
+  updateTrackers?: (trackers: string[]) => void;
 };
 const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
 
@@ -17,6 +18,7 @@ export const HlsjsPlayer = ({
   onPeerDisconnect,
   onChunkDownloaded,
   onChunkUploaded,
+  updateTrackers,
 }: HlsjsPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -40,18 +42,24 @@ export const HlsjsPlayer = ({
     hls.attachMedia(videoRef.current);
     hls.loadSource(streamUrl);
 
+    if (updateTrackers) {
+      const trackers = hls.p2pEngine.getConfig().core.announceTrackers;
+      updateTrackers([...trackers]);
+    }
+
     return () => hls.destroy();
   }, [
     onPeerConnect,
     onPeerDisconnect,
     onChunkDownloaded,
     onChunkUploaded,
+    updateTrackers,
     streamUrl,
   ]);
 
   return (
     <div className="video-container">
-      <video ref={videoRef} autoPlay controls style={{ width: 800 }} />
+      <video ref={videoRef} autoPlay controls />
     </div>
   );
 };
