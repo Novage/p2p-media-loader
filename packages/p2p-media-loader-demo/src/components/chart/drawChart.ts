@@ -3,16 +3,16 @@ import { ChartsData } from "./DownloadStatsChart";
 import * as d3 from "d3";
 
 export const drawChart = (
-  svgRef: React.RefObject<SVGSVGElement>,
+  svgElement: SVGSVGElement | null,
   data: ChartsData[],
 ) => {
-  if (!svgRef.current) return;
+  if (!svgElement) return;
 
   const margin = { top: 20, right: 2, bottom: 30, left: 25 },
-    width = svgRef.current.clientWidth - margin.left - margin.right,
-    height = svgRef.current.clientHeight - margin.top - margin.bottom;
+    width = svgElement.clientWidth - margin.left - margin.right,
+    height = svgElement.clientHeight - margin.top - margin.bottom;
 
-  const svg = d3.select(svgRef.current);
+  const svg = d3.select(svgElement);
   svg
     .selectAll("g")
     .data([null])

@@ -69,7 +69,7 @@ export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
 
   const [svgDimensions, setSvgDimensions] = useState(XL_CHART_DIMENSIONS);
 
-  const svgRef = useRef(null);
+  const svgRef = useRef<SVGSVGElement>(null);
 
   const updateSvgDimensions = useCallback(() => {
     const clientWidth = document.documentElement.clientWidth;
@@ -139,7 +139,7 @@ export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
   useEffect(() => {
     if (!svgRef.current) return;
 
-    const svg = drawChart(svgRef, data);
+    const svg = drawChart(svgRef.current, data);
 
     return () => {
       svg?.selectAll("*").remove();
