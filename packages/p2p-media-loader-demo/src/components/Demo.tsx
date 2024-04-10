@@ -3,10 +3,11 @@ import { PlaybackOptions } from "./PlaybackOptions";
 import { PLAYERS } from "../constants";
 import { useQueryParams } from "../hooks/useQueryParams";
 import { HlsjsPlayer } from "./players/Hlsjs";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { DownloadStatsChart } from "./chart/DownloadStatsChart";
 import "./demo.css";
 import { NodeNetwork } from "./nodeNetwork/NodeNetwork";
+import { DebugTools } from "./debugTools/DebugTools";
 
 declare global {
   interface Window {
@@ -23,7 +24,11 @@ export type DownloadStats = {
 
 export type Player = (typeof PLAYERS)[number];
 
-export const Demo = () => {
+type DemoProps = {
+  debugToolsEnabled?: boolean;
+};
+
+export const Demo = ({ debugToolsEnabled }: DemoProps) => {
   const data = useRef<DownloadStats>({
     httpDownloaded: 0,
     p2pDownloaded: 0,
@@ -31,10 +36,13 @@ export const Demo = () => {
   });
 
   const { queryParams, setURLQueryParams } = useQueryParams<
-    "player" | "streamUrl"
+    "player" | "streamUrl" | "trackers"
   >();
 
-  const [trackers, setTrackers] = useState<string[]>([]);
+  const trackers = useMemo(
+    () => queryParams.trackers.split(","),
+    [queryParams.trackers],
+  );
 
   const [peers, setPeers] = useState<string[]>([]);
 
@@ -75,21 +83,17 @@ export const Demo = () => {
     setURLQueryParams({ streamUrl: url, player });
   };
 
-  const handleTrackersUpdate = useCallback((trackers: string[]) => {
-    setTrackers(trackers);
-  }, []);
-
   const renderPlayer = () => {
     switch (queryParams.player) {
       case "hlsjs":
         return (
           <HlsjsPlayer
             streamUrl={queryParams.streamUrl}
+            announceTrackers={trackers}
             onPeerConnect={onPeerConnect}
             onPeerDisconnect={onPeerDisconnect}
             onChunkDownloaded={onChunkDownloaded}
             onChunkUploaded={onChunkUploaded}
-            updateTrackers={handleTrackersUpdate}
           />
         );
       default:
@@ -98,34 +102,37 @@ export const Demo = () => {
   };
 
   return (
-    <div className="container">
-      <div className="column-1">
-        {renderPlayer()}
-        <DownloadStatsChart downloadStatsRef={data} />
-      </div>
-
-      <div className="column-2">
-        <div style={{ display: "flex" }}>
-          <PlaybackOptions
-            updatePlaybackOptions={handlePlaybackOptionsUpdate}
-            currentPlayer={queryParams.player}
-            streamUrl={queryParams.streamUrl}
-          />
+    <>
+      <div className="container">
+        <div className="column-1">
+          {renderPlayer()}
+          <DownloadStatsChart downloadStatsRef={data} />
         </div>
 
-        <NodeNetwork peers={peers} />
-
-        {trackers.length > 0 && (
-          <div className="trackers-container">
-            <span>Trackers:</span>
-            <ul className="trackers-list">
-              {trackers.map((tracker) => (
-                <li key={tracker}>{tracker}</li>
-              ))}
-            </ul>
+        <div className="column-2">
+          <div style={{ display: "flex" }}>
+            <PlaybackOptions
+              updatePlaybackOptions={handlePlaybackOptionsUpdate}
+              currentPlayer={queryParams.player}
+              streamUrl={queryParams.streamUrl}
+            />
           </div>
-        )}
+
+          <NodeNetwork peers={peers} />
+
+          {trackers.length > 0 && (
+            <div className="trackers-container">
+              <span>Trackers:</span>
+              <ul className="trackers-list">
+                {trackers.map((tracker) => (
+                  <li key={tracker}>{tracker}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+      {debugToolsEnabled && <DebugTools />}
+    </>
   );
 };

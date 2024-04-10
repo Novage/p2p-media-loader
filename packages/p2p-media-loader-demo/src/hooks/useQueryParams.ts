@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { DEFAULT_STREAM, PLAYERS } from "../constants";
+import { DEFAULT_STREAM, DEFAULT_TRACKERS, PLAYERS } from "../constants";
 
 type QueryParamsType = Record<string, string>;
 
@@ -7,6 +7,7 @@ export function useQueryParams<T extends string>() {
   const [queryParams, setQueryParams] = useState<QueryParamsType>({
     player: PLAYERS[0],
     streamUrl: DEFAULT_STREAM,
+    trackers: DEFAULT_TRACKERS,
   });
 
   const updateQueryParamsFromURL = useCallback(() => {

@@ -1,7 +1,7 @@
 import { debug } from "p2p-media-loader-core";
 import { useCallback, useEffect, useState } from "react";
 
-export const DebugOptions = () => {
+export const DebugSelector = () => {
   const [activeLoggers, setActiveLoggers] = useLocalStorageItem<string[]>(
     "debug",
     [],
