@@ -85,7 +85,7 @@ export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
       newDimensions = SM_CHART_DIMENSIONS;
     } else {
       newDimensions = {
-        width: clientWidth < 320 ? 320 : clientWidth - 30,
+        width: clientWidth < 350 ? 320 : clientWidth - 30,
         height: 310,
       };
     }

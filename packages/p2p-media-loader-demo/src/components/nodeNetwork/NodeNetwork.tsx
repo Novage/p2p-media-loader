@@ -48,10 +48,7 @@ export const NodeNetwork = ({ peers }: GraphNetworkProps) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const networkDataRef = useRef(DEFAULT_GRAPH_DATA);
   const simulationRef = useRef<d3.Simulation<Node, Link> | null>(null);
-  const [svgDimensions, setSvgDimensions] = useState({
-    width: 380,
-    height: 400,
-  });
+  const [svgDimensions, setSvgDimensions] = useState(XL_NETWORK_DIMENSIONS);
 
   const updateSvgDimensions = useCallback(() => {
     const clientWidth = document.documentElement.clientWidth;
@@ -69,7 +66,7 @@ export const NodeNetwork = ({ peers }: GraphNetworkProps) => {
       newDimensions = SM_NETWORK_DIMENSIONS;
     } else {
       newDimensions = {
-        width: clientWidth < 320 ? 320 : clientWidth - 30,
+        width: clientWidth < 350 ? 320 : clientWidth - 30,
         height: 250,
       };
     }
