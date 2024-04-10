@@ -85,7 +85,7 @@ export const NodeNetwork = ({ peers }: GraphNetworkProps) => {
       networkDataRef.current.nodes,
       networkDataRef.current.links,
       simulationRef.current,
-      svgRef,
+      svgRef.current,
     );
   }, []);
 
@@ -147,7 +147,7 @@ export const NodeNetwork = ({ peers }: GraphNetworkProps) => {
       newNetworkData.nodes,
       newNetworkData.links,
       simulationRef.current,
-      svgRef,
+      svgRef.current,
     );
   }, [peers]);
 
