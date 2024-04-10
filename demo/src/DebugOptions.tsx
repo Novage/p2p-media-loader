@@ -77,14 +77,14 @@ function useLocalStorageItem<T>(
 }
 
 const loggers = [
-  "core:hybrid-loader-main",
-  "core:hybrid-loader-secondary",
-  "core:p2p-tracker-client",
-  "core:peer",
-  "core:p2p-loaders-container",
-  "core:request-main",
-  "core:request-secondary",
-  "core:segment-memory-storage",
+  "p2pml-core:hybrid-loader-main",
+  "p2pml-core:hybrid-loader-secondary",
+  "p2pml-core:p2p-tracker-client",
+  "p2pml-core:peer",
+  "p2pml-core:p2p-loaders-container",
+  "p2pml-core:request-main",
+  "p2pml-core:request-secondary",
+  "p2pml-core:segment-memory-storage",
 ] as const;
 
 const loggersToStorageItem = (list: string[]) => {
