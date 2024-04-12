@@ -37,7 +37,7 @@
     "types": "lib/index.d.ts"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "type-check": "tsc --noEmit",
     "clean": "rimraf lib dist build p2p-media-loader-demo-*.tgz",
@@ -52,13 +52,18 @@
   "devDependencies": {
     "@types/d3": "^7.4.3",
     "@types/dplayer": "^1.25.5",
+    "@types/node": "^20.12.7",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
+    "@vitejs/plugin-react": "^4.2.1",
     "eslint-plugin-react": "^7.34.1",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.6",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "vite-plugin-dts": "^3.8.1",
+    "vite-plugin-lib-inject-css": "^2.0.1",
+    "vite-plugin-node-polyfills": "^0.21.0"
   },
   "peerDependencies": {
     "react": ">=16",
