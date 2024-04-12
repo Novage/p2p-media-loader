@@ -28,7 +28,7 @@ type DemoProps = {
   debugToolsEnabled?: boolean;
 };
 
-export const Demo = ({ debugToolsEnabled }: DemoProps) => {
+export const DemoComponent = ({ debugToolsEnabled }: DemoProps) => {
   const data = useRef<DownloadStats>({
     httpDownloaded: 0,
     p2pDownloaded: 0,
@@ -103,7 +103,7 @@ export const Demo = ({ debugToolsEnabled }: DemoProps) => {
 
   return (
     <>
-      <div className="container">
+      <div className="demo-container">
         <div className="column-1">
           {renderPlayer()}
           <DownloadStatsChart downloadStatsRef={data} />

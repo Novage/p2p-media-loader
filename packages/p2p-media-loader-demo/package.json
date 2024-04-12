@@ -37,7 +37,8 @@
     "types": "lib/index.d.ts"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "pnpm clean && tsc && pnpm copy-css",
+    "copy-css": "cpy \"src/**/*.css\" \"./lib/\" --parents",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "type-check": "tsc --noEmit",
     "clean": "rimraf lib dist build p2p-media-loader-demo-*.tgz",
@@ -54,6 +55,7 @@
     "@types/dplayer": "^1.25.5",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
+    "cpy-cli": "^5.0.0",
     "eslint-plugin-react": "^7.34.1",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.6",

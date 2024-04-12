@@ -1,6 +1,10 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "module": "ESNext",
+    "target": "ESNext",
+    "moduleResolution": "node",
+    "declaration": true,
     "outDir": "lib",
     "rootDir": "src",
     "tsBuildInfoFile": "./build/.tsbuildinfo",
