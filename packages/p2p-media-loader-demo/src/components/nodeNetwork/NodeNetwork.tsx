@@ -42,8 +42,6 @@ export const NodeNetwork = ({ peers }: GraphNetworkProps) => {
       height: clientWidth > 380 ? 250 : 400,
     };
 
-    if (!newDimensions) return;
-
     setSvgDimensions(newDimensions);
 
     simulationRef.current?.stop();

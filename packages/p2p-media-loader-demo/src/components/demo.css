@@ -12,6 +12,12 @@
   width: 100%;
 }
 
+@media (max-width: 575px) {
+  .demo-container {
+    min-width: 320px;
+  }
+}
+
 @media (min-width: 576px) {
   .demo-container {
     max-width: 540px;
