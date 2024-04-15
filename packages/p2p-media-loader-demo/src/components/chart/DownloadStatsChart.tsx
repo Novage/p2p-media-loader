@@ -37,26 +37,6 @@ type StoredData = {
   totalDownloaded: number;
 } & DownloadStats;
 
-const XL_CHART_DIMENSIONS = {
-  width: 730,
-  height: 310,
-};
-
-const L_CHART_DIMENSIONS = {
-  width: 610,
-  height: 310,
-};
-
-const MD_CHART_DIMENSIONS = {
-  width: 440,
-  height: 310,
-};
-
-const SM_CHART_DIMENSIONS = {
-  width: 540,
-  height: 310,
-};
-
 export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
   const [data, setData] = useState<ChartsData[]>(generateInitialStackedData());
 
@@ -67,33 +47,25 @@ export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
     p2pUploaded: 0,
   });
 
-  const [svgDimensions, setSvgDimensions] = useState(XL_CHART_DIMENSIONS);
+  const [svgDimensions, setSvgDimensions] = useState({
+    width: 0,
+    height: 0,
+  });
 
   const svgRef = useRef<SVGSVGElement>(null);
+  const svgContainerRef = useRef<HTMLDivElement>(null);
 
   const updateSvgDimensions = useCallback(() => {
-    const clientWidth = document.documentElement.clientWidth;
-    let newDimensions;
+    if (!svgContainerRef.current) return;
 
-    if (clientWidth > 1200) {
-      newDimensions = XL_CHART_DIMENSIONS;
-    } else if (clientWidth > 992) {
-      newDimensions = L_CHART_DIMENSIONS;
-    } else if (clientWidth > 768) {
-      newDimensions = MD_CHART_DIMENSIONS;
-    } else if (clientWidth > 576) {
-      newDimensions = SM_CHART_DIMENSIONS;
-    } else {
-      newDimensions = {
-        width: clientWidth < 350 ? 320 : clientWidth - 30,
-        height: 310,
-      };
-    }
-
-    if (!newDimensions) return;
+    const clientWidth = svgContainerRef.current.clientWidth;
+    const newDimensions = {
+      width: clientWidth,
+      height: 310,
+    };
 
     setSvgDimensions(newDimensions);
-  }, []);
+  }, [svgContainerRef]);
 
   useEffect(() => {
     updateSvgDimensions();
@@ -147,7 +119,7 @@ export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
   }, [data, svgDimensions]);
 
   return (
-    <div className="chart-container">
+    <div ref={svgContainerRef} className="chart-container">
       <div className="legend-container">
         <ChartLegend
           legendItems={[
