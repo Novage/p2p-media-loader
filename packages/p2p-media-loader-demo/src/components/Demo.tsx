@@ -1,6 +1,6 @@
 import type Hls from "hls.js";
 import { PlaybackOptions } from "./PlaybackOptions";
-import { PLAYERS } from "../constants";
+import { DEFAULT_TRACKERS, PLAYERS } from "../constants";
 import { useQueryParams } from "../hooks/useQueryParams";
 import { HlsjsPlayer } from "./players/Hlsjs";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -40,7 +40,9 @@ export const DemoComponent = ({ debugToolsEnabled }: DemoProps) => {
   >();
 
   const trackers = useMemo(
-    () => queryParams.trackers.split(","),
+    () =>
+      (queryParams.trackers && queryParams.trackers.split(",")) ||
+      DEFAULT_TRACKERS.split(","),
     [queryParams.trackers],
   );
 
