@@ -1,1 +1,1 @@
-export { DemoComponent } from "./components/Demo";
+export { P2PVideoDemo } from "./components/P2PVideoDemo";

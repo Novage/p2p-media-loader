@@ -40,7 +40,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "pnpm build:es && pnpm build:esm && pnpm build:esm-min",
+    "build": "rimraf lib build && pnpm build:es && pnpm build:esm && pnpm build:esm-min",
     "build:esm": "vite build --mode esm",
     "build:esm-min": "vite build --mode esm-min",
     "build:es": "tsc",

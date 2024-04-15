@@ -37,7 +37,7 @@
     "types": "lib/index.d.ts"
   },
   "scripts": {
-    "build": "pnpm clean && tsc && pnpm copy-css",
+    "build": "rimraf lib build && tsc && pnpm copy-css",
     "copy-css": "cpy \"src/**/*.css\" \"./lib/\" --parents",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "type-check": "tsc --noEmit",

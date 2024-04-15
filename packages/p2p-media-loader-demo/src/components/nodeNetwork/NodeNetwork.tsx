@@ -108,11 +108,17 @@ export const NodeNetwork = ({ peers }: GraphNetworkProps) => {
       DEFAULT_NODE,
     ];
 
-    const allLinks = peers.map((peerId) => ({
-      source: DEFAULT_NODE,
-      target: allNodes.find((n) => n.id === peerId)!,
-      linkId: `${DEFAULT_PEER_ID}-${peerId}`,
-    }));
+    const allLinks = peers.map((peerId) => {
+      const target = allNodes.find((n) => n.id === peerId);
+
+      if (!target) throw new Error("Target node not found");
+
+      return {
+        source: DEFAULT_NODE,
+        target,
+        linkId: `${DEFAULT_PEER_ID}-${peerId}`,
+      };
+    });
 
     const networkData = networkDataRef.current;
 

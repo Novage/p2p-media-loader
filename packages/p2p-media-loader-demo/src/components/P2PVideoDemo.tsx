@@ -28,7 +28,7 @@ type DemoProps = {
   debugToolsEnabled?: boolean;
 };
 
-export const DemoComponent = ({ debugToolsEnabled }: DemoProps) => {
+export const P2PVideoDemo = ({ debugToolsEnabled }: DemoProps) => {
   const data = useRef<DownloadStats>({
     httpDownloaded: 0,
     p2pDownloaded: 0,

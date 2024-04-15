@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DownloadStats } from "../Demo";
+import { DownloadStats } from "../P2PVideoDemo";
 import { COLORS } from "../../constants";
 import "./chart.css";
 import { ChartLegend } from "./ChartLegend";
