@@ -1,3 +1,4 @@
+import "./demo.css";
 import type Hls from "hls.js";
 import { PlaybackOptions } from "./PlaybackOptions";
 import { DEFAULT_TRACKERS, PLAYERS } from "../constants";
@@ -5,7 +6,6 @@ import { useQueryParams } from "../hooks/useQueryParams";
 import { HlsjsPlayer } from "./players/Hlsjs";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { DownloadStatsChart } from "./chart/DownloadStatsChart";
-import "./demo.css";
 import { NodeNetwork } from "./nodeNetwork/NodeNetwork";
 import { DebugTools } from "./debugTools/DebugTools";
 

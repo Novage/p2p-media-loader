@@ -1,3 +1,4 @@
+import "./network.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 import {
@@ -7,7 +8,6 @@ import {
   prepareGroups,
   createSimulation,
 } from "./network";
-import "./network.css";
 
 type GraphNetworkProps = {
   peers: string[];
