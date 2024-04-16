@@ -22,9 +22,6 @@
   .demo-container {
     max-width: 540px;
   }
-  .column-1 {
-    width: 100%;
-  }
 }
 
 @media (min-width: 768px) {

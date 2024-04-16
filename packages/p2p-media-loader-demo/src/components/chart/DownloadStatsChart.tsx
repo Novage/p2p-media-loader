@@ -1,5 +1,5 @@
 import "./chart.css";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DownloadStats } from "../P2PVideoDemo";
 import { COLORS } from "../../constants";
 import { ChartLegend } from "./ChartLegend";
@@ -37,6 +37,11 @@ type StoredData = {
   totalDownloaded: number;
 } & DownloadStats;
 
+type SvgDimensionsType = {
+  width: number;
+  height: number;
+};
+
 export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
   const [data, setData] = useState<ChartsData[]>(generateInitialStackedData());
 
@@ -47,7 +52,7 @@ export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
     p2pUploaded: 0,
   });
 
-  const [svgDimensions, setSvgDimensions] = useState({
+  const [svgDimensions, setSvgDimensions] = useState<SvgDimensionsType>({
     width: 0,
     height: 0,
   });
@@ -55,21 +60,18 @@ export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const svgContainerRef = useRef<HTMLDivElement>(null);
 
-  const updateSvgDimensions = useCallback(() => {
-    if (!svgContainerRef.current) return;
+  const handleChartResize = (entries: ResizeObserverEntry[]) => {
+    const entry = entries[0];
 
-    const clientWidth = svgContainerRef.current.clientWidth;
     const newDimensions = {
-      width: clientWidth,
+      width: entry.contentRect.width,
       height: 310,
     };
 
     setSvgDimensions(newDimensions);
-  }, [svgContainerRef]);
+  };
 
   useEffect(() => {
-    updateSvgDimensions();
-
     const intervalID = setInterval(() => {
       if (!downloadStatsRef.current) return;
 
@@ -100,13 +102,17 @@ export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
       downloadStatsRef.current.p2pUploaded = 0;
     }, 1000);
 
-    window.addEventListener("resize", updateSvgDimensions);
+    const resizeObserver = new ResizeObserver(handleChartResize);
+
+    if (svgContainerRef.current) {
+      resizeObserver.observe(svgContainerRef.current);
+    }
 
     return () => {
       clearInterval(intervalID);
-      window.removeEventListener("resize", updateSvgDimensions);
+      resizeObserver.disconnect();
     };
-  }, [downloadStatsRef, updateSvgDimensions]);
+  }, [downloadStatsRef]);
 
   useEffect(() => {
     if (!svgRef.current) return;

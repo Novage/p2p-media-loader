@@ -1,5 +1,5 @@
 import "./network.css";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 import {
   Link,
@@ -20,26 +20,28 @@ const DEFAULT_GRAPH_DATA = {
   links: [] as Link[],
 };
 
+type SvgDimensionsType = {
+  width: number;
+  height: number;
+};
+
 export const NodeNetwork = ({ peers }: GraphNetworkProps) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const svgContainerRef = useRef<HTMLDivElement>(null);
-
   const networkDataRef = useRef(DEFAULT_GRAPH_DATA);
   const simulationRef = useRef<d3.Simulation<Node, Link> | null>(null);
 
-  const [svgDimensions, setSvgDimensions] = useState({
+  const [svgDimensions, setSvgDimensions] = useState<SvgDimensionsType>({
     width: 0,
     height: 0,
   });
 
-  const updateSvgDimensions = useCallback(() => {
-    if (!svgContainerRef.current) return;
-
-    const clientWidth = svgContainerRef.current.clientWidth;
+  const handleResize = (entries: ResizeObserverEntry[]) => {
+    const entry = entries[0];
 
     const newDimensions = {
-      width: clientWidth,
-      height: clientWidth > 380 ? 250 : 400,
+      width: entry.contentRect.width,
+      height: entry.contentRect.width > 380 ? 250 : 400,
     };
 
     setSvgDimensions(newDimensions);
@@ -56,20 +58,23 @@ export const NodeNetwork = ({ peers }: GraphNetworkProps) => {
       simulationRef.current,
       svgRef.current,
     );
-  }, []);
+  };
 
   useEffect(() => {
     if (!svgRef.current) return;
 
-    updateSvgDimensions();
     prepareGroups(svgRef.current);
 
-    window.addEventListener("resize", updateSvgDimensions);
+    const resizeObserver = new ResizeObserver(handleResize);
+
+    if (svgContainerRef.current) {
+      resizeObserver.observe(svgContainerRef.current);
+    }
 
     return () => {
-      window.removeEventListener("resize", updateSvgDimensions);
+      resizeObserver.disconnect();
     };
-  }, [updateSvgDimensions]);
+  }, []);
 
   useEffect(() => {
     const allNodes = [
@@ -133,7 +138,7 @@ export const NodeNetwork = ({ peers }: GraphNetworkProps) => {
         ref={svgRef}
         width={svgDimensions.width}
         height={svgDimensions.height}
-      ></svg>
+      />
     </div>
   );
 };

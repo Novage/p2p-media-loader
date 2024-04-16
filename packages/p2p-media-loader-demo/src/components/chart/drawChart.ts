@@ -8,7 +8,7 @@ export const drawChart = (
 ) => {
   if (!svgElement) return;
 
-  const margin = { top: 20, right: 2, bottom: 30, left: 25 },
+  const margin = { top: 20, right: 1, bottom: 30, left: 25 },
     width = svgElement.clientWidth - margin.left - margin.right,
     height = svgElement.clientHeight - margin.top - margin.bottom;
 
