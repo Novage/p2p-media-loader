@@ -1,7 +1,7 @@
 import "./demo.css";
 import type Hls from "hls.js";
 import { PlaybackOptions } from "./PlaybackOptions";
-import { DEFAULT_TRACKERS, PLAYERS } from "../constants";
+import { PLAYERS } from "../constants";
 import { useQueryParams } from "../hooks/useQueryParams";
 import { HlsjsPlayer } from "./players/Hlsjs";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -35,14 +35,10 @@ export const P2PVideoDemo = ({ debugToolsEnabled }: DemoProps) => {
     p2pUploaded: 0,
   });
 
-  const { queryParams, setURLQueryParams } = useQueryParams<
-    "player" | "streamUrl" | "trackers"
-  >();
+  const { queryParams, setURLQueryParams } = useQueryParams();
 
   const trackers = useMemo(
-    () =>
-      (queryParams.trackers && queryParams.trackers.split(",")) ||
-      DEFAULT_TRACKERS.split(","),
+    () => queryParams.trackers.split(","),
     [queryParams.trackers],
   );
 
