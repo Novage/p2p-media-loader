@@ -1,5 +1,5 @@
 import { COLORS } from "../../constants";
-import { ChartsData } from "./DownloadStatsChart";
+import { ChartsData } from "./../../types";
 import * as d3 from "d3";
 
 export const drawChart = (

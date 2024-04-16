@@ -8,6 +8,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { DownloadStatsChart } from "./chart/DownloadStatsChart";
 import { NodeNetwork } from "./nodeNetwork/NodeNetwork";
 import { DebugTools } from "./debugTools/DebugTools";
+import { DownloadStats } from "../types";
 
 declare global {
   interface Window {
@@ -15,12 +16,6 @@ declare global {
     videoPlayer?: { destroy?: () => void };
   }
 }
-
-export type DownloadStats = {
-  httpDownloaded: number;
-  p2pDownloaded: number;
-  p2pUploaded: number;
-};
 
 export type Player = (typeof PLAYERS)[number];
 

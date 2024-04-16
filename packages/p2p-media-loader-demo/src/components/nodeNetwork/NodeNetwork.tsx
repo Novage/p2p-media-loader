@@ -8,6 +8,7 @@ import {
   prepareGroups,
   createSimulation,
 } from "./network";
+import { SvgDimensionsType } from "../../types";
 
 type GraphNetworkProps = {
   peers: string[];
@@ -18,11 +19,6 @@ const DEFAULT_NODE: Node = { id: DEFAULT_PEER_ID, isMain: true };
 const DEFAULT_GRAPH_DATA = {
   nodes: [DEFAULT_NODE],
   links: [] as Link[],
-};
-
-type SvgDimensionsType = {
-  width: number;
-  height: number;
 };
 
 export const NodeNetwork = ({ peers }: GraphNetworkProps) => {

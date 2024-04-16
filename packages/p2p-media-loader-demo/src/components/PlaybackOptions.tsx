@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { PLAYERS } from "../constants";
+
 type PlaybackOptions = {
   updatePlaybackOptions: (url: string, player: string) => void;
   currentPlayer: string;

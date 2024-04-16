@@ -1,6 +1,6 @@
 import "./chart.css";
 import { useEffect, useRef, useState } from "react";
-import { DownloadStats } from "../P2PVideoDemo";
+import { DownloadStats, ChartsData } from "../../types";
 import { COLORS } from "../../constants";
 import { ChartLegend } from "./ChartLegend";
 import { drawChart } from "./drawChart";
@@ -28,10 +28,6 @@ const calculatePercentage = (part: number, total: number) => {
 type StatsChartProps = {
   downloadStatsRef: React.RefObject<DownloadStats>;
 };
-
-export type ChartsData = {
-  seconds: number;
-} & DownloadStats;
 
 type StoredData = {
   totalDownloaded: number;
