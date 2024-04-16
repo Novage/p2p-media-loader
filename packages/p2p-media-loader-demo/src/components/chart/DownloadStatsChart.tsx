@@ -1,6 +1,6 @@
 import "./chart.css";
-import { useEffect, useRef, useState } from "react";
-import { DownloadStats, ChartsData } from "../../types";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { DownloadStats, ChartsData, SvgDimensionsType } from "../../types";
 import { COLORS } from "../../constants";
 import { ChartLegend } from "./ChartLegend";
 import { drawChart } from "./drawChart";
@@ -33,11 +33,6 @@ type StoredData = {
   totalDownloaded: number;
 } & DownloadStats;
 
-type SvgDimensionsType = {
-  width: number;
-  height: number;
-};
-
 export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
   const [data, setData] = useState<ChartsData[]>(generateInitialStackedData());
 
@@ -67,7 +62,7 @@ export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
     setSvgDimensions(newDimensions);
   };
 
-  useEffect(() => {
+  const initStatsTracker = useCallback(() => {
     const intervalID = setInterval(() => {
       if (!downloadStatsRef.current) return;
 
@@ -98,17 +93,22 @@ export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
       downloadStatsRef.current.p2pUploaded = 0;
     }, 1000);
 
+    return () => {
+      clearInterval(intervalID);
+    };
+  }, [downloadStatsRef]);
+
+  useEffect(() => {
+    initStatsTracker();
+
     const resizeObserver = new ResizeObserver(handleChartResize);
 
     if (svgContainerRef.current) {
       resizeObserver.observe(svgContainerRef.current);
     }
 
-    return () => {
-      clearInterval(intervalID);
-      resizeObserver.disconnect();
-    };
-  }, [downloadStatsRef]);
+    return () => resizeObserver.disconnect();
+  }, [initStatsTracker]);
 
   useEffect(() => {
     if (!svgRef.current) return;
