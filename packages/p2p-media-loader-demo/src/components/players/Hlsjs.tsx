@@ -4,6 +4,7 @@ import Hls from "hls.js";
 
 type HlsjsPlayerProps = {
   streamUrl: string;
+  announceTrackers: string[];
   onPeerConnect?: (peerId: string) => void;
   onPeerDisconnect?: (peerId: string) => void;
   onChunkDownloaded?: (bytesLength: number, downloadSource: string) => void;
@@ -13,6 +14,7 @@ const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
 
 export const HlsjsPlayer = ({
   streamUrl,
+  announceTrackers,
   onPeerConnect,
   onPeerDisconnect,
   onChunkDownloaded,
@@ -22,7 +24,14 @@ export const HlsjsPlayer = ({
 
   useEffect(() => {
     if (!videoRef.current) return;
-    const hls = new HlsWithP2P();
+
+    const hls = new HlsWithP2P({
+      p2p: {
+        core: {
+          announceTrackers,
+        },
+      },
+    });
 
     if (onPeerConnect) {
       hls.p2pEngine.addEventListener("onPeerConnect", onPeerConnect);
@@ -47,11 +56,12 @@ export const HlsjsPlayer = ({
     onChunkDownloaded,
     onChunkUploaded,
     streamUrl,
+    announceTrackers,
   ]);
 
   return (
     <div className="video-container">
-      <video ref={videoRef} autoPlay controls style={{ width: 800 }} />
+      <video ref={videoRef} autoPlay controls />
     </div>
   );
 };

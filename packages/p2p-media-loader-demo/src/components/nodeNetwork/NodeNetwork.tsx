@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import "./network.css";
+import { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 import {
   Link,
@@ -7,6 +8,7 @@ import {
   prepareGroups,
   createSimulation,
 } from "./network";
+import { SvgDimensionsType } from "../../types";
 
 type GraphNetworkProps = {
   peers: string[];
@@ -21,22 +23,52 @@ const DEFAULT_GRAPH_DATA = {
 
 export const NodeNetwork = ({ peers }: GraphNetworkProps) => {
   const svgRef = useRef<SVGSVGElement>(null);
+  const svgContainerRef = useRef<HTMLDivElement>(null);
   const networkDataRef = useRef(DEFAULT_GRAPH_DATA);
   const simulationRef = useRef<d3.Simulation<Node, Link> | null>(null);
+
+  const [svgDimensions, setSvgDimensions] = useState<SvgDimensionsType>({
+    width: 0,
+    height: 0,
+  });
 
   useEffect(() => {
     if (!svgRef.current) return;
 
-    const width = svgRef.current.clientWidth;
-    const height = svgRef.current.clientHeight;
-    const simulation = createSimulation(width, height);
+    const handleResize = (entries: ResizeObserverEntry[]) => {
+      const entry = entries[0];
 
-    simulationRef.current = simulation;
+      const newDimensions = {
+        width: entry.contentRect.width,
+        height: entry.contentRect.width > 380 ? 250 : 400,
+      };
+
+      setSvgDimensions(newDimensions);
+
+      simulationRef.current?.stop();
+      simulationRef.current = createSimulation(
+        newDimensions.width,
+        newDimensions.height,
+      );
+
+      updateGraph(
+        networkDataRef.current.nodes,
+        networkDataRef.current.links,
+        simulationRef.current,
+        svgRef.current,
+      );
+    };
 
     prepareGroups(svgRef.current);
 
+    const resizeObserver = new ResizeObserver(handleResize);
+
+    if (svgContainerRef.current) {
+      resizeObserver.observe(svgContainerRef.current);
+    }
+
     return () => {
-      simulation.stop();
+      resizeObserver.disconnect();
     };
   }, []);
 
@@ -46,11 +78,17 @@ export const NodeNetwork = ({ peers }: GraphNetworkProps) => {
       DEFAULT_NODE,
     ];
 
-    const allLinks = peers.map((peerId) => ({
-      source: DEFAULT_NODE,
-      target: allNodes.find((n) => n.id === peerId)!,
-      linkId: `${DEFAULT_PEER_ID}-${peerId}`,
-    }));
+    const allLinks = peers.map((peerId) => {
+      const target = allNodes.find((n) => n.id === peerId);
+
+      if (!target) throw new Error("Target node not found");
+
+      return {
+        source: DEFAULT_NODE,
+        target,
+        linkId: `${DEFAULT_PEER_ID}-${peerId}`,
+      };
+    });
 
     const networkData = networkDataRef.current;
 
@@ -85,18 +123,18 @@ export const NodeNetwork = ({ peers }: GraphNetworkProps) => {
       newNetworkData.nodes,
       newNetworkData.links,
       simulationRef.current,
-      svgRef,
+      svgRef.current,
     );
   }, [peers]);
 
   return (
-    <>
+    <div ref={svgContainerRef} className="node-container">
       <svg
+        className="node-network"
         ref={svgRef}
-        width="380"
-        height="400"
-        style={{ border: "1px solid black" }}
-      ></svg>
-    </>
+        width={svgDimensions.width}
+        height={svgDimensions.height}
+      />
+    </div>
   );
 };

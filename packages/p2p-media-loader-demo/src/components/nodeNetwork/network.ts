@@ -44,16 +44,16 @@ export const updateGraph = (
   newNodes: Node[],
   newLinks: Link[],
   simulation: d3.Simulation<Node, Link> | null,
-  svgRef: React.MutableRefObject<SVGSVGElement | null>,
+  svgElement: SVGSVGElement | null,
 ) => {
-  if (!simulation || !svgRef.current) return;
+  if (!simulation || !svgElement) return;
 
   simulation.nodes(newNodes);
   simulation.force<d3.ForceLink<Node, Link>>("link")?.links(newLinks);
   simulation.alpha(0.5).restart();
 
   const link = d3
-    .select(svgRef.current)
+    .select(svgElement)
     .select(".links")
     .selectAll<SVGLineElement, Link>("line")
     .data(newLinks, getLinkText);
@@ -75,7 +75,7 @@ export const updateGraph = (
     .on("end", removeD3Item);
 
   const node = d3
-    .select(svgRef.current)
+    .select(svgElement)
     .select(".nodes")
     .selectAll<SVGCircleElement, Node>("circle")
     .data(newNodes, getNodeId);
@@ -93,7 +93,7 @@ export const updateGraph = (
   node.exit().transition().duration(200).attr("r", 0).remove();
 
   const text = d3
-    .select(svgRef.current)
+    .select(svgElement)
     .select(".nodes")
     .selectAll<SVGTextElement, Node>("text")
     .data(newNodes, getNodeId);
@@ -119,7 +119,7 @@ export const updateGraph = (
     .on("end", removeD3Item);
 
   simulation.on("tick", () => {
-    d3.select(svgRef.current)
+    d3.select(svgElement)
       .select(".links")
       .selectAll<SVGLineElement, Link>("line")
       .attr("x1", (d) => d.source.x ?? 0)
@@ -127,13 +127,13 @@ export const updateGraph = (
       .attr("x2", (d) => d.target.x ?? 0)
       .attr("y2", (d) => d.target.y ?? 0);
 
-    d3.select(svgRef.current)
+    d3.select(svgElement)
       .select(".nodes")
       .selectAll<SVGCircleElement, Node>("circle")
       .attr("cx", (d) => d.x ?? 0)
       .attr("cy", (d) => d.y ?? 0);
 
-    d3.select(svgRef.current)
+    d3.select(svgElement)
       .select(".nodes")
       .selectAll<SVGTextElement, Node>("text")
       .attr("x", (d) => d.x ?? 0)
@@ -176,8 +176,13 @@ const drag = (simulation: d3.Simulation<Node, Link>) => {
 };
 
 export const prepareGroups = (svg: SVGElement) => {
-  d3.select(svg).append("g").attr("class", "links");
-  d3.select(svg).append("g").attr("class", "nodes");
+  if (d3.select(svg).select("g.links").empty()) {
+    d3.select(svg).append("g").attr("class", "links");
+  }
+
+  if (d3.select(svg).select("g.nodes").empty()) {
+    d3.select(svg).append("g").attr("class", "nodes");
+  }
 };
 
 export const createSimulation = (width: number, height: number) => {

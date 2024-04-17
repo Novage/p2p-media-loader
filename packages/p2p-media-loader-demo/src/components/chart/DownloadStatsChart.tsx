@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useState } from "react";
-import { DownloadStats } from "../Demo";
-import { COLORS } from "../../constants";
 import "./chart.css";
+import { useEffect, useRef, useState } from "react";
+import { DownloadStats, ChartsData, SvgDimensionsType } from "../../types";
+import { COLORS } from "../../constants";
 import { ChartLegend } from "./ChartLegend";
 import { drawChart } from "./drawChart";
 
@@ -29,23 +29,27 @@ type StatsChartProps = {
   downloadStatsRef: React.RefObject<DownloadStats>;
 };
 
-export type ChartsData = {
-  seconds: number;
-} & DownloadStats;
-
 type StoredData = {
   totalDownloaded: number;
 } & DownloadStats;
 
 export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
   const [data, setData] = useState<ChartsData[]>(generateInitialStackedData());
+
   const [storedData, setStoredData] = useState<StoredData>({
     totalDownloaded: 0,
     httpDownloaded: 0,
     p2pDownloaded: 0,
     p2pUploaded: 0,
   });
-  const svgRef = useRef(null);
+
+  const [svgDimensions, setSvgDimensions] = useState<SvgDimensionsType>({
+    width: 0,
+    height: 0,
+  });
+
+  const svgRef = useRef<SVGSVGElement>(null);
+  const svgContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const intervalID = setInterval(() => {
@@ -78,21 +82,44 @@ export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
       downloadStatsRef.current.p2pUploaded = 0;
     }, 1000);
 
-    return () => clearInterval(intervalID);
+    return () => {
+      clearInterval(intervalID);
+    };
   }, [downloadStatsRef]);
+
+  useEffect(() => {
+    const handleChartResize = (entries: ResizeObserverEntry[]) => {
+      const entry = entries[0];
+
+      const newDimensions = {
+        width: entry.contentRect.width,
+        height: 310,
+      };
+
+      setSvgDimensions(newDimensions);
+    };
+
+    const resizeObserver = new ResizeObserver(handleChartResize);
+
+    if (svgContainerRef.current) {
+      resizeObserver.observe(svgContainerRef.current);
+    }
+
+    return () => resizeObserver.disconnect();
+  }, []);
 
   useEffect(() => {
     if (!svgRef.current) return;
 
-    const svg = drawChart(svgRef, data);
+    const svg = drawChart(svgRef.current, data);
 
     return () => {
       svg.selectAll("*").remove();
     };
-  }, [data]);
+  }, [data, svgDimensions]);
 
   return (
-    <div className="chart-container">
+    <div ref={svgContainerRef} className="chart-container">
       <div className="legend-container">
         <ChartLegend
           legendItems={[
@@ -135,7 +162,11 @@ export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
           ]}
         />
       </div>
-      <svg ref={svgRef} width={710} height={310} />
+      <svg
+        ref={svgRef}
+        width={svgDimensions.width}
+        height={svgDimensions.height}
+      />
     </div>
   );
 };
