@@ -2,12 +2,7 @@ import { COLORS } from "../../constants";
 import { ChartsData } from "./../../types";
 import * as d3 from "d3";
 
-export const drawChart = (
-  svgElement: SVGSVGElement | null,
-  data: ChartsData[],
-) => {
-  if (!svgElement) return;
-
+export const drawChart = (svgElement: SVGSVGElement, data: ChartsData[]) => {
   const margin = { top: 20, right: 1, bottom: 30, left: 25 },
     width = svgElement.clientWidth - margin.left - margin.right,
     height = svgElement.clientHeight - margin.top - margin.bottom;

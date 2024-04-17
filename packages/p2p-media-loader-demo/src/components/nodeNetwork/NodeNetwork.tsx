@@ -32,32 +32,32 @@ export const NodeNetwork = ({ peers }: GraphNetworkProps) => {
     height: 0,
   });
 
-  const handleResize = (entries: ResizeObserverEntry[]) => {
-    const entry = entries[0];
-
-    const newDimensions = {
-      width: entry.contentRect.width,
-      height: entry.contentRect.width > 380 ? 250 : 400,
-    };
-
-    setSvgDimensions(newDimensions);
-
-    simulationRef.current?.stop();
-    simulationRef.current = createSimulation(
-      newDimensions.width,
-      newDimensions.height,
-    );
-
-    updateGraph(
-      networkDataRef.current.nodes,
-      networkDataRef.current.links,
-      simulationRef.current,
-      svgRef.current,
-    );
-  };
-
   useEffect(() => {
     if (!svgRef.current) return;
+
+    const handleResize = (entries: ResizeObserverEntry[]) => {
+      const entry = entries[0];
+
+      const newDimensions = {
+        width: entry.contentRect.width,
+        height: entry.contentRect.width > 380 ? 250 : 400,
+      };
+
+      setSvgDimensions(newDimensions);
+
+      simulationRef.current?.stop();
+      simulationRef.current = createSimulation(
+        newDimensions.width,
+        newDimensions.height,
+      );
+
+      updateGraph(
+        networkDataRef.current.nodes,
+        networkDataRef.current.links,
+        simulationRef.current,
+        svgRef.current,
+      );
+    };
 
     prepareGroups(svgRef.current);
 

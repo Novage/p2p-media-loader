@@ -1,5 +1,5 @@
 import "./chart.css";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DownloadStats, ChartsData, SvgDimensionsType } from "../../types";
 import { COLORS } from "../../constants";
 import { ChartLegend } from "./ChartLegend";
@@ -51,18 +51,7 @@ export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const svgContainerRef = useRef<HTMLDivElement>(null);
 
-  const handleChartResize = (entries: ResizeObserverEntry[]) => {
-    const entry = entries[0];
-
-    const newDimensions = {
-      width: entry.contentRect.width,
-      height: 310,
-    };
-
-    setSvgDimensions(newDimensions);
-  };
-
-  const initStatsTracker = useCallback(() => {
+  useEffect(() => {
     const intervalID = setInterval(() => {
       if (!downloadStatsRef.current) return;
 
@@ -99,7 +88,16 @@ export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
   }, [downloadStatsRef]);
 
   useEffect(() => {
-    initStatsTracker();
+    const handleChartResize = (entries: ResizeObserverEntry[]) => {
+      const entry = entries[0];
+
+      const newDimensions = {
+        width: entry.contentRect.width,
+        height: 310,
+      };
+
+      setSvgDimensions(newDimensions);
+    };
 
     const resizeObserver = new ResizeObserver(handleChartResize);
 
@@ -108,7 +106,7 @@ export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
     }
 
     return () => resizeObserver.disconnect();
-  }, [initStatsTracker]);
+  }, []);
 
   useEffect(() => {
     if (!svgRef.current) return;
@@ -116,7 +114,7 @@ export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
     const svg = drawChart(svgRef.current, data);
 
     return () => {
-      svg?.selectAll("*").remove();
+      svg.selectAll("*").remove();
     };
   }, [data, svgDimensions]);
 
