@@ -9,6 +9,8 @@ import { DownloadStatsChart } from "./chart/DownloadStatsChart";
 import { NodeNetwork } from "./nodeNetwork/NodeNetwork";
 import { DebugTools } from "./debugTools/DebugTools";
 import { DownloadStats } from "../types";
+import { HlsjsDPlayer } from "./players/HlsjsDPLayer";
+import { HlsjsClapprPlayer } from "./players/HlsjsClapprPlayer";
 
 declare global {
   interface Window {
@@ -78,6 +80,28 @@ export const P2PVideoDemo = ({ debugToolsEnabled }: DemoProps) => {
 
   const renderPlayer = () => {
     switch (queryParams.player) {
+      case "hlsjs-clappr":
+        return (
+          <HlsjsClapprPlayer
+            streamUrl={queryParams.streamUrl}
+            announceTrackers={trackers}
+            onPeerConnect={onPeerConnect}
+            onPeerDisconnect={onPeerDisconnect}
+            onChunkDownloaded={onChunkDownloaded}
+            onChunkUploaded={onChunkUploaded}
+          />
+        );
+      case "hlsjs-dplayer":
+        return (
+          <HlsjsDPlayer
+            streamUrl={queryParams.streamUrl}
+            announceTrackers={trackers}
+            onPeerConnect={onPeerConnect}
+            onPeerDisconnect={onPeerDisconnect}
+            onChunkDownloaded={onChunkDownloaded}
+            onChunkUploaded={onChunkUploaded}
+          />
+        );
       case "hlsjs":
         return (
           <HlsjsPlayer
