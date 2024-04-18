@@ -3,6 +3,7 @@ export const PLAYERS = [
   "hlsjs-dplayer",
   "hlsjs-clappr",
   "hlsjs-vime",
+  "hlsjs-plyr",
 ] as const;
 export const DEFAULT_STREAM =
   "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8";
