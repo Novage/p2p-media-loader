@@ -49,6 +49,7 @@
     "d3": "^7.9.0",
     "dplayer": "^1.27.1",
     "hls.js": "^1.5.7",
+    "openplayerjs": "^2.14.3",
     "p2p-media-loader-core": "workspace:*",
     "p2p-media-loader-hlsjs": "workspace:*",
     "plyr": "^3.7.8"

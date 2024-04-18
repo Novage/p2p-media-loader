@@ -13,6 +13,7 @@ import { HlsjsDPlayer } from "./players/HlsjsDPLayer";
 import { HlsjsClapprPlayer } from "./players/HlsjsClapprPlayer";
 import { HlsjsVime } from "./players/HlsjsVime";
 import { HlsjsPlyr } from "./players/HlsjsPlyr";
+import { HlsjsOpenPlayer } from "./players/HlsjsOpenPlayer";
 
 declare global {
   interface Window {
@@ -82,6 +83,18 @@ export const P2PVideoDemo = ({ debugToolsEnabled }: DemoProps) => {
 
   const renderPlayer = () => {
     switch (queryParams.player) {
+      case "hlsjs-openplayer":
+        return (
+          <HlsjsOpenPlayer
+            streamUrl={queryParams.streamUrl}
+            announceTrackers={trackers}
+            onPeerConnect={onPeerConnect}
+            onPeerDisconnect={onPeerDisconnect}
+            onChunkDownloaded={onChunkDownloaded}
+            onChunkUploaded={onChunkUploaded}
+          />
+        );
+
       case "hlsjs-plyr":
         return (
           <HlsjsPlyr
@@ -117,6 +130,7 @@ export const P2PVideoDemo = ({ debugToolsEnabled }: DemoProps) => {
             onChunkUploaded={onChunkUploaded}
           />
         );
+
       case "hlsjs-dplayer":
         return (
           <HlsjsDPlayer
@@ -128,6 +142,7 @@ export const P2PVideoDemo = ({ debugToolsEnabled }: DemoProps) => {
             onChunkUploaded={onChunkUploaded}
           />
         );
+
       case "hlsjs":
         return (
           <HlsjsPlayer
@@ -139,6 +154,7 @@ export const P2PVideoDemo = ({ debugToolsEnabled }: DemoProps) => {
             onChunkUploaded={onChunkUploaded}
           />
         );
+
       default:
         return null;
     }
