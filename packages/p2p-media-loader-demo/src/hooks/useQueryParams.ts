@@ -4,7 +4,7 @@ import { DEFAULT_STREAM, DEFAULT_TRACKERS, PLAYERS } from "../constants";
 type QueryParamsType = Record<string, string>;
 
 const defaultParams: QueryParamsType = {
-  player: PLAYERS[0],
+  player: Object.keys(PLAYERS)[0],
   streamUrl: DEFAULT_STREAM,
   trackers: DEFAULT_TRACKERS,
 };

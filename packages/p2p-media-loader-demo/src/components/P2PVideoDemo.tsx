@@ -8,7 +8,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { DownloadStatsChart } from "./chart/DownloadStatsChart";
 import { NodeNetwork } from "./nodeNetwork/NodeNetwork";
 import { DebugTools } from "./debugTools/DebugTools";
-import { DownloadStats } from "../types";
+import { DownloadStats, PlayerKey } from "../types";
 import { HlsjsDPlayer } from "./players/HlsjsDPLayer";
 import { HlsjsClapprPlayer } from "./players/HlsjsClapprPlayer";
 import { HlsjsVime } from "./players/HlsjsVime";
@@ -21,8 +21,6 @@ declare global {
     videoPlayer?: { destroy?: () => void };
   }
 }
-
-export type Player = (typeof PLAYERS)[number];
 
 type DemoProps = {
   debugToolsEnabled?: boolean;
@@ -77,13 +75,13 @@ export const P2PVideoDemo = ({ debugToolsEnabled }: DemoProps) => {
   }, []);
 
   const handlePlaybackOptionsUpdate = (url: string, player: string) => {
-    if (!PLAYERS.includes(player as Player)) return;
+    if (!(player in PLAYERS)) return;
     setURLQueryParams({ streamUrl: url, player });
   };
 
   const renderPlayer = () => {
-    switch (queryParams.player) {
-      case "hlsjs-openplayer":
+    switch (queryParams.player as PlayerKey) {
+      case "openPlayer_hls":
         return (
           <HlsjsOpenPlayer
             streamUrl={queryParams.streamUrl}
@@ -95,7 +93,7 @@ export const P2PVideoDemo = ({ debugToolsEnabled }: DemoProps) => {
           />
         );
 
-      case "hlsjs-plyr":
+      case "plyr_hls":
         return (
           <HlsjsPlyr
             streamUrl={queryParams.streamUrl}
@@ -107,7 +105,7 @@ export const P2PVideoDemo = ({ debugToolsEnabled }: DemoProps) => {
           />
         );
 
-      case "hlsjs-vime":
+      case "vime_hls":
         return (
           <HlsjsVime
             streamUrl={queryParams.streamUrl}
@@ -119,7 +117,7 @@ export const P2PVideoDemo = ({ debugToolsEnabled }: DemoProps) => {
           />
         );
 
-      case "hlsjs-clappr":
+      case "clappr_hls":
         return (
           <HlsjsClapprPlayer
             streamUrl={queryParams.streamUrl}
@@ -131,7 +129,7 @@ export const P2PVideoDemo = ({ debugToolsEnabled }: DemoProps) => {
           />
         );
 
-      case "hlsjs-dplayer":
+      case "dplayer_hls":
         return (
           <HlsjsDPlayer
             streamUrl={queryParams.streamUrl}
@@ -143,7 +141,7 @@ export const P2PVideoDemo = ({ debugToolsEnabled }: DemoProps) => {
           />
         );
 
-      case "hlsjs":
+      case "hlsjs_hls":
         return (
           <HlsjsPlayer
             streamUrl={queryParams.streamUrl}

@@ -1,11 +1,11 @@
-export const PLAYERS = [
-  "hlsjs",
-  "hlsjs-dplayer",
-  "hlsjs-clappr",
-  "hlsjs-vime",
-  "hlsjs-plyr",
-  "hlsjs-openplayer",
-] as const;
+export const PLAYERS = {
+  hlsjs_hls: "Hls.js",
+  dplayer_hls: "DPlayer",
+  clappr_hls: "Clappr",
+  vime_hls: "Vime",
+  plyr_hls: "Plyr",
+  openPlayer_hls: "OpenPlayerJS",
+} as const;
 export const DEFAULT_STREAM =
   "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8";
 export const COLORS = {
