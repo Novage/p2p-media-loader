@@ -11,6 +11,7 @@ import { DebugTools } from "./debugTools/DebugTools";
 import { DownloadStats } from "../types";
 import { HlsjsDPlayer } from "./players/HlsjsDPLayer";
 import { HlsjsClapprPlayer } from "./players/HlsjsClapprPlayer";
+import { HlsjsVime } from "./players/HlsjsVime";
 
 declare global {
   interface Window {
@@ -80,6 +81,18 @@ export const P2PVideoDemo = ({ debugToolsEnabled }: DemoProps) => {
 
   const renderPlayer = () => {
     switch (queryParams.player) {
+      case "hlsjs-vime":
+        return (
+          <HlsjsVime
+            streamUrl={queryParams.streamUrl}
+            announceTrackers={trackers}
+            onPeerConnect={onPeerConnect}
+            onPeerDisconnect={onPeerDisconnect}
+            onChunkDownloaded={onChunkDownloaded}
+            onChunkUploaded={onChunkUploaded}
+          />
+        );
+
       case "hlsjs-clappr":
         return (
           <HlsjsClapprPlayer

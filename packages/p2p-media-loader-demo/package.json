@@ -45,6 +45,7 @@
     "clean-with-modules": "rimraf node_modules && pnpm clean"
   },
   "dependencies": {
+    "@vime/react": "^5.4.1",
     "d3": "^7.9.0",
     "dplayer": "^1.27.1",
     "hls.js": "^1.5.7",
