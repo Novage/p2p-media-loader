@@ -67,12 +67,10 @@ export const HlsjsPlyr = ({
         },
       };
 
-      if (!playerRef.current) {
-        playerRef.current = new Plyr(videoRef.current, {
-          quality,
-          autoplay: true,
-        });
-      }
+      playerRef.current = new Plyr(videoRef.current, {
+        quality,
+        autoplay: true,
+      });
     });
 
     hls.attachMedia(videoRef.current);
