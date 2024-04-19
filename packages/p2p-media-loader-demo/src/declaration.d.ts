@@ -3,6 +3,7 @@ declare global {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Clappr: any;
     LevelSelector: unknown;
+    DashShakaPlayback: unknown;
   }
 }
 

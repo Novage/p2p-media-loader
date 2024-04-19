@@ -16,6 +16,7 @@ import { HlsjsPlyr } from "./players/hlsjs/HlsjsPlyr";
 import { HlsjsOpenPlayer } from "./players/hlsjs/HlsjsOpenPlayer";
 import { Shaka } from "./players/shaka/Shaka";
 import { ShakaDPlayer } from "./players/shaka/ShakaDPlayer";
+import { ShakaClappr } from "./players/shaka/ShakaClappr";
 
 declare global {
   interface Window {
@@ -170,6 +171,18 @@ export const P2PVideoDemo = ({ debugToolsEnabled }: DemoProps) => {
       case "dplayer_shaka":
         return (
           <ShakaDPlayer
+            streamUrl={queryParams.streamUrl}
+            announceTrackers={trackers}
+            onPeerConnect={onPeerConnect}
+            onPeerDisconnect={onPeerDisconnect}
+            onChunkDownloaded={onChunkDownloaded}
+            onChunkUploaded={onChunkUploaded}
+          />
+        );
+
+      case "clappr_shaka":
+        return (
+          <ShakaClappr
             streamUrl={queryParams.streamUrl}
             announceTrackers={trackers}
             onPeerConnect={onPeerConnect}
