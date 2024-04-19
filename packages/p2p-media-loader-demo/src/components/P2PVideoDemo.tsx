@@ -15,6 +15,7 @@ import { HlsjsVime } from "./players/hlsjs/HlsjsVime";
 import { HlsjsPlyr } from "./players/hlsjs/HlsjsPlyr";
 import { HlsjsOpenPlayer } from "./players/hlsjs/HlsjsOpenPlayer";
 import { Shaka } from "./players/shaka/Shaka";
+import { ShakaDPlayer } from "./players/shaka/ShakaDPlayer";
 
 declare global {
   interface Window {
@@ -157,6 +158,18 @@ export const P2PVideoDemo = ({ debugToolsEnabled }: DemoProps) => {
       case "shaka":
         return (
           <Shaka
+            streamUrl={queryParams.streamUrl}
+            announceTrackers={trackers}
+            onPeerConnect={onPeerConnect}
+            onPeerDisconnect={onPeerDisconnect}
+            onChunkDownloaded={onChunkDownloaded}
+            onChunkUploaded={onChunkUploaded}
+          />
+        );
+
+      case "dplayer_shaka":
+        return (
+          <ShakaDPlayer
             streamUrl={queryParams.streamUrl}
             announceTrackers={trackers}
             onPeerConnect={onPeerConnect}
