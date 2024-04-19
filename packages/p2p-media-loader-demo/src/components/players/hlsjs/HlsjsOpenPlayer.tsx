@@ -2,16 +2,9 @@ import "./openPlayer.css";
 import { useEffect, useRef } from "react";
 import OpenPlayerJS from "openplayerjs";
 import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
+import { PlayerProps } from "../../../types";
 import Hls from "hls.js";
 
-type HlsjsOpenPlayer = {
-  streamUrl: string;
-  announceTrackers: string[];
-  onPeerConnect?: (peerId: string) => void;
-  onPeerDisconnect?: (peerId: string) => void;
-  onChunkDownloaded?: (bytesLength: number, downloadSource: string) => void;
-  onChunkUploaded?: (bytesLength: number) => void;
-};
 const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
 
 export const HlsjsOpenPlayer = ({
@@ -21,7 +14,7 @@ export const HlsjsOpenPlayer = ({
   onPeerDisconnect,
   onChunkDownloaded,
   onChunkUploaded,
-}: HlsjsOpenPlayer) => {
+}: PlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<OpenPlayerJS | null>(null);
 

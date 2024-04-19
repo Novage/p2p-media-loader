@@ -1,16 +1,8 @@
 import { Player, Hls as VimeHls, DefaultUi } from "@vime/react";
 import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 import { useRef, useEffect } from "react";
+import { PlayerProps } from "../../../types";
 import Hls from "hls.js";
-
-type HlsjsVimeProps = {
-  streamUrl: string;
-  announceTrackers: string[];
-  onPeerConnect?: (peerId: string) => void;
-  onPeerDisconnect?: (peerId: string) => void;
-  onChunkDownloaded?: (bytesLength: number, downloadSource: string) => void;
-  onChunkUploaded?: (bytesLength: number) => void;
-};
 
 interface CustomHlsWithP2P extends Hls {
   p2pEngine: HlsJsP2PEngine;
@@ -28,7 +20,7 @@ export const HlsjsVime = ({
   onPeerDisconnect,
   onChunkDownloaded,
   onChunkUploaded,
-}: HlsjsVimeProps) => {
+}: PlayerProps) => {
   const vimeRef = useRef<HTMLVmHlsElement>(null);
 
   useEffect(() => {

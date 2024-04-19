@@ -17,3 +17,12 @@ export type ChartsData = {
 
 export type PlayerKey = keyof typeof PLAYERS;
 export type PlayerName = (typeof PLAYERS)[PlayerKey];
+
+export type PlayerProps = {
+  streamUrl: string;
+  announceTrackers: string[];
+  onPeerConnect?: (peerId: string) => void;
+  onPeerDisconnect?: (peerId: string) => void;
+  onChunkDownloaded?: (bytesLength: number, downloadSource: string) => void;
+  onChunkUploaded?: (bytesLength: number) => void;
+};

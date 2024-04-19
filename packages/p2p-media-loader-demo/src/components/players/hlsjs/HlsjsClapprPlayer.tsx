@@ -1,17 +1,9 @@
 import { useEffect, useRef } from "react";
 import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
+import { PlayerProps } from "../../../types";
 import Hls from "hls.js";
 
 const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
-
-type HlsjsClapprProps = {
-  streamUrl: string;
-  announceTrackers: string[];
-  onPeerConnect?: (peerId: string) => void;
-  onPeerDisconnect?: (peerId: string) => void;
-  onChunkDownloaded?: (bytesLength: number, downloadSource: string) => void;
-  onChunkUploaded?: (bytesLength: number) => void;
-};
 
 export const HlsjsClapprPlayer = ({
   streamUrl,
@@ -20,7 +12,7 @@ export const HlsjsClapprPlayer = ({
   onPeerDisconnect,
   onChunkDownloaded,
   onChunkUploaded,
-}: HlsjsClapprProps) => {
+}: PlayerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

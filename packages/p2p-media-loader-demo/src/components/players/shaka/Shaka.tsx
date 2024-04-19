@@ -1,19 +1,12 @@
 import { useEffect, useRef } from "react";
 import { ShakaP2PEngine } from "p2p-media-loader-shaka";
+import { PlayerProps } from "../../../types";
 
 import "shaka-player/dist/shaka-player.ui";
 import "shaka-player/dist/controls.css";
 
-type ShakaProps = {
-  streamUrl: string;
-  announceTrackers: string[];
-  onPeerConnect?: (peerId: string) => void;
-  onPeerDisconnect?: (peerId: string) => void;
-  onChunkDownloaded?: (bytesLength: number, downloadSource: string) => void;
-  onChunkUploaded?: (bytesLength: number) => void;
-};
-
 ShakaP2PEngine.registerPlugins();
+
 export const Shaka = ({
   streamUrl,
   announceTrackers,
@@ -21,7 +14,7 @@ export const Shaka = ({
   onPeerDisconnect,
   onChunkDownloaded,
   onChunkUploaded,
-}: ShakaProps) => {
+}: PlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
 
