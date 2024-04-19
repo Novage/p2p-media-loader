@@ -37,8 +37,7 @@ export const HlsjsClapprPlayer = ({
       hls.p2pEngine.addEventListener("onChunkUploaded", onChunkUploaded);
     }
 
-    /* eslint-disable */
-    const clapprPlayer = new window.Clappr.Player({
+    const clapprPlayer = new Clappr.Player({
       parentId: `#${containerRef.current?.id}`,
       source: streamUrl,
       playback: {
@@ -53,12 +52,10 @@ export const HlsjsClapprPlayer = ({
 
     hls.p2pEngine.initClapprPlayer(clapprPlayer);
 
-    window.videoPlayer = clapprPlayer;
     return () => {
       clapprPlayer.destroy();
       hls.destroy();
     };
-    /* eslint-enable */
   }, [
     announceTrackers,
     onChunkDownloaded,

@@ -36,22 +36,18 @@ export const ShakaClappr = ({
       shakaP2PEngine.addEventListener("onChunkUploaded", onChunkUploaded);
     }
 
-    /* eslint-disable */
-    const clapprPlayer = new window.Clappr.Player({
+    const clapprPlayer = new Clappr.Player({
       parentId: "#player-container",
       source: streamUrl,
       plugins: [window.DashShakaPlayback, window.LevelSelector],
-      shakaOnBeforeLoad: (shakaPlayerInstance: any) => {
+      shakaOnBeforeLoad: (shakaPlayerInstance: shaka.Player) => {
         shakaP2PEngine.configureAndInitShakaPlayer(shakaPlayerInstance);
       },
       width: "100%",
       height: "100%",
     });
 
-    return () => {
-      clapprPlayer.destroy();
-    };
-    /* eslint-enable */
+    return () => clapprPlayer.destroy();
   }, [
     announceTrackers,
     onChunkDownloaded,
