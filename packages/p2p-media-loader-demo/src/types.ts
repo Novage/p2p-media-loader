@@ -26,3 +26,5 @@ export type PlayerProps = {
   onChunkDownloaded?: (bytesLength: number, downloadSource: string) => void;
   onChunkUploaded?: (bytesLength: number) => void;
 };
+
+export type PlayerEvents = Omit<PlayerProps, "streamUrl" | "announceTrackers">;
