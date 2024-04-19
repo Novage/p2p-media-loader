@@ -5,6 +5,8 @@ export const PLAYERS = {
   vime_hls: "Vime",
   plyr_hls: "Plyr",
   openPlayer_hls: "OpenPlayerJS",
+  mediaElement_hls: "MediaElement",
+  shaka: "Shaka",
 } as const;
 export const DEFAULT_STREAM =
   "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8";

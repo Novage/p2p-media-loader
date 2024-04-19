@@ -3,17 +3,18 @@ import type Hls from "hls.js";
 import { PlaybackOptions } from "./PlaybackOptions";
 import { PLAYERS } from "../constants";
 import { useQueryParams } from "../hooks/useQueryParams";
-import { HlsjsPlayer } from "./players/Hlsjs";
+import { HlsjsPlayer } from "./players/hlsjs/Hlsjs";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { DownloadStatsChart } from "./chart/DownloadStatsChart";
 import { NodeNetwork } from "./nodeNetwork/NodeNetwork";
 import { DebugTools } from "./debugTools/DebugTools";
 import { DownloadStats, PlayerKey } from "../types";
-import { HlsjsDPlayer } from "./players/HlsjsDPLayer";
-import { HlsjsClapprPlayer } from "./players/HlsjsClapprPlayer";
-import { HlsjsVime } from "./players/HlsjsVime";
-import { HlsjsPlyr } from "./players/HlsjsPlyr";
-import { HlsjsOpenPlayer } from "./players/HlsjsOpenPlayer";
+import { HlsjsDPlayer } from "./players/hlsjs/HlsjsDPLayer";
+import { HlsjsClapprPlayer } from "./players/hlsjs/HlsjsClapprPlayer";
+import { HlsjsVime } from "./players/hlsjs/HlsjsVime";
+import { HlsjsPlyr } from "./players/hlsjs/HlsjsPlyr";
+import { HlsjsOpenPlayer } from "./players/hlsjs/HlsjsOpenPlayer";
+import { Shaka } from "./players/shaka/Shaka";
 
 declare global {
   interface Window {
@@ -144,6 +145,18 @@ export const P2PVideoDemo = ({ debugToolsEnabled }: DemoProps) => {
       case "hlsjs_hls":
         return (
           <HlsjsPlayer
+            streamUrl={queryParams.streamUrl}
+            announceTrackers={trackers}
+            onPeerConnect={onPeerConnect}
+            onPeerDisconnect={onPeerDisconnect}
+            onChunkDownloaded={onChunkDownloaded}
+            onChunkUploaded={onChunkUploaded}
+          />
+        );
+
+      case "shaka":
+        return (
+          <Shaka
             streamUrl={queryParams.streamUrl}
             announceTrackers={trackers}
             onPeerConnect={onPeerConnect}
