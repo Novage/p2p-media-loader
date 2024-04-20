@@ -19,6 +19,14 @@ export const HlsjsPlyr = ({
   const playerRef = useRef<Plyr | null>(null);
 
   useEffect(() => {
+    return () => {
+      if (playerRef.current) {
+        playerRef.current.destroy();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (!videoRef.current) return;
 
     const hls = new HlsWithP2P({
