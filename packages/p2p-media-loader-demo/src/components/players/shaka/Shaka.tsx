@@ -4,6 +4,7 @@ import { PlayerProps } from "../../../types";
 
 import "shaka-player/dist/shaka-player.ui";
 import "shaka-player/dist/controls.css";
+import { getConfiguredShakaP2PEngine } from "../utils";
 
 ShakaP2PEngine.registerPlugins();
 
@@ -21,23 +22,13 @@ export const Shaka = ({
   useEffect(() => {
     if (!videoRef.current || !videoContainerRef.current) return;
 
-    const shakaP2PEngine = new ShakaP2PEngine({
-      core: {
-        announceTrackers,
-      },
+    const shakaP2PEngine = getConfiguredShakaP2PEngine({
+      announceTrackers,
+      onPeerConnect,
+      onPeerDisconnect,
+      onChunkDownloaded,
+      onChunkUploaded,
     });
-    if (onPeerConnect) {
-      shakaP2PEngine.addEventListener("onPeerConnect", onPeerConnect);
-    }
-    if (onPeerDisconnect) {
-      shakaP2PEngine.addEventListener("onPeerClose", onPeerDisconnect);
-    }
-    if (onChunkDownloaded) {
-      shakaP2PEngine.addEventListener("onChunkDownloaded", onChunkDownloaded);
-    }
-    if (onChunkUploaded) {
-      shakaP2PEngine.addEventListener("onChunkUploaded", onChunkUploaded);
-    }
 
     const player = new shaka.Player();
     const ui = new shaka.ui.Overlay(

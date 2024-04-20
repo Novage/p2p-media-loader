@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { PlayerProps } from "../../../types";
 import { ShakaP2PEngine } from "p2p-media-loader-shaka";
+import { getConfiguredShakaP2PEngine } from "../utils";
 
 ShakaP2PEngine.registerPlugins();
 
@@ -17,24 +18,13 @@ export const ShakaClappr = ({
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const shakaP2PEngine = new ShakaP2PEngine({
-      core: {
-        announceTrackers,
-      },
+    const shakaP2PEngine = getConfiguredShakaP2PEngine({
+      announceTrackers,
+      onPeerConnect,
+      onPeerDisconnect,
+      onChunkDownloaded,
+      onChunkUploaded,
     });
-
-    if (onPeerConnect) {
-      shakaP2PEngine.addEventListener("onPeerConnect", onPeerConnect);
-    }
-    if (onPeerDisconnect) {
-      shakaP2PEngine.addEventListener("onPeerClose", onPeerDisconnect);
-    }
-    if (onChunkDownloaded) {
-      shakaP2PEngine.addEventListener("onChunkDownloaded", onChunkDownloaded);
-    }
-    if (onChunkUploaded) {
-      shakaP2PEngine.addEventListener("onChunkUploaded", onChunkUploaded);
-    }
 
     const clapprPlayer = new Clappr.Player({
       parentId: "#player-container",
@@ -47,7 +37,10 @@ export const ShakaClappr = ({
       height: "100%",
     });
 
-    return () => clapprPlayer.destroy();
+    return () => {
+      shakaP2PEngine.destroy();
+      clapprPlayer.destroy();
+    };
   }, [
     announceTrackers,
     onChunkDownloaded,

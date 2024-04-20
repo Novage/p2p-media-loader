@@ -2,6 +2,7 @@ import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 import { PlayerProps } from "../../../types";
 import { useEffect, useRef } from "react";
 import DPlayer from "dplayer";
+import { getConfiguredShakaP2PEngine } from "../utils";
 
 ShakaP2PEngine.registerPlugins();
 
@@ -19,24 +20,13 @@ export const ShakaDPlayer = ({
   useEffect(() => {
     if (!videoRef.current) return;
 
-    const shakaP2PEngine = new ShakaP2PEngine({
-      core: {
-        announceTrackers,
-      },
+    const shakaP2PEngine = getConfiguredShakaP2PEngine({
+      announceTrackers,
+      onPeerConnect,
+      onPeerDisconnect,
+      onChunkDownloaded,
+      onChunkUploaded,
     });
-
-    if (onPeerConnect) {
-      shakaP2PEngine.addEventListener("onPeerConnect", onPeerConnect);
-    }
-    if (onPeerDisconnect) {
-      shakaP2PEngine.addEventListener("onPeerClose", onPeerDisconnect);
-    }
-    if (onChunkDownloaded) {
-      shakaP2PEngine.addEventListener("onChunkDownloaded", onChunkDownloaded);
-    }
-    if (onChunkUploaded) {
-      shakaP2PEngine.addEventListener("onChunkUploaded", onChunkUploaded);
-    }
 
     const player = new DPlayer({
       container: containerRef.current,
@@ -56,6 +46,7 @@ export const ShakaDPlayer = ({
     });
 
     return () => {
+      shakaP2PEngine.destroy();
       player.destroy();
     };
   }, [
