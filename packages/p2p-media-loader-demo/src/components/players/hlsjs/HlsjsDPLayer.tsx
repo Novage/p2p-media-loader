@@ -1,10 +1,7 @@
 import { useEffect, useRef } from "react";
-import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 import { PlayerProps } from "../../../types";
-import Hls from "hls.js";
 import DPlayer from "dplayer";
-
-const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
+import { getConfiguredHlsInstance } from "../utils";
 
 export const HlsjsDPlayer = ({
   streamUrl,
@@ -20,12 +17,12 @@ export const HlsjsDPlayer = ({
   useEffect(() => {
     if (!videoRef.current) return;
 
-    const hls = new HlsWithP2P({
-      p2p: {
-        core: {
-          announceTrackers,
-        },
-      },
+    const hls = getConfiguredHlsInstance({
+      announceTrackers,
+      onPeerConnect,
+      onPeerDisconnect,
+      onChunkDownloaded,
+      onChunkUploaded,
     });
 
     const player = new DPlayer({
@@ -35,25 +32,6 @@ export const HlsjsDPlayer = ({
         type: "customHls",
         customType: {
           customHls: (video: HTMLVideoElement) => {
-            if (onPeerConnect) {
-              hls.p2pEngine.addEventListener("onPeerConnect", onPeerConnect);
-            }
-            if (onPeerDisconnect) {
-              hls.p2pEngine.addEventListener("onPeerClose", onPeerDisconnect);
-            }
-            if (onChunkDownloaded) {
-              hls.p2pEngine.addEventListener(
-                "onChunkDownloaded",
-                onChunkDownloaded,
-              );
-            }
-            if (onChunkUploaded) {
-              hls.p2pEngine.addEventListener(
-                "onChunkUploaded",
-                onChunkUploaded,
-              );
-            }
-
             hls.attachMedia(video);
             hls.loadSource(streamUrl);
           },

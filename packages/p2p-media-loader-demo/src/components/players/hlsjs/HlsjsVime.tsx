@@ -30,21 +30,17 @@ export const HlsjsVime = ({
     vimeHlsElement.config = {
       p2p: {
         onHlsJsCreated: (hls: CustomHlsWithP2P) => {
-          if (onPeerConnect) {
+          onPeerConnect &&
             hls.p2pEngine.addEventListener("onPeerConnect", onPeerConnect);
-          }
-          if (onPeerDisconnect) {
+          onPeerDisconnect &&
             hls.p2pEngine.addEventListener("onPeerClose", onPeerDisconnect);
-          }
-          if (onChunkDownloaded) {
+          onChunkDownloaded &&
             hls.p2pEngine.addEventListener(
               "onChunkDownloaded",
               onChunkDownloaded,
             );
-          }
-          if (onChunkUploaded) {
+          onChunkUploaded &&
             hls.p2pEngine.addEventListener("onChunkUploaded", onChunkUploaded);
-          }
         },
         core: {
           announceTrackers,
