@@ -1,10 +1,7 @@
-/*import Hls from "hls.js";
 import "mediaelement";
 import "mediaelement/build/mediaelementplayer.min.css";
-import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 import { useEffect, useRef } from "react";
-
-const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
+import { getConfiguredHlsInstance } from "../utils";
 
 type HlsjsMediaElelementProps = {
   streamUrl: string;
@@ -24,54 +21,47 @@ export const HlsjsMediaElement = ({
   onChunkUploaded,
 }: HlsjsMediaElelementProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  /* eslint-disable  */
+  // @ts-ignore
   const playerRef = useRef<MediaElementPlayer>(null);
 
   useEffect(() => {
     if (!videoRef.current) return;
 
-    const hls = new HlsWithP2P({
-      p2p: {
-        core: {
-          announceTrackers,
-        },
-      },
+    const hls = getConfiguredHlsInstance({
+      announceTrackers,
+      onPeerConnect,
+      onPeerDisconnect,
+      onChunkDownloaded,
+      onChunkUploaded,
     });
 
-    if (onPeerConnect) {
-      hls.p2pEngine.addEventListener("onPeerConnect", onPeerConnect);
-    }
-    if (onPeerDisconnect) {
-      hls.p2pEngine.addEventListener("onPeerClose", onPeerDisconnect);
-    }
-    if (onChunkDownloaded) {
-      hls.p2pEngine.addEventListener("onChunkDownloaded", onChunkDownloaded);
-    }
-    if (onChunkUploaded) {
-      hls.p2pEngine.addEventListener("onChunkUploaded", onChunkUploaded);
-    }
-
     if (!playerRef.current) {
+      // @ts-ignore
       playerRef.current = new MediaElementPlayer("player", {
         stretching: "responsive",
         renderers: ["native_hls"],
         hls: {
           ...hls.p2pEngine.getHlsJsConfig(),
         },
+        // @ts-ignore
         success: (mediaElement, originalNode, instance) => {
-          mediaElement.addEventListener("hlsFragChanged", (event: any) => {
-            let hls2 = mediaElement.hlsPlayer;
-            hls.p2pEngine.setHls(hls2.p2pEngine.hlsInstanceGetter);
-            console.log("hlsFragChanged", hls2.p2pEngine.hlsInstanceGetter);
+          mediaElement.addEventListener("hlsFragChanged", (event: unknown) => {
+            const hlsInstance = mediaElement.hlsPlayer;
+            hlsInstance.p2pEngine.setHls(
+              hlsInstance.p2pEngine.hlsInstanceGetter,
+            );
           });
         },
       });
     }
+    /* eslint-enable  */
+    hls.attachMedia(videoRef.current);
+    hls.loadSource(streamUrl);
 
-    playerRef.current.setSrc(streamUrl);
-    playerRef.current.load();
-    playerRef.current.play();
-
-    return () => {};
+    return () => {
+      hls.destroy();
+    };
   }, [
     announceTrackers,
     onChunkDownloaded,
@@ -82,8 +72,7 @@ export const HlsjsMediaElement = ({
   ]);
   return (
     <div>
-      <video ref={videoRef} id="player" controls autoPlay></video>
+      <video ref={videoRef} id="player" controls autoPlay />
     </div>
   );
 };
-*/

@@ -22,6 +22,13 @@ export const Shaka = ({
   useEffect(() => {
     if (!videoRef.current || !videoContainerRef.current) return;
 
+    const player = new shaka.Player();
+    const ui = new shaka.ui.Overlay(
+      player,
+      videoContainerRef.current,
+      videoRef.current,
+    );
+
     const shakaP2PEngine = getConfiguredShakaP2PEngine({
       announceTrackers,
       onPeerConnect,
@@ -30,16 +37,20 @@ export const Shaka = ({
       onChunkUploaded,
     });
 
-    const player = new shaka.Player();
-    const ui = new shaka.ui.Overlay(
-      player,
-      videoContainerRef.current,
-      videoRef.current,
-    );
+    const setupPlayer = async () => {
+      if (!videoRef.current) return;
 
-    void player.attach(videoRef.current);
-    shakaP2PEngine.configureAndInitShakaPlayer(player);
-    void player.load(streamUrl);
+      try {
+        await player.attach(videoRef.current);
+        shakaP2PEngine.configureAndInitShakaPlayer(player);
+        await player.load(streamUrl);
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error("Error setting up Shaka Player:", error);
+      }
+    };
+
+    void setupPlayer();
 
     return () => {
       void player.destroy();
