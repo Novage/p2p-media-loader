@@ -15,26 +15,40 @@ export const HlsjsOpenPlayer = ({
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const playerContainerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<OpenPlayerJS | null>(null);
 
   useEffect(() => {
-    if (!videoRef.current) return;
+    if (!playerContainerRef.current) return;
+
+    const videoContainer = document.createElement("div");
+    videoContainer.className = "video-container";
+    playerContainerRef.current.appendChild(videoContainer);
+
+    const videoElement = document.createElement("video");
+    videoElement.className = "op-player__media";
+    videoElement.id = "player";
+    videoContainer.appendChild(videoElement);
 
     const initPlayer = async () => {
-      if (!videoRef.current || playerRef.current) return;
+      if (!videoElement) return;
 
-      playerRef.current = new OpenPlayerJS(videoRef.current, {
-        controls: {
-          layers: {
-            left: ["play", "time", "volume"],
-            right: ["settings", "fullscreen", "levels"],
-            middle: ["progress"],
+      try {
+        playerRef.current = new OpenPlayerJS(videoElement, {
+          controls: {
+            layers: {
+              left: ["play", "time", "volume"],
+              right: ["settings", "fullscreen", "levels"],
+              middle: ["progress"],
+            },
           },
-        },
-      });
+        });
 
-      await playerRef.current.init();
+        await playerRef.current.init();
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error("Failed to initialize OpenPlayerJS", error);
+      }
     };
 
     const hls = new HlsWithP2P({
@@ -58,12 +72,20 @@ export const HlsjsOpenPlayer = ({
       hls.p2pEngine.addEventListener("onChunkUploaded", onChunkUploaded);
     }
 
-    hls.attachMedia(videoRef.current);
+    hls.attachMedia(videoElement);
     hls.loadSource(streamUrl);
 
     void initPlayer();
 
-    return () => hls.destroy();
+    return () => {
+      hls.destroy();
+      if (playerRef.current) {
+        playerRef.current.destroy();
+        playerRef.current = null;
+      }
+      videoElement.remove();
+      videoContainer.remove();
+    };
   }, [
     announceTrackers,
     onChunkDownloaded,
@@ -73,7 +95,5 @@ export const HlsjsOpenPlayer = ({
     streamUrl,
   ]);
 
-  return (
-    <video className="op-player__media" id="player" ref={videoRef}></video>
-  );
+  return <div ref={playerContainerRef} className="player-container"></div>;
 };
