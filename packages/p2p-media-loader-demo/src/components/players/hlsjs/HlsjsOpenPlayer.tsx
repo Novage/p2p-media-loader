@@ -63,10 +63,7 @@ export const HlsjsOpenPlayer = ({
 
     return () => {
       hls.destroy();
-      if (playerRef.current) {
-        playerRef.current.destroy();
-        playerRef.current = null;
-      }
+      playerRef.current && playerRef.current.destroy();
       videoElement.remove();
       videoContainer.remove();
     };

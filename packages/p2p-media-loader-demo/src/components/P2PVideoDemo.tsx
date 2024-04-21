@@ -30,6 +30,19 @@ type DemoProps = {
   debugToolsEnabled?: boolean;
 };
 
+const playerComponents = {
+  openPlayer_hls: HlsjsOpenPlayer,
+  plyr_hls: HlsjsPlyr,
+  vime_hls: HlsjsVime,
+  clappr_hls: HlsjsClapprPlayer,
+  dplayer_hls: HlsjsDPlayer,
+  hlsjs_hls: HlsjsPlayer,
+  shaka: Shaka,
+  dplayer_shaka: ShakaDPlayer,
+  clappr_shaka: ShakaClappr,
+  mediaElement_hls: HlsjsMediaElement,
+};
+
 export const P2PVideoDemo = ({ debugToolsEnabled }: DemoProps) => {
   const data = useRef<DownloadStats>({
     httpDownloaded: 0,
@@ -84,130 +97,18 @@ export const P2PVideoDemo = ({ debugToolsEnabled }: DemoProps) => {
   };
 
   const renderPlayer = () => {
-    switch (queryParams.player as PlayerKey) {
-      case "openPlayer_hls":
-        return (
-          <HlsjsOpenPlayer
-            streamUrl={queryParams.streamUrl}
-            announceTrackers={trackers}
-            onPeerConnect={onPeerConnect}
-            onPeerDisconnect={onPeerDisconnect}
-            onChunkDownloaded={onChunkDownloaded}
-            onChunkUploaded={onChunkUploaded}
-          />
-        );
+    const PlayerComponent = playerComponents[queryParams.player as PlayerKey];
 
-      case "plyr_hls":
-        return (
-          <HlsjsPlyr
-            streamUrl={queryParams.streamUrl}
-            announceTrackers={trackers}
-            onPeerConnect={onPeerConnect}
-            onPeerDisconnect={onPeerDisconnect}
-            onChunkDownloaded={onChunkDownloaded}
-            onChunkUploaded={onChunkUploaded}
-          />
-        );
-
-      case "vime_hls":
-        return (
-          <HlsjsVime
-            streamUrl={queryParams.streamUrl}
-            announceTrackers={trackers}
-            onPeerConnect={onPeerConnect}
-            onPeerDisconnect={onPeerDisconnect}
-            onChunkDownloaded={onChunkDownloaded}
-            onChunkUploaded={onChunkUploaded}
-          />
-        );
-
-      case "clappr_hls":
-        return (
-          <HlsjsClapprPlayer
-            streamUrl={queryParams.streamUrl}
-            announceTrackers={trackers}
-            onPeerConnect={onPeerConnect}
-            onPeerDisconnect={onPeerDisconnect}
-            onChunkDownloaded={onChunkDownloaded}
-            onChunkUploaded={onChunkUploaded}
-          />
-        );
-
-      case "dplayer_hls":
-        return (
-          <HlsjsDPlayer
-            streamUrl={queryParams.streamUrl}
-            announceTrackers={trackers}
-            onPeerConnect={onPeerConnect}
-            onPeerDisconnect={onPeerDisconnect}
-            onChunkDownloaded={onChunkDownloaded}
-            onChunkUploaded={onChunkUploaded}
-          />
-        );
-
-      case "hlsjs_hls":
-        return (
-          <HlsjsPlayer
-            streamUrl={queryParams.streamUrl}
-            announceTrackers={trackers}
-            onPeerConnect={onPeerConnect}
-            onPeerDisconnect={onPeerDisconnect}
-            onChunkDownloaded={onChunkDownloaded}
-            onChunkUploaded={onChunkUploaded}
-          />
-        );
-
-      case "shaka":
-        return (
-          <Shaka
-            streamUrl={queryParams.streamUrl}
-            announceTrackers={trackers}
-            onPeerConnect={onPeerConnect}
-            onPeerDisconnect={onPeerDisconnect}
-            onChunkDownloaded={onChunkDownloaded}
-            onChunkUploaded={onChunkUploaded}
-          />
-        );
-
-      case "dplayer_shaka":
-        return (
-          <ShakaDPlayer
-            streamUrl={queryParams.streamUrl}
-            announceTrackers={trackers}
-            onPeerConnect={onPeerConnect}
-            onPeerDisconnect={onPeerDisconnect}
-            onChunkDownloaded={onChunkDownloaded}
-            onChunkUploaded={onChunkUploaded}
-          />
-        );
-
-      case "clappr_shaka":
-        return (
-          <ShakaClappr
-            streamUrl={queryParams.streamUrl}
-            announceTrackers={trackers}
-            onPeerConnect={onPeerConnect}
-            onPeerDisconnect={onPeerDisconnect}
-            onChunkDownloaded={onChunkDownloaded}
-            onChunkUploaded={onChunkUploaded}
-          />
-        );
-
-      case "mediaElement_hls":
-        return (
-          <HlsjsMediaElement
-            streamUrl={queryParams.streamUrl}
-            announceTrackers={trackers}
-            onPeerConnect={onPeerConnect}
-            onPeerDisconnect={onPeerDisconnect}
-            onChunkDownloaded={onChunkDownloaded}
-            onChunkUploaded={onChunkUploaded}
-          />
-        );
-
-      default:
-        return null;
-    }
+    return PlayerComponent ? (
+      <PlayerComponent
+        streamUrl={queryParams.streamUrl}
+        announceTrackers={trackers}
+        onPeerConnect={onPeerConnect}
+        onPeerDisconnect={onPeerDisconnect}
+        onChunkDownloaded={onChunkDownloaded}
+        onChunkUploaded={onChunkUploaded}
+      />
+    ) : null;
   };
 
   return (

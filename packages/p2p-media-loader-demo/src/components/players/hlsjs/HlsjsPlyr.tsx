@@ -18,9 +18,7 @@ export const HlsjsPlyr = ({
 
   useEffect(() => {
     return () => {
-      if (playerRef.current) {
-        playerRef.current.destroy();
-      }
+      playerRef.current && playerRef.current.destroy();
     };
   }, []);
 
