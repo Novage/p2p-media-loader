@@ -46,6 +46,7 @@ export const PlaybackOptions = ({
             Video URL{isHttps ? " (HTTPS only)" : ""}:
           </label>
           <input
+            key={streamUrl}
             className="item"
             defaultValue={streamUrl}
             id="streamUrl"
