@@ -18,6 +18,7 @@ import { Shaka } from "./players/shaka/Shaka";
 import { ShakaDPlayer } from "./players/shaka/ShakaDPlayer";
 import { ShakaClappr } from "./players/shaka/ShakaClappr";
 import { HlsjsMediaElement } from "./players/hlsjs/HlsjsMediaElement";
+import { ShakaPlyr } from "./players/shaka/ShakaPlyr";
 
 declare global {
   interface Window {
@@ -41,6 +42,7 @@ const playerComponents = {
   dplayer_shaka: ShakaDPlayer,
   clappr_shaka: ShakaClappr,
   mediaElement_hls: HlsjsMediaElement,
+  plyr_shaka: ShakaPlyr,
 };
 
 export const P2PVideoDemo = ({ debugToolsEnabled }: DemoProps) => {

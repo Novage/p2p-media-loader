@@ -9,6 +9,7 @@ export const PLAYERS = {
   shaka: "Shaka",
   dplayer_shaka: "DPlayer",
   clappr_shaka: "Clappr (DASH only)",
+  plyr_shaka: "Plyr",
 } as const;
 export const DEFAULT_STREAM =
   "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8";
