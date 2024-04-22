@@ -81,6 +81,7 @@ export const ShakaPlyr = ({
 
     return () => {
       void shakaPlayer.destroy();
+      shakaP2PEngine.destroy();
     };
   }, [
     announceTrackers,

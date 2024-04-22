@@ -57,6 +57,7 @@ export const Shaka = ({
     void setupPlayer();
 
     return () => {
+      shakaP2PEngine.destroy();
       void player.destroy();
       void ui.destroy();
     };
