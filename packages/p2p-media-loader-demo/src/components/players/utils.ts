@@ -32,18 +32,26 @@ export const getConfiguredHlsInstance = ({
   return hls;
 };
 
+type ShakaP2PEngineProps = Partial<PlayerProps> & {
+  shaka?: typeof shaka;
+};
+
 export const getConfiguredShakaP2PEngine = ({
   announceTrackers,
   onPeerConnect,
   onPeerDisconnect,
   onChunkDownloaded,
   onChunkUploaded,
-}: Partial<PlayerProps>) => {
-  const shakaP2PEngine = new ShakaP2PEngine({
-    core: {
-      announceTrackers,
+  shaka,
+}: ShakaP2PEngineProps) => {
+  const shakaP2PEngine = new ShakaP2PEngine(
+    {
+      core: {
+        announceTrackers,
+      },
     },
-  });
+    shaka,
+  );
 
   onPeerConnect &&
     shakaP2PEngine.addEventListener("onPeerConnect", onPeerConnect);

@@ -2,8 +2,7 @@ import { useEffect, useRef } from "react";
 import { PlayerProps } from "../../../types";
 import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 import { getConfiguredShakaP2PEngine } from "../utils";
-
-ShakaP2PEngine.registerPlugins();
+import shaka from "./shaka-import";
 
 export const ShakaClappr = ({
   streamUrl,
@@ -16,6 +15,11 @@ export const ShakaClappr = ({
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    ShakaP2PEngine.registerPlugins(shaka);
+    return () => ShakaP2PEngine.unregisterPlugins(shaka);
+  }, []);
+
+  useEffect(() => {
     if (!containerRef.current) return;
 
     const shakaP2PEngine = getConfiguredShakaP2PEngine({
@@ -24,6 +28,7 @@ export const ShakaClappr = ({
       onPeerDisconnect,
       onChunkDownloaded,
       onChunkUploaded,
+      shaka,
     });
 
     const clapprPlayer = new Clappr.Player({

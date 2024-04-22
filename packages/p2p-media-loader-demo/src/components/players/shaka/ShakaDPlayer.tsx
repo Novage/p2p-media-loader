@@ -3,8 +3,7 @@ import { PlayerProps } from "../../../types";
 import { useEffect, useRef } from "react";
 import DPlayer from "dplayer";
 import { getConfiguredShakaP2PEngine } from "../utils";
-
-ShakaP2PEngine.registerPlugins();
+import shaka from "./shaka-import";
 
 export const ShakaDPlayer = ({
   streamUrl,
@@ -18,6 +17,11 @@ export const ShakaDPlayer = ({
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    ShakaP2PEngine.registerPlugins(shaka);
+    return () => ShakaP2PEngine.unregisterPlugins(shaka);
+  }, []);
+
+  useEffect(() => {
     if (!videoRef.current) return;
 
     const shakaP2PEngine = getConfiguredShakaP2PEngine({
@@ -26,6 +30,7 @@ export const ShakaDPlayer = ({
       onPeerDisconnect,
       onChunkDownloaded,
       onChunkUploaded,
+      shaka,
     });
 
     const player = new DPlayer({
