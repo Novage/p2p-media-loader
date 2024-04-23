@@ -14,19 +14,24 @@ export const ShakaPlyr = ({
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<Plyr | null>(null);
 
   useEffect(() => {
     ShakaP2PEngine.registerPlugins(shaka);
-    return () => {
-      ShakaP2PEngine.unregisterPlugins(shaka);
-      playerRef.current && playerRef.current.destroy();
-    };
+    return () => ShakaP2PEngine.unregisterPlugins(shaka);
   }, []);
 
   useEffect(() => {
-    if (!videoRef.current) return;
+    if (!containerRef.current) return;
+
+    const videoContainer = document.createElement("div");
+    videoContainer.className = "video-container";
+    containerRef.current.appendChild(videoContainer);
+
+    const videoElement = document.createElement("video");
+    videoElement.id = "player";
+    videoContainer.appendChild(videoElement);
 
     const shakaP2PEngine = new ShakaP2PEngine(
       {
@@ -39,10 +44,8 @@ export const ShakaPlyr = ({
     const shakaPlayer = new shaka.Player();
 
     const initPlayer = async () => {
-      if (!videoRef.current) return;
-
       try {
-        await shakaPlayer.attach(videoRef.current);
+        await shakaPlayer.attach(videoElement);
         configureShakaP2PEngineEvents({
           engine: shakaP2PEngine,
           onPeerConnect,
@@ -74,7 +77,7 @@ export const ShakaPlyr = ({
           },
         };
 
-        playerRef.current = new Plyr(videoRef.current, {
+        playerRef.current = new Plyr(videoElement, {
           autoplay: true,
           quality,
         });
@@ -87,6 +90,8 @@ export const ShakaPlyr = ({
     void initPlayer();
 
     return () => {
+      videoContainer.remove();
+      playerRef.current && playerRef.current.destroy();
       void shakaPlayer.destroy();
       shakaP2PEngine.destroy();
     };
@@ -99,9 +104,5 @@ export const ShakaPlyr = ({
     streamUrl,
   ]);
 
-  return (
-    <div className="video-container">
-      <video ref={videoRef} />
-    </div>
-  );
+  return <div ref={containerRef} />;
 };

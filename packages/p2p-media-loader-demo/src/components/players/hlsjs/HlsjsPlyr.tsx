@@ -14,17 +14,19 @@ export const HlsjsPlyr = ({
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<Plyr | null>(null);
 
   useEffect(() => {
-    return () => {
-      playerRef.current && playerRef.current.destroy();
-    };
-  }, []);
+    if (!containerRef.current) return;
 
-  useEffect(() => {
-    if (!videoRef.current) return;
+    const videoContainer = document.createElement("div");
+    videoContainer.className = "video-container";
+    containerRef.current.appendChild(videoContainer);
+
+    const videoElement = document.createElement("video");
+    videoElement.id = "player";
+    videoContainer.appendChild(videoElement);
 
     const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
 
@@ -46,8 +48,6 @@ export const HlsjsPlyr = ({
     });
 
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
-      if (!videoRef.current) return;
-
       const levels = hls.levels;
 
       const quality: Options["quality"] = {
@@ -63,16 +63,20 @@ export const HlsjsPlyr = ({
         },
       };
 
-      playerRef.current = new Plyr(videoRef.current, {
+      playerRef.current = new Plyr(videoElement, {
         quality,
         autoplay: true,
       });
     });
 
-    hls.attachMedia(videoRef.current);
+    hls.attachMedia(videoElement);
     hls.loadSource(streamUrl);
 
-    return () => hls.destroy();
+    return () => {
+      playerRef.current && playerRef.current.destroy();
+      videoContainer.remove();
+      hls.destroy();
+    };
   }, [
     announceTrackers,
     onChunkDownloaded,
@@ -82,9 +86,5 @@ export const HlsjsPlyr = ({
     streamUrl,
   ]);
 
-  return (
-    <div className="video-container">
-      <video ref={videoRef} />
-    </div>
-  );
+  return <div ref={containerRef} />;
 };
