@@ -4,7 +4,7 @@ import { PlayerProps } from "../../../types";
 
 import "shaka-player/dist/controls.css";
 import shaka from "./shaka-import";
-import { getConfiguredShakaP2PEngine } from "../utils";
+import { configureShakaP2PEngineEvents } from "../utils";
 
 export const Shaka = ({
   streamUrl,
@@ -32,20 +32,29 @@ export const Shaka = ({
       videoRef.current,
     );
 
-    const shakaP2PEngine = getConfiguredShakaP2PEngine({
-      announceTrackers,
-      onPeerConnect,
-      onPeerDisconnect,
-      onChunkDownloaded,
-      onChunkUploaded,
+    const shakaP2PEngine = new ShakaP2PEngine(
+      {
+        core: {
+          announceTrackers,
+        },
+      },
       shaka,
-    });
+    );
 
     const setupPlayer = async () => {
       if (!videoRef.current) return;
 
       try {
         await player.attach(videoRef.current);
+
+        configureShakaP2PEngineEvents({
+          engine: shakaP2PEngine,
+          onPeerConnect,
+          onPeerDisconnect,
+          onChunkDownloaded,
+          onChunkUploaded,
+        });
+
         shakaP2PEngine.configureAndInitShakaPlayer(player);
         await player.load(streamUrl);
       } catch (error) {
