@@ -34,6 +34,7 @@ export const HlsjsVime = ({
           });
         },
         core: {
+          swarmId: "custom swarm ID for stream 2000341",
           announceTrackers,
         },
       },

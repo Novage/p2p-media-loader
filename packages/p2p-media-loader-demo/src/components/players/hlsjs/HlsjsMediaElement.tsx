@@ -22,48 +22,56 @@ export const HlsjsMediaElement = ({
   onChunkDownloaded,
   onChunkUploaded,
 }: HlsjsMediaElementProps) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   /* eslint-disable  */
   // @ts-ignore
   const playerRef = useRef<MediaElementPlayer>(null);
 
   useEffect(() => {
-    if (!videoRef.current) return;
+    if (!containerRef.current) return;
+
+    const videoContainer = document.createElement("div");
+    videoContainer.className = "video-container";
+    containerRef.current.appendChild(videoContainer);
+
+    const videoElement = document.createElement("video");
+    videoElement.id = "player";
+    videoContainer.appendChild(videoElement);
 
     window.Hls = HlsJsP2PEngine.injectMixin(Hls);
 
-    if (!playerRef.current) {
-      // @ts-ignore
-      playerRef.current = new MediaElementPlayer("player", {
-        stretching: "responsive",
-        iconSprite: "/mejs-controls.svg",
-        hls: {
-          p2p: {
-            onHlsJsCreated: (hls: HlsWithP2PType<Hls>) => {
-              configureHlsP2PEngineEvents({
-                engine: hls.p2pEngine,
-                onPeerConnect,
-                onPeerDisconnect,
-                onChunkDownloaded,
-                onChunkUploaded,
-              });
-            },
-            core: {
-              swarmId: "custom swarm ID for stream 2000341",
-              announceTrackers,
-            },
+    // @ts-ignore
+    const player = new MediaElementPlayer("player", {
+      stretching: "responsive",
+      iconSprite: "/mejs-controls.svg",
+      hls: {
+        p2p: {
+          onHlsJsCreated: (hls: HlsWithP2PType<Hls>) => {
+            configureHlsP2PEngineEvents({
+              engine: hls.p2pEngine,
+              onPeerConnect,
+              onPeerDisconnect,
+              onChunkDownloaded,
+              onChunkUploaded,
+            });
+          },
+          core: {
+            swarmId: "custom swarm ID for stream 2000341",
+            announceTrackers,
           },
         },
-      });
-    }
+      },
+    });
 
-    playerRef.current.setSrc(streamUrl);
-    playerRef.current.load();
-    /* eslint-enable  */
+    player.setSrc(streamUrl);
+    player.load();
 
     return () => {
       delete window.Hls;
+      videoContainer.remove();
+      player && player.remove();
     };
+    /* eslint-enable  */
   }, [
     announceTrackers,
     onChunkDownloaded,
@@ -73,9 +81,5 @@ export const HlsjsMediaElement = ({
     streamUrl,
   ]);
 
-  return (
-    <div>
-      <video ref={videoRef} id="player" controls autoPlay />
-    </div>
-  );
+  return <div ref={containerRef}></div>;
 };
