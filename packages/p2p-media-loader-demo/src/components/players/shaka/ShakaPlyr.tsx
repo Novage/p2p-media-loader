@@ -1,4 +1,4 @@
-import "./../hlsjs/plyr.css";
+import "plyr/dist/plyr.css";
 import { useEffect, useRef } from "react";
 import shaka from "../shaka/shaka-import";
 import { ShakaP2PEngine } from "p2p-media-loader-shaka";

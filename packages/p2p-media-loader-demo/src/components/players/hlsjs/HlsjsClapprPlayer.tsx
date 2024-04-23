@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { PlayerProps } from "../../../types";
-import { getConfiguredHlsInstance } from "../utils";
+import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
+import { configureHlsP2PEngineEvents } from "../utils";
 
 export const HlsjsClapprPlayer = ({
   streamUrl,
@@ -13,8 +14,15 @@ export const HlsjsClapprPlayer = ({
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const hls = getConfiguredHlsInstance({
-      announceTrackers,
+    const engine = new HlsJsP2PEngine({
+      core: {
+        swarmId: "custom swarm ID for stream 2000341",
+        announceTrackers,
+      },
+    });
+
+    configureHlsP2PEngineEvents({
+      engine,
       onPeerConnect,
       onPeerDisconnect,
       onChunkDownloaded,
@@ -26,7 +34,7 @@ export const HlsjsClapprPlayer = ({
       source: streamUrl,
       playback: {
         hlsjsConfig: {
-          ...hls.p2pEngine.getHlsJsConfig(),
+          ...engine.getHlsJsConfig(),
         },
       },
       plugins: [window.LevelSelector],
@@ -34,11 +42,11 @@ export const HlsjsClapprPlayer = ({
       height: "100%",
     });
 
-    hls.p2pEngine.initClapprPlayer(clapprPlayer);
+    engine.initClapprPlayer(clapprPlayer);
 
     return () => {
       clapprPlayer.destroy();
-      hls.destroy();
+      engine.destroy();
     };
   }, [
     announceTrackers,

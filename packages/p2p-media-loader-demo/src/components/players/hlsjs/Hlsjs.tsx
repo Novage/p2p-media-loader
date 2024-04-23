@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { PlayerProps } from "../../../types";
-import { getConfiguredHlsInstance } from "../utils";
+import { configureHlsP2PEngineEvents } from "../utils";
+import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
+import Hls from "hls.js";
 
 export const HlsjsPlayer = ({
   streamUrl,
@@ -15,8 +17,18 @@ export const HlsjsPlayer = ({
   useEffect(() => {
     if (!videoRef.current) return;
 
-    const hls = getConfiguredHlsInstance({
-      announceTrackers,
+    const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
+
+    const hls = new HlsWithP2P({
+      p2p: {
+        core: {
+          announceTrackers,
+        },
+      },
+    });
+
+    configureHlsP2PEngineEvents({
+      engine: hls.p2pEngine,
       onPeerConnect,
       onPeerDisconnect,
       onChunkDownloaded,

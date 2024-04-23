@@ -1,6 +1,5 @@
-import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
-import { PlayerProps } from "./../../types";
-import Hls from "hls.js";
+import { HlsJsP2PEngine, HlsWithP2PType } from "p2p-media-loader-hlsjs";
+import { PlayerEvents, PlayerProps } from "./../../types";
 import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 
 export const getConfiguredHlsInstance = ({
@@ -10,16 +9,6 @@ export const getConfiguredHlsInstance = ({
   onChunkDownloaded,
   onChunkUploaded,
 }: Partial<PlayerProps>) => {
-  const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
-
-  const hls = new HlsWithP2P({
-    p2p: {
-      core: {
-        announceTrackers,
-      },
-    },
-  });
-
   onPeerConnect &&
     hls.p2pEngine.addEventListener("onPeerConnect", onPeerConnect);
   onPeerDisconnect &&
@@ -30,6 +19,25 @@ export const getConfiguredHlsInstance = ({
     hls.p2pEngine.addEventListener("onChunkUploaded", onChunkUploaded);
 
   return hls;
+};
+
+type configureHlsP2PEngineEventsProps = PlayerEvents & {
+  engine: HlsJsP2PEngine;
+};
+
+export const configureHlsP2PEngineEvents = ({
+  engine,
+  onPeerConnect,
+  onPeerDisconnect,
+  onChunkDownloaded,
+  onChunkUploaded,
+}: configureHlsP2PEngineEventsProps) => {
+  onPeerConnect && engine.addEventListener("onPeerConnect", onPeerConnect);
+  onPeerDisconnect && engine.addEventListener("onPeerClose", onPeerDisconnect);
+  onChunkDownloaded &&
+    engine.addEventListener("onChunkDownloaded", onChunkDownloaded);
+  onChunkUploaded &&
+    engine.addEventListener("onChunkUploaded", onChunkUploaded);
 };
 
 type ShakaP2PEngineProps = Partial<PlayerProps> & {

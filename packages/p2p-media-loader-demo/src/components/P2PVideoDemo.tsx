@@ -1,5 +1,4 @@
 import "./demo.css";
-import type Hls from "hls.js";
 import { PlaybackOptions } from "./PlaybackOptions";
 import { PLAYERS } from "../constants";
 import { useQueryParams } from "../hooks/useQueryParams";
@@ -19,13 +18,6 @@ import { ShakaDPlayer } from "./players/shaka/ShakaDPlayer";
 import { ShakaClappr } from "./players/shaka/ShakaClappr";
 import { HlsjsMediaElement } from "./players/hlsjs/HlsjsMediaElement";
 import { ShakaPlyr } from "./players/shaka/ShakaPlyr";
-
-declare global {
-  interface Window {
-    Hls: typeof Hls;
-    videoPlayer?: { destroy?: () => void };
-  }
-}
 
 type DemoProps = {
   debugToolsEnabled?: boolean;

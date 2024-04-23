@@ -1,9 +1,10 @@
-import "./plyr.css";
+import "plyr/dist/plyr.css";
+import Plyr, { Options } from "plyr";
 import { useEffect, useRef } from "react";
 import { PlayerProps } from "../../../types";
 import Hls from "hls.js";
-import Plyr, { Options } from "plyr";
-import { getConfiguredHlsInstance } from "../utils";
+import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
+import { configureHlsP2PEngineEvents } from "../utils";
 
 export const HlsjsPlyr = ({
   streamUrl,
@@ -25,8 +26,18 @@ export const HlsjsPlyr = ({
   useEffect(() => {
     if (!videoRef.current) return;
 
-    const hls = getConfiguredHlsInstance({
-      announceTrackers,
+    const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
+
+    const hls = new HlsWithP2P({
+      p2p: {
+        core: {
+          announceTrackers,
+        },
+      },
+    });
+
+    configureHlsP2PEngineEvents({
+      engine: hls.p2pEngine,
       onPeerConnect,
       onPeerDisconnect,
       onChunkDownloaded,

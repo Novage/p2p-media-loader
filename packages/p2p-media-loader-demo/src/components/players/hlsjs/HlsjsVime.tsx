@@ -1,17 +1,9 @@
 import { Player, Hls as VimeHls, DefaultUi } from "@vime/react";
-import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
+import { HlsJsP2PEngine, HlsWithP2PType } from "p2p-media-loader-hlsjs";
 import { useRef, useEffect } from "react";
 import { PlayerProps } from "../../../types";
 import Hls from "hls.js";
-
-interface CustomHlsWithP2P extends Hls {
-  p2pEngine: HlsJsP2PEngine;
-}
-
-const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-(window as any).Hls = HlsWithP2P;
+import { configureHlsP2PEngineEvents } from "../utils";
 
 export const HlsjsVime = ({
   streamUrl,
@@ -25,27 +17,30 @@ export const HlsjsVime = ({
 
   useEffect(() => {
     if (!vimeRef.current) return;
+
+    window.Hls = HlsJsP2PEngine.injectMixin(Hls);
+
     const vimeHlsElement = vimeRef.current;
 
     vimeHlsElement.config = {
       p2p: {
-        onHlsJsCreated: (hls: CustomHlsWithP2P) => {
-          onPeerConnect &&
-            hls.p2pEngine.addEventListener("onPeerConnect", onPeerConnect);
-          onPeerDisconnect &&
-            hls.p2pEngine.addEventListener("onPeerClose", onPeerDisconnect);
-          onChunkDownloaded &&
-            hls.p2pEngine.addEventListener(
-              "onChunkDownloaded",
-              onChunkDownloaded,
-            );
-          onChunkUploaded &&
-            hls.p2pEngine.addEventListener("onChunkUploaded", onChunkUploaded);
+        onHlsJsCreated: (hls: HlsWithP2PType<Hls>) => {
+          configureHlsP2PEngineEvents({
+            engine: hls.p2pEngine,
+            onPeerConnect,
+            onPeerDisconnect,
+            onChunkDownloaded,
+            onChunkUploaded,
+          });
         },
         core: {
           announceTrackers,
         },
       },
+    };
+
+    return () => {
+      delete window.Hls;
     };
   }, [
     announceTrackers,

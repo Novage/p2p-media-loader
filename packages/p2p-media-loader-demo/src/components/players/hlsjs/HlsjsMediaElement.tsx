@@ -1,9 +1,11 @@
 import "mediaelement";
 import "mediaelement/build/mediaelementplayer.min.css";
 import { useEffect, useRef } from "react";
-import { getConfiguredHlsInstance } from "../utils";
+import Hls from "hls.js";
+import { HlsJsP2PEngine, HlsWithP2PType } from "p2p-media-loader-hlsjs";
+import { configureHlsP2PEngineEvents } from "../utils";
 
-type HlsjsMediaElelementProps = {
+type HlsjsMediaElementProps = {
   streamUrl: string;
   announceTrackers: string[];
   onPeerConnect?: (peerId: string) => void;
@@ -19,7 +21,7 @@ export const HlsjsMediaElement = ({
   onPeerDisconnect,
   onChunkDownloaded,
   onChunkUploaded,
-}: HlsjsMediaElelementProps) => {
+}: HlsjsMediaElementProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   /* eslint-disable  */
   // @ts-ignore
@@ -28,39 +30,39 @@ export const HlsjsMediaElement = ({
   useEffect(() => {
     if (!videoRef.current) return;
 
-    const hls = getConfiguredHlsInstance({
-      announceTrackers,
-      onPeerConnect,
-      onPeerDisconnect,
-      onChunkDownloaded,
-      onChunkUploaded,
-    });
+    window.Hls = HlsJsP2PEngine.injectMixin(Hls);
 
     if (!playerRef.current) {
       // @ts-ignore
       playerRef.current = new MediaElementPlayer("player", {
         stretching: "responsive",
-        renderers: ["native_hls"],
+        iconSprite: "/mejs-controls.svg",
         hls: {
-          ...hls.p2pEngine.getHlsJsConfig(),
-        },
-        // @ts-ignore
-        success: (mediaElement, originalNode, instance) => {
-          mediaElement.addEventListener("hlsFragChanged", (event: unknown) => {
-            const hlsInstance = mediaElement.hlsPlayer;
-            hlsInstance.p2pEngine.setHls(
-              hlsInstance.p2pEngine.hlsInstanceGetter,
-            );
-          });
+          p2p: {
+            onHlsJsCreated: (hls: HlsWithP2PType<Hls>) => {
+              configureHlsP2PEngineEvents({
+                engine: hls.p2pEngine,
+                onPeerConnect,
+                onPeerDisconnect,
+                onChunkDownloaded,
+                onChunkUploaded,
+              });
+            },
+            core: {
+              swarmId: "custom swarm ID for stream 2000341",
+              announceTrackers,
+            },
+          },
         },
       });
     }
+
+    playerRef.current.setSrc(streamUrl);
+    playerRef.current.load();
     /* eslint-enable  */
-    hls.attachMedia(videoRef.current);
-    hls.loadSource(streamUrl);
 
     return () => {
-      hls.destroy();
+      delete window.Hls;
     };
   }, [
     announceTrackers,
@@ -70,6 +72,7 @@ export const HlsjsMediaElement = ({
     onPeerDisconnect,
     streamUrl,
   ]);
+
   return (
     <div>
       <video ref={videoRef} id="player" controls autoPlay />

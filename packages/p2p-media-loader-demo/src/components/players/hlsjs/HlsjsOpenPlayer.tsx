@@ -1,8 +1,10 @@
-import "./openPlayer.css";
-import { useEffect, useRef } from "react";
+import "openplayerjs/dist/openplayer.min.css";
 import OpenPlayerJS from "openplayerjs";
+import { useEffect, useRef } from "react";
 import { PlayerProps } from "../../../types";
-import { getConfiguredHlsInstance } from "../utils";
+import { HlsJsP2PEngine, HlsWithP2PType } from "p2p-media-loader-hlsjs";
+import Hls from "hls.js";
+import { configureHlsP2PEngineEvents } from "../utils";
 
 export const HlsjsOpenPlayer = ({
   streamUrl,
@@ -18,6 +20,8 @@ export const HlsjsOpenPlayer = ({
   useEffect(() => {
     if (!playerContainerRef.current) return;
 
+    window.Hls = HlsJsP2PEngine.injectMixin(Hls);
+
     const videoContainer = document.createElement("div");
     videoContainer.className = "video-container";
     playerContainerRef.current.appendChild(videoContainer);
@@ -32,6 +36,23 @@ export const HlsjsOpenPlayer = ({
 
       try {
         playerRef.current = new OpenPlayerJS(videoElement, {
+          hls: {
+            p2p: {
+              onHlsJsCreated: (hls: HlsWithP2PType<Hls>) => {
+                configureHlsP2PEngineEvents({
+                  engine: hls.p2pEngine,
+                  onPeerConnect,
+                  onPeerDisconnect,
+                  onChunkDownloaded,
+                  onChunkUploaded,
+                });
+              },
+              core: {
+                swarmId: "custom swarm ID for stream 2000341",
+                trackers: announceTrackers,
+              },
+            },
+          },
           controls: {
             layers: {
               left: ["play", "time", "volume"],
@@ -41,28 +62,22 @@ export const HlsjsOpenPlayer = ({
           },
         });
 
+        playerRef.current.src = [
+          {
+            src: streamUrl,
+            type: "application/x-mpegURL",
+          },
+        ];
+
         await playerRef.current.init();
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error("Failed to initialize OpenPlayerJS", error);
       }
     };
-
-    const hls = getConfiguredHlsInstance({
-      announceTrackers,
-      onPeerConnect,
-      onPeerDisconnect,
-      onChunkDownloaded,
-      onChunkUploaded,
-    });
-
-    hls.attachMedia(videoElement);
-    hls.loadSource(streamUrl);
-
     void initPlayer();
 
     return () => {
-      hls.destroy();
       playerRef.current && playerRef.current.destroy();
       videoElement.remove();
       videoContainer.remove();
@@ -76,5 +91,5 @@ export const HlsjsOpenPlayer = ({
     streamUrl,
   ]);
 
-  return <div ref={playerContainerRef} className="player-container"></div>;
+  return <div ref={playerContainerRef} className="player-container" />;
 };

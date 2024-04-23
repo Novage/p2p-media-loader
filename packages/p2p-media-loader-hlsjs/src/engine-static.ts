@@ -1,4 +1,8 @@
-import { HlsJsP2PEngine, PartialHlsJsP2PEngineConfig } from "./engine";
+import {
+  HlsJsP2PEngine,
+  PartialHlsJsP2PEngineConfig,
+  HlsWithP2PType,
+} from "./engine";
 import { DeepReadonly } from "ts-essentials";
 
 type P2PConfig<T> = {
@@ -40,7 +44,5 @@ export function injectMixin<
   } as new (
     config?: ConstructorParameters<HlsJsConstructor>[0] &
       P2PConfig<InstanceType<HlsJsConstructor>>,
-  ) => InstanceType<HlsJsConstructor> & {
-    readonly p2pEngine: HlsJsP2PEngine;
-  };
+  ) => HlsWithP2PType<InstanceType<HlsJsConstructor>>;
 }

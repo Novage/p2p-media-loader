@@ -1,5 +1,8 @@
+import Hls from "hls.js";
+import { HlsWithP2PType } from "p2p-media-loader-hlsjs";
 declare global {
   interface Window {
+    Hls: typeof HlsWithP2PType<Hls>;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Clappr: any;
     LevelSelector: unknown;
