@@ -15,10 +15,12 @@ export const HlsjsOpenPlayer = ({
   onChunkUploaded,
 }: PlayerProps) => {
   const playerContainerRef = useRef<HTMLDivElement>(null);
-  const playerRef = useRef<OpenPlayerJS | null>(null);
 
   useEffect(() => {
     if (!playerContainerRef.current) return;
+
+    let isCleanedUp = false;
+    let player: OpenPlayerJS | undefined;
 
     window.Hls = HlsJsP2PEngine.injectMixin(Hls);
 
@@ -31,11 +33,20 @@ export const HlsjsOpenPlayer = ({
     videoElement.id = "player";
     videoContainer.appendChild(videoElement);
 
+    const cleanup = () => {
+      isCleanedUp = true;
+      player?.destroy();
+      player = undefined;
+      videoElement.remove();
+      videoContainer.remove();
+      delete window.Hls;
+    };
+
     const initPlayer = async () => {
-      if (!videoElement) return;
+      let playerInit;
 
       try {
-        playerRef.current = new OpenPlayerJS(videoElement, {
+        playerInit = new OpenPlayerJS(videoElement, {
           hls: {
             p2p: {
               onHlsJsCreated: (hls: HlsWithP2PType<Hls>) => {
@@ -62,26 +73,29 @@ export const HlsjsOpenPlayer = ({
           },
         });
 
-        playerRef.current.src = [
+        playerInit.src = [
           {
             src: streamUrl,
             type: "application/x-mpegURL",
           },
         ];
 
-        await playerRef.current.init();
+        await playerInit.init();
+        player = playerInit;
+
+        if (isCleanedUp) cleanup();
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error("Failed to initialize OpenPlayerJS", error);
+        player = playerInit;
+        cleanup();
       }
     };
+
     void initPlayer();
 
     return () => {
-      playerRef.current && playerRef.current.destroy();
-      videoElement.remove();
-      videoContainer.remove();
-      delete window.Hls;
+      cleanup();
     };
   }, [
     announceTrackers,
