@@ -25,8 +25,6 @@ export const HlsjsMediaElement = ({
   const containerRef = useRef<HTMLDivElement>(null);
   /* eslint-disable  */
   // @ts-ignore
-  const playerRef = useRef<MediaElementPlayer>(null);
-
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -68,7 +66,7 @@ export const HlsjsMediaElement = ({
 
     return () => {
       delete window.Hls;
-      if (player) player.remove();
+      player?.remove();
       videoContainer.remove();
     };
     /* eslint-enable  */

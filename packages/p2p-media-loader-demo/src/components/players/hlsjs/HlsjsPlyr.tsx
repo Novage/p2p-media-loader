@@ -15,10 +15,11 @@ export const HlsjsPlyr = ({
   onChunkUploaded,
 }: PlayerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const playerRef = useRef<Plyr | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
+
+    let player: Plyr | undefined;
 
     const videoContainer = document.createElement("div");
     videoContainer.className = "video-container";
@@ -63,7 +64,7 @@ export const HlsjsPlyr = ({
         },
       };
 
-      playerRef.current = new Plyr(videoElement, {
+      player = new Plyr(videoElement, {
         quality,
         autoplay: true,
       });
@@ -73,7 +74,7 @@ export const HlsjsPlyr = ({
     hls.loadSource(streamUrl);
 
     return () => {
-      if (playerRef.current) playerRef.current.destroy();
+      player?.destroy();
       videoContainer.remove();
       hls.destroy();
     };

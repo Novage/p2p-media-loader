@@ -15,7 +15,6 @@ export const ShakaPlyr = ({
   onChunkUploaded,
 }: PlayerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const playerRef = useRef<Plyr | null>(null);
 
   useEffect(() => {
     ShakaP2PEngine.registerPlugins(shaka);
@@ -33,30 +32,47 @@ export const ShakaPlyr = ({
     videoElement.id = "player";
     videoContainer.appendChild(videoElement);
 
-    const shakaP2PEngine = new ShakaP2PEngine(
-      {
-        core: {
-          announceTrackers,
-        },
-      },
-      shaka,
-    );
-    const shakaPlayer = new shaka.Player();
+    let plyrPlayer: Plyr | undefined;
+    let playerShaka: shaka.Player | undefined;
+    let shakaP2PEngine: ShakaP2PEngine | undefined;
+    let isCleanedUp = false;
+
+    const cleanup = () => {
+      isCleanedUp = true;
+      shakaP2PEngine?.destroy();
+      void playerShaka?.destroy();
+      playerShaka = undefined;
+      void plyrPlayer?.destroy();
+      plyrPlayer = undefined;
+      videoContainer.remove();
+    };
 
     const initPlayer = async () => {
       try {
-        await shakaPlayer.attach(videoElement);
+        const shakaP2PEngineInit = new ShakaP2PEngine(
+          {
+            core: {
+              announceTrackers,
+            },
+          },
+          shaka,
+        );
+        const shakaPlayerInit = new shaka.Player();
+
+        await shakaPlayerInit.attach(videoElement);
+
         configureShakaP2PEngineEvents({
-          engine: shakaP2PEngine,
+          engine: shakaP2PEngineInit,
           onPeerConnect,
           onPeerDisconnect,
           onChunkDownloaded,
           onChunkUploaded,
         });
-        shakaP2PEngine.configureAndInitShakaPlayer(shakaPlayer);
-        await shakaPlayer.load(streamUrl);
+        shakaP2PEngineInit.configureAndInitShakaPlayer(shakaPlayerInit);
 
-        const levels = shakaPlayer.getVariantTracks();
+        await shakaPlayerInit.load(streamUrl);
+
+        const levels = shakaPlayerInit.getVariantTracks();
 
         const quality: Options["quality"] = {
           default: levels[levels.length - 1]?.height ?? 0,
@@ -68,33 +84,35 @@ export const ShakaPlyr = ({
           onChange: (newQuality: number) => {
             levels.forEach((level) => {
               if (level.height === newQuality) {
-                shakaPlayer.configure({
+                shakaPlayerInit.configure({
                   abr: { enabled: false },
                 });
-                shakaPlayer.selectVariantTrack(level, true);
+                shakaPlayerInit.selectVariantTrack(level, true);
               }
             });
           },
         };
 
-        playerRef.current = new Plyr(videoElement, {
+        const plyrPlayerInit = new Plyr(videoElement, {
           autoplay: true,
           quality,
         });
+
+        playerShaka = shakaPlayerInit;
+        plyrPlayer = plyrPlayerInit;
+        shakaP2PEngine = shakaP2PEngineInit;
+
+        if (isCleanedUp) cleanup();
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error("Error setting up Shaka Player:", error);
+        cleanup();
       }
     };
 
     void initPlayer();
 
-    return () => {
-      videoContainer.remove();
-      if (playerRef.current) playerRef.current.destroy();
-      void shakaPlayer.destroy();
-      shakaP2PEngine.destroy();
-    };
+    return () => cleanup();
   }, [
     announceTrackers,
     onChunkDownloaded,

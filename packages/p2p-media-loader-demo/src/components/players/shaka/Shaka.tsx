@@ -23,53 +23,67 @@ export const Shaka = ({
   }, []);
 
   useEffect(() => {
-    if (!videoRef.current || !videoContainerRef.current) return;
+    let shakaP2PEngine: ShakaP2PEngine | undefined;
+    let player: shaka.Player | undefined;
+    let ui: shaka.ui.Overlay | undefined;
+    let isCleanedUp = false;
 
-    const player = new shaka.Player();
-    const ui = new shaka.ui.Overlay(
-      player,
-      videoContainerRef.current,
-      videoRef.current,
-    );
-
-    const shakaP2PEngine = new ShakaP2PEngine(
-      {
-        core: {
-          announceTrackers,
-        },
-      },
-      shaka,
-    );
+    const cleanup = () => {
+      isCleanedUp = true;
+      shakaP2PEngine?.destroy();
+      void player?.destroy();
+      player = undefined;
+      void ui?.destroy();
+    };
 
     const setupPlayer = async () => {
-      if (!videoRef.current) return;
+      if (!videoRef.current || !videoContainerRef.current) return;
 
       try {
-        await player.attach(videoRef.current);
+        const playerInit = new shaka.Player();
+        const uiInit = new shaka.ui.Overlay(
+          playerInit,
+          videoContainerRef.current,
+          videoRef.current,
+        );
+
+        const shakaP2PEngineInit = new ShakaP2PEngine(
+          {
+            core: {
+              announceTrackers,
+            },
+          },
+          shaka,
+        );
+
+        await playerInit.attach(videoRef.current);
 
         configureShakaP2PEngineEvents({
-          engine: shakaP2PEngine,
+          engine: shakaP2PEngineInit,
           onPeerConnect,
           onPeerDisconnect,
           onChunkDownloaded,
           onChunkUploaded,
         });
 
-        shakaP2PEngine.configureAndInitShakaPlayer(player);
-        await player.load(streamUrl);
+        shakaP2PEngineInit.configureAndInitShakaPlayer(playerInit);
+        await playerInit.load(streamUrl);
+
+        player = playerInit;
+        ui = uiInit;
+        shakaP2PEngine = shakaP2PEngineInit;
+
+        if (isCleanedUp) cleanup();
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error("Error setting up Shaka Player:", error);
+        cleanup();
       }
     };
 
     void setupPlayer();
 
-    return () => {
-      shakaP2PEngine.destroy();
-      void player.destroy();
-      void ui.destroy();
-    };
+    return () => cleanup();
   }, [
     announceTrackers,
     onChunkDownloaded,
