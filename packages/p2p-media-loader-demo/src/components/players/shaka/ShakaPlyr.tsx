@@ -91,7 +91,7 @@ export const ShakaPlyr = ({
 
     return () => {
       videoContainer.remove();
-      playerRef.current && playerRef.current.destroy();
+      if (playerRef.current) playerRef.current.destroy();
       void shakaPlayer.destroy();
       shakaP2PEngine.destroy();
     };

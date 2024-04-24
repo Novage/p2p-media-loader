@@ -41,7 +41,7 @@ export const HlsjsMediaElement = ({
     window.Hls = HlsJsP2PEngine.injectMixin(Hls);
 
     // @ts-ignore
-    const player = new MediaElementPlayer("player", {
+    const player = new MediaElementPlayer(videoElement.id, {
       stretching: "responsive",
       iconSprite: "/mejs-controls.svg",
       hls: {
@@ -68,8 +68,8 @@ export const HlsjsMediaElement = ({
 
     return () => {
       delete window.Hls;
+      if (player) player.remove();
       videoContainer.remove();
-      player && player.remove();
     };
     /* eslint-enable  */
   }, [

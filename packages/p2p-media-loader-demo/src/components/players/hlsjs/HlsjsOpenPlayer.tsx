@@ -94,9 +94,7 @@ export const HlsjsOpenPlayer = ({
 
     void initPlayer();
 
-    return () => {
-      cleanup();
-    };
+    return () => cleanup();
   }, [
     announceTrackers,
     onChunkDownloaded,

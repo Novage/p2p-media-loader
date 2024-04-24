@@ -73,7 +73,7 @@ export const HlsjsPlyr = ({
     hls.loadSource(streamUrl);
 
     return () => {
-      playerRef.current && playerRef.current.destroy();
+      if (playerRef.current) playerRef.current.destroy();
       videoContainer.remove();
       hls.destroy();
     };

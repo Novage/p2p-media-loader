@@ -13,12 +13,16 @@ export const configureHlsP2PEngineEvents = ({
   onChunkDownloaded,
   onChunkUploaded,
 }: ConfigureHlsP2PEngineEventsProps) => {
-  onPeerConnect && engine.addEventListener("onPeerConnect", onPeerConnect);
-  onPeerDisconnect && engine.addEventListener("onPeerClose", onPeerDisconnect);
-  onChunkDownloaded &&
+  if (onPeerConnect) engine.addEventListener("onPeerConnect", onPeerConnect);
+  if (onPeerDisconnect) {
+    engine.addEventListener("onPeerClose", onPeerDisconnect);
+  }
+  if (onChunkDownloaded) {
     engine.addEventListener("onChunkDownloaded", onChunkDownloaded);
-  onChunkUploaded &&
+  }
+  if (onChunkUploaded) {
     engine.addEventListener("onChunkUploaded", onChunkUploaded);
+  }
 };
 
 type ConfigureShakaP2PEngineEvents = PlayerEvents & {
@@ -32,10 +36,14 @@ export const configureShakaP2PEngineEvents = ({
   onChunkUploaded,
   engine,
 }: ConfigureShakaP2PEngineEvents) => {
-  onPeerConnect && engine.addEventListener("onPeerConnect", onPeerConnect);
-  onPeerDisconnect && engine.addEventListener("onPeerClose", onPeerDisconnect);
-  onChunkDownloaded &&
+  if (onPeerConnect) engine.addEventListener("onPeerConnect", onPeerConnect);
+  if (onPeerDisconnect) {
+    engine.addEventListener("onPeerClose", onPeerDisconnect);
+  }
+  if (onChunkDownloaded) {
     engine.addEventListener("onChunkDownloaded", onChunkDownloaded);
-  onChunkUploaded &&
+  }
+  if (onChunkUploaded) {
     engine.addEventListener("onChunkUploaded", onChunkUploaded);
+  }
 };
