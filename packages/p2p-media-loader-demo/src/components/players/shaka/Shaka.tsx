@@ -23,21 +23,20 @@ export const Shaka = ({
   }, []);
 
   useEffect(() => {
-    let shakaP2PEngine: ShakaP2PEngine | undefined;
-    let player: shaka.Player | undefined;
-    let ui: shaka.ui.Overlay | undefined;
     let isCleanedUp = false;
-
-    const cleanup = () => {
-      isCleanedUp = true;
-      shakaP2PEngine?.destroy();
-      void player?.destroy();
-      player = undefined;
-      void ui?.destroy();
-    };
 
     const setupPlayer = async () => {
       if (!videoRef.current || !videoContainerRef.current) return;
+
+      let shakaP2PEngine: ShakaP2PEngine | undefined;
+      let player: shaka.Player | undefined;
+      let ui: shaka.ui.Overlay | undefined;
+
+      const cleanup = () => {
+        void player?.destroy();
+        void ui?.destroy();
+        shakaP2PEngine?.destroy();
+      };
 
       try {
         const playerInit = new shaka.Player();
@@ -83,7 +82,9 @@ export const Shaka = ({
 
     void setupPlayer();
 
-    return () => cleanup();
+    return () => {
+      isCleanedUp = true;
+    };
   }, [
     announceTrackers,
     onChunkDownloaded,

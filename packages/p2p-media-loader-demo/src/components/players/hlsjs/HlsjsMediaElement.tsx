@@ -40,8 +40,8 @@ export const HlsjsMediaElement = ({
 
     // @ts-ignore
     const player = new MediaElementPlayer(videoElement.id, {
-      stretching: "responsive",
       iconSprite: "/mejs-controls.svg",
+      videoHeight: "100%",
       hls: {
         p2p: {
           onHlsJsCreated: (hls: HlsWithP2PType<Hls>) => {
@@ -79,5 +79,5 @@ export const HlsjsMediaElement = ({
     streamUrl,
   ]);
 
-  return <div ref={containerRef}></div>;
+  return <div ref={containerRef} />;
 };
