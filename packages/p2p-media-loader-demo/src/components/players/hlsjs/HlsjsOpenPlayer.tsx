@@ -81,6 +81,7 @@ export const HlsjsOpenPlayer = ({
       playerRef.current && playerRef.current.destroy();
       videoElement.remove();
       videoContainer.remove();
+      delete window.Hls;
     };
   }, [
     announceTrackers,
