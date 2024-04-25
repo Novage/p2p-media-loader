@@ -1,3 +1,4 @@
+import "./clappr.css";
 import { useEffect, useRef } from "react";
 import { PlayerProps } from "../../../types";
 import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
@@ -57,11 +58,5 @@ export const HlsjsClapprPlayer = ({
     streamUrl,
   ]);
 
-  return (
-    <div
-      ref={containerRef}
-      id="player-container"
-      style={{ width: "100%", height: "411px" }}
-    />
-  );
+  return <div ref={containerRef} id="clappr-player" />;
 };
