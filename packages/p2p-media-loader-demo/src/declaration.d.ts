@@ -4,10 +4,8 @@ import Hls from "hls.js";
 const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
 declare global {
   interface Window {
-    shaka?: shaka;
+    shaka?: unknown;
     Hls?: typeof HlsWithP2P;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    Clappr: any;
     LevelSelector: unknown;
     DashShakaPlayback: unknown;
   }
