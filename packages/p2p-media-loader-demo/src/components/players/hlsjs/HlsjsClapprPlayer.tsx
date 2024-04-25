@@ -30,6 +30,8 @@ export const HlsjsClapprPlayer = ({
       onChunkUploaded,
     });
 
+    /* eslint-disable  */
+    // @ts-ignore
     const clapprPlayer = new Clappr.Player({
       parentId: `#${containerRef.current?.id}`,
       source: streamUrl,
@@ -49,6 +51,7 @@ export const HlsjsClapprPlayer = ({
       clapprPlayer.destroy();
       engine.destroy();
     };
+    /* eslint-enable  */
   }, [
     announceTrackers,
     onChunkDownloaded,

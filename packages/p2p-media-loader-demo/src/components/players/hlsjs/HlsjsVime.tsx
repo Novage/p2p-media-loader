@@ -18,6 +18,8 @@ export const HlsjsVime = ({
   useEffect(() => {
     if (!vimeRef.current) return;
 
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
     window.Hls = HlsJsP2PEngine.injectMixin(Hls);
 
     const vimeHlsElement = vimeRef.current;
@@ -41,7 +43,9 @@ export const HlsjsVime = ({
     };
 
     return () => {
-      delete window.Hls;
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      window.Hls = undefined;
     };
   }, [
     announceTrackers,

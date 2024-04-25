@@ -31,6 +31,8 @@ export const ShakaClappr = ({
       window.shaka,
     );
 
+    /* eslint-disable  */
+    // @ts-ignore
     const clapprPlayer = new Clappr.Player({
       parentId: `#${containerRef.current.id}`,
       source: streamUrl,
@@ -54,6 +56,7 @@ export const ShakaClappr = ({
       shakaP2PEngine.destroy();
       clapprPlayer.destroy();
     };
+    /* eslint-enable  */
   }, [
     announceTrackers,
     onChunkDownloaded,

@@ -36,6 +36,7 @@ export const HlsjsMediaElement = ({
     videoElement.id = "player";
     videoContainer.appendChild(videoElement);
 
+    // @ts-ignore
     window.Hls = HlsJsP2PEngine.injectMixin(Hls);
 
     // @ts-ignore
@@ -65,7 +66,8 @@ export const HlsjsMediaElement = ({
     player.load();
 
     return () => {
-      delete window.Hls;
+      // @ts-ignore
+      window.Hls = undefined;
       player?.remove();
       videoContainer.remove();
     };
