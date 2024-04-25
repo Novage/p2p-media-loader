@@ -1,4 +1,4 @@
-import "./clappr.css";
+import "../clappr.css";
 import { useEffect, useRef } from "react";
 import { PlayerProps } from "../../../types";
 import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";

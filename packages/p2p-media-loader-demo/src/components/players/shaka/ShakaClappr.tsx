@@ -1,3 +1,4 @@
+import "../clappr.css";
 import { useEffect, useRef } from "react";
 import { PlayerProps } from "../../../types";
 import { ShakaP2PEngine } from "p2p-media-loader-shaka";
@@ -31,7 +32,7 @@ export const ShakaClappr = ({
     );
 
     const clapprPlayer = new Clappr.Player({
-      parentId: "#player-container",
+      parentId: `#${containerRef.current.id}`,
       source: streamUrl,
       plugins: [window.DashShakaPlayback, window.LevelSelector],
       shakaOnBeforeLoad: (shakaPlayerInstance: shaka.Player) => {
@@ -62,11 +63,5 @@ export const ShakaClappr = ({
     streamUrl,
   ]);
 
-  return (
-    <div
-      ref={containerRef}
-      id="player-container"
-      style={{ width: "100%", height: "411px" }}
-    />
-  );
+  return <div ref={containerRef} id="clappr-player" />;
 };
