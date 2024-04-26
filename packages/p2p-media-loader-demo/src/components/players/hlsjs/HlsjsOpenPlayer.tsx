@@ -22,8 +22,6 @@ export const HlsjsOpenPlayer = ({
     let isCleanedUp = false;
     let player: OpenPlayerJS | undefined;
 
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
     window.Hls = HlsJsP2PEngine.injectMixin(Hls);
 
     const videoContainer = document.createElement("div");
@@ -41,8 +39,6 @@ export const HlsjsOpenPlayer = ({
       player = undefined;
       videoElement.remove();
       videoContainer.remove();
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
       window.Hls = undefined;
     };
 
