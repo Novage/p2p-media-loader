@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PlayerProps } from "../../../types";
 import DPlayer from "dplayer";
 import { configureHlsP2PEngineEvents } from "../utils";
@@ -13,10 +13,17 @@ export const HlsjsDPlayer = ({
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
+  const [isHlsSupported, setIsHlsSupported] = useState(true);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!Hls.isSupported()) {
+      setIsHlsSupported(false);
+      return;
+    }
+
     if (!videoRef.current) return;
 
     const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
@@ -67,9 +74,13 @@ export const HlsjsDPlayer = ({
     onChunkUploaded,
   ]);
 
-  return (
+  return isHlsSupported ? (
     <div ref={containerRef} className="video-container">
       <video ref={videoRef} autoPlay controls />
+    </div>
+  ) : (
+    <div className="error-message">
+      <h3>HLS is not supported in this browser</h3>
     </div>
   );
 };

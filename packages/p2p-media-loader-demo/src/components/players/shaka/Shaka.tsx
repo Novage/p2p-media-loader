@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 import { PlayerProps } from "../../../types";
 
@@ -14,6 +14,8 @@ export const Shaka = ({
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
+  const [isShakaSupported, setIsShakaSupported] = useState(true);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
 
@@ -23,6 +25,11 @@ export const Shaka = ({
   }, []);
 
   useEffect(() => {
+    if (!shaka.Player.isBrowserSupported()) {
+      setIsShakaSupported(false);
+      return;
+    }
+
     let isCleanedUp = false;
 
     let shakaP2PEngine: ShakaP2PEngine | undefined;
@@ -94,9 +101,13 @@ export const Shaka = ({
     streamUrl,
   ]);
 
-  return (
+  return isShakaSupported ? (
     <div ref={videoContainerRef} className="video-container">
       <video ref={videoRef} autoPlay className="video-player" />
+    </div>
+  ) : (
+    <div className="error-message">
+      <h3>Shaka Player is not supported in this browser</h3>
     </div>
   );
 };

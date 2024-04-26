@@ -1,6 +1,6 @@
 import "mediaelement";
 import "mediaelement/build/mediaelementplayer.min.css";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import { HlsJsP2PEngine, HlsWithP2PType } from "p2p-media-loader-hlsjs";
 import { configureHlsP2PEngineEvents } from "../utils";
@@ -22,10 +22,17 @@ export const HlsjsMediaElement = ({
   onChunkDownloaded,
   onChunkUploaded,
 }: HlsjsMediaElementProps) => {
+  const [isHlsSupported, setIsHlsSupported] = useState(true);
+
   const containerRef = useRef<HTMLDivElement>(null);
   /* eslint-disable  */
   // @ts-ignore
   useEffect(() => {
+    if (!Hls.isSupported()) {
+      setIsHlsSupported(false);
+      return;
+    }
+
     if (!containerRef.current) return;
 
     const videoContainer = document.createElement("div");
@@ -79,5 +86,11 @@ export const HlsjsMediaElement = ({
     streamUrl,
   ]);
 
-  return <div ref={containerRef} />;
+  return isHlsSupported ? (
+    <div ref={containerRef} />
+  ) : (
+    <div className="error-message">
+      <h3>HLS is not supported in this browser</h3>
+    </div>
+  );
 };

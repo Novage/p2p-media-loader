@@ -1,6 +1,6 @@
 import "plyr/dist/plyr.css";
 import Plyr, { Options } from "plyr";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PlayerProps } from "../../../types";
 import Hls from "hls.js";
 import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
@@ -14,9 +14,16 @@ export const HlsjsPlyr = ({
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
+  const [isHlsSupported, setIsHlsSupported] = useState(true);
+
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!Hls.isSupported()) {
+      setIsHlsSupported(false);
+      return;
+    }
+
     if (!containerRef.current) return;
 
     let player: Plyr | undefined;
@@ -87,5 +94,11 @@ export const HlsjsPlyr = ({
     streamUrl,
   ]);
 
-  return <div ref={containerRef} />;
+  return isHlsSupported ? (
+    <div ref={containerRef} />
+  ) : (
+    <div className="error-message">
+      <h3>HLS is not supported in this browser</h3>
+    </div>
+  );
 };

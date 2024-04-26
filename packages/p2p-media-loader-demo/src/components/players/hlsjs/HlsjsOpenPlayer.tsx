@@ -1,6 +1,6 @@
 import "openplayerjs/dist/openplayer.min.css";
 import OpenPlayerJS from "openplayerjs";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PlayerProps } from "../../../types";
 import { HlsJsP2PEngine, HlsWithP2PType } from "p2p-media-loader-hlsjs";
 import Hls from "hls.js";
@@ -14,9 +14,16 @@ export const HlsjsOpenPlayer = ({
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
+  const [isHlsSupported, setIsHlsSupported] = useState(true);
+
   const playerContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!Hls.isSupported()) {
+      setIsHlsSupported(false);
+      return;
+    }
+
     if (!playerContainerRef.current) return;
 
     let isCleanedUp = false;
@@ -104,5 +111,11 @@ export const HlsjsOpenPlayer = ({
     streamUrl,
   ]);
 
-  return <div ref={playerContainerRef} className="player-container" />;
+  return isHlsSupported ? (
+    <div ref={playerContainerRef} className="player-container" />
+  ) : (
+    <div className="error-message">
+      <h3>HLS is not supported in this browser</h3>
+    </div>
+  );
 };

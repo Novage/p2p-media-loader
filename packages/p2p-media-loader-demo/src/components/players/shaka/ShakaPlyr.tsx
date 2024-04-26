@@ -1,5 +1,5 @@
 import "plyr/dist/plyr.css";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import shaka from "../shaka/shaka-import";
 import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 import { PlayerProps } from "../../../types";
@@ -14,6 +14,8 @@ export const ShakaPlyr = ({
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
+  const [isShakaSupported, setIsShakaSupported] = useState(true);
+
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -22,6 +24,11 @@ export const ShakaPlyr = ({
   }, []);
 
   useEffect(() => {
+    if (!shaka.Player.isBrowserSupported()) {
+      setIsShakaSupported(false);
+      return;
+    }
+
     if (!containerRef.current) return;
 
     const videoContainer = document.createElement("div");
@@ -122,5 +129,11 @@ export const ShakaPlyr = ({
     streamUrl,
   ]);
 
-  return <div ref={containerRef} />;
+  return isShakaSupported ? (
+    <div ref={containerRef} />
+  ) : (
+    <div className="error-message">
+      <h3>Shaka Player is not supported in this browser</h3>
+    </div>
+  );
 };

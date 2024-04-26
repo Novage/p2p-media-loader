@@ -1,5 +1,5 @@
 import "../clappr.css";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PlayerProps } from "../../../types";
 import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 import { configureShakaP2PEngineEvents } from "../utils";
@@ -12,6 +12,8 @@ export const ShakaClappr = ({
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
+  const [isShakaSupported, setIsShakaSupported] = useState(true);
+
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -20,6 +22,11 @@ export const ShakaClappr = ({
   }, []);
 
   useEffect(() => {
+    if (!window.shaka.Player.isBrowserSupported()) {
+      setIsShakaSupported(false);
+      return;
+    }
+
     if (!containerRef.current) return;
 
     const shakaP2PEngine = new ShakaP2PEngine(
@@ -66,5 +73,11 @@ export const ShakaClappr = ({
     streamUrl,
   ]);
 
-  return <div ref={containerRef} id="clappr-player" />;
+  return isShakaSupported ? (
+    <div ref={containerRef} id="clappr-player" />
+  ) : (
+    <div className="error-message">
+      <h3>Shaka Player is not supported in this browser</h3>
+    </div>
+  );
 };

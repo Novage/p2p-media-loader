@@ -1,6 +1,6 @@
 import { Player, Hls as VimeHls, DefaultUi } from "@vime/react";
 import { HlsJsP2PEngine, HlsWithP2PType } from "p2p-media-loader-hlsjs";
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { PlayerProps } from "../../../types";
 import Hls from "hls.js";
 import { configureHlsP2PEngineEvents } from "../utils";
@@ -13,9 +13,16 @@ export const HlsjsVime = ({
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
+  const [isHlsSupported, setIsHlsSupported] = useState(true);
+
   const vimeRef = useRef<HTMLVmHlsElement>(null);
 
   useEffect(() => {
+    if (!Hls.isSupported()) {
+      setIsHlsSupported(false);
+      return;
+    }
+
     if (!vimeRef.current) return;
 
     window.Hls = HlsJsP2PEngine.injectMixin(Hls);
@@ -51,7 +58,7 @@ export const HlsjsVime = ({
     onPeerDisconnect,
   ]);
 
-  return (
+  return isHlsSupported ? (
     <div>
       <link
         rel="stylesheet"
@@ -63,6 +70,10 @@ export const HlsjsVime = ({
         </VimeHls>
         <DefaultUi />
       </Player>
+    </div>
+  ) : (
+    <div className="error-message">
+      <h3>HLS is not supported in this browser</h3>
     </div>
   );
 };

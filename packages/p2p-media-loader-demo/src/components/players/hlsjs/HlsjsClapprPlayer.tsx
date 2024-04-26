@@ -1,8 +1,9 @@
 import "../clappr.css";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PlayerProps } from "../../../types";
 import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 import { configureHlsP2PEngineEvents } from "../utils";
+import Hls from "hls.js";
 
 export const HlsjsClapprPlayer = ({
   streamUrl,
@@ -12,9 +13,18 @@ export const HlsjsClapprPlayer = ({
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
+  const [isHlsSupported, setIsHlsSupported] = useState(true);
+
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!Hls.isSupported()) {
+      setIsHlsSupported(false);
+      return;
+    }
+
+    if (!containerRef.current) return;
+
     const engine = new HlsJsP2PEngine({
       core: {
         swarmId: "custom swarm ID for stream 2000341",
@@ -33,7 +43,7 @@ export const HlsjsClapprPlayer = ({
     /* eslint-disable  */
     // @ts-ignore
     const clapprPlayer = new Clappr.Player({
-      parentId: `#${containerRef.current?.id}`,
+      parentId: `#${containerRef.current.id}`,
       source: streamUrl,
       playback: {
         hlsjsConfig: {
@@ -61,5 +71,11 @@ export const HlsjsClapprPlayer = ({
     streamUrl,
   ]);
 
-  return <div ref={containerRef} id="clappr-player" />;
+  return isHlsSupported ? (
+    <div ref={containerRef} id="clappr-player" />
+  ) : (
+    <div className="error-message">
+      <h3>HLS is not supported in this browser</h3>
+    </div>
+  );
 };
