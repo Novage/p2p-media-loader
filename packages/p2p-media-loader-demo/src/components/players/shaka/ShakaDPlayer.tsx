@@ -15,7 +15,6 @@ export const ShakaDPlayer = ({
 }: PlayerProps) => {
   const [isShakaSupported, setIsShakaSupported] = useState(true);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -28,8 +27,6 @@ export const ShakaDPlayer = ({
       setIsShakaSupported(false);
       return;
     }
-
-    if (!videoRef.current) return;
 
     const shakaP2PEngine = new ShakaP2PEngine(
       {
@@ -79,9 +76,7 @@ export const ShakaDPlayer = ({
   ]);
 
   return isShakaSupported ? (
-    <div ref={containerRef} className="video-container">
-      <video ref={videoRef} autoPlay controls />
-    </div>
+    <div ref={containerRef} className="video-container" />
   ) : (
     <div className="error-message">
       <h3>Shaka Player is not supported in this browser</h3>

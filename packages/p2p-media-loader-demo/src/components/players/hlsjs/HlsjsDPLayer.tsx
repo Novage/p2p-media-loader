@@ -15,7 +15,6 @@ export const HlsjsDPlayer = ({
 }: PlayerProps) => {
   const [isHlsSupported, setIsHlsSupported] = useState(true);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -23,8 +22,6 @@ export const HlsjsDPlayer = ({
       setIsHlsSupported(false);
       return;
     }
-
-    if (!videoRef.current) return;
 
     const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
 
@@ -75,9 +72,7 @@ export const HlsjsDPlayer = ({
   ]);
 
   return isHlsSupported ? (
-    <div ref={containerRef} className="video-container">
-      <video ref={videoRef} autoPlay controls />
-    </div>
+    <div ref={containerRef} className="video-container"></div>
   ) : (
     <div className="error-message">
       <h3>HLS is not supported in this browser</h3>
