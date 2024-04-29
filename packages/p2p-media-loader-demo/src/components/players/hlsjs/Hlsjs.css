@@ -1,0 +1,45 @@
+.select-container {
+  position: relative;
+  width: 150px;
+  float: right;
+}
+
+.select-container select {
+  width: 100%;
+  padding: 8px 16px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: white;
+  font-size: 16px;
+  color: #333;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+}
+
+.select-container:after {
+  content: "▼";
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  color: #888;
+  pointer-events: none;
+  font-size: 12px;
+}
+
+.select-container select:hover {
+  border-color: #888;
+}
+
+.select-container select:focus {
+  outline: none;
+  border-color: #555;
+}
+
+.select-container select:disabled {
+  background-color: #eee;
+  color: #666;
+  cursor: not-allowed;
+}

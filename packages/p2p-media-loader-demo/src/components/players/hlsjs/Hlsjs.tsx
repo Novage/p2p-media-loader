@@ -1,3 +1,4 @@
+import "./Hlsjs.css";
 import { useEffect, useRef, useState } from "react";
 import { PlayerProps } from "../../../types";
 import { configureHlsP2PEngineEvents } from "../utils";
@@ -15,6 +16,7 @@ export const HlsjsPlayer = ({
   const [isHlsSupported, setIsHlsSupported] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const qualityRef = useRef<HTMLSelectElement>(null);
 
   useEffect(() => {
     if (!Hls.isSupported()) {
@@ -45,6 +47,11 @@ export const HlsjsPlayer = ({
     hls.attachMedia(videoRef.current);
     hls.loadSource(streamUrl);
 
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      if (!qualityRef.current) return;
+      updateQualityOptions(hls, qualityRef.current);
+    });
+
     return () => hls.destroy();
   }, [
     onPeerConnect,
@@ -55,9 +62,30 @@ export const HlsjsPlayer = ({
     announceTrackers,
   ]);
 
+  const updateQualityOptions = (hls: Hls, selectElement: HTMLSelectElement) => {
+    if (hls.levels.length < 2) {
+      selectElement.style.display = "none";
+    } else {
+      selectElement.style.display = "block";
+      selectElement.options.length = 0;
+      selectElement.add(new Option("Auto", "-1"));
+      hls.levels.forEach((level, index) => {
+        const label = `${level.height}p (${Math.round(level.bitrate / 1000)}k)`;
+        selectElement.add(new Option(label, index.toString()));
+      });
+
+      selectElement.addEventListener("change", () => {
+        hls.currentLevel = parseInt(selectElement.value);
+      });
+    }
+  };
+
   return isHlsSupported ? (
     <div className="video-container">
       <video ref={videoRef} autoPlay controls />
+      <div className="select-container">
+        <select ref={qualityRef} className="quality-selector" />
+      </div>
     </div>
   ) : (
     <div className="error-message">
