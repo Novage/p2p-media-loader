@@ -1,4 +1,4 @@
-import { Player, Hls as VimeHls, DefaultUi } from "@vime/react";
+import { Player, Hls as VimeHls, DefaultUi, Video } from "@vime/react";
 import { HlsJsP2PEngine, HlsWithP2PType } from "p2p-media-loader-hlsjs";
 import { useRef, useEffect, useState } from "react";
 import { PlayerProps } from "../../../types";
@@ -64,7 +64,7 @@ export const HlsjsVime = ({
         rel="stylesheet"
         href="https://cdn.jsdelivr.net/npm/@vime/core@^5/themes/default.css"
       />
-      <Player autoplay={true}>
+      <Player playsinline>
         <VimeHls ref={vimeRef}>
           <source data-src={streamUrl} type="application/x-mpegURL" />
         </VimeHls>

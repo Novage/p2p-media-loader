@@ -34,6 +34,7 @@ export const HlsjsPlyr = ({
 
     const videoElement = document.createElement("video");
     videoElement.id = "player";
+    videoElement.playsInline = true;
     videoContainer.appendChild(videoElement);
 
     const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
@@ -73,7 +74,6 @@ export const HlsjsPlyr = ({
 
       player = new Plyr(videoElement, {
         quality,
-        autoplay: true,
       });
     });
 

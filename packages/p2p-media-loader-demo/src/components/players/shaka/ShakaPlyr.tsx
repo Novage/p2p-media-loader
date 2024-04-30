@@ -37,6 +37,7 @@ export const ShakaPlyr = ({
 
     const videoElement = document.createElement("video");
     videoElement.id = "player";
+    videoElement.playsInline = true;
     videoContainer.appendChild(videoElement);
 
     let plyrPlayer: Plyr | undefined;
@@ -101,7 +102,6 @@ export const ShakaPlyr = ({
         };
 
         const plyrPlayerInit = new Plyr(videoElement, {
-          autoplay: true,
           quality,
         });
 

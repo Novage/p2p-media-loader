@@ -76,7 +76,9 @@ export const ShakaDPlayer = ({
   ]);
 
   return isShakaSupported ? (
-    <div ref={containerRef} className="video-container" />
+    <div ref={containerRef} className="video-container">
+      <video playsInline />
+    </div>
   ) : (
     <div className="error-message">
       <h3>Shaka Player is not supported in this browser</h3>

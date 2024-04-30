@@ -36,6 +36,7 @@ export const HlsjsDPlayer = ({
 
     const player = new DPlayer({
       container: containerRef.current,
+
       video: {
         url: "",
         type: "customHls",
@@ -72,7 +73,9 @@ export const HlsjsDPlayer = ({
   ]);
 
   return isHlsSupported ? (
-    <div ref={containerRef} className="video-container"></div>
+    <div ref={containerRef} className="video-container">
+      <video playsInline />
+    </div>
   ) : (
     <div className="error-message">
       <h3>HLS is not supported in this browser</h3>

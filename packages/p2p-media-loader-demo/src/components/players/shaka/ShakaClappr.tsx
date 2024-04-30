@@ -44,6 +44,9 @@ export const ShakaClappr = ({
       parentId: `#${containerRef.current.id}`,
       source: streamUrl,
       plugins: [window.DashShakaPlayback, window.LevelSelector],
+      playback: {
+        playInline: true,
+      },
       shakaOnBeforeLoad: (shakaPlayerInstance: shaka.Player) => {
         configureShakaP2PEngineEvents({
           engine: shakaP2PEngine,
