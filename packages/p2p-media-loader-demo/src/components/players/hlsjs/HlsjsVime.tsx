@@ -1,4 +1,4 @@
-import { Player, Hls as VimeHls, DefaultUi, Video } from "@vime/react";
+import { Player, Hls as VimeHls, DefaultUi } from "@vime/react";
 import { HlsJsP2PEngine, HlsWithP2PType } from "p2p-media-loader-hlsjs";
 import { useRef, useEffect, useState } from "react";
 import { PlayerProps } from "../../../types";
@@ -57,30 +57,6 @@ export const HlsjsVime = ({
     onPeerConnect,
     onPeerDisconnect,
   ]);
-
-  const isDev = true;
-
-  if (isDev) {
-    return (
-      <>
-        <div>
-          <link
-            rel="stylesheet"
-            href="https://cdn.jsdelivr.net/npm/@vime/core@^5/themes/default.css"
-          />
-          <Player playsinline>
-            <Video>
-              <source
-                src="https://cdn.plyr.io/static/demo/View_From_A_Blue_Moon_Trailer-1080p.mp4"
-                type="video/mp4"
-              />
-            </Video>
-            <DefaultUi />
-          </Player>
-        </div>
-      </>
-    );
-  }
 
   return isHlsSupported ? (
     <div>

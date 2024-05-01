@@ -17,9 +17,9 @@
     "dplayer": "^1.27.1",
     "mux.js": "^6.3.0",
     "p2p-media-loader-core": "workspace:*",
+    "p2p-media-loader-demo": "workspace:*",
     "p2p-media-loader-hlsjs": "workspace:*",
     "p2p-media-loader-shaka": "workspace:*",
-    "p2p-media-loader-demo": "workspace:*",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

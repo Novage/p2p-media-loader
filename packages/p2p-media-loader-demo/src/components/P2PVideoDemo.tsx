@@ -20,6 +20,7 @@ import { HlsjsMediaElement } from "./players/hlsjs/HlsjsMediaElement";
 import { ShakaPlyr } from "./players/shaka/ShakaPlyr";
 import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 import Hls from "hls.js";
+import { HlsjsVidstack } from "./players/hlsjs/HlsjsVidstack";
 
 type DemoProps = {
   debugToolsEnabled?: boolean;
@@ -48,6 +49,7 @@ const playerComponents = {
   clappr_shaka: ShakaClappr,
   mediaElement_hls: HlsjsMediaElement,
   plyr_shaka: ShakaPlyr,
+  vidstack_hls: HlsjsVidstack,
 };
 
 export const P2PVideoDemo = ({ debugToolsEnabled }: DemoProps) => {
