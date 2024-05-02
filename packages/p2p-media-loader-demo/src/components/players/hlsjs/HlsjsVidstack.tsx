@@ -59,6 +59,9 @@ export const HlsjsVidstack = ({
   const onProviderChange = useCallback(
     (provider: MediaProviderAdapter | null) => {
       if (isHLSProvider(provider) && engineRef.current) {
+        provider.library =
+          "https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.7/hls.min.js";
+
         provider.config = {
           ...engineRef.current.getHlsJsConfig(),
         };
