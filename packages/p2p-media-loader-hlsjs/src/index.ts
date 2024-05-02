@@ -5,4 +5,5 @@ export type {
   HlsJsP2PEngineConfig,
   PartialHlsJsP2PEngineConfig,
   HlsWithP2PType,
+  HlsWithP2PConfig,
 } from "./engine";
