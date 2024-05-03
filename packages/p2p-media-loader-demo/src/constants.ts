@@ -1,4 +1,5 @@
 export const PLAYERS = {
+  vidstack_hls: "Vidstack",
   hlsjs_hls: "Hls.js",
   dplayer_hls: "DPlayer",
   clappr_hls: "Clappr",
@@ -6,7 +7,6 @@ export const PLAYERS = {
   plyr_hls: "Plyr",
   openPlayer_hls: "OpenPlayerJS",
   mediaElement_hls: "MediaElement",
-  vidstack_hls: "Vidstack",
   shaka: "Shaka",
   dplayer_shaka: "DPlayer",
   clappr_shaka: "Clappr (DASH only)",
