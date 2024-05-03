@@ -2,7 +2,7 @@ import "mediaelement";
 import "mediaelement/build/mediaelementplayer.min.css";
 import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
-import { HlsJsP2PEngine, HlsWithP2PType } from "p2p-media-loader-hlsjs";
+import { HlsJsP2PEngine, HlsWithP2PInstance } from "p2p-media-loader-hlsjs";
 import { configureHlsP2PEngineEvents } from "../utils";
 
 type HlsjsMediaElementProps = {
@@ -52,7 +52,7 @@ export const HlsjsMediaElement = ({
       videoHeight: "100%",
       hls: {
         p2p: {
-          onHlsJsCreated: (hls: HlsWithP2PType<Hls>) => {
+          onHlsJsCreated: (hls: HlsWithP2PInstance<Hls>) => {
             configureHlsP2PEngineEvents({
               engine: hls.p2pEngine,
               onPeerConnect,
