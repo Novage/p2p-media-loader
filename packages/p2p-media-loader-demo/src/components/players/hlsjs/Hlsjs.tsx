@@ -33,15 +33,16 @@ export const HlsjsPlayer = ({
           swarmId: "custom swarm ID for stream 2000341",
           announceTrackers,
         },
+        onHlsJsCreated(hls) {
+          configureHlsP2PEngineEvents({
+            engine: hls.p2pEngine,
+            onPeerConnect,
+            onPeerDisconnect,
+            onChunkDownloaded,
+            onChunkUploaded,
+          });
+        },
       },
-    });
-
-    configureHlsP2PEngineEvents({
-      engine: hls.p2pEngine,
-      onPeerConnect,
-      onPeerDisconnect,
-      onChunkDownloaded,
-      onChunkUploaded,
     });
 
     hls.attachMedia(videoRef.current);

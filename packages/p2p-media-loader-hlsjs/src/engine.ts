@@ -34,14 +34,14 @@ export type DynamicHlsJsP2PEngineConfig = {
   core?: DynamicCoreConfig;
 };
 
-export type HlsWithP2PType<HlsType> = HlsType & {
+export type HlsWithP2PInstance<HlsType> = HlsType & {
   readonly p2pEngine: HlsJsP2PEngine;
 };
 
 export type HlsWithP2PConfig<HlsType extends abstract new () => unknown> =
   ConstructorParameters<HlsType>[0] & {
     p2p?: DeepReadonly<PartialHlsJsP2PEngineConfig> & {
-      onHlsJsCreated?: (hls: HlsWithP2PType<HlsType>) => void;
+      onHlsJsCreated?: (hls: HlsWithP2PInstance<HlsType>) => void;
     };
   };
 

@@ -2,7 +2,7 @@ import "openplayerjs/dist/openplayer.min.css";
 import OpenPlayerJS from "openplayerjs";
 import { useEffect, useRef, useState } from "react";
 import { PlayerProps } from "../../../types";
-import { HlsJsP2PEngine, HlsWithP2PType } from "p2p-media-loader-hlsjs";
+import { HlsJsP2PEngine, HlsWithP2PInstance } from "p2p-media-loader-hlsjs";
 import Hls from "hls.js";
 import { configureHlsP2PEngineEvents } from "../utils";
 
@@ -57,7 +57,7 @@ export const HlsjsOpenPlayer = ({
         playerInit = new OpenPlayerJS(videoElement, {
           hls: {
             p2p: {
-              onHlsJsCreated: (hls: HlsWithP2PType<Hls>) => {
+              onHlsJsCreated: (hls: HlsWithP2PInstance<Hls>) => {
                 configureHlsP2PEngineEvents({
                   engine: hls.p2pEngine,
                   onPeerConnect,

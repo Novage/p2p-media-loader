@@ -29,9 +29,9 @@ export const HlsjsVidstack = ({
       if (isHLSProvider(provider)) {
         const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
 
-        provider.library = HlsWithP2P;
+        provider.library = HlsWithP2P as unknown as typeof Hls;
 
-        const config: HlsWithP2PConfig<typeof HlsWithP2P> = {
+        const config: HlsWithP2PConfig<typeof Hls> = {
           p2p: {
             core: {
               swarmId: "custom swarm ID for stream 2000341",

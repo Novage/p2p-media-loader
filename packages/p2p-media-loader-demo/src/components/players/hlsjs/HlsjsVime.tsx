@@ -1,5 +1,5 @@
 import { Player, Hls as VimeHls, DefaultUi } from "@vime/react";
-import { HlsJsP2PEngine, HlsWithP2PType } from "p2p-media-loader-hlsjs";
+import { HlsJsP2PEngine, HlsWithP2PInstance } from "p2p-media-loader-hlsjs";
 import { useRef, useEffect, useState } from "react";
 import { PlayerProps } from "../../../types";
 import Hls from "hls.js";
@@ -31,7 +31,7 @@ export const HlsjsVime = ({
 
     vimeHlsElement.config = {
       p2p: {
-        onHlsJsCreated: (hls: HlsWithP2PType<Hls>) => {
+        onHlsJsCreated: (hls: HlsWithP2PInstance<Hls>) => {
           configureHlsP2PEngineEvents({
             engine: hls.p2pEngine,
             onPeerConnect,

@@ -1,7 +1,7 @@
 import {
   HlsJsP2PEngine,
   PartialHlsJsP2PEngineConfig,
-  HlsWithP2PType,
+  HlsWithP2PInstance,
   HlsWithP2PConfig,
 } from "./engine";
 import { DeepReadonly } from "ts-essentials";
@@ -36,8 +36,7 @@ export function injectMixin<
       this.#p2pEngine = p2pEngine;
       p2p?.onHlsJsCreated?.(this as InstanceType<HlsJsConstructor>);
     }
-  } as typeof HlsJsClass &
-    (new (
-      config?: HlsWithP2PConfig<HlsJsConstructor>,
-    ) => HlsWithP2PType<InstanceType<HlsJsConstructor>>);
+  } as new (
+    config?: HlsWithP2PConfig<HlsJsConstructor>,
+  ) => HlsWithP2PInstance<InstanceType<HlsJsConstructor>>;
 }
