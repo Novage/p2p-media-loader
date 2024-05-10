@@ -2,7 +2,7 @@ import "../clappr.css";
 import { useEffect, useRef, useState } from "react";
 import { PlayerProps } from "../../../types";
 import { ShakaP2PEngine } from "p2p-media-loader-shaka";
-import { configureShakaP2PEngineEvents } from "../utils";
+import { subscribeToUiEvents } from "../utils";
 
 export const ShakaClappr = ({
   streamUrl,
@@ -48,7 +48,7 @@ export const ShakaClappr = ({
         playInline: true,
       },
       shakaOnBeforeLoad: (shakaPlayerInstance: shaka.Player) => {
-        configureShakaP2PEngineEvents({
+        subscribeToUiEvents({
           engine: shakaP2PEngine,
           onPeerConnect,
           onPeerDisconnect,

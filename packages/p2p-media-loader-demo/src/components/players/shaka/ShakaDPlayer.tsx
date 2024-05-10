@@ -2,7 +2,7 @@ import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 import { PlayerProps } from "../../../types";
 import { useEffect, useRef, useState } from "react";
 import DPlayer from "dplayer";
-import { configureShakaP2PEngineEvents } from "../utils";
+import { subscribeToUiEvents } from "../utils";
 import shaka from "./shaka-import";
 
 export const ShakaDPlayer = ({
@@ -47,7 +47,7 @@ export const ShakaDPlayer = ({
             const shakaPlayer = new shaka.Player();
             void shakaPlayer.attach(video);
 
-            configureShakaP2PEngineEvents({
+            subscribeToUiEvents({
               engine: shakaP2PEngine,
               onPeerConnect,
               onPeerDisconnect,

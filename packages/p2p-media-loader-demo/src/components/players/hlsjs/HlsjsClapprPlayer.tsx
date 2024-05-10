@@ -2,7 +2,7 @@ import "../clappr.css";
 import { useEffect, useRef, useState } from "react";
 import { PlayerProps } from "../../../types";
 import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
-import { configureHlsP2PEngineEvents } from "../utils";
+import { subscribeToUiEvents } from "../utils";
 import Hls from "hls.js";
 
 export const HlsjsClapprPlayer = ({
@@ -32,7 +32,7 @@ export const HlsjsClapprPlayer = ({
       },
     });
 
-    configureHlsP2PEngineEvents({
+    subscribeToUiEvents({
       engine,
       onPeerConnect,
       onPeerDisconnect,

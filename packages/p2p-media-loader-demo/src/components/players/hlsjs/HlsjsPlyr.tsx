@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { PlayerProps } from "../../../types";
 import Hls from "hls.js";
 import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
-import { configureHlsP2PEngineEvents } from "../utils";
+import { subscribeToUiEvents } from "../utils";
 
 export const HlsjsPlyr = ({
   streamUrl,
@@ -46,7 +46,7 @@ export const HlsjsPlyr = ({
           announceTrackers,
         },
         onHlsJsCreated(hls) {
-          configureHlsP2PEngineEvents({
+          subscribeToUiEvents({
             engine: hls.p2pEngine,
             onPeerConnect,
             onPeerDisconnect,

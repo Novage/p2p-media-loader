@@ -3,7 +3,7 @@ import "mediaelement/build/mediaelementplayer.min.css";
 import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import { HlsJsP2PEngine, HlsWithP2PInstance } from "p2p-media-loader-hlsjs";
-import { configureHlsP2PEngineEvents } from "../utils";
+import { subscribeToUiEvents } from "../utils";
 
 type HlsjsMediaElementProps = {
   streamUrl: string;
@@ -53,7 +53,7 @@ export const HlsjsMediaElement = ({
       hls: {
         p2p: {
           onHlsJsCreated: (hls: HlsWithP2PInstance<Hls>) => {
-            configureHlsP2PEngineEvents({
+            subscribeToUiEvents({
               engine: hls.p2pEngine,
               onPeerConnect,
               onPeerDisconnect,

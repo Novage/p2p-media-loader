@@ -4,7 +4,7 @@ import shaka from "../shaka/shaka-import";
 import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 import { PlayerProps } from "../../../types";
 import Plyr, { Options } from "plyr";
-import { configureShakaP2PEngineEvents } from "../utils";
+import { subscribeToUiEvents } from "../utils";
 
 export const ShakaPlyr = ({
   streamUrl,
@@ -69,7 +69,7 @@ export const ShakaPlyr = ({
 
         await shakaPlayerInit.attach(videoElement);
 
-        configureShakaP2PEngineEvents({
+        subscribeToUiEvents({
           engine: shakaP2PEngineInit,
           onPeerConnect,
           onPeerDisconnect,
