@@ -1,7 +1,16 @@
+/**
+ * Represents the types of streams available, either primary (main) or secondary.
+ */
 export type StreamType = "main" | "secondary";
 
+/**
+ * Represents a range of bytes, typically used for specifying a segment of data to download.
+ */
 export type ByteRange = { start: number; end: number };
 
+/**
+ * Describes a media segment with its unique identifiers, location, and timing information.
+ */
 export type Segment = {
   readonly localId: string;
   readonly externalId: number;
@@ -11,12 +20,18 @@ export type Segment = {
   readonly endTime: number;
 };
 
+/**
+ * Represents a stream with a unique local identifier, type, and index position.
+ */
 export type Stream = {
   readonly localId: string;
   readonly type: StreamType;
   readonly index: number;
 };
 
+/**
+ * Defines a subset of CoreConfig for dynamic updates, allowing selective modification of configuration properties.
+ */
 export type DynamicCoreConfig = Partial<
   Pick<
     CoreConfig,
@@ -27,6 +42,9 @@ export type DynamicCoreConfig = Partial<
   >
 >;
 
+/**
+ * Configuration options for the Core functionality, including network and processing parameters.
+ */
 export type CoreConfig = {
   highDemandTimeWindow: number;
   httpDownloadTimeWindow: number;
@@ -54,6 +72,9 @@ export type CoreConfig = {
   ) => Promise<Request | undefined | null>;
 };
 
+/**
+ * Specifies the source of a download, indicating whether it was from HTTP or P2P.
+ */
 export type DownloadSource = "http" | "p2p";
 
 /**
@@ -174,13 +195,22 @@ export type CoreEventMap = {
   onChunkUploaded: (bytesLength: number, peerId: string) => void;
 };
 
+/**
+ * Defines the types of errors that can occur during a request abortion process.
+ */
 export type RequestAbortErrorType = "abort" | "bytes-receiving-timeout";
 
+/**
+ * Defines the types of errors specific to HTTP requests.
+ */
 export type HttpRequestErrorType =
   | "http-error"
   | "http-bytes-mismatch"
   | "http-unexpected-status-code";
 
+/**
+ * Defines the types of errors specific to peer-to-peer requests.
+ */
 export type PeerRequestErrorType =
   | "peer-response-bytes-length-mismatch"
   | "peer-protocol-violation"
@@ -188,16 +218,28 @@ export type PeerRequestErrorType =
   | "peer-closed"
   | "p2p-segment-validation-failed";
 
+/**
+ * Enumerates all possible request error types, including HTTP and peer-related errors.
+ */
 export type RequestErrorType =
   | RequestAbortErrorType
   | PeerRequestErrorType
   | HttpRequestErrorType;
 
+/**
+ * Represents an error that can occur during the request process, with a timestamp for when the error occurred.
+ * @template T - The specific type of request error.
+ */
 export class RequestError<
   T extends RequestErrorType = RequestErrorType,
 > extends Error {
   readonly timestamp: number;
 
+  /**
+   * Constructs a new RequestError.
+   * @param type - The specific error type.
+   * @param message - Optional message describing the error.
+   */
   constructor(
     readonly type: T,
     message?: string,
@@ -207,18 +249,40 @@ export class RequestError<
   }
 }
 
+/**
+ * Represents the response from a segment request, including the data and measured bandwidth.
+ */
 export type SegmentResponse = {
   data: ArrayBuffer;
   bandwidth: number;
 };
 
+/**
+ * Custom error class for errors that occur during core network requests.
+ */
 export class CoreRequestError extends Error {
+  /**
+   * Constructs a new CoreRequestError.
+   * @param type - The type of the error, either 'failed' or 'aborted'.
+   */
   constructor(readonly type: "failed" | "aborted") {
     super();
   }
 }
 
+/**
+ * Callbacks for handling the success or failure of an engine operation.
+ */
 export type EngineCallbacks = {
+  /**
+   * Called when the operation is successful.
+   * @param response - The response from the successful operation.
+   */
   onSuccess: (response: SegmentResponse) => void;
+
+  /**
+   * Called when the operation encounters an error.
+   * @param reason - The error encountered during the operation.
+   */
   onError: (reason: CoreRequestError) => void;
 };

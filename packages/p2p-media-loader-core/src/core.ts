@@ -67,18 +67,64 @@ export class Core<TStream extends Stream = Stream> {
     activeLevelBitrate: 0,
   };
 
+  /**
+   * Constructs a new Core instance with optional initial configuration.
+   * The configuration will be deeply copied to prevent modifications.
+   * This allows the user to override any default setting without affecting the global defaults.
+   *
+   * @param config - Optional partial configuration to override default settings.
+   *
+   * @example
+   * // Create a Core instance with custom configuration for HTTP and P2P downloads.
+   * const core = new Core({
+   *   simultaneousHttpDownloads: 5,
+   *   simultaneousP2PDownloads: 5,
+   *   httpErrorRetries: 5,
+   *   p2pErrorRetries: 5
+   * });
+   *
+   * @example
+   * // Create a Core instance using the default configuration.
+   * const core = new Core();
+   */
   constructor(config?: DeepReadonly<Partial<CoreConfig>>) {
     this.config = deepCopy({ ...Core.DEFAULT_CONFIG, ...config });
   }
 
+  /**
+   * Retrieves the current configuration for the core instance, ensuring immutability.
+   *
+   * @returns A deep readonly version of the core configuration.
+   */
   getConfig(): DeepReadonly<CoreConfig> {
     return this.config;
   }
 
+  /**
+   * Applies a set of dynamic configuration updates to the core, merging with the existing configuration.
+   *
+   * @param dynamicConfig - A set of configuration changes to apply.
+   *
+   * @example
+   * // Example of dynamically updating the download time windows and timeout settings.
+   * const dynamicConfig = {
+   *   httpDownloadTimeWindow: 60,  // Set HTTP download time window to 60 seconds
+   *   p2pDownloadTimeWindow: 60,   // Set P2P download time window to 60 seconds
+   *   httpNotReceivingBytesTimeoutMs: 1500,  // Set HTTP timeout to 1500 milliseconds
+   *   p2pNotReceivingBytesTimeoutMs: 1500    // Set P2P timeout to 1500 milliseconds
+   * };
+   * core.applyDynamicConfig(dynamicConfig);
+   */
   applyDynamicConfig(dynamicConfig: DeepReadonly<DynamicCoreConfig>) {
     this.config = deepCopy({ ...this.config, ...dynamicConfig });
   }
 
+  /**
+   * Adds an event listener for the specified event type on the core event target.
+   *
+   * @param eventName - The name of the event to listen for.
+   * @param listener - The callback function to invoke when the event is fired.
+   */
   addEventListener<K extends keyof CoreEventMap>(
     eventName: K,
     listener: CoreEventMap[K],
@@ -86,6 +132,12 @@ export class Core<TStream extends Stream = Stream> {
     this.eventTarget.addEventListener(eventName, listener);
   }
 
+  /**
+   * Removes an event listener for the specified event type on the core event target.
+   *
+   * @param eventName - The name of the event to listen for.
+   * @param listener - The callback function to be removed.
+   */
   removeEventListener<K extends keyof CoreEventMap>(
     eventName: K,
     listener: CoreEventMap[K],
@@ -93,18 +145,40 @@ export class Core<TStream extends Stream = Stream> {
     this.eventTarget.removeEventListener(eventName, listener);
   }
 
+  /**
+   * Sets the response URL for the manifest, stripping any query parameters.
+   *
+   * @param url - The full URL to the manifest response.
+   */
   setManifestResponseUrl(url: string): void {
     this.manifestResponseUrl = url.split("?")[0];
   }
 
+  /**
+   * Checks if a segment is already stored within the core.
+   *
+   * @param segmentLocalId - The local identifier of the segment to check.
+   * @returns `true` if the segment is present, otherwise `false`.
+   */
   hasSegment(segmentLocalId: string): boolean {
     return !!StreamUtils.getSegmentFromStreamsMap(this.streams, segmentLocalId);
   }
 
+  /**
+   * Retrieves a specific stream by its local identifier, if it exists.
+   *
+   * @param streamLocalId - The local identifier of the stream to retrieve.
+   * @returns The stream with its segments, or `undefined` if not found.
+   */
   getStream(streamLocalId: string): StreamWithSegments<TStream> | undefined {
     return this.streams.get(streamLocalId);
   }
 
+  /**
+   * Ensures a stream exists in the map; adds it if it does not.
+   *
+   * @param stream - The stream to potentially add to the map.
+   */
   addStreamIfNoneExists(stream: TStream): void {
     if (this.streams.has(stream.localId)) return;
 
@@ -114,6 +188,13 @@ export class Core<TStream extends Stream = Stream> {
     });
   }
 
+  /**
+   * Updates the segments associated with a specific stream.
+   *
+   * @param streamLocalId - The local identifier of the stream to update.
+   * @param addSegments - Optional segments to add to the stream.
+   * @param removeSegmentIds - Optional segment IDs to remove from the stream.
+   */
   updateStream(
     streamLocalId: string,
     addSegments?: Iterable<SegmentBase>,
@@ -139,6 +220,14 @@ export class Core<TStream extends Stream = Stream> {
     this.secondaryStreamLoader?.updateStream(stream);
   }
 
+  /**
+   * Loads a segment given its local identifier and invokes the provided callbacks during the process.
+   * Initializes segment storage if it has not been initialized yet.
+   *
+   * @param segmentLocalId - The local identifier of the segment to load.
+   * @param callbacks - The callbacks to be invoked during segment loading.
+   * @throws {Error} - Throws if the manifest response URL is not defined.
+   */
   async loadSegment(segmentLocalId: string, callbacks: EngineCallbacks) {
     if (!this.manifestResponseUrl) {
       throw new Error("Manifest response url is not defined");
@@ -157,16 +246,33 @@ export class Core<TStream extends Stream = Stream> {
     void loader.loadSegment(segment, callbacks);
   }
 
+  /**
+   * Aborts the loading of a segment specified by its local identifier.
+   *
+   * @param segmentLocalId - The local identifier of the segment whose loading is to be aborted.
+   */
   abortSegmentLoading(segmentLocalId: string): void {
     this.mainStreamLoader?.abortSegmentRequest(segmentLocalId);
     this.secondaryStreamLoader?.abortSegmentRequest(segmentLocalId);
   }
 
+  /**
+   * Updates the playback parameters, specifically position and playback rate, for stream loaders.
+   *
+   * @param position - The new position in the stream, in seconds.
+   * @param rate - The new playback rate.
+   */
   updatePlayback(position: number, rate: number): void {
     this.mainStreamLoader?.updatePlayback(position, rate);
     this.secondaryStreamLoader?.updatePlayback(position, rate);
   }
 
+  /**
+   * Sets the active level bitrate, used for adjusting quality levels in adaptive streaming.
+   * Notifies the stream loaders if a change occurs.
+   *
+   * @param bitrate - The new bitrate to set as active.
+   */
   setActiveLevelBitrate(bitrate: number) {
     if (bitrate !== this.streamDetails.activeLevelBitrate) {
       this.streamDetails.activeLevelBitrate = bitrate;
@@ -175,10 +281,19 @@ export class Core<TStream extends Stream = Stream> {
     }
   }
 
+  /**
+   * Updates the 'isLive' status of the stream.
+   *
+   * @param isLive - Boolean indicating whether the stream is live.
+   */
   setIsLive(isLive: boolean) {
     this.streamDetails.isLive = isLive;
   }
 
+  /**
+   * Cleans up resources used by the Core instance, including destroying any active stream loaders
+   * and clearing stored segments.
+   */
   destroy(): void {
     this.streams.clear();
     this.mainStreamLoader?.destroy();
