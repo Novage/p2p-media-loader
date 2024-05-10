@@ -1,15 +1,10 @@
-import { HlsJsP2PEngine, PartialHlsJsP2PEngineConfig } from "./engine";
+import {
+  HlsJsP2PEngine,
+  PartialHlsJsP2PEngineConfig,
+  HlsWithP2PInstance,
+  HlsWithP2PConfig,
+} from "./engine";
 import { DeepReadonly } from "ts-essentials";
-
-type P2PConfig<T> = {
-  p2p?: DeepReadonly<PartialHlsJsP2PEngineConfig> & {
-    onHlsJsCreated?: (
-      hls: T & {
-        readonly p2pEngine: HlsJsP2PEngine;
-      },
-    ) => void;
-  };
-};
 
 export function injectMixin<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -24,7 +19,11 @@ export function injectMixin<
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     constructor(...args: any[]) {
-      const config = args[0] as P2PConfig<InstanceType<HlsJsConstructor>>;
+      const config = args[0] as {
+        p2p?: DeepReadonly<PartialHlsJsP2PEngineConfig> & {
+          onHlsJsCreated?: (hls: InstanceType<HlsJsConstructor>) => void;
+        };
+      } & Record<string, unknown>;
 
       const { p2p, ...hlsJsConfig } = config ?? {};
 
@@ -38,9 +37,6 @@ export function injectMixin<
       p2p?.onHlsJsCreated?.(this as InstanceType<HlsJsConstructor>);
     }
   } as new (
-    config?: ConstructorParameters<HlsJsConstructor>[0] &
-      P2PConfig<InstanceType<HlsJsConstructor>>,
-  ) => InstanceType<HlsJsConstructor> & {
-    readonly p2pEngine: HlsJsP2PEngine;
-  };
+    config?: HlsWithP2PConfig<HlsJsConstructor>,
+  ) => HlsWithP2PInstance<InstanceType<HlsJsConstructor>>;
 }

@@ -4,33 +4,34 @@ import { DEFAULT_STREAM, DEFAULT_TRACKERS, PLAYERS } from "../constants";
 type QueryParamsType = Record<string, string>;
 
 const defaultParams: QueryParamsType = {
-  player: PLAYERS[0],
+  player: Object.keys(PLAYERS)[0],
   streamUrl: DEFAULT_STREAM,
   trackers: DEFAULT_TRACKERS,
+  debug: "",
 };
+
+function getInitialParams(searchParams: URLSearchParams): QueryParamsType {
+  return Object.keys(defaultParams).reduce((params, key) => {
+    params[key] = searchParams.get(key) ?? defaultParams[key];
+    return params;
+  }, {} as QueryParamsType);
+}
 
 export function useQueryParams() {
   const searchParamsRef = useRef(new URLSearchParams(window.location.search));
-  const [queryParams, setQueryParams] =
-    useState<QueryParamsType>(defaultParams);
+  const [queryParams, setQueryParams] = useState<QueryParamsType>(() =>
+    getInitialParams(searchParamsRef.current),
+  );
 
   const updateQueryParamsFromURL = useCallback(() => {
     const searchParams = searchParamsRef.current;
-    const paramsObj: QueryParamsType = {};
+    const newParams = getInitialParams(searchParams);
 
     setQueryParams((prevParams) => {
-      let hasChanges = false;
-
-      Object.keys(defaultParams).forEach((key) => {
-        const newValue = searchParams.get(key) ?? defaultParams[key];
-        paramsObj[key] = newValue;
-
-        if (prevParams[key] !== newValue) {
-          hasChanges = true;
-        }
-      });
-
-      return hasChanges ? paramsObj : prevParams;
+      const hasChanges = Object.keys(newParams).some(
+        (key) => prevParams[key] !== newParams[key],
+      );
+      return hasChanges ? newParams : prevParams;
     });
   }, []);
 
@@ -67,7 +68,6 @@ export function useQueryParams() {
       updateQueryParamsFromURL();
     };
 
-    updateQueryParamsFromURL();
     window.addEventListener("popstate", handlePopState);
 
     return () => {

@@ -1,29 +1,56 @@
 import "./demo.css";
-import type Hls from "hls.js";
 import { PlaybackOptions } from "./PlaybackOptions";
-import { PLAYERS } from "../constants";
+import { DEBUG_COMPONENT_ENABLED, PLAYERS } from "../constants";
 import { useQueryParams } from "../hooks/useQueryParams";
-import { HlsjsPlayer } from "./players/Hlsjs";
+import { HlsjsPlayer } from "./players/hlsjs/Hlsjs";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { DownloadStatsChart } from "./chart/DownloadStatsChart";
 import { NodeNetwork } from "./nodeNetwork/NodeNetwork";
 import { DebugTools } from "./debugTools/DebugTools";
-import { DownloadStats } from "../types";
-
-declare global {
-  interface Window {
-    Hls: typeof Hls;
-    videoPlayer?: { destroy?: () => void };
-  }
-}
-
-export type Player = (typeof PLAYERS)[number];
+import { DownloadStats, PlayerKey } from "../types";
+import { HlsjsDPlayer } from "./players/hlsjs/HlsjsDPLayer";
+import { HlsjsClapprPlayer } from "./players/hlsjs/HlsjsClapprPlayer";
+import { HlsjsPlyr } from "./players/hlsjs/HlsjsPlyr";
+import { HlsjsOpenPlayer } from "./players/hlsjs/HlsjsOpenPlayer";
+import { Shaka } from "./players/shaka/Shaka";
+import { ShakaDPlayer } from "./players/shaka/ShakaDPlayer";
+import { ShakaClappr } from "./players/shaka/ShakaClappr";
+import { HlsjsMediaElement } from "./players/hlsjs/HlsjsMediaElement";
+import { ShakaPlyr } from "./players/shaka/ShakaPlyr";
+import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
+import Hls from "hls.js";
+import { HlsjsVidstack } from "./players/hlsjs/HlsjsVidstack";
 
 type DemoProps = {
   debugToolsEnabled?: boolean;
 };
 
-export const P2PVideoDemo = ({ debugToolsEnabled }: DemoProps) => {
+const HlsWithP2PType = HlsJsP2PEngine.injectMixin(Hls);
+
+declare global {
+  interface Window {
+    shaka?: unknown;
+    Hls?: typeof HlsWithP2PType;
+    LevelSelector: unknown;
+    DashShakaPlayback: unknown;
+  }
+}
+
+const playerComponents = {
+  openPlayer_hls: HlsjsOpenPlayer,
+  plyr_hls: HlsjsPlyr,
+  clappr_hls: HlsjsClapprPlayer,
+  dplayer_hls: HlsjsDPlayer,
+  hlsjs_hls: HlsjsPlayer,
+  shaka: Shaka,
+  dplayer_shaka: ShakaDPlayer,
+  clappr_shaka: ShakaClappr,
+  mediaElement_hls: HlsjsMediaElement,
+  plyr_shaka: ShakaPlyr,
+  vidstack_hls: HlsjsVidstack,
+};
+
+export const P2PVideoDemo = ({ debugToolsEnabled = false }: DemoProps) => {
   const data = useRef<DownloadStats>({
     httpDownloaded: 0,
     p2pDownloaded: 0,
@@ -72,26 +99,23 @@ export const P2PVideoDemo = ({ debugToolsEnabled }: DemoProps) => {
   }, []);
 
   const handlePlaybackOptionsUpdate = (url: string, player: string) => {
-    if (!PLAYERS.includes(player as Player)) return;
+    if (!(player in PLAYERS)) return;
     setURLQueryParams({ streamUrl: url, player });
   };
 
   const renderPlayer = () => {
-    switch (queryParams.player) {
-      case "hlsjs":
-        return (
-          <HlsjsPlayer
-            streamUrl={queryParams.streamUrl}
-            announceTrackers={trackers}
-            onPeerConnect={onPeerConnect}
-            onPeerDisconnect={onPeerDisconnect}
-            onChunkDownloaded={onChunkDownloaded}
-            onChunkUploaded={onChunkUploaded}
-          />
-        );
-      default:
-        return null;
-    }
+    const PlayerComponent = playerComponents[queryParams.player as PlayerKey];
+
+    return PlayerComponent ? (
+      <PlayerComponent
+        streamUrl={queryParams.streamUrl}
+        announceTrackers={trackers}
+        onPeerConnect={onPeerConnect}
+        onPeerDisconnect={onPeerDisconnect}
+        onChunkDownloaded={onChunkDownloaded}
+        onChunkUploaded={onChunkUploaded}
+      />
+    ) : null;
   };
 
   return (
@@ -125,7 +149,9 @@ export const P2PVideoDemo = ({ debugToolsEnabled }: DemoProps) => {
           )}
         </div>
       </div>
-      {debugToolsEnabled && <DebugTools />}
+      {(debugToolsEnabled || queryParams.debug === DEBUG_COMPONENT_ENABLED) && (
+        <DebugTools />
+      )}
     </>
   );
 };
