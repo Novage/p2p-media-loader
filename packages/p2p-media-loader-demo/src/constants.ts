@@ -21,3 +21,5 @@ export const COLORS = {
   torchRed: "#ff1745",
 };
 export const DEFAULT_TRACKERS = `wss://tracker.webtorrent.dev,wss://tracker.files.fm:7073/announce,wss://tracker.openwebtorrent.com`;
+export const DEBUG_COMPONENT_ENABLED = "true";
+export const DEBUG_COMPONENT_DISABLED = "false";

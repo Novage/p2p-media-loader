@@ -1,6 +1,6 @@
 import "./demo.css";
 import { PlaybackOptions } from "./PlaybackOptions";
-import { PLAYERS } from "../constants";
+import { DEBUG_COMPONENT_ENABLED, PLAYERS } from "../constants";
 import { useQueryParams } from "../hooks/useQueryParams";
 import { HlsjsPlayer } from "./players/hlsjs/Hlsjs";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -52,7 +52,7 @@ const playerComponents = {
   vidstack_hls: HlsjsVidstack,
 };
 
-export const P2PVideoDemo = ({ debugToolsEnabled }: DemoProps) => {
+export const P2PVideoDemo = ({ debugToolsEnabled = false }: DemoProps) => {
   const data = useRef<DownloadStats>({
     httpDownloaded: 0,
     p2pDownloaded: 0,
@@ -151,7 +151,9 @@ export const P2PVideoDemo = ({ debugToolsEnabled }: DemoProps) => {
           )}
         </div>
       </div>
-      {debugToolsEnabled && <DebugTools />}
+      {(debugToolsEnabled || queryParams.debug === DEBUG_COMPONENT_ENABLED) && (
+        <DebugTools />
+      )}
     </>
   );
 };
