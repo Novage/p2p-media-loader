@@ -46,7 +46,6 @@
   },
   "dependencies": {
     "@vidstack/react": "^1.11.21",
-    "@vime/react": "^5.4.1",
     "d3": "^7.9.0",
     "dplayer": "^1.27.1",
     "hls.js": "^1.5.7",

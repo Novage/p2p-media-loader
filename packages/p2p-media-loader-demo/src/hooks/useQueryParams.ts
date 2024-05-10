@@ -1,10 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import {
-  DEBUG_COMPONENT_DISABLED,
-  DEFAULT_STREAM,
-  DEFAULT_TRACKERS,
-  PLAYERS,
-} from "../constants";
+import { DEFAULT_STREAM, DEFAULT_TRACKERS, PLAYERS } from "../constants";
 
 type QueryParamsType = Record<string, string>;
 
@@ -12,7 +7,7 @@ const defaultParams: QueryParamsType = {
   player: Object.keys(PLAYERS)[0],
   streamUrl: DEFAULT_STREAM,
   trackers: DEFAULT_TRACKERS,
-  debug: DEBUG_COMPONENT_DISABLED,
+  debug: "",
 };
 
 function getInitialParams(searchParams: URLSearchParams): QueryParamsType {

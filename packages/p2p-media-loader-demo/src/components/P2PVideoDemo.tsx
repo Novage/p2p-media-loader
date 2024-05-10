@@ -10,7 +10,6 @@ import { DebugTools } from "./debugTools/DebugTools";
 import { DownloadStats, PlayerKey } from "../types";
 import { HlsjsDPlayer } from "./players/hlsjs/HlsjsDPLayer";
 import { HlsjsClapprPlayer } from "./players/hlsjs/HlsjsClapprPlayer";
-import { HlsjsVime } from "./players/hlsjs/HlsjsVime";
 import { HlsjsPlyr } from "./players/hlsjs/HlsjsPlyr";
 import { HlsjsOpenPlayer } from "./players/hlsjs/HlsjsOpenPlayer";
 import { Shaka } from "./players/shaka/Shaka";
@@ -40,7 +39,6 @@ declare global {
 const playerComponents = {
   openPlayer_hls: HlsjsOpenPlayer,
   plyr_hls: HlsjsPlyr,
-  vime_hls: HlsjsVime,
   clappr_hls: HlsjsClapprPlayer,
   dplayer_hls: HlsjsDPlayer,
   hlsjs_hls: HlsjsPlayer,
