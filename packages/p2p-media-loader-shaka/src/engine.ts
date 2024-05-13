@@ -21,14 +21,23 @@ import {
 } from "p2p-media-loader-core";
 import { DeepReadonly } from "ts-essentials";
 
+/**
+ * Type for specifying dynamic configuration options that can be changed at runtime for the P2P engine's core.
+ */
 export type DynamicShakaP2PEngineConfig = {
   core?: DynamicCoreConfig;
 };
 
+/**
+ * Represents the complete configuration for ShakaP2PEngine.
+ */
 export type ShakaP2PEngineConfig = {
   core: CoreConfig;
 };
 
+/**
+ * Allows for partial configuration settings for the Shaka P2P Engine.
+ */
 export type PartialShakaEngineConfig = Partial<
   Omit<ShakaP2PEngineConfig, "core">
 > & {
@@ -37,6 +46,36 @@ export type PartialShakaEngineConfig = Partial<
 
 const LIVE_EDGE_DELAY = 25;
 
+/**
+ * Represents a P2P (peer-to-peer) engine for HLS (HTTP Live Streaming) to enhance media streaming efficiency.
+ * This class integrates P2P technologies into Shaka Player, enabling the distribution of media segments via a peer network
+ * alongside traditional HTTP fetching. It reduces server bandwidth costs and improves scalability by sharing the load
+ * across multiple clients.
+ *
+ * The engine manages core functionalities such as segment fetching, segment management, peer connection management,
+ * and event handling related to the P2P and HLS processes.
+ *
+ * @example
+ * // Initializing the ShakaP2PEngine with custom configuration
+ * const shakaP2PEngine = new ShakaP2PEngine({
+ *   core: {
+ *     highDemandTimeWindow: 30000, // 30 seconds
+ *     simultaneousHttpDownloads: 3,
+ *     cachedSegmentsCount: 50,
+ *     webRtcMaxMessageSize: 262144, // 256 KB
+ *     p2pNotReceivingBytesTimeoutMs: 10000, // 10 seconds
+ *     p2pLoaderDestroyTimeoutMs: 15000, // 15 seconds
+ *     httpNotReceivingBytesTimeoutMs: 8000, // 8 seconds
+ *     httpErrorRetries: 2,
+ *     p2pErrorRetries: 2,
+ *     announceTrackers: ["wss://tracker.example.com"],
+ *     rtcConfig: {
+ *       iceServers: [{ urls: "stun:stun.example.com" }]
+ *     },
+ *     swarmId: "example-swarm-id"
+ *   }
+ * });
+ */
 export class ShakaP2PEngine {
   private player?: shaka.Player;
   private readonly shaka: Shaka;
@@ -45,6 +84,12 @@ export class ShakaP2PEngine {
   private readonly segmentManager: SegmentManager;
   private requestFilter?: shaka.extern.RequestFilter;
 
+  /**
+   * Constructs an instance of ShakaP2PEngine.
+   *
+   * @param config Optional configuration for customizing the P2P engine's behavior.
+   * @param shaka The Shaka Player library, typically provided as a global variable by including Shaka Player in your project.
+   */
   constructor(
     config?: DeepReadonly<PartialShakaEngineConfig>,
     shaka = window.shaka,
@@ -56,6 +101,11 @@ export class ShakaP2PEngine {
     this.segmentManager = new SegmentManager(this.streamInfo, this.core);
   }
 
+  /**
+   * Configures and initializes the Shaka Player instance with predefined settings for optimal P2P performance.
+   *
+   * @param player The Shaka Player instance to configure.
+   */
   configureAndInitShakaPlayer(player: shaka.Player) {
     if (this.player === player) return;
     if (this.player) this.destroy();
@@ -71,14 +121,54 @@ export class ShakaP2PEngine {
     this.updatePlayerEventHandlers("register");
   }
 
+  /**
+   * Applies dynamic configuration updates to the P2P engine.
+   * This method allows for runtime adjustments to the engine's settings.
+   *
+   * @param dynamicConfig Configuration changes to apply.
+   */
   applyDynamicConfig(dynamicConfig: DeepReadonly<DynamicShakaP2PEngineConfig>) {
     if (dynamicConfig.core) this.core.applyDynamicConfig(dynamicConfig.core);
   }
 
+  /**
+   * Retrieves the current configuration of the ShakaP2PEngine.
+   *
+   * @returns The configuration as a readonly object.
+   */
   getConfig(): DeepReadonly<ShakaP2PEngineConfig> {
     return { core: this.core.getConfig() };
   }
 
+  /**
+   * Adds an event listener for the specified event.
+   * @param eventName The name of the event to listen for.
+   * @param listener The callback function to be invoked when the event is triggered.
+   *
+   * @example
+   * // Listening for a segment being successfully loaded
+   * shakaP2PEngine.addEventListener('onSegmentLoaded', (details) => {
+   *   console.log('Segment Loaded:', details);
+   * });
+   *
+   * @example
+   * // Handling segment load errors
+   * shakaP2PEngine.addEventListener('onSegmentError', (errorDetails) => {
+   *   console.error('Error loading segment:', errorDetails);
+   * });
+   *
+   * @example
+   * // Detecting when a peer connects, useful for monitoring the health of the P2P network
+   * shakaP2PEngine.addEventListener('onPeerConnect', (peerId) => {
+   *   console.log('Peer connected:', peerId);
+   * });
+   *
+   * @example
+   * // Tracking data downloaded from peers
+   * shakaP2PEngine.addEventListener('onChunkDownloaded', (bytesLength, downloadSource, peerId) => {
+   *   console.log(`Downloaded ${bytesLength} bytes from ${downloadSource} ${peerId ? 'from peer ' + peerId : 'from server'}`);
+   * });
+   */
   addEventListener<K extends keyof CoreEventMap>(
     eventName: K,
     listener: CoreEventMap[K],
@@ -86,6 +176,11 @@ export class ShakaP2PEngine {
     this.core.addEventListener(eventName, listener);
   }
 
+  /**
+   * Removes an event listener for the specified event.
+   * @param eventName The name of the event.
+   * @param listener The callback function that was previously added.
+   */
   removeEventListener<K extends keyof CoreEventMap>(
     eventName: K,
     listener: CoreEventMap[K],
@@ -173,6 +268,9 @@ export class ShakaP2PEngine {
     this.core.updatePlayback(media.currentTime, media.playbackRate);
   };
 
+  /**
+   * Clean up and release all resources. Unregisters all event handlers.
+   */
   destroy() {
     this.destroyCurrentStreamContext();
     this.updatePlayerEventHandlers("unregister");
@@ -227,6 +325,12 @@ export class ShakaP2PEngine {
     NetworkingEngine.unregisterScheme("https");
   }
 
+  /**
+   * Registers plugins related to P2P functionality into the Shaka Player. This includes setting up custom
+   * manifest parsers and networking schemes to enable P2P streaming capabilities.
+   *
+   * @param {Shaka} [shaka=window.shaka] - The Shaka Player library. Defaults to the global Shaka Player instance if not provided.
+   */
   static registerPlugins(shaka = window.shaka) {
     validateShaka(shaka);
 
@@ -234,6 +338,12 @@ export class ShakaP2PEngine {
     ShakaP2PEngine.registerNetworkingEngineSchemes(shaka);
   }
 
+  /**
+   * Unregisters plugins related to P2P functionality from the Shaka Player. This is important for cleanly
+   * removing the P2P integration, especially when the player is no longer needed or before setting up a new configuration.
+   *
+   * @param {Shaka} [shaka=window.shaka] - The Shaka Player library. Defaults to the global Shaka Player instance if not provided.
+   */
   static unregisterPlugins(shaka = window.shaka) {
     validateShaka(shaka);
 

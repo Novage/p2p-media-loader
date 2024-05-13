@@ -1,0 +1,9 @@
+{
+  "name": "P2P Media Loader Documentation",
+  "entryPoints": ["packages/*"],
+  "exclude": ["packages/p2p-media-loader-demo"],
+  "entryPointStrategy": "packages",
+  "excludeInternal": true,
+  "excludePrivate": true,
+  "excludeProtected": true
+}

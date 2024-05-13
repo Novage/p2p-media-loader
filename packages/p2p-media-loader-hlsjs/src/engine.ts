@@ -106,27 +106,6 @@ export class HlsJsP2PEngine {
   /**
    * Constructs an instance of HlsJsP2PEngine.
    * @param config Optional configuration for P2P engine setup.
-   *
-   * @example
-   *
-   * const hlsP2PEngine = new HlsJsP2PEngine({
-   *   core: {
-   *     highDemandTimeWindow: 30000, // 30 seconds
-   *     simultaneousHttpDownloads: 3,
-   *     cachedSegmentsCount: 50,
-   *     webRtcMaxMessageSize: 262144, // 256 KB
-   *     p2pNotReceivingBytesTimeoutMs: 10000, // 10 seconds
-   *     p2pLoaderDestroyTimeoutMs: 15000, // 15 seconds
-   *     httpNotReceivingBytesTimeoutMs: 8000, // 8 seconds
-   *     httpErrorRetries: 2,
-   *     p2pErrorRetries: 2,
-   *     announceTrackers: ["wss://tracker.example.com"],
-   *     rtcConfig: {
-   *       iceServers: [{ urls: "stun:stun.example.com" }]
-   *     },
-   *     swarmId: "example-swarm-id"
-   *   }
-   * });
    */
   constructor(config?: DeepReadonly<PartialHlsJsP2PEngineConfig>) {
     this.core = new Core(config?.core);
@@ -139,23 +118,28 @@ export class HlsJsP2PEngine {
    * @param listener The callback function to be invoked when the event is triggered.
    *
    * @example
-   * // Listening to the 'onSegmentLoaded' event
+   * // Listening for a segment being successfully loaded
    * p2pEngine.addEventListener('onSegmentLoaded', (details) => {
-   *   console.log('Segment loaded:', details);
+   *   console.log('Segment Loaded:', details);
    * });
    *
    * @example
-   * // Listening to the 'onPeerConnect' event to log when a new peer connects
+   * // Handling segment load errors
+   * p2pEngine.addEventListener('onSegmentError', (errorDetails) => {
+   *   console.error('Error loading segment:', errorDetails);
+   * });
+   *
+   * @example
+   * // Detecting when a peer connects, useful for monitoring the health of the P2P network
    * p2pEngine.addEventListener('onPeerConnect', (peerId) => {
-   *   console.log('New peer connected:', peerId);
+   *   console.log('Peer connected:', peerId);
    * });
    *
    * @example
-   * // Listening to the 'onChunkDownloaded' event to monitor downloaded chunks
+   * // Tracking data downloaded from peers
    * p2pEngine.addEventListener('onChunkDownloaded', (bytesLength, downloadSource, peerId) => {
    *   console.log(`Downloaded ${bytesLength} bytes from ${downloadSource} ${peerId ? 'from peer ' + peerId : 'from server'}`);
    * });
-   *
    */
   addEventListener<K extends keyof CoreEventMap>(
     eventName: K,
