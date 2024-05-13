@@ -1,14 +1,18 @@
-import { Playback, Segment } from "../internal-types";
+import { Playback } from "../internal-types";
+import { SegmentWithStream } from "../types";
 import {
   getSegmentPlaybackStatuses,
   SegmentPlaybackStatuses,
   PlaybackTimeWindowsConfig,
 } from "./stream";
 
-export type QueueItem = { segment: Segment; statuses: SegmentPlaybackStatuses };
+export type QueueItem = {
+  segment: SegmentWithStream;
+  statuses: SegmentPlaybackStatuses;
+};
 
 export function* generateQueue(
-  lastRequestedSegment: Readonly<Segment>,
+  lastRequestedSegment: Readonly<SegmentWithStream>,
   playback: Readonly<Playback>,
   playbackConfig: PlaybackTimeWindowsConfig,
 ): Generator<QueueItem, void> {
@@ -19,7 +23,7 @@ export function* generateQueue(
 
   const queueSegments = stream.segments.values();
 
-  let first: Segment;
+  let first: SegmentWithStream;
 
   do {
     const next = queueSegments.next();

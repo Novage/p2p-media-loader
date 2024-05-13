@@ -21,6 +21,21 @@ export type Segment = {
 };
 
 /**
+ * Extends a Segment with a reference to its associated stream.
+ */
+export type SegmentWithStream = Segment & {
+  readonly stream: StreamWithSegments;
+};
+
+/**
+ * Represents a stream that includes multiple segments, each associated with the stream.
+ * @template TStream Type of the underlying stream data structure.
+ */
+export type StreamWithSegments<TStream = Stream> = TStream & {
+  readonly segments: Map<string, SegmentWithStream>;
+};
+
+/**
  * Represents a stream with a unique local identifier, type, and index position.
  */
 export type Stream = {

@@ -1,10 +1,5 @@
-import { Stream } from "../types";
-import {
-  Playback,
-  ReadonlyCoreConfig,
-  Segment,
-  StreamWithSegments,
-} from "../internal-types";
+import { SegmentWithStream, Stream, StreamWithSegments } from "../types";
+import { Playback, ReadonlyCoreConfig } from "../internal-types";
 
 export type SegmentPlaybackStatuses = {
   isHighDemand?: boolean;
@@ -30,7 +25,7 @@ export function getStreamExternalId(
 export function getSegmentFromStreamsMap(
   streams: Map<string, StreamWithSegments>,
   segmentId: string,
-): Segment | undefined {
+): SegmentWithStream | undefined {
   for (const stream of streams.values()) {
     const segment = stream.segments.get(segmentId);
     if (segment) return segment;
@@ -40,7 +35,7 @@ export function getSegmentFromStreamsMap(
 export function getSegmentFromStreamByExternalId(
   stream: StreamWithSegments,
   segmentExternalId: number,
-): Segment | undefined {
+): SegmentWithStream | undefined {
   for (const segment of stream.segments.values()) {
     if (segment.externalId === segmentExternalId) return segment;
   }
@@ -63,7 +58,7 @@ export function getSegmentAvgDuration(stream: StreamWithSegments) {
 }
 
 export function isSegmentActualInPlayback(
-  segment: Readonly<Segment>,
+  segment: Readonly<SegmentWithStream>,
   playback: Playback,
   timeWindowsConfig: PlaybackTimeWindowsConfig,
 ): boolean {
@@ -76,7 +71,7 @@ export function isSegmentActualInPlayback(
 }
 
 export function getSegmentPlaybackStatuses(
-  segment: Segment,
+  segment: SegmentWithStream,
   playback: Playback,
   timeWindowsConfig: PlaybackTimeWindowsConfig,
 ): SegmentPlaybackStatuses {
@@ -101,7 +96,7 @@ export function getSegmentPlaybackStatuses(
 }
 
 function isSegmentInTimeWindow(
-  segment: Segment,
+  segment: SegmentWithStream,
   playback: Playback,
   timeWindowLength: number,
 ) {

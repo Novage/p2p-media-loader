@@ -1,21 +1,21 @@
-import { Stream } from "./types";
+import { SegmentWithStream, Stream } from "./types";
 import * as StreamUtils from "./utils/stream";
 import debug from "debug";
 import { EventTarget } from "./utils/event-target";
-import { ReadonlyCoreConfig, Segment } from "./internal-types";
+import { ReadonlyCoreConfig } from "./internal-types";
 
 type StorageConfig = Pick<
   ReadonlyCoreConfig,
   "cachedSegmentExpiration" | "cachedSegmentsCount"
 >;
 
-function getStorageItemId(segment: Segment) {
+function getStorageItemId(segment: SegmentWithStream) {
   const streamExternalId = StreamUtils.getStreamShortId(segment.stream);
   return `${streamExternalId}|${segment.externalId}`;
 }
 
 type StorageItem = {
-  segment: Segment;
+  segment: SegmentWithStream;
   data: ArrayBuffer;
   lastAccessed: number;
 };
@@ -28,7 +28,7 @@ export class SegmentsMemoryStorage {
   private cache = new Map<string, StorageItem>();
   private _isInitialized = false;
   private readonly isSegmentLockedPredicates: ((
-    segment: Segment,
+    segment: SegmentWithStream,
   ) => boolean)[] = [];
   private readonly logger: debug.Debugger;
   private readonly eventTarget = new EventTarget<StorageEventHandlers>();
@@ -51,16 +51,18 @@ export class SegmentsMemoryStorage {
     return this._isInitialized;
   }
 
-  addIsSegmentLockedPredicate(predicate: (segment: Segment) => boolean) {
+  addIsSegmentLockedPredicate(
+    predicate: (segment: SegmentWithStream) => boolean,
+  ) {
     this.isSegmentLockedPredicates.push(predicate);
   }
 
-  private isSegmentLocked(segment: Segment): boolean {
+  private isSegmentLocked(segment: SegmentWithStream): boolean {
     return this.isSegmentLockedPredicates.some((p) => p(segment));
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
-  async storeSegment(segment: Segment, data: ArrayBuffer) {
+  async storeSegment(segment: SegmentWithStream, data: ArrayBuffer) {
     const id = getStorageItemId(segment);
     this.cache.set(id, {
       segment,
@@ -73,7 +75,9 @@ export class SegmentsMemoryStorage {
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
-  async getSegmentData(segment: Segment): Promise<ArrayBuffer | undefined> {
+  async getSegmentData(
+    segment: SegmentWithStream,
+  ): Promise<ArrayBuffer | undefined> {
     const itemId = getStorageItemId(segment);
     const cacheItem = this.cache.get(itemId);
     if (cacheItem === undefined) return undefined;
@@ -82,7 +86,7 @@ export class SegmentsMemoryStorage {
     return cacheItem.data;
   }
 
-  hasSegment(segment: Segment): boolean {
+  hasSegment(segment: SegmentWithStream): boolean {
     const id = getStorageItemId(segment);
     return this.cache.has(id);
   }

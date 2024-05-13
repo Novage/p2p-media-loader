@@ -1,12 +1,15 @@
 import { HttpRequestExecutor } from "./http-loader";
 import { SegmentsMemoryStorage } from "./segments-storage";
-import { CoreEventMap, EngineCallbacks } from "./types";
+import {
+  CoreEventMap,
+  EngineCallbacks,
+  SegmentWithStream,
+  StreamWithSegments,
+} from "./types";
 import {
   Playback,
   BandwidthCalculators,
   StreamDetails,
-  Segment,
-  StreamWithSegments,
   ReadonlyCoreConfig,
 } from "./internal-types";
 import { P2PLoadersContainer } from "./p2p/loaders-container";
@@ -37,7 +40,7 @@ export class HybridLoader {
 
   constructor(
     private streamManifestUrl: string,
-    private lastRequestedSegment: Readonly<Segment>,
+    private lastRequestedSegment: Readonly<SegmentWithStream>,
     private readonly streamDetails: Required<Readonly<StreamDetails>>,
     private readonly config: ReadonlyCoreConfig,
     private readonly bandwidthCalculators: BandwidthCalculators,
@@ -90,7 +93,10 @@ export class HybridLoader {
   }
 
   // api method for engines
-  async loadSegment(segment: Readonly<Segment>, callbacks: EngineCallbacks) {
+  async loadSegment(
+    segment: Readonly<SegmentWithStream>,
+    callbacks: EngineCallbacks,
+  ) {
     this.logger(`requests: ${LoggerUtils.getSegmentString(segment)}`);
     const { stream } = segment;
     if (stream !== this.lastRequestedSegment.stream) {
@@ -325,13 +331,13 @@ export class HybridLoader {
     this.requestProcessQueueMicrotask();
   }
 
-  private loadThroughHttp(segment: Segment) {
+  private loadThroughHttp(segment: SegmentWithStream) {
     const request = this.requests.getOrCreateRequest(segment);
     new HttpRequestExecutor(request, this.config, this.eventTarget);
     this.p2pLoaders.currentLoader.broadcastAnnouncement();
   }
 
-  private loadThroughP2P(segment: Segment) {
+  private loadThroughP2P(segment: SegmentWithStream) {
     this.p2pLoaders.currentLoader.downloadSegment(segment);
   }
 
@@ -346,7 +352,7 @@ export class HybridLoader {
       return;
     }
 
-    const segmentsToLoad: Segment[] = [];
+    const segmentsToLoad: SegmentWithStream[] = [];
     for (const { segment, statuses } of QueueUtils.generateQueue(
       this.lastRequestedSegment,
       this.playback,
@@ -383,7 +389,7 @@ export class HybridLoader {
 
   private abortLastHttpLoadingInQueueAfterItem(
     queue: QueueUtils.QueueItem[],
-    segment: Segment,
+    segment: SegmentWithStream,
   ): boolean {
     for (const { segment: itemSegment } of Utils.arrayBackwards(queue)) {
       if (itemSegment === segment) break;
@@ -398,7 +404,7 @@ export class HybridLoader {
 
   private abortLastP2PLoadingInQueueAfterItem(
     queue: QueueUtils.QueueItem[],
-    segment: Segment,
+    segment: SegmentWithStream,
   ): boolean {
     for (const { segment: itemSegment } of Utils.arrayBackwards(queue)) {
       if (itemSegment === segment) break;

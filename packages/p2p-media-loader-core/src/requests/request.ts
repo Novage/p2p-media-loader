@@ -1,6 +1,11 @@
 import debug from "debug";
-import { BandwidthCalculators, Playback, Segment } from "../internal-types";
-import { CoreEventMap, RequestError, RequestAbortErrorType } from "../types";
+import { BandwidthCalculators, Playback } from "../internal-types";
+import {
+  CoreEventMap,
+  RequestError,
+  RequestAbortErrorType,
+  SegmentWithStream,
+} from "../types";
 
 import * as LoggerUtils from "../utils/logger";
 import * as StreamUtils from "../utils/stream";
@@ -71,7 +76,7 @@ export class Request {
   private readonly onSegmentLoaded: CoreEventMap["onSegmentLoaded"];
 
   constructor(
-    readonly segment: Segment,
+    readonly segment: SegmentWithStream,
     private readonly requestProcessQueueCallback: () => void,
     private readonly bandwidthCalculators: BandwidthCalculators,
     private readonly playback: Playback,
@@ -347,7 +352,7 @@ export class Request {
     all[method]();
   }
 
-  static getRequestItemId(segment: Segment) {
+  static getRequestItemId(segment: SegmentWithStream) {
     return segment.localId;
   }
 }

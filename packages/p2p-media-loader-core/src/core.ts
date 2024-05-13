@@ -2,17 +2,14 @@ import { HybridLoader } from "./hybrid-loader";
 import {
   Stream,
   CoreConfig,
-  Segment as SegmentBase,
+  Segment,
   CoreEventMap,
   DynamicCoreConfig,
   EngineCallbacks,
-} from "./types";
-import {
-  BandwidthCalculators,
-  Segment,
-  StreamDetails,
   StreamWithSegments,
-} from "./internal-types";
+  SegmentWithStream,
+} from "./types";
+import { BandwidthCalculators, StreamDetails } from "./internal-types";
 import * as StreamUtils from "./utils/stream";
 import { BandwidthCalculator } from "./bandwidth-calculator";
 import { SegmentsMemoryStorage } from "./segments-storage";
@@ -184,7 +181,7 @@ export class Core<TStream extends Stream = Stream> {
 
     this.streams.set(stream.localId, {
       ...stream,
-      segments: new Map<string, Segment>(),
+      segments: new Map<string, SegmentWithStream>(),
     });
   }
 
@@ -197,7 +194,7 @@ export class Core<TStream extends Stream = Stream> {
    */
   updateStream(
     streamLocalId: string,
-    addSegments?: Iterable<SegmentBase>,
+    addSegments?: Iterable<Segment>,
     removeSegmentIds?: Iterable<string>,
   ): void {
     const stream = this.streams.get(streamLocalId);
@@ -306,7 +303,7 @@ export class Core<TStream extends Stream = Stream> {
     this.streamDetails = { isLive: false, activeLevelBitrate: 0 };
   }
 
-  private identifySegment(segmentId: string): Segment {
+  private identifySegment(segmentId: string): SegmentWithStream {
     if (!this.manifestResponseUrl) {
       throw new Error("Manifest response url is undefined");
     }
@@ -322,7 +319,7 @@ export class Core<TStream extends Stream = Stream> {
     return segment;
   }
 
-  private getStreamHybridLoader(segment: Segment) {
+  private getStreamHybridLoader(segment: SegmentWithStream) {
     if (segment.stream.type === "main") {
       this.mainStreamLoader ??= this.createNewHybridLoader(segment);
       return this.mainStreamLoader;
@@ -332,7 +329,7 @@ export class Core<TStream extends Stream = Stream> {
     }
   }
 
-  private createNewHybridLoader(segment: Segment) {
+  private createNewHybridLoader(segment: SegmentWithStream) {
     if (!this.manifestResponseUrl) {
       throw new Error("Manifest response url is not defined");
     }
