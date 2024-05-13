@@ -1,6 +1,7 @@
 {
   "name": "P2P Media Loader Documentation",
   "entryPoints": ["packages/*"],
+  "plugin": ["typedoc-material-theme"],
   "exclude": ["packages/p2p-media-loader-demo"],
   "entryPointStrategy": "packages",
   "excludeInternal": true,
