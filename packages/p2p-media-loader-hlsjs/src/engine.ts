@@ -20,24 +20,41 @@ import {
 import { DeepReadonly } from "ts-essentials";
 import { injectMixin } from "./engine-static";
 
+/**
+ * Represents the complete configuration for HlsJsP2PEngine.
+ */
 export type HlsJsP2PEngineConfig = {
   core: CoreConfig;
 };
 
+/**
+ * Allows for partial configuration of HlsJsP2PEngine, useful for providing overrides or partial updates.
+ */
 export type PartialHlsJsP2PEngineConfig = Partial<
   Omit<HlsJsP2PEngineConfig, "core">
 > & {
   core?: Partial<CoreConfig>;
 };
 
+/**
+ * Type for specifying dynamic configuration options that can be changed at runtime for the P2P engine's core.
+ */
 export type DynamicHlsJsP2PEngineConfig = {
   core?: DynamicCoreConfig;
 };
 
+/**
+ * Extends a generic HLS type to include the P2P engine, integrating P2P capabilities directly into the HLS instance.
+ * @template HlsType The base HLS type that is being extended.
+ */
 export type HlsWithP2PInstance<HlsType> = HlsType & {
   readonly p2pEngine: HlsJsP2PEngine;
 };
 
+/**
+ * Configuration type for HLS instances that includes P2P settings, augmenting standard HLS configuration with P2P capabilities.
+ * @template HlsType A constructor type that produces an HLS instance.
+ */
 export type HlsWithP2PConfig<HlsType extends abstract new () => unknown> =
   ConstructorParameters<HlsType>[0] & {
     p2p?: DeepReadonly<PartialHlsJsP2PEngineConfig> & {
@@ -45,6 +62,37 @@ export type HlsWithP2PConfig<HlsType extends abstract new () => unknown> =
     };
   };
 
+/**
+ * Represents a P2P (peer-to-peer) engine for HLS (HTTP Live Streaming) to enhance media streaming efficiency.
+ * This class integrates P2P technologies into HLS.js, enabling the distribution of media segments via a peer network
+ * alongside traditional HTTP fetching. It reduces server bandwidth costs and improves scalability by sharing the load
+ * across multiple clients.
+ *
+ * The engine manages core functionalities such as segment fetching, segment management, peer connection management,
+ * and event handling related to the P2P and HLS processes.
+ *
+ * @example
+ * // Creating an instance of HlsJsP2PEngine with custom configuration
+ * const hlsP2PEngine = new HlsJsP2PEngine({
+ *   core: {
+ *     highDemandTimeWindow: 30000, // 30 seconds
+ *     simultaneousHttpDownloads: 3,
+ *     cachedSegmentsCount: 50,
+ *     webRtcMaxMessageSize: 262144, // 256 KB
+ *     p2pNotReceivingBytesTimeoutMs: 10000, // 10 seconds
+ *     p2pLoaderDestroyTimeoutMs: 15000, // 15 seconds
+ *     httpNotReceivingBytesTimeoutMs: 8000, // 8 seconds
+ *     httpErrorRetries: 2,
+ *     p2pErrorRetries: 2,
+ *     announceTrackers: ["wss://tracker.example.com"],
+ *     rtcConfig: {
+ *       iceServers: [{ urls: "stun:stun.example.com" }]
+ *     },
+ *     swarmId: "example-swarm-id"
+ *   }
+ * });
+ *
+ */
 export class HlsJsP2PEngine {
   private readonly core: Core;
   private readonly segmentManager: SegmentManager;
@@ -52,13 +100,63 @@ export class HlsJsP2PEngine {
   private currentHlsInstance?: Hls;
   private readonly debug = debug("p2pml-hlsjs:engine");
 
+  /** Static method to inject mixins for extending functionality */
   static injectMixin = injectMixin;
 
+  /**
+   * Constructs an instance of HlsJsP2PEngine.
+   * @param config Optional configuration for P2P engine setup.
+   *
+   * @example
+   *
+   * const hlsP2PEngine = new HlsJsP2PEngine({
+   *   core: {
+   *     highDemandTimeWindow: 30000, // 30 seconds
+   *     simultaneousHttpDownloads: 3,
+   *     cachedSegmentsCount: 50,
+   *     webRtcMaxMessageSize: 262144, // 256 KB
+   *     p2pNotReceivingBytesTimeoutMs: 10000, // 10 seconds
+   *     p2pLoaderDestroyTimeoutMs: 15000, // 15 seconds
+   *     httpNotReceivingBytesTimeoutMs: 8000, // 8 seconds
+   *     httpErrorRetries: 2,
+   *     p2pErrorRetries: 2,
+   *     announceTrackers: ["wss://tracker.example.com"],
+   *     rtcConfig: {
+   *       iceServers: [{ urls: "stun:stun.example.com" }]
+   *     },
+   *     swarmId: "example-swarm-id"
+   *   }
+   * });
+   */
   constructor(config?: DeepReadonly<PartialHlsJsP2PEngineConfig>) {
     this.core = new Core(config?.core);
     this.segmentManager = new SegmentManager(this.core);
   }
 
+  /**
+   * Adds an event listener for the specified event.
+   * @param eventName The name of the event to listen for.
+   * @param listener The callback function to be invoked when the event is triggered.
+   *
+   * @example
+   * // Listening to the 'onSegmentLoaded' event
+   * p2pEngine.addEventListener('onSegmentLoaded', (details) => {
+   *   console.log('Segment loaded:', details);
+   * });
+   *
+   * @example
+   * // Listening to the 'onPeerConnect' event to log when a new peer connects
+   * p2pEngine.addEventListener('onPeerConnect', (peerId) => {
+   *   console.log('New peer connected:', peerId);
+   * });
+   *
+   * @example
+   * // Listening to the 'onChunkDownloaded' event to monitor downloaded chunks
+   * p2pEngine.addEventListener('onChunkDownloaded', (bytesLength, downloadSource, peerId) => {
+   *   console.log(`Downloaded ${bytesLength} bytes from ${downloadSource} ${peerId ? 'from peer ' + peerId : 'from server'}`);
+   * });
+   *
+   */
   addEventListener<K extends keyof CoreEventMap>(
     eventName: K,
     listener: CoreEventMap[K],
@@ -66,6 +164,11 @@ export class HlsJsP2PEngine {
     this.core.addEventListener(eventName, listener);
   }
 
+  /**
+   * Removes an event listener for the specified event.
+   * @param eventName The name of the event.
+   * @param listener The callback function that was previously added.
+   */
   removeEventListener<K extends keyof CoreEventMap>(
     eventName: K,
     listener: CoreEventMap[K],
@@ -73,6 +176,10 @@ export class HlsJsP2PEngine {
     this.core.removeEventListener(eventName, listener);
   }
 
+  /**
+   * Retrieves the HLS.js specific configuration for loaders.
+   * @returns An object with fragment loader (fLoader) and playlist loader (pLoader).
+   */
   getHlsJsConfig<F = unknown, P = unknown>(): { fLoader: F; pLoader: P } {
     return {
       fLoader: this.createFragmentLoaderClass() as F,
@@ -80,14 +187,38 @@ export class HlsJsP2PEngine {
     };
   }
 
+  /**
+   * Returns the configuration of the HLS.js P2P engine.
+   * @returns A readonly version of the HlsJsP2PEngineConfig.
+   */
   getConfig(): DeepReadonly<HlsJsP2PEngineConfig> {
     return { core: this.core.getConfig() };
   }
 
+  /**
+   * Applies dynamic configuration updates to the P2P engine.
+   * @param dynamicConfig Configuration changes to apply.
+   *
+   * @example
+   * // Assuming `hlsP2PEngine` is an instance of HlsJsP2PEngine
+   *
+   * const newDynamicConfig = {
+   *   core: {
+   *     p2pNotReceivingBytesTimeoutMs: 20000, // Adjusting timeout to 20 seconds
+   *     httpDownloadTimeWindow: 15000, // Extending HTTP download time window to 15 seconds
+   *   }
+   * };
+   *
+   * hlsP2PEngine.applyDynamicConfig(newDynamicConfig);
+   */
   applyDynamicConfig(dynamicConfig: DeepReadonly<DynamicHlsJsP2PEngineConfig>) {
     if (dynamicConfig.core) this.core.applyDynamicConfig(dynamicConfig.core);
   }
 
+  /**
+   * Sets the HLS instance for handling media.
+   * @param hls The HLS instance or a function that returns an HLS instance.
+   */
   setHls<T = unknown>(hls: T | (() => T)) {
     this.hlsInstanceGetter =
       typeof hls === "function" ? (hls as () => Hls) : () => hls as Hls;
@@ -208,11 +339,18 @@ export class HlsJsP2PEngine {
 
   private destroyCore = () => this.core.destroy();
 
+  /**
+   * Initialize Clappr player integration with HLS.js.
+   * @param clapprPlayer The Clappr player instance to integrate with.
+   */
   initClapprPlayer(clapprPlayer: unknown) {
     // eslint-disable-next-line
     this.setHls(() => (clapprPlayer as any).core.getCurrentPlayback()?._hls);
   }
 
+  /**
+   * Clean up and release all resources. Unregisters all event handlers.
+   */
   destroy = () => {
     this.destroyCore();
     this.updateHlsEventsHandlers("unregister");
