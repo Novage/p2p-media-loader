@@ -107,7 +107,7 @@ export class HlsJsP2PEngine {
    * Constructs an instance of HlsJsP2PEngine.
    * @param config Optional configuration for P2P engine setup.
    */
-  constructor(config?: DeepReadonly<PartialHlsJsP2PEngineConfig>) {
+  constructor(config?: PartialHlsJsP2PEngineConfig) {
     this.core = new Core(config?.core);
     this.segmentManager = new SegmentManager(this.core);
   }

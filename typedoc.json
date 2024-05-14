@@ -4,7 +4,5 @@
   "plugin": ["typedoc-material-theme"],
   "exclude": ["packages/p2p-media-loader-demo"],
   "entryPointStrategy": "packages",
-  "excludeInternal": true,
-  "excludePrivate": true,
-  "excludeProtected": true
+  "readme": "none"
 }

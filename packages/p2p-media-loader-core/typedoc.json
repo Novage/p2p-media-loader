@@ -1,5 +1,7 @@
 {
   "entryPoints": ["src/index.ts"],
   "excludeExternals": true,
-  "excludePrivate": true
+  "excludePrivate": true,
+  "categorizeByGroup": true,
+  "readme": "none"
 }

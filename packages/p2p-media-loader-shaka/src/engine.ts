@@ -90,10 +90,7 @@ export class ShakaP2PEngine {
    * @param config Optional configuration for customizing the P2P engine's behavior.
    * @param shaka The Shaka Player library, typically provided as a global variable by including Shaka Player in your project.
    */
-  constructor(
-    config?: DeepReadonly<PartialShakaEngineConfig>,
-    shaka = window.shaka,
-  ) {
+  constructor(config?: PartialShakaEngineConfig, shaka = window.shaka) {
     validateShaka(shaka);
 
     this.shaka = shaka;

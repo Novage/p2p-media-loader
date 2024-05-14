@@ -84,7 +84,7 @@ export class Core<TStream extends Stream = Stream> {
    * // Create a Core instance using the default configuration.
    * const core = new Core();
    */
-  constructor(config?: DeepReadonly<Partial<CoreConfig>>) {
+  constructor(config?: Partial<CoreConfig>) {
     this.config = deepCopy({ ...Core.DEFAULT_CONFIG, ...config });
   }
 
