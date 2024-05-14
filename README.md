@@ -3,9 +3,9 @@
 [![jsDelivr Badge](https://data.jsdelivr.com/v1/package/npm/p2p-media-loader-core/badge)](https://www.jsdelivr.com/package/npm/p2p-media-loader-core)
 [![npm Version](https://badge.fury.io/js/p2p-media-loader-core.svg)](https://npmjs.com/package/p2p-media-loader-core)
 
-**P2P Media Loader** is an open-source JavaScript library that capitalizes on the capabilities of modern web browsers, such as HTML5 video and WebRTC, to facilitate media delivery over peer-to-peer (P2P) networks. It seamlessly integrates with many popular HTML5 video players and functions entirely without the need for browser plugins or add-ons. Experience it in action with the [demo](http://novage.com.ua/p2p-media-loader/demo.html).
+**P2P Media Loader** is an open-source JavaScript library that leverages modern web browser features, such as HTML5 video and WebRTC, to enable media delivery over peer-to-peer (P2P) networks. It integrates smoothly with many popular HTML5 video players and works entirely without browser plugins or add-ons. Experience it in action with the [demo](http://novage.com.ua/p2p-media-loader/demo.html).
 
-This library enables the creation of a P2P network, also known as P2P CDN or P2PTV, which allows traffic sharing among users who are simultaneously viewing the same live or VOD stream via HLS or MPEG-DASH protocols.
+This library enables the creation of a huge P2P mesh network, also known as P2P CDN or P2PTV, which allows traffic sharing among users who are simultaneously viewing the same live or VOD stream via HLS or MPEG-DASH protocols.
 
 By leveraging P2P technology, it greatly reduces reliance on traditional CDN resources, lowers costs, and enhances the ability to deliver media streams to a larger audience.
 
@@ -40,7 +40,7 @@ By leveraging P2P technology, it greatly reduces reliance on traditional CDN res
 - Supports live and VOD streams over HLS or MPEG-DASH protocols
 - Supports multiple HTML5 video players and engines:
   - Engines: Hls.js, Shaka Player
-  - Video players: [Vidstack](https://www.vidstack.io/), [Clappr](http://clappr.io/), [MediaElement](https://www.mediaelementjs.com/), [Plyr](https://plyr.io/), [DPlayer](https://dplayer.diygod.dev/), [OpenPlayerJS](https://www.openplayerjs.com/) and others
+  - Video players: [Vidstack](https://www.vidstack.io/), [Clappr](http://clappr.io/), [MediaElement](https://www.mediaelementjs.com/), [Plyr](https://plyr.io/), [DPlayer](https://dplayer.diygod.dev/), [OpenPlayerJS](https://www.openplayerjs.com/), and others that support Hls.js or Shaka video engines. These players can be integrated via custom integration with the library API.
 - Supports adaptive bitrate streaming of HLS and MPEG-DASH protocols
 - No need in server-side software. By default **P2P Media Loader** uses publicly available servers:
   - STUN servers - [Public STUN server list](https://gist.github.com/mondain/b0ec1cf5f60ae726202e)
@@ -72,20 +72,25 @@ A web browser runs a video player that integrates with the **P2P Media Loader** 
 
 **P2P Media Loader** initially downloads media segments over HTTP(S) from a source server or CDN to start media playback quickly. If no peers are available, it continues to download segments over HTTP(S), similar to a traditional media stream.
 
-Subsequently, **P2P Media Loader** transmits media stream details and connection information (including ICE candidates) to WebTorrent trackers. These trackers provide a list of other peers who are accessing the same media stream.
+Subsequently, **P2P Media Loader** transmits media stream details and connection information, such as ICE candidates, to WebTorrent trackers. These trackers provide a list of other peers who are accessing the same media stream.
 
 **P2P Media Loader** then connects with these peers to download additional media segments and simultaneously shares segments that it has already downloaded.
 
 Periodically, random peers in the P2P swarm download new segments over HTTP(S) and distribute them to others via P2P.
 
-## Limitations
-
-Only one media track is delivered over P2P. If video and audio tracks in HLS or MPEG-DASH go separately, just video is going to be shared over the P2P network.
-
 ## Web browsers support
 
-|                         | Chrome | Firefox | macOS Safari | iPadOS Safari (iPad) | iOS Safari (iPhone) | Edge  |
-| ----------------------- | ------ | ------- | ------------ | -------------------- | ------------------- | ----- |
-| WebRTC Data Channels    | +      | +       | +            | +                    | +                   | +     |
-| Media Source Extensions | +      | +       | +            | +                    | +                   | +     |
-| **P2P Media Loader**    | **+**  | **+**   | **+**        | **+**                | **+**               | **+** |
+**All features listed below are fully supported across the following browsers:**
+
+- Chrome
+- Firefox
+- macOS Safari
+- iPadOS Safari (iPad)
+- iOS Safari (iPhone, iOS version 17.1 and above)
+- Edge
+
+**Supported Features:**
+
+- WebRTC Data Channels
+- [Media Source Extensions](https://caniuse.com/mediasource) or [Managed Media Source](https://caniuse.com/mdn-api_managedmediasource)
+- P2P Media Loader
