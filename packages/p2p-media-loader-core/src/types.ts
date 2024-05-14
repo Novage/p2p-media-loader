@@ -61,24 +61,185 @@ export type DynamicCoreConfig = Partial<
  * Configuration options for the Core functionality, including network and processing parameters.
  */
 export type CoreConfig = {
+  /** Time window to consider for high demand scenarios, in milliseconds.
+   *
+   * @default
+   * ```typescript
+   * highDemandTimeWindow: 15
+   * ```
+   */
   highDemandTimeWindow: number;
+
+  /** Time window for HTTP downloads, in milliseconds.
+   *
+   * @default
+   * ```typescript
+   * httpDownloadTimeWindow: 45
+   * ```
+   */
   httpDownloadTimeWindow: number;
+
+  /** Time window for P2P downloads, in milliseconds.
+   *
+   * @default
+   * ```typescript
+   * p2pDownloadTimeWindow: 45
+   * ```
+   */
   p2pDownloadTimeWindow: number;
+
+  /** Maximum number of simultaneous HTTP downloads allowed.
+   *
+   * @default
+   * ```typescript
+   * simultaneousHttpDownloads: 3
+   * ```
+   */
   simultaneousHttpDownloads: number;
+
+  /** Maximum number of simultaneous P2P downloads allowed.
+   *
+   * @default
+   * ```typescript
+   * simultaneousP2PDownloads: 3
+   * ```
+   */
   simultaneousP2PDownloads: number;
+
+  /** Time after which a cached segment expires, in milliseconds.
+   *
+   * @default
+   * ```typescript
+   * cachedSegmentExpiration: 120 * 1000
+   * ```
+   */
   cachedSegmentExpiration: number;
+
+  /** Maximum number of segments to store in the cache.
+   *
+   * @default
+   * ```typescript
+   * cachedSegmentsCount: 50
+   * ```
+   */
   cachedSegmentsCount: number;
+
+  /** Maximum message size for WebRTC communications, in bytes.
+   *
+   * @default
+   * ```typescript
+   * webRtcMaxMessageSize: 64 * 1024 - 1
+   * ```
+   */
   webRtcMaxMessageSize: number;
+
+  /** Timeout for not receiving bytes from P2P, in milliseconds.
+   *
+   * @default
+   * ```typescript
+   * p2pNotReceivingBytesTimeoutMs: 1000
+   * ```
+   */
   p2pNotReceivingBytesTimeoutMs: number;
+
+  /** Timeout for destroying the P2P loader if inactive, in milliseconds.
+   *
+   * @default
+   * ```typescript
+   * p2pLoaderDestroyTimeoutMs: 30 * 1000
+   * ```
+   */
   p2pLoaderDestroyTimeoutMs: number;
+
+  /** Timeout for not receiving bytes from HTTP downloads, in milliseconds.
+   *
+   * @default
+   * ```typescript
+   * httpNotReceivingBytesTimeoutMs: 1000
+   * ```
+   */
   httpNotReceivingBytesTimeoutMs: number;
+
+  /** Number of retries allowed after an HTTP error.
+   *
+   * @default
+   * ```typescript
+   * httpErrorRetries: 3
+   * ```
+   */
   httpErrorRetries: number;
+
+  /** Number of retries allowed after a P2P error.
+   *
+   * @default
+   * ```typescript
+   * p2pErrorRetries: 3
+   * ```
+   */
   p2pErrorRetries: number;
+
+  /**
+   * List of URLs to the trackers used for announcing and discovering peers.
+   *
+   * @default
+   * The default trackers used are:
+   * ```typescript
+   * [
+   *   "wss://tracker.openwebtorrent.com",
+   *   "wss://tracker.novage.com.ua",
+   * ]
+   * ```
+   */
   announceTrackers: string[];
+
+  /**
+   * Configuration for the RTC layer, used in WebRTC communication.
+   * This configuration specifies the STUN/TURN servers used by WebRTC to establish connections through NATs and firewalls.
+   *
+   * @see https://developer.mozilla.org/en-US/docs/Web/API/RTCConfiguration
+   *
+   * @default
+   * ```json
+   * {
+   *   "rtcConfig": {
+   *     "iceServers": [
+   *       { "urls": "stun:stun.l.google.com:19302" },
+   *       { "urls": "stun:global.stun.twilio.com:3478" }
+   *     ]
+   *   }
+   * }
+   * ```
+   */
   rtcConfig: RTCConfiguration;
+
+  /** Prefix to use for the client version in tracker communications.
+   *
+   * @default
+   * ```typescript
+   * trackerClientVersionPrefix: "PM0100" // PM + VERSION
+   * ```
+   */
   trackerClientVersionPrefix: string;
+
+  /** Optional unique identifier for the swarm, used to isolate peer pools. */
   swarmId?: string;
+
+  /**
+   * Optional function to validate a P2P segment before fully integrating it into the playback buffer.
+   * @param url URL of the segment to validate.
+   * @param byteRange Optional range of bytes to validate within the segment.
+   * @returns A promise that resolves with a boolean indicating if the segment is valid.
+   */
   validateP2PSegment?: (url: string, byteRange?: ByteRange) => Promise<boolean>;
+
+  /**
+   * Optional function to customize the setup of HTTP requests for segment downloads.
+   * @param segmentUrl URL of the segment.
+   * @param segmentByteRange The range of bytes requested for the segment.
+   * @param requestAbortSignal An abort signal to cancel the request if needed.
+   * @param requestByteRange Additional byte range for partial requests, if required.
+   * @returns A promise that resolves with the configured request, or undefined if no request should be made.
+   */
   httpRequestSetup?: (
     segmentUrl: string,
     segmentByteRange: ByteRange | undefined,
