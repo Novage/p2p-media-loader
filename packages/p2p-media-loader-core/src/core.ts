@@ -66,8 +66,6 @@ export class Core<TStream extends Stream = Stream> {
 
   /**
    * Constructs a new Core instance with optional initial configuration.
-   * The configuration will be deeply copied to prevent modifications.
-   * This allows the user to override any default setting without affecting the global defaults.
    *
    * @param config - Optional partial configuration to override default settings.
    *

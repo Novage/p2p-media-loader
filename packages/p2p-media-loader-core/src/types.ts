@@ -4,19 +4,51 @@
 export type StreamType = "main" | "secondary";
 
 /**
- * Represents a range of bytes, typically used for specifying a segment of data to download.
+ * Represents a range of bytes, used for specifying a segment of data to download.
  */
-export type ByteRange = { start: number; end: number };
+export type ByteRange = {
+  /**
+   * The starting byte index of the range.
+   */
+  start: number;
+  /**
+   * The ending byte index of the range.
+   */
+  end: number;
+};
 
 /**
  * Describes a media segment with its unique identifiers, location, and timing information.
  */
 export type Segment = {
+  /**
+   * A unique identifier for the segment within the local system.
+   */
   readonly localId: string;
+
+  /**
+   * A unique identifier for the segment as recognized by external systems or servers.
+   */
   readonly externalId: number;
+
+  /**
+   * The URL from which the segment can be downloaded.
+   */
   readonly url: string;
+
+  /**
+   * An optional property specifying the range of bytes that represent the segment.
+   */
   readonly byteRange?: ByteRange;
+
+  /**
+   * The start time of the segment in seconds, relative to the beginning of the stream.
+   */
   readonly startTime: number;
+
+  /**
+   * The end time of the segment in seconds, relative to the beginning of the stream.
+   */
   readonly endTime: number;
 };
 
