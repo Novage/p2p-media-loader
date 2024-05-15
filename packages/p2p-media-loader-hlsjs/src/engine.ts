@@ -342,15 +342,6 @@ export class HlsJsP2PEngine {
   private destroyCore = () => this.core.destroy();
 
   /**
-   * Initialize Clappr player integration with HLS.js.
-   * @param clapprPlayer The Clappr player instance to integrate with.
-   */
-  initClapprPlayer(clapprPlayer: unknown) {
-    // eslint-disable-next-line
-    this.setHls(() => (clapprPlayer as any).core.getCurrentPlayback()?._hls);
-  }
-
-  /**
    * Clean up and release all resources. Unregisters all event handlers.
    */
   destroy = () => {

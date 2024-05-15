@@ -58,7 +58,7 @@ export const HlsjsClapprPlayer = ({
       height: "100%",
     });
 
-    engine.initClapprPlayer(clapprPlayer);
+    engine.setHls(() => (clapprPlayer as any).core.getCurrentPlayback()?._hls);
 
     return () => {
       clapprPlayer.destroy();
