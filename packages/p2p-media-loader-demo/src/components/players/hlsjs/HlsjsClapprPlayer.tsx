@@ -45,6 +45,8 @@ export const HlsjsClapprPlayer = ({
     const clapprPlayer = new Clappr.Player({
       parentId: `#${containerRef.current.id}`,
       source: streamUrl,
+      mute: true,
+      autoPlay: true,
       playback: {
         playInline: true,
         hlsjsConfig: {

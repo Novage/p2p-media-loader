@@ -103,6 +103,8 @@ export const ShakaPlyr = ({
 
         const plyrPlayerInit = new Plyr(videoElement, {
           quality,
+          autoplay: true,
+          muted: true,
         });
 
         playerShaka = shakaPlayerInit;

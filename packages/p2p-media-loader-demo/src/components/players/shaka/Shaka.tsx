@@ -102,7 +102,13 @@ export const Shaka = ({
 
   return isShakaSupported ? (
     <div ref={videoContainerRef} className="video-container">
-      <video ref={videoRef} playsInline className="video-player" />
+      <video
+        ref={videoRef}
+        playsInline
+        autoPlay
+        muted
+        className="video-player"
+      />
     </div>
   ) : (
     <div className="error-message">

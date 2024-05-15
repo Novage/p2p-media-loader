@@ -64,6 +64,7 @@ export const HlsjsVidstack = ({
   return (
     <div className="video-container">
       <MediaPlayer
+        autoPlay
         muted
         onProviderChange={onProviderChange}
         src={streamUrl}

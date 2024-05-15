@@ -42,6 +42,8 @@ export const HlsjsMediaElement = ({
     const videoElement = document.createElement("video");
     videoElement.id = "player";
     videoElement.playsInline = true;
+    videoElement.autoplay = true;
+    videoElement.muted = true;
     videoContainer.appendChild(videoElement);
 
     window.Hls = HlsJsP2PEngine.injectMixin(Hls);

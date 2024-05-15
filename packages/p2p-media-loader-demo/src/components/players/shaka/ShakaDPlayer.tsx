@@ -77,7 +77,7 @@ export const ShakaDPlayer = ({
 
   return isShakaSupported ? (
     <div ref={containerRef} className="video-container">
-      <video playsInline />
+      <video playsInline autoPlay muted />
     </div>
   ) : (
     <div className="error-message">

@@ -75,6 +75,8 @@ export const HlsjsPlyr = ({
 
       player = new Plyr(videoElement, {
         quality,
+        autoplay: true,
+        muted: true,
       });
     });
 

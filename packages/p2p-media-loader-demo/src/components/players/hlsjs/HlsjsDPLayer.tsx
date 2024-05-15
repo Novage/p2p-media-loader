@@ -75,7 +75,7 @@ export const HlsjsDPlayer = ({
 
   return isHlsSupported ? (
     <div ref={containerRef} className="video-container">
-      <video playsInline />
+      <video playsInline autoPlay muted />
     </div>
   ) : (
     <div className="error-message">

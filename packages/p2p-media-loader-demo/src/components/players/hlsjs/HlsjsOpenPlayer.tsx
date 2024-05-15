@@ -39,6 +39,8 @@ export const HlsjsOpenPlayer = ({
     videoElement.className = "op-player__media";
     videoElement.id = "player";
     videoElement.playsInline = true;
+    videoElement.autoplay = true;
+    videoElement.muted = true;
     videoContainer.appendChild(videoElement);
 
     const cleanup = () => {

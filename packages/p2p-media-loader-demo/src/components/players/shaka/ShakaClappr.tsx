@@ -44,6 +44,8 @@ export const ShakaClappr = ({
       parentId: `#${containerRef.current.id}`,
       source: streamUrl,
       plugins: [window.DashShakaPlayback, window.LevelSelector],
+      mute: true,
+      autoPlay: true,
       playback: {
         playInline: true,
       },
