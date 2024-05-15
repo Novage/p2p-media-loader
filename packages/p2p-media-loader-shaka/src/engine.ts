@@ -88,7 +88,7 @@ export class ShakaP2PEngine {
    * Constructs an instance of ShakaP2PEngine.
    *
    * @param config Optional configuration for customizing the P2P engine's behavior.
-   * @param shaka The Shaka Player library, typically provided as a global variable by including Shaka Player in your project.
+   * @param shaka The Shaka Player library instance.
    */
   constructor(config?: PartialShakaEngineConfig, shaka = window.shaka) {
     validateShaka(shaka);
@@ -120,11 +120,10 @@ export class ShakaP2PEngine {
 
   /**
    * Applies dynamic configuration updates to the P2P engine.
-   * This method allows for runtime adjustments to the engine's settings.
    *
    * @param dynamicConfig Configuration changes to apply.
    */
-  applyDynamicConfig(dynamicConfig: DeepReadonly<DynamicShakaP2PEngineConfig>) {
+  applyDynamicConfig(dynamicConfig: DynamicShakaP2PEngineConfig) {
     if (dynamicConfig.core) this.core.applyDynamicConfig(dynamicConfig.core);
   }
 

@@ -100,7 +100,25 @@ export class HlsJsP2PEngine {
   private currentHlsInstance?: Hls;
   private readonly debug = debug("p2pml-hlsjs:engine");
 
-  /** Static method to inject mixins for extending functionality */
+  /**
+   * Enhances a given Hls.js class by injecting additional P2P (peer-to-peer) functionalities.
+   *
+   * @returns {HlsWithP2PInstance} - The enhanced class with P2P functionalities.
+   *
+   * @example
+   * const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
+   *
+   * const hls = new HlsWithP2P({
+   *   p2p: {
+   *     core: {
+   *       // P2P configuration
+   *     },
+   *     onHlsJsCreated(hls) {
+   *       // Do something with the Hls.js instance
+   *     },
+   *   },
+   * });
+   */
   static injectMixin = injectMixin;
 
   /**
@@ -195,7 +213,7 @@ export class HlsJsP2PEngine {
    *
    * hlsP2PEngine.applyDynamicConfig(newDynamicConfig);
    */
-  applyDynamicConfig(dynamicConfig: DeepReadonly<DynamicHlsJsP2PEngineConfig>) {
+  applyDynamicConfig(dynamicConfig: DynamicHlsJsP2PEngineConfig) {
     if (dynamicConfig.core) this.core.applyDynamicConfig(dynamicConfig.core);
   }
 
