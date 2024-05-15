@@ -83,7 +83,14 @@ export const HlsjsPlayer = ({
 
   return isHlsSupported ? (
     <div className="video-container">
-      <video ref={videoRef} controls playsInline autoPlay muted />
+      <video
+        ref={videoRef}
+        style={{ aspectRatio: "auto" }}
+        controls
+        playsInline
+        autoPlay
+        muted
+      />
       <div className="select-container">
         <select ref={qualityRef} className="quality-selector" />
       </div>

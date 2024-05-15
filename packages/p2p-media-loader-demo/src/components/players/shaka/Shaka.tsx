@@ -107,7 +107,7 @@ export const Shaka = ({
         playsInline
         autoPlay
         muted
-        className="video-player"
+        style={{ aspectRatio: "auto" }}
       />
     </div>
   ) : (
