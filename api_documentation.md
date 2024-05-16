@@ -294,7 +294,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
 </script>
 ```
 
-- **Integrating P2P with OpenPlayerJS and Hls.js**
+### **Integrating P2P with OpenPlayerJS and Hls.js**
 
 ```html
 <script type="module">
