@@ -21,7 +21,7 @@ By leveraging P2P technology, it greatly reduces reliance on traditional CDN res
 - [FAQ](https://github.com/Novage/p2p-media-loader/blob/master/FAQ.md)
 - [Overview](http://novage.com.ua/p2p-media-loader/overview.html)
 - [Technical overview](http://novage.com.ua/p2p-media-loader/technical-overview.html)
-- [API documentation](https://novage.github.io/p2p-media-loader/)
+- [API documentation](https://novage.github.io/p2p-media-loader/v1.0/docs/)
 - npm packages
   - [Core](https://npmjs.com/package/p2p-media-loader-core)
   - [Hls.js integration](https://npmjs.com/package/p2p-media-loader-hlsjs)
