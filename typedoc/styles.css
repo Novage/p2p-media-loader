@@ -1,3 +1,16 @@
 .tsd-filter-visibility {
   display: none;
 }
+
+.tsd-typography ul {
+  margin: 0.2em 0;
+}
+
+.tsd-page-title h2 {
+  font-size: 32px;
+}
+
+code,
+pre {
+  font-family: Menlo, Monaco, Consolas, "Courier New", monospace !important;
+}

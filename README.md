@@ -1,7 +1,6 @@
 # P2P Media Loader
 
 [![jsDelivr Badge](https://data.jsdelivr.com/v1/package/npm/p2p-media-loader-core/badge)](https://www.jsdelivr.com/package/npm/p2p-media-loader-core)
-[![npm Version](https://badge.fury.io/js/p2p-media-loader-core.svg)](https://npmjs.com/package/p2p-media-loader-core)
 
 **P2P Media Loader** is an open-source JavaScript library that leverages modern web browser features, such as HTML5 video and WebRTC, to enable media delivery over peer-to-peer (P2P) networks. It integrates smoothly with many popular HTML5 video players and works entirely without browser plugins or add-ons. Experience it in action with the [demo](http://novage.com.ua/p2p-media-loader/demo.html).
 
@@ -19,17 +18,10 @@ By leveraging P2P technology, it greatly reduces reliance on traditional CDN res
 
 - [P2P development, support & consulting](https://novage.com.ua/)
 - [Demo](http://novage.com.ua/p2p-media-loader/demo.html)
-- [FAQ](FAQ.md)
+- [FAQ](https://github.com/Novage/p2p-media-loader/blob/master/FAQ.md)
 - [Overview](http://novage.com.ua/p2p-media-loader/overview.html)
 - [Technical overview](http://novage.com.ua/p2p-media-loader/technical-overview.html)
-- API documentation
-  - [Hls.js integration](p2p-media-loader-hlsjs#p2p-media-loader---hlsjs-integration)
-  - [Shaka Player integration](p2p-media-loader-shaka#p2p-media-loader---shaka-player-integration)
-  - [Core](p2p-media-loader-core#p2p-media-loader-core)
-- JS CDN
-  - [Core](https://cdn.jsdelivr.net/npm/p2p-media-loader-core@latest/build/)
-  - [Hls.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/build/)
-  - [Shaka Player integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@latest/build/)
+- [API documentation](https://novage.github.io/p2p-media-loader/)
 - npm packages
   - [Core](https://npmjs.com/package/p2p-media-loader-core)
   - [Hls.js integration](https://npmjs.com/package/p2p-media-loader-hlsjs)
@@ -86,7 +78,7 @@ Periodically, random peers in the P2P swarm download new segments over HTTP(S) a
 - Firefox
 - macOS Safari
 - iPadOS Safari (iPad)
-- iOS Safari (iPhone, iOS version 17.1 and above)
+- iOS Safari (iPhone, iOS version 17.1+)
 - Edge
 
 **Supported Features:**

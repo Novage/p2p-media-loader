@@ -253,7 +253,13 @@ export type CoreConfig = {
    */
   trackerClientVersionPrefix: string;
 
-  /** Optional unique identifier for the swarm, used to isolate peer pools. */
+  /** Optional unique identifier for the swarm, used to isolate peer pools.
+   *
+   * @default
+   * ```typescript
+   * // The master URL of the manifest is used as the swarmId.
+   * ```
+   */
   swarmId?: string;
 
   /**
