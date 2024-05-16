@@ -19,12 +19,11 @@ export const HlsjsPlayer = ({
   const qualityRef = useRef<HTMLSelectElement>(null);
 
   useEffect(() => {
+    if (!videoRef.current) return;
     if (!Hls.isSupported()) {
       setIsHlsSupported(false);
       return;
     }
-
-    if (!videoRef.current) return;
 
     const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
     const hls = new HlsWithP2P({

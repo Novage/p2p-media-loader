@@ -22,12 +22,11 @@ export const ShakaClappr = ({
   }, []);
 
   useEffect(() => {
+    if (!containerRef.current) return;
     if (!window.shaka.Player.isBrowserSupported()) {
       setIsShakaSupported(false);
       return;
     }
-
-    if (!containerRef.current) return;
 
     const shakaP2PEngine = new ShakaP2PEngine(
       {

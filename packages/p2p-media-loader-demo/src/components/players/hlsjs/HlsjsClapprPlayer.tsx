@@ -18,12 +18,11 @@ export const HlsjsClapprPlayer = ({
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!containerRef.current) return;
     if (!Hls.isSupported()) {
       setIsHlsSupported(false);
       return;
     }
-
-    if (!containerRef.current) return;
 
     const engine = new HlsJsP2PEngine({
       core: {

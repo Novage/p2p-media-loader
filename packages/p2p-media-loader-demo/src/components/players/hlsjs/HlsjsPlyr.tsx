@@ -19,12 +19,11 @@ export const HlsjsPlyr = ({
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!containerRef.current) return;
     if (!Hls.isSupported()) {
       setIsHlsSupported(false);
       return;
     }
-
-    if (!containerRef.current) return;
 
     let player: Plyr | undefined;
 

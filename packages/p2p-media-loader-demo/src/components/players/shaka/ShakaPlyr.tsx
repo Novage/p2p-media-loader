@@ -24,12 +24,11 @@ export const ShakaPlyr = ({
   }, []);
 
   useEffect(() => {
+    if (!containerRef.current) return;
     if (!shaka.Player.isBrowserSupported()) {
       setIsShakaSupported(false);
       return;
     }
-
-    if (!containerRef.current) return;
 
     const { videoContainer, videoElement } = createVideoElements();
 
@@ -44,9 +43,7 @@ export const ShakaPlyr = ({
       isCleanedUp = true;
       shakaP2PEngine?.destroy();
       void playerShaka?.destroy();
-      playerShaka = undefined;
       void plyrPlayer?.destroy();
-      plyrPlayer = undefined;
       videoContainer.remove();
     };
 

@@ -19,17 +19,16 @@ export const HlsjsOpenPlayer = ({
   const playerContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!playerContainerRef.current) return;
     if (!Hls.isSupported()) {
       setIsHlsSupported(false);
       return;
     }
 
-    if (!playerContainerRef.current) return;
+    window.Hls = HlsJsP2PEngine.injectMixin(Hls);
 
     let isCleanedUp = false;
     let player: OpenPlayerJS | undefined;
-
-    window.Hls = HlsJsP2PEngine.injectMixin(Hls);
 
     const { videoContainer, videoElement } = createVideoElements({
       videoClassName: "op-player__media",
