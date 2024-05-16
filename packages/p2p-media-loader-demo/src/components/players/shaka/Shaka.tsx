@@ -15,8 +15,7 @@ export const Shaka = ({
 }: PlayerProps) => {
   const [isShakaSupported, setIsShakaSupported] = useState(true);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const videoContainerRef = useRef<HTMLDivElement>(null);
+  const playerContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     ShakaP2PEngine.registerPlugins(shaka);
@@ -24,46 +23,49 @@ export const Shaka = ({
   }, []);
 
   useEffect(() => {
+    if (!playerContainerRef.current) return;
     if (!shaka.Player.isBrowserSupported()) {
       setIsShakaSupported(false);
       return;
     }
 
-    let isCleanedUp = false;
+    const { newVideoElement, newVideoContainer } = createVideoElement();
 
+    playerContainerRef.current.appendChild(newVideoContainer);
+
+    let isCleanedUp = false;
     let shakaP2PEngine: ShakaP2PEngine | undefined;
     let player: shaka.Player | undefined;
     let ui: shaka.ui.Overlay | undefined;
 
     const cleanup = () => {
       isCleanedUp = true;
+      newVideoElement.remove();
+      newVideoContainer.remove();
       void player?.destroy();
-      player = undefined;
-      shakaP2PEngine?.destroy();
       void ui?.destroy();
+      shakaP2PEngine?.destroy();
     };
 
     const setupPlayer = async () => {
-      if (!videoRef.current || !videoContainerRef.current) return;
+      const playerInit = new shaka.Player();
+      const uiInit = new shaka.ui.Overlay(
+        playerInit,
+        newVideoContainer,
+        newVideoElement,
+      );
+
+      const shakaP2PEngineInit = new ShakaP2PEngine(
+        {
+          core: {
+            announceTrackers,
+          },
+        },
+        shaka,
+      );
 
       try {
-        const playerInit = new shaka.Player();
-        const uiInit = new shaka.ui.Overlay(
-          playerInit,
-          videoContainerRef.current,
-          videoRef.current,
-        );
-
-        const shakaP2PEngineInit = new ShakaP2PEngine(
-          {
-            core: {
-              announceTrackers,
-            },
-          },
-          shaka,
-        );
-
-        await playerInit.attach(videoRef.current);
+        await playerInit.attach(newVideoElement);
 
         subscribeToUiEvents({
           engine: shakaP2PEngineInit,
@@ -73,24 +75,31 @@ export const Shaka = ({
           onChunkUploaded,
         });
 
-        shakaP2PEngineInit.configureAndInitShakaPlayer(playerInit);
-        await playerInit.load(streamUrl);
-
         player = playerInit;
         ui = uiInit;
         shakaP2PEngine = shakaP2PEngineInit;
-
-        if (isCleanedUp) cleanup();
       } catch (error) {
+        player = playerInit;
+        ui = uiInit;
+        shakaP2PEngine = shakaP2PEngineInit;
         // eslint-disable-next-line no-console
         console.error("Error setting up Shaka Player:", error);
         cleanup();
+        throw error;
       }
+
+      if (isCleanedUp) {
+        cleanup();
+        return;
+      }
+
+      shakaP2PEngineInit.configureAndInitShakaPlayer(playerInit);
+      await playerInit.load(streamUrl);
     };
 
     void setupPlayer();
 
-    return () => cleanup();
+    return cleanup;
   }, [
     announceTrackers,
     onChunkDownloaded,
@@ -101,18 +110,23 @@ export const Shaka = ({
   ]);
 
   return isShakaSupported ? (
-    <div ref={videoContainerRef} className="video-container">
-      <video
-        ref={videoRef}
-        playsInline
-        autoPlay
-        muted
-        style={{ aspectRatio: "auto" }}
-      />
-    </div>
+    <div ref={playerContainerRef}></div>
   ) : (
     <div className="error-message">
       <h3>Shaka Player is not supported in this browser</h3>
     </div>
   );
+};
+
+const createVideoElement = () => {
+  const newVideoElement = document.createElement("video");
+  newVideoElement.playsInline = true;
+  newVideoElement.autoplay = true;
+  newVideoElement.muted = true;
+  newVideoElement.style.aspectRatio = "auto";
+
+  const newVideoContainer = document.createElement("div");
+  newVideoContainer.appendChild(newVideoElement);
+
+  return { newVideoElement, newVideoContainer };
 };
