@@ -49,9 +49,9 @@ For more examples with npm packages, you may check our [React demo](https://gith
 
 ## Using P2P Media Loader with CDN via JavaScript Modules
 
-### Hls.js Integration
-
 **P2P Media Loader** supports many players that use Hls.js as media engine. Lets pick [Vidstack](https://www.vidstack.io/) player for extended hlsjs example:
+
+### Integrating P2P with Vidstack and Hls.js
 
 ```html
 <!doctype html>
@@ -335,7 +335,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
 </script>
 ```
 
-### Shaka Player Integration
+### Integrating P2P with Shaka Player
 
 [Shaka](https://shaka-player-demo.appspot.com/demo/) player is used for an extended example:
 
