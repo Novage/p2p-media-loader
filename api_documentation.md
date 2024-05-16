@@ -13,23 +13,43 @@
 To include **P2P Media Loader** in your project using npm, follow these steps:
 
 1. Install the package via npm:
-   ```bash
-   npm install p2p-media-loader-core p2p-media-loader-hlsjs
-   ```
+
+   - For HLS.js integration:
+
+     ```bash
+     npm install p2p-media-loader-hlsjs
+     ```
+
+   - For Shaka Player integration:
+     ```bash
+     npm install p2p-media-loader-shaka
+     ```
+
 2. Import and use it in your project:
 
-   ```typescript
-   import Hls from "hls.js";
-   import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
+   - HLS.js integration:
 
-   const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
-   ```
+     ```typescript
+     import Hls from "hls.js";
+     import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
+
+     const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
+     ```
+
+   - Shaka Player integration:
+
+     ```typescript
+     import shaka from "shaka-player/dist/shaka-player.ui";
+     import { ShakaP2PEngine } from "p2p-media-loader-shaka";
+
+     ShakaP2PEngine.registerPlugins(shaka);
+     ```
 
 For more examples with npm packages, you may check our [React demo](https://github.com/Novage/p2p-media-loader/tree/v1/packages/p2p-media-loader-demo)
 
-## Using P2P Media Loader with CDN
+## Using P2P Media Loader with CDN via JavaScript Modules
 
-### Hls.js Integration via JavaScript Modules
+### Hls.js Integration
 
 **P2P Media Loader** supports many players that use Hls.js as media engine. Lets pick [Vidstack](https://www.vidstack.io/) player for extended hlsjs example:
 
@@ -100,7 +120,34 @@ For more examples with npm packages, you may check our [React demo](https://gith
 </html>
 ```
 
-**DPlayer Example:**
+### **Integrating P2P with raw Hls.js player**
+
+```html
+<script type="module">
+  import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
+
+  const videoElement = document.querySelector("#video");
+
+  const HlsWithP2P = HlsJsP2PEngine.injectMixin(window.Hls);
+
+  const hls = new HlsWithP2P({
+    p2p: {
+      core: {
+        swarmId: "custom swarm ID for stream 2000341",
+        // Other P2P engine config parameters go here
+      },
+      onHlsJsCreated(hls) {
+        // Subscribe to P2P engine and Hls.js events here
+      },
+    },
+  });
+
+  hls.attachMedia(videoElement);
+  hls.loadSource(streamUrl);
+</script>
+```
+
+### **Integrating P2P with DPlayer and Hls.js**
 
 ```html
 <script type="module">
@@ -137,7 +184,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
 </script>
 ```
 
-**Clappr player example:**
+### **Integrating P2P with Clappr and Hls.js**
 
 ```html
 <script type="module">
@@ -167,34 +214,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
 </script>
 ```
 
-**HlsJs player example:**
-
-```html
-<script type="module">
-  import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
-
-  const videoElement = document.querySelector("#video");
-
-  const HlsWithP2P = HlsJsP2PEngine.injectMixin(window.Hls);
-
-  const hls = new HlsWithP2P({
-    p2p: {
-      core: {
-        swarmId: "custom swarm ID for stream 2000341",
-        // Other P2P engine config parameters go here
-      },
-      onHlsJsCreated(hls) {
-        // Subscribe to P2P engine and Hls.js events here
-      },
-    },
-  });
-
-  hls.attachMedia(videoElement);
-  hls.loadSource(streamUrl);
-</script>
-```
-
-**MediaElement player example:**
+### **Integrating P2P with MediaElement and Hls.js**
 
 ```html
 <script type="module">
@@ -224,7 +244,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
 </script>
 ```
 
-**Plyr player example:**
+### **Integrating P2P with Plyr and Hls.js**
 
 ```html
 <script type="module">
@@ -274,7 +294,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
 </script>
 ```
 
-**OpenPlayerJS example**
+- **Integrating P2P with OpenPlayerJS and Hls.js**
 
 ```html
 <script type="module">
@@ -394,7 +414,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
 </html>
 ```
 
-**Clappr player example(DASH Only):**
+### **Integrating P2P with Clappr and Shaka Player**
 
 ```html
 <script type="module">
@@ -433,7 +453,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
 </script>
 ```
 
-**DPlayer example:**
+### **Integrating P2P with DPlayer and Shaka Player**
 
 ```html
 <script type="module">
@@ -472,7 +492,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
 </script>
 ```
 
-**Plyr player example:**
+### **Integrating P2P with Plyr and Shaka Player**
 
 ```html
 <script type="module">
