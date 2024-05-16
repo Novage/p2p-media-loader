@@ -3,7 +3,7 @@ import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 import { PlayerProps } from "../../../types";
 import "shaka-player/dist/controls.css";
 import shaka from "./shaka-import";
-import { subscribeToUiEvents } from "../utils";
+import { createVideoElements, subscribeToUiEvents } from "../utils";
 
 export const Shaka = ({
   streamUrl,
@@ -29,9 +29,11 @@ export const Shaka = ({
       return;
     }
 
-    const { newVideoElement, newVideoContainer } = createVideoElement();
+    const { videoElement, videoContainer } = createVideoElements({
+      aspectRatio: "auto",
+    });
 
-    playerContainerRef.current.appendChild(newVideoContainer);
+    playerContainerRef.current.appendChild(videoContainer);
 
     let isCleanedUp = false;
     let shakaP2PEngine: ShakaP2PEngine | undefined;
@@ -40,8 +42,8 @@ export const Shaka = ({
 
     const cleanup = () => {
       isCleanedUp = true;
-      newVideoElement.remove();
-      newVideoContainer.remove();
+      videoElement.remove();
+      videoContainer.remove();
       void player?.destroy();
       void ui?.destroy();
       shakaP2PEngine?.destroy();
@@ -51,8 +53,8 @@ export const Shaka = ({
       const playerInit = new shaka.Player();
       const uiInit = new shaka.ui.Overlay(
         playerInit,
-        newVideoContainer,
-        newVideoElement,
+        videoContainer,
+        videoElement,
       );
 
       const shakaP2PEngineInit = new ShakaP2PEngine(
@@ -65,7 +67,7 @@ export const Shaka = ({
       );
 
       try {
-        await playerInit.attach(newVideoElement);
+        await playerInit.attach(videoElement);
 
         subscribeToUiEvents({
           engine: shakaP2PEngineInit,
@@ -116,17 +118,4 @@ export const Shaka = ({
       <h3>Shaka Player is not supported in this browser</h3>
     </div>
   );
-};
-
-const createVideoElement = () => {
-  const newVideoElement = document.createElement("video");
-  newVideoElement.playsInline = true;
-  newVideoElement.autoplay = true;
-  newVideoElement.muted = true;
-  newVideoElement.style.aspectRatio = "auto";
-
-  const newVideoContainer = document.createElement("div");
-  newVideoContainer.appendChild(newVideoElement);
-
-  return { newVideoElement, newVideoContainer };
 };

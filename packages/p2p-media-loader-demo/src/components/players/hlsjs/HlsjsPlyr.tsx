@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { PlayerProps } from "../../../types";
 import Hls from "hls.js";
 import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
-import { subscribeToUiEvents } from "../utils";
+import { createVideoElements, subscribeToUiEvents } from "../utils";
 
 export const HlsjsPlyr = ({
   streamUrl,
@@ -28,14 +28,9 @@ export const HlsjsPlyr = ({
 
     let player: Plyr | undefined;
 
-    const videoContainer = document.createElement("div");
-    videoContainer.className = "video-container";
-    containerRef.current.appendChild(videoContainer);
+    const { videoContainer, videoElement } = createVideoElements();
 
-    const videoElement = document.createElement("video");
-    videoElement.id = "player";
-    videoElement.playsInline = true;
-    videoContainer.appendChild(videoElement);
+    containerRef.current.appendChild(videoContainer);
 
     const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
 

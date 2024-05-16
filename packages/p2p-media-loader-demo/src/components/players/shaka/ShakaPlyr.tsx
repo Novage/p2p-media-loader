@@ -4,7 +4,7 @@ import shaka from "../shaka/shaka-import";
 import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 import { PlayerProps } from "../../../types";
 import Plyr, { Options } from "plyr";
-import { subscribeToUiEvents } from "../utils";
+import { createVideoElements, subscribeToUiEvents } from "../utils";
 
 export const ShakaPlyr = ({
   streamUrl,
@@ -31,14 +31,9 @@ export const ShakaPlyr = ({
 
     if (!containerRef.current) return;
 
-    const videoContainer = document.createElement("div");
-    videoContainer.className = "video-container";
-    containerRef.current.appendChild(videoContainer);
+    const { videoContainer, videoElement } = createVideoElements();
 
-    const videoElement = document.createElement("video");
-    videoElement.id = "player";
-    videoElement.playsInline = true;
-    videoContainer.appendChild(videoElement);
+    containerRef.current.appendChild(videoContainer);
 
     let plyrPlayer: Plyr | undefined;
     let playerShaka: shaka.Player | undefined;

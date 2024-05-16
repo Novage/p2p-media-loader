@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { PlayerProps } from "../../../types";
 import { HlsJsP2PEngine, HlsWithP2PInstance } from "p2p-media-loader-hlsjs";
 import Hls from "hls.js";
-import { subscribeToUiEvents } from "../utils";
+import { createVideoElements, subscribeToUiEvents } from "../utils";
 
 export const HlsjsOpenPlayer = ({
   streamUrl,
@@ -31,22 +31,15 @@ export const HlsjsOpenPlayer = ({
 
     window.Hls = HlsJsP2PEngine.injectMixin(Hls);
 
-    const videoContainer = document.createElement("div");
-    videoContainer.className = "video-container";
-    playerContainerRef.current.appendChild(videoContainer);
+    const { videoContainer, videoElement } = createVideoElements({
+      videoClassName: "op-player__media",
+    });
 
-    const videoElement = document.createElement("video");
-    videoElement.className = "op-player__media";
-    videoElement.id = "player";
-    videoElement.playsInline = true;
-    videoElement.autoplay = true;
-    videoElement.muted = true;
-    videoContainer.appendChild(videoElement);
+    playerContainerRef.current.appendChild(videoContainer);
 
     const cleanup = () => {
       isCleanedUp = true;
       player?.destroy();
-      player = undefined;
       videoElement.remove();
       videoContainer.remove();
       window.Hls = undefined;
