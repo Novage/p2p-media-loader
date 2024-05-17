@@ -77,7 +77,7 @@ export class P2PLoadersContainer {
   private setLoaderDestroyTimeout(item: P2PLoaderContainerItem) {
     item.destroyTimeoutId = window.setTimeout(
       () => this.destroyAndRemoveLoader(item),
-      this.config.p2pLoaderDestroyTimeoutMs,
+      this.config.p2pInactiveLoaderDestroyTimeoutMs,
     );
   }
 

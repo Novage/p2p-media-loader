@@ -29,7 +29,7 @@ export class Core<TStream extends Stream = Stream> {
     cachedSegmentsCount: 50,
     webRtcMaxMessageSize: 64 * 1024 - 1,
     p2pNotReceivingBytesTimeoutMs: 1000,
-    p2pLoaderDestroyTimeoutMs: 30 * 1000,
+    p2pInactiveLoaderDestroyTimeoutMs: 30 * 1000,
     httpNotReceivingBytesTimeoutMs: 1000,
     httpErrorRetries: 3,
     p2pErrorRetries: 3,

@@ -80,7 +80,7 @@ export type HlsWithP2PConfig<HlsType extends abstract new () => unknown> =
  *     cachedSegmentsCount: 50,
  *     webRtcMaxMessageSize: 262144, // 256 KB
  *     p2pNotReceivingBytesTimeoutMs: 10000, // 10 seconds
- *     p2pLoaderDestroyTimeoutMs: 15000, // 15 seconds
+ *     p2pInactiveLoaderDestroyTimeoutMs: 15000, // 15 seconds
  *     httpNotReceivingBytesTimeoutMs: 8000, // 8 seconds
  *     httpErrorRetries: 2,
  *     p2pErrorRetries: 2,
@@ -103,7 +103,7 @@ export class HlsJsP2PEngine {
   /**
    * Enhances a given Hls.js class by injecting additional P2P (peer-to-peer) functionalities.
    *
-   * @returns {HlsWithP2PInstance} - The enhanced class with P2P functionalities.
+   * @returns {HlsWithP2PInstance} - The enhanced Hls.js class with P2P functionalities.
    *
    * @example
    * const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
@@ -119,7 +119,9 @@ export class HlsJsP2PEngine {
    *   },
    * });
    */
-  static injectMixin = injectMixin;
+  static injectMixin(hls: typeof Hls) {
+    return injectMixin(hls);
+  }
 
   /**
    * Constructs an instance of HlsJsP2PEngine.

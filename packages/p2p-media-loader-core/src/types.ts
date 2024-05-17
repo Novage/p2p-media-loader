@@ -178,10 +178,10 @@ export type CoreConfig = {
    *
    * @default
    * ```typescript
-   * p2pLoaderDestroyTimeoutMs: 30 * 1000
+   * p2pInactiveLoaderDestroyTimeoutMs: 30 * 1000
    * ```
    */
-  p2pLoaderDestroyTimeoutMs: number;
+  p2pInactiveLoaderDestroyTimeoutMs: number;
 
   /** Timeout for not receiving bytes from HTTP downloads, in milliseconds.
    *
@@ -211,7 +211,7 @@ export type CoreConfig = {
   p2pErrorRetries: number;
 
   /**
-   * List of URLs to the trackers used for announcing and discovering peers.
+   * List of URLs to the webtorrent trackers used for announcing and discovering peers.
    *
    * @default
    * The default trackers used are:
@@ -253,19 +253,17 @@ export type CoreConfig = {
    */
   trackerClientVersionPrefix: string;
 
-  /** Optional unique identifier for the swarm, used to isolate peer pools.
+  /** Optional unique identifier for the swarm, used to isolate peer pools by media stream.
    *
    * @default
-   * ```typescript
-   * // The master URL of the manifest is used as the swarmId.
-   * ```
+   * The master URL of the manifest is used as the swarmId.
    */
   swarmId?: string;
 
   /**
    * Optional function to validate a P2P segment before fully integrating it into the playback buffer.
    * @param url URL of the segment to validate.
-   * @param byteRange Optional range of bytes to validate within the segment.
+   * @param byteRange Optional range of bytes to validate byte range of the segment for stream which represented by single file.
    * @returns A promise that resolves with a boolean indicating if the segment is valid.
    */
   validateP2PSegment?: (url: string, byteRange?: ByteRange) => Promise<boolean>;
