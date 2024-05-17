@@ -87,7 +87,7 @@ export const ShakaPlyr = ({
         return;
       }
 
-      shakaP2PEngineInit.configureAndInitShakaPlayer(shakaPlayerInit);
+      shakaP2PEngineInit.bindShakaPlayer(shakaPlayerInit);
       await shakaPlayerInit.load(streamUrl);
 
       const levels = shakaPlayerInit.getVariantTracks();

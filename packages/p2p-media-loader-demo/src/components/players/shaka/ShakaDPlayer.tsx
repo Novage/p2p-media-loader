@@ -55,7 +55,7 @@ export const ShakaDPlayer = ({
               onChunkUploaded,
             });
 
-            shakaP2PEngine.configureAndInitShakaPlayer(shakaPlayer);
+            shakaP2PEngine.bindShakaPlayer(shakaPlayer);
             void shakaPlayer.load(streamUrl);
           },
         },

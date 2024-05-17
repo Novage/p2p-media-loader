@@ -57,7 +57,7 @@ export const ShakaClappr = ({
           onChunkUploaded,
         });
 
-        shakaP2PEngine.configureAndInitShakaPlayer(shakaPlayerInstance);
+        shakaP2PEngine.bindShakaPlayer(shakaPlayerInstance);
       },
       width: "100%",
       height: "100%",

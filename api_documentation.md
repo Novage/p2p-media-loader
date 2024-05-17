@@ -206,11 +206,11 @@ For more examples with npm packages, you may check our [React demo](https://gith
     width: "100%",
     parentId: `#player`,
     hlsjsConfig: {
-      ...engine.getHlsJsConfig(),
+      ...engine.getConfigForHlsJs(),
     },
   });
 
-  engine.setHls(() => clapprPlayer.core.getCurrentPlayback()?._hls);
+  engine.bindHls(() => clapprPlayer.core.getCurrentPlayback()?._hls);
 </script>
 ```
 
@@ -389,7 +389,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
           shaka,
         );
         // Configure and initialize Shaka Player with P2P Media Loader
-        shakaP2PEngineInit.configureAndInitShakaPlayer(player);
+        shakaP2PEngineInit.bindShakaPlayer(player);
 
         // Load the stream URL into the player
         player.load(streamUrl);
@@ -447,7 +447,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
         onChunkUploaded,
       });
 
-      shakaP2PEngine.configureAndInitShakaPlayer(shakaPlayerInstance);
+      shakaP2PEngine.bindShakaPlayer(shakaPlayerInstance);
     },
   });
 </script>
@@ -483,7 +483,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
           const shakaPlayer = new shaka.Player();
           void shakaPlayer.attach(video);
 
-          shakaP2PEngine.configureAndInitShakaPlayer(shakaPlayer);
+          shakaP2PEngine.bindShakaPlayer(shakaPlayer);
           void shakaPlayer.load(streamUrl);
         },
       },
@@ -514,7 +514,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
 
     shakaPlayer.attach(videoElement);
 
-    shakaP2PEngine.configureAndInitShakaPlayer(shakaPlayer);
+    shakaP2PEngine.bindShakaPlayer(shakaPlayer);
 
     shakaPlayer.load(streamUrl);
 

@@ -102,7 +102,7 @@ export class ShakaP2PEngine {
    *
    * @param player The Shaka Player instance to configure.
    */
-  configureAndInitShakaPlayer(player: shaka.Player) {
+  bindShakaPlayer(player: shaka.Player) {
     if (this.player === player) return;
     if (this.player) this.destroy();
 
@@ -150,12 +150,6 @@ export class ShakaP2PEngine {
    * // Handling segment load errors
    * shakaP2PEngine.addEventListener('onSegmentError', (errorDetails) => {
    *   console.error('Error loading segment:', errorDetails);
-   * });
-   *
-   * @example
-   * // Detecting when a peer connects, useful for monitoring the health of the P2P network
-   * shakaP2PEngine.addEventListener('onPeerConnect', (peerId) => {
-   *   console.log('Peer connected:', peerId);
    * });
    *
    * @example
@@ -321,8 +315,8 @@ export class ShakaP2PEngine {
   }
 
   /**
-   * Registers plugins related to P2P functionality into the Shaka Player. This includes setting up custom
-   * manifest parsers and networking schemes to enable P2P streaming capabilities.
+   * Registers plugins related to P2P functionality into the Shaka Player.
+   * Plugins must be registered before initializing the player to ensure proper integration.
    *
    * @param {Shaka} [shaka=window.shaka] - The Shaka Player library. Defaults to the global Shaka Player instance if not provided.
    */
@@ -334,8 +328,7 @@ export class ShakaP2PEngine {
   }
 
   /**
-   * Unregisters plugins related to P2P functionality from the Shaka Player. This is important for cleanly
-   * removing the P2P integration, especially when the player is no longer needed or before setting up a new configuration.
+   * Unregisters plugins related to P2P functionality from the Shaka Player.
    *
    * @param {Shaka} [shaka=window.shaka] - The Shaka Player library. Defaults to the global Shaka Player instance if not provided.
    */

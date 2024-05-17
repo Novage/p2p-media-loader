@@ -28,9 +28,9 @@ export function injectMixin<
 
       const p2pEngine = new HlsJsP2PEngine(p2p);
 
-      super({ ...hlsJsConfig, ...p2pEngine.getHlsJsConfig() });
+      super({ ...hlsJsConfig, ...p2pEngine.getConfigForHlsJs() });
 
-      p2pEngine.setHls(this);
+      p2pEngine.bindHls(this);
 
       this.#p2pEngine = p2pEngine;
       p2p?.onHlsJsCreated?.(this as InstanceType<HlsJsConstructor>);

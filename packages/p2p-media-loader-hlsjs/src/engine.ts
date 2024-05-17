@@ -149,12 +149,6 @@ export class HlsJsP2PEngine {
    * });
    *
    * @example
-   * // Detecting when a peer connects, useful for monitoring the health of the P2P network
-   * p2pEngine.addEventListener('onPeerConnect', (peerId) => {
-   *   console.log('Peer connected:', peerId);
-   * });
-   *
-   * @example
    * // Tracking data downloaded from peers
    * p2pEngine.addEventListener('onChunkDownloaded', (bytesLength, downloadSource, peerId) => {
    *   console.log(`Downloaded ${bytesLength} bytes from ${downloadSource} ${peerId ? 'from peer ' + peerId : 'from server'}`);
@@ -180,10 +174,10 @@ export class HlsJsP2PEngine {
   }
 
   /**
-   * Retrieves the HLS.js specific configuration for loaders.
+   * provides the Hls.js P2P specific configuration for Hls.js loaders.
    * @returns An object with fragment loader (fLoader) and playlist loader (pLoader).
    */
-  getHlsJsConfig<F = unknown, P = unknown>(): { fLoader: F; pLoader: P } {
+  getConfigForHlsJs<F = unknown, P = unknown>(): { fLoader: F; pLoader: P } {
     return {
       fLoader: this.createFragmentLoaderClass() as F,
       pLoader: this.createPlaylistLoaderClass() as P,
@@ -222,7 +216,7 @@ export class HlsJsP2PEngine {
    * Sets the HLS instance for handling media.
    * @param hls The HLS instance or a function that returns an HLS instance.
    */
-  setHls<T = unknown>(hls: T | (() => T)) {
+  bindHls<T = unknown>(hls: T | (() => T)) {
     this.hlsInstanceGetter =
       typeof hls === "function" ? (hls as () => Hls) : () => hls as Hls;
   }

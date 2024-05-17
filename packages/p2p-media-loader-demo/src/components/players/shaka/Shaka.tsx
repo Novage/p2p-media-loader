@@ -95,7 +95,7 @@ export const Shaka = ({
         return;
       }
 
-      shakaP2PEngineInit.configureAndInitShakaPlayer(playerInit);
+      shakaP2PEngineInit.bindShakaPlayer(playerInit);
       await playerInit.load(streamUrl);
     };
 

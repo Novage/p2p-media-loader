@@ -49,7 +49,7 @@ export const HlsjsClapprPlayer = ({
       playback: {
         playInline: true,
         hlsjsConfig: {
-          ...engine.getHlsJsConfig(),
+          ...engine.getConfigForHlsJs(),
         },
       },
       plugins: [window.LevelSelector],
@@ -57,7 +57,7 @@ export const HlsjsClapprPlayer = ({
       height: "100%",
     });
 
-    engine.setHls(() => (clapprPlayer as any).core.getCurrentPlayback()?._hls);
+    engine.bindHls(() => (clapprPlayer as any).core.getCurrentPlayback()?._hls);
 
     return () => {
       clapprPlayer.destroy();
