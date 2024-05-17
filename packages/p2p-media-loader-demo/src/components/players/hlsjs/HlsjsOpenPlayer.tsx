@@ -87,7 +87,8 @@ export const HlsjsOpenPlayer = ({
         player = playerInit;
 
         cleanup();
-        throw error;
+        // eslint-disable-next-line no-console
+        console.error("Error initializing OpenPlayerJS", error);
       }
 
       if (isCleanedUp) cleanup();

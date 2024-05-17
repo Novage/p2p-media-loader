@@ -86,7 +86,8 @@ export const Shaka = ({
         shakaP2PEngine = shakaP2PEngineInit;
 
         cleanup();
-        throw error;
+        // eslint-disable-next-line no-console
+        console.error("Error attaching shaka player", error);
       }
 
       if (isCleanedUp) {
