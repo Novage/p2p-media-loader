@@ -66,16 +66,16 @@ export const Shaka = ({
         shaka,
       );
 
+      subscribeToUiEvents({
+        engine: shakaP2PEngineInit,
+        onPeerConnect,
+        onPeerDisconnect,
+        onChunkDownloaded,
+        onChunkUploaded,
+      });
+
       try {
         await playerInit.attach(videoElement);
-
-        subscribeToUiEvents({
-          engine: shakaP2PEngineInit,
-          onPeerConnect,
-          onPeerDisconnect,
-          onChunkDownloaded,
-          onChunkUploaded,
-        });
 
         player = playerInit;
         ui = uiInit;
@@ -84,8 +84,7 @@ export const Shaka = ({
         player = playerInit;
         ui = uiInit;
         shakaP2PEngine = shakaP2PEngineInit;
-        // eslint-disable-next-line no-console
-        console.error("Error setting up Shaka Player:", error);
+
         cleanup();
         throw error;
       }

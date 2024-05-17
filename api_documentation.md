@@ -45,7 +45,7 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
      ShakaP2PEngine.registerPlugins(shaka);
      ```
 
-For more examples with npm packages, you may check our [React demo](https://github.com/Novage/p2p-media-loader/tree/v1/packages/p2p-media-loader-demo)
+For more examples with npm packages, you may check our [React demo](https://github.com/Novage/p2p-media-loader/tree/v1/packages/p2p-media-loader-demo/src/components/players)
 
 ## Using P2P Media Loader with CDN via JavaScript Modules
 
@@ -95,7 +95,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
           provider.config = {
             p2p: {
               core: {
-                swarmId: "custom swarm ID for stream 2000341",
+                swarmId: "Optional custom swarm ID for stream",
                 // other P2P engine config parameters go here
               },
               onHlsJsCreated: (hls) => {
@@ -133,7 +133,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
   const hls = new HlsWithP2P({
     p2p: {
       core: {
-        swarmId: "custom swarm ID for stream 2000341",
+        swarmId: "Optional custom swarm ID for stream",
         // Other P2P engine config parameters go here
       },
       onHlsJsCreated(hls) {
@@ -167,7 +167,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
           const hls = new HlsWithP2P({
             p2p: {
               core: {
-                swarmId: "custom swarm ID for stream 2000341",
+                swarmId: "Optional custom swarm ID for stream",
                 // Other P2P engine config parameters go here
               },
             },
@@ -193,7 +193,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
   const engine = new HlsJsP2PEngine({
     p2p: {
       core: {
-        swarmId: "custom swarm ID for stream 2000341",
+        swarmId: "Optional custom swarm ID for stream",
         // Other P2P engine config parameters go here
       },
     },
@@ -229,7 +229,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
     hls: {
       p2p: {
         core: {
-          swarmId: "custom swarm ID for stream 2000341",
+          swarmId: "Optional custom swarm ID for stream",
           // Other P2P engine config parameters go here
         },
         onHlsJsCreated: (hls) => {
@@ -257,7 +257,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
   const hls = new HlsWithP2P({
     p2p: {
       core: {
-        swarmId: "custom swarm ID for stream 2000341",
+        swarmId: "Optional custom swarm ID for stream",
         // Other P2P engine config parameters go here
       },
       onHlsJsCreated(hls) {
@@ -307,7 +307,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
     hls: {
       p2p: {
         core: {
-          swarmId: "custom swarm ID for stream 2000341",
+          swarmId: "Optional custom swarm ID for stream",
           // Other P2P engine config parameters go here
         },
         onHlsJsCreated: (hls) => {
@@ -383,7 +383,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
         const shakaP2PEngineInit = new ShakaP2PEngine(
           {
             core: {
-              swarmId: "custom swarm ID for stream 2000341",
+              swarmId: "Optional custom swarm ID for stream",
             },
           },
           shaka,
@@ -427,7 +427,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
   const shakaP2PEngine = new ShakaP2PEngine(
     {
       core: {
-        swarmId: "custom swarm ID for stream 2000341",
+        swarmId: "Optional custom swarm ID for stream",
         // Other P2P Media Loader Core options
       },
     },
@@ -466,7 +466,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
   const shakaP2PEngine = new ShakaP2PEngine(
     {
       core: {
-        swarmId: "custom swarm ID for stream 2000341",
+        swarmId: "Optional custom swarm ID for stream",
         // Other P2P Media Loader Core options
       },
     },
@@ -504,7 +504,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
     const shakaP2PEngine = new ShakaP2PEngine(
       {
         core: {
-          swarmId: "custom swarm ID for stream 2000341",
+          swarmId: "Optional custom swarm ID for stream",
           // Other P2P Media Loader Core options
         },
       },

@@ -33,3 +33,13 @@ html * {
 .tsd-navigation::-webkit-scrollbar-button {
   display: none !important;
 }
+
+#tsd-theme {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  background-color: white;
+  color: #333;
+  cursor: pointer;
+}

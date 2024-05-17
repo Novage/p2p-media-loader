@@ -45,53 +45,52 @@ export const HlsjsOpenPlayer = ({
     };
 
     const initPlayer = async () => {
-      let playerInit;
+      const playerInit = new OpenPlayerJS(videoElement, {
+        hls: {
+          p2p: {
+            onHlsJsCreated: (hls: HlsWithP2PInstance<Hls>) => {
+              subscribeToUiEvents({
+                engine: hls.p2pEngine,
+                onPeerConnect,
+                onPeerDisconnect,
+                onChunkDownloaded,
+                onChunkUploaded,
+              });
+            },
+            core: {
+              swarmId: "custom swarm ID for stream 2000341",
+              trackers: announceTrackers,
+            },
+          },
+        },
+        controls: {
+          layers: {
+            left: ["play", "time", "volume"],
+            right: ["settings", "fullscreen", "levels"],
+            middle: ["progress"],
+          },
+        },
+      });
+
+      playerInit.src = [
+        {
+          src: streamUrl,
+          type: "application/x-mpegURL",
+        },
+      ];
 
       try {
-        playerInit = new OpenPlayerJS(videoElement, {
-          hls: {
-            p2p: {
-              onHlsJsCreated: (hls: HlsWithP2PInstance<Hls>) => {
-                subscribeToUiEvents({
-                  engine: hls.p2pEngine,
-                  onPeerConnect,
-                  onPeerDisconnect,
-                  onChunkDownloaded,
-                  onChunkUploaded,
-                });
-              },
-              core: {
-                swarmId: "custom swarm ID for stream 2000341",
-                trackers: announceTrackers,
-              },
-            },
-          },
-          controls: {
-            layers: {
-              left: ["play", "time", "volume"],
-              right: ["settings", "fullscreen", "levels"],
-              middle: ["progress"],
-            },
-          },
-        });
-
-        playerInit.src = [
-          {
-            src: streamUrl,
-            type: "application/x-mpegURL",
-          },
-        ];
-
         await playerInit.init();
+
+        player = playerInit;
+      } catch (error) {
         player = playerInit;
 
-        if (isCleanedUp) cleanup();
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error("Failed to initialize OpenPlayerJS", error);
-        player = playerInit;
         cleanup();
+        throw error;
       }
+
+      if (isCleanedUp) cleanup();
     };
 
     void initPlayer();

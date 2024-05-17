@@ -48,67 +48,72 @@ export const ShakaPlyr = ({
     };
 
     const initPlayer = async () => {
-      try {
-        const shakaP2PEngineInit = new ShakaP2PEngine(
-          {
-            core: {
-              announceTrackers,
-            },
+      const shakaP2PEngineInit = new ShakaP2PEngine(
+        {
+          core: {
+            announceTrackers,
           },
-          shaka,
-        );
-        const shakaPlayerInit = new shaka.Player();
+        },
+        shaka,
+      );
+      const shakaPlayerInit = new shaka.Player();
 
+      subscribeToUiEvents({
+        engine: shakaP2PEngineInit,
+        onPeerConnect,
+        onPeerDisconnect,
+        onChunkDownloaded,
+        onChunkUploaded,
+      });
+
+      try {
         await shakaPlayerInit.attach(videoElement);
 
-        subscribeToUiEvents({
-          engine: shakaP2PEngineInit,
-          onPeerConnect,
-          onPeerDisconnect,
-          onChunkDownloaded,
-          onChunkUploaded,
-        });
-        shakaP2PEngineInit.configureAndInitShakaPlayer(shakaPlayerInit);
-
-        await shakaPlayerInit.load(streamUrl);
-
-        const levels = shakaPlayerInit.getVariantTracks();
-
-        const quality: Options["quality"] = {
-          default: levels[levels.length - 1]?.height ?? 0,
-          options: levels
-            .map((level) => level.height)
-            .filter((height): height is number => height != null)
-            .sort((a, b) => a - b),
-          forced: true,
-          onChange: (newQuality: number) => {
-            levels.forEach((level) => {
-              if (level.height === newQuality) {
-                shakaPlayerInit.configure({
-                  abr: { enabled: false },
-                });
-                shakaPlayerInit.selectVariantTrack(level, true);
-              }
-            });
-          },
-        };
-
-        const plyrPlayerInit = new Plyr(videoElement, {
-          quality,
-          autoplay: true,
-          muted: true,
-        });
-
         playerShaka = shakaPlayerInit;
-        plyrPlayer = plyrPlayerInit;
         shakaP2PEngine = shakaP2PEngineInit;
 
         if (isCleanedUp) cleanup();
       } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error("Error setting up Shaka Player:", error);
+        playerShaka = shakaPlayerInit;
+        shakaP2PEngine = shakaP2PEngineInit;
+
         cleanup();
+        throw error;
       }
+
+      if (isCleanedUp) {
+        cleanup();
+        return;
+      }
+
+      shakaP2PEngineInit.configureAndInitShakaPlayer(shakaPlayerInit);
+      await shakaPlayerInit.load(streamUrl);
+
+      const levels = shakaPlayerInit.getVariantTracks();
+      const quality: Options["quality"] = {
+        default: levels[levels.length - 1]?.height ?? 0,
+        options: levels
+          .map((level) => level.height)
+          .filter((height): height is number => height != null)
+          .sort((a, b) => a - b),
+        forced: true,
+        onChange: (newQuality: number) => {
+          levels.forEach((level) => {
+            if (level.height === newQuality) {
+              shakaPlayerInit.configure({
+                abr: { enabled: false },
+              });
+              shakaPlayerInit.selectVariantTrack(level, true);
+            }
+          });
+        },
+      };
+
+      plyrPlayer = new Plyr(videoElement, {
+        quality,
+        autoplay: true,
+        muted: true,
+      });
     };
 
     void initPlayer();
