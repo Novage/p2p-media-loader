@@ -9,7 +9,7 @@ export const ShakaDPlayer = ({
   streamUrl,
   announceTrackers,
   onPeerConnect,
-  onPeerDisconnect,
+  onPeerClose,
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
@@ -50,7 +50,7 @@ export const ShakaDPlayer = ({
             subscribeToUiEvents({
               engine: shakaP2PEngine,
               onPeerConnect,
-              onPeerDisconnect,
+              onPeerClose,
               onChunkDownloaded,
               onChunkUploaded,
             });
@@ -71,7 +71,7 @@ export const ShakaDPlayer = ({
     onChunkDownloaded,
     onChunkUploaded,
     onPeerConnect,
-    onPeerDisconnect,
+    onPeerClose,
     streamUrl,
   ]);
 

@@ -9,13 +9,13 @@ type UIEventsProps = PlayerEvents & {
 export const subscribeToUiEvents = ({
   engine,
   onPeerConnect,
-  onPeerDisconnect,
+  onPeerClose,
   onChunkDownloaded,
   onChunkUploaded,
 }: UIEventsProps) => {
   if (onPeerConnect) engine.addEventListener("onPeerConnect", onPeerConnect);
-  if (onPeerDisconnect) {
-    engine.addEventListener("onPeerClose", onPeerDisconnect);
+  if (onPeerClose) {
+    engine.addEventListener("onPeerClose", onPeerClose);
   }
   if (onChunkDownloaded) {
     engine.addEventListener("onChunkDownloaded", onChunkDownloaded);

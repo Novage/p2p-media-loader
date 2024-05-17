@@ -10,7 +10,7 @@ export const HlsjsMediaElement = ({
   streamUrl,
   announceTrackers,
   onPeerConnect,
-  onPeerDisconnect,
+  onPeerClose,
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
@@ -42,7 +42,7 @@ export const HlsjsMediaElement = ({
             subscribeToUiEvents({
               engine: hls.p2pEngine,
               onPeerConnect,
-              onPeerDisconnect,
+              onPeerClose,
               onChunkDownloaded,
               onChunkUploaded,
             });
@@ -69,7 +69,7 @@ export const HlsjsMediaElement = ({
     onChunkDownloaded,
     onChunkUploaded,
     onPeerConnect,
-    onPeerDisconnect,
+    onPeerClose,
     streamUrl,
   ]);
 

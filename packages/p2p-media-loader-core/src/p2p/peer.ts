@@ -58,7 +58,9 @@ export class Peer {
       },
       eventTarget,
     );
-    eventTarget.getEventDispatcher("onPeerConnect")(this.id);
+    eventTarget.getEventDispatcher("onPeerConnect")({
+      peerId: this.id,
+    });
     connection.on("close", this.onPeerConnectionClosed);
     connection.on("error", this.onConnectionError);
   }
@@ -308,7 +310,9 @@ export class Peer {
     this.cancelSegmentDownloading("peer-closed");
     this.connection.destroy();
     this.eventHandlers.onPeerClosed(this);
-    this.onPeerClosed(this.id);
+    this.onPeerClosed({
+      peerId: this.id,
+    });
     this.logger(`peer closed ${this.id}`);
   };
 

@@ -339,6 +339,15 @@ export type SegmentLoadDetails = {
 };
 
 /**
+ * Represents the details of a peer in a peer-to-peer network.
+ *
+ * @param {string} peerId - The unique identifier for a peer in the network.
+ */
+export type PeerDetails = {
+  peerId: string;
+};
+
+/**
  * The CoreEventMap defines a comprehensive suite of event handlers crucial for monitoring and controlling the lifecycle
  * of segment downloading and uploading processes.
  */
@@ -376,14 +385,14 @@ export type CoreEventMap = {
    *
    * @param {string} peerId - The unique identifier of the peer that has just connected.
    */
-  onPeerConnect: (peerId: string) => void;
+  onPeerConnect: (params: PeerDetails) => void;
 
   /**
    * Triggered when an existing peer-to-peer connection is closed.
    *
    * @param {string} peerId - The unique identifier of the peer whose connection has been closed.
    */
-  onPeerClose: (peerId: string) => void;
+  onPeerClose: (params: PeerDetails) => void;
 
   /**
    * Invoked after a chunk of data from a segment has been successfully downloaded.

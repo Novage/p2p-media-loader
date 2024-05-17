@@ -20,6 +20,7 @@ import { ShakaPlyr } from "./players/shaka/ShakaPlyr";
 import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 import Hls from "hls.js";
 import { HlsjsVidstack } from "./players/hlsjs/HlsjsVidstack";
+import { PeerDetails } from "p2p-media-loader-core";
 
 type DemoProps = {
   debugToolsEnabled?: boolean;
@@ -86,15 +87,15 @@ export const P2PVideoDemo = ({ debugToolsEnabled = false }: DemoProps) => {
     data.current.p2pUploaded += bytesLength;
   }, []);
 
-  const onPeerConnect = useCallback((peerId: string) => {
+  const onPeerConnect = useCallback((params: PeerDetails) => {
     setPeers((peers) => {
-      return [...peers, peerId];
+      return [...peers, params.peerId];
     });
   }, []);
 
-  const onPeerDisconnect = useCallback((peerId: string) => {
+  const onPeerClose = useCallback((params: PeerDetails) => {
     setPeers((peers) => {
-      return peers.filter((peer) => peer !== peerId);
+      return peers.filter((peer) => peer !== params.peerId);
     });
   }, []);
 
@@ -111,7 +112,7 @@ export const P2PVideoDemo = ({ debugToolsEnabled = false }: DemoProps) => {
         streamUrl={queryParams.streamUrl}
         announceTrackers={trackers}
         onPeerConnect={onPeerConnect}
-        onPeerDisconnect={onPeerDisconnect}
+        onPeerClose={onPeerClose}
         onChunkDownloaded={onChunkDownloaded}
         onChunkUploaded={onChunkUploaded}
       />

@@ -9,7 +9,7 @@ export const HlsjsClapprPlayer = ({
   streamUrl,
   announceTrackers,
   onPeerConnect,
-  onPeerDisconnect,
+  onPeerClose,
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
@@ -34,7 +34,7 @@ export const HlsjsClapprPlayer = ({
     subscribeToUiEvents({
       engine,
       onPeerConnect,
-      onPeerDisconnect,
+      onPeerClose,
       onChunkDownloaded,
       onChunkUploaded,
     });
@@ -69,7 +69,7 @@ export const HlsjsClapprPlayer = ({
     onChunkDownloaded,
     onChunkUploaded,
     onPeerConnect,
-    onPeerDisconnect,
+    onPeerClose,
     streamUrl,
   ]);
 

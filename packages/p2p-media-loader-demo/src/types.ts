@@ -1,4 +1,5 @@
 import { PLAYERS } from "./constants";
+import { CoreEventMap } from "p2p-media-loader-core";
 
 export type DownloadStats = {
   httpDownloaded: number;
@@ -21,10 +22,11 @@ export type PlayerName = (typeof PLAYERS)[PlayerKey];
 export type PlayerProps = {
   streamUrl: string;
   announceTrackers: string[];
-  onPeerConnect?: (peerId: string) => void;
-  onPeerDisconnect?: (peerId: string) => void;
-  onChunkDownloaded?: (bytesLength: number, downloadSource: string) => void;
-  onChunkUploaded?: (bytesLength: number) => void;
-};
+} & Partial<
+  Pick<
+    CoreEventMap,
+    "onPeerConnect" | "onChunkDownloaded" | "onChunkUploaded" | "onPeerClose"
+  >
+>;
 
 export type PlayerEvents = Omit<PlayerProps, "streamUrl" | "announceTrackers">;

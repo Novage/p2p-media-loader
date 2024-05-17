@@ -20,7 +20,7 @@ export const HlsjsVidstack = ({
   streamUrl,
   announceTrackers,
   onPeerConnect,
-  onPeerDisconnect,
+  onPeerClose,
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
@@ -41,7 +41,7 @@ export const HlsjsVidstack = ({
               subscribeToUiEvents({
                 engine: hls.p2pEngine,
                 onPeerConnect,
-                onPeerDisconnect,
+                onPeerClose,
                 onChunkDownloaded,
                 onChunkUploaded,
               });
@@ -57,7 +57,7 @@ export const HlsjsVidstack = ({
       onChunkDownloaded,
       onChunkUploaded,
       onPeerConnect,
-      onPeerDisconnect,
+      onPeerClose,
     ],
   );
 

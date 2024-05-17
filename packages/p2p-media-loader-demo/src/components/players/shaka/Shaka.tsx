@@ -9,7 +9,7 @@ export const Shaka = ({
   streamUrl,
   announceTrackers,
   onPeerConnect,
-  onPeerDisconnect,
+  onPeerClose,
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
@@ -69,7 +69,7 @@ export const Shaka = ({
       subscribeToUiEvents({
         engine: shakaP2PEngineInit,
         onPeerConnect,
-        onPeerDisconnect,
+        onPeerClose,
         onChunkDownloaded,
         onChunkUploaded,
       });
@@ -107,7 +107,7 @@ export const Shaka = ({
     onChunkDownloaded,
     onChunkUploaded,
     onPeerConnect,
-    onPeerDisconnect,
+    onPeerClose,
     streamUrl,
   ]);
 
