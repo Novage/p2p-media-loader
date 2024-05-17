@@ -16,10 +16,9 @@ import { SegmentsMemoryStorage } from "./segments-storage";
 import { EventTarget } from "./utils/event-target";
 import { deepCopy } from "./utils/utils";
 import { TRACKER_CLIENT_VERSION_PREFIX } from "./utils/peer";
-import { DeepReadonly } from "ts-essentials";
 
 export class Core<TStream extends Stream = Stream> {
-  static readonly DEFAULT_CONFIG: DeepReadonly<CoreConfig> = {
+  static readonly DEFAULT_CONFIG: CoreConfig = {
     simultaneousHttpDownloads: 3,
     simultaneousP2PDownloads: 3,
     highDemandTimeWindow: 15,
@@ -51,7 +50,7 @@ export class Core<TStream extends Stream = Stream> {
   private readonly eventTarget = new EventTarget<CoreEventMap>();
   private manifestResponseUrl?: string;
   private readonly streams = new Map<string, StreamWithSegments<TStream>>();
-  private config: DeepReadonly<CoreConfig>;
+  private config: CoreConfig;
   private readonly bandwidthCalculators: BandwidthCalculators = {
     all: new BandwidthCalculator(),
     http: new BandwidthCalculator(),
@@ -91,7 +90,7 @@ export class Core<TStream extends Stream = Stream> {
    *
    * @returns A deep readonly version of the core configuration.
    */
-  getConfig(): DeepReadonly<CoreConfig> {
+  getConfig(): CoreConfig {
     return this.config;
   }
 
@@ -110,7 +109,7 @@ export class Core<TStream extends Stream = Stream> {
    * };
    * core.applyDynamicConfig(dynamicConfig);
    */
-  applyDynamicConfig(dynamicConfig: DeepReadonly<DynamicCoreConfig>) {
+  applyDynamicConfig(dynamicConfig: DynamicCoreConfig) {
     this.config = deepCopy({ ...this.config, ...dynamicConfig });
   }
 

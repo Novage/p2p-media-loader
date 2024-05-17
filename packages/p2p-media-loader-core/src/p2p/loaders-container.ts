@@ -1,11 +1,10 @@
 import { P2PLoader } from "./loader";
 import debug from "debug";
-import { CoreEventMap, Stream, StreamWithSegments } from "../index";
+import { CoreConfig, CoreEventMap, Stream, StreamWithSegments } from "../index";
 import { RequestsContainer } from "../requests/request-container";
 import { SegmentsMemoryStorage } from "../segments-storage";
 import * as LoggerUtils from "../utils/logger";
 import { EventTarget } from "../utils/event-target";
-import { ReadonlyCoreConfig } from "../internal-types";
 
 type P2PLoaderContainerItem = {
   stream: Stream;
@@ -24,7 +23,7 @@ export class P2PLoadersContainer {
     stream: StreamWithSegments,
     private readonly requests: RequestsContainer,
     private readonly segmentStorage: SegmentsMemoryStorage,
-    private readonly config: ReadonlyCoreConfig,
+    private readonly config: CoreConfig,
     private readonly eventTarget: EventTarget<CoreEventMap>,
   ) {
     this.changeCurrentLoader(stream);

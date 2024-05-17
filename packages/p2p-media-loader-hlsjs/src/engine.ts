@@ -17,7 +17,6 @@ import {
   DynamicCoreConfig,
   debug,
 } from "p2p-media-loader-core";
-import { DeepReadonly } from "ts-essentials";
 import { injectMixin } from "./engine-static";
 
 /**
@@ -57,7 +56,7 @@ export type HlsWithP2PInstance<HlsType> = HlsType & {
  */
 export type HlsWithP2PConfig<HlsType extends abstract new () => unknown> =
   ConstructorParameters<HlsType>[0] & {
-    p2p?: DeepReadonly<PartialHlsJsP2PEngineConfig> & {
+    p2p?: PartialHlsJsP2PEngineConfig & {
       onHlsJsCreated?: (hls: HlsWithP2PInstance<HlsType>) => void;
     };
   };
@@ -195,7 +194,7 @@ export class HlsJsP2PEngine {
    * Returns the configuration of the HLS.js P2P engine.
    * @returns A readonly version of the HlsJsP2PEngineConfig.
    */
-  getConfig(): DeepReadonly<HlsJsP2PEngineConfig> {
+  getConfig(): HlsJsP2PEngineConfig {
     return { core: this.core.getConfig() };
   }
 

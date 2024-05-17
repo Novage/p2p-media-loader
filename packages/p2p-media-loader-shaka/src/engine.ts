@@ -19,7 +19,6 @@ import {
   CoreEventMap,
   DynamicCoreConfig,
 } from "p2p-media-loader-core";
-import { DeepReadonly } from "ts-essentials";
 
 /**
  * Type for specifying dynamic configuration options that can be changed at runtime for the P2P engine's core.
@@ -132,7 +131,7 @@ export class ShakaP2PEngine {
    *
    * @returns The configuration as a readonly object.
    */
-  getConfig(): DeepReadonly<ShakaP2PEngineConfig> {
+  getConfig(): ShakaP2PEngineConfig {
     return { core: this.core.getConfig() };
   }
 
