@@ -206,7 +206,7 @@ function getDataTypeFromByte(byte: number): Serialization.SerializedItem {
     throw new Error("Not existing type");
   }
 
-  return typeCode as Serialization.SerializedItem;
+  return typeCode;
 }
 
 function stringToUtf8CodesBuffer(string: string, length?: number): Uint8Array {

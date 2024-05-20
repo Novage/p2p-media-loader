@@ -119,7 +119,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       // eslint-disable-next-line @typescript-eslint/unbound-method
       const originalGet = segmentIndex.get;
       const customGet = (position: number) => {
-        const reference = originalGet.call(segmentIndex, position);
+        const reference = originalGet.call(segmentIndex, position) as (shaka.media.SegmentReference | null);
         if (
           reference === prevReference ||
           (!this.player?.isLive() && stream.isSegmentIndexAlreadyRead)
