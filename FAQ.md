@@ -93,9 +93,9 @@ const config = {
 const engineShaka = new ShakaP2PEngine(config, shaka);
 // or
 const engineHlsJs = new HlsJsP2PEngine(config);
+```
 
-// other P2P integration with Hls.js
-
+```javascript
 const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
 const hls = new HlsWithP2P({
   p2p: {
@@ -133,9 +133,9 @@ const config = {
 const engineShaka = new ShakaP2PEngine(config, shaka);
 // or
 const engineHlsJs = new HlsJsP2PEngine(config);
+```
 
-// other P2P integration with Hls.js
-
+```javascript
 const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
 const hls = new HlsWithP2P({
   p2p: {
@@ -162,9 +162,9 @@ const engine = new HlsJsP2PEngine();
 engine.addEventListener("onSegmentLoaded", (details) => {
   console.log("Segment Loaded:", details);
 });
+```
 
-// or
-
+```javascript
 const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
 const hls = new HlsWithP2P({
   p2p: {
