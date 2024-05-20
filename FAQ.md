@@ -48,6 +48,8 @@ An example of a good configuration tested in production for a VOD stream with se
     cachedSegmentExpiration: 86400000,
     // count of the downloaded segments to store for P2P sharing
     cachedSegmentsCount: 1000,
+    // number of simultaneous downloads for P2P methods
+    simultaneousP2PDownloads: 20,
   };
 }
 ```
