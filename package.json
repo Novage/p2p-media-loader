@@ -13,7 +13,8 @@
     "lint": "pnpm --recursive lint",
     "prettier": "pnpm --recursive prettier",
     "type-check": "pnpm --recursive type-check",
-    "dev": "pnpm --filter './demo' dev"
+    "dev": "pnpm --filter './demo' dev",
+    "create-doc": "pnpm typedoc"
   },
   "devDependencies": {
     "@types/debug": "^4.1.12",
