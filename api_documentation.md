@@ -99,6 +99,9 @@ For more examples with npm packages, you may check our [React demo](https://gith
                 // other P2P engine config parameters go here
               },
               onHlsJsCreated: (hls) => {
+                hls.p2pEngine.addEventListener("onPeerConnect", (params) => {
+                  console.log("Peer connected:", params.peerId);
+                });
                 // Subscribe to P2P engine and Hls.js events here
               },
             },
@@ -137,6 +140,9 @@ For more examples with npm packages, you may check our [React demo](https://gith
         // Other P2P engine config parameters go here
       },
       onHlsJsCreated(hls) {
+        hls.p2pEngine.addEventListener("onPeerConnect", (params) => {
+          console.log("Peer connected:", params.peerId);
+        });
         // Subscribe to P2P engine and Hls.js events here
       },
     },
@@ -380,7 +386,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
         const player = controls.getPlayer();
 
         // Initialize P2P Media Loader with custom config
-        const shakaP2PEngineInit = new ShakaP2PEngine(
+        const shakaP2PEngine = new ShakaP2PEngine(
           {
             core: {
               swarmId: "Optional custom swarm ID for stream",
@@ -388,8 +394,14 @@ For more examples with npm packages, you may check our [React demo](https://gith
           },
           shaka,
         );
+
+        //Subscribe to P2P engine events here
+        shakaP2PEngine.addEventListener("onPeerConnect", (params) => {
+          console.log("Peer connected:", params.peerId);
+        });
+
         // Configure and initialize Shaka Player with P2P Media Loader
-        shakaP2PEngineInit.bindShakaPlayer(player);
+        shakaP2PEngine.bindShakaPlayer(player);
 
         // Load the stream URL into the player
         player.load(streamUrl);
