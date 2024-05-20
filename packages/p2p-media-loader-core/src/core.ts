@@ -178,7 +178,7 @@ export class Core<TStream extends Stream = Stream> {
 
     this.streams.set(stream.localId, {
       ...stream,
-      segments: new Map<string, SegmentWithStream>(),
+      segments: new Map<string, SegmentWithStream<TStream>>(),
     });
   }
 

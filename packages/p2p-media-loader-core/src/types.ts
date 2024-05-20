@@ -55,16 +55,16 @@ export type Segment = {
 /**
  * Extends a Segment with a reference to its associated stream.
  */
-export type SegmentWithStream = Segment & {
-  readonly stream: StreamWithSegments;
+export type SegmentWithStream<TStream extends Stream = Stream> = Segment & {
+  readonly stream: StreamWithSegments<TStream>;
 };
 
 /**
  * Represents a stream that includes multiple segments, each associated with the stream.
  * @template TStream Type of the underlying stream data structure.
  */
-export type StreamWithSegments<TStream = Stream> = TStream & {
-  readonly segments: Map<string, SegmentWithStream>;
+export type StreamWithSegments<TStream extends Stream = Stream> = TStream & {
+  readonly segments: Map<string, SegmentWithStream<TStream>>;
 };
 
 /**
