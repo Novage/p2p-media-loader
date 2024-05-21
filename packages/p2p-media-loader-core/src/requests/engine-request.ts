@@ -1,12 +1,11 @@
-import { Segment } from "../internal-types";
-import { CoreRequestError, EngineCallbacks } from "../types";
+import { CoreRequestError, EngineCallbacks, SegmentWithStream } from "../types";
 
 export class EngineRequest {
   private _status: "pending" | "succeed" | "failed" | "aborted" = "pending";
   private _shouldBeStartedImmediately = false;
 
   constructor(
-    readonly segment: Segment,
+    readonly segment: SegmentWithStream,
     readonly engineCallbacks: EngineCallbacks,
   ) {}
 

@@ -1,21 +1,16 @@
-import {
-  Playback,
-  BandwidthCalculators,
-  Segment,
-  ReadonlyCoreConfig,
-} from "../internal-types";
-import { CoreEventMap } from "../types";
+import { Playback, BandwidthCalculators } from "../internal-types";
+import { CoreConfig, CoreEventMap, SegmentWithStream } from "../types";
 import { EventTarget } from "../utils/event-target";
 import { Request } from "./request";
 
 export class RequestsContainer {
-  private readonly requests = new Map<Segment, Request>();
+  private readonly requests = new Map<SegmentWithStream, Request>();
 
   constructor(
     private readonly requestProcessQueueCallback: () => void,
     private readonly bandwidthCalculators: BandwidthCalculators,
     private readonly playback: Playback,
-    private readonly config: ReadonlyCoreConfig,
+    private readonly config: CoreConfig,
     private readonly eventTarget: EventTarget<CoreEventMap>,
   ) {}
 
@@ -35,11 +30,11 @@ export class RequestsContainer {
     return count;
   }
 
-  get(segment: Segment) {
+  get(segment: SegmentWithStream) {
     return this.requests.get(segment);
   }
 
-  getOrCreateRequest(segment: Segment) {
+  getOrCreateRequest(segment: SegmentWithStream) {
     let request = this.requests.get(segment);
     if (!request) {
       request = new Request(

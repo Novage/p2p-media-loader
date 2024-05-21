@@ -1,0 +1,45 @@
+.tsd-filter-visibility {
+  display: none;
+}
+
+.tsd-typography ul {
+  margin: 0.2em 0;
+}
+
+.tsd-page-title h2 {
+  font-size: 32px;
+}
+
+code,
+pre {
+  font-family: Menlo, Monaco, Consolas, "Courier New", monospace !important;
+}
+
+html * {
+  scrollbar-width: auto;
+  scrollbar-color: auto;
+}
+
+.tsd-navigation::-webkit-scrollbar {
+  background-color: #ffffff;
+  border-radius: 10px;
+}
+
+.tsd-navigation::-webkit-scrollbar-thumb {
+  background-color: #f6e0bb;
+  border-radius: 10px;
+}
+
+.tsd-navigation::-webkit-scrollbar-button {
+  display: none !important;
+}
+
+#tsd-theme {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  background-color: white;
+  color: #333;
+  cursor: pointer;
+}

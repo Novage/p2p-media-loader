@@ -12,7 +12,7 @@ export const PLAYERS = {
   plyr_shaka: "Plyr",
 } as const;
 export const DEFAULT_STREAM =
-  "https://fcc3ddae59ed.us-west-2.playback.live-video.net/api/video/v1/us-west-2.893648527354.channel.DmumNckWFTqz.m3u8";
+  "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8";
 export const COLORS = {
   yellow: "#faf21b",
   lightOrange: "#ff7f0e",

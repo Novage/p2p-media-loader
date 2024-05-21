@@ -1,12 +1,11 @@
-import { Segment } from "../internal-types";
-import { Stream } from "../types";
+import { SegmentWithStream, Stream } from "../types";
 import { SegmentPlaybackStatuses } from "./stream";
 
 export function getStreamString(stream: Stream) {
   return `${stream.type}-${stream.index}`;
 }
 
-export function getSegmentString(segment: Segment) {
+export function getSegmentString(segment: SegmentWithStream) {
   const { externalId } = segment;
   return `(${getStreamString(segment.stream)} | ${externalId})`;
 }

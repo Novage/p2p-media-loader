@@ -9,13 +9,13 @@ type UIEventsProps = PlayerEvents & {
 export const subscribeToUiEvents = ({
   engine,
   onPeerConnect,
-  onPeerDisconnect,
+  onPeerClose,
   onChunkDownloaded,
   onChunkUploaded,
 }: UIEventsProps) => {
   if (onPeerConnect) engine.addEventListener("onPeerConnect", onPeerConnect);
-  if (onPeerDisconnect) {
-    engine.addEventListener("onPeerClose", onPeerDisconnect);
+  if (onPeerClose) {
+    engine.addEventListener("onPeerClose", onPeerClose);
   }
   if (onChunkDownloaded) {
     engine.addEventListener("onChunkDownloaded", onChunkDownloaded);
@@ -23,4 +23,44 @@ export const subscribeToUiEvents = ({
   if (onChunkUploaded) {
     engine.addEventListener("onChunkUploaded", onChunkUploaded);
   }
+};
+
+interface VideoElementsOptions {
+  videoId?: string;
+  videoClassName?: string;
+  containerClassName?: string;
+  playIsInline?: boolean;
+  autoplay?: boolean;
+  muted?: boolean;
+  aspectRatio?: string | null;
+}
+
+export const createVideoElements = (options: VideoElementsOptions = {}) => {
+  const {
+    videoId = "player",
+    videoClassName = "",
+    containerClassName = "video-container",
+    playIsInline = true,
+    autoplay = true,
+    muted = true,
+    aspectRatio = null,
+  } = options;
+
+  const videoContainer = document.createElement("div");
+  videoContainer.className = containerClassName;
+
+  const videoElement = document.createElement("video");
+  videoElement.className = videoClassName;
+  videoElement.id = videoId;
+  videoElement.playsInline = playIsInline;
+  videoElement.autoplay = autoplay;
+  videoElement.muted = muted;
+
+  if (aspectRatio) {
+    videoElement.style.aspectRatio = aspectRatio;
+  }
+
+  videoContainer.appendChild(videoElement);
+
+  return { videoContainer, videoElement };
 };

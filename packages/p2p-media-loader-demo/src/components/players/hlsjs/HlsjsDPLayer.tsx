@@ -9,7 +9,7 @@ export const HlsjsDPlayer = ({
   streamUrl,
   announceTrackers,
   onPeerConnect,
-  onPeerDisconnect,
+  onPeerClose,
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
@@ -35,7 +35,7 @@ export const HlsjsDPlayer = ({
           subscribeToUiEvents({
             engine: hls.p2pEngine,
             onPeerConnect,
-            onPeerDisconnect,
+            onPeerClose,
             onChunkDownloaded,
             onChunkUploaded,
           });
@@ -68,14 +68,14 @@ export const HlsjsDPlayer = ({
     streamUrl,
     announceTrackers,
     onPeerConnect,
-    onPeerDisconnect,
+    onPeerClose,
     onChunkDownloaded,
     onChunkUploaded,
   ]);
 
   return isHlsSupported ? (
     <div ref={containerRef} className="video-container">
-      <video playsInline />
+      <video playsInline autoPlay muted />
     </div>
   ) : (
     <div className="error-message">

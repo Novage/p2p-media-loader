@@ -1,16 +1,16 @@
 import { Peer } from "./peer";
-import { CoreEventMap } from "../types";
+import {
+  CoreConfig,
+  CoreEventMap,
+  SegmentWithStream,
+  StreamWithSegments,
+} from "../types";
 import { SegmentsMemoryStorage } from "../segments-storage";
 import { RequestsContainer } from "../requests/request-container";
 import { P2PTrackerClient } from "./tracker-client";
 import * as StreamUtils from "../utils/stream";
 import * as Utils from "../utils/utils";
 import { EventTarget } from "../utils/event-target";
-import {
-  ReadonlyCoreConfig,
-  Segment,
-  StreamWithSegments,
-} from "../internal-types";
 
 export class P2PLoader {
   private readonly trackerClient: P2PTrackerClient;
@@ -21,7 +21,7 @@ export class P2PLoader {
     private readonly stream: StreamWithSegments,
     private readonly requests: RequestsContainer,
     private readonly segmentStorage: SegmentsMemoryStorage,
-    private readonly config: ReadonlyCoreConfig,
+    private readonly config: CoreConfig,
     eventTarget: EventTarget<CoreEventMap>,
   ) {
     const streamExternalId = StreamUtils.getStreamExternalId(
@@ -49,7 +49,7 @@ export class P2PLoader {
     this.trackerClient.start();
   }
 
-  downloadSegment(segment: Segment) {
+  downloadSegment(segment: SegmentWithStream) {
     const peersWithSegment: Peer[] = [];
     for (const peer of this.trackerClient.peers()) {
       if (
@@ -67,14 +67,14 @@ export class P2PLoader {
     peer.downloadSegment(request);
   }
 
-  isSegmentLoadingOrLoadedBySomeone(segment: Segment): boolean {
+  isSegmentLoadingOrLoadedBySomeone(segment: SegmentWithStream): boolean {
     for (const peer of this.trackerClient.peers()) {
       if (peer.getSegmentStatus(segment)) return true;
     }
     return false;
   }
 
-  isSegmentLoadedBySomeone(segment: Segment): boolean {
+  isSegmentLoadedBySomeone(segment: SegmentWithStream): boolean {
     for (const peer of this.trackerClient.peers()) {
       if (peer.getSegmentStatus(segment) === "loaded") return true;
     }

@@ -9,7 +9,7 @@ export const HlsjsClapprPlayer = ({
   streamUrl,
   announceTrackers,
   onPeerConnect,
-  onPeerDisconnect,
+  onPeerClose,
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
@@ -18,12 +18,11 @@ export const HlsjsClapprPlayer = ({
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!containerRef.current) return;
     if (!Hls.isSupported()) {
       setIsHlsSupported(false);
       return;
     }
-
-    if (!containerRef.current) return;
 
     const engine = new HlsJsP2PEngine({
       core: {
@@ -35,7 +34,7 @@ export const HlsjsClapprPlayer = ({
     subscribeToUiEvents({
       engine,
       onPeerConnect,
-      onPeerDisconnect,
+      onPeerClose,
       onChunkDownloaded,
       onChunkUploaded,
     });
@@ -45,10 +44,12 @@ export const HlsjsClapprPlayer = ({
     const clapprPlayer = new Clappr.Player({
       parentId: `#${containerRef.current.id}`,
       source: streamUrl,
+      mute: true,
+      autoPlay: true,
       playback: {
         playInline: true,
         hlsjsConfig: {
-          ...engine.getHlsJsConfig(),
+          ...engine.getConfigForHlsJs(),
         },
       },
       plugins: [window.LevelSelector],
@@ -56,7 +57,7 @@ export const HlsjsClapprPlayer = ({
       height: "100%",
     });
 
-    engine.initClapprPlayer(clapprPlayer);
+    engine.bindHls(() => (clapprPlayer as any).core.getCurrentPlayback()?._hls);
 
     return () => {
       clapprPlayer.destroy();
@@ -68,7 +69,7 @@ export const HlsjsClapprPlayer = ({
     onChunkDownloaded,
     onChunkUploaded,
     onPeerConnect,
-    onPeerDisconnect,
+    onPeerClose,
     streamUrl,
   ]);
 

@@ -9,7 +9,7 @@ export const ShakaDPlayer = ({
   streamUrl,
   announceTrackers,
   onPeerConnect,
-  onPeerDisconnect,
+  onPeerClose,
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
@@ -50,12 +50,12 @@ export const ShakaDPlayer = ({
             subscribeToUiEvents({
               engine: shakaP2PEngine,
               onPeerConnect,
-              onPeerDisconnect,
+              onPeerClose,
               onChunkDownloaded,
               onChunkUploaded,
             });
 
-            shakaP2PEngine.configureAndInitShakaPlayer(shakaPlayer);
+            shakaP2PEngine.bindShakaPlayer(shakaPlayer);
             void shakaPlayer.load(streamUrl);
           },
         },
@@ -71,13 +71,13 @@ export const ShakaDPlayer = ({
     onChunkDownloaded,
     onChunkUploaded,
     onPeerConnect,
-    onPeerDisconnect,
+    onPeerClose,
     streamUrl,
   ]);
 
   return isShakaSupported ? (
     <div ref={containerRef} className="video-container">
-      <video playsInline />
+      <video playsInline autoPlay muted />
     </div>
   ) : (
     <div className="error-message">

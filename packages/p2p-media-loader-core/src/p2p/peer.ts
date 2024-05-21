@@ -6,12 +6,12 @@ import {
   PeerRequestErrorType,
   RequestError,
   RequestAbortErrorType,
+  SegmentWithStream,
 } from "../types";
 import * as Utils from "../utils/utils";
 import * as Command from "./commands";
 import { PeerProtocol, PeerConfig } from "./peer-protocol";
 import { EventTarget } from "../utils/event-target";
-import { Segment } from "../internal-types";
 
 const { PeerCommandType } = Command;
 type PeerEventHandlers = {
@@ -58,16 +58,20 @@ export class Peer {
       },
       eventTarget,
     );
-    eventTarget.getEventDispatcher("onPeerConnect")(this.id);
+    eventTarget.getEventDispatcher("onPeerConnect")({
+      peerId: this.id,
+    });
     connection.on("close", this.onPeerConnectionClosed);
     connection.on("error", this.onConnectionError);
   }
 
-  get downloadingSegment(): Segment | undefined {
+  get downloadingSegment(): SegmentWithStream | undefined {
     return this.downloadingContext?.request.segment;
   }
 
-  getSegmentStatus(segment: Segment): "loaded" | "http-loading" | undefined {
+  getSegmentStatus(
+    segment: SegmentWithStream,
+  ): "loaded" | "http-loading" | undefined {
     const { externalId } = segment;
     if (this.loadedSegments.has(externalId)) return "loaded";
     if (this.httpLoadingSegments.has(externalId)) return "http-loading";
@@ -226,7 +230,7 @@ export class Peer {
     this.peerProtocol.sendCommand(command);
   }
 
-  async uploadSegmentData(segment: Segment, data: ArrayBuffer) {
+  async uploadSegmentData(segment: SegmentWithStream, data: ArrayBuffer) {
     const { externalId } = segment;
     this.logger(`send segment ${segment.externalId} to ${this.id}`);
     const command: Command.PeerSendSegmentCommand = {
@@ -276,14 +280,14 @@ export class Peer {
     });
   }
 
-  private sendCancelSegmentRequestCommand(segment: Segment) {
+  private sendCancelSegmentRequestCommand(segment: SegmentWithStream) {
     this.peerProtocol.sendCommand({
       c: PeerCommandType.CancelSegmentRequest,
       i: segment.externalId,
     });
   }
 
-  private sendSegmentDataSendingCompletedCommand(segment: Segment) {
+  private sendSegmentDataSendingCompletedCommand(segment: SegmentWithStream) {
     this.peerProtocol.sendCommand({
       c: PeerCommandType.SegmentDataSendingCompleted,
       i: segment.externalId,
@@ -306,7 +310,9 @@ export class Peer {
     this.cancelSegmentDownloading("peer-closed");
     this.connection.destroy();
     this.eventHandlers.onPeerClosed(this);
-    this.onPeerClosed(this.id);
+    this.onPeerClosed({
+      peerId: this.id,
+    });
     this.logger(`peer closed ${this.id}`);
   };
 

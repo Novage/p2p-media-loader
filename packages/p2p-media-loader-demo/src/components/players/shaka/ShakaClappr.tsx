@@ -8,7 +8,7 @@ export const ShakaClappr = ({
   streamUrl,
   announceTrackers,
   onPeerConnect,
-  onPeerDisconnect,
+  onPeerClose,
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
@@ -22,12 +22,11 @@ export const ShakaClappr = ({
   }, []);
 
   useEffect(() => {
+    if (!containerRef.current) return;
     if (!window.shaka.Player.isBrowserSupported()) {
       setIsShakaSupported(false);
       return;
     }
-
-    if (!containerRef.current) return;
 
     const shakaP2PEngine = new ShakaP2PEngine(
       {
@@ -44,6 +43,8 @@ export const ShakaClappr = ({
       parentId: `#${containerRef.current.id}`,
       source: streamUrl,
       plugins: [window.DashShakaPlayback, window.LevelSelector],
+      mute: true,
+      autoPlay: true,
       playback: {
         playInline: true,
       },
@@ -51,12 +52,12 @@ export const ShakaClappr = ({
         subscribeToUiEvents({
           engine: shakaP2PEngine,
           onPeerConnect,
-          onPeerDisconnect,
+          onPeerClose,
           onChunkDownloaded,
           onChunkUploaded,
         });
 
-        shakaP2PEngine.configureAndInitShakaPlayer(shakaPlayerInstance);
+        shakaP2PEngine.bindShakaPlayer(shakaPlayerInstance);
       },
       width: "100%",
       height: "100%",
@@ -72,7 +73,7 @@ export const ShakaClappr = ({
     onChunkDownloaded,
     onChunkUploaded,
     onPeerConnect,
-    onPeerDisconnect,
+    onPeerClose,
     streamUrl,
   ]);
 

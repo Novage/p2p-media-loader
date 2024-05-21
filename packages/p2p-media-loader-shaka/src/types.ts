@@ -1,7 +1,7 @@
 import type {
   Stream as CoreStream,
   Core,
-  Segment,
+  SegmentWithStream,
 } from "p2p-media-loader-core";
 import { SegmentManager } from "./segment-manager";
 
@@ -41,5 +41,5 @@ export type HookedNetworkingEngine = shaka.net.NetworkingEngine & {
 };
 
 export type StreamWithReadonlySegments = Stream & {
-  segments: ReadonlyMap<string, Segment>;
+  segments: ReadonlyMap<string, SegmentWithStream>;
 };

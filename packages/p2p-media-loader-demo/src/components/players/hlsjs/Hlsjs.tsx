@@ -9,7 +9,7 @@ export const HlsjsPlayer = ({
   streamUrl,
   announceTrackers,
   onPeerConnect,
-  onPeerDisconnect,
+  onPeerClose,
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
@@ -19,12 +19,11 @@ export const HlsjsPlayer = ({
   const qualityRef = useRef<HTMLSelectElement>(null);
 
   useEffect(() => {
+    if (!videoRef.current) return;
     if (!Hls.isSupported()) {
       setIsHlsSupported(false);
       return;
     }
-
-    if (!videoRef.current) return;
 
     const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
     const hls = new HlsWithP2P({
@@ -37,7 +36,7 @@ export const HlsjsPlayer = ({
           subscribeToUiEvents({
             engine: hls.p2pEngine,
             onPeerConnect,
-            onPeerDisconnect,
+            onPeerClose,
             onChunkDownloaded,
             onChunkUploaded,
           });
@@ -56,7 +55,7 @@ export const HlsjsPlayer = ({
     return () => hls.destroy();
   }, [
     onPeerConnect,
-    onPeerDisconnect,
+    onPeerClose,
     onChunkDownloaded,
     onChunkUploaded,
     streamUrl,
@@ -83,7 +82,14 @@ export const HlsjsPlayer = ({
 
   return isHlsSupported ? (
     <div className="video-container">
-      <video ref={videoRef} controls playsInline />
+      <video
+        ref={videoRef}
+        style={{ aspectRatio: "auto" }}
+        controls
+        playsInline
+        autoPlay
+        muted
+      />
       <div className="select-container">
         <select ref={qualityRef} className="quality-selector" />
       </div>

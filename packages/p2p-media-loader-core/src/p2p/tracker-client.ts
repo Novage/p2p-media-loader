@@ -2,13 +2,12 @@ import TrackerClient, {
   PeerConnection,
   TrackerClientEvents,
 } from "bittorrent-tracker";
-import { CoreEventMap } from "../types";
+import { CoreConfig, CoreEventMap, StreamWithSegments } from "../types";
 import debug from "debug";
 import * as PeerUtil from "../utils/peer";
 import * as LoggerUtils from "../utils/logger";
 import { Peer } from "./peer";
 import { EventTarget } from "../utils/event-target";
-import { ReadonlyCoreConfig, StreamWithSegments } from "../internal-types";
 import { utf8ToUintArray } from "../utils/utils";
 
 type PeerItem = {
@@ -31,7 +30,7 @@ export class P2PTrackerClient {
     streamId: string,
     stream: StreamWithSegments,
     private readonly eventHandlers: P2PTrackerClientEventHandlers,
-    private readonly config: ReadonlyCoreConfig,
+    private readonly config: CoreConfig,
     private readonly eventTarget: EventTarget<CoreEventMap>,
   ) {
     const streamHash = PeerUtil.getStreamHash(streamId);
@@ -42,8 +41,8 @@ export class P2PTrackerClient {
     this.client = new TrackerClient({
       infoHash: utf8ToUintArray(streamHash),
       peerId: utf8ToUintArray(peerId),
-      announce: this.config.announceTrackers as string[],
-      rtcConfig: this.config.rtcConfig as RTCConfiguration,
+      announce: this.config.announceTrackers,
+      rtcConfig: this.config.rtcConfig,
     });
     this.client.on("peer", this.onReceivePeerConnection);
     this.client.on("warning", this.onTrackerClientWarning);

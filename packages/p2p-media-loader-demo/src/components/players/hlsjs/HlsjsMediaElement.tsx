@@ -3,46 +3,32 @@ import "mediaelement/build/mediaelementplayer.min.css";
 import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import { HlsJsP2PEngine, HlsWithP2PInstance } from "p2p-media-loader-hlsjs";
-import { subscribeToUiEvents } from "../utils";
-
-type HlsjsMediaElementProps = {
-  streamUrl: string;
-  announceTrackers: string[];
-  onPeerConnect?: (peerId: string) => void;
-  onPeerDisconnect?: (peerId: string) => void;
-  onChunkDownloaded?: (bytesLength: number, downloadSource: string) => void;
-  onChunkUploaded?: (bytesLength: number) => void;
-};
+import { createVideoElements, subscribeToUiEvents } from "../utils";
+import { PlayerProps } from "../../../types";
 
 export const HlsjsMediaElement = ({
   streamUrl,
   announceTrackers,
   onPeerConnect,
-  onPeerDisconnect,
+  onPeerClose,
   onChunkDownloaded,
   onChunkUploaded,
-}: HlsjsMediaElementProps) => {
+}: PlayerProps) => {
   const [isHlsSupported, setIsHlsSupported] = useState(true);
 
   const containerRef = useRef<HTMLDivElement>(null);
   /* eslint-disable  */
   // @ts-ignore
   useEffect(() => {
+    if (!containerRef.current) return;
     if (!Hls.isSupported()) {
       setIsHlsSupported(false);
       return;
     }
 
-    if (!containerRef.current) return;
+    const { videoContainer, videoElement } = createVideoElements();
 
-    const videoContainer = document.createElement("div");
-    videoContainer.className = "video-container";
     containerRef.current.appendChild(videoContainer);
-
-    const videoElement = document.createElement("video");
-    videoElement.id = "player";
-    videoElement.playsInline = true;
-    videoContainer.appendChild(videoElement);
 
     window.Hls = HlsJsP2PEngine.injectMixin(Hls);
 
@@ -56,7 +42,7 @@ export const HlsjsMediaElement = ({
             subscribeToUiEvents({
               engine: hls.p2pEngine,
               onPeerConnect,
-              onPeerDisconnect,
+              onPeerClose,
               onChunkDownloaded,
               onChunkUploaded,
             });
@@ -83,7 +69,7 @@ export const HlsjsMediaElement = ({
     onChunkDownloaded,
     onChunkUploaded,
     onPeerConnect,
-    onPeerDisconnect,
+    onPeerClose,
     streamUrl,
   ]);
 
