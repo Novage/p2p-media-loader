@@ -315,6 +315,22 @@ export class HybridLoader {
           void this.loadThroughP2P(segment);
         }
       }
+      if (statuses.isHttpDownloadable) {
+        if (request?.status === "loading") continue;
+        if (this.requests.executingHttpCount < simultaneousHttpDownloads) {
+          void this.loadThroughHttp(segment);
+          continue;
+        }
+
+        if (
+          this.abortLastHttpLoadingInQueueAfterItem(queue, segment) &&
+          this.requests.executingHttpCount < simultaneousHttpDownloads
+        ) {
+          void this.loadThroughHttp(segment);
+          continue;
+        }
+      }
+
       break;
     }
   }
