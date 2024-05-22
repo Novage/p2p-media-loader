@@ -253,6 +253,9 @@ export class HybridLoader {
       const { statuses, segment } = item;
       const request = this.requests.get(segment);
 
+      const connectedPeersCount =
+        this.p2pLoaders.currentLoader.connectedPeerCount;
+
       if (statuses.isHighDemand) {
         if (
           request?.downloadSource === "http" &&
@@ -300,7 +303,7 @@ export class HybridLoader {
           void this.loadThroughP2P(segment);
         }
       }
-      if (statuses.isP2PDownloadable) {
+      if (statuses.isP2PDownloadable && connectedPeersCount > 0) {
         if (request?.status === "loading") continue;
         if (this.requests.executingP2PCount < simultaneousP2PDownloads) {
           void this.loadThroughP2P(segment);
@@ -327,7 +330,6 @@ export class HybridLoader {
           this.requests.executingHttpCount < simultaneousHttpDownloads
         ) {
           void this.loadThroughHttp(segment);
-          continue;
         }
       }
 

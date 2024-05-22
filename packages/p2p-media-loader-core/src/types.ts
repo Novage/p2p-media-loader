@@ -93,7 +93,7 @@ export type DynamicCoreConfig = Partial<
  * Configuration options for the Core functionality, including network and processing parameters.
  */
 export type CoreConfig = {
-  /** Time window to consider for high demand scenarios, in milliseconds.
+  /** Time window to consider for high demand scenarios, in seconds.
    *
    * @default
    * ```typescript
@@ -102,7 +102,7 @@ export type CoreConfig = {
    */
   highDemandTimeWindow: number;
 
-  /** Time window for HTTP downloads, in milliseconds.
+  /** Time window for HTTP downloads, in seconds.
    *
    * @default
    * ```typescript
@@ -111,7 +111,7 @@ export type CoreConfig = {
    */
   httpDownloadTimeWindow: number;
 
-  /** Time window for P2P downloads, in milliseconds.
+  /** Time window for P2P downloads, in seconds.
    *
    * @default
    * ```typescript
