@@ -103,6 +103,7 @@ export type CoreConfig = {
   highDemandTimeWindow: number;
 
   /** Time window for HTTP downloads, in seconds.
+   * Specifies amount of segments to be downloaded in advance through HTTP.
    *
    * @default
    * ```typescript
@@ -112,6 +113,8 @@ export type CoreConfig = {
   httpDownloadTimeWindow: number;
 
   /** Time window for P2P downloads, in seconds.
+   *  Specifies amount of segments to be downloaded in advance through P2P.
+   *  Should be greater than httpDownloadTimeWindow.
    *
    * @default
    * ```typescript
@@ -148,7 +151,7 @@ export type CoreConfig = {
   cachedSegmentExpiration: number;
 
   /** Maximum number of segments to store in the cache.
-   *
+   *  Has to be less then httpDownloadTimeWindow and p2pDownloadTimeWindow.
    * @default
    * ```typescript
    * cachedSegmentsCount: 50
