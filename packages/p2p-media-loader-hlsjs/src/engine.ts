@@ -74,7 +74,7 @@ export type HlsWithP2PConfig<HlsType extends abstract new () => unknown> =
  * // Creating an instance of HlsJsP2PEngine with custom configuration
  * const hlsP2PEngine = new HlsJsP2PEngine({
  *   core: {
- *     highDemandTimeWindow: 30000, // 30 seconds
+ *     highDemandTimeWindowMs: 30000, // 30 seconds
  *     simultaneousHttpDownloads: 3,
  *     cachedSegmentsCount: 50,
  *     webRtcMaxMessageSize: 262144, // 256 KB
@@ -202,7 +202,7 @@ export class HlsJsP2PEngine {
    * const newDynamicConfig = {
    *   core: {
    *     p2pNotReceivingBytesTimeoutMs: 20000, // Adjusting timeout to 20 seconds
-   *     httpDownloadTimeWindow: 15000, // Extending HTTP download time window to 15 seconds
+   *     httpDownloadTimeWindowMs: 15000, // Extending HTTP download time window to 15 seconds
    *   }
    * };
    *

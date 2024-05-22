@@ -21,9 +21,9 @@ export class Core<TStream extends Stream = Stream> {
   static readonly DEFAULT_CONFIG: CoreConfig = {
     simultaneousHttpDownloads: 3,
     simultaneousP2PDownloads: 3,
-    highDemandTimeWindow: 15,
-    httpDownloadTimeWindow: 45,
-    p2pDownloadTimeWindow: 45,
+    highDemandTimeWindowMs: 15,
+    httpDownloadTimeWindowMs: 45,
+    p2pDownloadTimeWindowMs: 45,
     cachedSegmentExpiration: 120 * 1000,
     cachedSegmentsCount: 50,
     webRtcMaxMessageSize: 64 * 1024 - 1,
@@ -102,8 +102,8 @@ export class Core<TStream extends Stream = Stream> {
    * @example
    * // Example of dynamically updating the download time windows and timeout settings.
    * const dynamicConfig = {
-   *   httpDownloadTimeWindow: 60,  // Set HTTP download time window to 60 seconds
-   *   p2pDownloadTimeWindow: 60,   // Set P2P download time window to 60 seconds
+   *   httpDownloadTimeWindowMs: 60,  // Set HTTP download time window to 60 seconds
+   *   p2pDownloadTimeWindowMs: 60,   // Set P2P download time window to 60 seconds
    *   httpNotReceivingBytesTimeoutMs: 1500,  // Set HTTP timeout to 1500 milliseconds
    *   p2pNotReceivingBytesTimeoutMs: 1500    // Set P2P timeout to 1500 milliseconds
    * };
