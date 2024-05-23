@@ -68,11 +68,22 @@ export type StreamWithSegments<TStream extends Stream = Stream> = TStream & {
 };
 
 /**
- * Represents a stream with a unique local identifier, type, and index position.
+ * Represents a media stream with various defining characteristics.
  */
 export type Stream = {
+  /**
+   * A unique identifier for the stream within the local system.
+   */
   readonly localId: string;
+
+  /**
+   * The type of stream, either "main" or "secondary".
+   */
   readonly type: StreamType;
+
+  /**
+   * The index position of the stream within a collection or sequence.
+   */
   readonly index: number;
 };
 
@@ -93,7 +104,8 @@ export type DynamicCoreConfig = Partial<
  * Configuration options for the Core functionality, including network and processing parameters.
  */
 export type CoreConfig = {
-  /** Time window to consider for high demand scenarios, in seconds.
+  /**
+   * Time window to consider for high demand scenarios, in seconds.
    *
    * @default
    * ```typescript
@@ -102,7 +114,8 @@ export type CoreConfig = {
    */
   highDemandTimeWindow: number;
 
-  /** Time window for HTTP downloads, in seconds.
+  /**
+   * Time window for HTTP downloads, in seconds.
    * Specifies amount of segments to be downloaded in advance through HTTP.
    *
    * @default
@@ -112,9 +125,10 @@ export type CoreConfig = {
    */
   httpDownloadTimeWindow: number;
 
-  /** Time window for P2P downloads, in seconds.
-   *  Specifies amount of segments to be downloaded in advance through P2P.
-   *  Should be greater than httpDownloadTimeWindow.
+  /**
+   * Time window for P2P downloads, in seconds.
+   * Specifies amount of segments to be downloaded in advance through P2P.
+   * Should be greater than httpDownloadTimeWindow.
    *
    * @default
    * ```typescript
@@ -123,7 +137,8 @@ export type CoreConfig = {
    */
   p2pDownloadTimeWindow: number;
 
-  /** Maximum number of simultaneous HTTP downloads allowed.
+  /**
+   * Maximum number of simultaneous HTTP downloads allowed.
    *
    * @default
    * ```typescript
@@ -132,7 +147,8 @@ export type CoreConfig = {
    */
   simultaneousHttpDownloads: number;
 
-  /** Maximum number of simultaneous P2P downloads allowed.
+  /**
+   * Maximum number of simultaneous P2P downloads allowed.
    *
    * @default
    * ```typescript
@@ -141,7 +157,8 @@ export type CoreConfig = {
    */
   simultaneousP2PDownloads: number;
 
-  /** Time after which a cached segment expires, in milliseconds.
+  /**
+   * Time after which a cached segment expires, in milliseconds.
    *
    * @default
    * ```typescript
@@ -150,8 +167,10 @@ export type CoreConfig = {
    */
   cachedSegmentExpiration: number;
 
-  /** Maximum number of segments to store in the cache.
-   *  Has to be less then httpDownloadTimeWindow and p2pDownloadTimeWindow.
+  /**
+   * Maximum number of segments to store in the cache.
+   * Has to be less then httpDownloadTimeWindow and p2pDownloadTimeWindow.
+   *
    * @default
    * ```typescript
    * cachedSegmentsCount: 50
@@ -159,7 +178,8 @@ export type CoreConfig = {
    */
   cachedSegmentsCount: number;
 
-  /** Maximum message size for WebRTC communications, in bytes.
+  /**
+   * Maximum message size for WebRTC communications, in bytes.
    *
    * @default
    * ```typescript
@@ -168,7 +188,8 @@ export type CoreConfig = {
    */
   webRtcMaxMessageSize: number;
 
-  /** Timeout for not receiving bytes from P2P, in milliseconds.
+  /**
+   * Timeout for not receiving bytes from P2P, in milliseconds.
    *
    * @default
    * ```typescript
@@ -177,7 +198,8 @@ export type CoreConfig = {
    */
   p2pNotReceivingBytesTimeoutMs: number;
 
-  /** Timeout for destroying the P2P loader if inactive, in milliseconds.
+  /**
+   * Timeout for destroying the P2P loader if inactive, in milliseconds.
    *
    * @default
    * ```typescript
@@ -186,7 +208,8 @@ export type CoreConfig = {
    */
   p2pInactiveLoaderDestroyTimeoutMs: number;
 
-  /** Timeout for not receiving bytes from HTTP downloads, in milliseconds.
+  /**
+   * Timeout for not receiving bytes from HTTP downloads, in milliseconds.
    *
    * @default
    * ```typescript
@@ -195,7 +218,8 @@ export type CoreConfig = {
    */
   httpNotReceivingBytesTimeoutMs: number;
 
-  /** Number of retries allowed after an HTTP error.
+  /**
+   * Number of retries allowed after an HTTP error.
    *
    * @default
    * ```typescript
@@ -247,7 +271,8 @@ export type CoreConfig = {
    */
   rtcConfig: RTCConfiguration;
 
-  /** Prefix to use for the WebTorrent client version in tracker communications.
+  /**
+   * Prefix to use for the WebTorrent client version in tracker communications.
    *
    * @default
    * ```typescript
@@ -288,7 +313,11 @@ export type CoreConfig = {
 };
 
 /**
- * Specifies the source of a download, indicating whether it was from HTTP or P2P.
+ * Specifies the source of a download within a media streaming context.
+ *
+ * "http" - Indicates that the segment was downloaded using the HTTP protocol.
+ *
+ * "p2p"- Indicates that the segment was downloaded through a peer-to-peer network.
  */
 export type DownloadSource = "http" | "p2p";
 
@@ -331,22 +360,34 @@ export type SegmentAbortDetails = {
 };
 
 /**
- * Represents the details about a loaded segment, including the length in bytes and the source of the download.
- * @param {number} bytesLength - The length of the segment in bytes.
- * @param {DownloadSource} downloadSource - The source of the download.
+ * Represents the details about a loaded segment in media streaming.
  */
 export type SegmentLoadDetails = {
+  /**
+   * The length of the segment in bytes.
+   */
   bytesLength: number;
+
+  /**
+   * The source of the download, indicating whether the segment was retrieved over HTTP or from a
+   * peer-to-peer network.
+   */
   downloadSource: DownloadSource;
+
+  /**
+   * The unique identifier of the peer from which this segment was downloaded, if applicable. This field
+   * is optional and may be undefined if the segment was not sourced from a peer.
+   */
   peerId: string | undefined;
 };
 
 /**
  * Represents the details of a peer in a peer-to-peer network.
- *
- * @param {string} peerId - The unique identifier for a peer in the network.
  */
 export type PeerDetails = {
+  /**
+   * The unique identifier for a peer in the network.
+   */
   peerId: string;
 };
 
@@ -474,10 +515,17 @@ export class RequestError<
 }
 
 /**
- * Represents the response from a segment request, including the data and measured bandwidth.
+ * Represents the response from a segment request in media streaming.
  */
 export type SegmentResponse = {
+  /**
+   * The raw binary data of the media segment.
+   */
   data: ArrayBuffer;
+
+  /**
+   * The measured bandwidth during the segment's download.
+   */
   bandwidth: number;
 };
 
