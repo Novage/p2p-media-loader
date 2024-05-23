@@ -82,8 +82,8 @@ export type Stream = {
 export type DynamicCoreConfig = Partial<
   Pick<
     CoreConfig,
-    | "httpDownloadTimeWindowMs"
-    | "p2pDownloadTimeWindowMs"
+    | "httpDownloadTimeWindow"
+    | "p2pDownloadTimeWindow"
     | "p2pNotReceivingBytesTimeoutMs"
     | "httpNotReceivingBytesTimeoutMs"
   >
@@ -97,10 +97,10 @@ export type CoreConfig = {
    *
    * @default
    * ```typescript
-   * highDemandTimeWindowMs: 15
+   * highDemandTimeWindow: 15
    * ```
    */
-  highDemandTimeWindowMs: number;
+  highDemandTimeWindow: number;
 
   /** Time window for HTTP downloads, in seconds.
    * Specifies amount of segments to be downloaded in advance through HTTP.
@@ -110,7 +110,7 @@ export type CoreConfig = {
    * httpDownloadTimeWindowMs: 45
    * ```
    */
-  httpDownloadTimeWindowMs: number;
+  httpDownloadTimeWindow: number;
 
   /** Time window for P2P downloads, in seconds.
    *  Specifies amount of segments to be downloaded in advance through P2P.
@@ -118,10 +118,10 @@ export type CoreConfig = {
    *
    * @default
    * ```typescript
-   * p2pDownloadTimeWindowMs: 45
+   * p2pDownloadTimeWindow: 45
    * ```
    */
-  p2pDownloadTimeWindowMs: number;
+  p2pDownloadTimeWindow: number;
 
   /** Maximum number of simultaneous HTTP downloads allowed.
    *

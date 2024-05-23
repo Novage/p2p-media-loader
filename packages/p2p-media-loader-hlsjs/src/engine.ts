@@ -74,7 +74,7 @@ export type HlsWithP2PConfig<HlsType extends abstract new () => unknown> =
  * // Creating an instance of HlsJsP2PEngine with custom configuration
  * const hlsP2PEngine = new HlsJsP2PEngine({
  *   core: {
- *     highDemandTimeWindowMs: 30000, // 30 seconds
+ *     highDemandTimeWindow: 30, // 30 seconds
  *     simultaneousHttpDownloads: 3,
  *     cachedSegmentsCount: 50,
  *     webRtcMaxMessageSize: 262144, // 256 KB
