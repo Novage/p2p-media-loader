@@ -5,6 +5,7 @@ import {
   StreamWithSegments,
 } from "../types";
 import { Playback } from "../internal-types";
+import { P2PLoader } from "../p2p/loader";
 
 export type SegmentPlaybackStatuses = {
   isHighDemand?: boolean;
@@ -79,6 +80,7 @@ export function getSegmentPlaybackStatuses(
   segment: SegmentWithStream,
   playback: Playback,
   timeWindowsConfig: PlaybackTimeWindowsConfig,
+  currentP2PLoader?: P2PLoader,
 ): SegmentPlaybackStatuses {
   const {
     highDemandTimeWindow,
@@ -86,15 +88,29 @@ export function getSegmentPlaybackStatuses(
     p2pDownloadTimeWindow,
   } = timeWindowsConfig;
 
-  const statuses: SegmentPlaybackStatuses = {};
+  const statuses: SegmentPlaybackStatuses = {
+    isHighDemand: false,
+    isHttpDownloadable: false,
+    isP2PDownloadable: false,
+  };
+
   if (isSegmentInTimeWindow(segment, playback, highDemandTimeWindow)) {
     statuses.isHighDemand = true;
   }
+
   if (isSegmentInTimeWindow(segment, playback, httpDownloadTimeWindow)) {
     statuses.isHttpDownloadable = true;
   }
+
   if (isSegmentInTimeWindow(segment, playback, p2pDownloadTimeWindow)) {
-    statuses.isP2PDownloadable = true;
+    if (
+      currentP2PLoader &&
+      currentP2PLoader.isSegmentLoadingOrLoadedBySomeone(segment)
+    ) {
+      statuses.isP2PDownloadable = true;
+    } else if (!currentP2PLoader) {
+      statuses.isP2PDownloadable = true;
+    }
   }
 
   return statuses;

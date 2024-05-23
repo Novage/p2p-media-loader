@@ -77,6 +77,7 @@ export class HybridLoader {
       this.config,
       this.eventTarget,
     );
+    this.requests.setP2PLoaders(this.p2pLoaders);
 
     this.logger = debug(`p2pml-core:hybrid-loader-${activeStream.type}`);
     this.logger.color = "coral";
@@ -85,7 +86,10 @@ export class HybridLoader {
   }
 
   private setIntervalLoading() {
-    const randomTimeout = (Math.random() * 2 + 1) * 1000;
+    const peerUpdateLatency = 1000;
+    const peersCount = this.p2pLoaders.currentLoader.connectedPeerCount;
+    const randomTimeout =
+      Math.random() * peerUpdateLatency * peersCount + peerUpdateLatency;
     this.randomHttpDownloadInterval = window.setTimeout(() => {
       this.loadRandomThroughHttp();
       this.setIntervalLoading();
@@ -253,9 +257,6 @@ export class HybridLoader {
       const { statuses, segment } = item;
       const request = this.requests.get(segment);
 
-      const connectedPeersCount =
-        this.p2pLoaders.currentLoader.connectedPeerCount;
-
       if (statuses.isHighDemand) {
         if (
           request?.downloadSource === "http" &&
@@ -303,7 +304,7 @@ export class HybridLoader {
           void this.loadThroughP2P(segment);
         }
       }
-      if (statuses.isP2PDownloadable && connectedPeersCount > 0) {
+      if (statuses.isP2PDownloadable) {
         if (request?.status === "loading") continue;
         if (this.requests.executingP2PCount < simultaneousP2PDownloads) {
           void this.loadThroughP2P(segment);
@@ -316,20 +317,6 @@ export class HybridLoader {
           this.requests.executingP2PCount < simultaneousP2PDownloads
         ) {
           void this.loadThroughP2P(segment);
-        }
-      }
-      if (statuses.isHttpDownloadable) {
-        if (request?.status === "loading") continue;
-        if (this.requests.executingHttpCount < simultaneousHttpDownloads) {
-          void this.loadThroughHttp(segment);
-          continue;
-        }
-
-        if (
-          this.abortLastHttpLoadingInQueueAfterItem(queue, segment) &&
-          this.requests.executingHttpCount < simultaneousHttpDownloads
-        ) {
-          void this.loadThroughHttp(segment);
         }
       }
 
@@ -375,10 +362,10 @@ export class HybridLoader {
       this.lastRequestedSegment,
       this.playback,
       this.config,
+      this.p2pLoaders.currentLoader,
     )) {
       if (
         !statuses.isHttpDownloadable ||
-        p2pLoader.isSegmentLoadingOrLoadedBySomeone(segment) ||
         this.segmentStorage.hasSegment(segment)
       ) {
         continue;
@@ -444,6 +431,7 @@ export class HybridLoader {
       this.lastRequestedSegment,
       this.playback,
       this.config,
+      this.p2pLoaders.currentLoader,
     )) {
       maxPossibleLength++;
       const { segment } = item;
