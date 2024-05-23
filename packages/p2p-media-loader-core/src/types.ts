@@ -82,8 +82,8 @@ export type Stream = {
 export type DynamicCoreConfig = Partial<
   Pick<
     CoreConfig,
-    | "httpDownloadTimeWindow"
-    | "p2pDownloadTimeWindow"
+    | "httpDownloadTimeWindowMs"
+    | "p2pDownloadTimeWindowMs"
     | "p2pNotReceivingBytesTimeoutMs"
     | "httpNotReceivingBytesTimeoutMs"
   >
@@ -97,20 +97,20 @@ export type CoreConfig = {
    *
    * @default
    * ```typescript
-   * highDemandTimeWindow: 15
+   * highDemandTimeWindowMs: 15
    * ```
    */
-  highDemandTimeWindow: number;
+  highDemandTimeWindowMs: number;
 
   /** Time window for HTTP downloads, in seconds.
    * Specifies amount of segments to be downloaded in advance through HTTP.
    *
    * @default
    * ```typescript
-   * httpDownloadTimeWindow: 45
+   * httpDownloadTimeWindowMs: 45
    * ```
    */
-  httpDownloadTimeWindow: number;
+  httpDownloadTimeWindowMs: number;
 
   /** Time window for P2P downloads, in seconds.
    *  Specifies amount of segments to be downloaded in advance through P2P.
@@ -118,10 +118,10 @@ export type CoreConfig = {
    *
    * @default
    * ```typescript
-   * p2pDownloadTimeWindow: 45
+   * p2pDownloadTimeWindowMs: 45
    * ```
    */
-  p2pDownloadTimeWindow: number;
+  p2pDownloadTimeWindowMs: number;
 
   /** Maximum number of simultaneous HTTP downloads allowed.
    *
@@ -214,7 +214,7 @@ export type CoreConfig = {
   p2pErrorRetries: number;
 
   /**
-   * List of URLs to the webtorrent trackers used for announcing and discovering peers.
+   * List of URLs to the WebTorrent trackers used for announcing and discovering peers (i.e. WebRTC signaling).
    *
    * @default
    * The default trackers used are:
@@ -247,7 +247,7 @@ export type CoreConfig = {
    */
   rtcConfig: RTCConfiguration;
 
-  /** Prefix to use for the client version in tracker communications.
+  /** Prefix to use for the WebTorrent client version in tracker communications.
    *
    * @default
    * ```typescript
@@ -266,7 +266,7 @@ export type CoreConfig = {
   /**
    * Optional function to validate a P2P segment before fully integrating it into the playback buffer.
    * @param url URL of the segment to validate.
-   * @param byteRange Optional range of bytes to validate byte range of the segment for stream which represented by single file.
+   * @param byteRange Optional byte range of the segment.
    * @returns A promise that resolves with a boolean indicating if the segment is valid.
    */
   validateP2PSegment?: (url: string, byteRange?: ByteRange) => Promise<boolean>;
@@ -277,7 +277,7 @@ export type CoreConfig = {
    * @param segmentByteRange The range of bytes requested for the segment.
    * @param requestAbortSignal An abort signal to cancel the request if needed.
    * @param requestByteRange Additional byte range for partial requests, if required.
-   * @returns A promise that resolves with the configured request, or undefined if no request should be made.
+   * @returns A promise that resolves with the configured request, or undefined if no customization should be made.
    */
   httpRequestSetup?: (
     segmentUrl: string,

@@ -15,7 +15,9 @@ export type SegmentPlaybackStatuses = {
 
 export type PlaybackTimeWindowsConfig = Pick<
   CoreConfig,
-  "highDemandTimeWindow" | "httpDownloadTimeWindow" | "p2pDownloadTimeWindow"
+  | "highDemandTimeWindowMs"
+  | "httpDownloadTimeWindowMs"
+  | "p2pDownloadTimeWindowMs"
 >;
 
 const PEER_PROTOCOL_VERSION = "V1";
@@ -83,9 +85,9 @@ export function getSegmentPlaybackStatuses(
   currentP2PLoader?: P2PLoader,
 ): SegmentPlaybackStatuses {
   const {
-    highDemandTimeWindow,
-    httpDownloadTimeWindow,
-    p2pDownloadTimeWindow,
+    highDemandTimeWindowMs,
+    httpDownloadTimeWindowMs,
+    p2pDownloadTimeWindowMs,
   } = timeWindowsConfig;
 
   const statuses: SegmentPlaybackStatuses = {
@@ -111,7 +113,6 @@ export function getSegmentPlaybackStatuses(
     } else if (!currentP2PLoader) {
       statuses.isP2PDownloadable = true;
     }
-  }
 
   return statuses;
 }

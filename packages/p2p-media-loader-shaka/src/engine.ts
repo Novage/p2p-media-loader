@@ -58,7 +58,7 @@ const LIVE_EDGE_DELAY = 25;
  * // Initializing the ShakaP2PEngine with custom configuration
  * const shakaP2PEngine = new ShakaP2PEngine({
  *   core: {
- *     highDemandTimeWindow: 30000, // 30 seconds
+ *     highDemandTimeWindowMs: 30000, // 30 seconds
  *     simultaneousHttpDownloads: 3,
  *     cachedSegmentsCount: 50,
  *     webRtcMaxMessageSize: 262144, // 256 KB
