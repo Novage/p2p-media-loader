@@ -366,6 +366,7 @@ export class HybridLoader {
     )) {
       if (
         !statuses.isHttpDownloadable ||
+        (statuses.isP2PDownloadable ?? false) ||
         this.segmentStorage.hasSegment(segment)
       ) {
         continue;
@@ -382,14 +383,26 @@ export class HybridLoader {
       segmentsToLoad.push(segment);
     }
 
-    if (!segmentsToLoad.length) return;
     const peersCount = p2pLoader.connectedPeerCount + 1;
-    const probability = Math.min(segmentsToLoad.length / peersCount, 1);
-    const shouldLoad = Math.random() < probability;
+    let probability = segmentsToLoad.length / peersCount;
 
-    if (!shouldLoad) return;
-    const segment = Utils.getRandomItem(segmentsToLoad);
-    void this.loadThroughHttp(segment);
+    if (probability <= 0) return;
+
+    for (let i = 0; i < segmentsToLoad.length; i++) {
+      if (this.requests.executingHttpCount >= simultaneousHttpDownloads) {
+        break;
+      }
+
+      const segment = segmentsToLoad[i];
+      if (probability >= 1) {
+        this.loadThroughHttp(segment);
+
+        probability--;
+      } else if (probability > 0 && Math.random() <= probability) {
+        this.loadThroughHttp(segment);
+        break;
+      }
+    }
   }
 
   private abortLastHttpLoadingInQueueAfterItem(
