@@ -8,9 +8,9 @@ import { Playback } from "../internal-types";
 import { P2PLoader } from "../p2p/loader";
 
 export type SegmentPlaybackStatuses = {
-  isHighDemand?: boolean;
-  isHttpDownloadable?: boolean;
-  isP2PDownloadable?: boolean;
+  isHighDemand: boolean;
+  isHttpDownloadable: boolean;
+  isP2PDownloadable: boolean;
 };
 
 export type PlaybackTimeWindowsConfig = Pick<

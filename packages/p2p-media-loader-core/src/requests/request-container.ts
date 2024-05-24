@@ -1,12 +1,10 @@
 import { Playback, BandwidthCalculators } from "../internal-types";
-import { P2PLoadersContainer } from "../p2p/loaders-container";
 import { CoreConfig, CoreEventMap, SegmentWithStream } from "../types";
 import { EventTarget } from "../utils/event-target";
 import { Request } from "./request";
 
 export class RequestsContainer {
   private readonly requests = new Map<SegmentWithStream, Request>();
-  private p2pLoaders: P2PLoadersContainer | undefined;
 
   constructor(
     private readonly requestProcessQueueCallback: () => void,
@@ -32,10 +30,6 @@ export class RequestsContainer {
     return count;
   }
 
-  setP2PLoaders(p2pLoaders: P2PLoadersContainer) {
-    this.p2pLoaders = p2pLoaders;
-  }
-
   get(segment: SegmentWithStream) {
     return this.requests.get(segment);
   }
@@ -49,8 +43,6 @@ export class RequestsContainer {
         this.bandwidthCalculators,
         this.playback,
         this.config,
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        this.p2pLoaders!,
         this.eventTarget,
       );
       this.requests.set(segment, request);
