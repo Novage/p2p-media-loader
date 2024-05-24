@@ -24,6 +24,7 @@ import { QueueItem } from "./utils/queue";
 import { EventTarget } from "./utils/event-target";
 
 const FAILED_ATTEMPTS_CLEAR_INTERVAL = 60000;
+const PEER_UPDATE_LATENCY = 1000;
 
 export class HybridLoader {
   private readonly requests: RequestsContainer;
@@ -77,7 +78,6 @@ export class HybridLoader {
       this.config,
       this.eventTarget,
     );
-    this.requests.setP2PLoaders(this.p2pLoaders);
 
     this.logger = debug(`p2pml-core:hybrid-loader-${activeStream.type}`);
     this.logger.color = "coral";
@@ -86,10 +86,9 @@ export class HybridLoader {
   }
 
   private setIntervalLoading() {
-    const peerUpdateLatency = 1000;
     const peersCount = this.p2pLoaders.currentLoader.connectedPeerCount;
     const randomTimeout =
-      Math.random() * peerUpdateLatency * peersCount + peerUpdateLatency;
+      Math.random() * PEER_UPDATE_LATENCY * peersCount + PEER_UPDATE_LATENCY;
     this.randomHttpDownloadInterval = window.setTimeout(() => {
       this.loadRandomThroughHttp();
       this.setIntervalLoading();
@@ -366,7 +365,7 @@ export class HybridLoader {
     )) {
       if (
         !statuses.isHttpDownloadable ||
-        (statuses.isP2PDownloadable ?? false) ||
+        statuses.isP2PDownloadable ||
         this.segmentStorage.hasSegment(segment)
       ) {
         continue;
@@ -383,10 +382,10 @@ export class HybridLoader {
       segmentsToLoad.push(segment);
     }
 
+    if (!segmentsToLoad.length) return;
+
     const peersCount = p2pLoader.connectedPeerCount + 1;
     let probability = segmentsToLoad.length / peersCount;
-
-    if (probability <= 0) return;
 
     for (let i = 0; i < segmentsToLoad.length; i++) {
       if (this.requests.executingHttpCount >= simultaneousHttpDownloads) {
