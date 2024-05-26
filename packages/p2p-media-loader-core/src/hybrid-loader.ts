@@ -384,14 +384,26 @@ export class HybridLoader {
 
     if (!segmentsToLoad.length) return;
 
-    const indices = Array.from({ length: segmentsToLoad.length }, (_, i) => i);
-    Utils.shuffleArray(indices);
+    const availableHttpDownloads =
+      simultaneousHttpDownloads - this.requests.executingHttpCount;
+
+    if (availableHttpDownloads <= 0) return;
 
     const peersCount = p2pLoader.connectedPeerCount + 1;
-    let probability = segmentsToLoad.length / peersCount;
+    const maxSegmentsToLoad = availableHttpDownloads * peersCount;
+
+    const segmentsToLoadPerPeer = Math.min(
+      segmentsToLoad.length,
+      maxSegmentsToLoad,
+    );
+
+    const indices = Array.from({ length: segmentsToLoadPerPeer }, (_, i) => i);
+    Utils.shuffleArray(indices);
+
+    let probability = segmentsToLoadPerPeer / peersCount;
 
     const usedIndices = new Set<number>();
-    for (let i = 0; i < segmentsToLoad.length; i++) {
+    for (let i = 0; i < segmentsToLoadPerPeer; i++) {
       if (this.requests.executingHttpCount >= simultaneousHttpDownloads) {
         break;
       }
