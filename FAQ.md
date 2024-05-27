@@ -39,7 +39,7 @@ The default configuration works best for live streams with 15-20 segments in the
 
 ## How to achieve better P2P ratio for VOD streams?
 
-An example of a good configuration tested in production for a VOD stream with segments 10 seconds long each:
+An example of a good configuration for a VOD stream that will download and cache up to 100 minutes of video:
 
 ```javascript
 {
@@ -50,10 +50,10 @@ An example of a good configuration tested in production for a VOD stream with se
     cachedSegmentsCount: 1000,
     // number of simultaneous downloads for P2P methods
     simultaneousP2PDownloads: 20,
-    // Time window for http downloads in seconds
-    httpDownloadTimeWindow: 320,
-    // Time window for p2p downloads in seconds.
-    p2pDownloadTimeWindow: 640,
+    // Time window for HTTP downloads in seconds
+    httpDownloadTimeWindow: 3000,
+    // Time window for P2P downloads in seconds.
+    p2pDownloadTimeWindow: 6000,
   };
 }
 ```

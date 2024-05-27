@@ -88,32 +88,22 @@ export function getSegmentPlaybackStatuses(
     p2pDownloadTimeWindow,
   } = timeWindowsConfig;
 
-  const statuses: SegmentPlaybackStatuses = {
-    isHighDemand: false,
-    isHttpDownloadable: false,
-    isP2PDownloadable: false,
+  return {
+    isHighDemand: isSegmentInTimeWindow(
+      segment,
+      playback,
+      highDemandTimeWindow,
+    ),
+    isHttpDownloadable: isSegmentInTimeWindow(
+      segment,
+      playback,
+      httpDownloadTimeWindow,
+    ),
+    isP2PDownloadable:
+      isSegmentInTimeWindow(segment, playback, p2pDownloadTimeWindow) &&
+      (!currentP2PLoader ||
+        currentP2PLoader.isSegmentLoadingOrLoadedBySomeone(segment)),
   };
-
-  if (isSegmentInTimeWindow(segment, playback, highDemandTimeWindow)) {
-    statuses.isHighDemand = true;
-  }
-
-  if (isSegmentInTimeWindow(segment, playback, httpDownloadTimeWindow)) {
-    statuses.isHttpDownloadable = true;
-  }
-
-  if (isSegmentInTimeWindow(segment, playback, p2pDownloadTimeWindow)) {
-    if (
-      currentP2PLoader &&
-      currentP2PLoader.isSegmentLoadingOrLoadedBySomeone(segment)
-    ) {
-      statuses.isP2PDownloadable = true;
-    } else if (!currentP2PLoader) {
-      statuses.isP2PDownloadable = true;
-    }
-  }
-
-  return statuses;
 }
 
 function isSegmentInTimeWindow(

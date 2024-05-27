@@ -238,8 +238,7 @@ export class HybridLoader {
       this.engineRequest.status === "pending" &&
       this.requests.executingHttpCount < simultaneousHttpDownloads
     ) {
-      const { engineRequest } = this;
-      const { segment } = engineRequest;
+      const { segment } = this.engineRequest;
       const request = this.requests.get(segment);
       if (
         !request ||
@@ -248,7 +247,7 @@ export class HybridLoader {
           request.failedAttempts.httpAttemptsCount <
             this.config.httpErrorRetries)
       ) {
-        void this.loadThroughHttp(segment);
+        this.loadThroughHttp(segment);
       }
     }
 
@@ -263,12 +262,13 @@ export class HybridLoader {
         ) {
           continue;
         }
+
         if (
           request?.downloadSource === "http" &&
           request.status === "failed" &&
           request.failedAttempts.httpAttemptsCount >= httpErrorRetries
         ) {
-          break;
+          continue;
         }
 
         const isP2PLoadingRequest =
@@ -276,7 +276,7 @@ export class HybridLoader {
 
         if (this.requests.executingHttpCount < simultaneousHttpDownloads) {
           if (isP2PLoadingRequest) request.abortFromProcessQueue();
-          void this.loadThroughHttp(segment);
+          this.loadThroughHttp(segment);
           continue;
         }
 
@@ -285,14 +285,14 @@ export class HybridLoader {
           this.requests.executingHttpCount < simultaneousHttpDownloads
         ) {
           if (isP2PLoadingRequest) request.abortFromProcessQueue();
-          void this.loadThroughHttp(segment);
+          this.loadThroughHttp(segment);
           continue;
         }
 
         if (isP2PLoadingRequest) continue;
 
         if (this.requests.executingP2PCount < simultaneousP2PDownloads) {
-          void this.loadThroughP2P(segment);
+          this.loadThroughP2P(segment);
           continue;
         }
 
@@ -300,26 +300,22 @@ export class HybridLoader {
           this.abortLastP2PLoadingInQueueAfterItem(queue, segment) &&
           this.requests.executingP2PCount < simultaneousP2PDownloads
         ) {
-          void this.loadThroughP2P(segment);
-        }
-      }
-      if (statuses.isP2PDownloadable) {
-        if (request?.status === "loading") continue;
-        if (this.requests.executingP2PCount < simultaneousP2PDownloads) {
-          void this.loadThroughP2P(segment);
+          this.loadThroughP2P(segment);
           continue;
         }
+      } else if (statuses.isP2PDownloadable) {
+        if (request?.status === "loading") continue;
 
-        if (
+        if (this.requests.executingP2PCount < simultaneousP2PDownloads) {
+          this.loadThroughP2P(segment);
+        } else if (
           this.p2pLoaders.currentLoader.isSegmentLoadedBySomeone(segment) &&
           this.abortLastP2PLoadingInQueueAfterItem(queue, segment) &&
           this.requests.executingP2PCount < simultaneousP2PDownloads
         ) {
-          void this.loadThroughP2P(segment);
+          this.loadThroughP2P(segment);
         }
       }
-
-      break;
     }
   }
 
@@ -390,37 +386,29 @@ export class HybridLoader {
     if (availableHttpDownloads === 0) return;
 
     const peersCount = p2pLoader.connectedPeerCount + 1;
-    const maxSegmentsToLoad = availableHttpDownloads * peersCount;
-    const segmentsToLoadPerPeer = Math.min(
+    const safeRandomSegmentsCount = Math.min(
       segmentsToLoad.length,
-      maxSegmentsToLoad,
+      simultaneousHttpDownloads * peersCount,
     );
-    const indices = Array.from({ length: segmentsToLoadPerPeer }, (_, i) => i);
 
-    Utils.shuffleArray(indices);
+    const randomIndices = Utils.shuffleArray(
+      Array.from({ length: safeRandomSegmentsCount }, (_, i) => i),
+    );
 
-    let probability = segmentsToLoadPerPeer / peersCount;
+    let probability = safeRandomSegmentsCount / peersCount;
 
-    const usedIndices = new Set<number>();
-    for (let i = 0; i < segmentsToLoadPerPeer; i++) {
+    for (const randomIndex of randomIndices) {
       if (this.requests.executingHttpCount >= simultaneousHttpDownloads) {
         break;
       }
 
-      if (usedIndices.has(indices[i])) continue;
-
-      usedIndices.add(indices[i]);
-
-      const segment = segmentsToLoad[indices[i]];
-
-      if (probability >= 1) {
+      if (probability >= 1 || Math.random() <= probability) {
+        const segment = segmentsToLoad[randomIndex];
         this.loadThroughHttp(segment);
-
-        probability--;
-      } else if (probability > 0 && Math.random() <= probability) {
-        this.loadThroughHttp(segment);
-        break;
       }
+
+      probability--;
+      if (probability <= 0) break;
     }
   }
 
