@@ -82,10 +82,11 @@ export type Stream = {
 export type DynamicCoreConfig = Partial<
   Pick<
     CoreConfig,
+    | "simultaneousP2PDownloads"
+    | "simultaneousHttpDownloads"
+    | "cachedSegmentsCount"
     | "httpDownloadTimeWindow"
     | "p2pDownloadTimeWindow"
-    | "p2pNotReceivingBytesTimeoutMs"
-    | "httpNotReceivingBytesTimeoutMs"
   >
 >;
 
