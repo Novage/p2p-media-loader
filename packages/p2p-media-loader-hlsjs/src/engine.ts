@@ -201,9 +201,12 @@ export class HlsJsP2PEngine {
    *
    * const newDynamicConfig = {
    *   core: {
-   *     p2pNotReceivingBytesTimeoutMs: 20000, // Adjusting timeout to 20 seconds
-   *     httpDownloadTimeWindowMs: 15000, // Extending HTTP download time window to 15 seconds
-   *   }
+   *     // Increase the number of cached segments to 1000
+   *     cachedSegmentsCount: 1000,
+   *     // 50 minutes of segments will be downloaded further through HTTP connections if P2P fails
+   *     httpDownloadTimeWindow: 3000,
+   *     // 100 minutes of segments will be downloaded further through P2P connections
+   *     p2pDownloadTimeWindow: 6000,
    * };
    *
    * hlsP2PEngine.applyDynamicConfig(newDynamicConfig);

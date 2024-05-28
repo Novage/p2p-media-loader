@@ -6,12 +6,9 @@ import {
   RequestAbortErrorType,
   SegmentWithStream,
 } from "../types";
-
-import * as LoggerUtils from "../utils/logger";
 import * as StreamUtils from "../utils/stream";
 import * as Utils from "../utils/utils";
 import { EventTarget } from "../utils/event-target";
-import { P2PLoadersContainer } from "../p2p/loaders-container";
 
 export type LoadProgress = {
   startTimestamp: number;
@@ -82,7 +79,6 @@ export class Request {
     private readonly bandwidthCalculators: BandwidthCalculators,
     private readonly playback: Playback,
     private readonly playbackConfig: StreamUtils.PlaybackTimeWindowsConfig,
-    private readonly p2pLoaderContainer: P2PLoadersContainer,
     eventTarget: EventTarget<CoreEventMap>,
   ) {
     this.onSegmentError = eventTarget.getEventDispatcher("onSegmentError");
@@ -188,16 +184,8 @@ export class Request {
       this.notReceivingBytesTimeout.start(notReceivingBytesTimeoutMs);
     }
 
-    const statuses = StreamUtils.getSegmentPlaybackStatuses(
-      this.segment,
-      this.playback,
-      this.playbackConfig,
-      this.p2pLoaderContainer.currentLoader,
-    );
-
-    const statusString = LoggerUtils.getSegmentPlaybackStatusesString(statuses);
     this.logger(
-      `${requestData.downloadSource} ${this.segment.externalId} ${statusString} started`,
+      `${requestData.downloadSource} ${this.segment.externalId} started`,
     );
 
     this.onSegmentStart({
