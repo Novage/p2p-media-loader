@@ -5,18 +5,17 @@ import {
   StreamWithSegments,
 } from "../types";
 import { Playback } from "../internal-types";
+import { P2PLoader } from "../p2p/loader";
 
 export type SegmentPlaybackStatuses = {
-  isHighDemand?: boolean;
-  isHttpDownloadable?: boolean;
-  isP2PDownloadable?: boolean;
+  isHighDemand: boolean;
+  isHttpDownloadable: boolean;
+  isP2PDownloadable: boolean;
 };
 
 export type PlaybackTimeWindowsConfig = Pick<
   CoreConfig,
-  | "highDemandTimeWindowMs"
-  | "httpDownloadTimeWindowMs"
-  | "p2pDownloadTimeWindowMs"
+  "highDemandTimeWindow" | "httpDownloadTimeWindow" | "p2pDownloadTimeWindow"
 >;
 
 const PEER_PROTOCOL_VERSION = "V1";
@@ -81,25 +80,30 @@ export function getSegmentPlaybackStatuses(
   segment: SegmentWithStream,
   playback: Playback,
   timeWindowsConfig: PlaybackTimeWindowsConfig,
+  currentP2PLoader?: P2PLoader,
 ): SegmentPlaybackStatuses {
   const {
-    highDemandTimeWindowMs,
-    httpDownloadTimeWindowMs,
-    p2pDownloadTimeWindowMs,
+    highDemandTimeWindow,
+    httpDownloadTimeWindow,
+    p2pDownloadTimeWindow,
   } = timeWindowsConfig;
 
-  const statuses: SegmentPlaybackStatuses = {};
-  if (isSegmentInTimeWindow(segment, playback, highDemandTimeWindowMs)) {
-    statuses.isHighDemand = true;
-  }
-  if (isSegmentInTimeWindow(segment, playback, httpDownloadTimeWindowMs)) {
-    statuses.isHttpDownloadable = true;
-  }
-  if (isSegmentInTimeWindow(segment, playback, p2pDownloadTimeWindowMs)) {
-    statuses.isP2PDownloadable = true;
-  }
-
-  return statuses;
+  return {
+    isHighDemand: isSegmentInTimeWindow(
+      segment,
+      playback,
+      highDemandTimeWindow,
+    ),
+    isHttpDownloadable: isSegmentInTimeWindow(
+      segment,
+      playback,
+      httpDownloadTimeWindow,
+    ),
+    isP2PDownloadable:
+      isSegmentInTimeWindow(segment, playback, p2pDownloadTimeWindow) &&
+      (!currentP2PLoader ||
+        currentP2PLoader.isSegmentLoadingOrLoadedBySomeone(segment)),
+  };
 }
 
 function isSegmentInTimeWindow(

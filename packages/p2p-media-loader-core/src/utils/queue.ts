@@ -1,4 +1,5 @@
 import { Playback } from "../internal-types";
+import { P2PLoader } from "../p2p/loader";
 import { SegmentWithStream } from "../types";
 import {
   getSegmentPlaybackStatuses,
@@ -15,6 +16,7 @@ export function* generateQueue(
   lastRequestedSegment: Readonly<SegmentWithStream>,
   playback: Readonly<Playback>,
   playbackConfig: PlaybackTimeWindowsConfig,
+  currentP2PLoader: P2PLoader,
 ): Generator<QueueItem, void> {
   const { localId: requestedSegmentId, stream } = lastRequestedSegment;
 
@@ -35,6 +37,7 @@ export function* generateQueue(
     first,
     playback,
     playbackConfig,
+    currentP2PLoader,
   );
   if (isNotActualStatuses(firstStatuses)) {
     const next = queueSegments.next();
@@ -50,6 +53,7 @@ export function* generateQueue(
       second,
       playback,
       playbackConfig,
+      currentP2PLoader,
     );
 
     if (isNotActualStatuses(secondStatuses)) return;
@@ -65,6 +69,7 @@ export function* generateQueue(
       segment,
       playback,
       playbackConfig,
+      currentP2PLoader,
     );
     if (isNotActualStatuses(statuses)) break;
     yield { segment, statuses };

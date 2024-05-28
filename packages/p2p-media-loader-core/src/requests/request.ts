@@ -6,8 +6,6 @@ import {
   RequestAbortErrorType,
   SegmentWithStream,
 } from "../types";
-
-import * as LoggerUtils from "../utils/logger";
 import * as StreamUtils from "../utils/stream";
 import * as Utils from "../utils/utils";
 import { EventTarget } from "../utils/event-target";
@@ -186,14 +184,8 @@ export class Request {
       this.notReceivingBytesTimeout.start(notReceivingBytesTimeoutMs);
     }
 
-    const statuses = StreamUtils.getSegmentPlaybackStatuses(
-      this.segment,
-      this.playback,
-      this.playbackConfig,
-    );
-    const statusString = LoggerUtils.getSegmentPlaybackStatusesString(statuses);
     this.logger(
-      `${requestData.downloadSource} ${this.segment.externalId} ${statusString} started`,
+      `${requestData.downloadSource} ${this.segment.externalId} started`,
     );
 
     this.onSegmentStart({

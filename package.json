@@ -8,7 +8,7 @@
     "build:esm": "pnpm --filter './packages/**' build:esm",
     "build:esm-min": "pnpm --filter './packages/**' build:esm-min",
     "clean": "pnpm --recursive clean",
-    "clean-with-modules": "pnpm --recursive clean-with-modules",
+    "clean-with-modules": "pnpm --recursive clean-with-modules && rimraf node_modules",
     "pack-packages": "pnpm --filter './packages/**' exec -- pnpm pack",
     "lint": "pnpm --recursive lint",
     "prettier": "pnpm --recursive prettier",

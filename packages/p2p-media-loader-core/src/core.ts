@@ -21,9 +21,9 @@ export class Core<TStream extends Stream = Stream> {
   static readonly DEFAULT_CONFIG: CoreConfig = {
     simultaneousHttpDownloads: 3,
     simultaneousP2PDownloads: 3,
-    highDemandTimeWindowMs: 15,
-    httpDownloadTimeWindowMs: 45,
-    p2pDownloadTimeWindowMs: 45,
+    highDemandTimeWindow: 15,
+    httpDownloadTimeWindow: 45,
+    p2pDownloadTimeWindow: 45,
     cachedSegmentExpiration: 120 * 1000,
     cachedSegmentsCount: 50,
     webRtcMaxMessageSize: 64 * 1024 - 1,

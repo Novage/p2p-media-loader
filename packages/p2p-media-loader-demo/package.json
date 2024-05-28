@@ -50,7 +50,7 @@
     "dplayer": "^1.27.1",
     "hls.js": "^1.5.7",
     "mediaelement": "^7.0.5",
-    "openplayerjs": "^2.14.3",
+    "openplayerjs": "^2.14.4",
     "p2p-media-loader-core": "workspace:*",
     "p2p-media-loader-hlsjs": "workspace:*",
     "p2p-media-loader-shaka": "workspace:*",

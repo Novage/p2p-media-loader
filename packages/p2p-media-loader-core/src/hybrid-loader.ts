@@ -24,6 +24,7 @@ import { QueueItem } from "./utils/queue";
 import { EventTarget } from "./utils/event-target";
 
 const FAILED_ATTEMPTS_CLEAR_INTERVAL = 60000;
+const PEER_UPDATE_LATENCY = 1000;
 
 export class HybridLoader {
   private readonly requests: RequestsContainer;
@@ -85,7 +86,9 @@ export class HybridLoader {
   }
 
   private setIntervalLoading() {
-    const randomTimeout = (Math.random() * 2 + 1) * 1000;
+    const peersCount = this.p2pLoaders.currentLoader.connectedPeerCount;
+    const randomTimeout =
+      Math.random() * PEER_UPDATE_LATENCY * peersCount + PEER_UPDATE_LATENCY;
     this.randomHttpDownloadInterval = window.setTimeout(() => {
       this.loadRandomThroughHttp();
       this.setIntervalLoading();
@@ -235,8 +238,7 @@ export class HybridLoader {
       this.engineRequest.status === "pending" &&
       this.requests.executingHttpCount < simultaneousHttpDownloads
     ) {
-      const { engineRequest } = this;
-      const { segment } = engineRequest;
+      const { segment } = this.engineRequest;
       const request = this.requests.get(segment);
       if (
         !request ||
@@ -245,7 +247,7 @@ export class HybridLoader {
           request.failedAttempts.httpAttemptsCount <
             this.config.httpErrorRetries)
       ) {
-        void this.loadThroughHttp(segment);
+        this.loadThroughHttp(segment);
       }
     }
 
@@ -260,12 +262,13 @@ export class HybridLoader {
         ) {
           continue;
         }
+
         if (
           request?.downloadSource === "http" &&
           request.status === "failed" &&
           request.failedAttempts.httpAttemptsCount >= httpErrorRetries
         ) {
-          break;
+          continue;
         }
 
         const isP2PLoadingRequest =
@@ -273,7 +276,7 @@ export class HybridLoader {
 
         if (this.requests.executingHttpCount < simultaneousHttpDownloads) {
           if (isP2PLoadingRequest) request.abortFromProcessQueue();
-          void this.loadThroughHttp(segment);
+          this.loadThroughHttp(segment);
           continue;
         }
 
@@ -282,14 +285,14 @@ export class HybridLoader {
           this.requests.executingHttpCount < simultaneousHttpDownloads
         ) {
           if (isP2PLoadingRequest) request.abortFromProcessQueue();
-          void this.loadThroughHttp(segment);
+          this.loadThroughHttp(segment);
           continue;
         }
 
         if (isP2PLoadingRequest) continue;
 
         if (this.requests.executingP2PCount < simultaneousP2PDownloads) {
-          void this.loadThroughP2P(segment);
+          this.loadThroughP2P(segment);
           continue;
         }
 
@@ -297,25 +300,22 @@ export class HybridLoader {
           this.abortLastP2PLoadingInQueueAfterItem(queue, segment) &&
           this.requests.executingP2PCount < simultaneousP2PDownloads
         ) {
-          void this.loadThroughP2P(segment);
-        }
-      }
-      if (statuses.isP2PDownloadable) {
-        if (request?.status === "loading") continue;
-        if (this.requests.executingP2PCount < simultaneousP2PDownloads) {
-          void this.loadThroughP2P(segment);
+          this.loadThroughP2P(segment);
           continue;
         }
+      } else if (statuses.isP2PDownloadable) {
+        if (request?.status === "loading") continue;
 
-        if (
+        if (this.requests.executingP2PCount < simultaneousP2PDownloads) {
+          this.loadThroughP2P(segment);
+        } else if (
           this.p2pLoaders.currentLoader.isSegmentLoadedBySomeone(segment) &&
           this.abortLastP2PLoadingInQueueAfterItem(queue, segment) &&
           this.requests.executingP2PCount < simultaneousP2PDownloads
         ) {
-          void this.loadThroughP2P(segment);
+          this.loadThroughP2P(segment);
         }
       }
-      break;
     }
   }
 
@@ -357,10 +357,11 @@ export class HybridLoader {
       this.lastRequestedSegment,
       this.playback,
       this.config,
+      this.p2pLoaders.currentLoader,
     )) {
       if (
         !statuses.isHttpDownloadable ||
-        p2pLoader.isSegmentLoadingOrLoadedBySomeone(segment) ||
+        statuses.isP2PDownloadable ||
         this.segmentStorage.hasSegment(segment)
       ) {
         continue;
@@ -378,13 +379,37 @@ export class HybridLoader {
     }
 
     if (!segmentsToLoad.length) return;
-    const peersCount = p2pLoader.connectedPeerCount + 1;
-    const probability = Math.min(segmentsToLoad.length / peersCount, 1);
-    const shouldLoad = Math.random() < probability;
 
-    if (!shouldLoad) return;
-    const segment = Utils.getRandomItem(segmentsToLoad);
-    void this.loadThroughHttp(segment);
+    const availableHttpDownloads =
+      simultaneousHttpDownloads - this.requests.executingHttpCount;
+
+    if (availableHttpDownloads === 0) return;
+
+    const peersCount = p2pLoader.connectedPeerCount + 1;
+    const safeRandomSegmentsCount = Math.min(
+      segmentsToLoad.length,
+      simultaneousHttpDownloads * peersCount,
+    );
+
+    const randomIndices = Utils.shuffleArray(
+      Array.from({ length: safeRandomSegmentsCount }, (_, i) => i),
+    );
+
+    let probability = safeRandomSegmentsCount / peersCount;
+
+    for (const randomIndex of randomIndices) {
+      if (this.requests.executingHttpCount >= simultaneousHttpDownloads) {
+        break;
+      }
+
+      if (probability >= 1 || Math.random() <= probability) {
+        const segment = segmentsToLoad[randomIndex];
+        this.loadThroughHttp(segment);
+      }
+
+      probability--;
+      if (probability <= 0) break;
+    }
   }
 
   private abortLastHttpLoadingInQueueAfterItem(
@@ -426,6 +451,7 @@ export class HybridLoader {
       this.lastRequestedSegment,
       this.playback,
       this.config,
+      this.p2pLoaders.currentLoader,
     )) {
       maxPossibleLength++;
       const { segment } = item;

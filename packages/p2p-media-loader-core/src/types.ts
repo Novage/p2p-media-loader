@@ -82,8 +82,8 @@ export type Stream = {
 export type DynamicCoreConfig = Partial<
   Pick<
     CoreConfig,
-    | "httpDownloadTimeWindowMs"
-    | "p2pDownloadTimeWindowMs"
+    | "httpDownloadTimeWindow"
+    | "p2pDownloadTimeWindow"
     | "p2pNotReceivingBytesTimeoutMs"
     | "httpNotReceivingBytesTimeoutMs"
   >
@@ -93,32 +93,35 @@ export type DynamicCoreConfig = Partial<
  * Configuration options for the Core functionality, including network and processing parameters.
  */
 export type CoreConfig = {
-  /** Time window to consider for high demand scenarios, in milliseconds.
+  /** Time window to consider for high demand scenarios, in seconds.
    *
    * @default
    * ```typescript
-   * highDemandTimeWindowMs: 15
+   * highDemandTimeWindow: 15
    * ```
    */
-  highDemandTimeWindowMs: number;
+  highDemandTimeWindow: number;
 
-  /** Time window for HTTP downloads, in milliseconds.
+  /** Time window for HTTP downloads, in seconds.
+   * Specifies amount of segments to be downloaded in advance through HTTP.
    *
    * @default
    * ```typescript
    * httpDownloadTimeWindowMs: 45
    * ```
    */
-  httpDownloadTimeWindowMs: number;
+  httpDownloadTimeWindow: number;
 
-  /** Time window for P2P downloads, in milliseconds.
+  /** Time window for P2P downloads, in seconds.
+   *  Specifies amount of segments to be downloaded in advance through P2P.
+   *  Should be greater than httpDownloadTimeWindow.
    *
    * @default
    * ```typescript
-   * p2pDownloadTimeWindowMs: 45
+   * p2pDownloadTimeWindow: 45
    * ```
    */
-  p2pDownloadTimeWindowMs: number;
+  p2pDownloadTimeWindow: number;
 
   /** Maximum number of simultaneous HTTP downloads allowed.
    *
@@ -148,7 +151,7 @@ export type CoreConfig = {
   cachedSegmentExpiration: number;
 
   /** Maximum number of segments to store in the cache.
-   *
+   *  Has to be less then httpDownloadTimeWindow and p2pDownloadTimeWindow.
    * @default
    * ```typescript
    * cachedSegmentsCount: 50
