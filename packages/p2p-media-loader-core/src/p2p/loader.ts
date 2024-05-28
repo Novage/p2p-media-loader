@@ -135,7 +135,7 @@ export class P2PLoader {
       peer.sendSegmentAbsentCommand(segmentExternalId);
       return;
     }
-    void peer.uploadSegmentData(
+    await peer.uploadSegmentData(
       segment,
       byteFrom !== undefined ? segmentData.slice(byteFrom) : segmentData,
     );

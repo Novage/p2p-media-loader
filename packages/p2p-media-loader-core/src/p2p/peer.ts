@@ -92,6 +92,7 @@ export class Peer {
       case PeerCommandType.SegmentData:
         {
           if (!this.downloadingContext) break;
+          if (this.downloadingContext.isSegmentDataCommandReceived) break;
 
           const { request, controls } = this.downloadingContext;
           if (request.segment.externalId !== command.i) break;

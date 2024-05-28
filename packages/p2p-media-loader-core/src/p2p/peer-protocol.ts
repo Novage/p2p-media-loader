@@ -67,23 +67,29 @@ export class PeerProtocol {
     const { promise, resolve, reject } = Utils.getControlledPromise<void>();
 
     let isUploadingSegmentData = false;
-    this.uploadingContext = {
+
+    const uploadingContext = {
       stopUploading: () => {
         isUploadingSegmentData = false;
       },
     };
 
+    this.uploadingContext = uploadingContext;
+
     const sendChunk = () => {
+      if (!isUploadingSegmentData) {
+        reject();
+        return;
+      }
+
       while (channel.bufferedAmount <= channel.bufferedAmountLowThreshold) {
         const chunk = chunks.next().value;
+
         if (!chunk) {
           resolve();
           break;
         }
-        if (chunk && !isUploadingSegmentData) {
-          reject();
-          break;
-        }
+
         this.connection.send(chunk);
         this.onChunkUploaded(chunk.byteLength, this.connection.idUtf8);
       }
@@ -94,10 +100,11 @@ export class PeerProtocol {
       isUploadingSegmentData = true;
       sendChunk();
       await promise;
-      return promise;
     } finally {
       channel.removeEventListener("bufferedamountlow", sendChunk);
-      this.uploadingContext = undefined;
+      if (this.uploadingContext === uploadingContext) {
+        this.uploadingContext = undefined;
+      }
     }
   }
 
