@@ -33,30 +33,9 @@ But they support a limited number of peers and can reject connections or even go
 
 That is why they can't be used in production environments. Consider running your personal tracker or buy resources from a tracker provider to go stable.
 
-## How to achieve better P2P ratio for live streams?
+## How to achieve better P2P ratio for live streams & VOD streams?
 
-The default configuration works best for live streams with 15-20 segments in the playlist. The segments duration should be about 5 seconds.
-
-## How to achieve better P2P ratio for VOD streams?
-
-An example of a good configuration for a VOD stream that will download and cache up to 100 minutes of video:
-
-```javascript
-{
-  const config = {
-    // how long to store the downloaded segments for P2P sharing
-    cachedSegmentExpiration: 86400000,
-    // count of the downloaded segments to store for P2P sharing
-    cachedSegmentsCount: 1000,
-    // number of simultaneous downloads for P2P methods
-    simultaneousP2PDownloads: 20,
-    // Time window for HTTP downloads in seconds
-    httpDownloadTimeWindow: 3000,
-    // Time window for P2P downloads in seconds.
-    p2pDownloadTimeWindow: 6000,
-  };
-}
-```
+Our current default configuration efficiently supports both Live and Video On Demand (VOD) streams. This setup is optimized to provide a robust P2P sharing ratio, enhancing performance without the need for custom settings.
 
 ## What are the requirements to share a stream over P2P?
 
