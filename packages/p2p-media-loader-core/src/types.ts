@@ -323,40 +323,68 @@ export type CoreConfig = {
 export type DownloadSource = "http" | "p2p";
 
 /**
- * Represents details about a segment event, including the segment itself, the source of download, and an optional peer ID.
- * @param {Segment} segment - The segment that the event is about.
- * @param {DownloadSource} downloadSource - The source of the download.
- * @param {string | undefined} peerId - The peer ID of the peer that the event is about, if applicable.
+ * Represents details about a segment event.
  */
 export type SegmentStartDetails = {
+  /**
+   * The media segment related to the event.
+   */
   segment: Segment;
+
+  /**
+   * The origin of the segment download, such as from a server or a peer.
+   */
   downloadSource: DownloadSource;
+
+  /**
+   * The peer ID associated with the segment event, if the segment was downloaded from a peer. Undefined if not applicable.
+   */
   peerId: string | undefined;
 };
 
 /**
- * Represents details about a segment error event with an error property to provide details about a segment download error.
- * @param {RequestError} error - The error that occurred during the segment download.
- * @param {Segment} segment - The segment that the event is about.
- * @param {DownloadSource} downloadSource - The source of the download.
- * @param {string | undefined} peerId - The peer ID of the peer that the event is about, if applicable.
+ * Represents details about a segment error event, providing contextual information about the error during a segment download.
  */
 export type SegmentErrorDetails = {
+  /**
+   * The error that occurred during the segment download.
+   */
   error: RequestError;
+
+  /**
+   * The media segment related to the event.
+   */
   segment: Segment;
+
+  /**
+   * The origin of the segment download, such as from a server or a peer.
+   */
   downloadSource: DownloadSource;
+
+  /**
+   * The peer ID of the peer that the event is about, if applicable. Undefined if not applicable.
+   */
   peerId: string | undefined;
 };
 
 /**
- * Represents details about a segment abort event, including the segment, the source of download, and an optional peer ID.
- * @param {Segment} segment - The segment that the event is about.
- * @param {DownloadSource | undefined} downloadSource - The source of the download.
- * @param {string | undefined} peerId - The peer ID of the peer that the event is about, if applicable.
+ * Represents details about a segment abort event. This includes information about the segment, the source from where it was being downloaded, and an optional peer ID if the download involved peer-to-peer transfer.
  */
 export type SegmentAbortDetails = {
+  /**
+   * The media segment related to the abort event.
+   */
   segment: Segment;
+
+  /**
+   * The source of the download, if it was specified; otherwise, undefined.
+   * This can be from a server or a peer, depending on the scenario.
+   */
   downloadSource: DownloadSource | undefined;
+
+  /**
+   * The peer ID of the peer involved in the event, if applicable. Undefined if not relevant or known.
+   */
   peerId: string | undefined;
 };
 
@@ -365,7 +393,7 @@ export type SegmentAbortDetails = {
  */
 export type SegmentLoadDetails = {
   /**
-   * The length of the segment in bytes.
+   *  The length of the segment in bytes.
    */
   bytesLength: number;
 
