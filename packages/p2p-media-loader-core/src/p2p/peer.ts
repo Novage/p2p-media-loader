@@ -21,6 +21,7 @@ type PeerEventHandlers = {
     segmentId: number,
     byteFrom?: number,
   ) => void;
+  onSegmentsAnnouncement: () => void;
 };
 
 export class Peer {
@@ -82,6 +83,7 @@ export class Peer {
       case PeerCommandType.SegmentsAnnouncement:
         this.loadedSegments = new Set(command.l);
         this.httpLoadingSegments = new Set(command.p);
+        this.eventHandlers.onSegmentsAnnouncement();
         break;
 
       case PeerCommandType.SegmentRequest:
@@ -92,6 +94,7 @@ export class Peer {
       case PeerCommandType.SegmentData:
         {
           if (!this.downloadingContext) break;
+          if (this.downloadingContext.isSegmentDataCommandReceived) break;
 
           const { request, controls } = this.downloadingContext;
           if (request.segment.externalId !== command.i) break;
