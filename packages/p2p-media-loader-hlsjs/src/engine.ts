@@ -19,26 +19,23 @@ import {
 } from "p2p-media-loader-core";
 import { injectMixin } from "./engine-static";
 
-/**
- * Represents the complete configuration for HlsJsP2PEngine.
- */
+/** Represents the complete configuration for HlsJsP2PEngine. */
 export type HlsJsP2PEngineConfig = {
+  /** Core configuration */
   core: CoreConfig;
 };
 
-/**
- * Allows for partial configuration of HlsJsP2PEngine, useful for providing overrides or partial updates.
- */
+/** Allows for partial configuration of HlsJsP2PEngine, useful for providing overrides or partial updates. */
 export type PartialHlsJsP2PEngineConfig = Partial<
   Omit<HlsJsP2PEngineConfig, "core">
 > & {
+  /** Partial core configuration */
   core?: Partial<CoreConfig>;
 };
 
-/**
- * Type for specifying dynamic configuration options that can be changed at runtime for the P2P engine's core.
- */
+/** Type for specifying dynamic configuration options that can be changed at runtime for the P2P engine's core. */
 export type DynamicHlsJsP2PEngineConfig = {
+  /** Dynamic core configuration */
   core?: DynamicCoreConfig;
 };
 
@@ -47,6 +44,7 @@ export type DynamicHlsJsP2PEngineConfig = {
  * @template HlsType The base HLS type that is being extended.
  */
 export type HlsWithP2PInstance<HlsType> = HlsType & {
+  /** HlsJsP2PEngine instance */
   readonly p2pEngine: HlsJsP2PEngine;
 };
 
@@ -339,9 +337,7 @@ export class HlsJsP2PEngine {
 
   private destroyCore = () => this.core.destroy();
 
-  /**
-   * Clean up and release all resources. Unregisters all event handlers.
-   */
+  /** Clean up and release all resources. Unregisters all event handlers. */
   destroy = () => {
     this.destroyCore();
     this.updateHlsEventsHandlers("unregister");
