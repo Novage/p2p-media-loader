@@ -43,6 +43,7 @@ export class Peer {
     private readonly connection: PeerConnection,
     private readonly eventHandlers: PeerEventHandlers,
     private readonly peerConfig: PeerConfig,
+    private readonly requestProcessQueueCallback: () => void,
     eventTarget: EventTarget<CoreEventMap>,
   ) {
     this.onPeerClosed = eventTarget.getEventDispatcher("onPeerClose");
@@ -82,6 +83,7 @@ export class Peer {
       case PeerCommandType.SegmentsAnnouncement:
         this.loadedSegments = new Set(command.l);
         this.httpLoadingSegments = new Set(command.p);
+        this.requestProcessQueueCallback();
         break;
 
       case PeerCommandType.SegmentRequest:

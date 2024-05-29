@@ -22,6 +22,7 @@ export class P2PLoader {
     private readonly requests: RequestsContainer,
     private readonly segmentStorage: SegmentsMemoryStorage,
     private readonly config: CoreConfig,
+    private readonly requestProcessQueueCallback: () => void,
     eventTarget: EventTarget<CoreEventMap>,
   ) {
     const streamExternalId = StreamUtils.getStreamExternalId(
@@ -39,6 +40,7 @@ export class P2PLoader {
       },
       this.config,
       eventTarget,
+      this.requestProcessQueueCallback,
     );
 
     this.segmentStorage.subscribeOnUpdate(

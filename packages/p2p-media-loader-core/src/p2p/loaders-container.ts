@@ -25,6 +25,7 @@ export class P2PLoadersContainer {
     private readonly segmentStorage: SegmentsMemoryStorage,
     private readonly config: CoreConfig,
     private readonly eventTarget: EventTarget<CoreEventMap>,
+    private requestProcessQueueCallback: () => void,
   ) {
     this.changeCurrentLoader(stream);
   }
@@ -39,6 +40,7 @@ export class P2PLoadersContainer {
       this.requests,
       this.segmentStorage,
       this.config,
+      this.requestProcessQueueCallback,
       this.eventTarget,
     );
     const loggerInfo = LoggerUtils.getStreamString(stream);

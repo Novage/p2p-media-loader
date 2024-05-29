@@ -32,6 +32,7 @@ export class P2PTrackerClient {
     private readonly eventHandlers: P2PTrackerClientEventHandlers,
     private readonly config: CoreConfig,
     private readonly eventTarget: EventTarget<CoreEventMap>,
+    private readonly requestProcessQueueCallback: () => void,
   ) {
     const streamHash = PeerUtil.getStreamHash(streamId);
     this.streamShortId = LoggerUtils.getStreamString(stream);
@@ -97,6 +98,7 @@ export class P2PTrackerClient {
           onSegmentRequested: this.eventHandlers.onSegmentRequested,
         },
         this.config,
+        this.requestProcessQueueCallback,
         this.eventTarget,
       );
       this.logger(
