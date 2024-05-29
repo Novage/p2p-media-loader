@@ -18,6 +18,7 @@ type PeerItem = {
 type P2PTrackerClientEventHandlers = {
   onPeerConnected: (peer: Peer) => void;
   onSegmentRequested: (peer: Peer, segmentExternalId: number) => void;
+  onSegmentsAnnouncement: () => void;
 };
 
 export class P2PTrackerClient {
@@ -32,7 +33,6 @@ export class P2PTrackerClient {
     private readonly eventHandlers: P2PTrackerClientEventHandlers,
     private readonly config: CoreConfig,
     private readonly eventTarget: EventTarget<CoreEventMap>,
-    private readonly requestProcessQueueCallback: () => void,
   ) {
     const streamHash = PeerUtil.getStreamHash(streamId);
     this.streamShortId = LoggerUtils.getStreamString(stream);
@@ -96,9 +96,9 @@ export class P2PTrackerClient {
         {
           onPeerClosed: this.onPeerClosed,
           onSegmentRequested: this.eventHandlers.onSegmentRequested,
+          onSegmentsAnnouncement: this.eventHandlers.onSegmentsAnnouncement,
         },
         this.config,
-        this.requestProcessQueueCallback,
         this.eventTarget,
       );
       this.logger(

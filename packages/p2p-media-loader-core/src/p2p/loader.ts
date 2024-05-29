@@ -37,10 +37,10 @@ export class P2PLoader {
         onPeerConnected: this.onPeerConnected,
         // eslint-disable-next-line @typescript-eslint/no-misused-promises
         onSegmentRequested: this.onSegmentRequested,
+        onSegmentsAnnouncement: this.requestProcessQueueCallback,
       },
       this.config,
       eventTarget,
-      this.requestProcessQueueCallback,
     );
 
     this.segmentStorage.subscribeOnUpdate(
