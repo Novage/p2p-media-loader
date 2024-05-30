@@ -77,6 +77,7 @@ export class HybridLoader {
       this.segmentStorage,
       this.config,
       this.eventTarget,
+      this.requestProcessQueueMicrotask,
     );
 
     this.logger = debug(`p2pml-core:hybrid-loader-${activeStream.type}`);

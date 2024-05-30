@@ -121,6 +121,21 @@ export class ShakaP2PEngine {
    * Applies dynamic configuration updates to the P2P engine.
    *
    * @param dynamicConfig Configuration changes to apply.
+   *
+   * @example
+   * // Assuming `shakaP2PEngine` is an instance of ShakaP2PEngine
+   *
+   * const newDynamicConfig = {
+   *   core: {
+   *     // Increase the number of cached segments to 1000
+   *     cachedSegmentsCount: 1000,
+   *     // 50 minutes of segments will be downloaded further through HTTP connections if P2P fails
+   *     httpDownloadTimeWindow: 3000,
+   *     // 100 minutes of segments will be downloaded further through P2P connections
+   *     p2pDownloadTimeWindow: 6000,
+   * };
+   *
+   * shakaP2PEngine.applyDynamicConfig(newDynamicConfig);
    */
   applyDynamicConfig(dynamicConfig: DynamicShakaP2PEngineConfig) {
     if (dynamicConfig.core) this.core.applyDynamicConfig(dynamicConfig.core);

@@ -22,7 +22,8 @@ export class P2PLoader {
     private readonly requests: RequestsContainer,
     private readonly segmentStorage: SegmentsMemoryStorage,
     private readonly config: CoreConfig,
-    eventTarget: EventTarget<CoreEventMap>,
+    private readonly eventTarget: EventTarget<CoreEventMap>,
+    private readonly onSegmentAnnouncement: () => void,
   ) {
     const streamExternalId = StreamUtils.getStreamExternalId(
       this.config.swarmId ?? this.streamManifestUrl,
@@ -36,9 +37,10 @@ export class P2PLoader {
         onPeerConnected: this.onPeerConnected,
         // eslint-disable-next-line @typescript-eslint/no-misused-promises
         onSegmentRequested: this.onSegmentRequested,
+        onSegmentsAnnouncement: this.onSegmentAnnouncement,
       },
       this.config,
-      eventTarget,
+      this.eventTarget,
     );
 
     this.segmentStorage.subscribeOnUpdate(
@@ -135,7 +137,7 @@ export class P2PLoader {
       peer.sendSegmentAbsentCommand(segmentExternalId);
       return;
     }
-    void peer.uploadSegmentData(
+    await peer.uploadSegmentData(
       segment,
       byteFrom !== undefined ? segmentData.slice(byteFrom) : segmentData,
     );

@@ -25,6 +25,7 @@ export class P2PLoadersContainer {
     private readonly segmentStorage: SegmentsMemoryStorage,
     private readonly config: CoreConfig,
     private readonly eventTarget: EventTarget<CoreEventMap>,
+    private onSegmentAnnouncement: () => void,
   ) {
     this.changeCurrentLoader(stream);
   }
@@ -40,6 +41,11 @@ export class P2PLoadersContainer {
       this.segmentStorage,
       this.config,
       this.eventTarget,
+      () => {
+        if (this._currentLoaderItem.loader === loader) {
+          this.onSegmentAnnouncement();
+        }
+      },
     );
     const loggerInfo = LoggerUtils.getStreamString(stream);
     this.logger(`created new loader: ${loggerInfo}`);
