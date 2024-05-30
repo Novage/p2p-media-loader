@@ -132,14 +132,14 @@ export type CoreConfig = {
 
   /**
    * Time after which a cached segment expires, in seconds.
-   * If set to 0, the cacheSegmentExpiration is disabled for VOD streams, and a default value (20 minutes) is used for live streams.
+   * If set to undefined, the cacheSegmentExpiration is disabled for VOD streams, and a default value (20 minutes) is used for live streams.
    *
    * @default
    * ```typescript
-   * cachedSegmentExpiration: 0
+   * cachedSegmentExpiration: undefined
    * ```
    */
-  cachedSegmentExpiration: number;
+  cachedSegmentExpiration: number | undefined;
 
   /**
    * Maximum number of segments to store in the cache.

@@ -17,7 +17,6 @@ type StorageItem = {
   segment: SegmentWithStream;
   data: ArrayBuffer;
   lastAccessed: number;
-  isSegmentLive: boolean;
 };
 
 type StorageEventHandlers = {
@@ -65,18 +64,17 @@ export class SegmentsMemoryStorage {
   async storeSegment(
     segment: SegmentWithStream,
     data: ArrayBuffer,
-    isStreamLive: boolean,
+    isLiveStream: boolean,
   ) {
     const id = getStorageItemId(segment);
     this.cache.set(id, {
       segment,
       data,
       lastAccessed: performance.now(),
-      isSegmentLive: isStreamLive,
     });
     this.logger(`add segment: ${id}`);
     this.dispatchStorageUpdatedEvent(segment.stream);
-    void this.clear();
+    void this.clear(isLiveStream);
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
@@ -107,29 +105,25 @@ export class SegmentsMemoryStorage {
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
-  private async clear(): Promise<boolean> {
+  private async clear(isLiveStream: boolean): Promise<boolean> {
+    const cacheSegmentExpiration =
+      (this.storageConfig.cachedSegmentExpiration ??
+        (isLiveStream ? 60 * 20 : 0)) * 1000;
+
+    if (cacheSegmentExpiration === 0) return false;
+
     const itemsToDelete: string[] = [];
     const remainingItems: [string, StorageItem][] = [];
     const streamsOfChangedItems = new Set<Stream>();
 
     // Delete old segments
     const now = performance.now();
-    const defaultLiveExpiration = 1000 * 60 * 20;
 
     for (const entry of this.cache.entries()) {
       const [itemId, item] = entry;
       const { lastAccessed, segment } = item;
 
-      let expirationThreshold;
-      if (this.storageConfig.cachedSegmentExpiration > 0) {
-        expirationThreshold = this.storageConfig.cachedSegmentExpiration * 1000;
-      } else if (item.isSegmentLive) {
-        expirationThreshold = defaultLiveExpiration;
-      } else {
-        continue;
-      }
-
-      if (now - lastAccessed > expirationThreshold) {
+      if (now - lastAccessed > cacheSegmentExpiration) {
         if (!this.isSegmentLocked(segment)) {
           itemsToDelete.push(itemId);
           streamsOfChangedItems.add(segment.stream);
