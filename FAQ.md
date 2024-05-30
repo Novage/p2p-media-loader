@@ -33,10 +33,6 @@ But they support a limited number of peers and can reject connections or even go
 
 That is why they can't be used in production environments. Consider running your personal tracker or buy resources from a tracker provider to go stable.
 
-## How to achieve better P2P ratio for live streams & VOD streams?
-
-Our current default configuration efficiently supports both Live and Video On Demand (VOD) streams. This setup is optimized to provide a robust P2P sharing ratio, enhancing performance without the need for custom settings.
-
 ## What are the requirements to share a stream over P2P?
 
 The requirements to share a stream over P2P are:
