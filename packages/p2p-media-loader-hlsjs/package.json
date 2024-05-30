@@ -51,7 +51,6 @@
   },
   "dependencies": {
     "hls.js": "^1.5.7",
-    "p2p-media-loader-core": "workspace:*",
-    "ts-essentials": "^9.4.1"
+    "p2p-media-loader-core": "workspace:*"
   }
 }

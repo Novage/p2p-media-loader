@@ -103,9 +103,6 @@ importers:
       nano-md5:
         specifier: ^1.0.5
         version: 1.0.5
-      ts-essentials:
-        specifier: ^9.4.1
-        version: 9.4.1(typescript@5.4.2)
     devDependencies:
       vite-plugin-node-polyfills:
         specifier: ^0.21.0
@@ -186,9 +183,6 @@ importers:
       p2p-media-loader-core:
         specifier: workspace:*
         version: link:../p2p-media-loader-core
-      ts-essentials:
-        specifier: ^9.4.1
-        version: 9.4.1(typescript@5.4.2)
 
   packages/p2p-media-loader-shaka:
     dependencies:
@@ -198,9 +192,6 @@ importers:
       shaka-player:
         specifier: ^4.7.11
         version: 4.7.11
-      ts-essentials:
-        specifier: ^9.4.1
-        version: 9.4.1(typescript@5.4.2)
 
 packages:
 
@@ -2534,14 +2525,6 @@ packages:
     engines: {node: '>=16'}
     peerDependencies:
       typescript: '>=4.2.0'
-
-  ts-essentials@9.4.1:
-    resolution: {integrity: sha512-oke0rI2EN9pzHsesdmrOrnqv1eQODmJpd/noJjwj2ZPC3Z4N2wbjrOEqnsEgmvlO2+4fBb0a794DCna2elEVIQ==}
-    peerDependencies:
-      typescript: '>=4.1.0'
-    peerDependenciesMeta:
-      typescript:
-        optional: true
 
   tty-browserify@0.0.1:
     resolution: {integrity: sha512-C3TaO7K81YvjCgQH9Q1S3R3P3BtN3RIM8n+OvX4il1K1zgE8ZhI0op7kClgkxtutIE8hQrcrHBXvIheqKUUCxw==}
@@ -5462,10 +5445,6 @@ snapshots:
 
   ts-api-utils@1.3.0(typescript@5.4.2):
     dependencies:
-      typescript: 5.4.2
-
-  ts-essentials@9.4.1(typescript@5.4.2):
-    optionalDependencies:
       typescript: 5.4.2
 
   tty-browserify@0.0.1: {}

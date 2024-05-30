@@ -52,7 +52,6 @@
   },
   "dependencies": {
     "p2p-media-loader-core": "workspace:*",
-    "shaka-player": "^4.7.11",
-    "ts-essentials": "^9.4.1"
+    "shaka-player": "^4.7.11"
   }
 }
