@@ -57,8 +57,7 @@ const LIVE_EDGE_DELAY = 25;
  *   core: {
  *     highDemandTimeWindow: 30, // 30 seconds
  *     simultaneousHttpDownloads: 3,
- *     cachedSegmentsCount: 50,
- *     webRtcMaxMessageSize: 262144, // 256 KB
+ *     webRtcMaxMessageSize: 64 * 1024, // 64 KB
  *     p2pNotReceivingBytesTimeoutMs: 10000, // 10 seconds
  *     p2pInactiveLoaderDestroyTimeoutMs: 15000, // 15 seconds
  *     httpNotReceivingBytesTimeoutMs: 8000, // 8 seconds

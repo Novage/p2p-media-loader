@@ -17,6 +17,7 @@ type StorageItem = {
   segment: SegmentWithStream;
   data: ArrayBuffer;
   lastAccessed: number;
+  isSegmentLive: boolean;
 };
 
 type StorageEventHandlers = {
@@ -61,12 +62,17 @@ export class SegmentsMemoryStorage {
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
-  async storeSegment(segment: SegmentWithStream, data: ArrayBuffer) {
+  async storeSegment(
+    segment: SegmentWithStream,
+    data: ArrayBuffer,
+    isStreamLive: boolean,
+  ) {
     const id = getStorageItemId(segment);
     this.cache.set(id, {
       segment,
       data,
       lastAccessed: performance.now(),
+      isSegmentLive: isStreamLive,
     });
     this.logger(`add segment: ${id}`);
     this.dispatchStorageUpdatedEvent(segment.stream);
@@ -108,11 +114,22 @@ export class SegmentsMemoryStorage {
 
     // Delete old segments
     const now = performance.now();
+    const defaultLiveExpiration = 1000 * 60 * 20;
 
     for (const entry of this.cache.entries()) {
       const [itemId, item] = entry;
       const { lastAccessed, segment } = item;
-      if (now - lastAccessed > this.storageConfig.cachedSegmentExpiration) {
+
+      let expirationThreshold;
+      if (this.storageConfig.cachedSegmentExpiration > 0) {
+        expirationThreshold = this.storageConfig.cachedSegmentExpiration * 1000;
+      } else if (item.isSegmentLive) {
+        expirationThreshold = defaultLiveExpiration;
+      } else {
+        continue;
+      }
+
+      if (now - lastAccessed > expirationThreshold) {
         if (!this.isSegmentLocked(segment)) {
           itemsToDelete.push(itemId);
           streamsOfChangedItems.add(segment.stream);
@@ -123,17 +140,19 @@ export class SegmentsMemoryStorage {
     }
 
     // Delete segments over cached count
-    let countOverhead =
-      remainingItems.length - this.storageConfig.cachedSegmentsCount;
-    if (countOverhead > 0) {
-      remainingItems.sort(([, a], [, b]) => a.lastAccessed - b.lastAccessed);
+    if (this.storageConfig.cachedSegmentsCount > 0) {
+      let countOverhead =
+        remainingItems.length - this.storageConfig.cachedSegmentsCount;
+      if (countOverhead > 0) {
+        remainingItems.sort(([, a], [, b]) => a.lastAccessed - b.lastAccessed);
 
-      for (const [itemId, { segment }] of remainingItems) {
-        if (!this.isSegmentLocked(segment)) {
-          itemsToDelete.push(itemId);
-          streamsOfChangedItems.add(segment.stream);
-          countOverhead--;
-          if (countOverhead === 0) break;
+        for (const [itemId, { segment }] of remainingItems) {
+          if (!this.isSegmentLocked(segment)) {
+            itemsToDelete.push(itemId);
+            streamsOfChangedItems.add(segment.stream);
+            countOverhead--;
+            if (countOverhead === 0) break;
+          }
         }
       }
     }

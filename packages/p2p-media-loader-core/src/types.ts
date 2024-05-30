@@ -130,11 +130,12 @@ export type CoreConfig = {
   simultaneousP2PDownloads: number;
 
   /**
-   * Time after which a cached segment expires, in milliseconds.
+   * Time after which a cached segment expires, in seconds.
+   * If set to 0, the cacheSegmentExpiration is disabled for VOD streams, and a default value (20 minutes) is used for live streams.
    *
    * @default
    * ```typescript
-   * cachedSegmentExpiration: 120 * 1000
+   * cachedSegmentExpiration: 0
    * ```
    */
   cachedSegmentExpiration: number;
@@ -142,10 +143,11 @@ export type CoreConfig = {
   /**
    * Maximum number of segments to store in the cache.
    * Has to be less then httpDownloadTimeWindow and p2pDownloadTimeWindow.
+   * If set to 0, the cache is unlimited.
    *
    * @default
    * ```typescript
-   * cachedSegmentsCount: 1000
+   * cachedSegmentsCount: 0
    * ```
    */
   cachedSegmentsCount: number;
