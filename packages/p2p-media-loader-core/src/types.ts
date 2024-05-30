@@ -55,15 +55,16 @@ export type Stream = {
   readonly index: number;
 };
 
-/** Defines a subset of CoreConfig for dynamic updates, allowing selective modification of configuration properties. */
+/** Represents a dynamically modifiable configuration, allowing updates to selected CoreConfig properties at runtime. */
 export type DynamicCoreConfig = Partial<
-  Pick<
+  Omit<
     CoreConfig,
-    | "simultaneousP2PDownloads"
-    | "simultaneousHttpDownloads"
-    | "cachedSegmentsCount"
-    | "httpDownloadTimeWindow"
-    | "p2pDownloadTimeWindow"
+    | "announceTrackers"
+    | "rtcConfig"
+    | "trackerClientVersionPrefix"
+    | "swarmId"
+    | "validateP2PSegment"
+    | "httpRequestSetup"
   >
 >;
 
