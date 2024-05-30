@@ -53,8 +53,7 @@
   "dependencies": {
     "bittorrent-tracker": "^11.0.2",
     "debug": "^4.3.4",
-    "nano-md5": "^1.0.5",
-    "ts-essentials": "^9.4.1"
+    "nano-md5": "^1.0.5"
   },
   "devDependencies": {
     "vite-plugin-node-polyfills": "^0.21.0"

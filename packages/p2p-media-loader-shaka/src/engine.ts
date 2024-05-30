@@ -20,26 +20,23 @@ import {
   DynamicCoreConfig,
 } from "p2p-media-loader-core";
 
-/**
- * Type for specifying dynamic configuration options that can be changed at runtime for the P2P engine's core.
- */
+/** Type for specifying dynamic configuration options that can be changed at runtime for the P2P engine's core. */
 export type DynamicShakaP2PEngineConfig = {
+  /** Dynamic core config */
   core?: DynamicCoreConfig;
 };
 
-/**
- * Represents the complete configuration for ShakaP2PEngine.
- */
+/** Represents the complete configuration for ShakaP2PEngine. */
 export type ShakaP2PEngineConfig = {
+  /** Core config */
   core: CoreConfig;
 };
 
-/**
- * Allows for partial configuration settings for the Shaka P2P Engine.
- */
+/** Allows for partial configuration settings for the Shaka P2P Engine. */
 export type PartialShakaEngineConfig = Partial<
   Omit<ShakaP2PEngineConfig, "core">
 > & {
+  /** Partial core config */
   core?: Partial<CoreConfig>;
 };
 
@@ -60,8 +57,7 @@ const LIVE_EDGE_DELAY = 25;
  *   core: {
  *     highDemandTimeWindow: 30, // 30 seconds
  *     simultaneousHttpDownloads: 3,
- *     cachedSegmentsCount: 50,
- *     webRtcMaxMessageSize: 262144, // 256 KB
+ *     webRtcMaxMessageSize: 64 * 1024, // 64 KB
  *     p2pNotReceivingBytesTimeoutMs: 10000, // 10 seconds
  *     p2pInactiveLoaderDestroyTimeoutMs: 15000, // 15 seconds
  *     httpNotReceivingBytesTimeoutMs: 8000, // 8 seconds
@@ -272,9 +268,7 @@ export class ShakaP2PEngine {
     this.core.updatePlayback(media.currentTime, media.playbackRate);
   };
 
-  /**
-   * Clean up and release all resources. Unregisters all event handlers.
-   */
+  /** Clean up and release all resources. Unregister all event handlers. */
   destroy() {
     this.destroyCurrentStreamContext();
     this.updatePlayerEventHandlers("unregister");
@@ -333,7 +327,7 @@ export class ShakaP2PEngine {
    * Registers plugins related to P2P functionality into the Shaka Player.
    * Plugins must be registered before initializing the player to ensure proper integration.
    *
-   * @param {Shaka} [shaka=window.shaka] - The Shaka Player library. Defaults to the global Shaka Player instance if not provided.
+   * @param shaka - The Shaka Player library. Defaults to the global Shaka Player instance if not provided.
    */
   static registerPlugins(shaka = window.shaka) {
     validateShaka(shaka);
@@ -343,9 +337,9 @@ export class ShakaP2PEngine {
   }
 
   /**
-   * Unregisters plugins related to P2P functionality from the Shaka Player.
+   * Unregister plugins related to P2P functionality from the Shaka Player.
    *
-   * @param {Shaka} [shaka=window.shaka] - The Shaka Player library. Defaults to the global Shaka Player instance if not provided.
+   * @param shaka - The Shaka Player library. Defaults to the global Shaka Player instance if not provided.
    */
   static unregisterPlugins(shaka = window.shaka) {
     validateShaka(shaka);

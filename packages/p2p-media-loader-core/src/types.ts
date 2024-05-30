@@ -1,60 +1,36 @@
-/**
- * Represents the types of streams available, either primary (main) or secondary.
- */
+/** Represents the types of streams available, either primary (main) or secondary. */
 export type StreamType = "main" | "secondary";
 
-/**
- * Represents a range of bytes, used for specifying a segment of data to download.
- */
+/** Represents a range of bytes, used for specifying a segment of data to download. */
 export type ByteRange = {
-  /**
-   * The starting byte index of the range.
-   */
+  /** The starting byte index of the range. */
   start: number;
-  /**
-   * The ending byte index of the range.
-   */
+  /** The ending byte index of the range. */
   end: number;
 };
 
-/**
- * Describes a media segment with its unique identifiers, location, and timing information.
- */
+/** Describes a media segment with its unique identifiers, location, and timing information. */
 export type Segment = {
-  /**
-   * A unique identifier for the segment within the local system.
-   */
+  /** A unique identifier for the segment within the local system. */
   readonly localId: string;
 
-  /**
-   * A unique identifier for the segment as recognized by external systems or servers.
-   */
+  /** A unique identifier for the segment as recognized by external systems or servers. */
   readonly externalId: number;
 
-  /**
-   * The URL from which the segment can be downloaded.
-   */
+  /** The URL from which the segment can be downloaded. */
   readonly url: string;
 
-  /**
-   * An optional property specifying the range of bytes that represent the segment.
-   */
+  /** An optional property specifying the range of bytes that represent the segment. */
   readonly byteRange?: ByteRange;
 
-  /**
-   * The start time of the segment in seconds, relative to the beginning of the stream.
-   */
+  /** The start time of the segment in seconds, relative to the beginning of the stream. */
   readonly startTime: number;
 
-  /**
-   * The end time of the segment in seconds, relative to the beginning of the stream.
-   */
+  /** The end time of the segment in seconds, relative to the beginning of the stream. */
   readonly endTime: number;
 };
 
-/**
- * Extends a Segment with a reference to its associated stream.
- */
+/** Extends a Segment with a reference to its associated stream. */
 export type SegmentWithStream<TStream extends Stream = Stream> = Segment & {
   readonly stream: StreamWithSegments<TStream>;
 };
@@ -67,46 +43,43 @@ export type StreamWithSegments<TStream extends Stream = Stream> = TStream & {
   readonly segments: Map<string, SegmentWithStream<TStream>>;
 };
 
-/**
- * Represents a media stream with various defining characteristics.
- */
+/** Represents a media stream with various defining characteristics. */
 export type Stream = {
-  /**
-   * A unique identifier for the stream within the local system.
-   */
+  /** Local ID of the stream: a string that consists of swarm ID, stream type, stream index. */
   readonly localId: string;
 
-  /**
-   * The type of stream, either "main" or "secondary".
-   */
+  /** Stream type. */
   readonly type: StreamType;
 
-  /**
-   * The index position of the stream within a collection or sequence.
-   */
+  /** Stream index in the manifest. */
   readonly index: number;
 };
 
-/**
- * Defines a subset of CoreConfig for dynamic updates, allowing selective modification of configuration properties.
- */
+/** Represents a dynamically modifiable configuration, allowing updates to selected CoreConfig properties at runtime. */
 export type DynamicCoreConfig = Partial<
   Pick<
     CoreConfig,
-    | "simultaneousP2PDownloads"
-    | "simultaneousHttpDownloads"
-    | "cachedSegmentsCount"
+    | "highDemandTimeWindow"
     | "httpDownloadTimeWindow"
     | "p2pDownloadTimeWindow"
+    | "simultaneousHttpDownloads"
+    | "simultaneousP2PDownloads"
+    | "cachedSegmentExpiration"
+    | "cachedSegmentsCount"
+    | "webRtcMaxMessageSize"
+    | "p2pNotReceivingBytesTimeoutMs"
+    | "p2pInactiveLoaderDestroyTimeoutMs"
+    | "httpNotReceivingBytesTimeoutMs"
+    | "httpErrorRetries"
+    | "p2pErrorRetries"
   >
 >;
 
-/**
- * Configuration options for the Core functionality, including network and processing parameters.
- */
+/** Configuration options for the Core functionality, including network and processing parameters. */
 export type CoreConfig = {
   /**
-   * Time window to consider for high demand scenarios, in seconds.
+   * Defines the duration of the time window, in seconds, during which segments are pre-loaded to ensure smooth playback.
+   * This window helps prioritize the fetching of media segments that are imminent to playback.
    *
    * @default
    * ```typescript
@@ -116,24 +89,30 @@ export type CoreConfig = {
   highDemandTimeWindow: number;
 
   /**
-   * Time window for HTTP downloads, in seconds.
-   * Specifies amount of segments to be downloaded in advance through HTTP.
+   * Defines the time window, in seconds, for HTTP segment downloads. This property specifies the duration
+   * over which media segments are pre-fetched using HTTP requests.
+   *
+   * For a better P2P ratio, it is recommended to set this `httpDownloadTimeWindow` to be lower than `p2pDownloadTimeWindow`.
+   *
+   * NOTE: This setting only takes effect if there is at least one peer connection and the connected peer
+   * does not have the requested segments available to share via P2P.
    *
    * @default
    * ```typescript
-   * httpDownloadTimeWindowMs: 45
+   * httpDownloadTimeWindow: 3000
    * ```
    */
   httpDownloadTimeWindow: number;
 
   /**
-   * Time window for P2P downloads, in seconds.
-   * Specifies amount of segments to be downloaded in advance through P2P.
-   * Should be greater than httpDownloadTimeWindow.
+   * Defines the time window, in seconds, dedicated to pre-fetching media segments via Peer-to-Peer (P2P) downloads.
+   * This duration determines how much content is downloaded in advance using P2P connections to ensure smooth playback and reduce reliance on HTTP downloads.
+   *
+   * For a better P2P ratio, it is recommended to set this time window to be greater than `httpDownloadTimeWindow` to maximize P2P usage.
    *
    * @default
    * ```typescript
-   * p2pDownloadTimeWindow: 45
+   * p2pDownloadTimeWindow: 6000
    * ```
    */
   p2pDownloadTimeWindow: number;
@@ -159,22 +138,24 @@ export type CoreConfig = {
   simultaneousP2PDownloads: number;
 
   /**
-   * Time after which a cached segment expires, in milliseconds.
+   * Time after which a cached segment expires, in seconds.
+   * If set to undefined, the cacheSegmentExpiration is disabled for VOD streams, and a default value (20 minutes) is used for live streams.
    *
    * @default
    * ```typescript
-   * cachedSegmentExpiration: 120 * 1000
+   * cachedSegmentExpiration: undefined
    * ```
    */
-  cachedSegmentExpiration: number;
+  cachedSegmentExpiration?: number;
 
   /**
    * Maximum number of segments to store in the cache.
    * Has to be less then httpDownloadTimeWindow and p2pDownloadTimeWindow.
+   * If set to 0, the cache is unlimited.
    *
    * @default
    * ```typescript
-   * cachedSegmentsCount: 50
+   * cachedSegmentsCount: 0
    * ```
    */
   cachedSegmentsCount: number;
@@ -229,7 +210,8 @@ export type CoreConfig = {
    */
   httpErrorRetries: number;
 
-  /** Number of retries allowed after a P2P error.
+  /**
+   * Number of retries allowed after a P2P error.
    *
    * @default
    * ```typescript
@@ -282,7 +264,8 @@ export type CoreConfig = {
    */
   trackerClientVersionPrefix: string;
 
-  /** Optional unique identifier for the swarm, used to isolate peer pools by media stream.
+  /**
+   * Optional unique identifier for the swarm, used to isolate peer pools by media stream.
    *
    * @default
    * The master URL of the manifest is used as the swarmId.
@@ -322,101 +305,60 @@ export type CoreConfig = {
  */
 export type DownloadSource = "http" | "p2p";
 
-/**
- * Represents details about a segment event.
- */
+/** Represents details about a segment event. */
 export type SegmentStartDetails = {
-  /**
-   * The media segment related to the event.
-   */
+  /** The segment that the event is about. */
   segment: Segment;
 
-  /**
-   * The origin of the segment download, such as from a server or a peer.
-   */
+  /** The origin of the segment download. */
   downloadSource: DownloadSource;
 
-  /**
-   * The peer ID associated with the segment event, if the segment was downloaded from a peer. Undefined if not applicable.
-   */
+  /** The peer ID, if the segment is downloaded from a peer. */
   peerId: string | undefined;
 };
 
-/**
- * Represents details about a segment error event, providing contextual information about the error during a segment download.
- */
+/** Represents details about a segment error event. */
 export type SegmentErrorDetails = {
-  /**
-   * The error that occurred during the segment download.
-   */
+  /** The error that occurred during the segment download. */
   error: RequestError;
 
-  /**
-   * The media segment related to the event.
-   */
+  /** The segment that the event is about. */
   segment: Segment;
 
-  /**
-   * The origin of the segment download, such as from a server or a peer.
-   */
+  /** The source of the download. */
   downloadSource: DownloadSource;
 
-  /**
-   * The peer ID of the peer that the event is about, if applicable. Undefined if not applicable.
-   */
+  /** The peer ID, if the segment was downloaded from a peer. */
   peerId: string | undefined;
 };
 
-/**
- * Represents details about a segment abort event. This includes information about the segment, the source from where it was being downloaded, and an optional peer ID if the download involved peer-to-peer transfer.
- */
+/** Represents details about a segment abort event. */
 export type SegmentAbortDetails = {
-  /**
-   * The media segment related to the abort event.
-   */
+  /** The segment that the event is about. */
   segment: Segment;
 
-  /**
-   * The source of the download, if it was specified; otherwise, undefined.
-   * This can be from a server or a peer, depending on the scenario.
-   */
+  /** The source of the download. */
   downloadSource: DownloadSource | undefined;
 
-  /**
-   * The peer ID of the peer involved in the event, if applicable. Undefined if not relevant or known.
-   */
+  /** The peer ID, if the segment was downloaded from a peer. */
   peerId: string | undefined;
 };
 
-/**
- * Represents the details about a loaded segment in media streaming.
- */
+/** Represents the details about a loaded segment. */
 export type SegmentLoadDetails = {
-  /**
-   *  The length of the segment in bytes.
-   */
+  /** The length of the segment in bytes. */
   bytesLength: number;
 
-  /**
-   * The source of the download, indicating whether the segment was retrieved over HTTP or from a
-   * peer-to-peer network.
-   */
+  /** The source of the download. */
   downloadSource: DownloadSource;
 
-  /**
-   * The unique identifier of the peer from which this segment was downloaded, if applicable. This field
-   * is optional and may be undefined if the segment was not sourced from a peer.
-   */
+  /** The peer ID, if the segment was downloaded from a peer. */
   peerId: string | undefined;
 };
 
-/**
- * Represents the details of a peer in a peer-to-peer network.
- */
+/** Represents the details of a peer in a peer-to-peer network. */
 export type PeerDetails = {
-  /**
-   * The unique identifier for a peer in the network.
-   */
+  /** The unique identifier for a peer in the network. */
   peerId: string;
 };
 
@@ -428,51 +370,51 @@ export type CoreEventMap = {
   /**
    * Invoked when a segment is fully downloaded and available for use.
    *
-   * @param {SegmentLoadDetails} params - Contains information about the loaded segment.
+   * @param params - Contains information about the loaded segment.
    */
   onSegmentLoaded: (params: SegmentLoadDetails) => void;
 
   /**
    * Triggered when an error occurs during the download of a segment.
    *
-   * @param {SegmentErrorDetails} params - Contains information about the errored segment.
+   * @param params - Contains information about the errored segment.
    */
   onSegmentError: (params: SegmentErrorDetails) => void;
 
   /**
    * Called if the download of a segment is aborted before completion.
    *
-   * @param {SegmentAbortDetails} params - Contains information about the aborted segment.
+   * @param params - Contains information about the aborted segment.
    */
   onSegmentAbort: (params: SegmentAbortDetails) => void;
 
   /**
    * Fired at the beginning of a segment download process.
    *
-   * @param {SegmentStartDetails} params - Provides details about the segment being downloaded.
+   * @param params - Provides details about the segment being downloaded.
    */
   onSegmentStart: (params: SegmentStartDetails) => void;
 
   /**
    * Occurs when a new peer-to-peer connection is established.
    *
-   * @param {string} peerId - The unique identifier of the peer that has just connected.
+   * @param peerId - The unique identifier of the peer that has just connected.
    */
   onPeerConnect: (params: PeerDetails) => void;
 
   /**
    * Triggered when an existing peer-to-peer connection is closed.
    *
-   * @param {string} peerId - The unique identifier of the peer whose connection has been closed.
+   * @param peerId - The unique identifier of the peer whose connection has been closed.
    */
   onPeerClose: (params: PeerDetails) => void;
 
   /**
    * Invoked after a chunk of data from a segment has been successfully downloaded.
    *
-   * @param {number} bytesLength - The size of the downloaded chunk in bytes, offering a measure of the download progress.
-   * @param {DownloadSource} type - The source of the download.
-   * @param {string} [peerId] - The peer ID of the peer that the event is about, if applicable.
+   * @param bytesLength - The size of the downloaded chunk in bytes.
+   * @param type - The source of the download.
+   * @param peerId - The peer ID of the peer that the event is about, if applicable.
    */
   onChunkDownloaded: (
     bytesLength: number,
@@ -483,28 +425,22 @@ export type CoreEventMap = {
   /**
    * Called when a chunk of data has been successfully uploaded to a peer.
    *
-   * @param {number} bytesLength - The length of the segment in bytes.
-   * @param {string} peerId - The peer ID of the peer that the event is about, if applicable.
+   * @param bytesLength - The length of the segment in bytes.
+   * @param peerId - The peer ID, if the segment was downloaded from a peer
    */
   onChunkUploaded: (bytesLength: number, peerId: string) => void;
 };
 
-/**
- * Defines the types of errors that can occur during a request abortion process.
- */
+/** Defines the types of errors that can occur during a request abortion process. */
 export type RequestAbortErrorType = "abort" | "bytes-receiving-timeout";
 
-/**
- * Defines the types of errors specific to HTTP requests.
- */
+/** Defines the types of errors specific to HTTP requests. */
 export type HttpRequestErrorType =
   | "http-error"
   | "http-bytes-mismatch"
   | "http-unexpected-status-code";
 
-/**
- * Defines the types of errors specific to peer-to-peer requests.
- */
+/** Defines the types of errors specific to peer-to-peer requests. */
 export type PeerRequestErrorType =
   | "peer-response-bytes-length-mismatch"
   | "peer-protocol-violation"
@@ -512,9 +448,7 @@ export type PeerRequestErrorType =
   | "peer-closed"
   | "p2p-segment-validation-failed";
 
-/**
- * Enumerates all possible request error types, including HTTP and peer-related errors.
- */
+/** Enumerates all possible request error types, including HTTP and peer-related errors. */
 export type RequestErrorType =
   | RequestAbortErrorType
   | PeerRequestErrorType
@@ -527,6 +461,7 @@ export type RequestErrorType =
 export class RequestError<
   T extends RequestErrorType = RequestErrorType,
 > extends Error {
+  /** Error timestamp. */
   readonly timestamp: number;
 
   /**
@@ -543,24 +478,16 @@ export class RequestError<
   }
 }
 
-/**
- * Represents the response from a segment request in media streaming.
- */
+/** Represents the response from a segment request, including the data and measured bandwidth. */
 export type SegmentResponse = {
-  /**
-   * The raw binary data of the media segment.
-   */
+  /** Segment data as an ArrayBuffer. */
   data: ArrayBuffer;
 
-  /**
-   * The measured bandwidth during the segment's download.
-   */
+  /** Measured bandwidth for the segment download, in bytes per second. */
   bandwidth: number;
 };
 
-/**
- * Custom error class for errors that occur during core network requests.
- */
+/** Custom error class for errors that occur during core network requests. */
 export class CoreRequestError extends Error {
   /**
    * Constructs a new CoreRequestError.
@@ -571,9 +498,7 @@ export class CoreRequestError extends Error {
   }
 }
 
-/**
- * Callbacks for handling the success or failure of an engine operation.
- */
+/** Callbacks for handling the success or failure of an engine operation. */
 export type EngineCallbacks = {
   /**
    * Called when the operation is successful.

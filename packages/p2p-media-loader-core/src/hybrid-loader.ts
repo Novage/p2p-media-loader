@@ -185,7 +185,11 @@ export class HybridLoader {
             this.engineRequest = undefined;
           }
           this.requests.remove(request);
-          void this.segmentStorage.storeSegment(request.segment, request.data);
+          void this.segmentStorage.storeSegment(
+            request.segment,
+            request.data,
+            this.streamDetails.isLive,
+          );
           break;
 
         case "failed":

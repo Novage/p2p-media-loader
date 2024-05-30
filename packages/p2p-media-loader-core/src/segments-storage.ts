@@ -23,6 +23,8 @@ type StorageEventHandlers = {
   [key in `onStorageUpdated-${string}`]: (steam: Stream) => void;
 };
 
+const DEFAULT_LIVE_CACHED_SEGMENT_EXPIRATION = 1200;
+
 export class SegmentsMemoryStorage {
   private cache = new Map<string, StorageItem>();
   private _isInitialized = false;
@@ -61,7 +63,11 @@ export class SegmentsMemoryStorage {
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
-  async storeSegment(segment: SegmentWithStream, data: ArrayBuffer) {
+  async storeSegment(
+    segment: SegmentWithStream,
+    data: ArrayBuffer,
+    isLiveStream: boolean,
+  ) {
     const id = getStorageItemId(segment);
     this.cache.set(id, {
       segment,
@@ -70,7 +76,7 @@ export class SegmentsMemoryStorage {
     });
     this.logger(`add segment: ${id}`);
     this.dispatchStorageUpdatedEvent(segment.stream);
-    void this.clear();
+    void this.clear(isLiveStream);
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
@@ -101,7 +107,13 @@ export class SegmentsMemoryStorage {
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
-  private async clear(): Promise<boolean> {
+  private async clear(isLiveStream: boolean): Promise<boolean> {
+    const cacheSegmentExpiration =
+      (this.storageConfig.cachedSegmentExpiration ??
+        (isLiveStream ? DEFAULT_LIVE_CACHED_SEGMENT_EXPIRATION : 0)) * 1000;
+
+    if (cacheSegmentExpiration === 0) return false;
+
     const itemsToDelete: string[] = [];
     const remainingItems: [string, StorageItem][] = [];
     const streamsOfChangedItems = new Set<Stream>();
@@ -112,7 +124,8 @@ export class SegmentsMemoryStorage {
     for (const entry of this.cache.entries()) {
       const [itemId, item] = entry;
       const { lastAccessed, segment } = item;
-      if (now - lastAccessed > this.storageConfig.cachedSegmentExpiration) {
+
+      if (now - lastAccessed > cacheSegmentExpiration) {
         if (!this.isSegmentLocked(segment)) {
           itemsToDelete.push(itemId);
           streamsOfChangedItems.add(segment.stream);
@@ -123,17 +136,19 @@ export class SegmentsMemoryStorage {
     }
 
     // Delete segments over cached count
-    let countOverhead =
-      remainingItems.length - this.storageConfig.cachedSegmentsCount;
-    if (countOverhead > 0) {
-      remainingItems.sort(([, a], [, b]) => a.lastAccessed - b.lastAccessed);
+    if (this.storageConfig.cachedSegmentsCount > 0) {
+      let countOverhead =
+        remainingItems.length - this.storageConfig.cachedSegmentsCount;
+      if (countOverhead > 0) {
+        remainingItems.sort(([, a], [, b]) => a.lastAccessed - b.lastAccessed);
 
-      for (const [itemId, { segment }] of remainingItems) {
-        if (!this.isSegmentLocked(segment)) {
-          itemsToDelete.push(itemId);
-          streamsOfChangedItems.add(segment.stream);
-          countOverhead--;
-          if (countOverhead === 0) break;
+        for (const [itemId, { segment }] of remainingItems) {
+          if (!this.isSegmentLocked(segment)) {
+            itemsToDelete.push(itemId);
+            streamsOfChangedItems.add(segment.stream);
+            countOverhead--;
+            if (countOverhead === 0) break;
+          }
         }
       }
     }
