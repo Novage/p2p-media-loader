@@ -24,7 +24,6 @@ export class Core<TStream extends Stream = Stream> {
     highDemandTimeWindow: 15,
     httpDownloadTimeWindow: 3000,
     p2pDownloadTimeWindow: 6000,
-    cachedSegmentExpiration: undefined,
     cachedSegmentsCount: 0,
     webRtcMaxMessageSize: 64 * 1024 - 1,
     p2pNotReceivingBytesTimeoutMs: 1000,

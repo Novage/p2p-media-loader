@@ -23,6 +23,8 @@ type StorageEventHandlers = {
   [key in `onStorageUpdated-${string}`]: (steam: Stream) => void;
 };
 
+const DEFAULT_LIVE_CACHED_SEGMENT_EXPIRATION = 1200;
+
 export class SegmentsMemoryStorage {
   private cache = new Map<string, StorageItem>();
   private _isInitialized = false;
@@ -108,7 +110,7 @@ export class SegmentsMemoryStorage {
   private async clear(isLiveStream: boolean): Promise<boolean> {
     const cacheSegmentExpiration =
       (this.storageConfig.cachedSegmentExpiration ??
-        (isLiveStream ? 60 * 20 : 0)) * 1000;
+        (isLiveStream ? DEFAULT_LIVE_CACHED_SEGMENT_EXPIRATION : 0)) * 1000;
 
     if (cacheSegmentExpiration === 0) return false;
 

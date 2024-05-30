@@ -57,14 +57,21 @@ export type Stream = {
 
 /** Represents a dynamically modifiable configuration, allowing updates to selected CoreConfig properties at runtime. */
 export type DynamicCoreConfig = Partial<
-  Omit<
+  Pick<
     CoreConfig,
-    | "announceTrackers"
-    | "rtcConfig"
-    | "trackerClientVersionPrefix"
-    | "swarmId"
-    | "validateP2PSegment"
-    | "httpRequestSetup"
+    | "highDemandTimeWindow"
+    | "httpDownloadTimeWindow"
+    | "p2pDownloadTimeWindow"
+    | "simultaneousHttpDownloads"
+    | "simultaneousP2PDownloads"
+    | "cachedSegmentExpiration"
+    | "cachedSegmentsCount"
+    | "webRtcMaxMessageSize"
+    | "p2pNotReceivingBytesTimeoutMs"
+    | "p2pInactiveLoaderDestroyTimeoutMs"
+    | "httpNotReceivingBytesTimeoutMs"
+    | "httpErrorRetries"
+    | "p2pErrorRetries"
   >
 >;
 
@@ -139,7 +146,7 @@ export type CoreConfig = {
    * cachedSegmentExpiration: undefined
    * ```
    */
-  cachedSegmentExpiration: number | undefined;
+  cachedSegmentExpiration?: number;
 
   /**
    * Maximum number of segments to store in the cache.
