@@ -92,3 +92,37 @@ export function shuffleArray<T>(array: T[]): T[] {
   }
   return array;
 }
+
+type RecursivePartial<T> = {
+  [P in keyof T]?: T[P] extends object ? RecursivePartial<T[P]> : T[P];
+};
+
+export function mergeConfigs<T>(target: T, updates: RecursivePartial<T>): T {
+  (Object.keys(updates) as Array<keyof T>).forEach((key) => {
+    const originalValue = target[key];
+    const updateValue = updates[key];
+
+    if (updateValue === undefined) {
+      target[key] = undefined as unknown as T[typeof key];
+      return;
+    }
+
+    if (
+      typeof updateValue === "object" &&
+      updateValue !== null &&
+      !Array.isArray(updateValue)
+    ) {
+      if (
+        typeof originalValue !== "object" ||
+        originalValue === null ||
+        Array.isArray(originalValue)
+      ) {
+        target[key] = {} as T[typeof key];
+      }
+      target[key] = mergeConfigs(originalValue as never, updateValue as never);
+    } else {
+      target[key] = updateValue as T[typeof key];
+    }
+  });
+  return target;
+}

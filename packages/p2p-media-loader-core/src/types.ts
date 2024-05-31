@@ -72,11 +72,41 @@ export type DynamicCoreConfig = Partial<
     | "httpNotReceivingBytesTimeoutMs"
     | "httpErrorRetries"
     | "p2pErrorRetries"
+    | "mainStream"
+    | "secondaryStream"
+    | "validateP2PSegment"
+    | "httpRequestSetup"
   >
 >;
 
+export type OptionalStreamConfig = Pick<
+  CoreConfig,
+  | "announceTrackers"
+  | "highDemandTimeWindow"
+  | "httpDownloadTimeWindow"
+  | "httpErrorRetries"
+  | "httpNotReceivingBytesTimeoutMs"
+  | "p2pDownloadTimeWindow"
+  | "p2pErrorRetries"
+  | "p2pInactiveLoaderDestroyTimeoutMs"
+  | "p2pNotReceivingBytesTimeoutMs"
+  | "rtcConfig"
+  | "simultaneousHttpDownloads"
+  | "simultaneousP2PDownloads"
+  | "trackerClientVersionPrefix"
+  | "webRtcMaxMessageSize"
+  | "httpRequestSetup"
+  | "validateP2PSegment"
+  | "swarmId"
+>;
+
+export type CoreConfig = StreamConfig & {
+  mainStream?: Partial<OptionalStreamConfig>;
+  secondaryStream?: Partial<OptionalStreamConfig>;
+};
+
 /** Configuration options for the Core functionality, including network and processing parameters. */
-export type CoreConfig = {
+export type StreamConfig = {
   /**
    * Defines the duration of the time window, in seconds, during which segments are pre-loaded to ensure smooth playback.
    * This window helps prioritize the fetching of media segments that are imminent to playback.

@@ -14,7 +14,7 @@ import * as StreamUtils from "./utils/stream";
 import { BandwidthCalculator } from "./bandwidth-calculator";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import { EventTarget } from "./utils/event-target";
-import { deepCopy } from "./utils/utils";
+import { deepCopy, mergeConfigs } from "./utils/utils";
 import { TRACKER_CLIENT_VERSION_PREFIX } from "./utils/peer";
 
 export class Core<TStream extends Stream = Stream> {
@@ -50,6 +50,8 @@ export class Core<TStream extends Stream = Stream> {
   private manifestResponseUrl?: string;
   private readonly streams = new Map<string, StreamWithSegments<TStream>>();
   private config: CoreConfig;
+  private mainStreamConfig?: CoreConfig;
+  private secondaryStreamConfig?: CoreConfig;
   private readonly bandwidthCalculators: BandwidthCalculators = {
     all: new BandwidthCalculator(),
     http: new BandwidthCalculator(),
@@ -82,6 +84,9 @@ export class Core<TStream extends Stream = Stream> {
    */
   constructor(config?: Partial<CoreConfig>) {
     this.config = deepCopy({ ...Core.DEFAULT_CONFIG, ...config });
+
+    this.setupStreamConfiguration("mainStream", "mainStreamConfig");
+    this.setupStreamConfiguration("secondaryStream", "secondaryStreamConfig");
   }
 
   /**
@@ -109,7 +114,31 @@ export class Core<TStream extends Stream = Stream> {
    * core.applyDynamicConfig(dynamicConfig);
    */
   applyDynamicConfig(dynamicConfig: DynamicCoreConfig) {
-    this.config = deepCopy({ ...this.config, ...dynamicConfig });
+    if (
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+      (dynamicConfig.mainStream && !this.mainStreamConfig) ||
+      (dynamicConfig.secondaryStream && !this.secondaryStreamConfig)
+    ) {
+      // eslint-disable-next-line no-console
+      console.error(
+        "Main or secondary stream configuration doesn't exist in the core. Please set it in the initial config",
+      );
+      return;
+    }
+
+    mergeConfigs(this.config, dynamicConfig);
+
+    if (dynamicConfig.mainStream && this.mainStreamConfig) {
+      mergeConfigs(this.mainStreamConfig, dynamicConfig);
+      mergeConfigs(this.mainStreamConfig, dynamicConfig.mainStream);
+    }
+    if (dynamicConfig.secondaryStream && this.secondaryStreamConfig) {
+      mergeConfigs(this.secondaryStreamConfig, dynamicConfig);
+      mergeConfigs(this.secondaryStreamConfig, dynamicConfig.secondaryStream);
+    }
+    console.log("Config updated", this.config);
+    console.log("Main stream config updated", this.mainStreamConfig);
+    console.log("Secondary stream config updated", this.secondaryStreamConfig);
   }
 
   /**
@@ -334,14 +363,35 @@ export class Core<TStream extends Stream = Stream> {
       throw new Error("Segment storage is not initialized");
     }
 
+    const configToUse =
+      !this.mainStreamConfig || !this.secondaryStreamConfig
+        ? this.config
+        : segment.stream.type === "main"
+          ? this.mainStreamConfig
+          : this.secondaryStreamConfig;
+
     return new HybridLoader(
       this.manifestResponseUrl,
       segment,
       this.streamDetails,
-      this.config,
+      configToUse || this.config,
       this.bandwidthCalculators,
       this.segmentStorage,
       this.eventTarget,
     );
+  }
+
+  private setupStreamConfiguration(
+    streamTypeKey: keyof Pick<CoreConfig, "mainStream" | "secondaryStream">,
+    configPropertyName: "mainStreamConfig" | "secondaryStreamConfig",
+  ): void {
+    const streamConfig = this.config[streamTypeKey];
+
+    if (streamConfig) {
+      this[configPropertyName] = deepCopy({
+        ...this.config,
+        ...streamConfig,
+      });
+    }
   }
 }
