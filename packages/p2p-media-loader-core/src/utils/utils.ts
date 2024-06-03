@@ -99,6 +99,10 @@ type RecursivePartial<T> = {
 
 export function mergeConfigs<T>(target: T, updates: RecursivePartial<T>): T {
   (Object.keys(updates) as Array<keyof T>).forEach((key) => {
+    if (key === "__proto__" || key === "constructor" || key === "prototype") {
+      throw new Error(`Attempt to modify restricted property '${String(key)}'`);
+    }
+
     const originalValue = target[key];
     const updateValue = updates[key];
 
