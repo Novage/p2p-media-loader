@@ -114,31 +114,29 @@ export class Core<TStream extends Stream = Stream> {
    * core.applyDynamicConfig(dynamicConfig);
    */
   applyDynamicConfig(dynamicConfig: DynamicCoreConfig) {
-    if (
-      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-      (dynamicConfig.mainStream && !this.mainStreamConfig) ||
-      (dynamicConfig.secondaryStream && !this.secondaryStreamConfig)
-    ) {
-      // eslint-disable-next-line no-console
-      console.error(
-        "Main or secondary stream configuration doesn't exist in the core. Please set it in the initial config",
-      );
-      return;
-    }
+    if (dynamicConfig.mainStream) {
+      if (!this.mainStreamConfig) {
+        throw new Error(
+          "Main stream configuration doesn't exist in the core. Please set it in the initial config",
+        );
+      }
 
-    mergeConfigs(this.config, dynamicConfig);
-
-    if (dynamicConfig.mainStream && this.mainStreamConfig) {
       mergeConfigs(this.mainStreamConfig, dynamicConfig);
       mergeConfigs(this.mainStreamConfig, dynamicConfig.mainStream);
     }
-    if (dynamicConfig.secondaryStream && this.secondaryStreamConfig) {
+
+    if (dynamicConfig.secondaryStream) {
+      if (!this.secondaryStreamConfig) {
+        throw new Error(
+          "Secondary stream configuration doesn't exist in the core. Please set it in the initial config",
+        );
+      }
+
       mergeConfigs(this.secondaryStreamConfig, dynamicConfig);
       mergeConfigs(this.secondaryStreamConfig, dynamicConfig.secondaryStream);
     }
-    console.log("Config updated", this.config);
-    console.log("Main stream config updated", this.mainStreamConfig);
-    console.log("Secondary stream config updated", this.secondaryStreamConfig);
+
+    mergeConfigs(this.config, dynamicConfig);
   }
 
   /**

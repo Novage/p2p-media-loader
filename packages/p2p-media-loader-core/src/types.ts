@@ -55,48 +55,38 @@ export type Stream = {
   readonly index: number;
 };
 
+type StreamProperties =
+  | "highDemandTimeWindow"
+  | "httpDownloadTimeWindow"
+  | "p2pDownloadTimeWindow"
+  | "simultaneousHttpDownloads"
+  | "simultaneousP2PDownloads"
+  | "webRtcMaxMessageSize"
+  | "p2pNotReceivingBytesTimeoutMs"
+  | "p2pInactiveLoaderDestroyTimeoutMs"
+  | "httpNotReceivingBytesTimeoutMs"
+  | "httpErrorRetries"
+  | "p2pErrorRetries"
+  | "validateP2PSegment"
+  | "httpRequestSetup";
+
 /** Represents a dynamically modifiable configuration, allowing updates to selected CoreConfig properties at runtime. */
 export type DynamicCoreConfig = Partial<
   Pick<
     CoreConfig,
-    | "highDemandTimeWindow"
-    | "httpDownloadTimeWindow"
-    | "p2pDownloadTimeWindow"
-    | "simultaneousHttpDownloads"
-    | "simultaneousP2PDownloads"
-    | "cachedSegmentExpiration"
-    | "cachedSegmentsCount"
-    | "webRtcMaxMessageSize"
-    | "p2pNotReceivingBytesTimeoutMs"
-    | "p2pInactiveLoaderDestroyTimeoutMs"
-    | "httpNotReceivingBytesTimeoutMs"
-    | "httpErrorRetries"
-    | "p2pErrorRetries"
-    | "mainStream"
-    | "secondaryStream"
-    | "validateP2PSegment"
-    | "httpRequestSetup"
+    StreamProperties | "cachedSegmentExpiration" | "cachedSegmentsCount"
   >
->;
+> & {
+  mainStream?: Partial<Pick<OptionalStreamConfig, StreamProperties>>;
+  secondaryStream?: Partial<Pick<OptionalStreamConfig, StreamProperties>>;
+};
 
 export type OptionalStreamConfig = Pick<
   CoreConfig,
+  | StreamProperties
   | "announceTrackers"
-  | "highDemandTimeWindow"
-  | "httpDownloadTimeWindow"
-  | "httpErrorRetries"
-  | "httpNotReceivingBytesTimeoutMs"
-  | "p2pDownloadTimeWindow"
-  | "p2pErrorRetries"
-  | "p2pInactiveLoaderDestroyTimeoutMs"
-  | "p2pNotReceivingBytesTimeoutMs"
   | "rtcConfig"
-  | "simultaneousHttpDownloads"
-  | "simultaneousP2PDownloads"
   | "trackerClientVersionPrefix"
-  | "webRtcMaxMessageSize"
-  | "httpRequestSetup"
-  | "validateP2PSegment"
   | "swarmId"
 >;
 
