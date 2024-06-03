@@ -117,7 +117,7 @@ export function mergeConfigs<T>(target: T, updates: RecursivePartial<T>): T {
         originalValue === null ||
         Array.isArray(originalValue)
       ) {
-        target[key] = {} as T[typeof key];
+        target[key] = Object.create(null) as T[typeof key];
       }
       target[key] = mergeConfigs(originalValue as never, updateValue as never);
     } else {
