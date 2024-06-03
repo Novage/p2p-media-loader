@@ -55,7 +55,8 @@ export type Stream = {
   readonly index: number;
 };
 
-type StreamProperties =
+/** Represents a stream with optional properties. */
+export type StreamProperties =
   | "highDemandTimeWindow"
   | "httpDownloadTimeWindow"
   | "p2pDownloadTimeWindow"
@@ -68,19 +69,42 @@ type StreamProperties =
   | "httpErrorRetries"
   | "p2pErrorRetries"
   | "validateP2PSegment"
-  | "httpRequestSetup";
+  | "httpRequestSetup"
+  | "swarmId";
 
-/** Represents a dynamically modifiable configuration, allowing updates to selected CoreConfig properties at runtime. */
+/**
+ * Represents a dynamically modifiable configuration, allowing updates to selected CoreConfig properties at runtime.
+ *
+ * @example
+ * ```typescript
+ * const dynamicConfig: DynamicCoreConfig = {
+ *   core: {
+ *     cachedSegmentsCount: 200,
+ *   },
+ *   mainStream: {
+ *     swarmId: "custom swarm ID for video stream",
+ *     p2pDownloadTimeWindow: 6000,
+ *   },
+ *   secondaryStream: {
+ *     swarmId: "custom swarm ID for audio stream",
+ *     p2pDownloadTimeWindow: 3000,
+ *   }
+ * };
+ * ```
+ */
 export type DynamicCoreConfig = Partial<
   Pick<
     CoreConfig,
     StreamProperties | "cachedSegmentExpiration" | "cachedSegmentsCount"
   >
 > & {
+  /** Optional configuration for the main stream. */
   mainStream?: Partial<Pick<OptionalStreamConfig, StreamProperties>>;
+  /** Optional configuration for the secondary stream. */
   secondaryStream?: Partial<Pick<OptionalStreamConfig, StreamProperties>>;
 };
 
+/** Represents an optional configuration for a stream. */
 export type OptionalStreamConfig = Pick<
   CoreConfig,
   | StreamProperties
@@ -90,6 +114,7 @@ export type OptionalStreamConfig = Pick<
   | "swarmId"
 >;
 
+/** Represents a partial configuration for a stream. */
 export type CoreConfig = StreamConfig & {
   mainStream?: Partial<OptionalStreamConfig>;
   secondaryStream?: Partial<OptionalStreamConfig>;
