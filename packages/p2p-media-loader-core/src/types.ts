@@ -55,8 +55,8 @@ export type Stream = {
   readonly index: number;
 };
 
-/** Represents a stream with optional properties. */
-export type StreamProperties =
+/** Represents a set of properties that can be dynamically modified at runtime. */
+export type DynamicStreamProperties =
   | "highDemandTimeWindow"
   | "httpDownloadTimeWindow"
   | "p2pDownloadTimeWindow"
@@ -95,28 +95,50 @@ export type StreamProperties =
 export type DynamicCoreConfig = Partial<
   Pick<
     CoreConfig,
-    StreamProperties | "cachedSegmentExpiration" | "cachedSegmentsCount"
+    DynamicStreamProperties | "cachedSegmentExpiration" | "cachedSegmentsCount"
   >
 > & {
   /** Optional configuration for the main stream. */
-  mainStream?: Partial<Pick<OptionalStreamConfig, StreamProperties>>;
+  mainStream?: Partial<Pick<OptionalStreamConfig, DynamicStreamProperties>>;
   /** Optional configuration for the secondary stream. */
-  secondaryStream?: Partial<Pick<OptionalStreamConfig, StreamProperties>>;
+  secondaryStream?: Partial<
+    Pick<OptionalStreamConfig, DynamicStreamProperties>
+  >;
 };
 
 /** Represents an optional configuration for a stream. */
 export type OptionalStreamConfig = Pick<
-  CoreConfig,
-  | StreamProperties
+  StreamConfig,
+  | DynamicStreamProperties
   | "announceTrackers"
   | "rtcConfig"
   | "trackerClientVersionPrefix"
-  | "swarmId"
 >;
 
-/** Represents a partial configuration for a stream. */
+/**
+ * Represents a set of configuration parameters that can be used to override or extend the
+ * default configuration settings for a specific stream (main or secondary).
+ *
+ * @example
+ * ```typescript
+ * const config: CoreConfig = {
+ *  highDemandTimeWindow: 20,
+ *  httpDownloadTimeWindow: 3000,
+ *  p2pDownloadTimeWindow: 6000,
+ *  mainStream: {
+ *   // Optional configuration for the main stream
+ *   swarmId: "custom swarm ID for video stream",
+ *  },
+ *  secondaryStream: {
+ *   // Optional configuration for the secondary stream
+ *   swarmId: "custom swarm ID for audio stream",
+ *  },
+ *
+ */
 export type CoreConfig = StreamConfig & {
+  /** Optional configuration for the main stream. */
   mainStream?: Partial<OptionalStreamConfig>;
+  /** Optional configuration for the secondary stream. */
   secondaryStream?: Partial<OptionalStreamConfig>;
 };
 
