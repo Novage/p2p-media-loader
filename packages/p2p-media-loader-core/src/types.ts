@@ -69,8 +69,7 @@ export type DynamicStreamProperties =
   | "httpErrorRetries"
   | "p2pErrorRetries"
   | "validateP2PSegment"
-  | "httpRequestSetup"
-  | "swarmId";
+  | "httpRequestSetup";
 
 /**
  * Represents a dynamically modifiable configuration, allowing updates to selected CoreConfig properties at runtime.
@@ -93,27 +92,38 @@ export type DynamicStreamProperties =
  * ```
  */
 export type DynamicCoreConfig = Partial<
-  Pick<
-    CoreConfig,
-    DynamicStreamProperties | "cachedSegmentExpiration" | "cachedSegmentsCount"
-  >
-> & {
-  /** Optional configuration for the main stream. */
-  mainStream?: Partial<Pick<OptionalStreamConfig, DynamicStreamProperties>>;
-  /** Optional configuration for the secondary stream. */
-  secondaryStream?: Partial<
-    Pick<OptionalStreamConfig, DynamicStreamProperties>
-  >;
-};
+  Pick<CoreConfig, DynamicStreamProperties>
+> &
+  Partial<CommonCoreConfig> & {
+    /** Optional dynamic configuration for the main stream. */
+    mainStream?: Partial<Pick<StreamConfig, DynamicStreamProperties>>;
+    /** Optional dynamic configuration for the secondary stream. */
+    secondaryStream?: Partial<Pick<StreamConfig, DynamicStreamProperties>>;
+  };
 
-/** Represents an optional configuration for a stream. */
-export type OptionalStreamConfig = Pick<
-  StreamConfig,
-  | DynamicStreamProperties
-  | "announceTrackers"
-  | "rtcConfig"
-  | "trackerClientVersionPrefix"
->;
+export type CommonCoreConfig = {
+  /**
+   * Time after which a cached segment expires, in seconds.
+   * If set to undefined, the cacheSegmentExpiration is disabled for VOD streams, and a default value (20 minutes) is used for live streams.
+   *
+   * @default
+   * ```typescript
+   * cachedSegmentExpiration: undefined
+   * ```
+   */
+  cachedSegmentExpiration?: number;
+  /**
+   * Maximum number of segments to store in the cache.
+   * Has to be less then httpDownloadTimeWindow and p2pDownloadTimeWindow.
+   * If set to 0, the cache is unlimited.
+   *
+   * @default
+   * ```typescript
+   * cachedSegmentsCount: 0
+   * ```
+   */
+  cachedSegmentsCount: number;
+};
 
 /**
  * Represents a set of configuration parameters that can be used to override or extend the
@@ -133,14 +143,15 @@ export type OptionalStreamConfig = Pick<
  *   // Optional configuration for the secondary stream
  *   swarmId: "custom swarm ID for audio stream",
  *  },
- *
+ *  ```
  */
-export type CoreConfig = StreamConfig & {
-  /** Optional configuration for the main stream. */
-  mainStream?: Partial<OptionalStreamConfig>;
-  /** Optional configuration for the secondary stream. */
-  secondaryStream?: Partial<OptionalStreamConfig>;
-};
+export type CoreConfig = StreamConfig &
+  CommonCoreConfig & {
+    /** Optional configuration for the main stream. */
+    mainStream?: Partial<StreamConfig>;
+    /** Optional configuration for the secondary stream. */
+    secondaryStream?: Partial<StreamConfig>;
+  };
 
 /** Configuration options for the Core functionality, including network and processing parameters. */
 export type StreamConfig = {
@@ -203,29 +214,6 @@ export type StreamConfig = {
    * ```
    */
   simultaneousP2PDownloads: number;
-
-  /**
-   * Time after which a cached segment expires, in seconds.
-   * If set to undefined, the cacheSegmentExpiration is disabled for VOD streams, and a default value (20 minutes) is used for live streams.
-   *
-   * @default
-   * ```typescript
-   * cachedSegmentExpiration: undefined
-   * ```
-   */
-  cachedSegmentExpiration?: number;
-
-  /**
-   * Maximum number of segments to store in the cache.
-   * Has to be less then httpDownloadTimeWindow and p2pDownloadTimeWindow.
-   * If set to 0, the cache is unlimited.
-   *
-   * @default
-   * ```typescript
-   * cachedSegmentsCount: 0
-   * ```
-   */
-  cachedSegmentsCount: number;
 
   /**
    * Maximum message size for WebRTC communications, in bytes.
