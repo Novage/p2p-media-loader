@@ -1,3 +1,5 @@
+import { CommonCoreConfig, CoreConfig, StreamConfig } from "../types";
+
 export function getControlledPromise<T>() {
   let resolve: (value: T) => void;
   let reject: (reason?: unknown) => void;
@@ -97,36 +99,59 @@ type RecursivePartial<T> = {
   [P in keyof T]?: T[P] extends object ? RecursivePartial<T[P]> : T[P];
 };
 
-export function mergeConfigs<T>(target: T, updates: RecursivePartial<T>): T {
+export function overrideConfig<T>(target: T, updates: RecursivePartial<T>): T {
+  if (
+    typeof target !== "object" ||
+    target === null ||
+    typeof updates !== "object" ||
+    updates === null
+  ) {
+    return target;
+  }
+
   (Object.keys(updates) as Array<keyof T>).forEach((key) => {
     if (key === "__proto__" || key === "constructor" || key === "prototype") {
       throw new Error(`Attempt to modify restricted property '${String(key)}'`);
     }
 
-    const originalValue = target[key];
     const updateValue = updates[key];
 
-    if (updateValue === undefined) {
-      target[key] = undefined as unknown as T[typeof key];
-      return;
-    }
-
-    if (
-      typeof updateValue === "object" &&
-      updateValue !== null &&
-      !Array.isArray(updateValue)
-    ) {
-      if (
-        typeof originalValue !== "object" ||
-        originalValue === null ||
-        Array.isArray(originalValue)
-      ) {
-        target[key] = Object.create(null) as T[typeof key];
+    if (key in target) {
+      if (updateValue === undefined) {
+        target[key] = undefined as (T & object)[keyof T];
+      } else {
+        target[key] = updateValue as (T & object)[keyof T];
       }
-      target[key] = mergeConfigs(originalValue as never, updateValue as never);
-    } else {
-      target[key] = updateValue as T[typeof key];
     }
   });
   return target;
+}
+
+type MergeConfigsToTypeOptions = {
+  defaultConfig: StreamConfig | CommonCoreConfig | CoreConfig;
+  baseConfig?: Partial<CoreConfig>;
+  specificStreamConfig?: Partial<StreamConfig>;
+};
+
+export function mergeAndFilterConfig<T>(options: MergeConfigsToTypeOptions): T {
+  const { defaultConfig, baseConfig = {}, specificStreamConfig = {} } = options;
+
+  const mergedConfig = deepCopy({
+    ...defaultConfig,
+    ...baseConfig,
+    ...specificStreamConfig,
+  });
+
+  const keysOfT = Object.keys(defaultConfig) as Array<keyof T>;
+  const filteredConfig: Partial<T> = {};
+
+  keysOfT.forEach((key) => {
+    if (key in mergedConfig) {
+      filteredConfig[key] = mergedConfig[
+        key as keyof typeof mergedConfig
+      ] as T[keyof T];
+    }
+  });
+
+  return filteredConfig as T;
 }

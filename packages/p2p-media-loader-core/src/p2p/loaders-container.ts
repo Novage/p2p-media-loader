@@ -1,6 +1,11 @@
 import { P2PLoader } from "./loader";
 import debug from "debug";
-import { CoreConfig, CoreEventMap, Stream, StreamWithSegments } from "../index";
+import {
+  CoreEventMap,
+  Stream,
+  StreamConfig,
+  StreamWithSegments,
+} from "../index";
 import { RequestsContainer } from "../requests/request-container";
 import { SegmentsMemoryStorage } from "../segments-storage";
 import * as LoggerUtils from "../utils/logger";
@@ -23,7 +28,7 @@ export class P2PLoadersContainer {
     stream: StreamWithSegments,
     private readonly requests: RequestsContainer,
     private readonly segmentStorage: SegmentsMemoryStorage,
-    private readonly config: CoreConfig,
+    private readonly config: StreamConfig,
     private readonly eventTarget: EventTarget<CoreEventMap>,
     private onSegmentAnnouncement: () => void,
   ) {
