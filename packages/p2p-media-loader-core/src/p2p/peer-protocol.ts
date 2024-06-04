@@ -1,11 +1,11 @@
 import { PeerConnection } from "bittorrent-tracker";
-import { CoreConfig, CoreEventMap } from "../types";
+import { CoreEventMap, StreamConfig } from "../types";
 import * as Utils from "../utils/utils";
 import * as Command from "./commands";
 import { EventTarget } from "../utils/event-target";
 
 export type PeerConfig = Pick<
-  CoreConfig,
+  StreamConfig,
   | "p2pNotReceivingBytesTimeoutMs"
   | "webRtcMaxMessageSize"
   | "p2pErrorRetries"
