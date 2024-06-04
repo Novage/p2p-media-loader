@@ -22,7 +22,7 @@ import { injectMixin } from "./engine-static";
 /** Represents the complete configuration for HlsJsP2PEngine. */
 export type HlsJsP2PEngineConfig = {
   /** Core config */
-  core: CoreConfig;
+  core: Partial<CoreConfig>;
 };
 
 /** Allows for partial configuration of HlsJsP2PEngine, useful for providing overrides or partial updates. */

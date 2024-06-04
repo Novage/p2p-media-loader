@@ -29,7 +29,7 @@ export type DynamicShakaP2PEngineConfig = {
 /** Represents the complete configuration for ShakaP2PEngine. */
 export type ShakaP2PEngineConfig = {
   /** Core config */
-  core: CoreConfig;
+  core: Partial<CoreConfig>;
 };
 
 /** Allows for partial configuration settings for the Shaka P2P Engine. */
