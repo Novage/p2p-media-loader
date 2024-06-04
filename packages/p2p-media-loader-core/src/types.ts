@@ -145,8 +145,8 @@ export type CommonCoreConfig = {
  *  },
  *  ```
  */
-export type CoreConfig = StreamConfig &
-  CommonCoreConfig & {
+export type CoreConfig = Partial<StreamConfig> &
+  Partial<CommonCoreConfig> & {
     /** Optional configuration for the main stream. */
     mainStream?: Partial<StreamConfig>;
     /** Optional configuration for the secondary stream. */
