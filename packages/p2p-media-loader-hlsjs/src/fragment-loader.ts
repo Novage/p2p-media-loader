@@ -58,10 +58,13 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     );
     this.#segmentId = Utils.getSegmentLocalId(context.url, byteRange);
 
-    if (!this.#core.hasSegment(this.#segmentId)) {
-      this.#defaultLoader = this.#createDefaultLoader();
-      this.#defaultLoader.stats = this.stats;
-      this.#defaultLoader?.load(context, config, callbacks);
+    const coreConfig = this.#core.getConfig();
+    if (
+      !this.#core.hasSegment(this.#segmentId) ||
+      (coreConfig.mainStream.isP2PDisabled &&
+        coreConfig.secondaryStream.isP2PDisabled)
+    ) {
+      this.#initAndLoadWithDefaultLoader(context, config, callbacks);
       return;
     }
 
@@ -102,7 +105,19 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       this.#handleError(error);
     };
 
-    void this.#core.loadSegment(this.#segmentId, { onSuccess, onError });
+    void this.#core.loadSegment(this.#segmentId, { onSuccess, onError }, () => {
+      this.#initAndLoadWithDefaultLoader(context, config, callbacks);
+    });
+  }
+
+  #initAndLoadWithDefaultLoader(
+    context: FragmentLoaderContext,
+    config: LoaderConfiguration,
+    callbacks: LoaderCallbacks<LoaderContext>,
+  ) {
+    this.#defaultLoader = this.#createDefaultLoader();
+    this.#defaultLoader.stats = this.stats;
+    this.#defaultLoader?.load(context, config, callbacks);
   }
 
   #handleError(thrownError: unknown) {

@@ -32,6 +32,7 @@ export class Core<TStream extends Stream = Stream> {
   };
 
   static readonly DEFAULT_STREAM_CONFIG: StreamConfig = {
+    isP2PDisabled: false,
     simultaneousHttpDownloads: 3,
     simultaneousP2PDownloads: 3,
     highDemandTimeWindow: 15,
@@ -268,7 +269,11 @@ export class Core<TStream extends Stream = Stream> {
    * @param callbacks - The callbacks to be invoked during segment loading.
    * @throws {Error} - Throws if the manifest response URL is not defined.
    */
-  async loadSegment(segmentLocalId: string, callbacks: EngineCallbacks) {
+  async loadSegment(
+    segmentLocalId: string,
+    callbacks: EngineCallbacks,
+    loadSegmentThroughDefaultLoader: () => void,
+  ) {
     if (!this.manifestResponseUrl) {
       throw new Error("Manifest response url is not defined");
     }
@@ -282,6 +287,18 @@ export class Core<TStream extends Stream = Stream> {
     }
 
     const segment = this.identifySegment(segmentLocalId);
+    if (segment.stream.type === "main" && this.mainStreamConfig.isP2PDisabled) {
+      loadSegmentThroughDefaultLoader();
+      return;
+    }
+    if (
+      segment.stream.type === "secondary" &&
+      this.secondaryStreamConfig.isP2PDisabled
+    ) {
+      loadSegmentThroughDefaultLoader();
+      return;
+    }
+
     const loader = this.getStreamHybridLoader(segment);
     void loader.loadSegment(segment, callbacks);
   }

@@ -164,6 +164,7 @@ export type CoreConfig = Partial<StreamConfig> &
 
 /** Configuration options for the Core functionality, including network and processing parameters. */
 export type StreamConfig = {
+  isP2PDisabled: boolean;
   /**
    * Defines the duration of the time window, in seconds, during which segments are pre-loaded to ensure smooth playback.
    * This window helps prioritize the fetching of media segments that are imminent to playback.
