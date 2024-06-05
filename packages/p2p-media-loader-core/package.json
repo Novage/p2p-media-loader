@@ -48,12 +48,14 @@
     "lint": "eslint . --ext .ts --report-unused-disable-directives --max-warnings 0",
     "clean": "rimraf lib dist build p2p-media-loader-core-*.tgz",
     "clean-with-modules": "rimraf node_modules && pnpm clean",
-    "type-check": "npx tsc --noEmit"
+    "type-check": "npx tsc --noEmit",
+    "test": "vitest"
   },
   "dependencies": {
     "bittorrent-tracker": "^11.0.2",
     "debug": "^4.3.4",
-    "nano-md5": "^1.0.5"
+    "nano-md5": "^1.0.5",
+    "vitest": "^1.6.0"
   },
   "devDependencies": {
     "vite-plugin-node-polyfills": "^0.21.0"
