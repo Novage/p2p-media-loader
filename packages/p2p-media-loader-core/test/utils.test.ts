@@ -1,11 +1,11 @@
 import { expect, test } from "vitest";
-import { overrideConfig } from "../src/utils/utils";
+import { overrideConfig } from "../src/utils/utils.js";
 import {
   CommonCoreConfig,
   CoreConfig,
   DynamicCoreConfig,
   StreamConfig,
-} from "../src/types";
+} from "../src/types.js";
 
 test("override configs", () => {
   const coreConfig: CoreConfig = {
