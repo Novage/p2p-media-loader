@@ -199,6 +199,21 @@ test("filter undefined props", () => {
     validateP2PSegment: undefined,
     httpRequestSetup: undefined,
     swarmId: undefined,
+    mainStream: {
+      simultaneousHttpDownloads: undefined,
+      simultaneousP2PDownloads: undefined,
+      highDemandTimeWindow: undefined,
+      httpDownloadTimeWindow: undefined,
+      p2pDownloadTimeWindow: undefined,
+    },
+    secondaryStream: {
+      swarmId: "CUSTOM_SWARM_ID",
+      simultaneousHttpDownloads: undefined,
+      simultaneousP2PDownloads: undefined,
+      highDemandTimeWindow: undefined,
+      httpDownloadTimeWindow: undefined,
+      p2pDownloadTimeWindow: undefined,
+    },
   };
 
   const result: CoreConfig = {
@@ -220,6 +235,10 @@ test("filter undefined props", () => {
       "wss://tracker.openwebtorrent.com",
       // "wss://tracker.novage.com.ua",
     ],
+    mainStream: {},
+    secondaryStream: {
+      swarmId: "CUSTOM_SWARM_ID",
+    },
   };
 
   expect(filterUndefinedProps(coreConfig)).toEqual(result);
