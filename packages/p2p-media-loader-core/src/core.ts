@@ -100,8 +100,6 @@ export class Core<TStream extends Stream = Stream> {
   constructor(config?: Partial<CoreConfig>) {
     const filteredConfig = filterUndefinedProps(config ?? {});
 
-    console.log("filteredConfig", filteredConfig);
-
     this.commonCoreConfig = mergeAndFilterConfig<CommonCoreConfig>({
       defaultConfig: Core.DEFAULT_COMMON_CORE_CONFIG,
       baseConfig: filteredConfig,
