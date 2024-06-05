@@ -55,6 +55,14 @@ export type Stream = {
   readonly index: number;
 };
 
+/** Represents a defined Core configuration with specific settings for the main and secondary streams. */
+export type DefinedCoreConfig = CommonCoreConfig & {
+  /** Configuration for the main stream. */
+  mainStream: StreamConfig;
+  /** Configuration for the secondary stream. */
+  secondaryStream: StreamConfig;
+};
+
 /** Represents a set of properties that can be dynamically modified at runtime. */
 export type DynamicStreamProperties =
   | "highDemandTimeWindow"
@@ -101,6 +109,7 @@ export type DynamicCoreConfig = Partial<
     secondaryStream?: Partial<Pick<StreamConfig, DynamicStreamProperties>>;
   };
 
+/** Represents the configuration for the Core functionality that is common to all streams. */
 export type CommonCoreConfig = {
   /**
    * Time after which a cached segment expires, in seconds.
@@ -311,19 +320,22 @@ export type StreamConfig = {
 
   /**
    * Prefix to use for the WebTorrent client version in tracker communications.
+   * If undefined, the default version prefix is used, which is calculated based on the package version.
    *
    * @default
    * ```typescript
-   * trackerClientVersionPrefix: "PM0100" // PM + VERSION
+   * trackerClientVersionPrefix: undefined
    * ```
    */
   trackerClientVersionPrefix: string;
 
   /**
    * Optional unique identifier for the swarm, used to isolate peer pools by media stream.
-   *
+   * If undefined, the master URL of the manifest is used as the swarm ID.
    * @default
-   * The master URL of the manifest is used as the swarmId.
+   * ```typescript
+   * swarmId: undefined
+   * ```
    */
   swarmId?: string;
 
@@ -332,6 +344,11 @@ export type StreamConfig = {
    * @param url URL of the segment to validate.
    * @param byteRange Optional byte range of the segment.
    * @returns A promise that resolves with a boolean indicating if the segment is valid.
+   *
+   * @default
+   * ```typescript
+   * validateP2PSegment: undefined
+   * ```
    */
   validateP2PSegment?: (url: string, byteRange?: ByteRange) => Promise<boolean>;
 
@@ -342,6 +359,11 @@ export type StreamConfig = {
    * @param requestAbortSignal An abort signal to cancel the request if needed.
    * @param requestByteRange Additional byte range for partial requests, if required.
    * @returns A promise that resolves with the configured request, or undefined if no customization should be made.
+   *
+   * @default
+   * ```typescript
+   * httpRequestSetup: undefined
+   * ```
    */
   httpRequestSetup?: (
     segmentUrl: string,

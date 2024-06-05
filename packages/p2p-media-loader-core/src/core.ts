@@ -10,6 +10,7 @@ import {
   SegmentWithStream,
   CommonCoreConfig,
   StreamConfig,
+  DefinedCoreConfig,
 } from "./types";
 import { BandwidthCalculators, StreamDetails } from "./internal-types";
 import * as StreamUtils from "./utils/stream";
@@ -115,7 +116,7 @@ export class Core<TStream extends Stream = Stream> {
    *
    * @returns A deep readonly version of the core configuration.
    */
-  getConfig(): Partial<CoreConfig> {
+  getConfig(): DefinedCoreConfig {
     return {
       ...deepCopy(this.commonCoreConfig),
       mainStream: deepCopy(this.mainStreamConfig),
