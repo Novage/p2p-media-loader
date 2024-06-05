@@ -17,7 +17,12 @@ import * as StreamUtils from "./utils/stream";
 import { BandwidthCalculator } from "./bandwidth-calculator";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import { EventTarget } from "./utils/event-target";
-import { overrideConfig, mergeAndFilterConfig, deepCopy } from "./utils/utils";
+import {
+  overrideConfig,
+  mergeAndFilterConfig,
+  deepCopy,
+  filterUndefinedProps,
+} from "./utils/utils";
 import { TRACKER_CLIENT_VERSION_PREFIX } from "./utils/peer";
 
 export class Core<TStream extends Stream = Stream> {
@@ -93,21 +98,25 @@ export class Core<TStream extends Stream = Stream> {
    * const core = new Core();
    */
   constructor(config?: Partial<CoreConfig>) {
+    const filteredConfig = filterUndefinedProps(config ?? {});
+
+    console.log("filteredConfig", filteredConfig);
+
     this.commonCoreConfig = mergeAndFilterConfig<CommonCoreConfig>({
       defaultConfig: Core.DEFAULT_COMMON_CORE_CONFIG,
-      baseConfig: config,
+      baseConfig: filteredConfig,
     });
 
     this.mainStreamConfig = mergeAndFilterConfig<StreamConfig>({
       defaultConfig: Core.DEFAULT_STREAM_CONFIG,
-      baseConfig: config,
-      specificStreamConfig: config?.mainStream,
+      baseConfig: filteredConfig,
+      specificStreamConfig: filteredConfig?.mainStream,
     });
 
     this.secondaryStreamConfig = mergeAndFilterConfig<StreamConfig>({
       defaultConfig: Core.DEFAULT_STREAM_CONFIG,
-      baseConfig: config,
-      specificStreamConfig: config?.secondaryStream,
+      baseConfig: filteredConfig,
+      specificStreamConfig: filteredConfig?.secondaryStream,
     });
   }
 

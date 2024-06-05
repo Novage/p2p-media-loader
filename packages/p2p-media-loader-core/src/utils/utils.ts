@@ -73,6 +73,27 @@ function isArray(item: unknown): item is unknown[] {
   return Array.isArray(item);
 }
 
+export function filterUndefinedProps<T extends object>(obj: T): Partial<T> {
+  function filter(obj: unknown): unknown {
+    if (isObject(obj)) {
+      const result: Record<string, unknown> = {};
+      Object.keys(obj).forEach((key) => {
+        if (obj[key] !== undefined) {
+          const value = filter(obj[key]);
+          if (value !== undefined) {
+            result[key] = value;
+          }
+        }
+      });
+      return result;
+    } else {
+      return obj;
+    }
+  }
+
+  return filter(obj) as Partial<T>;
+}
+
 export function deepCopy<T>(item: T): T {
   if (isArray(item)) {
     return item.map((element) => deepCopy(element)) as T;
@@ -99,7 +120,11 @@ type RecursivePartial<T> = {
   [P in keyof T]?: T[P] extends object ? RecursivePartial<T[P]> : T[P];
 };
 
-export function overrideConfig<T>(target: T, updates: RecursivePartial<T>): T {
+export function overrideConfig<T>(
+  target: T,
+  updates: RecursivePartial<T>,
+  defaults: RecursivePartial<T> = {} as RecursivePartial<T>,
+): T {
   if (
     typeof target !== "object" ||
     target === null ||
@@ -115,15 +140,20 @@ export function overrideConfig<T>(target: T, updates: RecursivePartial<T>): T {
     }
 
     const updateValue = updates[key];
+    const defaultValue = defaults[key];
 
     if (key in target) {
       if (updateValue === undefined) {
-        target[key] = undefined as (T & object)[keyof T];
+        target[key] =
+          defaultValue === undefined
+            ? (undefined as (T & object)[keyof T])
+            : (defaultValue as (T & object)[keyof T]);
       } else {
         target[key] = updateValue as (T & object)[keyof T];
       }
     }
   });
+
   return target;
 }
 

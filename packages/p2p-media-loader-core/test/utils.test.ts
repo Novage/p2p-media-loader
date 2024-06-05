@@ -1,11 +1,12 @@
 import { expect, test } from "vitest";
-import { overrideConfig } from "../src/utils/utils.js";
+import { filterUndefinedProps, overrideConfig } from "../src/utils/utils";
 import {
   CommonCoreConfig,
   CoreConfig,
   DynamicCoreConfig,
   StreamConfig,
-} from "../src/types.js";
+} from "../src/types";
+import { Core } from "../src/core";
 
 test("override configs", () => {
   const coreConfig: CoreConfig = {
@@ -42,7 +43,7 @@ test("override common config", () => {
 
   const coreConfig: CoreConfig = {
     cachedSegmentExpiration: undefined,
-    cachedSegmentsCount: 0,
+    cachedSegmentsCount: undefined,
     simultaneousHttpDownloads: 3,
     simultaneousP2PDownloads: 3,
     highDemandTimeWindow: 15,
@@ -72,12 +73,14 @@ test("override common config", () => {
     swarmId: undefined,
   };
 
-  const result: CommonCoreConfig = {
+  const result: Partial<CommonCoreConfig> = {
     cachedSegmentExpiration: undefined,
     cachedSegmentsCount: 0,
   };
 
-  expect(overrideConfig(commonConfig, coreConfig)).toEqual(result);
+  expect(
+    overrideConfig(commonConfig, coreConfig, Core.DEFAULT_COMMON_CORE_CONFIG),
+  ).toEqual(result);
 });
 
 test("override defined stream config", () => {
@@ -168,4 +171,56 @@ test("override defined stream config", () => {
   }
 
   expect(overrideConfigs(mainStreamConfig, dynamicCoreConfig)).toEqual(result);
+});
+
+test("filter undefined props", () => {
+  const coreConfig: CoreConfig = {
+    cachedSegmentExpiration: undefined,
+    cachedSegmentsCount: undefined,
+    simultaneousHttpDownloads: 2,
+    simultaneousP2PDownloads: 20,
+    highDemandTimeWindow: 45,
+    httpDownloadTimeWindow: 5000,
+    p2pDownloadTimeWindow: 10000,
+    webRtcMaxMessageSize: 64 * 1024 - 1,
+    p2pNotReceivingBytesTimeoutMs: 2000,
+    p2pInactiveLoaderDestroyTimeoutMs: 15 * 1000,
+    httpNotReceivingBytesTimeoutMs: 1500,
+    httpErrorRetries: 2,
+    p2pErrorRetries: 4,
+    trackerClientVersionPrefix: "PM1000",
+    announceTrackers: [
+      "wss://tracker.webtorrent.dev",
+      "wss://tracker.files.fm:7073/announce",
+      "wss://tracker.openwebtorrent.com",
+      // "wss://tracker.novage.com.ua",
+    ],
+    rtcConfig: undefined,
+    validateP2PSegment: undefined,
+    httpRequestSetup: undefined,
+    swarmId: undefined,
+  };
+
+  const result: CoreConfig = {
+    simultaneousHttpDownloads: 2,
+    simultaneousP2PDownloads: 20,
+    highDemandTimeWindow: 45,
+    httpDownloadTimeWindow: 5000,
+    p2pDownloadTimeWindow: 10000,
+    webRtcMaxMessageSize: 64 * 1024 - 1,
+    p2pNotReceivingBytesTimeoutMs: 2000,
+    p2pInactiveLoaderDestroyTimeoutMs: 15 * 1000,
+    httpNotReceivingBytesTimeoutMs: 1500,
+    httpErrorRetries: 2,
+    p2pErrorRetries: 4,
+    trackerClientVersionPrefix: "PM1000",
+    announceTrackers: [
+      "wss://tracker.webtorrent.dev",
+      "wss://tracker.files.fm:7073/announce",
+      "wss://tracker.openwebtorrent.com",
+      // "wss://tracker.novage.com.ua",
+    ],
+  };
+
+  expect(filterUndefinedProps(coreConfig)).toEqual(result);
 });
