@@ -62,8 +62,9 @@ export class Peer {
     eventTarget.getEventDispatcher("onPeerConnect")({
       peerId: this.id,
     });
-    connection.on("close", this.onPeerConnectionClosed);
-    connection.on("error", this.onConnectionError);
+
+    connection._channel.onerror = this.onConnectionError;
+    connection._channel.onclose = this.onPeerConnectionClosed;
   }
 
   get downloadingSegment(): SegmentWithStream | undefined {
@@ -301,10 +302,12 @@ export class Peer {
     this.destroy();
   };
 
-  private onConnectionError = (error: { code: string }) => {
-    this.logger(`peer connection error ${this.id} %O`, error);
-
-    if (error.code === "ERR_DATA_CHANNEL") {
+  private onConnectionError = (ev: Event) => {
+    // Log the error
+    this.logger(`peer connection error ${this.id} %O`, ev);
+    // Extract error information
+    const event = ev as RTCErrorEvent;
+    if (event.error.errorDetail === "data-channel-failure") {
       this.destroy();
     }
   };
