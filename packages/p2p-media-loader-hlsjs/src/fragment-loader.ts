@@ -56,17 +56,6 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       start,
       end !== undefined ? end - 1 : undefined,
     );
-    this.#segmentId = Utils.getSegmentLocalId(context.url, byteRange);
-
-    const coreConfig = this.#core.getConfig();
-    if (
-      !this.#core.hasSegment(this.#segmentId) ||
-      (coreConfig.mainStream.isP2PDisabled &&
-        coreConfig.secondaryStream.isP2PDisabled)
-    ) {
-      this.#initAndLoadWithDefaultLoader(context, config, callbacks);
-      return;
-    }
 
     const onSuccess = (response: SegmentResponse) => {
       this.#response = response;
@@ -105,9 +94,37 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       this.#handleError(error);
     };
 
-    void this.#core.loadSegment(this.#segmentId, { onSuccess, onError }, () => {
+    const coreConfig = this.#core.getConfig();
+    this.#segmentId = Utils.getSegmentLocalId(context.url, byteRange);
+
+    if (
+      !this.#core.hasSegment(this.#segmentId) &&
+      !coreConfig.mainStream.isP2PDisabled &&
+      !coreConfig.secondaryStream.isP2PDisabled
+    ) {
+      void this.#core.loadSegment(
+        this.#segmentId,
+        { onSuccess, onError },
+        () => {
+          this.#initAndLoadWithDefaultLoader(context, config, callbacks);
+        },
+      );
+    } else if (
+      !this.#core.hasSegment(this.#segmentId) ||
+      (coreConfig.mainStream.isP2PDisabled &&
+        coreConfig.secondaryStream.isP2PDisabled)
+    ) {
       this.#initAndLoadWithDefaultLoader(context, config, callbacks);
-    });
+      return;
+    } else {
+      void this.#core.loadSegment(
+        this.#segmentId,
+        { onSuccess, onError },
+        () => {
+          this.#initAndLoadWithDefaultLoader(context, config, callbacks);
+        },
+      );
+    }
   }
 
   #initAndLoadWithDefaultLoader(

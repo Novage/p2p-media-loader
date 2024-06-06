@@ -77,7 +77,8 @@ export type DynamicStreamProperties =
   | "httpErrorRetries"
   | "p2pErrorRetries"
   | "validateP2PSegment"
-  | "httpRequestSetup";
+  | "httpRequestSetup"
+  | "isP2PDisabled";
 
 /**
  * Represents a dynamically modifiable configuration, allowing updates to selected CoreConfig properties at runtime.

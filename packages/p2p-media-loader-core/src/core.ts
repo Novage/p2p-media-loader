@@ -148,15 +148,63 @@ export class Core<TStream extends Stream = Stream> {
    * core.applyDynamicConfig(dynamicConfig);
    */
   applyDynamicConfig(dynamicConfig: DynamicCoreConfig) {
+    const { isP2PDisabled, mainStream, secondaryStream } = dynamicConfig;
+
+    const hasP2PDisabledChanged = (
+      current: boolean | undefined,
+      updated: boolean | undefined,
+    ) => updated !== undefined && current !== updated;
+
+    const isP2PDisabledChanged =
+      isP2PDisabled !== undefined &&
+      (this.mainStreamConfig.isP2PDisabled !== isP2PDisabled ||
+        this.secondaryStreamConfig.isP2PDisabled !== isP2PDisabled);
+
+    const isMainStreamP2PDisabledChanged = hasP2PDisabledChanged(
+      this.mainStreamConfig.isP2PDisabled,
+      mainStream?.isP2PDisabled,
+    );
+
+    const isSecondaryStreamP2PDisabledChanged = hasP2PDisabledChanged(
+      this.secondaryStreamConfig.isP2PDisabled,
+      secondaryStream?.isP2PDisabled,
+    );
+
     overrideConfig(this.commonCoreConfig, dynamicConfig);
     overrideConfig(this.mainStreamConfig, dynamicConfig);
     overrideConfig(this.secondaryStreamConfig, dynamicConfig);
 
-    if (dynamicConfig.mainStream) {
-      overrideConfig(this.mainStreamConfig, dynamicConfig.mainStream);
+    if (mainStream) {
+      overrideConfig(this.mainStreamConfig, mainStream);
     }
-    if (dynamicConfig.secondaryStream) {
-      overrideConfig(this.secondaryStreamConfig, dynamicConfig.secondaryStream);
+
+    if (secondaryStream) {
+      overrideConfig(this.secondaryStreamConfig, secondaryStream);
+    }
+
+    if (
+      isP2PDisabledChanged &&
+      this.mainStreamConfig.isP2PDisabled &&
+      this.secondaryStreamConfig.isP2PDisabled
+    ) {
+      this.mainStreamLoader?.destroy();
+      this.secondaryStreamLoader?.destroy();
+      this.mainStreamLoader = undefined;
+      this.secondaryStreamLoader = undefined;
+      return;
+    }
+
+    if (isMainStreamP2PDisabledChanged && this.mainStreamConfig.isP2PDisabled) {
+      this.mainStreamLoader?.destroy();
+      this.mainStreamLoader = undefined;
+    }
+
+    if (
+      isSecondaryStreamP2PDisabledChanged &&
+      this.secondaryStreamConfig.isP2PDisabled
+    ) {
+      this.secondaryStreamLoader?.destroy();
+      this.secondaryStreamLoader = undefined;
     }
   }
 
@@ -272,7 +320,7 @@ export class Core<TStream extends Stream = Stream> {
   async loadSegment(
     segmentLocalId: string,
     callbacks: EngineCallbacks,
-    loadSegmentThroughDefaultLoader: () => void,
+    loadThroughDefaultLoaderCallback: () => void,
   ) {
     if (!this.manifestResponseUrl) {
       throw new Error("Manifest response url is not defined");
@@ -286,16 +334,24 @@ export class Core<TStream extends Stream = Stream> {
       await this.segmentStorage.initialize();
     }
 
-    const segment = this.identifySegment(segmentLocalId);
+    let segment: SegmentWithStream | undefined = undefined;
+
+    try {
+      segment = this.identifySegment(segmentLocalId);
+    } catch (e) {
+      loadThroughDefaultLoaderCallback();
+      return;
+    }
+
     if (segment.stream.type === "main" && this.mainStreamConfig.isP2PDisabled) {
-      loadSegmentThroughDefaultLoader();
+      loadThroughDefaultLoaderCallback();
       return;
     }
     if (
       segment.stream.type === "secondary" &&
       this.secondaryStreamConfig.isP2PDisabled
     ) {
-      loadSegmentThroughDefaultLoader();
+      loadThroughDefaultLoaderCallback();
       return;
     }
 
