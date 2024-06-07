@@ -170,41 +170,27 @@ export class Core<TStream extends Stream = Stream> {
       secondaryStream?.isP2PDisabled,
     );
 
-    overrideConfig(this.commonCoreConfig, dynamicConfig);
-    overrideConfig(this.mainStreamConfig, dynamicConfig);
-    overrideConfig(this.secondaryStreamConfig, dynamicConfig);
-
-    if (mainStream) {
-      overrideConfig(this.mainStreamConfig, mainStream);
-    }
-
-    if (secondaryStream) {
-      overrideConfig(this.secondaryStreamConfig, secondaryStream);
-    }
+    this.overrideAllConfigs(dynamicConfig, mainStream, secondaryStream);
 
     if (
       isP2PDisabledChanged &&
       this.mainStreamConfig.isP2PDisabled &&
       this.secondaryStreamConfig.isP2PDisabled
     ) {
-      this.mainStreamLoader?.destroy();
-      this.secondaryStreamLoader?.destroy();
-      this.mainStreamLoader = undefined;
-      this.secondaryStreamLoader = undefined;
+      this.destroyStreamLoader("main");
+      this.destroyStreamLoader("secondary");
       return;
     }
 
     if (isMainStreamP2PDisabledChanged && this.mainStreamConfig.isP2PDisabled) {
-      this.mainStreamLoader?.destroy();
-      this.mainStreamLoader = undefined;
+      this.destroyStreamLoader("main");
     }
 
     if (
       isSecondaryStreamP2PDisabledChanged &&
       this.secondaryStreamConfig.isP2PDisabled
     ) {
-      this.secondaryStreamLoader?.destroy();
-      this.secondaryStreamLoader = undefined;
+      this.destroyStreamLoader("secondary");
     }
   }
 
@@ -434,6 +420,34 @@ export class Core<TStream extends Stream = Stream> {
     }
 
     return segment;
+  }
+
+  private overrideAllConfigs(
+    dynamicConfig: DynamicCoreConfig,
+    mainStream?: Partial<StreamConfig>,
+    secondaryStream?: Partial<StreamConfig>,
+  ) {
+    overrideConfig(this.commonCoreConfig, dynamicConfig);
+    overrideConfig(this.mainStreamConfig, dynamicConfig);
+    overrideConfig(this.secondaryStreamConfig, dynamicConfig);
+
+    if (mainStream) {
+      overrideConfig(this.mainStreamConfig, mainStream);
+    }
+
+    if (secondaryStream) {
+      overrideConfig(this.secondaryStreamConfig, secondaryStream);
+    }
+  }
+
+  private destroyStreamLoader(streamType: "main" | "secondary") {
+    if (streamType === "main") {
+      this.mainStreamLoader?.destroy();
+      this.mainStreamLoader = undefined;
+    } else {
+      this.secondaryStreamLoader?.destroy();
+      this.secondaryStreamLoader = undefined;
+    }
   }
 
   private getStreamHybridLoader(segment: SegmentWithStream) {
