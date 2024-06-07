@@ -1,12 +1,9 @@
-import { CoreConfig, SegmentWithStream, Stream } from "./types";
+import { CommonCoreConfig, SegmentWithStream, Stream } from "./types";
 import * as StreamUtils from "./utils/stream";
 import debug from "debug";
 import { EventTarget } from "./utils/event-target";
 
-type StorageConfig = Pick<
-  CoreConfig,
-  "cachedSegmentExpiration" | "cachedSegmentsCount"
->;
+type StorageConfig = CommonCoreConfig;
 
 function getStorageItemId(segment: SegmentWithStream) {
   const streamExternalId = StreamUtils.getStreamShortId(segment.stream);

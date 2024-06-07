@@ -2,7 +2,7 @@ import TrackerClient, {
   PeerConnection,
   TrackerClientEvents,
 } from "bittorrent-tracker";
-import { CoreConfig, CoreEventMap, StreamWithSegments } from "../types";
+import { CoreEventMap, StreamConfig, StreamWithSegments } from "../types";
 import debug from "debug";
 import * as PeerUtil from "../utils/peer";
 import * as LoggerUtils from "../utils/logger";
@@ -31,7 +31,7 @@ export class P2PTrackerClient {
     streamId: string,
     stream: StreamWithSegments,
     private readonly eventHandlers: P2PTrackerClientEventHandlers,
-    private readonly config: CoreConfig,
+    private readonly config: StreamConfig,
     private readonly eventTarget: EventTarget<CoreEventMap>,
   ) {
     const streamHash = PeerUtil.getStreamHash(streamId);

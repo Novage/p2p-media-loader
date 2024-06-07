@@ -1,7 +1,7 @@
 import {
-  CoreConfig,
   SegmentWithStream,
   Stream,
+  StreamConfig,
   StreamWithSegments,
 } from "../types";
 import { Playback } from "../internal-types";
@@ -14,7 +14,7 @@ export type SegmentPlaybackStatuses = {
 };
 
 export type PlaybackTimeWindowsConfig = Pick<
-  CoreConfig,
+  StreamConfig,
   "highDemandTimeWindow" | "httpDownloadTimeWindow" | "p2pDownloadTimeWindow"
 >;
 

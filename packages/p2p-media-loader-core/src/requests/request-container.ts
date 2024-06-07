@@ -1,5 +1,5 @@
 import { Playback, BandwidthCalculators } from "../internal-types";
-import { CoreConfig, CoreEventMap, SegmentWithStream } from "../types";
+import { CoreEventMap, SegmentWithStream, StreamConfig } from "../types";
 import { EventTarget } from "../utils/event-target";
 import { Request } from "./request";
 
@@ -10,7 +10,7 @@ export class RequestsContainer {
     private readonly requestProcessQueueCallback: () => void,
     private readonly bandwidthCalculators: BandwidthCalculators,
     private readonly playback: Playback,
-    private readonly config: CoreConfig,
+    private readonly config: StreamConfig,
     private readonly eventTarget: EventTarget<CoreEventMap>,
   ) {}
 

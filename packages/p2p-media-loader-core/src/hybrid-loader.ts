@@ -1,10 +1,10 @@
 import { HttpRequestExecutor } from "./http-loader";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import {
-  CoreConfig,
   CoreEventMap,
   EngineCallbacks,
   SegmentWithStream,
+  StreamConfig,
   StreamWithSegments,
 } from "./types";
 import {
@@ -43,7 +43,7 @@ export class HybridLoader {
     private streamManifestUrl: string,
     private lastRequestedSegment: Readonly<SegmentWithStream>,
     private readonly streamDetails: Required<Readonly<StreamDetails>>,
-    private readonly config: CoreConfig,
+    private readonly config: StreamConfig,
     private readonly bandwidthCalculators: BandwidthCalculators,
     private readonly segmentStorage: SegmentsMemoryStorage,
     private readonly eventTarget: EventTarget<CoreEventMap>,

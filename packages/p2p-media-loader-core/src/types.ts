@@ -55,28 +55,115 @@ export type Stream = {
   readonly index: number;
 };
 
-/** Represents a dynamically modifiable configuration, allowing updates to selected CoreConfig properties at runtime. */
+/** Represents a defined Core configuration with specific settings for the main and secondary streams. */
+export type DefinedCoreConfig = CommonCoreConfig & {
+  /** Configuration for the main stream. */
+  mainStream: StreamConfig;
+  /** Configuration for the secondary stream. */
+  secondaryStream: StreamConfig;
+};
+
+/** Represents a set of properties that can be dynamically modified at runtime. */
+export type DynamicStreamProperties =
+  | "highDemandTimeWindow"
+  | "httpDownloadTimeWindow"
+  | "p2pDownloadTimeWindow"
+  | "simultaneousHttpDownloads"
+  | "simultaneousP2PDownloads"
+  | "webRtcMaxMessageSize"
+  | "p2pNotReceivingBytesTimeoutMs"
+  | "p2pInactiveLoaderDestroyTimeoutMs"
+  | "httpNotReceivingBytesTimeoutMs"
+  | "httpErrorRetries"
+  | "p2pErrorRetries"
+  | "validateP2PSegment"
+  | "httpRequestSetup";
+
+/**
+ * Represents a dynamically modifiable configuration, allowing updates to selected CoreConfig properties at runtime.
+ *
+ * @example
+ * ```typescript
+ * const dynamicConfig: DynamicCoreConfig = {
+ *   core: {
+ *     cachedSegmentsCount: 200,
+ *   },
+ *   mainStream: {
+ *     swarmId: "custom swarm ID for video stream",
+ *     p2pDownloadTimeWindow: 6000,
+ *   },
+ *   secondaryStream: {
+ *     swarmId: "custom swarm ID for audio stream",
+ *     p2pDownloadTimeWindow: 3000,
+ *   }
+ * };
+ * ```
+ */
 export type DynamicCoreConfig = Partial<
-  Pick<
-    CoreConfig,
-    | "highDemandTimeWindow"
-    | "httpDownloadTimeWindow"
-    | "p2pDownloadTimeWindow"
-    | "simultaneousHttpDownloads"
-    | "simultaneousP2PDownloads"
-    | "cachedSegmentExpiration"
-    | "cachedSegmentsCount"
-    | "webRtcMaxMessageSize"
-    | "p2pNotReceivingBytesTimeoutMs"
-    | "p2pInactiveLoaderDestroyTimeoutMs"
-    | "httpNotReceivingBytesTimeoutMs"
-    | "httpErrorRetries"
-    | "p2pErrorRetries"
-  >
->;
+  Pick<CoreConfig, DynamicStreamProperties>
+> &
+  Partial<CommonCoreConfig> & {
+    /** Optional dynamic configuration for the main stream. */
+    mainStream?: Partial<Pick<StreamConfig, DynamicStreamProperties>>;
+    /** Optional dynamic configuration for the secondary stream. */
+    secondaryStream?: Partial<Pick<StreamConfig, DynamicStreamProperties>>;
+  };
+
+/** Represents the configuration for the Core functionality that is common to all streams. */
+export type CommonCoreConfig = {
+  /**
+   * Time after which a cached segment expires, in seconds.
+   * If set to undefined, the cacheSegmentExpiration is disabled for VOD streams, and a default value (20 minutes) is used for live streams.
+   *
+   * @default
+   * ```typescript
+   * cachedSegmentExpiration: undefined
+   * ```
+   */
+  cachedSegmentExpiration?: number;
+  /**
+   * Maximum number of segments to store in the cache.
+   * Has to be less then httpDownloadTimeWindow and p2pDownloadTimeWindow.
+   * If set to 0, the cache is unlimited.
+   *
+   * @default
+   * ```typescript
+   * cachedSegmentsCount: 0
+   * ```
+   */
+  cachedSegmentsCount: number;
+};
+
+/**
+ * Represents a set of configuration parameters that can be used to override or extend the
+ * default configuration settings for a specific stream (main or secondary).
+ *
+ * @example
+ * ```typescript
+ * const config: CoreConfig = {
+ *  highDemandTimeWindow: 20,
+ *  httpDownloadTimeWindow: 3000,
+ *  p2pDownloadTimeWindow: 6000,
+ *  mainStream: {
+ *   // Optional configuration for the main stream
+ *   swarmId: "custom swarm ID for video stream",
+ *  },
+ *  secondaryStream: {
+ *   // Optional configuration for the secondary stream
+ *   swarmId: "custom swarm ID for audio stream",
+ *  },
+ *  ```
+ */
+export type CoreConfig = Partial<StreamConfig> &
+  Partial<CommonCoreConfig> & {
+    /** Optional configuration for the main stream. */
+    mainStream?: Partial<StreamConfig>;
+    /** Optional configuration for the secondary stream. */
+    secondaryStream?: Partial<StreamConfig>;
+  };
 
 /** Configuration options for the Core functionality, including network and processing parameters. */
-export type CoreConfig = {
+export type StreamConfig = {
   /**
    * Defines the duration of the time window, in seconds, during which segments are pre-loaded to ensure smooth playback.
    * This window helps prioritize the fetching of media segments that are imminent to playback.
@@ -136,29 +223,6 @@ export type CoreConfig = {
    * ```
    */
   simultaneousP2PDownloads: number;
-
-  /**
-   * Time after which a cached segment expires, in seconds.
-   * If set to undefined, the cacheSegmentExpiration is disabled for VOD streams, and a default value (20 minutes) is used for live streams.
-   *
-   * @default
-   * ```typescript
-   * cachedSegmentExpiration: undefined
-   * ```
-   */
-  cachedSegmentExpiration?: number;
-
-  /**
-   * Maximum number of segments to store in the cache.
-   * Has to be less then httpDownloadTimeWindow and p2pDownloadTimeWindow.
-   * If set to 0, the cache is unlimited.
-   *
-   * @default
-   * ```typescript
-   * cachedSegmentsCount: 0
-   * ```
-   */
-  cachedSegmentsCount: number;
 
   /**
    * Maximum message size for WebRTC communications, in bytes.
@@ -256,19 +320,22 @@ export type CoreConfig = {
 
   /**
    * Prefix to use for the WebTorrent client version in tracker communications.
+   * If undefined, the default version prefix is used, which is calculated based on the package version.
    *
    * @default
    * ```typescript
-   * trackerClientVersionPrefix: "PM0100" // PM + VERSION
+   * trackerClientVersionPrefix: undefined
    * ```
    */
   trackerClientVersionPrefix: string;
 
   /**
    * Optional unique identifier for the swarm, used to isolate peer pools by media stream.
-   *
+   * If undefined, the master URL of the manifest is used as the swarm ID.
    * @default
-   * The master URL of the manifest is used as the swarmId.
+   * ```typescript
+   * swarmId: undefined
+   * ```
    */
   swarmId?: string;
 
@@ -277,6 +344,11 @@ export type CoreConfig = {
    * @param url URL of the segment to validate.
    * @param byteRange Optional byte range of the segment.
    * @returns A promise that resolves with a boolean indicating if the segment is valid.
+   *
+   * @default
+   * ```typescript
+   * validateP2PSegment: undefined
+   * ```
    */
   validateP2PSegment?: (url: string, byteRange?: ByteRange) => Promise<boolean>;
 
@@ -287,6 +359,11 @@ export type CoreConfig = {
    * @param requestAbortSignal An abort signal to cancel the request if needed.
    * @param requestByteRange Additional byte range for partial requests, if required.
    * @returns A promise that resolves with the configured request, or undefined if no customization should be made.
+   *
+   * @default
+   * ```typescript
+   * httpRequestSetup: undefined
+   * ```
    */
   httpRequestSetup?: (
     segmentUrl: string,

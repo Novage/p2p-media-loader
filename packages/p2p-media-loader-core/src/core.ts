@@ -8,23 +8,35 @@ import {
   EngineCallbacks,
   StreamWithSegments,
   SegmentWithStream,
+  CommonCoreConfig,
+  StreamConfig,
+  DefinedCoreConfig,
 } from "./types";
 import { BandwidthCalculators, StreamDetails } from "./internal-types";
 import * as StreamUtils from "./utils/stream";
 import { BandwidthCalculator } from "./bandwidth-calculator";
 import { SegmentsMemoryStorage } from "./segments-storage";
 import { EventTarget } from "./utils/event-target";
-import { deepCopy } from "./utils/utils";
+import {
+  overrideConfig,
+  mergeAndFilterConfig,
+  deepCopy,
+  filterUndefinedProps,
+} from "./utils/utils";
 import { TRACKER_CLIENT_VERSION_PREFIX } from "./utils/peer";
 
 export class Core<TStream extends Stream = Stream> {
-  static readonly DEFAULT_CONFIG: CoreConfig = {
+  static readonly DEFAULT_COMMON_CORE_CONFIG: CommonCoreConfig = {
+    cachedSegmentExpiration: undefined,
+    cachedSegmentsCount: 0,
+  };
+
+  static readonly DEFAULT_STREAM_CONFIG: StreamConfig = {
     simultaneousHttpDownloads: 3,
     simultaneousP2PDownloads: 3,
     highDemandTimeWindow: 15,
     httpDownloadTimeWindow: 3000,
     p2pDownloadTimeWindow: 6000,
-    cachedSegmentsCount: 0,
     webRtcMaxMessageSize: 64 * 1024 - 1,
     p2pNotReceivingBytesTimeoutMs: 1000,
     p2pInactiveLoaderDestroyTimeoutMs: 30 * 1000,
@@ -44,12 +56,17 @@ export class Core<TStream extends Stream = Stream> {
         { urls: "stun:global.stun.twilio.com:3478" },
       ],
     },
+    validateP2PSegment: undefined,
+    httpRequestSetup: undefined,
+    swarmId: undefined,
   };
 
   private readonly eventTarget = new EventTarget<CoreEventMap>();
   private manifestResponseUrl?: string;
   private readonly streams = new Map<string, StreamWithSegments<TStream>>();
-  private config: CoreConfig;
+  private mainStreamConfig: StreamConfig;
+  private secondaryStreamConfig: StreamConfig;
+  private commonCoreConfig: CommonCoreConfig;
   private readonly bandwidthCalculators: BandwidthCalculators = {
     all: new BandwidthCalculator(),
     http: new BandwidthCalculator(),
@@ -81,7 +98,24 @@ export class Core<TStream extends Stream = Stream> {
    * const core = new Core();
    */
   constructor(config?: Partial<CoreConfig>) {
-    this.config = deepCopy({ ...Core.DEFAULT_CONFIG, ...config });
+    const filteredConfig = filterUndefinedProps(config ?? {});
+
+    this.commonCoreConfig = mergeAndFilterConfig<CommonCoreConfig>({
+      defaultConfig: Core.DEFAULT_COMMON_CORE_CONFIG,
+      baseConfig: filteredConfig,
+    });
+
+    this.mainStreamConfig = mergeAndFilterConfig<StreamConfig>({
+      defaultConfig: Core.DEFAULT_STREAM_CONFIG,
+      baseConfig: filteredConfig,
+      specificStreamConfig: filteredConfig?.mainStream,
+    });
+
+    this.secondaryStreamConfig = mergeAndFilterConfig<StreamConfig>({
+      defaultConfig: Core.DEFAULT_STREAM_CONFIG,
+      baseConfig: filteredConfig,
+      specificStreamConfig: filteredConfig?.secondaryStream,
+    });
   }
 
   /**
@@ -89,8 +123,12 @@ export class Core<TStream extends Stream = Stream> {
    *
    * @returns A deep readonly version of the core configuration.
    */
-  getConfig(): CoreConfig {
-    return this.config;
+  getConfig(): DefinedCoreConfig {
+    return {
+      ...deepCopy(this.commonCoreConfig),
+      mainStream: deepCopy(this.mainStreamConfig),
+      secondaryStream: deepCopy(this.secondaryStreamConfig),
+    };
   }
 
   /**
@@ -109,7 +147,16 @@ export class Core<TStream extends Stream = Stream> {
    * core.applyDynamicConfig(dynamicConfig);
    */
   applyDynamicConfig(dynamicConfig: DynamicCoreConfig) {
-    this.config = deepCopy({ ...this.config, ...dynamicConfig });
+    overrideConfig(this.commonCoreConfig, dynamicConfig);
+    overrideConfig(this.mainStreamConfig, dynamicConfig);
+    overrideConfig(this.secondaryStreamConfig, dynamicConfig);
+
+    if (dynamicConfig.mainStream) {
+      overrideConfig(this.mainStreamConfig, dynamicConfig.mainStream);
+    }
+    if (dynamicConfig.secondaryStream) {
+      overrideConfig(this.secondaryStreamConfig, dynamicConfig.secondaryStream);
+    }
   }
 
   /**
@@ -229,7 +276,7 @@ export class Core<TStream extends Stream = Stream> {
     if (!this.segmentStorage) {
       this.segmentStorage = new SegmentsMemoryStorage(
         this.manifestResponseUrl,
-        this.config,
+        this.commonCoreConfig,
       );
       await this.segmentStorage.initialize();
     }
@@ -334,11 +381,16 @@ export class Core<TStream extends Stream = Stream> {
       throw new Error("Segment storage is not initialized");
     }
 
+    const streamConfig =
+      segment.stream.type === "main"
+        ? this.mainStreamConfig
+        : this.secondaryStreamConfig;
+
     return new HybridLoader(
       this.manifestResponseUrl,
       segment,
       this.streamDetails,
-      this.config,
+      streamConfig,
       this.bandwidthCalculators,
       this.segmentStorage,
       this.eventTarget,

@@ -1,8 +1,8 @@
 import { Peer } from "./peer";
 import {
-  CoreConfig,
   CoreEventMap,
   SegmentWithStream,
+  StreamConfig,
   StreamWithSegments,
 } from "../types";
 import { SegmentsMemoryStorage } from "../segments-storage";
@@ -21,7 +21,7 @@ export class P2PLoader {
     private readonly stream: StreamWithSegments,
     private readonly requests: RequestsContainer,
     private readonly segmentStorage: SegmentsMemoryStorage,
-    private readonly config: CoreConfig,
+    private readonly config: StreamConfig,
     private readonly eventTarget: EventTarget<CoreEventMap>,
     private readonly onSegmentAnnouncement: () => void,
   ) {
