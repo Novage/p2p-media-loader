@@ -57,6 +57,21 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       end !== undefined ? end - 1 : undefined,
     );
 
+    this.#segmentId = Utils.getSegmentLocalId(context.url, byteRange);
+    const isSegmentP2Downloadable = this.#core.isSegmentLoadableByP2P(
+      this.#segmentId,
+    );
+
+    if (
+      !this.#core.hasSegment(this.#segmentId) ||
+      isSegmentP2Downloadable === false
+    ) {
+      this.#defaultLoader = this.#createDefaultLoader();
+      this.#defaultLoader.stats = this.stats;
+      this.#defaultLoader?.load(context, config, callbacks);
+      return;
+    }
+
     const onSuccess = (response: SegmentResponse) => {
       this.#response = response;
       const loadedBytes = this.#response.data.byteLength;
@@ -94,47 +109,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       this.#handleError(error);
     };
 
-    const coreConfig = this.#core.getConfig();
-    this.#segmentId = Utils.getSegmentLocalId(context.url, byteRange);
-
-    if (
-      !this.#core.hasSegment(this.#segmentId) &&
-      !coreConfig.mainStream.isP2PDisabled &&
-      !coreConfig.secondaryStream.isP2PDisabled
-    ) {
-      void this.#core.loadSegment(
-        this.#segmentId,
-        { onSuccess, onError },
-        () => {
-          this.#initAndLoadWithDefaultLoader(context, config, callbacks);
-        },
-      );
-    } else if (
-      !this.#core.hasSegment(this.#segmentId) ||
-      (coreConfig.mainStream.isP2PDisabled &&
-        coreConfig.secondaryStream.isP2PDisabled)
-    ) {
-      this.#initAndLoadWithDefaultLoader(context, config, callbacks);
-      return;
-    } else {
-      void this.#core.loadSegment(
-        this.#segmentId,
-        { onSuccess, onError },
-        () => {
-          this.#initAndLoadWithDefaultLoader(context, config, callbacks);
-        },
-      );
-    }
-  }
-
-  #initAndLoadWithDefaultLoader(
-    context: FragmentLoaderContext,
-    config: LoaderConfiguration,
-    callbacks: LoaderCallbacks<LoaderContext>,
-  ) {
-    this.#defaultLoader = this.#createDefaultLoader();
-    this.#defaultLoader.stats = this.stats;
-    this.#defaultLoader?.load(context, config, callbacks);
+    void this.#core.loadSegment(this.#segmentId, { onSuccess, onError });
   }
 
   #handleError(thrownError: unknown) {

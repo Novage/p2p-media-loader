@@ -317,11 +317,7 @@ export class Core<TStream extends Stream = Stream> {
    * @param callbacks - The callbacks to be invoked during segment loading.
    * @throws {Error} - Throws if the manifest response URL is not defined.
    */
-  async loadSegment(
-    segmentLocalId: string,
-    callbacks: EngineCallbacks,
-    loadThroughDefaultLoaderCallback: () => void,
-  ) {
+  async loadSegment(segmentLocalId: string, callbacks: EngineCallbacks) {
     if (!this.manifestResponseUrl) {
       throw new Error("Manifest response url is not defined");
     }
@@ -334,26 +330,7 @@ export class Core<TStream extends Stream = Stream> {
       await this.segmentStorage.initialize();
     }
 
-    let segment: SegmentWithStream | undefined = undefined;
-
-    try {
-      segment = this.identifySegment(segmentLocalId);
-    } catch (e) {
-      loadThroughDefaultLoaderCallback();
-      return;
-    }
-
-    if (segment.stream.type === "main" && this.mainStreamConfig.isP2PDisabled) {
-      loadThroughDefaultLoaderCallback();
-      return;
-    }
-    if (
-      segment.stream.type === "secondary" &&
-      this.secondaryStreamConfig.isP2PDisabled
-    ) {
-      loadThroughDefaultLoaderCallback();
-      return;
-    }
+    const segment = this.identifySegment(segmentLocalId);
 
     const loader = this.getStreamHybridLoader(segment);
     void loader.loadSegment(segment, callbacks);
@@ -401,6 +378,30 @@ export class Core<TStream extends Stream = Stream> {
    */
   setIsLive(isLive: boolean) {
     this.streamDetails.isLive = isLive;
+  }
+
+  isSegmentLoadableByP2P(segmentLocalId: string): boolean {
+    try {
+      const segment = this.identifySegment(segmentLocalId);
+
+      if (
+        segment.stream.type === "main" &&
+        this.mainStreamConfig.isP2PDisabled
+      ) {
+        return false;
+      }
+
+      if (
+        segment.stream.type === "secondary" &&
+        this.secondaryStreamConfig.isP2PDisabled
+      ) {
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
   /**

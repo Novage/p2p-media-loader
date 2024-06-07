@@ -165,6 +165,15 @@ export type CoreConfig = Partial<StreamConfig> &
 
 /** Configuration options for the Core functionality, including network and processing parameters. */
 export type StreamConfig = {
+  /**
+   * Indicates whether Peer-to-Peer (P2P) functionality is disabled for the stream.
+   * If set to true, P2P functionality is disabled for the stream.
+   *
+   * @default
+   * ```typescript
+   * isP2PDisabled: false
+   * ```
+   */
   isP2PDisabled: boolean;
   /**
    * Defines the duration of the time window, in seconds, during which segments are pre-loaded to ensure smooth playback.

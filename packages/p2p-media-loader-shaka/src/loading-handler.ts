@@ -54,7 +54,9 @@ export class Loader {
     byteRangeString: string,
   ): LoadingHandlerResult {
     const segmentId = Utils.getSegmentLocalId(segmentUrl, byteRangeString);
-    if (!this.core.hasSegment(segmentId)) {
+    const isSegmentP2Downloadable = this.core.isSegmentLoadableByP2P(segmentId);
+
+    if (!this.core.hasSegment(segmentId) || isSegmentP2Downloadable === false) {
       return this.defaultLoad() as LoadingHandlerResult;
     }
 
