@@ -148,32 +148,11 @@ export class Core<TStream extends Stream = Stream> {
    * core.applyDynamicConfig(dynamicConfig);
    */
   applyDynamicConfig(dynamicConfig: DynamicCoreConfig) {
-    const { isP2PDisabled, mainStream, secondaryStream } = dynamicConfig;
-
-    const hasP2PDisabledChanged = (
-      current: boolean | undefined,
-      updated: boolean | undefined,
-    ) => updated !== undefined && current !== updated;
-
-    const isP2PDisabledChanged =
-      isP2PDisabled !== undefined &&
-      (this.mainStreamConfig.isP2PDisabled !== isP2PDisabled ||
-        this.secondaryStreamConfig.isP2PDisabled !== isP2PDisabled);
-
-    const isMainStreamP2PDisabledChanged = hasP2PDisabledChanged(
-      this.mainStreamConfig.isP2PDisabled,
-      mainStream?.isP2PDisabled,
-    );
-
-    const isSecondaryStreamP2PDisabledChanged = hasP2PDisabledChanged(
-      this.secondaryStreamConfig.isP2PDisabled,
-      secondaryStream?.isP2PDisabled,
-    );
+    const { mainStream, secondaryStream } = dynamicConfig;
 
     this.overrideAllConfigs(dynamicConfig, mainStream, secondaryStream);
 
     if (
-      isP2PDisabledChanged &&
       this.mainStreamConfig.isP2PDisabled &&
       this.secondaryStreamConfig.isP2PDisabled
     ) {
@@ -182,14 +161,11 @@ export class Core<TStream extends Stream = Stream> {
       return;
     }
 
-    if (isMainStreamP2PDisabledChanged && this.mainStreamConfig.isP2PDisabled) {
+    if (this.mainStreamConfig.isP2PDisabled) {
       this.destroyStreamLoader("main");
     }
 
-    if (
-      isSecondaryStreamP2PDisabledChanged &&
-      this.secondaryStreamConfig.isP2PDisabled
-    ) {
+    if (this.secondaryStreamConfig.isP2PDisabled) {
       this.destroyStreamLoader("secondary");
     }
   }
