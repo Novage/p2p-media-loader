@@ -139,9 +139,23 @@ export type CommonCoreConfig = {
  * Represents a set of configuration parameters that can be used to override or extend the
  * default configuration settings for a specific stream (main or secondary).
  *
- * @example
+ * @example Configuration for basic video stream
+ *
  * ```typescript
  * const config: CoreConfig = {
+ *  highDemandTimeWindow: 15,
+ *  httpDownloadTimeWindow: 3000,
+ *  p2pDownloadTimeWindow: 6000,
+ *  swarmId: "custom swarm ID for video stream",
+ *  cashedSegmentsCount: 1000,
+ * }
+ * ```
+ *
+ * @example Configuration for advanced video stream
+ *
+ * ```typescript
+ * const config: CoreConfig = {
+ *  // Configuration for both streams
  *  highDemandTimeWindow: 20,
  *  httpDownloadTimeWindow: 3000,
  *  p2pDownloadTimeWindow: 6000,
