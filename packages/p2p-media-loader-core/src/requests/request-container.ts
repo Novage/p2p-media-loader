@@ -72,7 +72,12 @@ export class RequestsContainer {
 
   destroy() {
     for (const request of this.requests.values()) {
-      request.abortFromProcessQueue();
+      try {
+        request.abortFromProcessQueue();
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.warn(error);
+      }
     }
     this.requests.clear();
   }
