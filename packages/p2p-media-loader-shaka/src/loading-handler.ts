@@ -58,7 +58,7 @@ export class Loader {
       this.core.isSegmentLoadableByP2P(segmentId);
 
     if (
-      !this.core.hasSegment(segmentId) &&
+      !this.core.hasSegment(segmentId) ||
       isSegmentDownloadableByP2PCore === false
     ) {
       return this.defaultLoad() as LoadingHandlerResult;
