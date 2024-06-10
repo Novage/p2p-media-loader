@@ -303,9 +303,8 @@ export class Peer {
   };
 
   private onConnectionError = (ev: Event) => {
-    // Log the error
     this.logger(`peer connection error ${this.id} %O`, ev);
-    // Extract error information
+
     const event = ev as RTCErrorEvent;
     if (event.error.errorDetail === "data-channel-failure") {
       this.destroy();
