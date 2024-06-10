@@ -63,7 +63,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     );
 
     if (
-      !this.#core.hasSegment(this.#segmentId) ||
+      !this.#core.hasSegment(this.#segmentId) &&
       isSegmentP2Downloadable === false
     ) {
       this.#defaultLoader = this.#createDefaultLoader();
