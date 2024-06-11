@@ -72,12 +72,8 @@ export class RequestsContainer {
 
   destroy() {
     for (const request of this.requests.values()) {
-      try {
-        request.abortFromProcessQueue();
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.warn(error);
-      }
+      if (request.status !== "loading") continue;
+      request.abortFromProcessQueue();
     }
     this.requests.clear();
   }

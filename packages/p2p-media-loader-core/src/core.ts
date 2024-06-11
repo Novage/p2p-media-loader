@@ -152,15 +152,6 @@ export class Core<TStream extends Stream = Stream> {
 
     this.overrideAllConfigs(dynamicConfig, mainStream, secondaryStream);
 
-    if (
-      this.mainStreamConfig.isP2PDisabled &&
-      this.secondaryStreamConfig.isP2PDisabled
-    ) {
-      this.destroyStreamLoader("main");
-      this.destroyStreamLoader("secondary");
-      return;
-    }
-
     if (this.mainStreamConfig.isP2PDisabled) {
       this.destroyStreamLoader("main");
     }
