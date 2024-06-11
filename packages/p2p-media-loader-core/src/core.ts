@@ -352,7 +352,7 @@ export class Core<TStream extends Stream = Stream> {
       }
 
       return true;
-    } catch (e) {
+    } catch {
       return false;
     }
   }
