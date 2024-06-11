@@ -342,7 +342,7 @@ export class Core<TStream extends Stream = Stream> {
     this.streamDetails.isLive = isLive;
   }
 
-  isSegmentLoadableByP2P(segmentLocalId: string): boolean {
+  isSegmentLoadableByP2PCore(segmentLocalId: string): boolean {
     try {
       const segment = this.identifySegment(segmentLocalId);
 
