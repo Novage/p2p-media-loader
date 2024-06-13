@@ -32,6 +32,7 @@ export class Core<TStream extends Stream = Stream> {
   };
 
   static readonly DEFAULT_STREAM_CONFIG: StreamConfig = {
+    isP2PDisabled: false,
     simultaneousHttpDownloads: 3,
     simultaneousP2PDownloads: 3,
     highDemandTimeWindow: 15,
@@ -147,15 +148,16 @@ export class Core<TStream extends Stream = Stream> {
    * core.applyDynamicConfig(dynamicConfig);
    */
   applyDynamicConfig(dynamicConfig: DynamicCoreConfig) {
-    overrideConfig(this.commonCoreConfig, dynamicConfig);
-    overrideConfig(this.mainStreamConfig, dynamicConfig);
-    overrideConfig(this.secondaryStreamConfig, dynamicConfig);
+    const { mainStream, secondaryStream } = dynamicConfig;
 
-    if (dynamicConfig.mainStream) {
-      overrideConfig(this.mainStreamConfig, dynamicConfig.mainStream);
+    this.overrideAllConfigs(dynamicConfig, mainStream, secondaryStream);
+
+    if (this.mainStreamConfig.isP2PDisabled) {
+      this.destroyStreamLoader("main");
     }
-    if (dynamicConfig.secondaryStream) {
-      overrideConfig(this.secondaryStreamConfig, dynamicConfig.secondaryStream);
+
+    if (this.secondaryStreamConfig.isP2PDisabled) {
+      this.destroyStreamLoader("secondary");
     }
   }
 
@@ -282,6 +284,7 @@ export class Core<TStream extends Stream = Stream> {
     }
 
     const segment = this.identifySegment(segmentLocalId);
+
     const loader = this.getStreamHybridLoader(segment);
     void loader.loadSegment(segment, callbacks);
   }
@@ -330,6 +333,30 @@ export class Core<TStream extends Stream = Stream> {
     this.streamDetails.isLive = isLive;
   }
 
+  isSegmentLoadableByP2PCore(segmentLocalId: string): boolean {
+    try {
+      const segment = this.identifySegment(segmentLocalId);
+
+      if (
+        segment.stream.type === "main" &&
+        this.mainStreamConfig.isP2PDisabled
+      ) {
+        return false;
+      }
+
+      if (
+        segment.stream.type === "secondary" &&
+        this.secondaryStreamConfig.isP2PDisabled
+      ) {
+        return false;
+      }
+
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   /**
    * Cleans up resources used by the Core instance, including destroying any active stream loaders
    * and clearing stored segments.
@@ -360,6 +387,34 @@ export class Core<TStream extends Stream = Stream> {
     }
 
     return segment;
+  }
+
+  private overrideAllConfigs(
+    dynamicConfig: DynamicCoreConfig,
+    mainStream?: Partial<StreamConfig>,
+    secondaryStream?: Partial<StreamConfig>,
+  ) {
+    overrideConfig(this.commonCoreConfig, dynamicConfig);
+    overrideConfig(this.mainStreamConfig, dynamicConfig);
+    overrideConfig(this.secondaryStreamConfig, dynamicConfig);
+
+    if (mainStream) {
+      overrideConfig(this.mainStreamConfig, mainStream);
+    }
+
+    if (secondaryStream) {
+      overrideConfig(this.secondaryStreamConfig, secondaryStream);
+    }
+  }
+
+  private destroyStreamLoader(streamType: "main" | "secondary") {
+    if (streamType === "main") {
+      this.mainStreamLoader?.destroy();
+      this.mainStreamLoader = undefined;
+    } else {
+      this.secondaryStreamLoader?.destroy();
+      this.secondaryStreamLoader = undefined;
+    }
   }
 
   private getStreamHybridLoader(segment: SegmentWithStream) {

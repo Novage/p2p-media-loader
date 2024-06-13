@@ -56,9 +56,15 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       start,
       end !== undefined ? end - 1 : undefined,
     );
-    this.#segmentId = Utils.getSegmentLocalId(context.url, byteRange);
 
-    if (!this.#core.hasSegment(this.#segmentId)) {
+    this.#segmentId = Utils.getSegmentLocalId(context.url, byteRange);
+    const isSegmentDownloadableByP2PCore =
+      this.#core.isSegmentLoadableByP2PCore(this.#segmentId);
+
+    if (
+      !this.#core.hasSegment(this.#segmentId) ||
+      isSegmentDownloadableByP2PCore === false
+    ) {
       this.#defaultLoader = this.#createDefaultLoader();
       this.#defaultLoader.stats = this.stats;
       this.#defaultLoader?.load(context, config, callbacks);

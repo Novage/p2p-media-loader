@@ -77,7 +77,8 @@ export type DynamicStreamProperties =
   | "httpErrorRetries"
   | "p2pErrorRetries"
   | "validateP2PSegment"
-  | "httpRequestSetup";
+  | "httpRequestSetup"
+  | "isP2PDisabled";
 
 /**
  * Represents a dynamically modifiable configuration, allowing updates to selected CoreConfig properties at runtime.
@@ -138,9 +139,23 @@ export type CommonCoreConfig = {
  * Represents a set of configuration parameters that can be used to override or extend the
  * default configuration settings for a specific stream (main or secondary).
  *
- * @example
+ * @example Configuration for basic video stream
+ *
  * ```typescript
  * const config: CoreConfig = {
+ *  highDemandTimeWindow: 15,
+ *  httpDownloadTimeWindow: 3000,
+ *  p2pDownloadTimeWindow: 6000,
+ *  swarmId: "custom swarm ID for video stream",
+ *  cashedSegmentsCount: 1000,
+ * }
+ * ```
+ *
+ * @example Configuration for advanced video stream
+ *
+ * ```typescript
+ * const config: CoreConfig = {
+ *  // Configuration for both streams
  *  highDemandTimeWindow: 20,
  *  httpDownloadTimeWindow: 3000,
  *  p2pDownloadTimeWindow: 6000,
@@ -164,6 +179,16 @@ export type CoreConfig = Partial<StreamConfig> &
 
 /** Configuration options for the Core functionality, including network and processing parameters. */
 export type StreamConfig = {
+  /**
+   * Indicates whether Peer-to-Peer (P2P) functionality is disabled for the stream.
+   * If set to true, P2P functionality is disabled for the stream.
+   *
+   * @default
+   * ```typescript
+   * isP2PDisabled: false
+   * ```
+   */
+  isP2PDisabled: boolean;
   /**
    * Defines the duration of the time window, in seconds, during which segments are pre-loaded to ensure smooth playback.
    * This window helps prioritize the fetching of media segments that are imminent to playback.

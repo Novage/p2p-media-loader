@@ -72,6 +72,7 @@ export class RequestsContainer {
 
   destroy() {
     for (const request of this.requests.values()) {
+      if (request.status !== "loading") continue;
       request.abortFromProcessQueue();
     }
     this.requests.clear();
