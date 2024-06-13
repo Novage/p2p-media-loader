@@ -63,7 +63,6 @@ export class PeerProtocol {
       throw new Error(`Some segment data is already uploading.`);
     }
     const chunks = getBufferChunks(data, this.peerConfig.webRtcMaxMessageSize);
-    const channel = this.connection._channel;
     const { promise, resolve, reject } = Utils.getControlledPromise<void>();
 
     let isUploadingSegmentData = false;
@@ -82,7 +81,7 @@ export class PeerProtocol {
         return;
       }
 
-      while (channel.bufferedAmount <= channel.bufferedAmountLowThreshold) {
+      while (true) {
         const chunk = chunks.next().value;
 
         if (!chunk) {
@@ -90,18 +89,20 @@ export class PeerProtocol {
           break;
         }
 
-        this.connection.send(chunk);
+        const drained = this.connection.write(chunk);
         this.onChunkUploaded(chunk.byteLength, this.connection.idUtf8);
+        if (!drained) break;
       }
     };
 
     try {
-      channel.addEventListener("bufferedamountlow", sendChunk);
+      this.connection.on("drain", sendChunk);
       isUploadingSegmentData = true;
       sendChunk();
       await promise;
     } finally {
-      channel.removeEventListener("bufferedamountlow", sendChunk);
+      this.connection.off("drain", sendChunk);
+
       if (this.uploadingContext === uploadingContext) {
         this.uploadingContext = undefined;
       }

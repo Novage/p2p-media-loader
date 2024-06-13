@@ -58,6 +58,7 @@
     "vitest": "^1.6.0"
   },
   "devDependencies": {
+    "@types/streamx": "^2.9.5",
     "vite-plugin-node-polyfills": "^0.21.0"
   }
 }

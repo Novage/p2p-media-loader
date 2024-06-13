@@ -35,7 +35,7 @@ importers:
         version: 7.2.0(eslint@8.57.0)(typescript@5.4.2)
       vite:
         specifier: ^5.1.6
-        version: 5.1.6
+        version: 5.1.6(@types/node@20.14.2)
 
   demo:
     dependencies:
@@ -75,7 +75,7 @@ importers:
         version: 18.2.22
       '@vitejs/plugin-react':
         specifier: ^4.2.1
-        version: 4.2.1(vite@5.1.6)
+        version: 4.2.1(vite@5.1.6(@types/node@20.14.2))
       eslint-plugin-react:
         specifier: ^7.34.1
         version: 7.34.1(eslint@8.57.0)
@@ -90,7 +90,7 @@ importers:
         version: 1.5.7
       vite-plugin-node-polyfills:
         specifier: ^0.21.0
-        version: 0.21.0(rollup@4.13.0)(vite@5.1.6)
+        version: 0.21.0(rollup@4.13.0)(vite@5.1.6(@types/node@20.14.2))
 
   packages/p2p-media-loader-core:
     dependencies:
@@ -105,11 +105,14 @@ importers:
         version: 1.0.5
       vitest:
         specifier: ^1.6.0
-        version: 1.6.0
+        version: 1.6.0(@types/node@20.14.2)
     devDependencies:
+      '@types/streamx':
+        specifier: ^2.9.5
+        version: 2.9.5
       vite-plugin-node-polyfills:
         specifier: ^0.21.0
-        version: 0.21.0(rollup@4.13.0)(vite@5.1.6)
+        version: 0.21.0(rollup@4.13.0)(vite@5.1.6(@types/node@20.14.2))
 
   packages/p2p-media-loader-demo:
     dependencies:
@@ -740,6 +743,9 @@ packages:
   '@types/ms@0.7.34':
     resolution: {integrity: sha512-nG96G3Wp6acyAgJqGasjODb+acrI7KltPiRxzHPXnP3NgI28bpQDRv53olbqGXbfcgF5aiiHmO3xpwEpS5Ld9g==}
 
+  '@types/node@20.14.2':
+    resolution: {integrity: sha512-xyu6WAMVwv6AKFLB+e/7ySZVr/0zLCzOa7rSpq6jNwpqOrUbcACDWC+53d4n2QHOnDou0fbIsg8wZu/sxrnI4Q==}
+
   '@types/prop-types@15.7.11':
     resolution: {integrity: sha512-ga8y9v9uyeiLdpKddhxYQkxNDrfvuPrlFb0N1qnZZByvcElJaXthF1UhvCh9TLWJBEHeNtdnbysW7Y6Uq8CVng==}
 
@@ -754,6 +760,9 @@ packages:
 
   '@types/semver@7.5.8':
     resolution: {integrity: sha512-I8EUhyrgfLrcTkzV3TSsGyl1tSuPrEDzr0yd5m90UgNxQkyDXULk3b6MlQqTCpZpNtWe1K0hzclnZkTcLBe2UQ==}
+
+  '@types/streamx@2.9.5':
+    resolution: {integrity: sha512-IHYsa6jYrck8VEdSwpY141FTTf6D7boPeMq9jy4qazNrFMA4VbRz/sw5LSsfR7jwdDcx0QKWkUexZvsWBC2eIQ==}
 
   '@typescript-eslint/eslint-plugin@7.2.0':
     resolution: {integrity: sha512-mdekAHOqS9UjlmyF/LSs6AIEvfceV749GFxoBAjwAv0nkevfKHWQFDMcBZWUiIC5ft6ePWivXoS36aKQ0Cy3sw==}
@@ -2758,6 +2767,9 @@ packages:
   unbox-primitive@1.0.2:
     resolution: {integrity: sha512-61pPlCD9h51VoreyJ0BReideM3MDKMKnh6+V9L08331ipq6Q8OFXZYiqP6n/tbHx4s5I9uRhcye6BrbkizkBDw==}
 
+  undici-types@5.26.5:
+    resolution: {integrity: sha512-JlCMO+ehdEIKqlFxk6IfVoAUVmgz7cU7zD/h9XZ0qzeosSHmUJVOzSQvvYSYWXkFXC+IfLKSIffhv0sVZup6pA==}
+
   unordered-array-remove@1.0.2:
     resolution: {integrity: sha512-45YsfD6svkgaCBNyvD+dFHm4qFX9g3wRSIVgWVPtm2OCnphvPxzJoe20ATsiNpNJrmzHifnxm+BN5F7gFT/4gw==}
 
@@ -3470,6 +3482,10 @@ snapshots:
 
   '@types/ms@0.7.34': {}
 
+  '@types/node@20.14.2':
+    dependencies:
+      undici-types: 5.26.5
+
   '@types/prop-types@15.7.11': {}
 
   '@types/react-dom@18.2.22':
@@ -3485,6 +3501,10 @@ snapshots:
   '@types/scheduler@0.16.8': {}
 
   '@types/semver@7.5.8': {}
+
+  '@types/streamx@2.9.5':
+    dependencies:
+      '@types/node': 20.14.2
 
   '@typescript-eslint/eslint-plugin@7.2.0(@typescript-eslint/parser@7.2.0(eslint@8.57.0)(typescript@5.4.2))(eslint@8.57.0)(typescript@5.4.2)':
     dependencies:
@@ -3580,14 +3600,14 @@ snapshots:
       media-captions: 1.0.3
       react: 18.2.0
 
-  '@vitejs/plugin-react@4.2.1(vite@5.1.6)':
+  '@vitejs/plugin-react@4.2.1(vite@5.1.6(@types/node@20.14.2))':
     dependencies:
       '@babel/core': 7.24.0
       '@babel/plugin-transform-react-jsx-self': 7.23.3(@babel/core@7.24.0)
       '@babel/plugin-transform-react-jsx-source': 7.23.3(@babel/core@7.24.0)
       '@types/babel__core': 7.20.5
       react-refresh: 0.14.0
-      vite: 5.1.6
+      vite: 5.1.6(@types/node@20.14.2)
     transitivePeerDependencies:
       - supports-color
 
@@ -5896,6 +5916,8 @@ snapshots:
       has-symbols: 1.0.3
       which-boxed-primitive: 1.0.2
 
+  undici-types@5.26.5: {}
+
   unordered-array-remove@1.0.2: {}
 
   update-browserslist-db@1.0.13(browserslist@4.23.0):
@@ -5930,13 +5952,13 @@ snapshots:
       is-typed-array: 1.1.13
       which-typed-array: 1.1.15
 
-  vite-node@1.6.0:
+  vite-node@1.6.0(@types/node@20.14.2):
     dependencies:
       cac: 6.7.14
       debug: 4.3.4
       pathe: 1.1.2
       picocolors: 1.0.0
-      vite: 5.1.6
+      vite: 5.1.6(@types/node@20.14.2)
     transitivePeerDependencies:
       - '@types/node'
       - less
@@ -5947,23 +5969,24 @@ snapshots:
       - supports-color
       - terser
 
-  vite-plugin-node-polyfills@0.21.0(rollup@4.13.0)(vite@5.1.6):
+  vite-plugin-node-polyfills@0.21.0(rollup@4.13.0)(vite@5.1.6(@types/node@20.14.2)):
     dependencies:
       '@rollup/plugin-inject': 5.0.5(rollup@4.13.0)
       node-stdlib-browser: 1.2.0
-      vite: 5.1.6
+      vite: 5.1.6(@types/node@20.14.2)
     transitivePeerDependencies:
       - rollup
 
-  vite@5.1.6:
+  vite@5.1.6(@types/node@20.14.2):
     dependencies:
       esbuild: 0.19.12
       postcss: 8.4.36
       rollup: 4.13.0
     optionalDependencies:
+      '@types/node': 20.14.2
       fsevents: 2.3.3
 
-  vitest@1.6.0:
+  vitest@1.6.0(@types/node@20.14.2):
     dependencies:
       '@vitest/expect': 1.6.0
       '@vitest/runner': 1.6.0
@@ -5982,9 +6005,11 @@ snapshots:
       strip-literal: 2.1.0
       tinybench: 2.8.0
       tinypool: 0.8.4
-      vite: 5.1.6
-      vite-node: 1.6.0
+      vite: 5.1.6(@types/node@20.14.2)
+      vite-node: 1.6.0(@types/node@20.14.2)
       why-is-node-running: 2.2.2
+    optionalDependencies:
+      '@types/node': 20.14.2
     transitivePeerDependencies:
       - less
       - lightningcss
