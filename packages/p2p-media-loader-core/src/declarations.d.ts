@@ -1,4 +1,6 @@
 declare module "bittorrent-tracker" {
+  import type { Duplex, WritableEvents } from "streamx";
+
   export default class Client {
     constructor(options: {
       infoHash: Uint8Array;
@@ -31,22 +33,15 @@ declare module "bittorrent-tracker" {
 
   export type PeerEvents = {
     connect: () => void;
-    data: (data: Uint8Array) => void;
-    close: () => void;
-    finish: () => void;
-    end: () => void;
-    error: (error: { code: string }) => void;
-  };
+  } & WritableEvents<unknown>;
 
-  export type PeerConnection = {
+  export type PeerConnection = Duplex & {
     id: string;
     idUtf8: string;
     initiator: boolean;
-    _channel: RTCDataChannel;
     on<E extends keyof PeerEvents>(event: E, handler: PeerEvents[E]): void;
+    off<E extends keyof PeerEvents>(event: E, handler: PeerEvents[E]): void;
     send(data: string | ArrayBuffer): void;
-    write(data: string | ArrayBuffer): void;
-    destroy(): void;
   };
 }
 

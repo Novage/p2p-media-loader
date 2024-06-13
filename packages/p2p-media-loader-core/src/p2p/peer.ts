@@ -304,12 +304,14 @@ export class Peer {
     this.destroy();
   };
 
-  private onConnectionError = (error: { code: string }) => {
+  private onConnectionError = (error: Error) => {
     this.logger(`peer connection error ${this.id} %O`, error);
 
-    if (error.code === "ERR_DATA_CHANNEL") {
+    const code = (error as { code?: string }).code;
+
+    if (code === "ERR_DATA_CHANNEL") {
       this.destroy();
-    } else if (error.code === "ERR_CONNECTION_FAILURE") {
+    } else if (code === "ERR_CONNECTION_FAILURE") {
       this.destroy();
     }
   };
