@@ -313,7 +313,7 @@ export class Peer {
       this.destroy();
     } else if (code === "ERR_CONNECTION_FAILURE") {
       this.destroy();
-    } else if (error.code === "ERR_CONNECTION_FAILURE") {
+    } else if (code === "ERR_CONNECTION_FAILURE") {
       this.destroy();
     }
   };
