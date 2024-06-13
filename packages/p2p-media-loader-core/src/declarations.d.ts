@@ -33,6 +33,8 @@ declare module "bittorrent-tracker" {
     connect: () => void;
     data: (data: Uint8Array) => void;
     close: () => void;
+    finish: () => void;
+    end: () => void;
     error: (error: { code: string }) => void;
   };
 

@@ -64,7 +64,9 @@ export class Peer {
     });
 
     connection.on("error", this.onConnectionError);
-    connection._channel.addEventListener("close", this.onPeerConnectionClosed);
+    connection.on("close", this.onPeerConnectionClosed);
+    connection.on("end", this.onPeerConnectionClosed);
+    connection.on("finish", this.onPeerConnectionClosed);
   }
 
   get downloadingSegment(): SegmentWithStream | undefined {
