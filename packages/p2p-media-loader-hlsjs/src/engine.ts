@@ -80,9 +80,9 @@ export type HlsWithP2PConfig<HlsType extends abstract new () => unknown> =
  *     httpNotReceivingBytesTimeoutMs: 8000, // 8 seconds
  *     httpErrorRetries: 2,
  *     p2pErrorRetries: 2,
- *     announceTrackers: ["wss://tracker.example.com"],
+ *     announceTrackers: ["wss://personal.tracker.com"],
  *     rtcConfig: {
- *       iceServers: [{ urls: "stun:stun.example.com" }]
+ *       iceServers: [{ urls: "stun:personal.stun.com" }]
  *     },
  *     swarmId: "example-swarm-id"
  *   }

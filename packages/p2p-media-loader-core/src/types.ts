@@ -316,8 +316,9 @@ export type StreamConfig = {
    * The default trackers used are:
    * ```typescript
    * [
-   *   "wss://tracker.openwebtorrent.com",
    *   "wss://tracker.novage.com.ua",
+   *   "wss://tracker.webtorrent.dev",
+   *   "wss://tracker.openwebtorrent.com",
    * ]
    * ```
    */

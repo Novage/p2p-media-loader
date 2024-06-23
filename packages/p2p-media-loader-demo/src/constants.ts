@@ -1,3 +1,5 @@
+import { Core } from "p2p-media-loader-core";
+
 export const PLAYERS = {
   vidstack_hls: "Vidstack",
   hlsjs_hls: "Hls.js",
@@ -19,5 +21,6 @@ export const COLORS = {
   lightBlue: "#ADD8E6",
   torchRed: "#ff1745",
 };
-export const DEFAULT_TRACKERS = `wss://tracker.webtorrent.dev,wss://tracker.files.fm:7073/announce,wss://tracker.openwebtorrent.com`;
+export const DEFAULT_TRACKERS =
+  Core.DEFAULT_STREAM_CONFIG.announceTrackers.join(",");
 export const DEBUG_COMPONENT_ENABLED = "true";

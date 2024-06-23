@@ -22,7 +22,9 @@
     "torrent",
     "bittorrent",
     "webtorrent",
-    "shaka player"
+    "shaka player",
+    "ecdn",
+    "cdn"
   ],
   "files": [
     "dist",

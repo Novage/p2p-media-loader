@@ -2,17 +2,18 @@
 
 [![jsDelivr Badge](https://data.jsdelivr.com/v1/package/npm/p2p-media-loader-core/badge)](https://www.jsdelivr.com/package/npm/p2p-media-loader-core)
 
-**P2P Media Loader** is an open-source JavaScript library that leverages modern web browser features, such as HTML5 video and WebRTC, to enable media delivery over peer-to-peer (P2P) networks. It integrates smoothly with many popular HTML5 video players and works entirely without browser plugins or add-ons. Experience it in action with the [demo](http://novage.com.ua/p2p-media-loader/demo.html).
+**P2P Media Loader** is an open-source JavaScript library that leverages modern web browser features, such as HTML5 video and WebRTC, to enable media delivery over peer-to-peer (P2P) connections. It integrates smoothly with many popular HTML5 video players and works entirely without browser plugins or add-ons. Experience it in action with the [demo](http://novage.com.ua/p2p-media-loader/demo.html).
 
-This library enables the creation of a huge P2P mesh network, also known as P2P CDN or P2PTV, which allows traffic sharing among users who are simultaneously viewing the same live or VOD stream via HLS or MPEG-DASH protocols.
+By leveraging P2P technology, it greatly reduces reliance on traditional content delivery network (CDN) resources, lowers costs, and enhances the ability to deliver media streams to a larger audience.
 
-By leveraging P2P technology, it greatly reduces reliance on traditional CDN resources, lowers costs, and enhances the ability to deliver media streams to a larger audience.
+This library enables the creation of a huge P2P mesh networks, also known as peer-to-peer content delivery network (P2P CDN), peer-to-peer television (P2PTV), and Enterprise Content Delivery Network (eCDN), which allows traffic sharing among users who are simultaneously viewing the same live or video on demand (VOD) stream via HLS or MPEG-DASH protocols.
 
-## Related projects
+## Related software
 
-- [Aquatic](https://github.com/greatest-ape/aquatic): A high-performance BitTorrent tracker written in Rust.
-- [wt-tracker](https://github.com/Novage/wt-tracker): A high-performance WebTorrent tracker.
-- [WebTorrent](https://github.com/webtorrent/webtorrent): A streaming torrent client designed for web use. Learn more at [WebTorrent.io](https://webtorrent.io).
+- [wt-tracker](https://github.com/Novage/wt-tracker): a high-performance WebTorrent tracker for Node.js using [µWebSockets.js](https://github.com/uNetworking/uWebSockets.js).
+- [Aquatic](https://github.com/greatest-ape/aquatic): a high-performance BitTorrent tracker written in Rust.
+- [OpenWebtorrent Tracker](https://github.com/OpenWebTorrent/openwebtorrent-tracker): fast and simple webtorrent tracker written in C++ using [µWebSockets](https://github.com/uNetworking/uWebSockets).
+- [bittorrent-tracker](https://github.com/webtorrent/bittorrent-tracker): a simple, robust, BitTorrent tracker (client & server) implementation for Node.js and Web.
 
 ## Useful links
 
@@ -34,9 +35,9 @@ By leveraging P2P technology, it greatly reduces reliance on traditional CDN res
   - Engines: Hls.js, Shaka Player
   - Video players: [Vidstack](https://www.vidstack.io/), [Clappr](http://clappr.io/), [MediaElement](https://www.mediaelementjs.com/), [Plyr](https://plyr.io/), [DPlayer](https://dplayer.diygod.dev/), [OpenPlayerJS](https://www.openplayerjs.com/), and others that support Hls.js or Shaka video engines. These players can be integrated via custom integration with the library API.
 - Supports adaptive bitrate streaming of HLS and MPEG-DASH protocols
-- No need in server-side software. By default **P2P Media Loader** uses publicly available servers:
+- There is no need for server-side software for simple use cases. By default **P2P Media Loader** uses publicly available servers:
+  - WebTorrent trackers - [https://tracker.novage.com.ua/](https://tracker.novage.com.ua/), [https://tracker.webtorrent.dev/](https://tracker.webtorrent.dev/), [https://openwebtorrent.com/](https://openwebtorrent.com/)
   - STUN servers - [Public STUN server list](https://gist.github.com/mondain/b0ec1cf5f60ae726202e)
-  - WebTorrent trackers - [https://openwebtorrent.com/](https://openwebtorrent.com/), [https://tracker.novage.com.ua/](https://tracker.novage.com.ua/)
 
 ## Key components of the P2P network
 
@@ -52,11 +53,12 @@ All the components of the P2P network are free and open-source.
 [**STUN**](https://en.wikipedia.org/wiki/STUN) server is used by [WebRTC](https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API) to gather [ICE](https://en.wikipedia.org/wiki/Interactive_Connectivity_Establishment) candidates.
 There are many running public servers available on [Public STUN server list](https://gist.github.com/mondain/b0ec1cf5f60ae726202e).
 
-[**WebTorrent**](https://webtorrent.io/) tracker is used for WebRTC signaling and to create swarms of peers that download the same media stream.
-Few running public trackers are available: [https://openwebtorrent.com](https://openwebtorrent.com), [https://tracker.novage.com.ua](https://tracker.novage.com.ua).
-It is possible to run personal WebTorrent tracker using open-source implementations: [bittorrent-tracker](https://github.com/webtorrent/bittorrent-tracker), [wt-tracker](https://github.com/Novage/wt-tracker).
+A compatible [**WebTorrent**](https://webtorrent.io/) tracker is required for WebRTC signaling and to create swarms of peers downloading the same media stream.
+A few running public trackers are available: [https://tracker.novage.com.ua/](https://tracker.novage.com.ua/), [https://tracker.webtorrent.dev/](https://tracker.webtorrent.dev/), [https://openwebtorrent.com/](https://openwebtorrent.com/).
 
-**P2P Media Loader** is configured to use public **STUN** and **WebTorrent** servers by default. It means that it is not required to run any server-side software for the P2P network to function.
+It is possible to run personal WebTorrent tracker using open-source implementations: [wt-tracker](https://github.com/Novage/wt-tracker), [Aquatic](https://github.com/greatest-ape/aquatic), [OpenWebtorrent Tracker](https://github.com/OpenWebTorrent/openwebtorrent-tracker), [bittorrent-tracker](https://github.com/webtorrent/bittorrent-tracker).
+
+**P2P Media Loader** is configured to use public **STUN** and **WebTorrent** servers by default. It means that it is not required to run any server-side software for the P2P network to function for simple use cases.
 
 ## How It Works
 

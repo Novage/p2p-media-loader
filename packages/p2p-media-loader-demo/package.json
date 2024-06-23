@@ -22,7 +22,9 @@
     "bittorrent",
     "webtorrent",
     "hlsjs",
-    "shaka player"
+    "shaka player",
+    "ecdn",
+    "cdn"
   ],
   "version": "0.0.0",
   "type": "module",
