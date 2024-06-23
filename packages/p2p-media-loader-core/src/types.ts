@@ -356,7 +356,7 @@ export type StreamConfig = {
 
   /**
    * Optional unique identifier for the swarm, used to isolate peer pools by media stream.
-   * If undefined, the master URL of the manifest is used as the swarm ID.
+   * If undefined, the URL of the manifest is used as the swarm ID.
    * @default
    * ```typescript
    * swarmId: undefined

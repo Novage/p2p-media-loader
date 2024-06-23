@@ -276,10 +276,7 @@ export class Core<TStream extends Stream = Stream> {
     }
 
     if (!this.segmentStorage) {
-      this.segmentStorage = new SegmentsMemoryStorage(
-        this.manifestResponseUrl,
-        this.commonCoreConfig,
-      );
+      this.segmentStorage = new SegmentsMemoryStorage(this.commonCoreConfig);
       await this.segmentStorage.initialize();
     }
 

@@ -31,10 +31,7 @@ export class SegmentsMemoryStorage {
   private readonly logger: debug.Debugger;
   private readonly eventTarget = new EventTarget<StorageEventHandlers>();
 
-  constructor(
-    private readonly masterManifestUrl: string,
-    private readonly storageConfig: StorageConfig,
-  ) {
+  constructor(private readonly storageConfig: StorageConfig) {
     this.logger = debug("p2pml-core:segment-memory-storage");
     this.logger.color = "RebeccaPurple";
   }

@@ -43,7 +43,7 @@ export class Loader {
 
   private async handleManifestLoading(loadingPromise: Promise<Response>) {
     if (!this.streamInfo.manifestResponseUrl) {
-      // loading master manifest either HLS or DASH
+      // loading main manifest either HLS or DASH
       const response = await loadingPromise;
       this.setManifestResponseUrl(response.uri);
     }

@@ -18,7 +18,7 @@ By leveraging P2P technology, it greatly reduces reliance on traditional CDN res
 
 - [P2P development, support & consulting](https://novage.com.ua/)
 - [Demo](http://novage.com.ua/p2p-media-loader/demo.html)
-- [FAQ](https://github.com/Novage/p2p-media-loader/blob/master/FAQ.md)
+- [FAQ](https://github.com/Novage/p2p-media-loader/blob/main/FAQ.md)
 - [Overview](http://novage.com.ua/p2p-media-loader/overview.html)
 - [Technical overview](http://novage.com.ua/p2p-media-loader/technical-overview.html)
 - [API documentation](https://novage.github.io/p2p-media-loader/docs/v1.0/)

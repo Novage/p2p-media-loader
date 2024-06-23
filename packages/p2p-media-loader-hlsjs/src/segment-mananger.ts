@@ -13,7 +13,7 @@ export class SegmentManager {
     this.core = core;
   }
 
-  processMasterManifest(data: ManifestLoadedData) {
+  processMainManifest(data: ManifestLoadedData) {
     const { levels, audioTracks } = data;
     // in the case of audio only stream it is stored in levels
 

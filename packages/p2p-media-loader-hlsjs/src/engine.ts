@@ -289,7 +289,7 @@ export class HlsJsP2PEngine {
     } else if (networkDetails instanceof Response) {
       this.core.setManifestResponseUrl(networkDetails.url);
     }
-    this.segmentManager.processMasterManifest(data);
+    this.segmentManager.processMainManifest(data);
   };
 
   private handleLevelSwitching = (event: string, data: LevelSwitchingData) => {
