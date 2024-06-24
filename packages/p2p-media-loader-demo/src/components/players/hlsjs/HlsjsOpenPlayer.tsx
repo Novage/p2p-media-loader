@@ -58,7 +58,6 @@ export const HlsjsOpenPlayer = ({
               });
             },
             core: {
-              swarmId: "custom swarm ID for stream 2000341",
               trackers: announceTrackers,
             },
           },

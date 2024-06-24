@@ -34,7 +34,6 @@ export const HlsjsVidstack = ({
         const config: HlsWithP2PConfig<typeof Hls> = {
           p2p: {
             core: {
-              swarmId: "custom swarm ID for stream 2000341",
               announceTrackers,
             },
             onHlsJsCreated: (hls) => {

@@ -390,6 +390,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
           {
             core: {
               swarmId: "Optional custom swarm ID for stream",
+              // Other P2P engine config parameters go here
             },
           },
           shaka,
