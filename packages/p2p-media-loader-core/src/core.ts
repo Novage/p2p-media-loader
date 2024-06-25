@@ -302,7 +302,7 @@ export class Core<TStream extends Stream = Stream> {
   }
 
   /**
-   * Updates the playback parameters, specifically position and playback rate, for stream loaders.
+   * Updates the playback parameters while play head moves, specifically position and playback rate, for stream loaders.
    *
    * @param position - The new position in the stream, in seconds.
    * @param rate - The new playback rate.
