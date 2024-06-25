@@ -38,7 +38,6 @@
     "types": "./lib/index.d.ts"
   },
   "sideEffects": false,
-  "private": false,
   "type": "module",
   "scripts": {
     "dev": "vite",

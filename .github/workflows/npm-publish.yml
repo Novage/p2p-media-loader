@@ -45,6 +45,4 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          for package in p2p-media-loader-core p2p-media-loader-hlsjs p2p-media-loader-shaka p2p-media-loader-demo; do
-            pnpm publish ./packages/$package/$package-$VERSION.tgz --access public --no-git-checks
-          done
+          pnpm publish --access public --no-git-checks --filter './packages/**'
