@@ -80,7 +80,12 @@ Periodically, random peers in the P2P swarm download new segments over HTTP(S) a
 
 ## Web browsers support
 
-**All features listed below are fully supported across the following browsers:**
+### P2P Media Loader required browser features
+
+- [WebRTC Data Channels](https://caniuse.com/mdn-api_rtcdatachannel)
+- [Media Source Extensions](https://caniuse.com/mediasource) or [Managed Media Source](https://caniuse.com/mdn-api_managedmediasource)
+
+### The features are fully supported across the most popular browsers
 
 - Chrome
 - Firefox
@@ -88,9 +93,3 @@ Periodically, random peers in the P2P swarm download new segments over HTTP(S) a
 - iPadOS Safari (iPad)
 - iOS Safari (iPhone, iOS version 17.1+)
 - Edge
-
-**Supported Features:**
-
-- WebRTC Data Channels
-- [Media Source Extensions](https://caniuse.com/mediasource) or [Managed Media Source](https://caniuse.com/mdn-api_managedmediasource)
-- P2P Media Loader
