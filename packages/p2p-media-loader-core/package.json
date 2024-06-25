@@ -54,6 +54,7 @@
     "test": "vitest"
   },
   "dependencies": {
+    "@types/debug": "^4.1.12",
     "bittorrent-tracker": "^11.0.2",
     "debug": "^4.3.4",
     "nano-md5": "^1.0.5"

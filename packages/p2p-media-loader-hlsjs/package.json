@@ -52,7 +52,9 @@
     "type-check": "npx tsc --noEmit"
   },
   "dependencies": {
-    "hls.js": "^1.5.7",
     "p2p-media-loader-core": "workspace:*"
+  },
+  "devDependencies": {
+    "hls.js": "^1.5.7"
   }
 }

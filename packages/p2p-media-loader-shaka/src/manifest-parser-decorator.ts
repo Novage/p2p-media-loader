@@ -117,7 +117,9 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       let prevLastItemReference: shaka.media.SegmentReference;
 
       // eslint-disable-next-line @typescript-eslint/unbound-method
-      const originalGet = segmentIndex.get;
+      const originalGet = segmentIndex.get as (
+        position: number,
+      ) => shaka.media.SegmentReference;
       const customGet = (position: number) => {
         const reference = originalGet.call(segmentIndex, position);
         if (
