@@ -11,8 +11,8 @@ export type ByteRange = {
 
 /** Describes a media segment with its unique identifiers, location, and timing information. */
 export type Segment = {
-  /** An unique identifier for the segment within the local system that includes URL and byte range from its manifest. */
-  readonly localId: string;
+  /** A runtime identifier for the segment that includes URL and byte range from its manifest. */
+  readonly runtimeId: string;
 
   /** An unique identifier of the segment in its stream used for P2P communications: sequence number for HLS or playtime for MPEG-DASH. */
   readonly externalId: number;
@@ -45,8 +45,8 @@ export type StreamWithSegments<TStream extends Stream = Stream> = TStream & {
 
 /** Represents a media stream with various defining characteristics. */
 export type Stream = {
-  /** Local ID of the stream: a string that consists of swarm ID, stream type, stream index. */
-  readonly localId: string;
+  /** Runtime identifier of the stream from an engine. */
+  readonly runtimeId: string;
 
   /** Stream type. */
   readonly type: StreamType;

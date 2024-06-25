@@ -4,16 +4,16 @@ import { Segment, ByteRange } from "p2p-media-loader-core";
 export function createSegment({
   segmentReference,
   externalId,
-  localId,
+  runtimeId,
 }: {
   segmentReference: shaka.media.SegmentReference;
   externalId: number;
-  localId?: string;
+  runtimeId?: string;
 }): Segment {
   const { byteRange, url, startTime, endTime } =
     getSegmentInfoFromReference(segmentReference);
   return {
-    localId: localId ?? getSegmentLocalId(url, byteRange),
+    runtimeId: runtimeId ?? getSegmentRuntimeId(url, byteRange),
     externalId,
     byteRange,
     url,
@@ -22,14 +22,17 @@ export function createSegment({
   };
 }
 
-export function getSegmentLocalIdFromReference(
+export function getSegmentRuntimeIdFromReference(
   segmentReference: shaka.media.SegmentReference,
 ) {
   const { url, byteRange } = getSegmentInfoFromReference(segmentReference);
-  return getSegmentLocalId(url, byteRange);
+  return getSegmentRuntimeId(url, byteRange);
 }
 
-export function getSegmentLocalId(url: string, byteRange?: ByteRange | string) {
+export function getSegmentRuntimeId(
+  url: string,
+  byteRange?: ByteRange | string,
+) {
   if (!byteRange) return url;
 
   const range: ByteRange | undefined =

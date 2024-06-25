@@ -53,12 +53,15 @@ export class Loader {
     segmentUrl: string,
     byteRangeString: string,
   ): LoadingHandlerResult {
-    const segmentId = Utils.getSegmentLocalId(segmentUrl, byteRangeString);
+    const segmentRuntimeId = Utils.getSegmentRuntimeId(
+      segmentUrl,
+      byteRangeString,
+    );
     const isSegmentDownloadableByP2PCore =
-      this.core.isSegmentLoadable(segmentId);
+      this.core.isSegmentLoadable(segmentRuntimeId);
 
     if (
-      !this.core.hasSegment(segmentId) ||
+      !this.core.hasSegment(segmentRuntimeId) ||
       isSegmentDownloadableByP2PCore === false
     ) {
       return this.defaultLoad() as LoadingHandlerResult;
@@ -66,7 +69,7 @@ export class Loader {
 
     const loadSegment = async (): Promise<Response> => {
       const { request, callbacks } = getSegmentRequest();
-      void this.core.loadSegment(segmentId, callbacks);
+      void this.core.loadSegment(segmentRuntimeId, callbacks);
       try {
         const { data, bandwidth } = await request;
         return {
@@ -96,7 +99,7 @@ export class Loader {
     };
 
     return new this.shaka.util.AbortableOperation(loadSegment(), () =>
-      Promise.resolve(this.core.abortSegmentLoading(segmentId)),
+      Promise.resolve(this.core.abortSegmentLoading(segmentRuntimeId)),
     );
   }
 

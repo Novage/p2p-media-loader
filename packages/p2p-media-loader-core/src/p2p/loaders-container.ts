@@ -36,7 +36,7 @@ export class P2PLoadersContainer {
   }
 
   private createLoader(stream: StreamWithSegments): P2PLoaderContainerItem {
-    if (this.loaders.has(stream.localId)) {
+    if (this.loaders.has(stream.runtimeId)) {
       throw new Error("Loader for this stream already exists");
     }
     const loader = new P2PLoader(
@@ -62,7 +62,7 @@ export class P2PLoadersContainer {
   }
 
   changeCurrentLoader(stream: StreamWithSegments) {
-    const loaderItem = this.loaders.get(stream.localId);
+    const loaderItem = this.loaders.get(stream.runtimeId);
     if (this._currentLoaderItem) {
       const ids = this.segmentStorage.getStoredSegmentExternalIdsOfStream(
         this._currentLoaderItem.stream,
@@ -76,7 +76,7 @@ export class P2PLoadersContainer {
       loaderItem.destroyTimeoutId = undefined;
     } else {
       const loader = this.createLoader(stream);
-      this.loaders.set(stream.localId, loader);
+      this.loaders.set(stream.runtimeId, loader);
       this._currentLoaderItem = loader;
     }
     this.logger(
@@ -93,7 +93,7 @@ export class P2PLoadersContainer {
 
   private destroyAndRemoveLoader(item: P2PLoaderContainerItem) {
     item.loader.destroy();
-    this.loaders.delete(item.stream.localId);
+    this.loaders.delete(item.stream.runtimeId);
     this.logger(`destroy p2p loader: `, item.loggerInfo);
   }
 

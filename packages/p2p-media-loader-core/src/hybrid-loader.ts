@@ -166,7 +166,7 @@ export class HybridLoader {
 
       switch (status) {
         case "loading":
-          if (!queueSegmentIds.has(segment.localId) && !engineRequest) {
+          if (!queueSegmentIds.has(segment.runtimeId) && !engineRequest) {
             request.abortFromProcessQueue();
             this.requests.remove(request);
           }
@@ -196,7 +196,10 @@ export class HybridLoader {
           if (type === "http" && !isHandledByProcessQueue) {
             this.p2pLoaders.currentLoader.broadcastAnnouncement();
           }
-          if (!engineRequest && !stream.segments.has(request.segment.localId)) {
+          if (
+            !engineRequest &&
+            !stream.segments.has(request.segment.runtimeId)
+          ) {
             this.requests.remove(request);
           }
           if (
@@ -325,8 +328,8 @@ export class HybridLoader {
   }
 
   // api method for engines
-  abortSegmentRequest(segmentLocalId: string) {
-    if (this.engineRequest?.segment.localId !== segmentLocalId) return;
+  abortSegmentRequest(segmentRuntimeId: string) {
+    if (this.engineRequest?.segment.runtimeId !== segmentRuntimeId) return;
     this.engineRequest.abort();
     this.logger(
       "abort: ",
@@ -468,7 +471,7 @@ export class HybridLoader {
         continue;
       }
       queue.push(item);
-      queueSegmentIds.add(segment.localId);
+      queueSegmentIds.add(segment.runtimeId);
     }
 
     return {

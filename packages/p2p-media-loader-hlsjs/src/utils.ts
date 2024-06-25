@@ -1,6 +1,6 @@
 import { ByteRange } from "p2p-media-loader-core";
 
-export function getSegmentLocalId(
+export function getSegmentRuntimeId(
   segmentRequestUrl: string,
   byteRange?: ByteRange,
 ) {

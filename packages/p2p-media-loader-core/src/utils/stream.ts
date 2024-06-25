@@ -18,22 +18,21 @@ export type PlaybackTimeWindowsConfig = Pick<
   "highDemandTimeWindow" | "httpDownloadTimeWindow" | "p2pDownloadTimeWindow"
 >;
 
-const PEER_PROTOCOL_VERSION = "V1";
+const PEER_PROTOCOL_VERSION = "v1";
 
-export function getStreamExternalId(
-  manifestResponseUrl: string,
+export function getStreamSwarmId(
+  swarmId: string,
   stream: Readonly<Stream>,
 ): string {
-  const { type, index } = stream;
-  return `${PEER_PROTOCOL_VERSION}:${manifestResponseUrl}-${type}-${index}`;
+  return `${PEER_PROTOCOL_VERSION}-${swarmId}-${getStreamId(stream)}`;
 }
 
 export function getSegmentFromStreamsMap(
   streams: Map<string, StreamWithSegments>,
-  segmentId: string,
+  segmentRuntimeId: string,
 ): SegmentWithStream | undefined {
   for (const stream of streams.values()) {
-    const segment = stream.segments.get(segmentId);
+    const segment = stream.segments.get(segmentRuntimeId);
     if (segment) return segment;
   }
 }
@@ -47,7 +46,7 @@ export function getSegmentFromStreamByExternalId(
   }
 }
 
-export function getStreamShortId(stream: Stream) {
+export function getStreamId(stream: Stream) {
   return `${stream.type}-${stream.index}`;
 }
 

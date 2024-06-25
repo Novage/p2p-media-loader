@@ -28,13 +28,13 @@ export class P2PTrackerClient {
   private readonly logger = debug("p2pml-core:p2p-tracker-client");
 
   constructor(
-    streamId: string,
+    streamSwarmId: string,
     stream: StreamWithSegments,
     private readonly eventHandlers: P2PTrackerClientEventHandlers,
     private readonly config: StreamConfig,
     private readonly eventTarget: EventTarget<CoreEventMap>,
   ) {
-    const streamHash = PeerUtil.getStreamHash(streamId);
+    const streamHash = PeerUtil.getStreamHash(streamSwarmId);
     this.streamShortId = LoggerUtils.getStreamString(stream);
 
     const peerId = PeerUtil.generatePeerId(config.trackerClientVersionPrefix);

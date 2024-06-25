@@ -25,13 +25,11 @@ export class P2PLoader {
     private readonly eventTarget: EventTarget<CoreEventMap>,
     private readonly onSegmentAnnouncement: () => void,
   ) {
-    const streamExternalId = StreamUtils.getStreamExternalId(
-      this.config.swarmId ?? this.streamManifestUrl,
-      this.stream,
-    );
+    const swarmId = this.config.swarmId ?? this.streamManifestUrl;
+    const streamSwarmId = StreamUtils.getStreamSwarmId(swarmId, this.stream);
 
     this.trackerClient = new P2PTrackerClient(
-      streamExternalId,
+      streamSwarmId,
       this.stream,
       {
         onPeerConnected: this.onPeerConnected,
@@ -96,7 +94,7 @@ export class P2PLoader {
     const httpLoading: number[] = [];
 
     for (const request of this.requests.httpRequests()) {
-      const segment = this.stream.segments.get(request.segment.localId);
+      const segment = this.stream.segments.get(request.segment.runtimeId);
       if (!segment) continue;
 
       httpLoading.push(segment.externalId);

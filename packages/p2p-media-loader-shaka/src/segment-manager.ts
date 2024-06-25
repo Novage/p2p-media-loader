@@ -24,7 +24,7 @@ export class SegmentManager {
 
   setStream(shakaStream: HookedStream, type: StreamType, index = -1) {
     this.core.addStreamIfNoneExists({
-      localId: shakaStream.id.toString(),
+      runtimeId: shakaStream.id.toString(),
       type,
       index,
       shakaStream,
@@ -67,21 +67,21 @@ export class SegmentManager {
         reference.getStartTime() / SEGMENT_ID_RESOLUTION_IN_SECONDS,
       );
 
-      const segmentLocalId = Utils.getSegmentLocalIdFromReference(reference);
-      if (!managerStream.segments.has(segmentLocalId)) {
+      const runtimeId = Utils.getSegmentRuntimeIdFromReference(reference);
+      if (!managerStream.segments.has(runtimeId)) {
         const segment = Utils.createSegment({
           segmentReference: reference,
           externalId,
-          localId: segmentLocalId,
+          runtimeId,
         });
         newSegments.push(segment);
       }
-      staleSegmentsIds.delete(segmentLocalId);
+      staleSegmentsIds.delete(runtimeId);
     }
 
     if (!newSegments.length && !staleSegmentsIds.size) return;
     this.core.updateStream(
-      managerStream.localId,
+      managerStream.runtimeId,
       newSegments,
       staleSegmentsIds.values(),
     );
@@ -108,7 +108,7 @@ export class SegmentManager {
         });
         newSegments.push(segment);
       }
-      this.core.updateStream(managerStream.localId, newSegments);
+      this.core.updateStream(managerStream.runtimeId, newSegments);
       return;
     }
 
@@ -116,10 +116,10 @@ export class SegmentManager {
     let mediaSequence = lastMediaSequence;
 
     for (const reference of itemsBackwards(segmentReferences)) {
-      const localId = Utils.getSegmentLocalIdFromReference(reference);
-      if (segments.has(localId)) break;
+      const runtimeId = Utils.getSegmentRuntimeIdFromReference(reference);
+      if (segments.has(runtimeId)) break;
       const segment = Utils.createSegment({
-        localId,
+        runtimeId,
         segmentReference: reference,
         externalId: mediaSequence,
       });
@@ -131,11 +131,15 @@ export class SegmentManager {
     const staleSegmentIds: string[] = [];
     const countToDelete = newSegments.length;
     for (const segment of nSegmentsBackwards(segments, countToDelete)) {
-      staleSegmentIds.push(segment.localId);
+      staleSegmentIds.push(segment.runtimeId);
     }
 
     if (!newSegments.length && !staleSegmentIds.length) return;
-    this.core.updateStream(managerStream.localId, newSegments, staleSegmentIds);
+    this.core.updateStream(
+      managerStream.runtimeId,
+      newSegments,
+      staleSegmentIds,
+    );
   }
 }
 

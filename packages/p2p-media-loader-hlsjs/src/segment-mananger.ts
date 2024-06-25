@@ -20,7 +20,7 @@ export class SegmentManager {
     for (const [index, level] of levels.entries()) {
       const { url } = level;
       this.core.addStreamIfNoneExists({
-        localId: Array.isArray(url) ? (url as string[])[0] : url,
+        runtimeId: Array.isArray(url) ? (url as string[])[0] : url,
         type: "main",
         index,
       });
@@ -29,7 +29,7 @@ export class SegmentManager {
     for (const [index, track] of audioTracks.entries()) {
       const { url } = track;
       this.core.addStreamIfNoneExists({
-        localId: Array.isArray(url) ? (url as string[])[0] : url,
+        runtimeId: Array.isArray(url) ? (url as string[])[0] : url,
         type: "secondary",
         index,
       });
@@ -62,12 +62,12 @@ export class SegmentManager {
         start,
         end !== undefined ? end - 1 : undefined,
       );
-      const segmentLocalId = Utils.getSegmentLocalId(responseUrl, byteRange);
-      segmentToRemoveIds.delete(segmentLocalId);
+      const runtimeId = Utils.getSegmentRuntimeId(responseUrl, byteRange);
+      segmentToRemoveIds.delete(runtimeId);
 
-      if (playlist.segments.has(segmentLocalId)) return;
+      if (playlist.segments.has(runtimeId)) return;
       newSegments.push({
-        localId: segmentLocalId,
+        runtimeId,
         url: responseUrl,
         externalId: live ? sn : index,
         byteRange,

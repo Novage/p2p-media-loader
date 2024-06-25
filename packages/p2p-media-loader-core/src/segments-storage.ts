@@ -6,8 +6,8 @@ import { EventTarget } from "./utils/event-target";
 type StorageConfig = CommonCoreConfig;
 
 function getStorageItemId(segment: SegmentWithStream) {
-  const streamExternalId = StreamUtils.getStreamShortId(segment.stream);
-  return `${streamExternalId}|${segment.externalId}`;
+  const streamId = StreamUtils.getStreamId(segment.stream);
+  return `${streamId}|${segment.externalId}`;
 }
 
 type StorageItem = {
@@ -91,10 +91,10 @@ export class SegmentsMemoryStorage {
   }
 
   getStoredSegmentExternalIdsOfStream(stream: Stream) {
-    const streamId = StreamUtils.getStreamShortId(stream);
+    const streamId = StreamUtils.getStreamId(stream);
     const externalIds: number[] = [];
     for (const { segment } of this.cache.values()) {
-      const itemStreamId = StreamUtils.getStreamShortId(segment.stream);
+      const itemStreamId = StreamUtils.getStreamId(segment.stream);
       if (itemStreamId === streamId) externalIds.push(segment.externalId);
     }
     return externalIds;
@@ -162,24 +162,24 @@ export class SegmentsMemoryStorage {
     stream: Stream,
     listener: StorageEventHandlers["onStorageUpdated-"],
   ) {
-    const localId = StreamUtils.getStreamShortId(stream);
-    this.eventTarget.addEventListener(`onStorageUpdated-${localId}`, listener);
+    const streamId = StreamUtils.getStreamId(stream);
+    this.eventTarget.addEventListener(`onStorageUpdated-${streamId}`, listener);
   }
 
   unsubscribeFromUpdate(
     stream: Stream,
     listener: StorageEventHandlers["onStorageUpdated-"],
   ) {
-    const localId = StreamUtils.getStreamShortId(stream);
+    const streamId = StreamUtils.getStreamId(stream);
     this.eventTarget.removeEventListener(
-      `onStorageUpdated-${localId}`,
+      `onStorageUpdated-${streamId}`,
       listener,
     );
   }
 
   private dispatchStorageUpdatedEvent(stream: Stream) {
     this.eventTarget.dispatchEvent(
-      `onStorageUpdated-${StreamUtils.getStreamShortId(stream)}`,
+      `onStorageUpdated-${StreamUtils.getStreamId(stream)}`,
       stream,
     );
   }

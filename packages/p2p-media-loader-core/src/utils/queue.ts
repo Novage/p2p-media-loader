@@ -18,9 +18,9 @@ export function* generateQueue(
   playbackConfig: PlaybackTimeWindowsConfig,
   currentP2PLoader: P2PLoader,
 ): Generator<QueueItem, void> {
-  const { localId: requestedSegmentId, stream } = lastRequestedSegment;
+  const { runtimeId, stream } = lastRequestedSegment;
 
-  const requestedSegment = stream.segments.get(requestedSegmentId);
+  const requestedSegment = stream.segments.get(runtimeId);
   if (!requestedSegment) return;
 
   const queueSegments = stream.segments.values();

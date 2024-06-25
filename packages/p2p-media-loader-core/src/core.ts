@@ -201,21 +201,24 @@ export class Core<TStream extends Stream = Stream> {
   /**
    * Checks if a segment is already stored within the core.
    *
-   * @param segmentLocalId - The local identifier of the segment to check.
+   * @param segmentRuntimeId - The runtime identifier of the segment to check.
    * @returns `true` if the segment is present, otherwise `false`.
    */
-  hasSegment(segmentLocalId: string): boolean {
-    return !!StreamUtils.getSegmentFromStreamsMap(this.streams, segmentLocalId);
+  hasSegment(segmentRuntimeId: string): boolean {
+    return !!StreamUtils.getSegmentFromStreamsMap(
+      this.streams,
+      segmentRuntimeId,
+    );
   }
 
   /**
-   * Retrieves a specific stream by its local identifier, if it exists.
+   * Retrieves a specific stream by its runtime identifier, if it exists.
    *
-   * @param streamLocalId - The local identifier of the stream to retrieve.
+   * @param streamRuntimeId - The runtime identifier of the stream to retrieve.
    * @returns The stream with its segments, or `undefined` if not found.
    */
-  getStream(streamLocalId: string): StreamWithSegments<TStream> | undefined {
-    return this.streams.get(streamLocalId);
+  getStream(streamRuntimeId: string): StreamWithSegments<TStream> | undefined {
+    return this.streams.get(streamRuntimeId);
   }
 
   /**
@@ -224,9 +227,9 @@ export class Core<TStream extends Stream = Stream> {
    * @param stream - The stream to potentially add to the map.
    */
   addStreamIfNoneExists(stream: TStream): void {
-    if (this.streams.has(stream.localId)) return;
+    if (this.streams.has(stream.runtimeId)) return;
 
-    this.streams.set(stream.localId, {
+    this.streams.set(stream.runtimeId, {
       ...stream,
       segments: new Map<string, SegmentWithStream<TStream>>(),
     });
@@ -235,22 +238,22 @@ export class Core<TStream extends Stream = Stream> {
   /**
    * Updates the segments associated with a specific stream.
    *
-   * @param streamLocalId - The local identifier of the stream to update.
+   * @param streamRuntimeId - The runtime identifier of the stream to update.
    * @param addSegments - Optional segments to add to the stream.
    * @param removeSegmentIds - Optional segment IDs to remove from the stream.
    */
   updateStream(
-    streamLocalId: string,
+    streamRuntimeId: string,
     addSegments?: Iterable<Segment>,
     removeSegmentIds?: Iterable<string>,
   ): void {
-    const stream = this.streams.get(streamLocalId);
+    const stream = this.streams.get(streamRuntimeId);
     if (!stream) return;
 
     if (addSegments) {
       for (const segment of addSegments) {
-        if (stream.segments.has(segment.localId)) continue; // should not happen
-        stream.segments.set(segment.localId, { ...segment, stream });
+        if (stream.segments.has(segment.runtimeId)) continue; // should not happen
+        stream.segments.set(segment.runtimeId, { ...segment, stream });
       }
     }
 
@@ -265,14 +268,14 @@ export class Core<TStream extends Stream = Stream> {
   }
 
   /**
-   * Loads a segment given its local identifier and invokes the provided callbacks during the process.
+   * Loads a segment given its runtime identifier and invokes the provided callbacks during the process.
    * Initializes segment storage if it has not been initialized yet.
    *
-   * @param segmentLocalId - The local identifier of the segment to load.
+   * @param segmentRuntimeId - The runtime identifier of the segment to load.
    * @param callbacks - The callbacks to be invoked during segment loading.
    * @throws {Error} - Throws if the manifest response URL is not defined.
    */
-  async loadSegment(segmentLocalId: string, callbacks: EngineCallbacks) {
+  async loadSegment(segmentRuntimeId: string, callbacks: EngineCallbacks) {
     if (!this.manifestResponseUrl) {
       throw new Error("Manifest response url is not defined");
     }
@@ -282,20 +285,20 @@ export class Core<TStream extends Stream = Stream> {
       await this.segmentStorage.initialize();
     }
 
-    const segment = this.identifySegment(segmentLocalId);
+    const segment = this.identifySegment(segmentRuntimeId);
 
     const loader = this.getStreamHybridLoader(segment);
     void loader.loadSegment(segment, callbacks);
   }
 
   /**
-   * Aborts the loading of a segment specified by its local identifier.
+   * Aborts the loading of a segment specified by its runtime identifier.
    *
-   * @param segmentLocalId - The local identifier of the segment whose loading is to be aborted.
+   * @param segmentRuntimeId - The runtime identifier of the segment whose loading is to be aborted.
    */
-  abortSegmentLoading(segmentLocalId: string): void {
-    this.mainStreamLoader?.abortSegmentRequest(segmentLocalId);
-    this.secondaryStreamLoader?.abortSegmentRequest(segmentLocalId);
+  abortSegmentLoading(segmentRuntimeId: string): void {
+    this.mainStreamLoader?.abortSegmentRequest(segmentRuntimeId);
+    this.secondaryStreamLoader?.abortSegmentRequest(segmentRuntimeId);
   }
 
   /**
@@ -334,12 +337,12 @@ export class Core<TStream extends Stream = Stream> {
 
   /**
    * Identify if a segment is loadable by the P2P core based on the segment's stream type and configuration.
-   * @param segmentLocalId Segment local ID to check.
+   * @param segmentRuntimeId Segment runtime identifier to check.
    * @returns `true` if the segment is loadable by the P2P core, otherwise `false`.
    */
-  isSegmentLoadable(segmentLocalId: string): boolean {
+  isSegmentLoadable(segmentRuntimeId: string): boolean {
     try {
-      const segment = this.identifySegment(segmentLocalId);
+      const segment = this.identifySegment(segmentRuntimeId);
 
       if (
         segment.stream.type === "main" &&
@@ -377,17 +380,17 @@ export class Core<TStream extends Stream = Stream> {
     this.streamDetails = { isLive: false, activeLevelBitrate: 0 };
   }
 
-  private identifySegment(segmentId: string): SegmentWithStream {
+  private identifySegment(segmentRuntimeId: string): SegmentWithStream {
     if (!this.manifestResponseUrl) {
       throw new Error("Manifest response url is undefined");
     }
 
     const segment = StreamUtils.getSegmentFromStreamsMap(
       this.streams,
-      segmentId,
+      segmentRuntimeId,
     );
     if (!segment) {
-      throw new Error(`Not found segment with id: ${segmentId}`);
+      throw new Error(`Not found segment with id: ${segmentRuntimeId}`);
     }
 
     return segment;

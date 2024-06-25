@@ -86,7 +86,7 @@ export class Request {
     this.onSegmentStart = eventTarget.getEventDispatcher("onSegmentStart");
     this.onSegmentLoaded = eventTarget.getEventDispatcher("onSegmentLoaded");
 
-    this.id = Request.getRequestItemId(this.segment);
+    this.id = this.segment.runtimeId;
     const { byteRange } = this.segment;
     if (byteRange) {
       const { end, start } = byteRange;
@@ -342,10 +342,6 @@ export class Request {
     const method = state === "start" ? "startLoading" : "stopLoading";
     if (this.currentAttempt?.downloadSource === "http") http[method]();
     all[method]();
-  }
-
-  static getRequestItemId(segment: SegmentWithStream) {
-    return segment.localId;
   }
 }
 
