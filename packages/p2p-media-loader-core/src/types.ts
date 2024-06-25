@@ -11,10 +11,10 @@ export type ByteRange = {
 
 /** Describes a media segment with its unique identifiers, location, and timing information. */
 export type Segment = {
-  /** A unique identifier for the segment within the local system. */
+  /** An unique identifier for the segment within the local system that includes URL and byte range from its manifest. */
   readonly localId: string;
 
-  /** A unique identifier for the segment as recognized by external systems or servers. */
+  /** An unique identifier of the segment in its stream used for P2P communications: sequence number for HLS or playtime for MPEG-DASH. */
   readonly externalId: number;
 
   /** The URL from which the segment can be downloaded. */

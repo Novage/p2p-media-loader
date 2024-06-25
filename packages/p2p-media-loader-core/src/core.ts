@@ -25,12 +25,15 @@ import {
 } from "./utils/utils";
 import { TRACKER_CLIENT_VERSION_PREFIX } from "./utils/peer";
 
+/** Core class for managing media streams loading via P2P. */
 export class Core<TStream extends Stream = Stream> {
+  /** Default configuration for common core settings. */
   static readonly DEFAULT_COMMON_CORE_CONFIG: CommonCoreConfig = {
     cachedSegmentExpiration: undefined,
     cachedSegmentsCount: 0,
   };
 
+  /** Default configuration for stream settings. */
   static readonly DEFAULT_STREAM_CONFIG: StreamConfig = {
     isP2PDisabled: false,
     simultaneousHttpDownloads: 3,
@@ -329,7 +332,12 @@ export class Core<TStream extends Stream = Stream> {
     this.streamDetails.isLive = isLive;
   }
 
-  isSegmentLoadableByP2PCore(segmentLocalId: string): boolean {
+  /**
+   * Identify if a segment is loadable by the P2P core based on the segment's stream type and configuration.
+   * @param segmentLocalId Segment local ID to check.
+   * @returns `true` if the segment is loadable by the P2P core, otherwise `false`.
+   */
+  isSegmentLoadable(segmentLocalId: string): boolean {
     try {
       const segment = this.identifySegment(segmentLocalId);
 
