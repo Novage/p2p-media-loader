@@ -1,0 +1,61 @@
+{
+  "name": "p2p-media-loader-shaka",
+  "version": "1.0.0",
+  "description": "P2P Media Loader Shaka Player integration",
+  "license": "Apache-2.0",
+  "author": "Novage",
+  "homepage": "https://github.com/Novage/p2p-media-loader",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Novage/p2p-media-loader/tree/v1",
+    "directory": "packages/p2p-media-loader-shaka"
+  },
+  "keywords": [
+    "p2p",
+    "peer-to-peer",
+    "hls",
+    "dash",
+    "webrtc",
+    "video",
+    "mse",
+    "player",
+    "torrent",
+    "bittorrent",
+    "webtorrent",
+    "shaka player",
+    "ecdn",
+    "cdn"
+  ],
+  "files": [
+    "dist",
+    "lib",
+    "src"
+  ],
+  "exports": "./src/index.ts",
+  "types": "./src/index.ts",
+  "publishConfig": {
+    "exports": "./lib/index.js",
+    "types": "./lib/index.d.ts"
+  },
+  "sideEffects": false,
+  "private": false,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "rimraf lib build && pnpm build:es && pnpm build:esm && pnpm build:esm-min",
+    "build:esm": "vite build --mode esm",
+    "build:esm-min": "vite build --mode esm-min",
+    "build:es": "tsc",
+    "prettier": "prettier --write .",
+    "lint": "eslint . --ext .ts --report-unused-disable-directives --max-warnings 0",
+    "clean": "rimraf lib dist build p2p-media-loader-shaka-*.tgz",
+    "clean-with-modules": "rimraf node_modules && pnpm clean",
+    "type-check": "npx tsc --noEmit"
+  },
+  "dependencies": {
+    "p2p-media-loader-core": "workspace:*"
+  },
+  "devDependencies": {
+    "shaka-player": "^4.9.9"
+  }
+}

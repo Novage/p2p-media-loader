@@ -1,0 +1,67 @@
+{
+  "name": "p2p-media-loader-core",
+  "description": "P2P Media Loader core functionality",
+  "license": "Apache-2.0",
+  "author": "Novage",
+  "homepage": "https://github.com/Novage/p2p-media-loader",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Novage/p2p-media-loader/tree/v1",
+    "directory": "packages/p2p-media-loader-core"
+  },
+  "keywords": [
+    "p2p",
+    "peer-to-peer",
+    "hls",
+    "dash",
+    "webrtc",
+    "video",
+    "mse",
+    "player",
+    "torrent",
+    "bittorrent",
+    "webtorrent",
+    "hlsjs",
+    "shaka player",
+    "ecdn",
+    "cdn"
+  ],
+  "version": "1.0.0",
+  "files": [
+    "dist",
+    "lib",
+    "src"
+  ],
+  "exports": "./src/index.ts",
+  "types": "./src/index.ts",
+  "publishConfig": {
+    "exports": "lib/index.js",
+    "types": "lib/index.d.ts"
+  },
+  "sideEffects": false,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "rimraf lib build && pnpm build:es && pnpm build:esm && pnpm build:esm-min",
+    "build:esm": "vite build --mode esm",
+    "build:esm-min": "vite build --mode esm-min",
+    "build:es": "tsc",
+    "prettier": "prettier --write .",
+    "lint": "eslint . --ext .ts --report-unused-disable-directives --max-warnings 0",
+    "clean": "rimraf lib dist build p2p-media-loader-core-*.tgz",
+    "clean-with-modules": "rimraf node_modules && pnpm clean",
+    "type-check": "npx tsc --noEmit",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@types/debug": "^4.1.12",
+    "bittorrent-tracker": "^11.0.2",
+    "debug": "^4.3.4",
+    "nano-md5": "^1.0.5"
+  },
+  "devDependencies": {
+    "@types/streamx": "^2.9.5",
+    "vite-plugin-node-polyfills": "^0.21.0",
+    "vitest": "^1.6.0"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "name": "p2p-media-loader",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "pnpm --recursive build",
+    "build:es": "pnpm --filter './packages/**' build:es",
+    "build:esm": "pnpm --filter './packages/**' build:esm",
+    "build:esm-min": "pnpm --filter './packages/**' build:esm-min",
+    "clean": "pnpm --recursive clean",
+    "clean-with-modules": "pnpm --recursive clean-with-modules && rimraf node_modules",
+    "pack-packages": "pnpm --filter './packages/**' exec -- pnpm pack",
+    "lint": "pnpm --recursive lint",
+    "prettier": "pnpm --recursive prettier",
+    "type-check": "pnpm --recursive type-check",
+    "dev": "pnpm --filter './demo' dev",
+    "create-doc": "pnpm typedoc"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "prettier": "^3.3.2",
+    "rimraf": "^5.0.7",
+    "typedoc": "^0.25.13",
+    "typedoc-material-theme": "^1.0.3",
+    "typescript": "^5.5.2",
+    "typescript-eslint": "^7.14.1",
+    "vite": "^5.3.1"
+  }
+}
