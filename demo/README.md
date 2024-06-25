@@ -14,6 +14,6 @@
   - [Shaka Player integration](../p2p-media-loader-shaka#p2p-media-loader---shaka-player-integration)
   - [Core](../p2p-media-loader-core#p2p-media-loader-core)
 - JS CDN
-  - [Core](https://cdn.jsdelivr.net/npm/p2p-media-loader-core@latest/build/)
-  - [Hls.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/build/)
-  - [Shaka Player integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@latest/build/)
+  - [Core](https://cdn.jsdelivr.net/npm/p2p-media-loader-core@latest/dist/)
+  - [Hls.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/dist/)
+  - [Shaka Player integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@latest/dist/)
