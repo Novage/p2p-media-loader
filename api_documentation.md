@@ -45,7 +45,7 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
      ShakaP2PEngine.registerPlugins(shaka);
      ```
 
-For more examples with npm packages, you may check our [React demo](https://github.com/Novage/p2p-media-loader/tree/v1/packages/p2p-media-loader-demo/src/components/players)
+For more examples with npm packages, you may check our [React demo](https://github.com/Novage/p2p-media-loader/tree/main/packages/p2p-media-loader-demo/src/components/players)
 
 ## Using P2P Media Loader with CDN via JavaScript Modules
 
