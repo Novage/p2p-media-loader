@@ -29,6 +29,10 @@ This library enables the creation of a huge P2P mesh networks, also known as pee
   - [Core](https://npmjs.com/package/p2p-media-loader-core)
   - [Hls.js integration](https://npmjs.com/package/p2p-media-loader-hlsjs)
   - [Shaka Player integration](https://npmjs.com/package/p2p-media-loader-shaka)
+- ES modules CDN
+  - [Core](https://cdn.jsdelivr.net/npm/p2p-media-loader-core@latest/dist/)
+  - [Hls.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/dist/)
+  - [Shaka Player integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@latest/dist/)
 
 ## Key features
 
