@@ -60,6 +60,7 @@
     "nano-md5": "^1.0.5"
   },
   "devDependencies": {
+    "@rollup/plugin-terser": "^0.4.4",
     "@types/streamx": "^2.9.5",
     "vite-plugin-node-polyfills": "^0.21.0",
     "vitest": "^1.6.0"

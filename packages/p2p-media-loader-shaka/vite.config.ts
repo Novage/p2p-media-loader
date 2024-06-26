@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import type { UserConfig } from "vite";
+import terser from "@rollup/plugin-terser";
 
 const getESMConfig = ({ minify }: { minify: boolean }): UserConfig => {
   return {
@@ -18,6 +19,15 @@ const getESMConfig = ({ minify }: { minify: boolean }): UserConfig => {
         external: ["p2p-media-loader-core"],
       },
     },
+    plugins: [
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-expect-error
+      terser({
+        format: {
+          comments: false,
+        },
+      }),
+    ],
   };
 };
 
