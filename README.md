@@ -1,8 +1,10 @@
 # P2P Media Loader
 
-[![GitHub ations workflow status](https://img.shields.io/github/actions/workflow/status/Novage/p2p-media-loader/check-pr.yml)](https://github.com/Novage/p2p-media-loader/actions/workflows/check-pr.yml)
-[![npm version](https://img.shields.io/npm/v/p2p-media-loader-core)](https://npmjs.com/package/p2p-media-loader-core)
-[![jsDelivr hits (npm)](https://img.shields.io/jsdelivr/npm/hm/p2p-media-loader-core)](https://www.jsdelivr.com/package/npm/p2p-media-loader-core)
+[![GitHub ations workflow status](https://img.shields.io/github/actions/workflow/status/Novage/p2p-media-loader/check-pr.yml?logo=github&color=%23347d39)](https://github.com/Novage/p2p-media-loader/actions/workflows/check-pr.yml)
+[![npm version](https://img.shields.io/npm/v/p2p-media-loader-core?logo=npm&logoColor=white)](https://npmjs.com/package/p2p-media-loader-core)
+[![jsDelivr hits (npm)](https://data.jsdelivr.com/v1/package/npm/p2p-media-loader-core/badge?style=rounded)](https://www.jsdelivr.com/package/npm/p2p-media-loader-core)
+
+
 
 **P2P Media Loader** is an open-source JavaScript library that leverages modern web browser features, such as HTML5 video and WebRTC, to enable media delivery over peer-to-peer (P2P) connections. It integrates smoothly with many popular HTML5 video players and works entirely without browser plugins or add-ons. Experience it in action with the [demo](http://novage.com.ua/p2p-media-loader/demo.html).
 
