@@ -105,9 +105,11 @@ export class HlsJsP2PEngine {
    * const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
    *
    * const hls = new HlsWithP2P({
+   *   // Hls.js configuration
+   *   startLevel: 0, // Example of Hls.js config parameter
    *   p2p: {
    *     core: {
-   *       // P2P configuration
+   *       // P2P core configuration
    *     },
    *     onHlsJsCreated(hls) {
    *       // Do something with the Hls.js instance
