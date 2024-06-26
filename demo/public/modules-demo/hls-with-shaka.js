@@ -13,15 +13,12 @@ async function initApp() {
 }
 
 function initHlsPlayer() {
-  const p2pEngine = new HlsJsP2PEngine();
-
-  const hls = new Hls({ ...p2pEngine.getHlsJsConfig() });
+  const HlsWithP2P = HlsJsP2PEngine.injectMixin(window.Hls);
+  const hls = new HlsWithP2P();
   hls.attachMedia(document.getElementById("video1"));
   hls.on(Hls.Events.ERROR, function (event, data) {
     console.error("Error code", data.details, "object", data);
   });
-
-  p2pEngine.setHls(hls);
 
   try {
     hls.loadSource(manifestUri);
@@ -38,7 +35,7 @@ async function initShakaPlayer() {
   await player.attach(document.getElementById("video2"));
   player.addEventListener("error", onErrorEvent);
 
-  engine.configureAndInitShakaPlayer(player);
+  engine.bindShakaPlayer(player);
 
   try {
     await player.load(manifestUri);
