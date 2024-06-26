@@ -20,11 +20,13 @@ const getESMConfig = ({ minify }: { minify: boolean }): UserConfig => {
       },
     },
     plugins: [
-      terser({
-        format: {
-          comments: false,
-        },
-      }),
+      minify
+        ? terser({
+            format: {
+              comments: false,
+            },
+          })
+        : undefined,
     ],
   };
 };
