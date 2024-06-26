@@ -19,8 +19,6 @@ const getESMConfig = ({ minify }: { minify: boolean }): UserConfig => {
     },
     plugins: [
       nodePolyfills(),
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-expect-error
       terser({
         format: {
           comments: false,
