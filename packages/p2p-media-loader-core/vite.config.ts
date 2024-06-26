@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import type { UserConfig } from "vite";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
+import terser from "@rollup/plugin-terser";
 
 const getESMConfig = ({ minify }: { minify: boolean }): UserConfig => {
   return {
@@ -16,7 +17,16 @@ const getESMConfig = ({ minify }: { minify: boolean }): UserConfig => {
         entry: "src/index.ts",
       },
     },
-    plugins: [nodePolyfills()],
+    plugins: [
+      nodePolyfills(),
+      minify
+        ? terser({
+            format: {
+              comments: false,
+            },
+          })
+        : undefined,
+    ],
   };
 };
 
