@@ -374,7 +374,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
       import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 
       // Register P2P Media Loader plugins with Shaka
-      ShakaP2PEngine.registerPlugins(shaka);
+      ShakaP2PEngine.registerPlugins();
 
       async function init() {
         // Get the video element by its ID
@@ -386,15 +386,12 @@ For more examples with npm packages, you may check our [React demo](https://gith
         const player = controls.getPlayer();
 
         // Initialize P2P Media Loader with custom config
-        const shakaP2PEngine = new ShakaP2PEngine(
-          {
-            core: {
-              swarmId: "Optional custom swarm ID for stream",
-              // Other P2P engine config parameters go here
-            },
+        const shakaP2PEngine = new ShakaP2PEngine({
+          core: {
+            swarmId: "Optional custom swarm ID for stream",
+            // Other P2P engine config parameters go here
           },
-          shaka,
-        );
+        });
 
         //Subscribe to P2P engine events here
         shakaP2PEngine.addEventListener("onPeerConnect", (params) => {
@@ -437,15 +434,12 @@ For more examples with npm packages, you may check our [React demo](https://gith
 
   ShakaP2PEngine.registerPlugins();
 
-  const shakaP2PEngine = new ShakaP2PEngine(
-    {
-      core: {
-        swarmId: "Optional custom swarm ID for stream",
-        // Other P2P Media Loader Core options
-      },
+  const shakaP2PEngine = new ShakaP2PEngine({
+    core: {
+      swarmId: "Optional custom swarm ID for stream",
+      // Other P2P Media Loader Core options
     },
-    window.shaka,
-  );
+  });
 
   const player = new Clappr.Player({
     parentId: `#${container.id}`,
@@ -476,15 +470,12 @@ For more examples with npm packages, you may check our [React demo](https://gith
 
   ShakaP2PEngine.registerPlugins();
 
-  const shakaP2PEngine = new ShakaP2PEngine(
-    {
-      core: {
-        swarmId: "Optional custom swarm ID for stream",
-        // Other P2P Media Loader Core options
-      },
+  const shakaP2PEngine = new ShakaP2PEngine({
+    core: {
+      swarmId: "Optional custom swarm ID for stream",
+      // Other P2P Media Loader Core options
     },
-    shaka,
-  );
+  });
 
   const player = new DPlayer({
     container,
@@ -511,18 +502,17 @@ For more examples with npm packages, you may check our [React demo](https://gith
 <script type="module">
   import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 
+  ShakaP2PEngine.registerPlugins();
+
   const videoElement = document.getElementById("video");
 
   const initPlayer = () => {
-    const shakaP2PEngine = new ShakaP2PEngine(
-      {
-        core: {
-          swarmId: "Optional custom swarm ID for stream",
-          // Other P2P Media Loader Core options
-        },
+    const shakaP2PEngine = new ShakaP2PEngine({
+      core: {
+        swarmId: "Optional custom swarm ID for stream",
+        // Other P2P Media Loader Core options
       },
-      window.shaka,
-    );
+    });
     const shakaPlayer = new shaka.Player();
 
     shakaPlayer.attach(videoElement);
