@@ -1,1 +1,1 @@
-/home/andriy/work/novage/p2pml/p2p-media-loader/README.md
+../README.md
