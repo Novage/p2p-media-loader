@@ -67,6 +67,10 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     return this.originalManifestParser.update() as unknown;
   }
 
+  setMediaElement(mediaElement: HTMLMediaElement | null) {
+    return this.originalManifestParser.setMediaElement(mediaElement) as unknown;
+  }
+
   onExpirationUpdated(sessionId: string, expiration: number) {
     return this.originalManifestParser.onExpirationUpdated(
       sessionId,

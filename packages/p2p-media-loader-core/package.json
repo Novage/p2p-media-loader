@@ -55,14 +55,14 @@
   },
   "dependencies": {
     "@types/debug": "^4.1.12",
-    "bittorrent-tracker": "^11.0.2",
-    "debug": "^4.3.4",
+    "bittorrent-tracker": "^11.1.0",
+    "debug": "^4.3.5",
     "nano-md5": "^1.0.5"
   },
   "devDependencies": {
     "@rollup/plugin-terser": "^0.4.4",
     "@types/streamx": "^2.9.5",
-    "vite-plugin-node-polyfills": "^0.21.0",
+    "vite-plugin-node-polyfills": "^0.22.0",
     "vitest": "^1.6.0"
   }
 }
