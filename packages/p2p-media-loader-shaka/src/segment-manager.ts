@@ -1,10 +1,10 @@
-import * as Utils from "./stream-utils";
+import * as Utils from "./stream-utils.js";
 import {
   HookedStream,
   StreamInfo,
   Stream,
   StreamWithReadonlySegments,
-} from "./types";
+} from "./types.js";
 import { Core, Segment, StreamType } from "p2p-media-loader-core";
 
 // The minimum time interval (in seconds) between segments to assign unique IDs.

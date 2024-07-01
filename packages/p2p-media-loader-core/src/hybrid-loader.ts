@@ -1,27 +1,27 @@
-import { HttpRequestExecutor } from "./http-loader";
-import { SegmentsMemoryStorage } from "./segments-storage";
+import { HttpRequestExecutor } from "./http-loader.js";
+import { SegmentsMemoryStorage } from "./segments-storage.js";
 import {
   CoreEventMap,
   EngineCallbacks,
   SegmentWithStream,
   StreamConfig,
   StreamWithSegments,
-} from "./types";
+} from "./types.js";
 import {
   Playback,
   BandwidthCalculators,
   StreamDetails,
-} from "./internal-types";
-import { P2PLoadersContainer } from "./p2p/loaders-container";
-import { RequestsContainer } from "./requests/request-container";
-import { EngineRequest } from "./requests/engine-request";
-import * as QueueUtils from "./utils/queue";
-import * as LoggerUtils from "./utils/logger";
-import * as StreamUtils from "./utils/stream";
-import * as Utils from "./utils/utils";
+} from "./internal-types.js";
+import { P2PLoadersContainer } from "./p2p/loaders-container.js";
+import { RequestsContainer } from "./requests/request-container.js";
+import { EngineRequest } from "./requests/engine-request.js";
+import * as QueueUtils from "./utils/queue.js";
+import * as LoggerUtils from "./utils/logger.js";
+import * as StreamUtils from "./utils/stream.js";
+import * as Utils from "./utils/utils.js";
 import debug from "debug";
-import { QueueItem } from "./utils/queue";
-import { EventTarget } from "./utils/event-target";
+import { QueueItem } from "./utils/queue.js";
+import { EventTarget } from "./utils/event-target.js";
 
 const FAILED_ATTEMPTS_CLEAR_INTERVAL = 60000;
 const PEER_UPDATE_LATENCY = 1000;

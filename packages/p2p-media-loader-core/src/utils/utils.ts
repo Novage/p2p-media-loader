@@ -1,4 +1,4 @@
-import { CommonCoreConfig, CoreConfig, StreamConfig } from "../types";
+import { CommonCoreConfig, CoreConfig, StreamConfig } from "../types.js";
 
 export function getControlledPromise<T>() {
   let resolve: (value: T) => void;

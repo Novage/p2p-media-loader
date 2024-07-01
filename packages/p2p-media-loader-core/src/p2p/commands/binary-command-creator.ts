@@ -1,5 +1,5 @@
-import * as Serialization from "./binary-serialization";
-import { PeerCommandType, PeerCommand } from "./types";
+import * as Serialization from "./binary-serialization.js";
+import { PeerCommandType, PeerCommand } from "./types.js";
 
 const FRAME_PART_LENGTH = 4;
 const commandFrameStart = stringToUtf8CodesBuffer("cstr", FRAME_PART_LENGTH);

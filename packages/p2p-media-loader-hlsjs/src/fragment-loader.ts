@@ -7,7 +7,7 @@ import type {
   LoaderContext,
   LoaderStats,
 } from "hls.js";
-import * as Utils from "./utils";
+import * as Utils from "./utils.js";
 import { Core, SegmentResponse, CoreRequestError } from "p2p-media-loader-core";
 
 const DEFAULT_DOWNLOAD_LATENCY = 10;

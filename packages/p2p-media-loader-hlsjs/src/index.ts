@@ -1,4 +1,4 @@
-export { HlsJsP2PEngine } from "./engine";
+export { HlsJsP2PEngine } from "./engine.js";
 
 export type {
   DynamicHlsJsP2PEngineConfig,
@@ -6,4 +6,4 @@ export type {
   PartialHlsJsP2PEngineConfig,
   HlsWithP2PInstance,
   HlsWithP2PConfig,
-} from "./engine";
+} from "./engine.js";

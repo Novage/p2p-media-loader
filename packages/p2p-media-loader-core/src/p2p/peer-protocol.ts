@@ -1,8 +1,8 @@
 import { PeerConnection } from "bittorrent-tracker";
-import { CoreEventMap, StreamConfig } from "../types";
-import * as Utils from "../utils/utils";
-import * as Command from "./commands";
-import { EventTarget } from "../utils/event-target";
+import { CoreEventMap, StreamConfig } from "../types.js";
+import * as Utils from "../utils/utils.js";
+import * as Command from "./commands/index.js";
+import { EventTarget } from "../utils/event-target.js";
 
 export type PeerConfig = Pick<
   StreamConfig,

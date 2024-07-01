@@ -2,8 +2,8 @@ import "shaka-player/dist/shaka-player.compiled.d.ts";
 import {
   HlsManifestParser,
   DashManifestParser,
-} from "./manifest-parser-decorator";
-import { SegmentManager } from "./segment-manager";
+} from "./manifest-parser-decorator.js";
+import { SegmentManager } from "./segment-manager.js";
 import {
   StreamInfo,
   Shaka,
@@ -11,8 +11,8 @@ import {
   HookedNetworkingEngine,
   HookedRequest,
   P2PMLShakaData,
-} from "./types";
-import { Loader } from "./loading-handler";
+} from "./types.js";
+import { Loader } from "./loading-handler.js";
 import {
   CoreConfig,
   Core,

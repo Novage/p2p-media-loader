@@ -1,4 +1,4 @@
-import { HybridLoader } from "./hybrid-loader";
+import { HybridLoader } from "./hybrid-loader.js";
 import {
   Stream,
   CoreConfig,
@@ -11,19 +11,19 @@ import {
   CommonCoreConfig,
   StreamConfig,
   DefinedCoreConfig,
-} from "./types";
-import { BandwidthCalculators, StreamDetails } from "./internal-types";
-import * as StreamUtils from "./utils/stream";
-import { BandwidthCalculator } from "./bandwidth-calculator";
-import { SegmentsMemoryStorage } from "./segments-storage";
-import { EventTarget } from "./utils/event-target";
+} from "./types.js";
+import { BandwidthCalculators, StreamDetails } from "./internal-types.js";
+import * as StreamUtils from "./utils/stream.js";
+import { BandwidthCalculator } from "./bandwidth-calculator.js";
+import { SegmentsMemoryStorage } from "./segments-storage.js";
+import { EventTarget } from "./utils/event-target.js";
 import {
   overrideConfig,
   mergeAndFilterConfig,
   deepCopy,
   filterUndefinedProps,
-} from "./utils/utils";
-import { TRACKER_CLIENT_VERSION_PREFIX } from "./utils/peer";
+} from "./utils/utils.js";
+import { TRACKER_CLIENT_VERSION_PREFIX } from "./utils/peer.js";
 
 /** Core class for managing media streams loading via P2P. */
 export class Core<TStream extends Stream = Stream> {

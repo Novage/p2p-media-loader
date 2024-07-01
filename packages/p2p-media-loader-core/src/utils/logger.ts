@@ -1,5 +1,5 @@
-import { SegmentWithStream, Stream } from "../types";
-import { SegmentPlaybackStatuses } from "./stream";
+import { SegmentWithStream, Stream } from "../types.js";
+import { SegmentPlaybackStatuses } from "./stream.js";
 
 export function getStreamString(stream: Stream) {
   return `${stream.type}-${stream.index}`;

@@ -1,16 +1,16 @@
-import { Peer } from "./peer";
+import { Peer } from "./peer.js";
 import {
   CoreEventMap,
   SegmentWithStream,
   StreamConfig,
   StreamWithSegments,
-} from "../types";
-import { SegmentsMemoryStorage } from "../segments-storage";
-import { RequestsContainer } from "../requests/request-container";
-import { P2PTrackerClient } from "./tracker-client";
-import * as StreamUtils from "../utils/stream";
-import * as Utils from "../utils/utils";
-import { EventTarget } from "../utils/event-target";
+} from "../types.js";
+import { SegmentsMemoryStorage } from "../segments-storage.js";
+import { RequestsContainer } from "../requests/request-container.js";
+import { P2PTrackerClient } from "./tracker-client.js";
+import * as StreamUtils from "../utils/stream.js";
+import * as Utils from "../utils/utils.js";
+import { EventTarget } from "../utils/event-target.js";
 
 export class P2PLoader {
   private readonly trackerClient: P2PTrackerClient;

@@ -1,7 +1,7 @@
-import { Playback, BandwidthCalculators } from "../internal-types";
-import { CoreEventMap, SegmentWithStream, StreamConfig } from "../types";
-import { EventTarget } from "../utils/event-target";
-import { Request } from "./request";
+import { Playback, BandwidthCalculators } from "../internal-types.js";
+import { CoreEventMap, SegmentWithStream, StreamConfig } from "../types.js";
+import { EventTarget } from "../utils/event-target.js";
+import { Request } from "./request.js";
 
 export class RequestsContainer {
   private readonly requests = new Map<SegmentWithStream, Request>();

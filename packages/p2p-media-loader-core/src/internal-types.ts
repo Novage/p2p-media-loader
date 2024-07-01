@@ -1,6 +1,6 @@
 /// <reference types="./declarations.d.ts" />
 
-import { BandwidthCalculator } from "./bandwidth-calculator";
+import { BandwidthCalculator } from "./bandwidth-calculator.js";
 
 export type Playback = {
   position: number;

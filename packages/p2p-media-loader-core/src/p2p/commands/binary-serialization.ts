@@ -1,4 +1,4 @@
-import { joinChunks } from "../../utils/utils";
+import { joinChunks } from "../../utils/utils.js";
 
 // restricted up to 16 item types (4 bits to type definition)
 export const enum SerializedItem {
