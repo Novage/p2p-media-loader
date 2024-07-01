@@ -28,15 +28,15 @@
   ],
   "version": "0.0.0",
   "type": "module",
-  "exports": "./src/index.ts",
-  "types": "./src/index.ts",
   "files": [
     "lib",
     "src"
   ],
+  "exports": "./src/index.ts",
+  "types": "./src/index.ts",
   "publishConfig": {
-    "exports": "lib/index.js",
-    "types": "lib/index.d.ts"
+    "exports": "./lib/index.js",
+    "types": "./lib/index.d.ts"
   },
   "scripts": {
     "build": "rimraf lib build && tsc && pnpm copy-css",
