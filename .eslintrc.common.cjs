@@ -7,7 +7,7 @@ module.exports = {
     "plugin:@typescript-eslint/eslint-recommended",
     "plugin:@typescript-eslint/recommended-type-checked",
   ],
-  plugins: ["@typescript-eslint"],
+  plugins: ["@typescript-eslint", "import"],
   ignorePatterns: ["/.eslintrc.cjs", "/lib", "/dist"],
   rules: {
     "no-console": "warn",
@@ -16,5 +16,15 @@ module.exports = {
     "spaced-comment": ["warn", "always", { markers: ["/"] }],
     "no-debugger": "warn",
     "@typescript-eslint/no-non-null-assertion": "error",
+    "import/extensions": [
+      "error",
+      "always",
+      {
+        js: "ignorePackages",
+        jsx: "never",
+        ts: "never",
+        tsx: "never",
+      },
+    ],
   },
 };
