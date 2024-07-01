@@ -1,6 +1,6 @@
-import * as Utils from "./stream-utils";
-import { StreamInfo } from "./types";
-import { Shaka, Stream } from "./types";
+import * as Utils from "./stream-utils.js";
+import { StreamInfo } from "./types.js";
+import { Shaka, Stream } from "./types.js";
 import {
   Core,
   CoreRequestError,

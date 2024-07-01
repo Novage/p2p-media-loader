@@ -7,9 +7,9 @@ import type {
   PlaylistLevelType,
 } from "hls.js";
 import type { HlsConfig, Events } from "hls.js";
-import { FragmentLoaderBase } from "./fragment-loader";
-import { PlaylistLoaderBase } from "./playlist-loader";
-import { SegmentManager } from "./segment-mananger";
+import { FragmentLoaderBase } from "./fragment-loader.js";
+import { PlaylistLoaderBase } from "./playlist-loader.js";
+import { SegmentManager } from "./segment-mananger.js";
 import {
   CoreConfig,
   Core,
@@ -17,7 +17,7 @@ import {
   DynamicCoreConfig,
   debug,
 } from "p2p-media-loader-core";
-import { injectMixin } from "./engine-static";
+import { injectMixin } from "./engine-static.js";
 
 /** Represents the complete configuration for HlsJsP2PEngine. */
 export type HlsJsP2PEngineConfig = {

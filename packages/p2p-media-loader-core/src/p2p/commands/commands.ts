@@ -1,4 +1,4 @@
-import { BinaryCommandCreator } from "./binary-command-creator";
+import { BinaryCommandCreator } from "./binary-command-creator.js";
 import {
   PeerSegmentCommand,
   PeerSendSegmentCommand,
@@ -6,7 +6,7 @@ import {
   PeerRequestSegmentCommand,
   PeerCommand,
   PeerCommandType,
-} from "./types";
+} from "./types.js";
 
 function serializeSegmentAnnouncementCommand(
   command: PeerSegmentAnnouncementCommand,

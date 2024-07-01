@@ -1,4 +1,4 @@
-import { StreamWithReadonlySegments } from "./types";
+import { StreamWithReadonlySegments } from "./types.js";
 import { Segment, ByteRange } from "p2p-media-loader-core";
 
 export function createSegment({

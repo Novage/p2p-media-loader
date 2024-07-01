@@ -1,17 +1,17 @@
 import { PeerConnection } from "bittorrent-tracker";
 import debug from "debug";
-import { Request, RequestControls } from "../requests/request";
+import { Request, RequestControls } from "../requests/request.js";
 import {
   CoreEventMap,
   PeerRequestErrorType,
   RequestError,
   RequestAbortErrorType,
   SegmentWithStream,
-} from "../types";
-import * as Utils from "../utils/utils";
-import * as Command from "./commands";
-import { PeerProtocol, PeerConfig } from "./peer-protocol";
-import { EventTarget } from "../utils/event-target";
+} from "../types.js";
+import * as Utils from "../utils/utils.js";
+import * as Command from "./commands/index.js";
+import { PeerProtocol, PeerConfig } from "./peer-protocol.js";
+import { EventTarget } from "../utils/event-target.js";
 
 const { PeerCommandType } = Command;
 type PeerEventHandlers = {

@@ -1,14 +1,14 @@
 import debug from "debug";
-import { BandwidthCalculators, Playback } from "../internal-types";
+import { BandwidthCalculators, Playback } from "../internal-types.js";
 import {
   CoreEventMap,
   RequestError,
   RequestAbortErrorType,
   SegmentWithStream,
-} from "../types";
-import * as StreamUtils from "../utils/stream";
-import * as Utils from "../utils/utils";
-import { EventTarget } from "../utils/event-target";
+} from "../types.js";
+import * as StreamUtils from "../utils/stream.js";
+import * as Utils from "../utils/utils.js";
+import { EventTarget } from "../utils/event-target.js";
 
 export type LoadProgress = {
   startTimestamp: number;

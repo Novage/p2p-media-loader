@@ -1,7 +1,7 @@
-import { CommonCoreConfig, SegmentWithStream, Stream } from "./types";
-import * as StreamUtils from "./utils/stream";
+import { CommonCoreConfig, SegmentWithStream, Stream } from "./types.js";
+import * as StreamUtils from "./utils/stream.js";
 import debug from "debug";
-import { EventTarget } from "./utils/event-target";
+import { EventTarget } from "./utils/event-target.js";
 
 type StorageConfig = CommonCoreConfig;
 

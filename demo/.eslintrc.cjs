@@ -18,6 +18,9 @@ module.exports = {
     "plugin:react-hooks/recommended",
   ],
   ignorePatterns: ["public/*"],
+  rules: {
+    "import/extensions": "off",
+  },
   settings: {
     react: {
       version: "detect",

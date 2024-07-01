@@ -3,7 +3,7 @@ import type {
   Core,
   SegmentWithStream,
 } from "p2p-media-loader-core";
-import { SegmentManager } from "./segment-manager";
+import { SegmentManager } from "./segment-manager.js";
 
 export type StreamProtocol = "hls" | "dash";
 

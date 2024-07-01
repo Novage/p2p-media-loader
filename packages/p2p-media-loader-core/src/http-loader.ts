@@ -1,7 +1,10 @@
-import { CoreConfig, CoreEventMap } from "./types";
-import { Request as SegmentRequest, RequestControls } from "./requests/request";
-import { RequestError, HttpRequestErrorType } from "./types";
-import { EventTarget } from "./utils/event-target";
+import { CoreConfig, CoreEventMap } from "./types.js";
+import {
+  Request as SegmentRequest,
+  RequestControls,
+} from "./requests/request.js";
+import { RequestError, HttpRequestErrorType } from "./types.js";
+import { EventTarget } from "./utils/event-target.js";
 
 type HttpConfig = Pick<
   CoreConfig,

@@ -2,13 +2,13 @@ import TrackerClient, {
   PeerConnection,
   TrackerClientEvents,
 } from "bittorrent-tracker";
-import { CoreEventMap, StreamConfig, StreamWithSegments } from "../types";
+import { CoreEventMap, StreamConfig, StreamWithSegments } from "../types.js";
 import debug from "debug";
-import * as PeerUtil from "../utils/peer";
-import * as LoggerUtils from "../utils/logger";
-import { Peer } from "./peer";
-import { EventTarget } from "../utils/event-target";
-import { utf8ToUintArray } from "../utils/utils";
+import * as PeerUtil from "../utils/peer.js";
+import * as LoggerUtils from "../utils/logger.js";
+import { Peer } from "./peer.js";
+import { EventTarget } from "../utils/event-target.js";
+import { utf8ToUintArray } from "../utils/utils.js";
 
 type PeerItem = {
   peer?: Peer;

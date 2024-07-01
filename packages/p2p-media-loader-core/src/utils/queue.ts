@@ -1,11 +1,11 @@
-import { Playback } from "../internal-types";
-import { P2PLoader } from "../p2p/loader";
-import { SegmentWithStream } from "../types";
+import { Playback } from "../internal-types.js";
+import { P2PLoader } from "../p2p/loader.js";
+import { SegmentWithStream } from "../types.js";
 import {
   getSegmentPlaybackStatuses,
   SegmentPlaybackStatuses,
   PlaybackTimeWindowsConfig,
-} from "./stream";
+} from "./stream.js";
 
 export type QueueItem = {
   segment: SegmentWithStream;

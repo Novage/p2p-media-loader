@@ -1,6 +1,6 @@
-export { ShakaP2PEngine } from "./engine";
+export { ShakaP2PEngine } from "./engine.js";
 export type {
   DynamicShakaP2PEngineConfig,
   ShakaP2PEngineConfig,
   PartialShakaEngineConfig,
-} from "./engine";
+} from "./engine.js";

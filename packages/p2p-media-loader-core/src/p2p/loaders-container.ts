@@ -1,15 +1,15 @@
-import { P2PLoader } from "./loader";
+import { P2PLoader } from "./loader.js";
 import debug from "debug";
 import {
   CoreEventMap,
   Stream,
   StreamConfig,
   StreamWithSegments,
-} from "../index";
-import { RequestsContainer } from "../requests/request-container";
-import { SegmentsMemoryStorage } from "../segments-storage";
-import * as LoggerUtils from "../utils/logger";
-import { EventTarget } from "../utils/event-target";
+} from "../index.js";
+import { RequestsContainer } from "../requests/request-container.js";
+import { SegmentsMemoryStorage } from "../segments-storage.js";
+import * as LoggerUtils from "../utils/logger.js";
+import { EventTarget } from "../utils/event-target.js";
 
 type P2PLoaderContainerItem = {
   stream: Stream;

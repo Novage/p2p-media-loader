@@ -19,5 +19,6 @@ module.exports = {
       "warn",
       { allowConstantExport: true },
     ],
+    "import/extensions": "off",
   },
 };

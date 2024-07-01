@@ -3,7 +3,7 @@ import {
   PartialHlsJsP2PEngineConfig,
   HlsWithP2PInstance,
   HlsWithP2PConfig,
-} from "./engine";
+} from "./engine.js";
 
 export function injectMixin<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

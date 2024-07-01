@@ -3,9 +3,9 @@ import {
   Stream,
   StreamConfig,
   StreamWithSegments,
-} from "../types";
-import { Playback } from "../internal-types";
-import { P2PLoader } from "../p2p/loader";
+} from "../types.js";
+import { Playback } from "../internal-types.js";
+import { P2PLoader } from "../p2p/loader.js";
 
 export type SegmentPlaybackStatuses = {
   isHighDemand: boolean;

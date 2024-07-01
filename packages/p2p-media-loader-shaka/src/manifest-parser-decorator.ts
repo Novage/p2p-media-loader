@@ -1,10 +1,10 @@
-import { SegmentManager } from "./segment-manager";
+import { SegmentManager } from "./segment-manager.js";
 import {
   HookedStream,
   Shaka,
   HookedNetworkingEngine,
   P2PMLShakaData,
-} from "./types";
+} from "./types.js";
 import { StreamType, debug } from "p2p-media-loader-core";
 
 export class ManifestParserDecorator implements shaka.extern.ManifestParser {
