@@ -25,11 +25,11 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
      npm install p2p-media-loader-shaka
      ```
 
-2. Provide Node Polyfills
+2. Provide Node.js polyfills
 
-   To ensure the P2P Media Loader works correctly in a browser environment, you need to provide Node.js polyfills. These polyfills simulate the Node.js environment in the browser, allowing Node-specific code to run.
+   To ensure the P2P Media Loader works correctly in a browser environment, you must provide Node.js polyfills required by `bittorrent-tracker` dependency.
 
-   - Vite Configuration Example:
+   - Vite configuration example:
 
      ```typescript
      // vite.config.ts
@@ -41,7 +41,7 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
      });
      ```
 
-   - Webpack Configuration Example:
+   - Webpack configuration example:
 
      ```javascript
      // webpack.config.mjs
