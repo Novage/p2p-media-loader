@@ -27,7 +27,7 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
 
 2. Provide Node.js polyfills
 
-   To ensure the P2P Media Loader works correctly in a browser environment, you must provide Node.js polyfills required by `bittorrent-tracker` dependency.
+   To ensure the P2P Media Loader works correctly in a browser environment, you must provide Node.js polyfills required by [bittorrent-tracker](https://www.npmjs.com/package/bittorrent-tracker) dependency.
 
    - Vite configuration example:
 
