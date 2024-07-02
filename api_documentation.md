@@ -49,9 +49,7 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
 
      export default {
        plugins: [
-         new NodePolyfillPlugin({
-           additionalAliases: ["process"],
-         }),
+         new NodePolyfillPlugin({ additionalAliases: ["process"] }),
        ],
      };
      ```
