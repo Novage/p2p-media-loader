@@ -25,7 +25,38 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
      npm install p2p-media-loader-shaka
      ```
 
-2. Import and use it in your project:
+2. Provide Node Polyfills
+
+   To ensure the P2P Media Loader works correctly in a browser environment, you need to provide Node.js polyfills. These polyfills simulate the Node.js environment in the browser, allowing Node-specific code to run.
+
+   - Vite Configuration Example:
+
+     ```typescript
+     // vite.config.ts
+     import { defineConfig } from "vite";
+     import { nodePolyfills } from "vite-plugin-node-polyfills";
+
+     export default defineConfig({
+       plugins: [nodePolyfills()],
+     });
+     ```
+
+   - Webpack Configuration Example:
+
+     ```javascript
+     // webpack.config.mjs
+     import NodePolyfillPlugin from "node-polyfill-webpack-plugin";
+
+     export default {
+       plugins: [
+         new NodePolyfillPlugin({
+           additionalAliases: ["process"],
+         }),
+       ],
+     };
+     ```
+
+3. Import and use it in your project:
 
    - HLS.js integration:
 
