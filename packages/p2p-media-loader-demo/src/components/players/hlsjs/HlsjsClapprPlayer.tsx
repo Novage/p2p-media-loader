@@ -4,6 +4,12 @@ import { PlayerProps } from "../../../types";
 import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 import { subscribeToUiEvents } from "../utils";
 import Hls from "hls.js";
+import { useScripts } from "../../../hooks/useScripts";
+
+const SCRIPTS = [
+  "https://cdn.jsdelivr.net/npm/@clappr/player@~0/dist/clappr.min.js",
+  "https://cdn.jsdelivr.net/gh/clappr/clappr-level-selector-plugin@~0/dist/level-selector.min.js",
+];
 
 export const HlsjsClapprPlayer = ({
   streamUrl,
@@ -13,12 +19,31 @@ export const HlsjsClapprPlayer = ({
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
+  useScripts(SCRIPTS);
+
+  const [isClapprLoaded, setIsClapprLoaded] = useState(false);
   const [isHlsSupported, setIsHlsSupported] = useState(true);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    let intervalId: NodeJS.Timeout | null = null;
+
+    const checkClapprLoaded = () => {
+      if (!window.Clappr && !window.LevelSelector) return;
+      if (intervalId) clearInterval(intervalId);
+      setIsClapprLoaded(true);
+    };
+
+    intervalId = setInterval(checkClapprLoaded, 200);
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!containerRef.current || !isClapprLoaded) return;
     if (!Hls.isSupported()) {
       setIsHlsSupported(false);
       return;
@@ -56,7 +81,7 @@ export const HlsjsClapprPlayer = ({
       height: "100%",
     });
 
-    engine.bindHls(() => (clapprPlayer as any).core.getCurrentPlayback()?._hls);
+    engine.bindHls(() => clapprPlayer.core.getCurrentPlayback()?._hls);
 
     return () => {
       clapprPlayer.destroy();
@@ -64,6 +89,7 @@ export const HlsjsClapprPlayer = ({
     };
     /* eslint-enable  */
   }, [
+    isClapprLoaded,
     announceTrackers,
     onChunkDownloaded,
     onChunkUploaded,

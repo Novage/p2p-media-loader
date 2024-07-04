@@ -34,6 +34,9 @@ declare global {
     Hls?: typeof HlsWithP2PType;
     LevelSelector: unknown;
     DashShakaPlayback: unknown;
+    Clappr: {
+      Player: unknown;
+    };
   }
 }
 
