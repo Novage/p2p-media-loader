@@ -48,9 +48,7 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
      import NodePolyfillPlugin from "node-polyfill-webpack-plugin";
 
      export default {
-       plugins: [
-         new NodePolyfillPlugin({ additionalAliases: ["process"] }),
-       ],
+       plugins: [new NodePolyfillPlugin({ additionalAliases: ["process"] })],
      };
      ```
 
@@ -240,8 +238,10 @@ For more examples with npm packages, you may check our [React demo](https://gith
     height: "100%",
     width: "100%",
     parentId: `#player`,
-    hlsjsConfig: {
-      ...engine.getConfigForHlsJs(),
+    playback: {
+      hlsjsConfig: {
+        ...engine.getConfigForHlsJs(),
+      },
     },
   });
 
