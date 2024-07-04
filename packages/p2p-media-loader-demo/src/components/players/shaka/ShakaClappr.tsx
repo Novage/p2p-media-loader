@@ -3,6 +3,14 @@ import { useEffect, useRef, useState } from "react";
 import { PlayerProps } from "../../../types";
 import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 import { subscribeToUiEvents } from "../utils";
+import { useScripts } from "../../../hooks/useScripts";
+
+const SCRIPTS = [
+  "https://cdn.jsdelivr.net/npm/shaka-player@~4/dist/shaka-player.compiled.min.js",
+  "https://cdn.jsdelivr.net/npm/@clappr/player@~0/dist/clappr.min.js",
+  "https://cdn.jsdelivr.net/gh/clappr/clappr-level-selector-plugin@~0/dist/level-selector.min.js",
+  "https://cdn.jsdelivr.net/npm/dash-shaka-playback@~3/dist/dash-shaka-playback.external.min.js",
+];
 
 export const ShakaClappr = ({
   streamUrl,
@@ -12,30 +20,49 @@ export const ShakaClappr = ({
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
+  useScripts(SCRIPTS);
+
+  const [isClapprLoaded, setIsClapprLoaded] = useState(false);
   const [isShakaSupported, setIsShakaSupported] = useState(true);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    ShakaP2PEngine.registerPlugins();
-    return () => ShakaP2PEngine.unregisterPlugins();
+    let intervalId: NodeJS.Timeout | null = null;
+
+    const checkClapprLoaded = () => {
+      if (
+        window.Clappr &&
+        window.LevelSelector &&
+        window.DashShakaPlayback &&
+        window.shaka.Player
+      ) {
+        if (intervalId) clearInterval(intervalId);
+        setIsClapprLoaded(true);
+        ShakaP2PEngine.registerPlugins();
+      }
+    };
+
+    intervalId = setInterval(checkClapprLoaded, 200);
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+      if (window.shaka) ShakaP2PEngine.unregisterPlugins();
+    };
   }, []);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || !isClapprLoaded) return;
     if (!window.shaka.Player.isBrowserSupported()) {
       setIsShakaSupported(false);
       return;
     }
 
-    const shakaP2PEngine = new ShakaP2PEngine(
-      {
-        core: {
-          announceTrackers,
-        },
+    const shakaP2PEngine = new ShakaP2PEngine({
+      core: {
+        announceTrackers,
       },
-      window.shaka,
-    );
+    });
 
     /* eslint-disable  */
     // @ts-ignore
@@ -69,6 +96,7 @@ export const ShakaClappr = ({
     };
     /* eslint-enable  */
   }, [
+    isClapprLoaded,
     announceTrackers,
     onChunkDownloaded,
     onChunkUploaded,
