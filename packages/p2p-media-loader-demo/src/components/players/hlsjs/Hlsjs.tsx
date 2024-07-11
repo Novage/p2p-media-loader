@@ -17,6 +17,7 @@ export const HlsjsPlayer = ({
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const qualityRef = useRef<HTMLSelectElement>(null);
+  const p2pEngineRef = useRef<HlsJsP2PEngine | null>(null);
 
   useEffect(() => {
     if (!videoRef.current) return;
@@ -46,10 +47,12 @@ export const HlsjsPlayer = ({
     hls.attachMedia(videoRef.current);
     hls.loadSource(streamUrl);
 
-    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+    /*hls.on(Hls.Events.MANIFEST_PARSED, () => {
       if (!qualityRef.current) return;
       updateQualityOptions(hls, qualityRef.current);
-    });
+    });*/
+    hls.currentLevel = 4;
+    p2pEngineRef.current = hls.p2pEngine;
 
     return () => hls.destroy();
   }, [
@@ -81,6 +84,18 @@ export const HlsjsPlayer = ({
 
   return isHlsSupported ? (
     <div className="video-container">
+      <button
+        onClick={() => {
+          if (!p2pEngineRef.current) return;
+          p2pEngineRef.current.applyDynamicConfig({
+            core: {
+              isP2PDisabled: true,
+            },
+          });
+        }}
+      >
+        Disable p2p
+      </button>
       <video
         ref={videoRef}
         style={{ aspectRatio: "auto" }}

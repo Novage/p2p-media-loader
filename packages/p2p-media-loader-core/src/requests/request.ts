@@ -53,6 +53,7 @@ export type RequestStatus =
   | "aborted";
 
 export class Request {
+  private static requestChunks = new Map<number, number>();
   readonly id: string;
   private currentAttempt?: RequestAttempt;
   private _failedAttempts = new FailedRequestAttempts();
@@ -317,6 +318,9 @@ export class Request {
     this.progress.lastLoadedChunkTimestamp = performance.now();
     this.progress.loadedBytes += byteLength;
     this._loadedBytes += byteLength;
+    const currentChunkCount =
+      Request.requestChunks.get(this.segment.externalId) || 0;
+    Request.requestChunks.set(this.segment.externalId, currentChunkCount + 1);
   };
 
   private firstBytesReceived = () => {

@@ -105,6 +105,10 @@ export class Peer {
           this.downloadingContext.isSegmentDataCommandReceived = true;
           controls.firstBytesReceived();
 
+          console.log(
+            `<<< received segment data from ${this.id} | segmentID: ${command.i} | bytes: ${command.s} | request: ${request} >>>`,
+          );
+
           if (request.totalBytes === undefined) {
             request.setTotalBytes(command.s);
           } else if (request.totalBytes - request.loadedBytes !== command.s) {
@@ -173,6 +177,7 @@ export class Peer {
         break;
 
       case PeerCommandType.CancelSegmentRequest:
+        console.log(`cancelSegmentRequest SEGMENT ID:`, command.i);
         this.peerProtocol.stopUploadingSegmentData();
         break;
     }
@@ -195,6 +200,9 @@ export class Peer {
     }
 
     controls.addLoadedChunk(chunk);
+    /*console.log(
+      ` <<<< OnSegmentChunkReceived | ${chunk.byteLength} bytes received | ${request.totalBytes} total bytes | ${request.loadedBytes} loaded bytes | ${request.segment.externalId} segment ID | ${this.id} peer ID >>>`,
+    );*/
   };
 
   downloadSegment(segmentRequest: Request) {
@@ -233,11 +241,18 @@ export class Peer {
       i: segmentRequest.segment.externalId,
     };
     if (segmentRequest.loadedBytes) command.b = segmentRequest.loadedBytes;
+    console.log(
+      ` >>> Requesting segment from peer | Segment ID: ${segmentRequest.segment.externalId} 
+      | Loaded Bytes: ${segmentRequest.loadedBytes} >>>`,
+    );
     this.peerProtocol.sendCommand(command);
   }
 
   async uploadSegmentData(segment: SegmentWithStream, data: ArrayBuffer) {
     const { externalId } = segment;
+    console.log(
+      ` <<< Received segment request | segmentID: ${segment.externalId} byteFrom: ${data.byteLength}`,
+    );
     this.logger(`send segment ${segment.externalId} to ${this.id}`);
     const command: Command.PeerSendSegmentCommand = {
       c: PeerCommandType.SegmentData,
@@ -310,8 +325,6 @@ export class Peer {
     const code = (error as { code?: string }).code;
 
     if (code === "ERR_DATA_CHANNEL") {
-      this.destroy();
-    } else if (code === "ERR_CONNECTION_FAILURE") {
       this.destroy();
     } else if (code === "ERR_CONNECTION_FAILURE") {
       this.destroy();
