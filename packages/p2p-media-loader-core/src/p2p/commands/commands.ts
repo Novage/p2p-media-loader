@@ -28,6 +28,7 @@ function serializePeerSegmentCommand(
 ) {
   const creator = new BinaryCommandCreator(command.c, maxChunkSize);
   creator.addInteger("i", command.i);
+  if (command.r) creator.addInteger("r", command.r);
   creator.complete();
   return creator.getResultBuffers();
 }
@@ -39,6 +40,7 @@ function serializePeerSendSegmentCommand(
   const creator = new BinaryCommandCreator(command.c, maxChunkSize);
   creator.addInteger("i", command.i);
   creator.addInteger("s", command.s);
+  creator.addInteger("r", command.r);
   creator.complete();
   return creator.getResultBuffers();
 }
@@ -49,6 +51,7 @@ function serializePeerSegmentRequestCommand(
 ) {
   const creator = new BinaryCommandCreator(command.c, maxChunkSize);
   creator.addInteger("i", command.i);
+  creator.addInteger("r", command.r);
   if (command.b) creator.addInteger("b", command.b);
   creator.complete();
   return creator.getResultBuffers();

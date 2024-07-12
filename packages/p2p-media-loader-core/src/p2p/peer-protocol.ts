@@ -39,7 +39,7 @@ export class PeerProtocol {
     } else {
       this.eventHandlers.onSegmentChunkReceived(data);
 
-      this.onChunkDownloaded(data.length, "p2p", this.connection.idUtf8);
+      this.onChunkDownloaded(data.byteLength, "p2p", this.connection.idUtf8);
     }
   };
 
@@ -49,7 +49,7 @@ export class PeerProtocol {
       this.peerConfig.webRtcMaxMessageSize,
     );
     for (const buffer of binaryCommandBuffers) {
-      this.connection.send(buffer);
+      this.connection.write(buffer);
     }
   }
 

@@ -53,7 +53,6 @@ export type RequestStatus =
   | "aborted";
 
 export class Request {
-  readonly id: string;
   private currentAttempt?: RequestAttempt;
   private _failedAttempts = new FailedRequestAttempts();
   private finalData?: ArrayBuffer;
@@ -86,7 +85,6 @@ export class Request {
     this.onSegmentStart = eventTarget.getEventDispatcher("onSegmentStart");
     this.onSegmentLoaded = eventTarget.getEventDispatcher("onSegmentLoaded");
 
-    this.id = this.segment.runtimeId;
     const { byteRange } = this.segment;
     if (byteRange) {
       const { end, start } = byteRange;

@@ -123,6 +123,7 @@ export class P2PLoader {
   private onSegmentRequested = async (
     peer: Peer,
     segmentExternalId: number,
+    requestId: number,
     byteFrom?: number,
   ) => {
     const segment = StreamUtils.getSegmentFromStreamByExternalId(
@@ -132,11 +133,12 @@ export class P2PLoader {
     if (!segment) return;
     const segmentData = await this.segmentStorage.getSegmentData(segment);
     if (!segmentData) {
-      peer.sendSegmentAbsentCommand(segmentExternalId);
+      peer.sendSegmentAbsentCommand(segmentExternalId, requestId);
       return;
     }
     await peer.uploadSegmentData(
       segment,
+      requestId,
       byteFrom !== undefined ? segmentData.slice(byteFrom) : segmentData,
     );
   };
