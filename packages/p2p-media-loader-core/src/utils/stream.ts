@@ -18,7 +18,7 @@ export type PlaybackTimeWindowsConfig = Pick<
   "highDemandTimeWindow" | "httpDownloadTimeWindow" | "p2pDownloadTimeWindow"
 >;
 
-const PEER_PROTOCOL_VERSION = "v1";
+const PEER_PROTOCOL_VERSION = "v2";
 
 export function getStreamSwarmId(
   swarmId: string,
