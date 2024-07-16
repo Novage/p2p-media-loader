@@ -28,7 +28,7 @@ function serializePeerSegmentCommand(
 ) {
   const creator = new BinaryCommandCreator(command.c, maxChunkSize);
   creator.addInteger("i", command.i);
-  if (command.r) creator.addInteger("r", command.r);
+  creator.addInteger("r", command.r);
   creator.complete();
   return creator.getResultBuffers();
 }

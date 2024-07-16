@@ -121,7 +121,7 @@ export class Peer {
             request.setTotalBytes(command.s);
           } else if (request.totalBytes - request.loadedBytes !== command.s) {
             request.clearLoadedBytes();
-            this.sendCancelSegmentRequestCommand(request.segment);
+            this.sendCancelSegmentRequestCommand(request.segment, requestId);
             this.cancelSegmentDownloading(
               "peer-response-bytes-length-mismatch",
             );
@@ -180,7 +180,7 @@ export class Peer {
 
       case PeerCommandType.SegmentAbsent:
         if (
-          this.downloadingContext?.request.segment.externalId === command.i ||
+          this.downloadingContext?.request.segment.externalId === command.i &&
           this.downloadingContext?.requestId === command.r
         ) {
           this.cancelSegmentDownloading("peer-segment-absent");
@@ -189,6 +189,10 @@ export class Peer {
         break;
 
       case PeerCommandType.CancelSegmentRequest:
+        const uploadingRequestId = this.peerProtocol.getUploadingRequestId();
+
+        if (uploadingRequestId !== command.r) break;
+
         this.peerProtocol.stopUploadingSegmentData();
         break;
     }
@@ -228,9 +232,8 @@ export class Peer {
             this.peerConfig.p2pNotReceivingBytesTimeoutMs,
           abort: (error) => {
             if (!this.downloadingContext) return;
-            const { request } = this.downloadingContext;
-
-            this.sendCancelSegmentRequestCommand(request.segment);
+            const { request, requestId } = this.downloadingContext;
+            this.sendCancelSegmentRequestCommand(request.segment, requestId);
             this.downloadingErrors.push(error);
             this.downloadingContext = undefined;
 
@@ -271,6 +274,7 @@ export class Peer {
     try {
       await this.peerProtocol.splitSegmentDataToChunksAndUploadAsync(
         data as Uint8Array,
+        requestId,
       );
       this.sendSegmentDataSendingCompletedCommand(segment, requestId);
       this.logger(`segment ${externalId} has been sent to ${this.id}`);
@@ -310,10 +314,14 @@ export class Peer {
     });
   }
 
-  private sendCancelSegmentRequestCommand(segment: SegmentWithStream) {
+  private sendCancelSegmentRequestCommand(
+    segment: SegmentWithStream,
+    requestId: number,
+  ) {
     this.peerProtocol.sendCommand({
       c: PeerCommandType.CancelSegmentRequest,
       i: segment.externalId,
+      r: requestId,
     });
   }
 

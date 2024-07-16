@@ -14,7 +14,7 @@ export type PeerConfig = Pick<
 
 export class PeerProtocol {
   private commandChunks?: Command.BinaryCommandChunksJoiner;
-  private uploadingContext?: { stopUploading: () => void };
+  private uploadingContext?: { stopUploading: () => void; requestId: number };
   private readonly onChunkDownloaded: CoreEventMap["onChunkDownloaded"];
   private readonly onChunkUploaded: CoreEventMap["onChunkUploaded"];
 
@@ -58,7 +58,14 @@ export class PeerProtocol {
     this.uploadingContext = undefined;
   }
 
-  async splitSegmentDataToChunksAndUploadAsync(data: Uint8Array) {
+  getUploadingRequestId() {
+    return this.uploadingContext?.requestId;
+  }
+
+  async splitSegmentDataToChunksAndUploadAsync(
+    data: Uint8Array,
+    requestId: number,
+  ) {
     if (this.uploadingContext) {
       throw new Error(`Some segment data is already uploading.`);
     }
@@ -71,6 +78,7 @@ export class PeerProtocol {
       stopUploading: () => {
         isUploadingSegmentData = false;
       },
+      requestId,
     };
 
     this.uploadingContext = uploadingContext;
