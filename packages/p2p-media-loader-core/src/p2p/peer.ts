@@ -223,7 +223,7 @@ export class Peer {
     }
     this.downloadingContext = {
       request: segmentRequest,
-      requestId: Math.floor(Math.random() * 900) + 100,
+      requestId: Math.floor(Math.random() * 1000),
       isSegmentDataCommandReceived: false,
       controls: segmentRequest.start(
         { downloadSource: "p2p", peerId: this.id },
