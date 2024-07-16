@@ -17,7 +17,7 @@ export type PeerSegmentCommand = BasePeerCommand<
   | PeerCommandType.SegmentDataSendingCompleted
 > & {
   i: number; // segment id
-  r?: number; // request id
+  r: number; // request id
 };
 
 export type PeerRequestSegmentCommand =
