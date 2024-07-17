@@ -34,7 +34,7 @@ export class P2PTrackerClient {
 
   constructor(
     streamSwarmId: string,
-    stream: StreamWithSegments,
+    private readonly stream: StreamWithSegments,
     private readonly eventHandlers: P2PTrackerClientEventHandlers,
     private readonly config: StreamConfig,
     private readonly eventTarget: EventTarget<CoreEventMap>,
@@ -104,6 +104,7 @@ export class P2PTrackerClient {
           onSegmentsAnnouncement: this.eventHandlers.onSegmentsAnnouncement,
         },
         this.config,
+        this.stream.type,
         this.eventTarget,
       );
       this.logger(

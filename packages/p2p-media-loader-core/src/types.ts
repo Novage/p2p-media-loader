@@ -463,6 +463,13 @@ export type SegmentLoadDetails = {
 export type PeerDetails = {
   /** The unique identifier for a peer in the network. */
   peerId: string;
+  streamType: StreamType;
+};
+
+/** Represents the details of a peer error event. */
+export type PeerErrorDetails = PeerDetails & {
+  /** The error that occurred during the peer-to-peer connection. */
+  error: Error;
 };
 
 /**
@@ -501,16 +508,23 @@ export type CoreEventMap = {
   /**
    * Occurs when a new peer-to-peer connection is established.
    *
-   * @param peerId - The unique identifier of the peer that has just connected.
+   * @param params - Contains details about the peer that the event is about.
    */
   onPeerConnect: (params: PeerDetails) => void;
 
   /**
    * Triggered when an existing peer-to-peer connection is closed.
    *
-   * @param peerId - The unique identifier of the peer whose connection has been closed.
+   * @param params - Contains details about the peer that the event is about.
    */
   onPeerClose: (params: PeerDetails) => void;
+
+  /**
+   * Triggered when an error occurs during a peer-to-peer connection.
+   *
+   * @param params - Contains details about the error and the peer that the event is about.
+   */
+  onPeerError: (params: PeerErrorDetails) => void;
 
   /**
    * Invoked after a chunk of data from a segment has been successfully downloaded.
