@@ -17,11 +17,13 @@ export type PeerSegmentCommand = BasePeerCommand<
   | PeerCommandType.SegmentDataSendingCompleted
 > & {
   i: number; // segment id
+  r: number; // request id
 };
 
 export type PeerRequestSegmentCommand =
   BasePeerCommand<PeerCommandType.SegmentRequest> & {
     i: number; // segment id
+    r: number; // request id
     b?: number; // byte from
   };
 
@@ -34,6 +36,7 @@ export type PeerSegmentAnnouncementCommand =
 export type PeerSendSegmentCommand =
   BasePeerCommand<PeerCommandType.SegmentData> & {
     i: number; // segment id
+    r: number; // request id
     s: number; // size in bytes
   };
 

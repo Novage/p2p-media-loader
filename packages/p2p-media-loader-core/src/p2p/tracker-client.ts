@@ -17,7 +17,12 @@ type PeerItem = {
 
 type P2PTrackerClientEventHandlers = {
   onPeerConnected: (peer: Peer) => void;
-  onSegmentRequested: (peer: Peer, segmentExternalId: number) => void;
+  onSegmentRequested: (
+    peer: Peer,
+    segmentExternalId: number,
+    requestId: number,
+    bytesFrom?: number,
+  ) => void;
   onSegmentsAnnouncement: () => void;
 };
 

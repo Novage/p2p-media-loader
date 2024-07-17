@@ -14,7 +14,7 @@ export type PeerConfig = Pick<
 
 export class PeerProtocol {
   private commandChunks?: Command.BinaryCommandChunksJoiner;
-  private uploadingContext?: { stopUploading: () => void };
+  private uploadingContext?: { stopUploading: () => void; requestId: number };
   private readonly onChunkDownloaded: CoreEventMap["onChunkDownloaded"];
   private readonly onChunkUploaded: CoreEventMap["onChunkUploaded"];
 
@@ -39,7 +39,7 @@ export class PeerProtocol {
     } else {
       this.eventHandlers.onSegmentChunkReceived(data);
 
-      this.onChunkDownloaded(data.length, "p2p", this.connection.idUtf8);
+      this.onChunkDownloaded(data.byteLength, "p2p", this.connection.idUtf8);
     }
   };
 
@@ -49,7 +49,7 @@ export class PeerProtocol {
       this.peerConfig.webRtcMaxMessageSize,
     );
     for (const buffer of binaryCommandBuffers) {
-      this.connection.send(buffer);
+      this.connection.write(buffer);
     }
   }
 
@@ -58,7 +58,14 @@ export class PeerProtocol {
     this.uploadingContext = undefined;
   }
 
-  async splitSegmentDataToChunksAndUploadAsync(data: Uint8Array) {
+  getUploadingRequestId() {
+    return this.uploadingContext?.requestId;
+  }
+
+  async splitSegmentDataToChunksAndUploadAsync(
+    data: Uint8Array,
+    requestId: number,
+  ) {
     if (this.uploadingContext) {
       throw new Error(`Some segment data is already uploading.`);
     }
@@ -71,6 +78,7 @@ export class PeerProtocol {
       stopUploading: () => {
         isUploadingSegmentData = false;
       },
+      requestId,
     };
 
     this.uploadingContext = uploadingContext;

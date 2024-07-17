@@ -36,15 +36,15 @@ export class Core<TStream extends Stream = Stream> {
   /** Default configuration for stream settings. */
   static readonly DEFAULT_STREAM_CONFIG: StreamConfig = {
     isP2PDisabled: false,
-    simultaneousHttpDownloads: 3,
+    simultaneousHttpDownloads: 2,
     simultaneousP2PDownloads: 3,
     highDemandTimeWindow: 15,
     httpDownloadTimeWindow: 3000,
     p2pDownloadTimeWindow: 6000,
     webRtcMaxMessageSize: 64 * 1024 - 1,
-    p2pNotReceivingBytesTimeoutMs: 1000,
+    p2pNotReceivingBytesTimeoutMs: 2000,
     p2pInactiveLoaderDestroyTimeoutMs: 30 * 1000,
-    httpNotReceivingBytesTimeoutMs: 1000,
+    httpNotReceivingBytesTimeoutMs: 3000,
     httpErrorRetries: 3,
     p2pErrorRetries: 3,
     trackerClientVersionPrefix: TRACKER_CLIENT_VERSION_PREFIX,
