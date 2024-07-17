@@ -433,6 +433,9 @@ export type SegmentErrorDetails = {
 
   /** The peer ID, if the segment was downloaded from a peer. */
   peerId: string | undefined;
+
+  /** The type of stream that the segment is associated with. */
+  streamType: StreamType;
 };
 
 /** Represents details about a segment abort event. */
@@ -445,10 +448,16 @@ export type SegmentAbortDetails = {
 
   /** The peer ID, if the segment was downloaded from a peer. */
   peerId: string | undefined;
+
+  /** The type of stream that the segment is associated with. */
+  streamType: StreamType;
 };
 
 /** Represents the details about a loaded segment. */
 export type SegmentLoadDetails = {
+  /** The segment ID that was loaded. */
+  segmentId: number;
+
   /** The length of the segment in bytes. */
   bytesLength: number;
 
@@ -457,6 +466,9 @@ export type SegmentLoadDetails = {
 
   /** The peer ID, if the segment was downloaded from a peer. */
   peerId: string | undefined;
+
+  /** The segment that the event is about. */
+  streamType: StreamType;
 };
 
 /** Represents the details of a peer in a peer-to-peer network. */

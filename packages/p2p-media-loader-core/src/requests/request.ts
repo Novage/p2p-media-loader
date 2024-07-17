@@ -215,6 +215,7 @@ export class Request {
         this.currentAttempt?.downloadSource === "p2p"
           ? this.currentAttempt.peerId
           : undefined,
+      streamType: this.segment.stream.type,
     });
     this._abortRequestCallback = undefined;
     this.manageBandwidthCalculatorsState("stop");
@@ -243,6 +244,7 @@ export class Request {
         this.currentAttempt.downloadSource === "p2p"
           ? this.currentAttempt.peerId
           : undefined,
+      streamType: this.segment.stream.type,
     });
     this.notReceivingBytesTimeout.clear();
     this.manageBandwidthCalculatorsState("stop");
@@ -269,6 +271,7 @@ export class Request {
         this.currentAttempt.downloadSource === "p2p"
           ? this.currentAttempt.peerId
           : undefined,
+      streamType: this.segment.stream.type,
     });
     this.notReceivingBytesTimeout.clear();
     this.manageBandwidthCalculatorsState("stop");
@@ -285,12 +288,14 @@ export class Request {
     this.setStatus("succeed");
     this._totalBytes = this._loadedBytes;
     this.onSegmentLoaded({
+      segmentId: this.segment.externalId,
       bytesLength: this.finalData.byteLength,
       downloadSource: this.currentAttempt.downloadSource,
       peerId:
         this.currentAttempt.downloadSource === "p2p"
           ? this.currentAttempt.peerId
           : undefined,
+      streamType: this.segment.stream.type,
     });
 
     this.logger(
