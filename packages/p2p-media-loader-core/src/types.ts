@@ -463,13 +463,33 @@ export type SegmentLoadDetails = {
 export type PeerDetails = {
   /** The unique identifier for a peer in the network. */
   peerId: string;
+  /** The type of stream that the peer is connected to. */
   streamType: StreamType;
 };
 
 /** Represents the details of a peer error event. */
-export type PeerErrorDetails = PeerDetails & {
+export type PeerErrorDetails = {
+  /** The unique identifier for a peer in the network. */
+  peerId: string;
+  /** The type of stream that the peer is connected to. */
+  streamType: StreamType;
   /** The error that occurred during the peer-to-peer connection. */
   error: Error;
+};
+
+/** Represents the details of a tracker error event. */
+export type TrackerErrorDetails = {
+  /** The type of stream that the tracker is for. */
+  streamType: StreamType;
+  /** The error that occurred during the tracker request. */
+  error: unknown;
+};
+
+export type TrackerWarningDetails = {
+  /** The type of stream that the tracker is for. */
+  streamType: StreamType;
+  /** The warning that occurred during the tracker request. */
+  warning: unknown;
 };
 
 /**
@@ -546,6 +566,20 @@ export type CoreEventMap = {
    * @param peerId - The peer ID, if the segment was downloaded from a peer
    */
   onChunkUploaded: (bytesLength: number, peerId: string) => void;
+
+  /**
+   * Called when an error occurs during the tracker request process.
+   *
+   * @param details - Contains information about the tracker error.
+   */
+  onTrackerError: (details: TrackerErrorDetails) => void;
+
+  /**
+   * Called when a warning occurs during the tracker request process.
+   *
+   * @param details - Contains information about the tracker warning.
+   */
+  onTrackerWarning: (details: TrackerWarningDetails) => void;
 };
 
 /** Defines the types of errors that can occur during a request abortion process. */

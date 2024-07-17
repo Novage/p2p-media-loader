@@ -119,11 +119,19 @@ export class P2PTrackerClient {
   ) => {
     // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
     this.logger(`tracker warning (${this.streamShortId}: ${warning})`);
+    this.eventTarget.getEventDispatcher("onTrackerWarning")({
+      streamType: this.stream.type,
+      warning,
+    });
   };
 
   private onTrackerClientError: TrackerClientEvents["error"] = (error) => {
     // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
     this.logger(`tracker error (${this.streamShortId}: ${error})`);
+    this.eventTarget.getEventDispatcher("onTrackerError")({
+      streamType: this.stream.type,
+      error,
+    });
   };
 
   *peers() {
