@@ -91,12 +91,16 @@ export const P2PVideoDemo = ({ debugToolsEnabled = false }: DemoProps) => {
   }, []);
 
   const onPeerConnect = useCallback((params: PeerDetails) => {
+    if (params.streamType !== "main") return;
+
     setPeers((peers) => {
       return [...peers, params.peerId];
     });
   }, []);
 
   const onPeerClose = useCallback((params: PeerDetails) => {
+    if (params.streamType !== "main") return;
+
     setPeers((peers) => {
       return peers.filter((peer) => peer !== params.peerId);
     });
