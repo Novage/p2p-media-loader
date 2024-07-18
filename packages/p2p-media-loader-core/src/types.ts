@@ -234,7 +234,7 @@ export type StreamConfig = {
    *
    * @default
    * ```typescript
-   * simultaneousHttpDownloads: 3
+   * simultaneousHttpDownloads: 2
    * ```
    */
   simultaneousHttpDownloads: number;
@@ -264,7 +264,7 @@ export type StreamConfig = {
    *
    * @default
    * ```typescript
-   * p2pNotReceivingBytesTimeoutMs: 1000
+   * p2pNotReceivingBytesTimeoutMs: 2000
    * ```
    */
   p2pNotReceivingBytesTimeoutMs: number;
@@ -284,7 +284,7 @@ export type StreamConfig = {
    *
    * @default
    * ```typescript
-   * httpNotReceivingBytesTimeoutMs: 1000
+   * httpNotReceivingBytesTimeoutMs: 3000
    * ```
    */
   httpNotReceivingBytesTimeoutMs: number;
@@ -311,6 +311,9 @@ export type StreamConfig = {
 
   /**
    * List of URLs to the WebTorrent trackers used for announcing and discovering peers (i.e. WebRTC signaling).
+   *
+   * WARNING: In the Safari browser, only the first tracker will be used. Safari has issues with multiple trackers,
+   * leading to problems with sending SDP messages for WebRTC signaling.
    *
    * @default
    * The default trackers used are:
