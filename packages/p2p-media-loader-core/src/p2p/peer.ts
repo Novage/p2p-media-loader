@@ -7,6 +7,7 @@ import {
   RequestError,
   RequestAbortErrorType,
   SegmentWithStream,
+  StreamType,
 } from "../types.js";
 import * as Utils from "../utils/utils.js";
 import * as Command from "./commands/index.js";
@@ -46,7 +47,8 @@ export class Peer {
     private readonly connection: PeerConnection,
     private readonly eventHandlers: PeerEventHandlers,
     private readonly peerConfig: PeerConfig,
-    eventTarget: EventTarget<CoreEventMap>,
+    private readonly streamType: StreamType,
+    private readonly eventTarget: EventTarget<CoreEventMap>,
   ) {
     this.onPeerClosed = eventTarget.getEventDispatcher("onPeerClose");
 
@@ -63,6 +65,7 @@ export class Peer {
     );
     eventTarget.getEventDispatcher("onPeerConnect")({
       peerId: this.id,
+      streamType,
     });
 
     connection.on("error", this.onConnectionError);
@@ -342,6 +345,11 @@ export class Peer {
 
   private onConnectionError = (error: Error) => {
     this.logger(`peer connection error ${this.id} %O`, error);
+    this.eventTarget.getEventDispatcher("onPeerError")({
+      peerId: this.id,
+      streamType: this.streamType,
+      error,
+    });
 
     const code = (error as { code?: string }).code;
 
@@ -358,6 +366,7 @@ export class Peer {
     this.eventHandlers.onPeerClosed(this);
     this.onPeerClosed({
       peerId: this.id,
+      streamType: this.streamType,
     });
     this.logger(`peer closed ${this.id}`);
   };

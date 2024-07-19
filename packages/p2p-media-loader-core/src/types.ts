@@ -436,6 +436,9 @@ export type SegmentErrorDetails = {
 
   /** The peer ID, if the segment was downloaded from a peer. */
   peerId: string | undefined;
+
+  /** The type of stream that the segment is associated with. */
+  streamType: StreamType;
 };
 
 /** Represents details about a segment abort event. */
@@ -448,10 +451,16 @@ export type SegmentAbortDetails = {
 
   /** The peer ID, if the segment was downloaded from a peer. */
   peerId: string | undefined;
+
+  /** The type of stream that the segment is associated with. */
+  streamType: StreamType;
 };
 
 /** Represents the details about a loaded segment. */
 export type SegmentLoadDetails = {
+  /** The URL of the loaded segment */
+  segmentUrl: string;
+
   /** The length of the segment in bytes. */
   bytesLength: number;
 
@@ -460,12 +469,42 @@ export type SegmentLoadDetails = {
 
   /** The peer ID, if the segment was downloaded from a peer. */
   peerId: string | undefined;
+
+  /** The segment that the event is about. */
+  streamType: StreamType;
 };
 
 /** Represents the details of a peer in a peer-to-peer network. */
 export type PeerDetails = {
   /** The unique identifier for a peer in the network. */
   peerId: string;
+  /** The type of stream that the peer is connected to. */
+  streamType: StreamType;
+};
+
+/** Represents the details of a peer error event. */
+export type PeerErrorDetails = {
+  /** The unique identifier for a peer in the network. */
+  peerId: string;
+  /** The type of stream that the peer is connected to. */
+  streamType: StreamType;
+  /** The error that occurred during the peer-to-peer connection. */
+  error: Error;
+};
+
+/** Represents the details of a tracker error event. */
+export type TrackerErrorDetails = {
+  /** The type of stream that the tracker is for. */
+  streamType: StreamType;
+  /** The error that occurred during the tracker request. */
+  error: unknown;
+};
+
+export type TrackerWarningDetails = {
+  /** The type of stream that the tracker is for. */
+  streamType: StreamType;
+  /** The warning that occurred during the tracker request. */
+  warning: unknown;
 };
 
 /**
@@ -504,16 +543,23 @@ export type CoreEventMap = {
   /**
    * Occurs when a new peer-to-peer connection is established.
    *
-   * @param peerId - The unique identifier of the peer that has just connected.
+   * @param params - Contains details about the peer that the event is about.
    */
   onPeerConnect: (params: PeerDetails) => void;
 
   /**
    * Triggered when an existing peer-to-peer connection is closed.
    *
-   * @param peerId - The unique identifier of the peer whose connection has been closed.
+   * @param params - Contains details about the peer that the event is about.
    */
   onPeerClose: (params: PeerDetails) => void;
+
+  /**
+   * Triggered when an error occurs during a peer-to-peer connection.
+   *
+   * @param params - Contains details about the error and the peer that the event is about.
+   */
+  onPeerError: (params: PeerErrorDetails) => void;
 
   /**
    * Invoked after a chunk of data from a segment has been successfully downloaded.
@@ -535,6 +581,20 @@ export type CoreEventMap = {
    * @param peerId - The peer ID, if the segment was downloaded from a peer
    */
   onChunkUploaded: (bytesLength: number, peerId: string) => void;
+
+  /**
+   * Called when an error occurs during the tracker request process.
+   *
+   * @param params - Contains information about the tracker error.
+   */
+  onTrackerError: (params: TrackerErrorDetails) => void;
+
+  /**
+   * Called when a warning occurs during the tracker request process.
+   *
+   * @param params - Contains information about the tracker warning.
+   */
+  onTrackerWarning: (params: TrackerWarningDetails) => void;
 };
 
 /** Defines the types of errors that can occur during a request abortion process. */
