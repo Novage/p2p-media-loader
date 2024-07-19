@@ -582,16 +582,16 @@ export type CoreEventMap = {
   /**
    * Called when an error occurs during the tracker request process.
    *
-   * @param details - Contains information about the tracker error.
+   * @param params - Contains information about the tracker error.
    */
-  onTrackerError: (details: TrackerErrorDetails) => void;
+  onTrackerError: (params: TrackerErrorDetails) => void;
 
   /**
    * Called when a warning occurs during the tracker request process.
    *
-   * @param details - Contains information about the tracker warning.
+   * @param params - Contains information about the tracker warning.
    */
-  onTrackerWarning: (details: TrackerWarningDetails) => void;
+  onTrackerWarning: (params: TrackerWarningDetails) => void;
 };
 
 /** Defines the types of errors that can occur during a request abortion process. */
