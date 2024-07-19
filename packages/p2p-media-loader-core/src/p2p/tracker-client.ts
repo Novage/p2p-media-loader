@@ -26,6 +26,10 @@ type P2PTrackerClientEventHandlers = {
   onSegmentsAnnouncement: () => void;
 };
 
+function isSafariBrowser() {
+  return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+}
+
 export class P2PTrackerClient {
   private readonly streamShortId: string;
   private readonly client: TrackerClient;
@@ -47,7 +51,9 @@ export class P2PTrackerClient {
     this.client = new TrackerClient({
       infoHash: utf8ToUintArray(streamHash),
       peerId: utf8ToUintArray(peerId),
-      announce: this.config.announceTrackers,
+      announce: isSafariBrowser()
+        ? config.announceTrackers.slice(0, 1) // Safari has issues with multiple trackers
+        : config.announceTrackers,
       rtcConfig: this.config.rtcConfig,
     });
     this.client.on("peer", this.onReceivePeerConnection);
