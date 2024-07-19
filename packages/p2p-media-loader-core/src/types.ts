@@ -455,8 +455,8 @@ export type SegmentAbortDetails = {
 
 /** Represents the details about a loaded segment. */
 export type SegmentLoadDetails = {
-  /** The segment ID that was loaded. */
-  segmentId: number;
+  /** The URL of the loaded segment */
+  segmentUrl: string;
 
   /** The length of the segment in bytes. */
   bytesLength: number;

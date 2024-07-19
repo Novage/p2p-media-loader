@@ -288,7 +288,7 @@ export class Request {
     this.setStatus("succeed");
     this._totalBytes = this._loadedBytes;
     this.onSegmentLoaded({
-      segmentId: this.segment.externalId,
+      segmentUrl: this.segment.url,
       bytesLength: this.finalData.byteLength,
       downloadSource: this.currentAttempt.downloadSource,
       peerId:
