@@ -180,6 +180,34 @@ For more examples with npm packages, you may check our [React demo](https://gith
 </script>
 ```
 
+### **Integrating P2P with PlayerJS and Hls.js**
+
+```html
+<script type="module">
+  import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
+
+  window.Hls = HlsJsP2PEngine.injectMixin(window.Hls);
+
+  const player = new Playerjs({
+    id: "player",
+    hlsconfig: {
+      p2p: {
+        core: {
+          swarmId: "Optional custom swarm ID for stream",
+          // Other P2P engine config parameters go here
+        },
+        onHlsJsCreated: (hls) => {
+          // Subscribe to P2P engine and Hls.js events here
+          hls.p2pEngine.addEventListener("onPeerConnect", (details) => {
+            console.log(`Connected to peer ${details.peerId})`);
+          });
+        },
+      },
+    },
+  });
+</script>
+```
+
 ### **Integrating P2P with DPlayer and Hls.js**
 
 ```html

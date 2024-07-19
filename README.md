@@ -4,8 +4,6 @@
 [![npm version](https://img.shields.io/npm/v/p2p-media-loader-core?logo=npm&logoColor=white)](https://npmjs.com/package/p2p-media-loader-core)
 [![jsDelivr hits (npm)](https://data.jsdelivr.com/v1/package/npm/p2p-media-loader-core/badge?style=rounded)](https://www.jsdelivr.com/package/npm/p2p-media-loader-core)
 
-
-
 **P2P Media Loader** is an open-source JavaScript library that leverages modern web browser features, such as HTML5 video and WebRTC, to enable media delivery over peer-to-peer (P2P) connections. It integrates smoothly with many popular HTML5 video players and works entirely without browser plugins or add-ons. Experience it in action with the [demo](http://novage.com.ua/p2p-media-loader/demo.html).
 
 By leveraging P2P technology, it greatly reduces reliance on traditional content delivery network (CDN) resources, lowers costs, and enhances the ability to deliver media streams to a larger audience.
@@ -41,7 +39,7 @@ This library enables the creation of a huge P2P mesh networks, also known as pee
 - Supports live and VOD streams over HLS or MPEG-DASH protocols
 - Supports multiple HTML5 video players and engines:
   - Engines: Hls.js, Shaka Player
-  - Video players: [Vidstack](https://www.vidstack.io/), [Clappr](http://clappr.io/), [MediaElement](https://www.mediaelementjs.com/), [Plyr](https://plyr.io/), [DPlayer](https://dplayer.diygod.dev/), [OpenPlayerJS](https://www.openplayerjs.com/), and others that support Hls.js or Shaka video engines. These players can be integrated via custom integration with the library API.
+  - Video players: [Vidstack](https://www.vidstack.io/), [Clappr](http://clappr.io/), [MediaElement](https://www.mediaelementjs.com/), [Plyr](https://plyr.io/), [DPlayer](https://dplayer.diygod.dev/), [OpenPlayerJS](https://www.openplayerjs.com/), [PlayerJS](https://playerjs.com/) , and others that support Hls.js or Shaka video engines. These players can be integrated via custom integration with the library API.
 - Supports adaptive bitrate streaming of HLS and MPEG-DASH protocols
 - There is no need for server-side software for simple use cases. By default **P2P Media Loader** uses publicly available servers:
   - WebTorrent trackers - [https://tracker.novage.com.ua/](https://tracker.novage.com.ua/), [https://tracker.webtorrent.dev/](https://tracker.webtorrent.dev/), [https://openwebtorrent.com/](https://openwebtorrent.com/)
