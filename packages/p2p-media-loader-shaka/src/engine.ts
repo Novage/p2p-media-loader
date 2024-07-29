@@ -18,6 +18,7 @@ import {
   Core,
   CoreEventMap,
   DynamicCoreConfig,
+  DefinedCoreConfig,
 } from "p2p-media-loader-core";
 
 /** Type for specifying dynamic configuration options that can be changed at runtime for the P2P engine's core. */
@@ -28,8 +29,8 @@ export type DynamicShakaP2PEngineConfig = {
 
 /** Represents the complete configuration for ShakaP2PEngine. */
 export type ShakaP2PEngineConfig = {
-  /** Core config */
-  core: CoreConfig;
+  /** Complete core configuration settings. */
+  core: DefinedCoreConfig;
 };
 
 /** Allows for partial configuration settings for the Shaka P2P Engine. */

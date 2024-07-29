@@ -16,13 +16,14 @@ import {
   CoreEventMap,
   DynamicCoreConfig,
   debug,
+  DefinedCoreConfig,
 } from "p2p-media-loader-core";
 import { injectMixin } from "./engine-static.js";
 
 /** Represents the complete configuration for HlsJsP2PEngine. */
 export type HlsJsP2PEngineConfig = {
-  /** Core config */
-  core: CoreConfig;
+  /** Complete core configuration settings. */
+  core: DefinedCoreConfig;
 };
 
 /** Allows for partial configuration of HlsJsP2PEngine, useful for providing overrides or partial updates. */
