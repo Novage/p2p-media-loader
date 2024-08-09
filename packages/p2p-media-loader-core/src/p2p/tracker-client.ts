@@ -26,8 +26,14 @@ type P2PTrackerClientEventHandlers = {
   onSegmentsAnnouncement: () => void;
 };
 
-function isSafariBrowser() {
-  return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+function isSafariOrWkWebview() {
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  const isWkWebview =
+    /\b(iPad|iPhone|Macintosh).*AppleWebKit(?!.*Safari)/i.test(
+      navigator.userAgent,
+    );
+
+  return isSafari || isWkWebview;
 }
 
 export class P2PTrackerClient {
@@ -51,7 +57,7 @@ export class P2PTrackerClient {
     this.client = new TrackerClient({
       infoHash: utf8ToUintArray(streamHash),
       peerId: utf8ToUintArray(peerId),
-      announce: isSafariBrowser()
+      announce: isSafariOrWkWebview()
         ? config.announceTrackers.slice(0, 1) // Safari has issues with multiple trackers
         : config.announceTrackers,
       rtcConfig: this.config.rtcConfig,
