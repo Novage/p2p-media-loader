@@ -565,7 +565,7 @@ export type CoreEventMap = {
    * Invoked after a chunk of data from a segment has been successfully downloaded.
    *
    * @param bytesLength - The size of the downloaded chunk in bytes.
-   * @param type - The source of the download.
+   * @param downloadSource - The source of the download.
    * @param peerId - The peer ID of the peer that the event is about, if applicable.
    */
   onChunkDownloaded: (

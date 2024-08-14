@@ -252,11 +252,9 @@ For more examples with npm packages, you may check our [React demo](https://gith
   import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 
   const engine = new HlsJsP2PEngine({
-    p2p: {
-      core: {
-        swarmId: "Optional custom swarm ID for stream",
-        // Other P2P engine config parameters go here
-      },
+    core: {
+      swarmId: "Optional custom swarm ID for stream",
+      // Other P2P engine config parameters go here
     },
   });
 
