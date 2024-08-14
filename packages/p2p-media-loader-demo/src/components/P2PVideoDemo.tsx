@@ -18,20 +18,19 @@ import { ShakaClappr } from "./players/shaka/ShakaClappr";
 import { HlsjsMediaElement } from "./players/hlsjs/HlsjsMediaElement";
 import { ShakaPlyr } from "./players/shaka/ShakaPlyr";
 import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
-import Hls from "hls.js";
 import { HlsjsVidstack } from "./players/hlsjs/HlsjsVidstack";
 import { PeerDetails } from "p2p-media-loader-core";
 
 type DemoProps = {
   debugToolsEnabled?: boolean;
 };
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const HlsWithP2PType = HlsJsP2PEngine.injectMixin(Hls);
+
+type HlsWithP2PType = ReturnType<typeof HlsJsP2PEngine.injectMixin>;
 
 declare global {
   interface Window {
     shaka?: unknown;
-    Hls?: typeof HlsWithP2PType;
+    Hls?: HlsWithP2PType;
     LevelSelector: unknown;
     DashShakaPlayback: unknown;
     Clappr: {
