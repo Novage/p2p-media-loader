@@ -43,7 +43,7 @@ export class SegmentManager {
     if (!segmentReferences && segmentIndex) {
       try {
         segmentReferences = [...segmentIndex];
-      } catch (err) {
+      } catch {
         return;
       }
     }

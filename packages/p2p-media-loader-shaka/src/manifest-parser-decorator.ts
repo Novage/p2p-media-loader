@@ -153,7 +153,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
           segmentManager.updateStreamSegments(stream, references);
           stream.isSegmentIndexAlreadyRead = true;
           this.debug(`Stream ${stream.id} is updated`);
-        } catch (err) {
+        } catch {
           // This catch is intentionally left blank.
           // [...segmentIndex] throws an error when segmentIndex inner array is empty
         } finally {
