@@ -281,7 +281,7 @@ export class Peer {
       );
       this.sendSegmentDataSendingCompletedCommand(segment, requestId);
       this.logger(`segment ${externalId} has been sent to ${this.id}`);
-    } catch (err) {
+    } catch {
       this.logger(`cancel segment uploading ${externalId}`);
     }
   }

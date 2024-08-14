@@ -15,7 +15,7 @@ const loadScript = (script: { url: string; id: string }) => {
     scriptElement.type = "text/javascript";
     scriptElement.setAttribute("data-id", id);
     scriptElement.onload = () => resolve(scriptElement);
-    scriptElement.onerror = (error) => reject(error);
+    scriptElement.onerror = () => reject(new Error(`Failed to load script: ${url}`));
 
     document.body.appendChild(scriptElement);
   });

@@ -25,7 +25,7 @@ import { PeerDetails } from "p2p-media-loader-core";
 type DemoProps = {
   debugToolsEnabled?: boolean;
 };
-
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const HlsWithP2PType = HlsJsP2PEngine.injectMixin(Hls);
 
 declare global {
