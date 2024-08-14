@@ -17,14 +17,14 @@ This library enables the creation of a huge P2P mesh networks, also known as pee
 - [OpenWebtorrent Tracker](https://github.com/OpenWebTorrent/openwebtorrent-tracker): fast and simple webtorrent tracker written in C++ using [µWebSockets](https://github.com/uNetworking/uWebSockets).
 - [bittorrent-tracker](https://github.com/webtorrent/bittorrent-tracker): a simple, robust, BitTorrent tracker (client & server) implementation for Node.js and Web.
 
-## Useful links
+## Documentation and important links
 
+- [API documentation](https://novage.github.io/p2p-media-loader/docs/v1.0/)
 - [P2P development, support & consulting](https://novage.com.ua/)
 - [Demo](http://novage.com.ua/p2p-media-loader/demo.html)
 - [FAQ](https://github.com/Novage/p2p-media-loader/blob/main/FAQ.md)
 - [Overview](http://novage.com.ua/p2p-media-loader/overview.html)
 - [Technical overview](http://novage.com.ua/p2p-media-loader/technical-overview.html)
-- [API documentation](https://novage.github.io/p2p-media-loader/docs/v1.0/)
 - npm packages
   - [Core](https://npmjs.com/package/p2p-media-loader-core)
   - [Hls.js integration](https://npmjs.com/package/p2p-media-loader-hlsjs)
