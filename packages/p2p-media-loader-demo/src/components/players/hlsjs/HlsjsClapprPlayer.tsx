@@ -19,31 +19,14 @@ export const HlsjsClapprPlayer = ({
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
-  useScripts(SCRIPTS);
+  const areScriptsLoaded = useScripts(SCRIPTS);
 
-  const [isClapprLoaded, setIsClapprLoaded] = useState(false);
   const [isHlsSupported, setIsHlsSupported] = useState(true);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    let intervalId: NodeJS.Timeout | null = null;
-
-    const checkClapprLoaded = () => {
-      if (!window.Clappr && !window.LevelSelector) return;
-      if (intervalId) clearInterval(intervalId);
-      setIsClapprLoaded(true);
-    };
-
-    intervalId = setInterval(checkClapprLoaded, 200);
-
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!containerRef.current || !isClapprLoaded) return;
+    if (!containerRef.current || !areScriptsLoaded) return;
     if (!Hls.isSupported()) {
       setIsHlsSupported(false);
       return;
@@ -89,7 +72,7 @@ export const HlsjsClapprPlayer = ({
     };
     /* eslint-enable  */
   }, [
-    isClapprLoaded,
+    areScriptsLoaded,
     announceTrackers,
     onChunkDownloaded,
     onChunkUploaded,

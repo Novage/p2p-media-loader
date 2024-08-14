@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 const generateUniqueId = () => {
   return `script-${Math.random().toString(36).substring(2, 11)}`;
@@ -22,6 +22,8 @@ const loadScript = (script: { url: string; id: string }) => {
 };
 
 export const useScripts = (scripts: string[]) => {
+  const [areScriptsLoaded, setAreScriptsLoaded] = useState(false);
+
   useEffect(() => {
     let isCleanup = false;
 
@@ -41,12 +43,18 @@ export const useScripts = (scripts: string[]) => {
     };
 
     const loadAllScripts = async () => {
-      for (const script of scriptsWithIds) {
-        await loadScript(script);
-        if (isCleanup) {
-          cleanUp();
-          break;
+      try {
+        for (const script of scriptsWithIds) {
+          await loadScript(script);
+          if (isCleanup) {
+            cleanUp();
+            break;
+          }
         }
+        if (!isCleanup) setAreScriptsLoaded(true);
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error("Error loading scripts", error);
       }
     };
 
@@ -54,4 +62,6 @@ export const useScripts = (scripts: string[]) => {
 
     return () => cleanUp();
   }, [scripts]);
+
+  return areScriptsLoaded;
 };
