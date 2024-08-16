@@ -1,32 +1,48 @@
-import { CommonCoreConfig, SegmentWithStream, Stream } from "./types.js";
-import * as StreamUtils from "./utils/stream.js";
+import { CommonCoreConfig } from "./types.js";
 import debug from "debug";
 import { EventTarget } from "./utils/event-target.js";
 
 type StorageConfig = CommonCoreConfig;
 
-function getStorageItemId(segment: SegmentWithStream) {
-  const streamId = StreamUtils.getStreamId(segment.stream);
-  return `${streamId}|${segment.externalId}`;
+export function getStorageItemId(streamSwarmId: string, externalId: number) {
+  return `${streamSwarmId}|${externalId}`;
 }
 
-type StorageItem = {
-  segment: SegmentWithStream;
+export function createSegmentInfoItem(
+  streamSwarmId: string,
+  streamId: string,
+  externalId: number,
+): SegmentInfoItem {
+  return { streamSwarmId, streamId, externalId };
+}
+
+type SegmentInfoItem = {
+  streamSwarmId: string;
+  streamId: string;
+  externalId: number;
+};
+
+type SegmentDataItem = {
+  storageId: string;
   data: ArrayBuffer;
   lastAccessed: number;
+  streamId: string;
+  externalId: number;
+  streamSwarmId: string;
 };
 
 type StorageEventHandlers = {
-  [key in `onStorageUpdated-${string}`]: (steam: Stream) => void;
+  [key in `onStorageUpdated-${string}`]: () => void;
 };
 
 const DEFAULT_LIVE_CACHED_SEGMENT_EXPIRATION = 1200;
 
 export class SegmentsMemoryStorage {
-  private cache = new Map<string, StorageItem>();
+  private cache = new Map<string, SegmentDataItem>();
+  private cacheMap = new Map<string, Map<number, SegmentInfoItem>>();
   private _isInitialized = false;
   private readonly isSegmentLockedPredicates: ((
-    segment: SegmentWithStream,
+    segment: SegmentInfoItem,
   ) => boolean)[] = [];
   private readonly logger: debug.Debugger;
   private readonly eventTarget = new EventTarget<StorageEventHandlers>();
@@ -47,56 +63,73 @@ export class SegmentsMemoryStorage {
   }
 
   addIsSegmentLockedPredicate(
-    predicate: (segment: SegmentWithStream) => boolean,
+    predicate: (segment: SegmentInfoItem) => boolean,
   ) {
     this.isSegmentLockedPredicates.push(predicate);
   }
 
-  private isSegmentLocked(segment: SegmentWithStream): boolean {
+  private isSegmentLocked(segment: SegmentInfoItem): boolean {
     return this.isSegmentLockedPredicates.some((p) => p(segment));
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async storeSegment(
-    segment: SegmentWithStream,
+    segment: SegmentInfoItem,
     data: ArrayBuffer,
     isLiveStream: boolean,
   ) {
-    const id = getStorageItemId(segment);
-    this.cache.set(id, {
-      segment,
+    const { streamId, externalId, streamSwarmId } = segment;
+
+    if (!this.cacheMap.has(streamSwarmId)) {
+      this.cacheMap.set(streamSwarmId, new Map<number, SegmentInfoItem>());
+    }
+
+    const streamCache = this.cacheMap.get(streamSwarmId);
+
+    if (streamCache === undefined) return;
+
+    streamCache.set(externalId, segment);
+
+    const storageId = getStorageItemId(streamSwarmId, externalId);
+    this.cache.set(storageId, {
+      storageId,
       data,
       lastAccessed: performance.now(),
+      streamId,
+      externalId,
+      streamSwarmId,
     });
-    this.logger(`add segment: ${id}`);
-    this.dispatchStorageUpdatedEvent(segment.stream);
+    this.logger(`add segment: ${storageId}`);
+    this.dispatchStorageUpdatedEvent(streamId);
     void this.clear(isLiveStream);
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async getSegmentData(
-    segment: SegmentWithStream,
+    segmentStorageId: string,
   ): Promise<ArrayBuffer | undefined> {
-    const itemId = getStorageItemId(segment);
-    const cacheItem = this.cache.get(itemId);
-    if (cacheItem === undefined) return undefined;
+    const dataItem = this.cache.get(segmentStorageId);
 
-    cacheItem.lastAccessed = performance.now();
-    return cacheItem.data;
+    if (dataItem === undefined) return undefined;
+
+    dataItem.lastAccessed = performance.now();
+    return dataItem.data;
   }
 
-  hasSegment(segment: SegmentWithStream): boolean {
-    const id = getStorageItemId(segment);
-    return this.cache.has(id);
+  hasSegment(segmentStorageId: string): boolean {
+    return this.cache.has(segmentStorageId);
   }
 
-  getStoredSegmentExternalIdsOfStream(stream: Stream) {
-    const streamId = StreamUtils.getStreamId(stream);
+  getStoredSegmentExternalIdsOfStream(streamSwarmId: string) {
+    const streamInfoCache = this.cacheMap.get(streamSwarmId);
     const externalIds: number[] = [];
-    for (const { segment } of this.cache.values()) {
-      const itemStreamId = StreamUtils.getStreamId(segment.stream);
-      if (itemStreamId === streamId) externalIds.push(segment.externalId);
+
+    if (streamInfoCache === undefined) return externalIds;
+
+    for (const [, segment] of streamInfoCache) {
+      externalIds.push(segment.externalId);
     }
+
     return externalIds;
   }
 
@@ -109,23 +142,18 @@ export class SegmentsMemoryStorage {
     if (cacheSegmentExpiration === 0) return false;
 
     const itemsToDelete: string[] = [];
-    const remainingItems: [string, StorageItem][] = [];
-    const streamsOfChangedItems = new Set<Stream>();
+    const remainingItems: [string, SegmentDataItem][] = [];
+    const streamsOfChangedItems = new Set<string>();
 
     // Delete old segments
     const now = performance.now();
 
-    for (const entry of this.cache.entries()) {
-      const [itemId, item] = entry;
-      const { lastAccessed, segment } = item;
-
-      if (now - lastAccessed > cacheSegmentExpiration) {
-        if (!this.isSegmentLocked(segment)) {
-          itemsToDelete.push(itemId);
-          streamsOfChangedItems.add(segment.stream);
-        }
+    for (const [id, item] of this.cache) {
+      if (now - item.lastAccessed > cacheSegmentExpiration) {
+        itemsToDelete.push(id);
       } else {
-        remainingItems.push(entry);
+        remainingItems.push([id, item]);
+        streamsOfChangedItems.add(item.streamId);
       }
     }
 
@@ -136,10 +164,10 @@ export class SegmentsMemoryStorage {
       if (countOverhead > 0) {
         remainingItems.sort(([, a], [, b]) => a.lastAccessed - b.lastAccessed);
 
-        for (const [itemId, { segment }] of remainingItems) {
+        for (const [itemId, segment] of remainingItems) {
           if (!this.isSegmentLocked(segment)) {
             itemsToDelete.push(itemId);
-            streamsOfChangedItems.add(segment.stream);
+            streamsOfChangedItems.add(segment.streamId);
             countOverhead--;
             if (countOverhead === 0) break;
           }
@@ -149,7 +177,17 @@ export class SegmentsMemoryStorage {
 
     if (itemsToDelete.length) {
       this.logger(`cleared ${itemsToDelete.length} segments`);
-      itemsToDelete.forEach((id) => this.cache.delete(id));
+      itemsToDelete.forEach((id) => {
+        const segment = this.cache.get(id);
+        if (segment) {
+          this.cacheMap.get(segment.streamSwarmId)?.delete(segment.externalId);
+          if (this.cacheMap.get(segment.streamSwarmId)?.size === 0) {
+            this.cacheMap.delete(segment.streamSwarmId);
+          }
+        }
+
+        this.cache.delete(id);
+      });
       for (const stream of streamsOfChangedItems) {
         this.dispatchStorageUpdatedEvent(stream);
       }
@@ -159,29 +197,24 @@ export class SegmentsMemoryStorage {
   }
 
   subscribeOnUpdate(
-    stream: Stream,
+    streamId: string,
     listener: StorageEventHandlers["onStorageUpdated-"],
   ) {
-    const streamId = StreamUtils.getStreamId(stream);
     this.eventTarget.addEventListener(`onStorageUpdated-${streamId}`, listener);
   }
 
   unsubscribeFromUpdate(
-    stream: Stream,
+    streamId: string,
     listener: StorageEventHandlers["onStorageUpdated-"],
   ) {
-    const streamId = StreamUtils.getStreamId(stream);
     this.eventTarget.removeEventListener(
       `onStorageUpdated-${streamId}`,
       listener,
     );
   }
 
-  private dispatchStorageUpdatedEvent(stream: Stream) {
-    this.eventTarget.dispatchEvent(
-      `onStorageUpdated-${StreamUtils.getStreamId(stream)}`,
-      stream,
-    );
+  private dispatchStorageUpdatedEvent(streamId: string) {
+    this.eventTarget.dispatchEvent(`onStorageUpdated-${streamId}`);
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await

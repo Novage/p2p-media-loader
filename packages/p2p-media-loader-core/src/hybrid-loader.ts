@@ -1,5 +1,9 @@
 import { HttpRequestExecutor } from "./http-loader.js";
-import { SegmentsMemoryStorage } from "./segments-storage.js";
+import {
+  createSegmentInfoItem,
+  getStorageItemId,
+  SegmentsMemoryStorage,
+} from "./segments-storage.js";
 import {
   CoreEventMap,
   EngineCallbacks,
@@ -63,9 +67,23 @@ export class HybridLoader {
       throw new Error("Segment storage is not initialized.");
     }
     this.segmentStorage.addIsSegmentLockedPredicate((segment) => {
-      if (segment.stream !== activeStream) return false;
+      const streamSwarmId = this.config.swarmId ?? this.streamManifestUrl;
+      const activeStreamSwarmId = StreamUtils.getStreamSwarmId(
+        streamSwarmId,
+        activeStream,
+      );
+
+      if (segment.streamSwarmId !== activeStreamSwarmId) return false;
+
+      const runtimeSegment = StreamUtils.getSegmentFromStreamByExternalId(
+        activeStream,
+        segment.externalId,
+      );
+
+      if (!runtimeSegment) return false;
+
       return StreamUtils.isSegmentActualInPlayback(
-        segment,
+        runtimeSegment,
         this.playback,
         this.config,
       );
@@ -110,9 +128,18 @@ export class HybridLoader {
     this.lastRequestedSegment = segment;
 
     const engineRequest = new EngineRequest(segment, callbacks);
-    if (this.segmentStorage.hasSegment(segment)) {
+
+    const streamSwarmId = StreamUtils.getStreamSwarmId(
+      this.config.swarmId ?? this.streamManifestUrl,
+      stream,
+    );
+    const segmentStorageId = getStorageItemId(
+      streamSwarmId,
+      segment.externalId,
+    );
+    if (this.segmentStorage.hasSegment(segmentStorageId)) {
       // TODO: error handling
-      const data = await this.segmentStorage.getSegmentData(segment);
+      const data = await this.segmentStorage.getSegmentData(segmentStorageId);
       if (data) {
         const { queueDownloadRatio } = this.generateQueue();
         engineRequest.resolve(data, this.getBandwidth(queueDownloadRatio));
@@ -185,8 +212,20 @@ export class HybridLoader {
             this.engineRequest = undefined;
           }
           this.requests.remove(request);
+
+          const streamSwarmId = StreamUtils.getStreamSwarmId(
+            this.config.swarmId ?? this.streamManifestUrl,
+            stream,
+          );
+          const streamId = StreamUtils.getStreamId(stream);
+          const segmentInfoItem = createSegmentInfoItem(
+            streamSwarmId,
+            streamId,
+            segment.externalId,
+          );
+
           void this.segmentStorage.storeSegment(
-            request.segment,
+            segmentInfoItem,
             request.data,
             this.streamDetails.isLive,
           );
@@ -367,10 +406,19 @@ export class HybridLoader {
       this.config,
       this.p2pLoaders.currentLoader,
     )) {
+      const streamSwarmId = StreamUtils.getStreamSwarmId(
+        this.config.swarmId ?? this.streamManifestUrl,
+        segment.stream,
+      );
+      const segmentStorageId = getStorageItemId(
+        streamSwarmId,
+        segment.externalId,
+      );
+
       if (
         !statuses.isHttpDownloadable ||
         statuses.isP2PDownloadable ||
-        this.segmentStorage.hasSegment(segment)
+        this.segmentStorage.hasSegment(segmentStorageId)
       ) {
         continue;
       }
@@ -463,8 +511,18 @@ export class HybridLoader {
     )) {
       maxPossibleLength++;
       const { segment } = item;
+
+      const streamSwarmId = StreamUtils.getStreamSwarmId(
+        this.config.swarmId ?? this.streamManifestUrl,
+        segment.stream,
+      );
+      const segmentStorageId = getStorageItemId(
+        streamSwarmId,
+        segment.externalId,
+      );
+
       if (
-        this.segmentStorage.hasSegment(segment) ||
+        this.segmentStorage.hasSegment(segmentStorageId) ||
         this.requests.get(segment)?.status === "succeed"
       ) {
         alreadyLoadedCount++;

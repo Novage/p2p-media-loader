@@ -5,7 +5,10 @@ import {
   StreamConfig,
   StreamWithSegments,
 } from "../types.js";
-import { SegmentsMemoryStorage } from "../segments-storage.js";
+import {
+  getStorageItemId,
+  SegmentsMemoryStorage,
+} from "../segments-storage.js";
 import { RequestsContainer } from "../requests/request-container.js";
 import { P2PTrackerClient } from "./tracker-client.js";
 import * as StreamUtils from "../utils/stream.js";
@@ -42,7 +45,7 @@ export class P2PLoader {
     );
 
     this.segmentStorage.subscribeOnUpdate(
-      this.stream,
+      StreamUtils.getStreamId(this.stream),
       this.broadcastAnnouncement,
     );
 
@@ -89,8 +92,13 @@ export class P2PLoader {
   }
 
   private getSegmentsAnnouncement() {
+    const streamSwarmId = StreamUtils.getStreamSwarmId(
+      this.config.swarmId ?? this.streamManifestUrl,
+      this.stream,
+    );
+
     const loaded: number[] =
-      this.segmentStorage.getStoredSegmentExternalIdsOfStream(this.stream);
+      this.segmentStorage.getStoredSegmentExternalIdsOfStream(streamSwarmId);
     const httpLoading: number[] = [];
 
     for (const request of this.requests.httpRequests()) {
@@ -131,7 +139,18 @@ export class P2PLoader {
       segmentExternalId,
     );
     if (!segment) return;
-    const segmentData = await this.segmentStorage.getSegmentData(segment);
+
+    const streamSwarmId = StreamUtils.getStreamSwarmId(
+      this.config.swarmId ?? this.streamManifestUrl,
+      this.stream,
+    );
+    const segmentStorageId = getStorageItemId(
+      streamSwarmId,
+      segment.externalId,
+    );
+
+    const segmentData =
+      await this.segmentStorage.getSegmentData(segmentStorageId);
     if (!segmentData) {
       peer.sendSegmentAbsentCommand(segmentExternalId, requestId);
       return;
@@ -145,7 +164,7 @@ export class P2PLoader {
 
   destroy() {
     this.segmentStorage.unsubscribeFromUpdate(
-      this.stream,
+      StreamUtils.getStreamId(this.stream),
       this.broadcastAnnouncement,
     );
     this.trackerClient.destroy();

@@ -10,6 +10,7 @@ import { RequestsContainer } from "../requests/request-container.js";
 import { SegmentsMemoryStorage } from "../segments-storage.js";
 import * as LoggerUtils from "../utils/logger.js";
 import { EventTarget } from "../utils/event-target.js";
+import * as StreamUtils from "../utils/stream.js";
 
 type P2PLoaderContainerItem = {
   stream: Stream;
@@ -64,9 +65,12 @@ export class P2PLoadersContainer {
   changeCurrentLoader(stream: StreamWithSegments) {
     const loaderItem = this.loaders.get(stream.runtimeId);
     if (this._currentLoaderItem) {
-      const ids = this.segmentStorage.getStoredSegmentExternalIdsOfStream(
+      const streamSwarmId = StreamUtils.getStreamSwarmId(
+        this.config.swarmId ?? this.streamManifestUrl,
         this._currentLoaderItem.stream,
       );
+      const ids =
+        this.segmentStorage.getStoredSegmentExternalIdsOfStream(streamSwarmId);
       if (!ids.length) this.destroyAndRemoveLoader(this._currentLoaderItem);
       else this.setLoaderDestroyTimeout(this._currentLoaderItem);
     }
