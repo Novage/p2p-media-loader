@@ -179,11 +179,11 @@ export class SegmentsMemoryStorage {
       this.logger(`cleared ${itemsToDelete.length} segments`);
       itemsToDelete.forEach((id) => {
         const segment = this.cache.get(id);
-        if (segment) {
-          this.cacheMap.get(segment.streamSwarmId)?.delete(segment.externalId);
-          if (this.cacheMap.get(segment.streamSwarmId)?.size === 0) {
-            this.cacheMap.delete(segment.streamSwarmId);
-          }
+        if (!segment) return;
+
+        this.cacheMap.get(segment.streamSwarmId)?.delete(segment.externalId);
+        if (this.cacheMap.get(segment.streamSwarmId)?.size === 0) {
+          this.cacheMap.delete(segment.streamSwarmId);
         }
 
         this.cache.delete(id);
