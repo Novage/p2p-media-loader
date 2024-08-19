@@ -68,9 +68,8 @@ export class HybridLoader {
       throw new Error("Segment storage is not initialized.");
     }
     this.segmentStorage.addIsSegmentLockedPredicate((segment) => {
-      const streamSwarmId = this.config.swarmId ?? this.streamManifestUrl;
       const activeStreamSwarmId = StreamUtils.getStreamSwarmId(
-        streamSwarmId,
+        this.config.swarmId ?? this.streamManifestUrl,
         activeStream,
       );
 
