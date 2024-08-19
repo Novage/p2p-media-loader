@@ -8,8 +8,9 @@ export function createSegmentInfoItem(
   streamSwarmId: string,
   streamId: string,
   externalId: number,
+  storageId: string,
 ): SegmentInfoItem {
-  return { streamSwarmId, streamId, externalId };
+  return { streamSwarmId, streamId, externalId, storageId };
 }
 
 export function createSegmentDataItem(

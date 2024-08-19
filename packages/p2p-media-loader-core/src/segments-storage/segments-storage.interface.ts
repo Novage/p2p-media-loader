@@ -17,7 +17,7 @@ export interface ISegmentsStorage {
 
   getSegmentData(segmentStorageId: string): Promise<ArrayBuffer | undefined>;
 
-  hasSegment(segmentStorageId: string): boolean;
+  hasSegment(streamSwarmId: string, externalId: number): boolean;
 
   getStoredSegmentExternalIdsOfStream(streamSwarmId: string): number[];
 

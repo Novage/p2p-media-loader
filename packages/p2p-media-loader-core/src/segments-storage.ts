@@ -86,8 +86,10 @@ export class SegmentsMemoryStorage implements ISegmentsStorage {
     return dataItem.data;
   }
 
-  hasSegment(segmentStorageId: string): boolean {
-    return this.cache.has(segmentStorageId);
+  hasSegment(streamSwarmId: string, externalId: number): boolean {
+    const streamCache = this.cacheMap.get(streamSwarmId);
+
+    return streamCache === undefined ? false : streamCache.has(externalId);
   }
 
   getStoredSegmentExternalIdsOfStream(streamSwarmId: string) {

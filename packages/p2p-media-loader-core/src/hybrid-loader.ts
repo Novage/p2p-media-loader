@@ -137,7 +137,7 @@ export class HybridLoader {
       streamSwarmId,
       segment.externalId,
     );
-    if (this.segmentStorage.hasSegment(segmentStorageId)) {
+    if (this.segmentStorage.hasSegment(streamSwarmId, segment.externalId)) {
       // TODO: error handling
       const data = await this.segmentStorage.getSegmentData(segmentStorageId);
       if (data) {
@@ -218,13 +218,18 @@ export class HybridLoader {
             stream,
           );
           const streamId = StreamUtils.getStreamId(stream);
+          const segmentStorageId = getStorageItemId(
+            streamSwarmId,
+            segment.externalId,
+          );
           const segmentInfoItem = createSegmentInfoItem(
             streamSwarmId,
             streamId,
             segment.externalId,
+            segmentStorageId,
           );
           const segmentDataItem = createSegmentDataItem(
-            getStorageItemId(streamSwarmId, segment.externalId),
+            segmentStorageId,
             request.data,
             now,
             streamId,
@@ -418,15 +423,11 @@ export class HybridLoader {
         this.config.swarmId ?? this.streamManifestUrl,
         segment.stream,
       );
-      const segmentStorageId = getStorageItemId(
-        streamSwarmId,
-        segment.externalId,
-      );
 
       if (
         !statuses.isHttpDownloadable ||
         statuses.isP2PDownloadable ||
-        this.segmentStorage.hasSegment(segmentStorageId)
+        this.segmentStorage.hasSegment(streamSwarmId, segment.externalId)
       ) {
         continue;
       }
@@ -524,13 +525,9 @@ export class HybridLoader {
         this.config.swarmId ?? this.streamManifestUrl,
         segment.stream,
       );
-      const segmentStorageId = getStorageItemId(
-        streamSwarmId,
-        segment.externalId,
-      );
 
       if (
-        this.segmentStorage.hasSegment(segmentStorageId) ||
+        this.segmentStorage.hasSegment(streamSwarmId, segment.externalId) ||
         this.requests.get(segment)?.status === "succeed"
       ) {
         alreadyLoadedCount++;
