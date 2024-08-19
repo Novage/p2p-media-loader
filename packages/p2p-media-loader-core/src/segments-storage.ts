@@ -1,35 +1,13 @@
 import { CommonCoreConfig } from "./types.js";
 import debug from "debug";
 import { EventTarget } from "./utils/event-target.js";
+import { ISegmentsStorage } from "./segments-storage/segments-storage.interface.js";
+import {
+  SegmentDataItem,
+  SegmentInfoItem,
+} from "./segments-storage/segments-types.js";
 
 type StorageConfig = CommonCoreConfig;
-
-export function getStorageItemId(streamSwarmId: string, externalId: number) {
-  return `${streamSwarmId}|${externalId}`;
-}
-
-export function createSegmentInfoItem(
-  streamSwarmId: string,
-  streamId: string,
-  externalId: number,
-): SegmentInfoItem {
-  return { streamSwarmId, streamId, externalId };
-}
-
-type SegmentInfoItem = {
-  streamSwarmId: string;
-  streamId: string;
-  externalId: number;
-};
-
-type SegmentDataItem = {
-  storageId: string;
-  data: ArrayBuffer;
-  lastAccessed: number;
-  streamId: string;
-  externalId: number;
-  streamSwarmId: string;
-};
 
 type StorageEventHandlers = {
   [key in `onStorageUpdated-${string}`]: () => void;
@@ -37,7 +15,7 @@ type StorageEventHandlers = {
 
 const DEFAULT_LIVE_CACHED_SEGMENT_EXPIRATION = 1200;
 
-export class SegmentsMemoryStorage {
+export class SegmentsMemoryStorage implements ISegmentsStorage {
   private cache = new Map<string, SegmentDataItem>();
   private cacheMap = new Map<string, Map<number, SegmentInfoItem>>();
   private _isInitialized = false;
@@ -74,11 +52,11 @@ export class SegmentsMemoryStorage {
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async storeSegment(
-    segment: SegmentInfoItem,
-    data: ArrayBuffer,
+    segmentInfoItem: SegmentInfoItem,
+    segmentDataItem: SegmentDataItem,
     isLiveStream: boolean,
   ) {
-    const { streamId, externalId, streamSwarmId } = segment;
+    const { streamId, externalId, streamSwarmId } = segmentInfoItem;
 
     if (!this.cacheMap.has(streamSwarmId)) {
       this.cacheMap.set(streamSwarmId, new Map<number, SegmentInfoItem>());
@@ -88,18 +66,10 @@ export class SegmentsMemoryStorage {
 
     if (streamCache === undefined) return;
 
-    streamCache.set(externalId, segment);
+    streamCache.set(externalId, segmentInfoItem);
 
-    const storageId = getStorageItemId(streamSwarmId, externalId);
-    this.cache.set(storageId, {
-      storageId,
-      data,
-      lastAccessed: performance.now(),
-      streamId,
-      externalId,
-      streamSwarmId,
-    });
-    this.logger(`add segment: ${storageId}`);
+    this.cache.set(segmentDataItem.storageId, segmentDataItem);
+    this.logger(`add segment: ${segmentDataItem.storageId}`);
     this.dispatchStorageUpdatedEvent(streamId);
     void this.clear(isLiveStream);
   }

@@ -1,9 +1,5 @@
 import { HttpRequestExecutor } from "./http-loader.js";
-import {
-  createSegmentInfoItem,
-  getStorageItemId,
-  SegmentsMemoryStorage,
-} from "./segments-storage.js";
+import { SegmentsMemoryStorage } from "./segments-storage.js";
 import {
   CoreEventMap,
   EngineCallbacks,
@@ -26,6 +22,11 @@ import * as Utils from "./utils/utils.js";
 import debug from "debug";
 import { QueueItem } from "./utils/queue.js";
 import { EventTarget } from "./utils/event-target.js";
+import {
+  createSegmentDataItem,
+  createSegmentInfoItem,
+  getStorageItemId,
+} from "./segments-storage/utils.js";
 
 const FAILED_ATTEMPTS_CLEAR_INTERVAL = 60000;
 const PEER_UPDATE_LATENCY = 1000;
@@ -223,10 +224,18 @@ export class HybridLoader {
             streamId,
             segment.externalId,
           );
+          const segmentDataItem = createSegmentDataItem(
+            getStorageItemId(streamSwarmId, segment.externalId),
+            request.data,
+            now,
+            streamId,
+            segment.externalId,
+            streamSwarmId,
+          );
 
           void this.segmentStorage.storeSegment(
             segmentInfoItem,
-            request.data,
+            segmentDataItem,
             this.streamDetails.isLive,
           );
           break;

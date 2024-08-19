@@ -5,15 +5,13 @@ import {
   StreamConfig,
   StreamWithSegments,
 } from "../types.js";
-import {
-  getStorageItemId,
-  SegmentsMemoryStorage,
-} from "../segments-storage.js";
+import { SegmentsMemoryStorage } from "../segments-storage.js";
 import { RequestsContainer } from "../requests/request-container.js";
 import { P2PTrackerClient } from "./tracker-client.js";
 import * as StreamUtils from "../utils/stream.js";
 import * as Utils from "../utils/utils.js";
 import { EventTarget } from "../utils/event-target.js";
+import { getStorageItemId } from "../segments-storage/utils.js";
 
 export class P2PLoader {
   private readonly trackerClient: P2PTrackerClient;
