@@ -22,11 +22,6 @@ import * as Utils from "./utils/utils.js";
 import debug from "debug";
 import { QueueItem } from "./utils/queue.js";
 import { EventTarget } from "./utils/event-target.js";
-import {
-  createSegmentDataItem,
-  createSegmentInfoItem,
-  getStorageItemId,
-} from "./segments-storage/utils.js";
 
 const FAILED_ATTEMPTS_CLEAR_INTERVAL = 60000;
 const PEER_UPDATE_LATENCY = 1000;
@@ -67,27 +62,29 @@ export class HybridLoader {
     if (!this.segmentStorage.isInitialized) {
       throw new Error("Segment storage is not initialized.");
     }
-    this.segmentStorage.addIsSegmentLockedPredicate((segment) => {
-      const activeStreamSwarmId = StreamUtils.getStreamSwarmId(
-        this.config.swarmId ?? this.streamManifestUrl,
-        activeStream,
-      );
+    this.segmentStorage.addIsSegmentLockedPredicate(
+      (segmentSwarmId, segmentId) => {
+        const activeStreamSwarmId = StreamUtils.getStreamSwarmId(
+          this.config.swarmId ?? this.streamManifestUrl,
+          activeStream,
+        );
 
-      if (segment.streamSwarmId !== activeStreamSwarmId) return false;
+        if (segmentSwarmId !== activeStreamSwarmId) return false;
 
-      const runtimeSegment = StreamUtils.getSegmentFromStreamByExternalId(
-        activeStream,
-        segment.externalId,
-      );
+        const runtimeSegment = StreamUtils.getSegmentFromStreamByExternalId(
+          activeStream,
+          segmentId,
+        );
 
-      if (!runtimeSegment) return false;
+        if (!runtimeSegment) return false;
 
-      return StreamUtils.isSegmentActualInPlayback(
-        runtimeSegment,
-        this.playback,
-        this.config,
-      );
-    });
+        return StreamUtils.isSegmentActualInPlayback(
+          runtimeSegment,
+          this.playback,
+          this.config,
+        );
+      },
+    );
     this.p2pLoaders = new P2PLoadersContainer(
       this.streamManifestUrl,
       this.lastRequestedSegment.stream,
@@ -133,13 +130,13 @@ export class HybridLoader {
       this.config.swarmId ?? this.streamManifestUrl,
       stream,
     );
-    const segmentStorageId = getStorageItemId(
-      streamSwarmId,
-      segment.externalId,
-    );
+
     if (this.segmentStorage.hasSegment(streamSwarmId, segment.externalId)) {
       // TODO: error handling
-      const data = await this.segmentStorage.getSegmentData(segmentStorageId);
+      const data = await this.segmentStorage.getSegmentData(
+        streamSwarmId,
+        segment.externalId,
+      );
       if (data) {
         const { queueDownloadRatio } = this.generateQueue();
         engineRequest.resolve(data, this.getBandwidth(queueDownloadRatio));
@@ -217,29 +214,11 @@ export class HybridLoader {
             this.config.swarmId ?? this.streamManifestUrl,
             stream,
           );
-          const streamId = StreamUtils.getStreamId(stream);
-          const segmentStorageId = getStorageItemId(
-            streamSwarmId,
-            segment.externalId,
-          );
-          const segmentInfoItem = createSegmentInfoItem(
-            streamSwarmId,
-            streamId,
-            segment.externalId,
-            segmentStorageId,
-          );
-          const segmentDataItem = createSegmentDataItem(
-            segmentStorageId,
-            request.data,
-            now,
-            streamId,
-            segment.externalId,
-            streamSwarmId,
-          );
 
           void this.segmentStorage.storeSegment(
-            segmentInfoItem,
-            segmentDataItem,
+            streamSwarmId,
+            segment.externalId,
+            request.data,
             this.streamDetails.isLive,
           );
           break;

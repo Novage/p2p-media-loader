@@ -11,7 +11,6 @@ import { P2PTrackerClient } from "./tracker-client.js";
 import * as StreamUtils from "../utils/stream.js";
 import * as Utils from "../utils/utils.js";
 import { EventTarget } from "../utils/event-target.js";
-import { getStorageItemId } from "../segments-storage/utils.js";
 
 export class P2PLoader {
   private readonly trackerClient: P2PTrackerClient;
@@ -43,7 +42,7 @@ export class P2PLoader {
     );
 
     this.segmentStorage.subscribeOnUpdate(
-      StreamUtils.getStreamId(this.stream),
+      streamSwarmId,
       this.broadcastAnnouncement,
     );
 
@@ -142,13 +141,11 @@ export class P2PLoader {
       this.config.swarmId ?? this.streamManifestUrl,
       this.stream,
     );
-    const segmentStorageId = getStorageItemId(
-      streamSwarmId,
-      segment.externalId,
-    );
 
-    const segmentData =
-      await this.segmentStorage.getSegmentData(segmentStorageId);
+    const segmentData = await this.segmentStorage.getSegmentData(
+      streamSwarmId,
+      segmentExternalId,
+    );
     if (!segmentData) {
       peer.sendSegmentAbsentCommand(segmentExternalId, requestId);
       return;

@@ -1,25 +1,27 @@
-import { SegmentDataItem, SegmentInfoItem } from "./segments-types.js";
-
 export interface ISegmentsStorage {
-  readonly isInitialized: boolean;
-
   initialize(): Promise<void>;
 
+  isInitialized(): boolean;
+
   addIsSegmentLockedPredicate(
-    predicate: (segment: SegmentInfoItem) => boolean,
+    predicate: (streamId: string, segmentId: number) => boolean,
   ): void;
 
   storeSegment(
-    segmentInfoItem: SegmentInfoItem,
-    segmentDataItem: SegmentDataItem,
+    streamId: string,
+    segmentId: number,
+    segmentData: ArrayBuffer,
     isLiveStream: boolean,
   ): Promise<void>;
 
-  getSegmentData(segmentStorageId: string): Promise<ArrayBuffer | undefined>;
+  getSegmentData(
+    streamId: string,
+    segmentId: number,
+  ): Promise<ArrayBuffer | undefined>;
 
-  hasSegment(streamSwarmId: string, externalId: number): boolean;
+  hasSegment(streamId: string, segmentId: number): boolean;
 
-  getStoredSegmentExternalIdsOfStream(streamSwarmId: string): number[];
+  getStoredSegmentExternalIdsOfStream(streamId: string): number[];
 
   subscribeOnUpdate(streamId: string, listener: () => void): void;
 

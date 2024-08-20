@@ -2,25 +2,32 @@ import { CommonCoreConfig } from "./types.js";
 import debug from "debug";
 import { EventTarget } from "./utils/event-target.js";
 import { ISegmentsStorage } from "./segments-storage/segments-storage.interface.js";
-import {
-  SegmentDataItem,
-  SegmentInfoItem,
-} from "./segments-storage/segments-types.js";
 
 type StorageConfig = CommonCoreConfig;
+
+const DEFAULT_LIVE_CACHED_SEGMENT_EXPIRATION = 1200;
+
+type SegmentDataItem = {
+  segmentId: number;
+  streamId: string;
+  data: ArrayBuffer;
+  lastAccessed: number;
+};
 
 type StorageEventHandlers = {
   [key in `onStorageUpdated-${string}`]: () => void;
 };
 
-const DEFAULT_LIVE_CACHED_SEGMENT_EXPIRATION = 1200;
+function getStorageItemId(streamSwarmId: string, externalId: number) {
+  return `${streamSwarmId}|${externalId}`;
+}
 
 export class SegmentsMemoryStorage implements ISegmentsStorage {
   private cache = new Map<string, SegmentDataItem>();
-  private cacheMap = new Map<string, Map<number, SegmentInfoItem>>();
   private _isInitialized = false;
   private readonly isSegmentLockedPredicates: ((
-    segment: SegmentInfoItem,
+    streamId: string,
+    segmentId: number,
   ) => boolean)[] = [];
   private readonly logger: debug.Debugger;
   private readonly eventTarget = new EventTarget<StorageEventHandlers>();
@@ -36,70 +43,69 @@ export class SegmentsMemoryStorage implements ISegmentsStorage {
     this.logger("initialized");
   }
 
-  get isInitialized(): boolean {
+  isInitialized(): boolean {
     return this._isInitialized;
   }
 
   addIsSegmentLockedPredicate(
-    predicate: (segment: SegmentInfoItem) => boolean,
+    predicate: (streamId: string, segmentId: number) => boolean,
   ) {
     this.isSegmentLockedPredicates.push(predicate);
   }
 
-  private isSegmentLocked(segment: SegmentInfoItem): boolean {
-    return this.isSegmentLockedPredicates.some((p) => p(segment));
+  private isSegmentLocked(streamId: string, segmentId: number): boolean {
+    return this.isSegmentLockedPredicates.some((p) => p(streamId, segmentId));
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async storeSegment(
-    segmentInfoItem: SegmentInfoItem,
-    segmentDataItem: SegmentDataItem,
+    streamId: string,
+    segmentId: number,
+    data: ArrayBuffer,
     isLiveStream: boolean,
   ) {
-    const { streamId, externalId, streamSwarmId } = segmentInfoItem;
+    const storageId = getStorageItemId(streamId, segmentId);
 
-    if (!this.cacheMap.has(streamSwarmId)) {
-      this.cacheMap.set(streamSwarmId, new Map<number, SegmentInfoItem>());
-    }
+    this.cache.set(storageId, {
+      data,
+      segmentId,
+      streamId,
+      lastAccessed: performance.now(),
+    });
 
-    const streamCache = this.cacheMap.get(streamSwarmId);
-
-    if (streamCache === undefined) return;
-
-    streamCache.set(externalId, segmentInfoItem);
-
-    this.cache.set(segmentDataItem.storageId, segmentDataItem);
-    this.logger(`add segment: ${segmentDataItem.storageId}`);
+    this.logger(`add segment: ${segmentId}`);
     this.dispatchStorageUpdatedEvent(streamId);
     void this.clear(isLiveStream);
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async getSegmentData(
-    segmentStorageId: string,
+    streamId: string,
+    segmentId: number,
   ): Promise<ArrayBuffer | undefined> {
+    const segmentStorageId = getStorageItemId(streamId, segmentId);
     const dataItem = this.cache.get(segmentStorageId);
 
     if (dataItem === undefined) return undefined;
 
     dataItem.lastAccessed = performance.now();
+
     return dataItem.data;
   }
 
-  hasSegment(streamSwarmId: string, externalId: number): boolean {
-    const streamCache = this.cacheMap.get(streamSwarmId);
+  hasSegment(streamId: string, externalId: number): boolean {
+    const segmentStorageId = getStorageItemId(streamId, externalId);
+    const segment = this.cache.get(segmentStorageId);
 
-    return streamCache === undefined ? false : streamCache.has(externalId);
+    return segment !== undefined;
   }
 
-  getStoredSegmentExternalIdsOfStream(streamSwarmId: string) {
-    const streamInfoCache = this.cacheMap.get(streamSwarmId);
+  getStoredSegmentExternalIdsOfStream(streamSwarm: string) {
     const externalIds: number[] = [];
 
-    if (streamInfoCache === undefined) return externalIds;
-
-    for (const [, segment] of streamInfoCache) {
-      externalIds.push(segment.externalId);
+    for (const { segmentId, streamId } of this.cache.values()) {
+      if (streamId !== streamSwarm) continue;
+      externalIds.push(segmentId);
     }
 
     return externalIds;
@@ -120,12 +126,17 @@ export class SegmentsMemoryStorage implements ISegmentsStorage {
     // Delete old segments
     const now = performance.now();
 
-    for (const [id, item] of this.cache) {
-      if (now - item.lastAccessed > cacheSegmentExpiration) {
-        itemsToDelete.push(id);
+    for (const entry of this.cache.entries()) {
+      const [itemId, item] = entry;
+      const { lastAccessed, segmentId, streamId } = item;
+
+      if (now - lastAccessed > cacheSegmentExpiration) {
+        if (!this.isSegmentLocked(streamId, segmentId)) {
+          itemsToDelete.push(itemId);
+          streamsOfChangedItems.add(streamId);
+        }
       } else {
-        remainingItems.push([id, item]);
-        streamsOfChangedItems.add(item.streamId);
+        remainingItems.push(entry);
       }
     }
 
@@ -136,10 +147,10 @@ export class SegmentsMemoryStorage implements ISegmentsStorage {
       if (countOverhead > 0) {
         remainingItems.sort(([, a], [, b]) => a.lastAccessed - b.lastAccessed);
 
-        for (const [itemId, segment] of remainingItems) {
-          if (!this.isSegmentLocked(segment)) {
+        for (const [itemId, { streamId, segmentId }] of remainingItems) {
+          if (!this.isSegmentLocked(streamId, segmentId)) {
             itemsToDelete.push(itemId);
-            streamsOfChangedItems.add(segment.streamId);
+            streamsOfChangedItems.add(streamId);
             countOverhead--;
             if (countOverhead === 0) break;
           }
@@ -149,17 +160,7 @@ export class SegmentsMemoryStorage implements ISegmentsStorage {
 
     if (itemsToDelete.length) {
       this.logger(`cleared ${itemsToDelete.length} segments`);
-      itemsToDelete.forEach((id) => {
-        const segment = this.cache.get(id);
-        if (!segment) return;
-
-        this.cacheMap.get(segment.streamSwarmId)?.delete(segment.externalId);
-        if (this.cacheMap.get(segment.streamSwarmId)?.size === 0) {
-          this.cacheMap.delete(segment.streamSwarmId);
-        }
-
-        this.cache.delete(id);
-      });
+      itemsToDelete.forEach((id) => this.cache.delete(id));
       for (const stream of streamsOfChangedItems) {
         this.dispatchStorageUpdatedEvent(stream);
       }
