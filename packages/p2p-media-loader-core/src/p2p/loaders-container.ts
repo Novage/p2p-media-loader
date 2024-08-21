@@ -2,12 +2,12 @@ import { P2PLoader } from "./loader.js";
 import debug from "debug";
 import {
   CoreEventMap,
+  ISegmentsStorage,
   Stream,
   StreamConfig,
   StreamWithSegments,
 } from "../index.js";
 import { RequestsContainer } from "../requests/request-container.js";
-import { SegmentsMemoryStorage } from "../segments-storage.js";
 import * as LoggerUtils from "../utils/logger.js";
 import { EventTarget } from "../utils/event-target.js";
 import * as StreamUtils from "../utils/stream.js";
@@ -28,7 +28,7 @@ export class P2PLoadersContainer {
     private readonly streamManifestUrl: string,
     stream: StreamWithSegments,
     private readonly requests: RequestsContainer,
-    private readonly segmentStorage: SegmentsMemoryStorage,
+    private readonly segmentStorage: ISegmentsStorage,
     private readonly config: StreamConfig,
     private readonly eventTarget: EventTarget<CoreEventMap>,
     private onSegmentAnnouncement: () => void,

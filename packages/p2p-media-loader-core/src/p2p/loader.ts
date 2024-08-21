@@ -5,12 +5,12 @@ import {
   StreamConfig,
   StreamWithSegments,
 } from "../types.js";
-import { SegmentsMemoryStorage } from "../segments-storage.js";
 import { RequestsContainer } from "../requests/request-container.js";
 import { P2PTrackerClient } from "./tracker-client.js";
 import * as StreamUtils from "../utils/stream.js";
 import * as Utils from "../utils/utils.js";
 import { EventTarget } from "../utils/event-target.js";
+import { ISegmentsStorage } from "../segments-storage/segments-storage.interface.js";
 
 export class P2PLoader {
   private readonly trackerClient: P2PTrackerClient;
@@ -20,7 +20,7 @@ export class P2PLoader {
     private streamManifestUrl: string,
     private readonly stream: StreamWithSegments,
     private readonly requests: RequestsContainer,
-    private readonly segmentStorage: SegmentsMemoryStorage,
+    private readonly segmentStorage: ISegmentsStorage,
     private readonly config: StreamConfig,
     private readonly eventTarget: EventTarget<CoreEventMap>,
     private readonly onSegmentAnnouncement: () => void,

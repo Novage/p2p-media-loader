@@ -1,5 +1,4 @@
 import { HttpRequestExecutor } from "./http-loader.js";
-import { SegmentsMemoryStorage } from "./segments-storage.js";
 import {
   CoreEventMap,
   EngineCallbacks,
@@ -22,6 +21,7 @@ import * as Utils from "./utils/utils.js";
 import debug from "debug";
 import { QueueItem } from "./utils/queue.js";
 import { EventTarget } from "./utils/event-target.js";
+import { ISegmentsStorage } from "./segments-storage/segments-storage.interface.js";
 
 const FAILED_ATTEMPTS_CLEAR_INTERVAL = 60000;
 const PEER_UPDATE_LATENCY = 1000;
@@ -45,7 +45,7 @@ export class HybridLoader {
     private readonly streamDetails: Required<Readonly<StreamDetails>>,
     private readonly config: StreamConfig,
     private readonly bandwidthCalculators: BandwidthCalculators,
-    private readonly segmentStorage: SegmentsMemoryStorage,
+    private readonly segmentStorage: ISegmentsStorage,
     private readonly eventTarget: EventTarget<CoreEventMap>,
   ) {
     const activeStream = this.lastRequestedSegment.stream;

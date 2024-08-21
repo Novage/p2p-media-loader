@@ -24,6 +24,7 @@ import {
   filterUndefinedProps,
 } from "./utils/utils.js";
 import { TRACKER_CLIENT_VERSION_PREFIX } from "./utils/peer.js";
+import { ISegmentsStorage } from "./segments-storage/segments-storage.interface.js";
 
 /** Core class for managing media streams loading via P2P. */
 export class Core<TStream extends Stream = Stream> {
@@ -31,6 +32,7 @@ export class Core<TStream extends Stream = Stream> {
   static readonly DEFAULT_COMMON_CORE_CONFIG: CommonCoreConfig = {
     cachedSegmentExpiration: undefined,
     cachedSegmentsCount: 0,
+    customSegmentStorageClass: undefined,
   };
 
   /** Default configuration for stream settings. */
@@ -74,7 +76,7 @@ export class Core<TStream extends Stream = Stream> {
     all: new BandwidthCalculator(),
     http: new BandwidthCalculator(),
   };
-  private segmentStorage?: SegmentsMemoryStorage;
+  private segmentStorage?: ISegmentsStorage;
   private mainStreamLoader?: HybridLoader;
   private secondaryStreamLoader?: HybridLoader;
   private streamDetails: StreamDetails = {
@@ -281,7 +283,10 @@ export class Core<TStream extends Stream = Stream> {
     }
 
     if (!this.segmentStorage) {
-      this.segmentStorage = new SegmentsMemoryStorage();
+      this.segmentStorage =
+        this.commonCoreConfig.customSegmentStorageClass ??
+        new SegmentsMemoryStorage();
+
       await this.segmentStorage.initialize(
         this.commonCoreConfig,
         this.mainStreamConfig,

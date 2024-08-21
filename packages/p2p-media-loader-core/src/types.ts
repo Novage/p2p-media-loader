@@ -1,3 +1,5 @@
+import { ISegmentsStorage } from "./segments-storage/segments-storage.interface";
+
 /** Represents the types of streams available, either primary (main) or secondary. */
 export type StreamType = "main" | "secondary";
 
@@ -133,6 +135,16 @@ export type CommonCoreConfig = {
    * ```
    */
   cachedSegmentsCount: number;
+
+  /**
+   * Custom storage class for segments.
+   *
+   * @default
+   * ```typescript
+   * customSegmentStorageClass: undefined
+   * ```
+   */
+  customSegmentStorageClass?: ISegmentsStorage;
 };
 
 /**
