@@ -59,31 +59,18 @@ export class HybridLoader {
       this.eventTarget,
     );
 
-    if (!this.segmentStorage.isInitialized) {
+    if (!this.segmentStorage.isInitialized()) {
       throw new Error("Segment storage is not initialized.");
     }
-    this.segmentStorage.addIsSegmentLockedPredicate(
-      (segmentSwarmId, segmentId) => {
-        const activeStreamSwarmId = StreamUtils.getStreamSwarmId(
-          this.config.swarmId ?? this.streamManifestUrl,
-          activeStream,
-        );
+    this.segmentStorage.setEngineRequestSegmentDurationCallback(() => {
+      return {
+        startTime: this.lastRequestedSegment.startTime,
+        endTime: this.lastRequestedSegment.endTime,
+      };
+    });
 
-        if (segmentSwarmId !== activeStreamSwarmId) return false;
-
-        const runtimeSegment = StreamUtils.getSegmentFromStreamByExternalId(
-          activeStream,
-          segmentId,
-        );
-
-        if (!runtimeSegment) return false;
-
-        return StreamUtils.isSegmentActualInPlayback(
-          runtimeSegment,
-          this.playback,
-          this.config,
-        );
-      },
+    this.segmentStorage.setSegmentPlaybackCallback(
+      () => this.playback.position,
     );
     this.p2pLoaders = new P2PLoadersContainer(
       this.streamManifestUrl,
@@ -219,6 +206,9 @@ export class HybridLoader {
             streamSwarmId,
             segment.externalId,
             request.data,
+            segment.startTime,
+            segment.endTime,
+            segment.stream.type,
             this.streamDetails.isLive,
           );
           break;

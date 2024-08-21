@@ -1,16 +1,30 @@
+import { CommonCoreConfig, StreamConfig } from "../types.js";
+
 export interface ISegmentsStorage {
-  initialize(): Promise<void>;
+  initialize(
+    storageConfig: CommonCoreConfig,
+    mainStreamConfig: StreamConfig,
+    secondaryStreamConfig: StreamConfig,
+  ): Promise<void>;
 
   isInitialized(): boolean;
 
-  addIsSegmentLockedPredicate(
-    predicate: (streamId: string, segmentId: number) => boolean,
+  setSegmentPlaybackCallback(getCurrentPlaybackTime: () => number): void;
+
+  setEngineRequestSegmentDurationCallback(
+    getSegmentDurationFromEngineRequest: () => {
+      startTime: number;
+      endTime: number;
+    },
   ): void;
 
   storeSegment(
     streamId: string,
     segmentId: number,
-    segmentData: ArrayBuffer,
+    data: ArrayBuffer,
+    startTime: number,
+    endTime: number,
+    streamType: string,
     isLiveStream: boolean,
   ): Promise<void>;
 

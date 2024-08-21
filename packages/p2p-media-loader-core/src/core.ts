@@ -281,8 +281,12 @@ export class Core<TStream extends Stream = Stream> {
     }
 
     if (!this.segmentStorage) {
-      this.segmentStorage = new SegmentsMemoryStorage(this.commonCoreConfig);
-      await this.segmentStorage.initialize();
+      this.segmentStorage = new SegmentsMemoryStorage();
+      await this.segmentStorage.initialize(
+        this.commonCoreConfig,
+        this.mainStreamConfig,
+        this.secondaryStreamConfig,
+      );
     }
 
     const segment = this.identifySegment(segmentRuntimeId);
@@ -439,7 +443,7 @@ export class Core<TStream extends Stream = Stream> {
       throw new Error("Manifest response url is not defined");
     }
 
-    if (!this.segmentStorage?.isInitialized) {
+    if (!this.segmentStorage?.isInitialized()) {
       throw new Error("Segment storage is not initialized");
     }
 
