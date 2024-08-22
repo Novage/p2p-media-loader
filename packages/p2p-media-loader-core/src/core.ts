@@ -283,10 +283,9 @@ export class Core<TStream extends Stream = Stream> {
     }
 
     if (!this.segmentStorage) {
-      !this.commonCoreConfig.customSegmentStorage
-        ? (this.segmentStorage = new SegmentsMemoryStorage())
-        : (this.segmentStorage =
-            new this.commonCoreConfig.customSegmentStorage());
+      this.segmentStorage = this.commonCoreConfig.customSegmentStorage
+    ? new this.commonCoreConfig.customSegmentStorage()
+    : new SegmentsMemoryStorage();
 
       await this.segmentStorage.initialize(
         this.commonCoreConfig,

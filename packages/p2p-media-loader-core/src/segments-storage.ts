@@ -258,8 +258,7 @@ export class SegmentsMemoryStorage implements ISegmentsStorage {
       : this.secondaryStreamConfig.httpDownloadTimeWindow;
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  public async destroy() {
+  public destroy() {
     this.cache.clear();
     this._isInitialized = false;
   }
