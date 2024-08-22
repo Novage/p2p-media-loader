@@ -41,5 +41,5 @@ export interface ISegmentsStorage {
 
   unsubscribeFromUpdate(streamId: string, listener: () => void): void;
 
-  destroy(): Promise<void>;
+  destroy(): void;
 }
