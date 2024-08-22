@@ -22,12 +22,14 @@ type SegmentInfoItem = {
   endTime: number;
 };
 
-function getStorageItemId(streamSwarmId: string, externalId: number) {
-  return `${streamSwarmId}|${externalId}`;
+function getStorageItemId(streamId: string, segmentId: number) {
+  return `${streamId}|${segmentId}`;
 }
 
 const INFO_ITEMS_STORE_NAME = "segmentInfo";
 const DATA_ITEMS_STORE_NAME = "segmentData";
+const DB_NAME = "p2p-media-loader";
+const DB_VERSION = 1;
 
 export class CustomSegmentStorage implements ISegmentsStorage {
   private initialized = false;
@@ -54,6 +56,7 @@ export class CustomSegmentStorage implements ISegmentsStorage {
       // await this.deleteDatabase("p2p-media-loader");
       await this.openDb();
       await this.loadCacheMap();
+
       this.initialized = true;
     } catch (error) {
       this.initialized = false;
@@ -110,49 +113,47 @@ export class CustomSegmentStorage implements ISegmentsStorage {
     this.getSegmentDuration = getSegmentDurationFromEngineRequest;
   }
 
-  getSegmentData(
+  async getSegmentData(
     streamId: string,
     segmentId: number,
   ): Promise<ArrayBuffer | undefined> {
-    return new Promise((resolve, reject) => {
-      if (!this.db) {
-        reject(new Error("Database is not initialized."));
-        return;
-      }
+    if (!this.db) {
+      throw new Error("Database is not initialized.");
+    }
 
-      const segmentStorageId = getStorageItemId(streamId, segmentId);
-      const transaction = this.db.transaction(
-        DATA_ITEMS_STORE_NAME,
-        "readonly",
-      );
-      const objectStore = transaction.objectStore(DATA_ITEMS_STORE_NAME);
-      const request = objectStore.get(segmentStorageId);
+    const segmentStorageId = getStorageItemId(streamId, segmentId);
+    const transaction = this.db.transaction(DATA_ITEMS_STORE_NAME, "readonly");
+    const objectStore = transaction.objectStore(DATA_ITEMS_STORE_NAME);
 
-      request.onsuccess = (event) => {
-        const result = (event.target as IDBRequest<SegmentDataItem | undefined>)
-          .result;
+    const result = await new Promise<ArrayBuffer | undefined>(
+      (resolve, reject) => {
+        const request = objectStore.get(segmentStorageId);
 
-        if (!result) {
-          resolve(undefined);
-          return;
-        }
+        request.onsuccess = (event) => {
+          const storageDataItem = (
+            event.target as IDBRequest<SegmentDataItem | undefined>
+          ).result;
 
-        resolve(result.data);
-      };
+          if (!storageDataItem) {
+            resolve(undefined);
+            return;
+          }
 
-      request.onerror = () => {
-        reject(new Error("Failed to retrieve segment data."));
-      };
-    });
+          resolve(storageDataItem.data);
+        };
+
+        request.onerror = () => {
+          reject(new Error("Failed to retrieve segment data."));
+        };
+      },
+    );
+
+    return result;
   }
 
   hasSegment(streamSwarmId: string, externalId: number): boolean {
     const streamCache = this.cacheMap.get(streamSwarmId);
-
-    const doesExist =
-      streamCache === undefined ? false : streamCache.has(externalId);
-
-    return doesExist;
+    return streamCache?.has(externalId) ?? false;
   }
 
   getStoredSegmentExternalIdsOfStream(streamSwarmId: string): number[] {
@@ -179,19 +180,14 @@ export class CustomSegmentStorage implements ISegmentsStorage {
     );
   }
 
-  destroy(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (!this.db) {
-        reject(new Error("Database is not initialized."));
-        return;
-      }
+  destroy() {
+    if (!this.db) {
+      throw new Error("Database is not initialized.");
+    }
 
-      this.db.close();
-      this.initialized = false;
-      this.cacheMap.clear();
-
-      resolve();
-    });
+    this.db.close();
+    this.initialized = false;
+    this.cacheMap.clear();
   }
 
   private dispatchStorageUpdatedEvent(streamId: string) {
@@ -200,21 +196,12 @@ export class CustomSegmentStorage implements ISegmentsStorage {
 
   private openDb() {
     return new Promise<void>((resolve, reject) => {
-      const request = indexedDB.open("p2p-media-loader", 1);
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
 
       request.onerror = () => reject(request.error);
 
       request.onsuccess = () => {
         this.db = request.result;
-
-        if (
-          this.db &&
-          this.db.objectStoreNames.contains(DATA_ITEMS_STORE_NAME) &&
-          this.db.objectStoreNames.contains(INFO_ITEMS_STORE_NAME)
-        ) {
-          resolve();
-        }
-
         resolve();
       };
 
@@ -226,42 +213,33 @@ export class CustomSegmentStorage implements ISegmentsStorage {
           !this.db.objectStoreNames.contains(DATA_ITEMS_STORE_NAME) &&
           !this.db.objectStoreNames.contains(INFO_ITEMS_STORE_NAME)
         ) {
-          const segmentDataStore = this.db.createObjectStore(
-            DATA_ITEMS_STORE_NAME,
-            {
-              keyPath: "storageId",
-            },
-          );
-          segmentDataStore.createIndex("storageId", "storageId", {
-            unique: true,
-          });
-
-          const segmentInfoStore = this.db.createObjectStore(
-            INFO_ITEMS_STORE_NAME,
-            {
-              keyPath: "storageId",
-            },
-          );
-          segmentInfoStore.createIndex("storageId", "storageId", {
-            unique: true,
-          });
+          this.createObjectStores(this.db);
         }
       };
     });
   }
 
+  private createObjectStores(db: IDBDatabase): void {
+    const segmentDataStore = db.createObjectStore(DATA_ITEMS_STORE_NAME, {
+      keyPath: "storageId",
+    });
+    segmentDataStore.createIndex("storageId", "storageId", { unique: true });
+
+    const segmentInfoStore = db.createObjectStore(INFO_ITEMS_STORE_NAME, {
+      keyPath: "storageId",
+    });
+    segmentInfoStore.createIndex("storageId", "storageId", { unique: true });
+  }
+
   private loadCacheMap() {
+    if (!this.db) {
+      throw new Error("Database is not initialized.");
+    }
+
+    const transaction = this.db.transaction(INFO_ITEMS_STORE_NAME, "readonly");
+    const objectStore = transaction.objectStore(INFO_ITEMS_STORE_NAME);
+
     return new Promise<void>((resolve, reject) => {
-      if (!this.db) {
-        throw new Error("Database is not initialized.");
-      }
-
-      const transaction = this.db.transaction(
-        INFO_ITEMS_STORE_NAME,
-        "readonly",
-      );
-      const objectStore = transaction.objectStore(INFO_ITEMS_STORE_NAME);
-
       const request = objectStore.getAll();
 
       request.onsuccess = (event) => {
@@ -291,13 +269,14 @@ export class CustomSegmentStorage implements ISegmentsStorage {
     storeName: string,
     itemToStore: SegmentInfoItem | SegmentDataItem,
   ) {
-    return new Promise<void>((resolve, reject) => {
-      if (!this.db) {
-        throw new Error("Database is not initialized.");
-      }
+    if (!this.db) {
+      throw new Error("Database is not initialized.");
+    }
 
-      const transaction = this.db.transaction(storeName, "readwrite");
-      const store = transaction.objectStore(storeName);
+    const transaction = this.db.transaction(storeName, "readwrite");
+    const store = transaction.objectStore(storeName);
+
+    return new Promise<void>((resolve, reject) => {
       const request = store.put(itemToStore);
 
       request.onsuccess = () => resolve();
@@ -307,15 +286,15 @@ export class CustomSegmentStorage implements ISegmentsStorage {
   }
 
   private deleteFromObjectStore(storeName: string, storageId: string) {
+    if (!this.db) {
+      throw new Error("Database is not initialized.");
+    }
+
+    const transaction = this.db.transaction(storeName, "readwrite");
+    const store = transaction.objectStore(storeName);
+
     return new Promise<void>((resolve, reject) => {
-      if (!this.db) {
-        throw new Error("Database is not initialized.");
-      }
-
-      const transaction = this.db.transaction(storeName, "readwrite");
-      const store = transaction.objectStore(storeName);
       const request = store.delete(storageId);
-
       request.onsuccess = () => resolve();
       request.onerror = () =>
         reject(new Error(`Failed to delete item from ${storeName}.`));

@@ -4,6 +4,7 @@ import { PlayerProps } from "../../../types";
 import { subscribeToUiEvents } from "../utils";
 import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 import Hls from "hls.js";
+import { CustomSegmentStorage } from "../../../custom-segment-storage";
 
 export const HlsjsPlayer = ({
   streamUrl,
@@ -30,6 +31,7 @@ export const HlsjsPlayer = ({
       p2p: {
         core: {
           announceTrackers,
+          customSegmentStorage: CustomSegmentStorage,
         },
         onHlsJsCreated(hls) {
           subscribeToUiEvents({
