@@ -41,7 +41,10 @@ export class CustomSegmentStorage implements ISegmentsStorage {
   private cacheMap = new Map<string, Map<number, SegmentInfoItem>>();
   private readonly eventTarget = new EventTarget<StorageEventHandlers>();
   private getCurrentPlaybackTime?: () => number;
-  private getSegmentDuration?: () => { startTime: number; endTime: number };
+  private getLastRequestedSegmentDuration?: () => {
+    startTime: number;
+    endTime: number;
+  };
 
   async initialize(
     storageConfig: CommonCoreConfig,
@@ -93,8 +96,11 @@ export class CustomSegmentStorage implements ISegmentsStorage {
     };
 
     this.updateCacheMap(segmentInfoItem);
-    await this.saveInObjectStore(DATA_ITEMS_STORE_NAME, segmentDataItem);
-    await this.saveInObjectStore(INFO_ITEMS_STORE_NAME, segmentInfoItem);
+
+    await Promise.all([
+      this.saveInObjectStore(DATA_ITEMS_STORE_NAME, segmentDataItem),
+      this.saveInObjectStore(INFO_ITEMS_STORE_NAME, segmentInfoItem),
+    ]);
 
     this.dispatchStorageUpdatedEvent(segmentInfoItem.streamId);
     void this.clear(segmentInfoItem.streamId);
@@ -110,7 +116,7 @@ export class CustomSegmentStorage implements ISegmentsStorage {
       endTime: number;
     },
   ) {
-    this.getSegmentDuration = getSegmentDurationFromEngineRequest;
+    this.getLastRequestedSegmentDuration = getSegmentDurationFromEngineRequest;
   }
 
   async getSegmentData(
@@ -151,22 +157,16 @@ export class CustomSegmentStorage implements ISegmentsStorage {
     return result;
   }
 
-  hasSegment(streamSwarmId: string, externalId: number): boolean {
-    const streamCache = this.cacheMap.get(streamSwarmId);
-    return streamCache?.has(externalId) ?? false;
+  hasSegment(streamId: string, segmentId: number): boolean {
+    const streamCache = this.cacheMap.get(streamId);
+    return streamCache?.has(segmentId) ?? false;
   }
 
-  getStoredSegmentExternalIdsOfStream(streamSwarmId: string): number[] {
-    const streamCache = this.cacheMap.get(streamSwarmId);
-    const externalIds: number[] = [];
+  getStoredSegmentExternalIdsOfStream(streamId: string): number[] {
+    const streamCache = this.cacheMap.get(streamId);
+    if (!streamCache) return [];
 
-    if (streamCache === undefined) return externalIds;
-
-    for (const [, segment] of streamCache) {
-      externalIds.push(segment.segmentId);
-    }
-
-    return externalIds;
+    return Array.from(streamCache.keys(), (key) => key);
   }
 
   subscribeOnUpdate(streamId: string, listener: () => void): void {
@@ -220,15 +220,12 @@ export class CustomSegmentStorage implements ISegmentsStorage {
   }
 
   private createObjectStores(db: IDBDatabase): void {
-    const segmentDataStore = db.createObjectStore(DATA_ITEMS_STORE_NAME, {
+    db.createObjectStore(DATA_ITEMS_STORE_NAME, {
       keyPath: "storageId",
     });
-    segmentDataStore.createIndex("storageId", "storageId", { unique: true });
-
-    const segmentInfoStore = db.createObjectStore(INFO_ITEMS_STORE_NAME, {
+    db.createObjectStore(INFO_ITEMS_STORE_NAME, {
       keyPath: "storageId",
     });
-    segmentInfoStore.createIndex("storageId", "storageId", { unique: true });
   }
 
   private loadCacheMap() {
@@ -285,22 +282,6 @@ export class CustomSegmentStorage implements ISegmentsStorage {
     });
   }
 
-  private deleteFromObjectStore(storeName: string, storageId: string) {
-    if (!this.db) {
-      throw new Error("Database is not initialized.");
-    }
-
-    const transaction = this.db.transaction(storeName, "readwrite");
-    const store = transaction.objectStore(storeName);
-
-    return new Promise<void>((resolve, reject) => {
-      const request = store.delete(storageId);
-      request.onsuccess = () => resolve();
-      request.onerror = () =>
-        reject(new Error(`Failed to delete item from ${storeName}.`));
-    });
-  }
-
   private updateCacheMap(segmentInfoItem: SegmentInfoItem) {
     if (!this.cacheMap.has(segmentInfoItem.streamId)) {
       this.cacheMap.set(
@@ -319,7 +300,7 @@ export class CustomSegmentStorage implements ISegmentsStorage {
       !this.mainStreamConfig ||
       !this.secondaryStreamConfig ||
       !this.getCurrentPlaybackTime ||
-      !this.getSegmentDuration
+      !this.getLastRequestedSegmentDuration
     ) {
       return;
     }
@@ -374,11 +355,30 @@ export class CustomSegmentStorage implements ISegmentsStorage {
     );
   }
 
-  private async removeSegmentsFromStorage(segmentsStorageIds: Set<string>) {
-    for (const storageId of segmentsStorageIds) {
-      await this.deleteFromObjectStore(DATA_ITEMS_STORE_NAME, storageId);
-      await this.deleteFromObjectStore(INFO_ITEMS_STORE_NAME, storageId);
-    }
+  private async removeSegmentsFromStorage(
+    segmentsStorageIds: Set<string>,
+  ): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      if (!this.db) {
+        throw new Error("Database is not initialized.");
+      }
+
+      const transaction = this.db.transaction(
+        [DATA_ITEMS_STORE_NAME, INFO_ITEMS_STORE_NAME],
+        "readwrite",
+      );
+      const dataStore = transaction.objectStore(DATA_ITEMS_STORE_NAME);
+      const infoStore = transaction.objectStore(INFO_ITEMS_STORE_NAME);
+
+      segmentsStorageIds.forEach((storageId) => {
+        dataStore.delete(storageId);
+        infoStore.delete(storageId);
+      });
+
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () =>
+        reject(new Error("Failed to delete segments from storage."));
+    });
   }
 
   private async deleteDatabase(dbName: string) {
