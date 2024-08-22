@@ -144,7 +144,7 @@ export type CommonCoreConfig = {
    * customSegmentStorageClass: undefined
    * ```
    */
-  customSegmentStorageClass?: ISegmentsStorage;
+  customSegmentStorage?: new () => ISegmentsStorage;
 };
 
 /**

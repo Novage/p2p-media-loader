@@ -32,7 +32,7 @@ export class Core<TStream extends Stream = Stream> {
   static readonly DEFAULT_COMMON_CORE_CONFIG: CommonCoreConfig = {
     cachedSegmentExpiration: undefined,
     cachedSegmentsCount: 0,
-    customSegmentStorageClass: undefined,
+    customSegmentStorage: undefined,
   };
 
   /** Default configuration for stream settings. */
@@ -283,9 +283,10 @@ export class Core<TStream extends Stream = Stream> {
     }
 
     if (!this.segmentStorage) {
-      this.segmentStorage =
-        this.commonCoreConfig.customSegmentStorageClass ??
-        new SegmentsMemoryStorage();
+      !this.commonCoreConfig.customSegmentStorage
+        ? (this.segmentStorage = new SegmentsMemoryStorage())
+        : (this.segmentStorage =
+            new this.commonCoreConfig.customSegmentStorage());
 
       await this.segmentStorage.initialize(
         this.commonCoreConfig,
