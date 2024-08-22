@@ -198,7 +198,7 @@ export class CustomSegmentStorage implements ISegmentsStorage {
     return new Promise<void>((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-      request.onerror = () => reject(request.error);
+      request.onerror = () => reject(new Error("Failed to open database."));
 
       request.onsuccess = () => {
         this.db = request.result;
@@ -260,7 +260,7 @@ export class CustomSegmentStorage implements ISegmentsStorage {
       };
 
       request.onerror = () => {
-        reject("Failed to retrieve segment information.");
+        reject(new Error("Failed to load cache map."));
       };
     });
   }
@@ -386,7 +386,7 @@ export class CustomSegmentStorage implements ISegmentsStorage {
       const request = indexedDB.deleteDatabase(dbName);
 
       request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
+      request.onerror = () => reject(new Error("Failed to delete database."));
     });
   }
 
