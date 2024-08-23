@@ -3,6 +3,7 @@ import {
   ISegmentsStorage,
   StreamConfig,
 } from "p2p-media-loader-core";
+import { P2PLoaderIndexedDB } from "./p2ploader-db";
 
 type StorageEventHandlers = {
   [key in `onStorageUpdated-${string}`]: () => void;
@@ -45,6 +46,16 @@ export class CustomSegmentStorage implements ISegmentsStorage {
     startTime: number;
     endTime: number;
   };
+  private dbWrapper: P2PLoaderIndexedDB;
+
+  constructor() {
+    this.dbWrapper = new P2PLoaderIndexedDB(
+      DB_NAME,
+      DB_VERSION,
+      INFO_ITEMS_STORE_NAME,
+      DATA_ITEMS_STORE_NAME,
+    );
+  }
 
   async initialize(
     storageConfig: CommonCoreConfig,
@@ -56,8 +67,8 @@ export class CustomSegmentStorage implements ISegmentsStorage {
     this.secondaryStreamConfig = secondaryStreamConfig;
 
     try {
-      // await this.deleteDatabase("p2p-media-loader");
-      await this.openDb();
+      // await this.dbWrapper.deleteDatabase();
+      await this.dbWrapper.openDatabase();
       await this.loadCacheMap();
 
       this.initialized = true;
@@ -98,8 +109,8 @@ export class CustomSegmentStorage implements ISegmentsStorage {
     this.updateCacheMap(segmentInfoItem);
 
     await Promise.all([
-      this.saveInObjectStore(DATA_ITEMS_STORE_NAME, segmentDataItem),
-      this.saveInObjectStore(INFO_ITEMS_STORE_NAME, segmentInfoItem),
+      this.dbWrapper.put(DATA_ITEMS_STORE_NAME, segmentDataItem),
+      this.dbWrapper.put(INFO_ITEMS_STORE_NAME, segmentInfoItem),
     ]);
 
     this.dispatchStorageUpdatedEvent(segmentInfoItem.streamId);
@@ -123,38 +134,13 @@ export class CustomSegmentStorage implements ISegmentsStorage {
     streamId: string,
     segmentId: number,
   ): Promise<ArrayBuffer | undefined> {
-    if (!this.db) {
-      throw new Error("Database is not initialized.");
-    }
-
     const segmentStorageId = getStorageItemId(streamId, segmentId);
-    const transaction = this.db.transaction(DATA_ITEMS_STORE_NAME, "readonly");
-    const objectStore = transaction.objectStore(DATA_ITEMS_STORE_NAME);
-
-    const result = await new Promise<ArrayBuffer | undefined>(
-      (resolve, reject) => {
-        const request = objectStore.get(segmentStorageId);
-
-        request.onsuccess = (event) => {
-          const storageDataItem = (
-            event.target as IDBRequest<SegmentDataItem | undefined>
-          ).result;
-
-          if (!storageDataItem) {
-            resolve(undefined);
-            return;
-          }
-
-          resolve(storageDataItem.data);
-        };
-
-        request.onerror = () => {
-          reject(new Error("Failed to retrieve segment data."));
-        };
-      },
+    const result = await this.dbWrapper.get<SegmentDataItem>(
+      DATA_ITEMS_STORE_NAME,
+      segmentStorageId,
     );
 
-    return result;
+    return result?.data;
   }
 
   hasSegment(streamId: string, segmentId: number): boolean {
@@ -194,91 +180,17 @@ export class CustomSegmentStorage implements ISegmentsStorage {
     this.eventTarget.dispatchEvent(`onStorageUpdated-${streamId}`);
   }
 
-  private openDb() {
-    return new Promise<void>((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
+  private async loadCacheMap() {
+    const result = await this.dbWrapper.getAll<SegmentInfoItem>(
+      INFO_ITEMS_STORE_NAME,
+    );
 
-      request.onerror = () => reject(new Error("Failed to open database."));
-
-      request.onsuccess = () => {
-        this.db = request.result;
-        resolve();
-      };
-
-      request.onupgradeneeded = () => {
-        this.db = request.result;
-        if (!this.db) return;
-
-        if (
-          !this.db.objectStoreNames.contains(DATA_ITEMS_STORE_NAME) &&
-          !this.db.objectStoreNames.contains(INFO_ITEMS_STORE_NAME)
-        ) {
-          this.createObjectStores(this.db);
-        }
-      };
-    });
-  }
-
-  private createObjectStores(db: IDBDatabase): void {
-    db.createObjectStore(DATA_ITEMS_STORE_NAME, {
-      keyPath: "storageId",
-    });
-    db.createObjectStore(INFO_ITEMS_STORE_NAME, {
-      keyPath: "storageId",
-    });
-  }
-
-  private loadCacheMap() {
-    if (!this.db) {
-      throw new Error("Database is not initialized.");
-    }
-
-    const transaction = this.db.transaction(INFO_ITEMS_STORE_NAME, "readonly");
-    const objectStore = transaction.objectStore(INFO_ITEMS_STORE_NAME);
-
-    return new Promise<void>((resolve, reject) => {
-      const request = objectStore.getAll();
-
-      request.onsuccess = (event) => {
-        const result = (event.target as IDBRequest<SegmentInfoItem[]>).result;
-
-        result.forEach((item) => {
-          if (!this.cacheMap.has(item.streamId)) {
-            this.cacheMap.set(
-              item.streamId,
-              new Map<number, SegmentInfoItem>(),
-            );
-          }
-          this.cacheMap.get(item.streamId)?.set(item.segmentId, item);
-          this.storageSegmentsCount++;
-        });
-
-        resolve();
-      };
-
-      request.onerror = () => {
-        reject(new Error("Failed to load cache map."));
-      };
-    });
-  }
-
-  private saveInObjectStore(
-    storeName: string,
-    itemToStore: SegmentInfoItem | SegmentDataItem,
-  ) {
-    if (!this.db) {
-      throw new Error("Database is not initialized.");
-    }
-
-    const transaction = this.db.transaction(storeName, "readwrite");
-    const store = transaction.objectStore(storeName);
-
-    return new Promise<void>((resolve, reject) => {
-      const request = store.put(itemToStore);
-
-      request.onsuccess = () => resolve();
-      request.onerror = () =>
-        reject(new Error(`Failed to store item in ${storeName}.`));
+    result.forEach((item) => {
+      if (!this.cacheMap.has(item.streamId)) {
+        this.cacheMap.set(item.streamId, new Map<number, SegmentInfoItem>());
+      }
+      this.cacheMap.get(item.streamId)?.set(item.segmentId, item);
+      this.storageSegmentsCount++;
     });
   }
 
@@ -309,7 +221,7 @@ export class CustomSegmentStorage implements ISegmentsStorage {
 
     const currentPlayback = this.getCurrentPlaybackTime();
     const affectedStreams = new Set<string>();
-    const segmentsStorageIdsToRemove = new Set<string>();
+    const segmentsStorageIdsToRemove: string[] = [];
 
     const tryRemoveSegment = (
       segmentInfoItem: SegmentInfoItem,
@@ -334,7 +246,7 @@ export class CustomSegmentStorage implements ISegmentsStorage {
       if (isPastThreshold) {
         this.storageSegmentsCount--;
         streamCache.delete(segmentInfoItem.segmentId);
-        segmentsStorageIdsToRemove.add(storageId);
+        segmentsStorageIdsToRemove.push(storageId);
         affectedStreams.add(streamId);
       }
     };
@@ -346,7 +258,7 @@ export class CustomSegmentStorage implements ISegmentsStorage {
       tryRemoveSegment(segmentInfoItem, streamCache),
     );
 
-    if (segmentsStorageIdsToRemove.size === 0) {
+    if (segmentsStorageIdsToRemove.length === 0) {
       for (const [streamId, streamCache] of this.cacheMap) {
         if (streamId === activeStreamId) continue;
         streamCache.forEach((segmentInfoItem) =>
@@ -363,38 +275,13 @@ export class CustomSegmentStorage implements ISegmentsStorage {
   }
 
   private async removeSegmentsFromStorage(
-    segmentsStorageIds: Set<string>,
+    segmentsStorageIds: string[],
   ): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      if (!this.db) {
-        throw new Error("Database is not initialized.");
-      }
-
-      const transaction = this.db.transaction(
-        [DATA_ITEMS_STORE_NAME, INFO_ITEMS_STORE_NAME],
-        "readwrite",
-      );
-      const dataStore = transaction.objectStore(DATA_ITEMS_STORE_NAME);
-      const infoStore = transaction.objectStore(INFO_ITEMS_STORE_NAME);
-
-      segmentsStorageIds.forEach((storageId) => {
-        dataStore.delete(storageId);
-        infoStore.delete(storageId);
-      });
-
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () =>
-        reject(new Error("Failed to delete segments from storage."));
-    });
-  }
-
-  private async deleteDatabase(dbName: string) {
-    return new Promise<void>((resolve, reject) => {
-      const request = indexedDB.deleteDatabase(dbName);
-
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(new Error("Failed to delete database."));
-    });
+    const promises = segmentsStorageIds.flatMap((storageId) => [
+      this.dbWrapper.delete(DATA_ITEMS_STORE_NAME, storageId),
+      this.dbWrapper.delete(INFO_ITEMS_STORE_NAME, storageId),
+    ]);
+    await Promise.all(promises);
   }
 
   private getStreamTimeWindow(
