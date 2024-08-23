@@ -30,7 +30,6 @@ import { ISegmentsStorage } from "./segments-storage/segments-storage.interface.
 export class Core<TStream extends Stream = Stream> {
   /** Default configuration for common core settings. */
   static readonly DEFAULT_COMMON_CORE_CONFIG: CommonCoreConfig = {
-    cachedSegmentExpiration: undefined,
     cachedSegmentsCount: 0,
     customSegmentStorage: undefined,
   };

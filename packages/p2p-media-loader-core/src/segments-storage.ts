@@ -33,7 +33,10 @@ export class SegmentsMemoryStorage implements ISegmentsStorage {
   private mainStreamConfig?: StreamConfig;
   private secondaryStreamConfig?: StreamConfig;
   private getCurrentPlaybackTime?: () => number;
-  private getSegmentDuration?: () => { startTime: number; endTime: number };
+  private getLastRequestedSegmentDuration?: () => {
+    startTime: number;
+    endTime: number;
+  };
 
   constructor() {
     this.logger = debug("p2pml-core:segment-memory-storage");
@@ -62,13 +65,13 @@ export class SegmentsMemoryStorage implements ISegmentsStorage {
     this.getCurrentPlaybackTime = getCurrentPlaybackTime;
   }
 
-  setEngineRequestSegmentDurationCallback(
+  setLastRequestedSegmentDurationCallback(
     getSegmentDurationFromEngineRequest: () => {
       startTime: number;
       endTime: number;
     },
   ) {
-    this.getSegmentDuration = getSegmentDurationFromEngineRequest;
+    this.getLastRequestedSegmentDuration = getSegmentDurationFromEngineRequest;
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
@@ -200,7 +203,7 @@ export class SegmentsMemoryStorage implements ISegmentsStorage {
   private getStorageMaxCacheCount() {
     if (
       !this.storageConfig ||
-      !this.getSegmentDuration ||
+      !this.getLastRequestedSegmentDuration ||
       !this.mainStreamConfig ||
       !this.secondaryStreamConfig
     ) {
@@ -216,7 +219,7 @@ export class SegmentsMemoryStorage implements ISegmentsStorage {
         ? this.mainStreamConfig.httpDownloadTimeWindow
         : this.secondaryStreamConfig.httpDownloadTimeWindow;
 
-    const { startTime, endTime } = this.getSegmentDuration();
+    const { startTime, endTime } = this.getLastRequestedSegmentDuration();
     const segmentDuration = endTime - startTime;
     const segmentsInTimeWindow = Math.ceil(maxHttpTimeWindow / segmentDuration);
 
