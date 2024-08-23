@@ -15,7 +15,7 @@ import {
 import { BandwidthCalculators, StreamDetails } from "./internal-types.js";
 import * as StreamUtils from "./utils/stream.js";
 import { BandwidthCalculator } from "./bandwidth-calculator.js";
-import { SegmentsMemoryStorage } from "./segments-storage.js";
+import { SegmentsMemoryStorage } from "./segments-storage/segments-storage.js";
 import { EventTarget } from "./utils/event-target.js";
 import {
   overrideConfig,
@@ -30,7 +30,6 @@ import { ISegmentsStorage } from "./segments-storage/segments-storage.interface.
 export class Core<TStream extends Stream = Stream> {
   /** Default configuration for common core settings. */
   static readonly DEFAULT_COMMON_CORE_CONFIG: CommonCoreConfig = {
-    cachedSegmentExpiration: undefined,
     cachedSegmentsCount: 0,
     customSegmentStorage: undefined,
   };
@@ -282,10 +281,22 @@ export class Core<TStream extends Stream = Stream> {
       throw new Error("Manifest response url is not defined");
     }
 
+    if (
+      this.segmentStorage?.isInitialized() &&
+      this.streamDetails.isLive &&
+      !(this.segmentStorage instanceof SegmentsMemoryStorage)
+    ) {
+      this.segmentStorage.destroy();
+      this.segmentStorage = undefined;
+    }
+
     if (!this.segmentStorage) {
-      this.segmentStorage = this.commonCoreConfig.customSegmentStorage
-    ? new this.commonCoreConfig.customSegmentStorage()
-    : new SegmentsMemoryStorage();
+      const StorageToUseIfNotLive =
+        this.commonCoreConfig.customSegmentStorage ?? SegmentsMemoryStorage;
+
+      this.segmentStorage = this.streamDetails.isLive
+        ? new SegmentsMemoryStorage()
+        : new StorageToUseIfNotLive();
 
       await this.segmentStorage.initialize(
         this.commonCoreConfig,

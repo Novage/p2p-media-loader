@@ -11,8 +11,8 @@ export interface ISegmentsStorage {
 
   setSegmentPlaybackCallback(getCurrentPlaybackTime: () => number): void;
 
-  setEngineRequestSegmentDurationCallback(
-    getSegmentDurationFromEngineRequest: () => {
+  setLastRequestedSegmentDurationCallback(
+    getLastRequestedSegmentDuration: () => {
       startTime: number;
       endTime: number;
     },

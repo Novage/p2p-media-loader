@@ -1,7 +1,7 @@
-import { CommonCoreConfig, StreamConfig } from "./types.js";
+import { CommonCoreConfig, StreamConfig } from "../types.js";
 import debug from "debug";
-import { EventTarget } from "./utils/event-target.js";
-import { ISegmentsStorage } from "./segments-storage/segments-storage.interface.js";
+import { EventTarget } from "../utils/event-target.js";
+import { ISegmentsStorage } from "./segments-storage.interface.js";
 
 type SegmentDataItem = {
   segmentId: number;
@@ -16,8 +16,8 @@ type StorageEventHandlers = {
   [key in `onStorageUpdated-${string}`]: () => void;
 };
 
-function getStorageItemId(streamSwarmId: string, externalId: number) {
-  return `${streamSwarmId}|${externalId}`;
+function getStorageItemId(streamId: string, segmentId: number) {
+  return `${streamId}|${segmentId}`;
 }
 
 export class SegmentsMemoryStorage implements ISegmentsStorage {
@@ -33,7 +33,10 @@ export class SegmentsMemoryStorage implements ISegmentsStorage {
   private mainStreamConfig?: StreamConfig;
   private secondaryStreamConfig?: StreamConfig;
   private getCurrentPlaybackTime?: () => number;
-  private getSegmentDuration?: () => { startTime: number; endTime: number };
+  private getLastRequestedSegmentDuration?: () => {
+    startTime: number;
+    endTime: number;
+  };
 
   constructor() {
     this.logger = debug("p2pml-core:segment-memory-storage");
@@ -62,13 +65,13 @@ export class SegmentsMemoryStorage implements ISegmentsStorage {
     this.getCurrentPlaybackTime = getCurrentPlaybackTime;
   }
 
-  setEngineRequestSegmentDurationCallback(
+  setLastRequestedSegmentDurationCallback(
     getSegmentDurationFromEngineRequest: () => {
       startTime: number;
       endTime: number;
     },
   ) {
-    this.getSegmentDuration = getSegmentDurationFromEngineRequest;
+    this.getLastRequestedSegmentDuration = getSegmentDurationFromEngineRequest;
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
@@ -82,7 +85,6 @@ export class SegmentsMemoryStorage implements ISegmentsStorage {
     isLiveStream: boolean,
   ) {
     const storageId = getStorageItemId(streamId, segmentId);
-
     this.cache.set(storageId, {
       data,
       segmentId,
@@ -92,7 +94,7 @@ export class SegmentsMemoryStorage implements ISegmentsStorage {
       streamType,
     });
 
-    this.logger(`add segment: ${segmentId}`);
+    this.logger(`add segment: ${segmentId} to ${streamId}`);
     this.dispatchStorageUpdatedEvent(streamId);
     void this.clear(isLiveStream);
   }
@@ -130,11 +132,55 @@ export class SegmentsMemoryStorage implements ISegmentsStorage {
 
   // eslint-disable-next-line @typescript-eslint/require-await
   private async clear(isLiveStream: boolean): Promise<boolean> {
-    if (isLiveStream) {
-      return this.clearLive();
+    if (
+      !this.getCurrentPlaybackTime ||
+      !this.mainStreamConfig ||
+      !this.secondaryStreamConfig ||
+      !this.storageConfig
+    ) {
+      return false;
     }
 
-    return this.clearVOD();
+    const currentPlayback = this.getCurrentPlaybackTime();
+    const affectedStreams = new Set<string>();
+    const maxStorageCapacity = isLiveStream
+      ? Infinity
+      : this.getStorageMaxCacheCount();
+
+    if (
+      !isLiveStream &&
+      (maxStorageCapacity === 0 || this.cache.size <= maxStorageCapacity)
+    ) {
+      return false;
+    }
+
+    for (const [storageId, segmentData] of this.cache.entries()) {
+      const { endTime, streamType, streamId } = segmentData;
+      const highDemandTimeWindow = this.getHighDemandTimeWindow(streamType);
+
+      let shouldRemove = false;
+
+      if (isLiveStream) {
+        shouldRemove = currentPlayback >= highDemandTimeWindow + endTime;
+      } else {
+        const httpDownloadTimeWindow =
+          this.getHttpDownloadTimeWindow(streamType);
+        shouldRemove =
+          currentPlayback >= endTime + httpDownloadTimeWindow * 1.05;
+      }
+
+      if (shouldRemove) {
+        this.logger(`remove segment: ${segmentData.segmentId}`);
+        this.cache.delete(storageId);
+        affectedStreams.add(streamId);
+      }
+    }
+
+    affectedStreams.forEach((stream) =>
+      this.dispatchStorageUpdatedEvent(stream),
+    );
+
+    return affectedStreams.size > 0;
   }
 
   subscribeOnUpdate(
@@ -154,84 +200,35 @@ export class SegmentsMemoryStorage implements ISegmentsStorage {
     );
   }
 
-  private clearLive() {
+  private getStorageMaxCacheCount() {
     if (
-      !this.getCurrentPlaybackTime ||
+      !this.storageConfig ||
+      !this.getLastRequestedSegmentDuration ||
       !this.mainStreamConfig ||
       !this.secondaryStreamConfig
     ) {
-      return false;
-    }
-
-    const currentPlayback = this.getCurrentPlaybackTime();
-    const affectedStreams = new Set<string>();
-
-    for (const [itemId, item] of this.cache.entries()) {
-      const { endTime, streamType, streamId } = item;
-
-      const highDemandTimeWindow = this.getHighDemandTimeWindow(streamType);
-
-      const isPastHighDemandWindow =
-        currentPlayback > endTime + highDemandTimeWindow;
-
-      if (isPastHighDemandWindow) {
-        this.logger(`remove segment: ${item.segmentId}`);
-        affectedStreams.add(streamId);
-        this.cache.delete(itemId);
-      }
-    }
-
-    affectedStreams.forEach((stream) =>
-      this.dispatchStorageUpdatedEvent(stream),
-    );
-
-    return affectedStreams.size > 0;
-  }
-
-  private clearVOD() {
-    if (
-      !this.getCurrentPlaybackTime ||
-      !this.mainStreamConfig ||
-      !this.secondaryStreamConfig ||
-      !this.storageConfig
-    ) {
-      return false;
+      return 0;
     }
 
     const cachedSegmentsCount = this.storageConfig.cachedSegmentsCount;
+    if (cachedSegmentsCount === 0) return 0;
 
-    if (
-      cachedSegmentsCount === 0 ||
-      this.cache.size + 1 <= cachedSegmentsCount
-    ) {
-      return false;
-    }
+    const maxHttpTimeWindow =
+      this.mainStreamConfig.httpDownloadTimeWindow >=
+      this.secondaryStreamConfig.httpDownloadTimeWindow
+        ? this.mainStreamConfig.httpDownloadTimeWindow
+        : this.secondaryStreamConfig.httpDownloadTimeWindow;
 
-    const currentPlayback = this.getCurrentPlaybackTime();
-    const affectedStreams = new Set<string>();
+    const { startTime, endTime } = this.getLastRequestedSegmentDuration();
+    const segmentDuration = endTime - startTime;
+    const segmentsInTimeWindow = Math.ceil(maxHttpTimeWindow / segmentDuration);
 
-    for (const [itemId, item] of this.cache.entries()) {
-      const { endTime, streamType, streamId } = item;
+    const isCachedSegmentCountValid =
+      cachedSegmentsCount >= segmentsInTimeWindow;
 
-      const httpDownloadTimeWindow = this.getHttpDownloadTimeWindow(streamType);
-      const highDemandTimeWindow = this.getHighDemandTimeWindow(streamType);
-
-      const isPastThreshold =
-        endTime <
-        currentPlayback - (httpDownloadTimeWindow - highDemandTimeWindow);
-
-      if (isPastThreshold) {
-        this.logger(`remove segment: ${item.segmentId}`);
-        this.cache.delete(itemId);
-        affectedStreams.add(streamId);
-      }
-    }
-
-    affectedStreams.forEach((stream) =>
-      this.dispatchStorageUpdatedEvent(stream),
-    );
-
-    return affectedStreams.size > 0;
+    return isCachedSegmentCountValid
+      ? cachedSegmentsCount
+      : segmentsInTimeWindow;
   }
 
   private dispatchStorageUpdatedEvent(streamId: string) {

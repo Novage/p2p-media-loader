@@ -62,7 +62,7 @@ export class HybridLoader {
     if (!this.segmentStorage.isInitialized()) {
       throw new Error("Segment storage is not initialized.");
     }
-    this.segmentStorage.setEngineRequestSegmentDurationCallback(() => {
+    this.segmentStorage.setLastRequestedSegmentDurationCallback(() => {
       return {
         startTime: this.lastRequestedSegment.startTime,
         endTime: this.lastRequestedSegment.endTime,
