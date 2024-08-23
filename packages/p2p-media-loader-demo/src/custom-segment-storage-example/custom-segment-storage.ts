@@ -110,13 +110,13 @@ export class CustomSegmentStorage implements ISegmentsStorage {
     this.getCurrentPlaybackTime = getCurrentPlaybackTime;
   }
 
-  setEngineRequestSegmentDurationCallback(
-    getSegmentDurationFromEngineRequest: () => {
+  setLastRequestedSegmentDurationCallback(
+    getLastRequestedSegmentDuration: () => {
       startTime: number;
       endTime: number;
     },
   ) {
-    this.getLastRequestedSegmentDuration = getSegmentDurationFromEngineRequest;
+    this.getLastRequestedSegmentDuration = getLastRequestedSegmentDuration;
   }
 
   async getSegmentData(
@@ -322,7 +322,8 @@ export class CustomSegmentStorage implements ISegmentsStorage {
 
       const isPastThreshold =
         endTime <
-        currentPlayback - (httpDownloadTimeWindow - highDemandTimeWindow);
+        currentPlayback -
+          (httpDownloadTimeWindow - highDemandTimeWindow) * 1.05;
 
       if (isPastThreshold) {
         this.storageSegmentsCount--;
