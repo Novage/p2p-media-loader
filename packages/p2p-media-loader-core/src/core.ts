@@ -282,10 +282,22 @@ export class Core<TStream extends Stream = Stream> {
       throw new Error("Manifest response url is not defined");
     }
 
+    if (
+      this.segmentStorage?.isInitialized() &&
+      this.streamDetails.isLive &&
+      !(this.segmentStorage instanceof SegmentsMemoryStorage)
+    ) {
+      this.segmentStorage.destroy();
+      this.segmentStorage = undefined;
+    }
+
     if (!this.segmentStorage) {
-      this.segmentStorage = this.commonCoreConfig.customSegmentStorage
-    ? new this.commonCoreConfig.customSegmentStorage()
-    : new SegmentsMemoryStorage();
+      const StorageToUseIfNotLive =
+        this.commonCoreConfig.customSegmentStorage ?? SegmentsMemoryStorage;
+
+      this.segmentStorage = this.streamDetails.isLive
+        ? new SegmentsMemoryStorage()
+        : new StorageToUseIfNotLive();
 
       await this.segmentStorage.initialize(
         this.commonCoreConfig,
