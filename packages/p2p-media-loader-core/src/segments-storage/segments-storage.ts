@@ -156,15 +156,20 @@ export class SegmentsMemoryStorage implements ISegmentsStorage {
 
     for (const [storageId, segmentData] of this.cache.entries()) {
       const { endTime, streamType, streamId } = segmentData;
-      const highDemandTimeWindow = this.getHighDemandTimeWindow(streamType);
+      const highDemandTimeWindow = this.getStreamTimeWindow(
+        streamType,
+        "highDemandTimeWindow",
+      );
 
       let shouldRemove = false;
 
       if (isLiveStream) {
         shouldRemove = currentPlayback > highDemandTimeWindow + endTime;
       } else {
-        const httpDownloadTimeWindow =
-          this.getHttpDownloadTimeWindow(streamType);
+        const httpDownloadTimeWindow = this.getStreamTimeWindow(
+          streamType,
+          "httpDownloadTimeWindow",
+        );
         shouldRemove =
           currentPlayback > endTime + httpDownloadTimeWindow * 1.05;
       }
@@ -235,24 +240,19 @@ export class SegmentsMemoryStorage implements ISegmentsStorage {
     this.eventTarget.dispatchEvent(`onStorageUpdated-${streamId}`);
   }
 
-  private getHighDemandTimeWindow(streamType: string) {
+  private getStreamTimeWindow(
+    streamType: string,
+    configKey: "highDemandTimeWindow" | "httpDownloadTimeWindow",
+  ): number {
     if (!this.mainStreamConfig || !this.secondaryStreamConfig) {
       return 0;
     }
 
-    return streamType === "main"
-      ? this.mainStreamConfig.highDemandTimeWindow
-      : this.secondaryStreamConfig.highDemandTimeWindow;
-  }
-
-  private getHttpDownloadTimeWindow(streamType: string) {
-    if (!this.mainStreamConfig || !this.secondaryStreamConfig) {
-      return 0;
-    }
-
-    return streamType === "main"
-      ? this.mainStreamConfig.httpDownloadTimeWindow
-      : this.secondaryStreamConfig.httpDownloadTimeWindow;
+    const config =
+      streamType === "main"
+        ? this.mainStreamConfig
+        : this.secondaryStreamConfig;
+    return config[configKey];
   }
 
   public destroy() {
