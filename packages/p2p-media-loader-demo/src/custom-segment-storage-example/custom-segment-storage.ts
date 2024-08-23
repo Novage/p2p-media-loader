@@ -317,8 +317,14 @@ export class CustomSegmentStorage implements ISegmentsStorage {
     ) => {
       const { streamType, endTime, streamId, storageId } = segmentInfoItem;
 
-      const httpDownloadTimeWindow = this.getHttpDownloadTimeWindow(streamType);
-      const highDemandTimeWindow = this.getHighDemandTimeWindow(streamType);
+      const httpDownloadTimeWindow = this.getStreamTimeWindow(
+        streamType,
+        "httpDownloadTimeWindow",
+      );
+      const highDemandTimeWindow = this.getStreamTimeWindow(
+        streamType,
+        "highDemandTimeWindow",
+      );
 
       const isPastThreshold =
         endTime <
@@ -391,24 +397,19 @@ export class CustomSegmentStorage implements ISegmentsStorage {
     });
   }
 
-  private getHighDemandTimeWindow(streamType: string) {
+  private getStreamTimeWindow(
+    streamType: string,
+    configKey: "highDemandTimeWindow" | "httpDownloadTimeWindow",
+  ): number {
     if (!this.mainStreamConfig || !this.secondaryStreamConfig) {
       return 0;
     }
 
-    return streamType === "main"
-      ? this.mainStreamConfig.highDemandTimeWindow
-      : this.secondaryStreamConfig.highDemandTimeWindow;
-  }
-
-  private getHttpDownloadTimeWindow(streamType: string) {
-    if (!this.mainStreamConfig || !this.secondaryStreamConfig) {
-      return 0;
-    }
-
-    return streamType === "main"
-      ? this.mainStreamConfig.httpDownloadTimeWindow
-      : this.secondaryStreamConfig.httpDownloadTimeWindow;
+    const config =
+      streamType === "main"
+        ? this.mainStreamConfig
+        : this.secondaryStreamConfig;
+    return config[configKey];
   }
 }
 
