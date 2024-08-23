@@ -15,7 +15,7 @@ import {
 import { BandwidthCalculators, StreamDetails } from "./internal-types.js";
 import * as StreamUtils from "./utils/stream.js";
 import { BandwidthCalculator } from "./bandwidth-calculator.js";
-import { SegmentsMemoryStorage } from "./segments-storage.js";
+import { SegmentsMemoryStorage } from "./segments-storage/segments-storage.js";
 import { EventTarget } from "./utils/event-target.js";
 import {
   overrideConfig,

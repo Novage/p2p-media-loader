@@ -1,7 +1,7 @@
-import { CommonCoreConfig, StreamConfig } from "./types.js";
+import { CommonCoreConfig, StreamConfig } from "../types.js";
 import debug from "debug";
-import { EventTarget } from "./utils/event-target.js";
-import { ISegmentsStorage } from "./segments-storage/segments-storage.interface.js";
+import { EventTarget } from "../utils/event-target.js";
+import { ISegmentsStorage } from "./segments-storage.interface.js";
 
 type SegmentDataItem = {
   segmentId: number;
