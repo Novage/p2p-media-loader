@@ -161,12 +161,12 @@ export class SegmentsMemoryStorage implements ISegmentsStorage {
       let shouldRemove = false;
 
       if (isLiveStream) {
-        shouldRemove = currentPlayback >= highDemandTimeWindow + endTime;
+        shouldRemove = currentPlayback > highDemandTimeWindow + endTime;
       } else {
         const httpDownloadTimeWindow =
           this.getHttpDownloadTimeWindow(streamType);
         shouldRemove =
-          currentPlayback >= endTime + httpDownloadTimeWindow * 1.05;
+          currentPlayback > endTime + httpDownloadTimeWindow * 1.05;
       }
 
       if (shouldRemove) {
