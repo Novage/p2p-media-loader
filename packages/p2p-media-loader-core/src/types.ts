@@ -1,4 +1,4 @@
-import { ISegmentsStorage } from "./segments-storage/segments-storage.interface";
+import { SegmentsStorage } from "./segments-storage/index.js";
 
 /** Represents the types of streams available, either primary (main) or secondary. */
 export type StreamType = "main" | "secondary";
@@ -127,14 +127,24 @@ export type CommonCoreConfig = {
   cachedSegmentsCount: number;
 
   /**
-   * Custom storage class for segments.
+   * Custom storage class for VOD segments.
    *
    * @default
    * ```typescript
-   * customSegmentStorageClass: undefined
+   * vodSegmentsStorage: undefined
    * ```
    */
-  customSegmentStorage?: new () => ISegmentsStorage;
+  vodSegmentsStorage?: new () => SegmentsStorage;
+
+  /**
+   * Custom storage class for live segments.
+   *
+   * @default
+   * ```typescript
+   * liveSegmentsStorage: undefined
+   * ```
+   */
+  liveSegmentsStorage?: new () => SegmentsStorage;
 };
 
 /**

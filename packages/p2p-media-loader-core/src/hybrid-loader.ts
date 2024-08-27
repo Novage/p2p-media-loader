@@ -21,7 +21,7 @@ import * as Utils from "./utils/utils.js";
 import debug from "debug";
 import { QueueItem } from "./utils/queue.js";
 import { EventTarget } from "./utils/event-target.js";
-import { ISegmentsStorage } from "./segments-storage/segments-storage.interface.js";
+import { SegmentsStorage } from "./segments-storage/index.js";
 
 const FAILED_ATTEMPTS_CLEAR_INTERVAL = 60000;
 const PEER_UPDATE_LATENCY = 1000;
@@ -45,7 +45,7 @@ export class HybridLoader {
     private readonly streamDetails: Required<Readonly<StreamDetails>>,
     private readonly config: StreamConfig,
     private readonly bandwidthCalculators: BandwidthCalculators,
-    private readonly segmentStorage: ISegmentsStorage,
+    private readonly segmentStorage: SegmentsStorage,
     private readonly eventTarget: EventTarget<CoreEventMap>,
   ) {
     const activeStream = this.lastRequestedSegment.stream;
@@ -59,19 +59,10 @@ export class HybridLoader {
       this.eventTarget,
     );
 
-    if (!this.segmentStorage.isInitialized()) {
+    if (!this.segmentStorage) {
       throw new Error("Segment storage is not initialized.");
     }
-    this.segmentStorage.setLastRequestedSegmentDurationCallback(() => {
-      return {
-        startTime: this.lastRequestedSegment.startTime,
-        endTime: this.lastRequestedSegment.endTime,
-      };
-    });
 
-    this.segmentStorage.setSegmentPlaybackCallback(
-      () => this.playback.position,
-    );
     this.p2pLoaders = new P2PLoadersContainer(
       this.streamManifestUrl,
       this.lastRequestedSegment.stream,
@@ -110,7 +101,12 @@ export class HybridLoader {
       this.p2pLoaders.changeCurrentLoader(stream);
     }
     this.lastRequestedSegment = segment;
-
+    this.segmentStorage.onSegmentRequested(
+      stream.runtimeId,
+      segment.externalId,
+      segment.startTime,
+      segment.endTime,
+    );
     const engineRequest = new EngineRequest(segment, callbacks);
 
     const streamSwarmId = StreamUtils.getStreamSwarmId(
@@ -118,20 +114,24 @@ export class HybridLoader {
       stream,
     );
 
-    if (this.segmentStorage.hasSegment(streamSwarmId, segment.externalId)) {
-      // TODO: error handling
-      const data = await this.segmentStorage.getSegmentData(
-        streamSwarmId,
-        segment.externalId,
-      );
-      if (data) {
-        const { queueDownloadRatio } = this.generateQueue();
-        engineRequest.resolve(data, this.getBandwidth(queueDownloadRatio));
+    try {
+      if (this.segmentStorage.hasSegment(streamSwarmId, segment.externalId)) {
+        const data = await this.segmentStorage.getSegmentData(
+          streamSwarmId,
+          segment.externalId,
+        );
+        if (data) {
+          const { queueDownloadRatio } = this.generateQueue();
+          engineRequest.resolve(data, this.getBandwidth(queueDownloadRatio));
+        }
+      } else {
+        this.engineRequest = engineRequest;
       }
-    } else {
-      this.engineRequest = engineRequest;
+    } catch {
+      engineRequest.reject();
+    } finally {
+      this.requestProcessQueueMicrotask();
     }
-    this.requestProcessQueueMicrotask();
   }
 
   private requestProcessQueueMicrotask = (force = true) => {
@@ -566,6 +566,7 @@ export class HybridLoader {
       this.logger("position significantly changed");
       this.engineRequest?.markAsShouldBeStartedImmediately();
     }
+    this.segmentStorage.onPlaybackUpdated(position, rate);
     void this.requestProcessQueueMicrotask(isPositionSignificantlyChanged);
   }
 

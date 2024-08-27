@@ -1,47 +1,47 @@
-import { CommonCoreConfig, StreamConfig } from "../types.js";
+import { CommonCoreConfig, StreamConfig, StreamType } from "../types.js";
 /** Segments storage interface */
-export interface ISegmentsStorage {
+export interface SegmentsStorage {
   /**
    * Initializes storage
-   * @param storageConfig - Storage configuration
+   * @param coreConfig - Storage configuration
    * @param mainStreamConfig - Main stream configuration
    * @param secondaryStreamConfig - Secondary stream configuration
    */
   initialize(
-    storageConfig: CommonCoreConfig,
+    coreConfig: CommonCoreConfig,
     mainStreamConfig: StreamConfig,
     secondaryStreamConfig: StreamConfig,
   ): Promise<void>;
 
-  /** Returns true if storage is initialized */
-  isInitialized(): boolean;
+  /**
+   * Updates playback position
+   * @param position - Playback position
+   * @param rate - Playback rate
+   */
+  onPlaybackUpdated(position: number, rate: number): void;
 
   /**
-   * Sets callback to get current playback time
-   * @param getCurrentPlaybackTime - Callback to get current playback time
+   * Updates segment request information
+   * @param streamId - Stream identifier
+   * @param segmentId - Segment identifier
+   * @param startTime - Segment start time
+   * @param endTime - Segment end time
    */
-  setSegmentPlaybackCallback(getCurrentPlaybackTime: () => number): void;
-
-  /**
-   * Sets callback to get last requested segment duration
-   * @param getLastRequestedSegmentDuration - Callback to get last requested segment duration
-   */
-  setLastRequestedSegmentDurationCallback(
-    getLastRequestedSegmentDuration: () => {
-      startTime: number;
-      endTime: number;
-    },
+  onSegmentRequested(
+    streamId: string,
+    segmentId: number,
+    startTime: number,
+    endTime: number,
   ): void;
 
   /**
    *  Stores segment data
-   *
    * @param streamId - Stream identifier
    * @param segmentId - Segment identifier
    * @param data - Segment data
    * @param startTime - Segment start time
    * @param endTime - Segment end time
-   * @param streamType - stream type
+   * @param streamType - Stream type
    * @param isLiveStream - Is live stream
    */
   storeSegment(
@@ -50,7 +50,7 @@ export interface ISegmentsStorage {
     data: ArrayBuffer,
     startTime: number,
     endTime: number,
-    streamType: string,
+    streamType: StreamType,
     isLiveStream: boolean,
   ): Promise<void>;
 
@@ -72,10 +72,10 @@ export interface ISegmentsStorage {
   hasSegment(streamId: string, segmentId: number): boolean;
 
   /**
-   * Returns segment Ids of stream that are stored in storage
+   * Returns segment IDs of a stream that are stored in the storage
    * @param streamId - Stream identifier
    */
-  getStoredSegmentExternalIdsOfStream(streamId: string): number[];
+  getStoredSegmentIds(streamId: string): number[];
 
   /**
    * Function to subscribe on stream updates
