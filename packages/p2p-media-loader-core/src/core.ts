@@ -387,7 +387,11 @@ export class Core<TStream extends Stream = Stream> {
         this.segmentStorage instanceof
           this.commonCoreConfig.liveSegmentsStorage);
 
-    if (this.segmentStorage && isLive !== isStorageForLive) {
+    if (
+      this.segmentStorage &&
+      isStorageForLive !== undefined &&
+      isLive !== isStorageForLive
+    ) {
       this.segmentStorage.destroy();
       this.segmentStorage = undefined;
     }
