@@ -79,10 +79,9 @@ export class P2PLoaderIndexedDB {
   }
 
   closeDatabase(): void {
-    if (this.db) {
-      this.db.close();
-      this.db = null;
-    }
+    if (!this.db) return;
+    this.db.close();
+    this.db = null;
   }
 
   async deleteDatabase(): Promise<void> {

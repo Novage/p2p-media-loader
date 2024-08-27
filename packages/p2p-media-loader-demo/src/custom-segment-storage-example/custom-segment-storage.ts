@@ -1,6 +1,6 @@
 import {
   CommonCoreConfig,
-  ISegmentsStorage,
+  SegmentsStorage,
   StreamConfig,
 } from "p2p-media-loader-core";
 import { P2PLoaderIndexedDB } from "./p2ploader-db";
@@ -12,6 +12,18 @@ type StorageEventHandlers = {
 type SegmentDataItem = {
   storageId: string;
   data: ArrayBuffer;
+};
+
+type Playback = {
+  position: number;
+  rate: number;
+};
+
+type LastRequestedSegmentInfo = {
+  streamId: string;
+  segmentId: number;
+  startTime: number;
+  endTime: number;
 };
 
 type SegmentInfoItem = {
@@ -32,20 +44,15 @@ const DATA_ITEMS_STORE_NAME = "segmentData";
 const DB_NAME = "p2p-media-loader";
 const DB_VERSION = 1;
 
-export class CustomSegmentStorage implements ISegmentsStorage {
-  private initialized = false;
+export class CustomSegmentStorage implements SegmentsStorage {
   private storageSegmentsCount = 0;
   private storageConfig?: CommonCoreConfig;
   private mainStreamConfig?: StreamConfig;
   private secondaryStreamConfig?: StreamConfig;
-  private db?: IDBDatabase;
   private cacheMap = new Map<string, Map<number, SegmentInfoItem>>();
   private readonly eventTarget = new EventTarget<StorageEventHandlers>();
-  private getCurrentPlaybackTime?: () => number;
-  private getLastRequestedSegmentDuration?: () => {
-    startTime: number;
-    endTime: number;
-  };
+  private currentPlayback?: Playback;
+  private lastRequestedSegmentInfo?: LastRequestedSegmentInfo;
   private dbWrapper: P2PLoaderIndexedDB;
 
   constructor() {
@@ -57,6 +64,24 @@ export class CustomSegmentStorage implements ISegmentsStorage {
     );
   }
 
+  onPlaybackUpdated(position: number, rate: number): void {
+    this.currentPlayback = { position, rate };
+  }
+
+  onSegmentRequested(
+    streamId: string,
+    segmentId: number,
+    startTime: number,
+    endTime: number,
+  ): void {
+    this.lastRequestedSegmentInfo = {
+      streamId,
+      segmentId,
+      startTime,
+      endTime,
+    };
+  }
+
   async initialize(
     storageConfig: CommonCoreConfig,
     mainStreamConfig: StreamConfig,
@@ -66,20 +91,9 @@ export class CustomSegmentStorage implements ISegmentsStorage {
     this.mainStreamConfig = mainStreamConfig;
     this.secondaryStreamConfig = secondaryStreamConfig;
 
-    try {
-      // await this.dbWrapper.deleteDatabase();
-      await this.dbWrapper.openDatabase();
-      await this.loadCacheMap();
-
-      this.initialized = true;
-    } catch (error) {
-      this.initialized = false;
-      throw error;
-    }
-  }
-
-  isInitialized(): boolean {
-    return this.initialized;
+    // await this.dbWrapper.deleteDatabase();
+    await this.dbWrapper.openDatabase();
+    await this.loadCacheMap();
   }
 
   async storeSegment(
@@ -117,19 +131,6 @@ export class CustomSegmentStorage implements ISegmentsStorage {
     void this.clear(segmentInfoItem.streamId);
   }
 
-  setSegmentPlaybackCallback(getCurrentPlaybackTime: () => number) {
-    this.getCurrentPlaybackTime = getCurrentPlaybackTime;
-  }
-
-  setLastRequestedSegmentDurationCallback(
-    getLastRequestedSegmentDuration: () => {
-      startTime: number;
-      endTime: number;
-    },
-  ) {
-    this.getLastRequestedSegmentDuration = getLastRequestedSegmentDuration;
-  }
-
   async getSegmentData(
     streamId: string,
     segmentId: number,
@@ -148,7 +149,7 @@ export class CustomSegmentStorage implements ISegmentsStorage {
     return streamCache?.has(segmentId) ?? false;
   }
 
-  getStoredSegmentExternalIdsOfStream(streamId: string): number[] {
+  getStoredSegmentIds(streamId: string): number[] {
     const streamCache = this.cacheMap.get(streamId);
     if (!streamCache) return [];
 
@@ -167,12 +168,7 @@ export class CustomSegmentStorage implements ISegmentsStorage {
   }
 
   destroy() {
-    if (!this.db) {
-      throw new Error("Database is not initialized.");
-    }
-
-    this.db.close();
-    this.initialized = false;
+    this.dbWrapper.closeDatabase();
     this.cacheMap.clear();
   }
 
@@ -211,15 +207,14 @@ export class CustomSegmentStorage implements ISegmentsStorage {
       !this.storageConfig ||
       !this.mainStreamConfig ||
       !this.secondaryStreamConfig ||
-      !this.getCurrentPlaybackTime ||
-      !this.getLastRequestedSegmentDuration
+      !this.currentPlayback
     ) {
       return;
     }
     const cachedSegmentsCount = this.storageConfig.cachedSegmentsCount;
     if (this.storageSegmentsCount + 1 <= cachedSegmentsCount) return;
 
-    const currentPlayback = this.getCurrentPlaybackTime();
+    const currentPlaybackPosition = this.currentPlayback.position;
     const affectedStreams = new Set<string>();
     const segmentsStorageIdsToRemove: string[] = [];
 
@@ -240,7 +235,7 @@ export class CustomSegmentStorage implements ISegmentsStorage {
 
       const isPastThreshold =
         endTime <
-        currentPlayback -
+        currentPlaybackPosition -
           (httpDownloadTimeWindow - highDemandTimeWindow) * 1.05;
 
       if (isPastThreshold) {

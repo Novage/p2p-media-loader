@@ -31,7 +31,7 @@ export const HlsjsPlayer = ({
       p2p: {
         core: {
           announceTrackers,
-          customSegmentStorage: CustomSegmentStorage,
+          vodSegmentsStorage: CustomSegmentStorage,
         },
         onHlsJsCreated(hls) {
           subscribeToUiEvents({
