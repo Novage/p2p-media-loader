@@ -3,7 +3,7 @@ import {
   SegmentsStorage,
   StreamConfig,
 } from "p2p-media-loader-core";
-import { P2PLoaderIndexedDB } from "./p2ploader-db";
+import { P2PLoaderIndexedDB } from "./p2p-db";
 
 type StorageEventHandlers = {
   [key in `onStorageUpdated-${string}`]: () => void;
@@ -52,11 +52,11 @@ export class CustomSegmentStorage implements SegmentsStorage {
   private cacheMap = new Map<string, Map<number, SegmentInfoItem>>();
   private readonly eventTarget = new EventTarget<StorageEventHandlers>();
   private currentPlayback?: Playback;
-  private lastRequestedSegmentInfo?: LastRequestedSegmentInfo;
-  private dbWrapper: P2PLoaderIndexedDB;
+  private lastRequestedSegmentInfo?: LastRequestedSegmentInfo; // can be used to implement custom logic for clearing storage
+  private db: P2PLoaderIndexedDB;
 
   constructor() {
-    this.dbWrapper = new P2PLoaderIndexedDB(
+    this.db = new P2PLoaderIndexedDB(
       DB_NAME,
       DB_VERSION,
       INFO_ITEMS_STORE_NAME,
@@ -92,7 +92,7 @@ export class CustomSegmentStorage implements SegmentsStorage {
     this.secondaryStreamConfig = secondaryStreamConfig;
 
     // await this.dbWrapper.deleteDatabase();
-    await this.dbWrapper.openDatabase();
+    await this.db.openDatabase();
     await this.loadCacheMap();
   }
 
@@ -123,8 +123,8 @@ export class CustomSegmentStorage implements SegmentsStorage {
     this.updateCacheMap(segmentInfoItem);
 
     await Promise.all([
-      this.dbWrapper.put(DATA_ITEMS_STORE_NAME, segmentDataItem),
-      this.dbWrapper.put(INFO_ITEMS_STORE_NAME, segmentInfoItem),
+      this.db.put(DATA_ITEMS_STORE_NAME, segmentDataItem),
+      this.db.put(INFO_ITEMS_STORE_NAME, segmentInfoItem),
     ]);
 
     this.dispatchStorageUpdatedEvent(segmentInfoItem.streamId);
@@ -136,7 +136,7 @@ export class CustomSegmentStorage implements SegmentsStorage {
     segmentId: number,
   ): Promise<ArrayBuffer | undefined> {
     const segmentStorageId = getStorageItemId(streamId, segmentId);
-    const result = await this.dbWrapper.get<SegmentDataItem>(
+    const result = await this.db.get<SegmentDataItem>(
       DATA_ITEMS_STORE_NAME,
       segmentStorageId,
     );
@@ -168,7 +168,7 @@ export class CustomSegmentStorage implements SegmentsStorage {
   }
 
   destroy() {
-    this.dbWrapper.closeDatabase();
+    this.db.closeDatabase();
     this.cacheMap.clear();
   }
 
@@ -177,9 +177,7 @@ export class CustomSegmentStorage implements SegmentsStorage {
   }
 
   private async loadCacheMap() {
-    const result = await this.dbWrapper.getAll<SegmentInfoItem>(
-      INFO_ITEMS_STORE_NAME,
-    );
+    const result = await this.db.getAll<SegmentInfoItem>(INFO_ITEMS_STORE_NAME);
 
     result.forEach((item) => {
       if (!this.cacheMap.has(item.streamId)) {
@@ -273,8 +271,8 @@ export class CustomSegmentStorage implements SegmentsStorage {
     segmentsStorageIds: string[],
   ): Promise<void> {
     const promises = segmentsStorageIds.flatMap((storageId) => [
-      this.dbWrapper.delete(DATA_ITEMS_STORE_NAME, storageId),
-      this.dbWrapper.delete(INFO_ITEMS_STORE_NAME, storageId),
+      this.db.delete(DATA_ITEMS_STORE_NAME, storageId),
+      this.db.delete(INFO_ITEMS_STORE_NAME, storageId),
     ]);
     await Promise.all(promises);
   }
