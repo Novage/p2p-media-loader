@@ -282,7 +282,7 @@ export class CustomSegmentStorage implements SegmentsStorage {
     configKey: "highDemandTimeWindow" | "httpDownloadTimeWindow",
   ): number {
     if (!this.mainStreamConfig || !this.secondaryStreamConfig) {
-      return 0;
+      throw new Error("Stream config is not initialized");
     }
 
     const config =
