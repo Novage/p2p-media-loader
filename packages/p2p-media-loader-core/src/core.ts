@@ -401,6 +401,10 @@ export class Core<TStream extends Stream = Stream> {
         ? this.commonCoreConfig.liveSegmentsStorage
         : this.commonCoreConfig.vodSegmentsStorage;
 
+      if (createCustomStorage && typeof createCustomStorage !== "function") {
+        throw new Error("Storage configuration is invalid");
+      }
+
       const segmentStorage = createCustomStorage
         ? createCustomStorage(isLive)
         : new SegmentsMemoryStorage();
