@@ -71,8 +71,8 @@ export class P2PLoadersContainer {
         this._currentLoaderItem.stream,
       );
       const ids = this.segmentStorage.getStoredSegmentIds(
-        swarmId,
         streamSwarmId,
+        swarmId,
       );
       if (!ids.length) this.destroyAndRemoveLoader(this._currentLoaderItem);
       else this.setLoaderDestroyTimeout(this._currentLoaderItem);

@@ -90,14 +90,11 @@ export class P2PLoader {
 
   private getSegmentsAnnouncement() {
     const swarmId = this.config.swarmId ?? this.streamManifestUrl;
-    const streamSwarmId = StreamUtils.getStreamSwarmId(
-      this.config.swarmId ?? this.streamManifestUrl,
-      this.stream,
-    );
+    const streamSwarmId = StreamUtils.getStreamSwarmId(swarmId, this.stream);
 
     const loaded: number[] = this.segmentStorage.getStoredSegmentIds(
-      swarmId,
       streamSwarmId,
+      swarmId,
     );
     const httpLoading: number[] = [];
 

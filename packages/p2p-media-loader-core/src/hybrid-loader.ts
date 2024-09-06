@@ -101,19 +101,20 @@ export class HybridLoader {
       this.p2pLoaders.changeCurrentLoader(stream);
     }
     this.lastRequestedSegment = segment;
+
+    const swarmId = this.config.swarmId ?? this.streamManifestUrl;
+    const streamSwarmId = StreamUtils.getStreamSwarmId(swarmId, stream);
+
     this.segmentStorage.onSegmentRequested(
-      stream.runtimeId,
+      streamSwarmId,
       segment.externalId,
       segment.startTime,
       segment.endTime,
-      this.config.swarmId ?? this.streamManifestUrl,
+      swarmId,
       stream.type,
       this.streamDetails.isLive,
     );
     const engineRequest = new EngineRequest(segment, callbacks);
-
-    const swarmId = this.config.swarmId ?? this.streamManifestUrl;
-    const streamSwarmId = StreamUtils.getStreamSwarmId(swarmId, stream);
 
     try {
       if (

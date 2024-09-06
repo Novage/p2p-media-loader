@@ -108,11 +108,7 @@ export class SegmentsMemoryStorage implements SegmentsStorage {
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
-  async getSegmentData(
-    streamId: string,
-    segmentId: number,
-    _swarmId: string,
-  ): Promise<ArrayBuffer | undefined> {
+  async getSegmentData(streamId: string, segmentId: number, _swarmId: string) {
     const segmentStorageId = getStorageItemId(streamId, segmentId);
     const dataItem = this.cache.get(segmentStorageId);
 
@@ -121,18 +117,18 @@ export class SegmentsMemoryStorage implements SegmentsStorage {
     return dataItem.data;
   }
 
-  hasSegment(streamId: string, externalId: number, _swarmId: string): boolean {
+  hasSegment(streamId: string, externalId: number, _swarmId: string) {
     const segmentStorageId = getStorageItemId(streamId, externalId);
     const segment = this.cache.get(segmentStorageId);
 
     return segment !== undefined;
   }
 
-  getStoredSegmentIds(streamSwarm: string) {
+  getStoredSegmentIds(streamId: string, _swarmId: string) {
     const externalIds: number[] = [];
 
-    for (const { segmentId, streamId } of this.cache.values()) {
-      if (streamId !== streamSwarm) continue;
+    for (const { segmentId, streamId: streamCacheId } of this.cache.values()) {
+      if (streamCacheId !== streamId) continue;
       externalIds.push(segmentId);
     }
 
@@ -140,7 +136,7 @@ export class SegmentsMemoryStorage implements SegmentsStorage {
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
-  private async clear(isLiveStream: boolean): Promise<boolean> {
+  private async clear(isLiveStream: boolean) {
     if (
       !this.currentPlayback ||
       !this.mainStreamConfig ||
