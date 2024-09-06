@@ -397,11 +397,13 @@ export class Core<TStream extends Stream = Stream> {
     }
 
     if (!this.segmentStorage) {
-      const storageClass = isLive
-        ? (this.commonCoreConfig.liveSegmentsStorage ?? SegmentsMemoryStorage)
-        : (this.commonCoreConfig.vodSegmentsStorage ?? SegmentsMemoryStorage);
+      const createCustomStorage = isLive
+        ? this.commonCoreConfig.liveSegmentsStorage
+        : this.commonCoreConfig.vodSegmentsStorage;
 
-      const segmentStorage = new storageClass();
+      const segmentStorage = createCustomStorage
+        ? createCustomStorage(isLive)
+        : new SegmentsMemoryStorage();
 
       await segmentStorage.initialize(
         this.commonCoreConfig,

@@ -3,7 +3,7 @@ import { CommonCoreConfig, StreamConfig, StreamType } from "../types.js";
 export interface SegmentsStorage {
   /**
    * Initializes storage
-   * @param coreConfig - Storage configuration
+   * @param coreConfig - Core configuration with storage options
    * @param mainStreamConfig - Main stream configuration
    * @param secondaryStreamConfig - Secondary stream configuration
    */
@@ -14,33 +14,40 @@ export interface SegmentsStorage {
   ): Promise<void>;
 
   /**
-   * Updates playback position
+   * Provides playback position from player
    * @param position - Playback position
    * @param rate - Playback rate
    */
   onPlaybackUpdated(position: number, rate: number): void;
 
   /**
-   * Updates segment request information
+   * Provides segment request information from player
    * @param streamId - Stream identifier
    * @param segmentId - Segment identifier
    * @param startTime - Segment start time
    * @param endTime - Segment end time
+   * @param swarmId - Swarm identifier
+   * @param streamType - Stream type
+   * @param isLiveStream - Is live stream
    */
   onSegmentRequested(
     streamId: string,
     segmentId: number,
     startTime: number,
     endTime: number,
+    swarmId: string,
+    streamType: StreamType,
+    isLiveStream: boolean,
   ): void;
 
   /**
-   *  Stores segment data
+   * Stores segment data
    * @param streamId - Stream identifier
    * @param segmentId - Segment identifier
    * @param data - Segment data
    * @param startTime - Segment start time
    * @param endTime - Segment end time
+   * @param swarmId - Swarm identifier
    * @param streamType - Stream type
    * @param isLiveStream - Is live stream
    */
@@ -50,6 +57,7 @@ export interface SegmentsStorage {
     data: ArrayBuffer,
     startTime: number,
     endTime: number,
+    swarmId: string,
     streamType: StreamType,
     isLiveStream: boolean,
   ): Promise<void>;
@@ -58,24 +66,28 @@ export interface SegmentsStorage {
    * Returns segment data
    * @param streamId - Stream identifier
    * @param segmentId - Segment identifier
+   * @param swarmId - Swarm identifier
    */
   getSegmentData(
     streamId: string,
     segmentId: number,
+    swarmId: string,
   ): Promise<ArrayBuffer | undefined>;
 
   /**
    * Returns true if segment is in storage
    * @param streamId - Stream identifier
    * @param segmentId - Segment identifier
+   * @param swarmId - Swarm identifier
    */
-  hasSegment(streamId: string, segmentId: number): boolean;
+  hasSegment(streamId: string, segmentId: number, swarmId: string): boolean;
 
   /**
    * Returns segment IDs of a stream that are stored in the storage
    * @param streamId - Stream identifier
+   * @param swarmId - Swarm identifier
    */
-  getStoredSegmentIds(streamId: string): number[];
+  getStoredSegmentIds(streamId: string, swarmId: string): number[];
 
   /**
    * Function to subscribe on stream updates

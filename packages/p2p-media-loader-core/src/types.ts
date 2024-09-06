@@ -134,7 +134,7 @@ export type CommonCoreConfig = {
    * vodSegmentsStorage: undefined
    * ```
    */
-  vodSegmentsStorage?: new () => SegmentsStorage;
+  vodSegmentsStorage?: (isLive: boolean) => SegmentsStorage;
 
   /**
    * Custom storage class for live segments.
@@ -144,7 +144,7 @@ export type CommonCoreConfig = {
    * liveSegmentsStorage: undefined
    * ```
    */
-  liveSegmentsStorage?: new () => SegmentsStorage;
+  liveSegmentsStorage?: (isLive: boolean) => SegmentsStorage;
 };
 
 /**

@@ -89,13 +89,16 @@ export class P2PLoader {
   }
 
   private getSegmentsAnnouncement() {
+    const swarmId = this.config.swarmId ?? this.streamManifestUrl;
     const streamSwarmId = StreamUtils.getStreamSwarmId(
       this.config.swarmId ?? this.streamManifestUrl,
       this.stream,
     );
 
-    const loaded: number[] =
-      this.segmentStorage.getStoredSegmentIds(streamSwarmId);
+    const loaded: number[] = this.segmentStorage.getStoredSegmentIds(
+      swarmId,
+      streamSwarmId,
+    );
     const httpLoading: number[] = [];
 
     for (const request of this.requests.httpRequests()) {
@@ -137,14 +140,13 @@ export class P2PLoader {
     );
     if (!segment) return;
 
-    const streamSwarmId = StreamUtils.getStreamSwarmId(
-      this.config.swarmId ?? this.streamManifestUrl,
-      this.stream,
-    );
+    const swarmId = this.config.swarmId ?? this.streamManifestUrl;
+    const streamSwarmId = StreamUtils.getStreamSwarmId(swarmId, this.stream);
 
     const segmentData = await this.segmentStorage.getSegmentData(
       streamSwarmId,
       segmentExternalId,
+      swarmId,
     );
     if (!segmentData) {
       peer.sendSegmentAbsentCommand(segmentExternalId, requestId);

@@ -106,25 +106,33 @@ export class HybridLoader {
       segment.externalId,
       segment.startTime,
       segment.endTime,
+      this.config.swarmId ?? this.streamManifestUrl,
+      stream.type,
+      this.streamDetails.isLive,
     );
     const engineRequest = new EngineRequest(segment, callbacks);
 
-    const streamSwarmId = StreamUtils.getStreamSwarmId(
-      this.config.swarmId ?? this.streamManifestUrl,
-      stream,
-    );
+    const swarmId = this.config.swarmId ?? this.streamManifestUrl;
+    const streamSwarmId = StreamUtils.getStreamSwarmId(swarmId, stream);
 
     try {
-      if (this.segmentStorage.hasSegment(streamSwarmId, segment.externalId)) {
+      if (
+        this.segmentStorage.hasSegment(
+          streamSwarmId,
+          segment.externalId,
+          swarmId,
+        )
+      ) {
         const data = await this.segmentStorage.getSegmentData(
           streamSwarmId,
           segment.externalId,
+          swarmId,
         );
         if (data) {
           const { queueDownloadRatio } = this.generateQueue();
           engineRequest.resolve(data, this.getBandwidth(queueDownloadRatio));
         }
-      } else {
+
         this.engineRequest = engineRequest;
       }
     } catch {
@@ -197,10 +205,8 @@ export class HybridLoader {
           }
           this.requests.remove(request);
 
-          const streamSwarmId = StreamUtils.getStreamSwarmId(
-            this.config.swarmId ?? this.streamManifestUrl,
-            stream,
-          );
+          const swarmId = this.config.swarmId ?? this.streamManifestUrl;
+          const streamSwarmId = StreamUtils.getStreamSwarmId(swarmId, stream);
 
           void this.segmentStorage.storeSegment(
             streamSwarmId,
@@ -208,6 +214,7 @@ export class HybridLoader {
             request.data,
             segment.startTime,
             segment.endTime,
+            swarmId,
             segment.stream.type,
             this.streamDetails.isLive,
           );
@@ -388,15 +395,20 @@ export class HybridLoader {
       this.config,
       this.p2pLoaders.currentLoader,
     )) {
+      const swarmId = this.config.swarmId ?? this.streamManifestUrl;
       const streamSwarmId = StreamUtils.getStreamSwarmId(
-        this.config.swarmId ?? this.streamManifestUrl,
+        swarmId,
         segment.stream,
       );
 
       if (
         !statuses.isHttpDownloadable ||
         statuses.isP2PDownloadable ||
-        this.segmentStorage.hasSegment(streamSwarmId, segment.externalId)
+        this.segmentStorage.hasSegment(
+          streamSwarmId,
+          segment.externalId,
+          swarmId,
+        )
       ) {
         continue;
       }
@@ -490,13 +502,18 @@ export class HybridLoader {
       maxPossibleLength++;
       const { segment } = item;
 
+      const swarmId = this.config.swarmId ?? this.streamManifestUrl;
       const streamSwarmId = StreamUtils.getStreamSwarmId(
-        this.config.swarmId ?? this.streamManifestUrl,
+        swarmId,
         segment.stream,
       );
 
       if (
-        this.segmentStorage.hasSegment(streamSwarmId, segment.externalId) ||
+        this.segmentStorage.hasSegment(
+          streamSwarmId,
+          segment.externalId,
+          swarmId,
+        ) ||
         this.requests.get(segment)?.status === "succeed"
       ) {
         alreadyLoadedCount++;

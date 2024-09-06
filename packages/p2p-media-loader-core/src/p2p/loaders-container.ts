@@ -65,11 +65,15 @@ export class P2PLoadersContainer {
   changeCurrentLoader(stream: StreamWithSegments) {
     const loaderItem = this.loaders.get(stream.runtimeId);
     if (this._currentLoaderItem) {
+      const swarmId = this.config.swarmId ?? this.streamManifestUrl;
       const streamSwarmId = StreamUtils.getStreamSwarmId(
-        this.config.swarmId ?? this.streamManifestUrl,
+        swarmId,
         this._currentLoaderItem.stream,
       );
-      const ids = this.segmentStorage.getStoredSegmentIds(streamSwarmId);
+      const ids = this.segmentStorage.getStoredSegmentIds(
+        swarmId,
+        streamSwarmId,
+      );
       if (!ids.length) this.destroyAndRemoveLoader(this._currentLoaderItem);
       else this.setLoaderDestroyTimeout(this._currentLoaderItem);
     }

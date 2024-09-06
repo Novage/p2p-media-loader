@@ -1,4 +1,4 @@
-import { CommonCoreConfig, StreamConfig } from "../types.js";
+import { CommonCoreConfig, StreamConfig, StreamType } from "../types.js";
 import debug from "debug";
 import { EventTarget } from "../utils/event-target.js";
 import { SegmentsStorage } from "./index.js";
@@ -69,6 +69,9 @@ export class SegmentsMemoryStorage implements SegmentsStorage {
     segmentId: number,
     startTime: number,
     endTime: number,
+    _swarmId: string,
+    _streamType: StreamType,
+    _isLiveStream: boolean,
   ): void {
     this.lastRequestedSegment = {
       streamId,
@@ -85,7 +88,8 @@ export class SegmentsMemoryStorage implements SegmentsStorage {
     data: ArrayBuffer,
     startTime: number,
     endTime: number,
-    streamType: string,
+    _swarmId: string,
+    streamType: StreamType,
     isLiveStream: boolean,
   ) {
     const storageId = getStorageItemId(streamId, segmentId);
@@ -107,6 +111,7 @@ export class SegmentsMemoryStorage implements SegmentsStorage {
   async getSegmentData(
     streamId: string,
     segmentId: number,
+    _swarmId: string,
   ): Promise<ArrayBuffer | undefined> {
     const segmentStorageId = getStorageItemId(streamId, segmentId);
     const dataItem = this.cache.get(segmentStorageId);
@@ -116,7 +121,7 @@ export class SegmentsMemoryStorage implements SegmentsStorage {
     return dataItem.data;
   }
 
-  hasSegment(streamId: string, externalId: number): boolean {
+  hasSegment(streamId: string, externalId: number, _swarmId: string): boolean {
     const segmentStorageId = getStorageItemId(streamId, externalId);
     const segment = this.cache.get(segmentStorageId);
 
