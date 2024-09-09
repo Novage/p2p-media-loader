@@ -1,6 +1,6 @@
 import { CommonCoreConfig, StreamConfig, StreamType } from "../types.js";
 /** Segments storage interface */
-export interface SegmentsStorage {
+export interface SegmentStorage {
   /**
    * Initializes storage
    * @param coreConfig - Core configuration with storage options

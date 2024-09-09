@@ -15,7 +15,7 @@ import {
 import { BandwidthCalculators, StreamDetails } from "./internal-types.js";
 import * as StreamUtils from "./utils/stream.js";
 import { BandwidthCalculator } from "./bandwidth-calculator.js";
-import { SegmentsMemoryStorage } from "./segments-storage/segments-memory-storage.js";
+import { SegmentMemoryStorage } from "./segment-storage/segment-memory-storage.js";
 import { EventTarget } from "./utils/event-target.js";
 import {
   overrideConfig,
@@ -24,15 +24,14 @@ import {
   filterUndefinedProps,
 } from "./utils/utils.js";
 import { TRACKER_CLIENT_VERSION_PREFIX } from "./utils/peer.js";
-import { SegmentsStorage } from "./segments-storage/index.js";
+import { SegmentStorage } from "./segment-storage/index.js";
 
 /** Core class for managing media streams loading via P2P. */
 export class Core<TStream extends Stream = Stream> {
   /** Default configuration for common core settings. */
   static readonly DEFAULT_COMMON_CORE_CONFIG: CommonCoreConfig = {
     cachedSegmentsCount: 0,
-    vodSegmentsStorage: undefined,
-    liveSegmentsStorage: undefined,
+    customStorageFactory: undefined,
   };
 
   /** Default configuration for stream settings. */
@@ -76,7 +75,7 @@ export class Core<TStream extends Stream = Stream> {
     all: new BandwidthCalculator(),
     http: new BandwidthCalculator(),
   };
-  private segmentStorage?: SegmentsStorage;
+  private segmentStorage?: SegmentStorage;
   private mainStreamLoader?: HybridLoader;
   private secondaryStreamLoader?: HybridLoader;
   private streamDetails: StreamDetails = {
@@ -380,43 +379,26 @@ export class Core<TStream extends Stream = Stream> {
   }
 
   private async initializeSegmentStorage() {
+    if (this.segmentStorage) return;
+
     const isLive = this.streamDetails.isLive;
-    const isStorageForLive =
-      this.segmentStorage instanceof SegmentsMemoryStorage ||
-      (this.commonCoreConfig.liveSegmentsStorage &&
-        this.segmentStorage instanceof
-          this.commonCoreConfig.liveSegmentsStorage);
+    const createCustomStorage = this.commonCoreConfig.customStorageFactory;
 
-    if (
-      this.segmentStorage &&
-      isStorageForLive !== undefined &&
-      isLive !== isStorageForLive
-    ) {
-      this.segmentStorage.destroy();
-      this.segmentStorage = undefined;
+    if (createCustomStorage && typeof createCustomStorage !== "function") {
+      throw new Error("Storage configuration is invalid");
     }
 
-    if (!this.segmentStorage) {
-      const createCustomStorage = isLive
-        ? this.commonCoreConfig.liveSegmentsStorage
-        : this.commonCoreConfig.vodSegmentsStorage;
+    const segmentStorage = createCustomStorage
+      ? createCustomStorage(isLive)
+      : new SegmentMemoryStorage();
 
-      if (createCustomStorage && typeof createCustomStorage !== "function") {
-        throw new Error("Storage configuration is invalid");
-      }
+    await segmentStorage.initialize(
+      this.commonCoreConfig,
+      this.mainStreamConfig,
+      this.secondaryStreamConfig,
+    );
 
-      const segmentStorage = createCustomStorage
-        ? createCustomStorage(isLive)
-        : new SegmentsMemoryStorage();
-
-      await segmentStorage.initialize(
-        this.commonCoreConfig,
-        this.mainStreamConfig,
-        this.secondaryStreamConfig,
-      );
-
-      this.segmentStorage = segmentStorage;
-    }
+    this.segmentStorage = segmentStorage;
   }
 
   private identifySegment(segmentRuntimeId: string): SegmentWithStream {

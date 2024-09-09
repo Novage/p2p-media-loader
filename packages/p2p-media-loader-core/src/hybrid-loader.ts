@@ -21,7 +21,7 @@ import * as Utils from "./utils/utils.js";
 import debug from "debug";
 import { QueueItem } from "./utils/queue.js";
 import { EventTarget } from "./utils/event-target.js";
-import { SegmentsStorage } from "./segments-storage/index.js";
+import { SegmentStorage } from "./segment-storage/index.js";
 
 const FAILED_ATTEMPTS_CLEAR_INTERVAL = 60000;
 const PEER_UPDATE_LATENCY = 1000;
@@ -45,7 +45,7 @@ export class HybridLoader {
     private readonly streamDetails: Required<Readonly<StreamDetails>>,
     private readonly config: StreamConfig,
     private readonly bandwidthCalculators: BandwidthCalculators,
-    private readonly segmentStorage: SegmentsStorage,
+    private readonly segmentStorage: SegmentStorage,
     private readonly eventTarget: EventTarget<CoreEventMap>,
   ) {
     const activeStream = this.lastRequestedSegment.stream;

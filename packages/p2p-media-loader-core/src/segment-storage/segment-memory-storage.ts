@@ -1,7 +1,7 @@
 import { CommonCoreConfig, StreamConfig, StreamType } from "../types.js";
 import debug from "debug";
 import { EventTarget } from "../utils/event-target.js";
-import { SegmentsStorage } from "./index.js";
+import { SegmentStorage } from "./index.js";
 
 type SegmentDataItem = {
   segmentId: number;
@@ -32,7 +32,7 @@ function getStorageItemId(streamId: string, segmentId: number) {
   return `${streamId}|${segmentId}`;
 }
 
-export class SegmentsMemoryStorage implements SegmentsStorage {
+export class SegmentMemoryStorage implements SegmentStorage {
   private cache = new Map<string, SegmentDataItem>();
   private readonly logger: debug.Debugger;
   private readonly eventTarget = new EventTarget<StorageEventHandlers>();
