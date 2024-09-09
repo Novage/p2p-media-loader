@@ -5,7 +5,7 @@ import {
   Stream,
   StreamConfig,
   StreamWithSegments,
-  SegmentsStorage,
+  SegmentStorage,
 } from "../index.js";
 import { RequestsContainer } from "../requests/request-container.js";
 import * as LoggerUtils from "../utils/logger.js";
@@ -28,7 +28,7 @@ export class P2PLoadersContainer {
     private readonly streamManifestUrl: string,
     stream: StreamWithSegments,
     private readonly requests: RequestsContainer,
-    private readonly segmentStorage: SegmentsStorage,
+    private readonly segmentStorage: SegmentStorage,
     private readonly config: StreamConfig,
     private readonly eventTarget: EventTarget<CoreEventMap>,
     private onSegmentAnnouncement: () => void,
