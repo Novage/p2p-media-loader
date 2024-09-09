@@ -1,6 +1,5 @@
 import { CommonCoreConfig, StreamConfig, StreamType } from "../types.js";
 import debug from "debug";
-import { EventTarget } from "../utils/event-target.js";
 import { SegmentStorage } from "./index.js";
 
 type SegmentDataItem = {
@@ -24,10 +23,6 @@ type LastRequestedSegmentInfo = {
   endTime: number;
 };
 
-type StorageEventHandlers = {
-  [key in `onStorageUpdated-${string}`]: () => void;
-};
-
 function getStorageItemId(streamId: string, segmentId: number) {
   return `${streamId}|${segmentId}`;
 }
@@ -35,12 +30,12 @@ function getStorageItemId(streamId: string, segmentId: number) {
 export class SegmentMemoryStorage implements SegmentStorage {
   private cache = new Map<string, SegmentDataItem>();
   private readonly logger: debug.Debugger;
-  private readonly eventTarget = new EventTarget<StorageEventHandlers>();
   private storageConfig?: CommonCoreConfig;
   private mainStreamConfig?: StreamConfig;
   private secondaryStreamConfig?: StreamConfig;
   private currentPlayback?: Playback;
   private lastRequestedSegment?: LastRequestedSegmentInfo;
+  private dispatchStorageUpdatedEvent?: (streamId: string) => void;
 
   constructor() {
     this.logger = debug("p2pml-core:segment-memory-storage");
@@ -103,6 +98,11 @@ export class SegmentMemoryStorage implements SegmentStorage {
     });
 
     this.logger(`add segment: ${segmentId} to ${streamId}`);
+
+    if (!this.dispatchStorageUpdatedEvent) {
+      throw new Error("dispatchStorageUpdatedEvent is not set");
+    }
+
     this.dispatchStorageUpdatedEvent(streamId);
     void this.clear(isLiveStream);
   }
@@ -186,28 +186,19 @@ export class SegmentMemoryStorage implements SegmentStorage {
       }
     }
 
-    affectedStreams.forEach((stream) =>
-      this.dispatchStorageUpdatedEvent(stream),
-    );
+    affectedStreams.forEach((stream) => {
+      if (!this.dispatchStorageUpdatedEvent) {
+        throw new Error("dispatchStorageUpdatedEvent is not set");
+      }
+
+      this.dispatchStorageUpdatedEvent(stream);
+    });
 
     return affectedStreams.size > 0;
   }
 
-  subscribeOnUpdate(
-    streamId: string,
-    listener: StorageEventHandlers["onStorageUpdated-"],
-  ) {
-    this.eventTarget.addEventListener(`onStorageUpdated-${streamId}`, listener);
-  }
-
-  unsubscribeFromUpdate(
-    streamId: string,
-    listener: StorageEventHandlers["onStorageUpdated-"],
-  ) {
-    this.eventTarget.removeEventListener(
-      `onStorageUpdated-${streamId}`,
-      listener,
-    );
+  setUpdateEventDispatcher(eventDispatcher: (streamId: string) => void) {
+    this.dispatchStorageUpdatedEvent = eventDispatcher;
   }
 
   private getStorageMaxCacheCount() {
@@ -239,10 +230,6 @@ export class SegmentMemoryStorage implements SegmentStorage {
     return isCachedSegmentCountValid
       ? cachedSegmentsCount
       : segmentsInTimeWindow;
-  }
-
-  private dispatchStorageUpdatedEvent(streamId: string) {
-    this.eventTarget.dispatchEvent(`onStorageUpdated-${streamId}`);
   }
 
   private getStreamTimeWindow(

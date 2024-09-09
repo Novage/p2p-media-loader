@@ -117,13 +117,13 @@ export class HybridLoader {
     const engineRequest = new EngineRequest(segment, callbacks);
 
     try {
-      if (
-        this.segmentStorage.hasSegment(
-          streamSwarmId,
-          segment.externalId,
-          swarmId,
-        )
-      ) {
+      const hasSegment = this.segmentStorage.hasSegment(
+        streamSwarmId,
+        segment.externalId,
+        swarmId,
+      );
+
+      if (hasSegment) {
         const data = await this.segmentStorage.getSegmentData(
           streamSwarmId,
           segment.externalId,
@@ -132,10 +132,11 @@ export class HybridLoader {
         if (data) {
           const { queueDownloadRatio } = this.generateQueue();
           engineRequest.resolve(data, this.getBandwidth(queueDownloadRatio));
+          return;
         }
-
-        this.engineRequest = engineRequest;
       }
+
+      this.engineRequest = engineRequest;
     } catch {
       engineRequest.reject();
     } finally {

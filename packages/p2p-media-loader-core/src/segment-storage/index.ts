@@ -90,18 +90,10 @@ export interface SegmentStorage {
   getStoredSegmentIds(streamId: string, swarmId: string): number[];
 
   /**
-   * Function to subscribe on stream updates
-   * @param streamId - Stream identifier
-   * @param listener - Listener
+   * Sets event dispatcher for storage update
+   * @param eventDispatcher - Event dispatcher
    */
-  subscribeOnUpdate(streamId: string, listener: () => void): void;
-
-  /**
-   * Function to unsubscribe from stream updates
-   * @param streamId - Stream identifier
-   * @param listener - Listener
-   */
-  unsubscribeFromUpdate(streamId: string, listener: () => void): void;
+  setUpdateEventDispatcher(eventDispatcher: (streamId: string) => void): void;
 
   /**
    * Function to destroy storage
