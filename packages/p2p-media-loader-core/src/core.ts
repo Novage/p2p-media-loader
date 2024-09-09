@@ -31,7 +31,7 @@ export class Core<TStream extends Stream = Stream> {
   /** Default configuration for common core settings. */
   static readonly DEFAULT_COMMON_CORE_CONFIG: CommonCoreConfig = {
     cachedSegmentsCount: 0,
-    customStorageFactory: undefined,
+    customSegmentStorageFactory: undefined,
   };
 
   /** Default configuration for stream settings. */
@@ -382,7 +382,8 @@ export class Core<TStream extends Stream = Stream> {
     if (this.segmentStorage) return;
 
     const isLive = this.streamDetails.isLive;
-    const createCustomStorage = this.commonCoreConfig.customStorageFactory;
+    const createCustomStorage =
+      this.commonCoreConfig.customSegmentStorageFactory;
 
     if (createCustomStorage && typeof createCustomStorage !== "function") {
       throw new Error("Storage configuration is invalid");

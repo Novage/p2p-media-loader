@@ -131,10 +131,10 @@ export type CommonCoreConfig = {
    *
    * @default
    * ```typescript
-   * customStorageFactory: undefined
+   * customSegmentStorageFactory: undefined
    * ```
    */
-  customStorageFactory?: (isLive: boolean) => SegmentStorage;
+  customSegmentStorageFactory?: (isLive: boolean) => SegmentStorage;
 };
 
 /**
