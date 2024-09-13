@@ -119,10 +119,10 @@ export type CommonCoreConfig = {
    *
    * @default
    * ```typescript
-   * segmentsMemoryStorageLimit: 1000
+   * segmentsMemoryStorageLimit: undefined
    * ```
    */
-  segmentsMemoryStorageLimit: number;
+  segmentsMemoryStorageLimit: number | undefined;
 
   /**
    * Optional custom storage factory for the segments storage.
