@@ -23,34 +23,28 @@ type LastRequestedSegmentInfo = {
   endTime: number;
 };
 
-function getStorageItemId(streamId: string, segmentId: number) {
-  return `${streamId}|${segmentId}`;
-}
+const getStorageItemId = (streamId: string, segmentId: number) =>
+  `${streamId}|${segmentId}`;
 
-function isAndroid(ua: string) {
-  return /Android/i.test(ua);
-}
+const isAndroid = (ua: string) => /Android/i.test(ua);
 
-function isIPadOrIPhone(ua: string) {
-  return /iPad|iPhone/i.test(ua);
-}
+const isIPadOrIPhone = (ua: string) => /iPad|iPhone/i.test(ua);
 
-function isWkWebviewOnIPadOrIPhone(ua: string) {
-  return /\b(iPad|iPhone).*AppleWebKit(?!.*Safari)/i.test(ua);
-}
+const isWkWebviewOnIPadOrIPhone = (ua: string) =>
+  /\b(iPad|iPhone).*AppleWebKit(?!.*Safari)/i.test(ua);
 
-function isAndroidWebview(ua: string) {
-  return /Android/i.test(ua) && !/Chrome|Firefox/i.test(ua);
-}
+const isAndroidWebview = (ua: string) =>
+  /Android/i.test(ua) && !/Chrome|Firefox/i.test(ua);
 
 const firstNonEmpty = (...arrays: string[][]) =>
   arrays.find((arr) => arr.length > 0) ?? [];
+
+const BYTES_PER_MB = 1048576;
 
 export class SegmentMemoryStorage implements SegmentStorage {
   private readonly userAgent = navigator.userAgent;
   private segmentsMemoryStorageLimit = 4000;
   private currentMemoryStorageSize = 0;
-  private lastStoredSegmentSize = 0;
 
   private cache = new Map<string, SegmentDataItem>();
   private readonly logger: debug.Debugger;
@@ -112,8 +106,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
     streamType: StreamType,
     isLiveStream: boolean,
   ) {
-    const segmentDataInMB = data.byteLength / 1048576;
-    void this.clear(isLiveStream, segmentDataInMB);
+    void this.clear(isLiveStream, data.byteLength);
 
     const storageId = getStorageItemId(streamId, segmentId);
     this.cache.set(storageId, {
@@ -124,8 +117,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
       endTime,
       streamType,
     });
-
-    this.currentMemoryStorageSize += segmentDataInMB;
+    this.updateMemoryStorageSize(data.byteLength, true);
 
     this.logger(`add segment: ${segmentId} to ${streamId}`);
 
@@ -165,7 +157,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
-  private async clear(isLiveStream: boolean, segmentDataInMB: number) {
+  private async clear(isLiveStream: boolean, segmentByteLength: number) {
     if (
       !this.currentPlayback ||
       !this.mainStreamConfig ||
@@ -176,26 +168,13 @@ export class SegmentMemoryStorage implements SegmentStorage {
     }
 
     const isMemoryLimitReached =
-      this.currentMemoryStorageSize + segmentDataInMB >=
+      this.currentMemoryStorageSize + segmentByteLength / BYTES_PER_MB >
       this.segmentsMemoryStorageLimit;
 
-    if (!isMemoryLimitReached) return;
+    if (!isMemoryLimitReached && !isLiveStream) return;
 
-    const affectedStreams = new Set<string>();
     const segmentsToRemove = this.findSegmentsToRemove(isLiveStream);
-
-    for (const segmentId of segmentsToRemove) {
-      const segmentData = this.cache.get(segmentId);
-      if (!segmentData) continue;
-
-      this.cache.delete(segmentId);
-      this.currentMemoryStorageSize -= segmentData.data.byteLength / 1048576;
-      this.logger(
-        `remove segment: ${segmentData.segmentId} from ${segmentData.streamId}`,
-      );
-
-      affectedStreams.add(segmentData.streamId);
-    }
+    const affectedStreams = this.removeSegmentsFromCache(segmentsToRemove);
 
     this.sendUpdatesToAffectedStreams(affectedStreams);
   }
@@ -212,6 +191,39 @@ export class SegmentMemoryStorage implements SegmentStorage {
 
       this.dispatchStorageUpdatedEvent(stream);
     });
+  }
+
+  private removeSegmentsFromCache(segmentsToRemove: string[]) {
+    const affectedStreams = new Set<string>();
+
+    for (const segmentId of segmentsToRemove) {
+      const segmentData = this.cache.get(segmentId);
+      if (!segmentData) continue;
+
+      this.cache.delete(segmentId);
+      this.updateMemoryStorageSize(segmentData.data.byteLength);
+
+      this.logger(
+        `remove segment: ${segmentData.segmentId} from ${segmentData.streamId}`,
+      );
+
+      affectedStreams.add(segmentData.streamId);
+    }
+
+    return affectedStreams;
+  }
+
+  private updateMemoryStorageSize(
+    byteLength: number,
+    isAddition: boolean = false,
+  ): void {
+    const changeInMB = byteLength / BYTES_PER_MB;
+
+    if (isAddition) {
+      this.currentMemoryStorageSize += changeInMB;
+    } else {
+      this.currentMemoryStorageSize -= changeInMB;
+    }
   }
 
   private findSegmentsToRemove(isLiveStream: boolean = false) {
