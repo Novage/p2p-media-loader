@@ -27,10 +27,34 @@ function getStorageItemId(streamId: string, segmentId: number) {
   return `${streamId}|${segmentId}`;
 }
 
+function isAndroid(ua: string) {
+  return /Android/i.test(ua);
+}
+
+function isIPadOrIPhone(ua: string) {
+  return /iPad|iPhone/i.test(ua);
+}
+
+function isWkWebviewOnIPadOrIPhone(ua: string) {
+  return /\b(iPad|iPhone).*AppleWebKit(?!.*Safari)/i.test(ua);
+}
+
+function isAndroidWebview(ua: string) {
+  return /Android/i.test(ua) && !/Chrome|Firefox/i.test(ua);
+}
+
+const firstNonEmpty = (...arrays: string[][]) =>
+  arrays.find((arr) => arr.length > 0) ?? [];
+
 export class SegmentMemoryStorage implements SegmentStorage {
+  private readonly userAgent = navigator.userAgent;
+  private segmentsMemoryStorageLimit = 4000;
+  private currentMemoryStorageSize = 0;
+  private lastStoredSegmentSize = 0;
+
   private cache = new Map<string, SegmentDataItem>();
   private readonly logger: debug.Debugger;
-  private storageConfig?: CommonCoreConfig;
+  private coreConfig?: CommonCoreConfig;
   private mainStreamConfig?: StreamConfig;
   private secondaryStreamConfig?: StreamConfig;
   private currentPlayback?: Playback;
@@ -44,14 +68,15 @@ export class SegmentMemoryStorage implements SegmentStorage {
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async initialize(
-    storageConfig: CommonCoreConfig,
+    coreConfig: CommonCoreConfig,
     mainStreamConfig: StreamConfig,
     secondaryStreamConfig: StreamConfig,
   ) {
-    this.storageConfig = storageConfig;
+    this.coreConfig = coreConfig;
     this.mainStreamConfig = mainStreamConfig;
     this.secondaryStreamConfig = secondaryStreamConfig;
 
+    this.setMemoryStorageLimit();
     this.logger("initialized");
   }
 
@@ -87,6 +112,9 @@ export class SegmentMemoryStorage implements SegmentStorage {
     streamType: StreamType,
     isLiveStream: boolean,
   ) {
+    const segmentDataInMB = data.byteLength / 1048576;
+    void this.clear(isLiveStream, segmentDataInMB);
+
     const storageId = getStorageItemId(streamId, segmentId);
     this.cache.set(storageId, {
       data,
@@ -97,6 +125,8 @@ export class SegmentMemoryStorage implements SegmentStorage {
       streamType,
     });
 
+    this.currentMemoryStorageSize += segmentDataInMB;
+
     this.logger(`add segment: ${segmentId} to ${streamId}`);
 
     if (!this.dispatchStorageUpdatedEvent) {
@@ -104,7 +134,6 @@ export class SegmentMemoryStorage implements SegmentStorage {
     }
 
     this.dispatchStorageUpdatedEvent(streamId);
-    void this.clear(isLiveStream);
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
@@ -136,56 +165,46 @@ export class SegmentMemoryStorage implements SegmentStorage {
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
-  private async clear(isLiveStream: boolean) {
+  private async clear(isLiveStream: boolean, segmentDataInMB: number) {
     if (
       !this.currentPlayback ||
       !this.mainStreamConfig ||
       !this.secondaryStreamConfig ||
-      !this.storageConfig
+      !this.coreConfig
     ) {
       return false;
     }
 
-    const currentPlayback = this.currentPlayback.position;
+    const isMemoryLimitReached =
+      this.currentMemoryStorageSize + segmentDataInMB >=
+      this.segmentsMemoryStorageLimit;
+
+    if (!isMemoryLimitReached) return;
+
     const affectedStreams = new Set<string>();
-    const maxStorageCapacity = isLiveStream
-      ? Infinity
-      : this.getStorageMaxCacheCount();
+    const segmentsToRemove = this.findSegmentsToRemove(isLiveStream);
 
-    if (
-      !isLiveStream &&
-      (maxStorageCapacity === 0 || this.cache.size <= maxStorageCapacity)
-    ) {
-      return false;
-    }
+    for (const segmentId of segmentsToRemove) {
+      const segmentData = this.cache.get(segmentId);
+      if (!segmentData) continue;
 
-    for (const [storageId, segmentData] of this.cache.entries()) {
-      const { endTime, streamType, streamId } = segmentData;
-      const highDemandTimeWindow = this.getStreamTimeWindow(
-        streamType,
-        "highDemandTimeWindow",
+      this.cache.delete(segmentId);
+      this.currentMemoryStorageSize -= segmentData.data.byteLength / 1048576;
+      this.logger(
+        `remove segment: ${segmentData.segmentId} from ${segmentData.streamId}`,
       );
 
-      let shouldRemove = false;
-
-      if (isLiveStream) {
-        shouldRemove = currentPlayback > highDemandTimeWindow + endTime;
-      } else {
-        const httpDownloadTimeWindow = this.getStreamTimeWindow(
-          streamType,
-          "httpDownloadTimeWindow",
-        );
-        shouldRemove =
-          currentPlayback > endTime + httpDownloadTimeWindow * 1.05;
-      }
-
-      if (shouldRemove) {
-        this.logger(`remove segment: ${segmentData.segmentId}`);
-        this.cache.delete(storageId);
-        affectedStreams.add(streamId);
-      }
+      affectedStreams.add(segmentData.streamId);
     }
 
+    this.sendUpdatesToAffectedStreams(affectedStreams);
+  }
+
+  setUpdateEventDispatcher(eventDispatcher: (streamId: string) => void) {
+    this.dispatchStorageUpdatedEvent = eventDispatcher;
+  }
+
+  private sendUpdatesToAffectedStreams(affectedStreams: Set<string>) {
     affectedStreams.forEach((stream) => {
       if (!this.dispatchStorageUpdatedEvent) {
         throw new Error("dispatchStorageUpdatedEvent is not set");
@@ -193,43 +212,81 @@ export class SegmentMemoryStorage implements SegmentStorage {
 
       this.dispatchStorageUpdatedEvent(stream);
     });
-
-    return affectedStreams.size > 0;
   }
 
-  setUpdateEventDispatcher(eventDispatcher: (streamId: string) => void) {
-    this.dispatchStorageUpdatedEvent = eventDispatcher;
-  }
-
-  private getStorageMaxCacheCount() {
+  private findSegmentsToRemove(isLiveStream: boolean = false) {
     if (
-      !this.storageConfig ||
-      !this.lastRequestedSegment ||
+      !this.currentPlayback ||
       !this.mainStreamConfig ||
-      !this.secondaryStreamConfig
+      !this.secondaryStreamConfig ||
+      !this.coreConfig
     ) {
-      return 0;
+      return [];
     }
 
-    const cachedSegmentsCount = this.storageConfig.cachedSegmentsCount;
-    if (cachedSegmentsCount === 0) return 0;
+    const segmentsToRemove: string[] = [];
+    const halfSegmentsBehindPlayback: string[] = [];
+    const allSegmentsBehindPlayback: string[] = [];
+    const segmentsAheadOfPlayback: string[] = [];
 
-    const maxHttpTimeWindow =
-      this.mainStreamConfig.httpDownloadTimeWindow >=
-      this.secondaryStreamConfig.httpDownloadTimeWindow
-        ? this.mainStreamConfig.httpDownloadTimeWindow
-        : this.secondaryStreamConfig.httpDownloadTimeWindow;
+    const currentPlayback = this.currentPlayback.position;
 
-    const { startTime, endTime } = this.lastRequestedSegment;
-    const segmentDuration = endTime - startTime;
-    const segmentsInTimeWindow = Math.ceil(maxHttpTimeWindow / segmentDuration);
+    for (const [storageId, segmentData] of this.cache.entries()) {
+      const { endTime, streamType } = segmentData;
+      const highDemandTimeWindow = this.getStreamTimeWindow(
+        streamType,
+        "highDemandTimeWindow",
+      );
+      const httpDownloadTimeWindow = this.getStreamTimeWindow(
+        streamType,
+        "httpDownloadTimeWindow",
+      );
 
-    const isCachedSegmentCountValid =
-      cachedSegmentsCount >= segmentsInTimeWindow;
+      if (isLiveStream && currentPlayback > highDemandTimeWindow + endTime) {
+        segmentsToRemove.push(storageId);
+        continue;
+      }
 
-    return isCachedSegmentCountValid
-      ? cachedSegmentsCount
-      : segmentsInTimeWindow;
+      if (currentPlayback > endTime + httpDownloadTimeWindow * 0.95) {
+        segmentsToRemove.push(storageId);
+      }
+      if (currentPlayback > endTime + httpDownloadTimeWindow * 0.5) {
+        halfSegmentsBehindPlayback.push(storageId);
+      }
+      if (currentPlayback > endTime) {
+        allSegmentsBehindPlayback.push(storageId);
+      }
+      if (endTime > currentPlayback + httpDownloadTimeWindow) {
+        segmentsAheadOfPlayback.push(storageId);
+      }
+    }
+
+    if (isLiveStream) return segmentsToRemove;
+    if (segmentsToRemove.length > 0) return segmentsToRemove;
+
+    return firstNonEmpty(
+      halfSegmentsBehindPlayback,
+      allSegmentsBehindPlayback,
+      segmentsAheadOfPlayback,
+    );
+  }
+
+  private setMemoryStorageLimit() {
+    if (this.coreConfig && this.coreConfig.segmentsMemoryStorageLimit) {
+      this.segmentsMemoryStorageLimit =
+        this.coreConfig.segmentsMemoryStorageLimit;
+      return;
+    }
+
+    if (
+      isAndroidWebview(this.userAgent) ||
+      isWkWebviewOnIPadOrIPhone(this.userAgent) ||
+      isIPadOrIPhone(this.userAgent)
+    ) {
+      this.segmentsMemoryStorageLimit = 1000;
+    } else if (isAndroid(this.userAgent)) {
+      this.segmentsMemoryStorageLimit = 2000;
+    }
   }
 
   private getStreamTimeWindow(

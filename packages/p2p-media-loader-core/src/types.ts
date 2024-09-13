@@ -115,16 +115,14 @@ export type DynamicCoreConfig = Partial<
 /** Represents the configuration for the Core functionality that is common to all streams. */
 export type CommonCoreConfig = {
   /**
-   * Maximum number of segments to store in the cache.
-   * Has to be less then httpDownloadTimeWindow and p2pDownloadTimeWindow.
-   * If set to 0, the cache is unlimited.
+   * Limit on the SegmentsMemoryStorage size for segments, in MB.
    *
    * @default
    * ```typescript
-   * cachedSegmentsCount: 0
+   * segmentsMemoryStorageLimit: 1000
    * ```
    */
-  cachedSegmentsCount: number;
+  segmentsMemoryStorageLimit: number;
 
   /**
    * Optional custom storage factory for the segments storage.
