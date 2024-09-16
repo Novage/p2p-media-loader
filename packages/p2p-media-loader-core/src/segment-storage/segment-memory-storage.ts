@@ -23,6 +23,12 @@ type LastRequestedSegmentInfo = {
   endTime: number;
 };
 
+type SegmentCategories = {
+  obsolete: string[];
+  beyondHalfHttpWindowBehind: string[];
+  behindPlayback: string[];
+  aheadHttpWindow: string[];
+};
 const getStorageItemId = (streamId: string, segmentId: number) =>
   `${streamId}|${segmentId}`;
 
@@ -236,10 +242,12 @@ export class SegmentMemoryStorage implements SegmentStorage {
       return [];
     }
 
-    const segmentsToRemove: string[] = [];
-    const halfSegmentsBehindPlayback: string[] = [];
-    const allSegmentsBehindPlayback: string[] = [];
-    const segmentsAheadOfPlayback: string[] = [];
+    const segmentIds: SegmentCategories = {
+      obsolete: [],
+      beyondHalfHttpWindowBehind: [],
+      behindPlayback: [],
+      aheadHttpWindow: [],
+    };
 
     const currentPlayback = this.currentPlayback.position;
 
@@ -255,31 +263,31 @@ export class SegmentMemoryStorage implements SegmentStorage {
       );
 
       if (isLiveStream && currentPlayback > highDemandTimeWindow + endTime) {
-        segmentsToRemove.push(storageId);
+        segmentIds.obsolete.push(storageId);
         continue;
       }
 
       if (currentPlayback > endTime + httpDownloadTimeWindow * 0.95) {
-        segmentsToRemove.push(storageId);
+        segmentIds.obsolete.push(storageId);
       }
       if (currentPlayback > endTime + httpDownloadTimeWindow * 0.5) {
-        halfSegmentsBehindPlayback.push(storageId);
+        segmentIds.beyondHalfHttpWindowBehind.push(storageId);
       }
       if (currentPlayback > endTime) {
-        allSegmentsBehindPlayback.push(storageId);
+        segmentIds.behindPlayback.push(storageId);
       }
       if (endTime > currentPlayback + httpDownloadTimeWindow) {
-        segmentsAheadOfPlayback.push(storageId);
+        segmentIds.aheadHttpWindow.push(storageId);
       }
     }
 
-    if (isLiveStream) return segmentsToRemove;
-    if (segmentsToRemove.length > 0) return segmentsToRemove;
+    if (isLiveStream) return segmentIds.obsolete;
+    if (segmentIds.obsolete.length > 0) return segmentIds.obsolete;
 
     return firstNonEmpty(
-      halfSegmentsBehindPlayback,
-      allSegmentsBehindPlayback,
-      segmentsAheadOfPlayback,
+      segmentIds.beyondHalfHttpWindowBehind,
+      segmentIds.behindPlayback,
+      segmentIds.aheadHttpWindow,
     );
   }
 
