@@ -36,9 +36,6 @@ const isAndroid = (ua: string) => /Android/i.test(ua);
 
 const isIPadOrIPhone = (ua: string) => /iPad|iPhone/i.test(ua);
 
-const isWkWebviewOnIPadOrIPhone = (ua: string) =>
-  /\b(iPad|iPhone).*AppleWebKit(?!.*Safari)/i.test(ua);
-
 const isAndroidWebview = (ua: string) =>
   /Android/i.test(ua) && !/Chrome|Firefox/i.test(ua);
 
@@ -298,11 +295,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
       return;
     }
 
-    if (
-      isAndroidWebview(this.userAgent) ||
-      isWkWebviewOnIPadOrIPhone(this.userAgent) ||
-      isIPadOrIPhone(this.userAgent)
-    ) {
+    if (isAndroidWebview(this.userAgent) || isIPadOrIPhone(this.userAgent)) {
       this.segmentsMemoryStorageLimit = 1000;
     } else if (isAndroid(this.userAgent)) {
       this.segmentsMemoryStorageLimit = 2000;
