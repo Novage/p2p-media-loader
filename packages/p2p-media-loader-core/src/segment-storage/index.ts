@@ -75,6 +75,14 @@ export interface SegmentStorage {
   ): Promise<ArrayBuffer | undefined>;
 
   /**
+   * Returns available space in the storage
+   */
+  getAvailableSpace(): {
+    limit: number;
+    used: number;
+  };
+
+  /**
    * Returns true if segment is in storage
    * @param streamId - Stream identifier
    * @param segmentId - Segment identifier

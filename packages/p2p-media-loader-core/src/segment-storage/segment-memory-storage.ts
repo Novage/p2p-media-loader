@@ -21,12 +21,11 @@ type LastRequestedSegmentInfo = {
   segmentId: number;
   startTime: number;
   endTime: number;
+  swarmId: string;
+  streamType: StreamType;
+  isLiveStream: boolean;
 };
 
-type SegmentCategories = {
-  obsolete: string[];
-  aheadHttpWindow: string[];
-};
 const getStorageItemId = (streamId: string, segmentId: number) =>
   `${streamId}|${segmentId}`;
 
@@ -81,15 +80,18 @@ export class SegmentMemoryStorage implements SegmentStorage {
     segmentId: number,
     startTime: number,
     endTime: number,
-    _swarmId: string,
-    _streamType: StreamType,
-    _isLiveStream: boolean,
+    swarmId: string,
+    streamType: StreamType,
+    isLiveStream: boolean,
   ): void {
     this.lastRequestedSegment = {
       streamId,
       segmentId,
       startTime,
       endTime,
+      swarmId,
+      streamType,
+      isLiveStream,
     };
   }
 
@@ -134,6 +136,30 @@ export class SegmentMemoryStorage implements SegmentStorage {
     if (dataItem === undefined) return undefined;
 
     return dataItem.data;
+  }
+
+  getAvailableSpace() {
+    if (!this.lastRequestedSegment) {
+      return {
+        limit: this.segmentsMemoryStorageLimit,
+        used: this.currentMemoryStorageSize,
+      };
+    }
+    const { streamId, isLiveStream } = this.lastRequestedSegment;
+    const segmentsToRemove = this.findSegmentsToRemove(isLiveStream, streamId);
+
+    const potentialFreeSpace = segmentsToRemove.reduce((total, segmentId) => {
+      const segment = this.cache.get(segmentId);
+      return segment ? total + segment.data.byteLength : total;
+    }, 0);
+
+    const usedMemoryInMB =
+      this.currentMemoryStorageSize - potentialFreeSpace / BYTES_PER_MB;
+
+    return {
+      limit: this.segmentsMemoryStorageLimit,
+      used: usedMemoryInMB,
+    };
   }
 
   hasSegment(streamId: string, externalId: number, _swarmId: string) {
@@ -241,54 +267,49 @@ export class SegmentMemoryStorage implements SegmentStorage {
       return [];
     }
 
-    const segmentsToRemove: SegmentCategories = {
-      obsolete: [],
-      aheadHttpWindow: [],
-    };
+    const obsoleteSegments: string[] = [];
+    const playbackPosition = this.currentPlayback.position;
 
-    const currentPlayback = this.currentPlayback.position;
-    const sortedCache = Array.from(this.cache.values()).sort(
-      (a, b) => a.endTime - b.endTime,
-    );
-
-    for (const segmentData of sortedCache) {
-      const { streamId, segmentId, endTime, streamType } = segmentData;
+    for (const segmentData of this.cache.values()) {
+      const { streamId, segmentId } = segmentData;
       const storageId = getStorageItemId(streamId, segmentId);
 
-      if (streamId !== currentStreamId) {
-        segmentsToRemove.obsolete.push(storageId);
-      }
-
-      const highDemandTimeWindow = this.getStreamTimeWindow(
-        streamType,
-        "highDemandTimeWindow",
-      );
-      const httpDownloadTimeWindow = this.getStreamTimeWindow(
-        streamType,
-        "httpDownloadTimeWindow",
+      const shouldRemove = this.shouldRemoveSegment(
+        segmentData,
+        isLiveStream,
+        currentStreamId,
+        playbackPosition,
       );
 
-      if (isLiveStream && currentPlayback > highDemandTimeWindow + endTime) {
-        segmentsToRemove.obsolete.push(storageId);
-        continue;
-      }
-
-      if (currentPlayback > endTime) {
-        segmentsToRemove.obsolete.push(storageId);
-      }
-
-      if (segmentsToRemove.obsolete.length > 0) {
-        break;
-      }
-
-      if (endTime > currentPlayback + httpDownloadTimeWindow) {
-        segmentsToRemove.aheadHttpWindow.push(storageId);
-      }
+      if (shouldRemove) obsoleteSegments.push(storageId);
     }
 
-    return segmentsToRemove.obsolete.length > 0
-      ? segmentsToRemove.obsolete
-      : segmentsToRemove.aheadHttpWindow;
+    return obsoleteSegments;
+  }
+
+  private shouldRemoveSegment(
+    segmentData: SegmentDataItem,
+    isLiveStream: boolean,
+    currentStreamId: string,
+    currentPlaybackPosition: number,
+  ): boolean {
+    const { streamId, endTime, streamType } = segmentData;
+    const highDemandTimeWindow = this.getStreamTimeWindow(
+      streamType,
+      "highDemandTimeWindow",
+    );
+
+    if (currentPlaybackPosition <= endTime) return false;
+    if (streamId !== currentStreamId) return true;
+    if (
+      isLiveStream &&
+      currentPlaybackPosition > highDemandTimeWindow + endTime
+    ) {
+      return true;
+    }
+    if (!isLiveStream) return true;
+
+    return false;
   }
 
   private setMemoryStorageLimit() {
