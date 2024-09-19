@@ -380,6 +380,9 @@ export class HybridLoader {
   }
 
   private loadRandomThroughHttp() {
+    const availableMemoryPercent = this.getAvailableMemoryPercent();
+    if (availableMemoryPercent <= 10) return;
+
     const { simultaneousHttpDownloads, httpErrorRetries } = this.config;
     const p2pLoader = this.p2pLoaders.currentLoader;
 
@@ -390,7 +393,6 @@ export class HybridLoader {
       return;
     }
 
-    const availableMemoryPercent = this.getAvailableMemoryPercent();
     const segmentsToLoad: SegmentWithStream[] = [];
     for (const { segment, statuses } of QueueUtils.generateQueue(
       this.lastRequestedSegment,
