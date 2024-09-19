@@ -138,11 +138,11 @@ export class SegmentMemoryStorage implements SegmentStorage {
     return dataItem.data;
   }
 
-  getAvailableSpace() {
+  getUsedMemory() {
     if (!this.lastRequestedSegment) {
       return {
-        limit: this.segmentsMemoryStorageLimit,
-        used: this.currentMemoryStorageSize,
+        memoryLimit: this.segmentsMemoryStorageLimit,
+        memoryUsed: this.currentMemoryStorageSize,
       };
     }
     const { streamId, isLiveStream } = this.lastRequestedSegment;
@@ -157,8 +157,8 @@ export class SegmentMemoryStorage implements SegmentStorage {
       this.currentMemoryStorageSize - potentialFreeSpace / BYTES_PER_MB;
 
     return {
-      limit: this.segmentsMemoryStorageLimit,
-      used: usedMemoryInMB,
+      memoryLimit: this.segmentsMemoryStorageLimit,
+      memoryUsed: usedMemoryInMB,
     };
   }
 

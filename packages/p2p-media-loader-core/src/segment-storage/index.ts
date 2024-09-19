@@ -75,11 +75,11 @@ export interface SegmentStorage {
   ): Promise<ArrayBuffer | undefined>;
 
   /**
-   * Returns available space in the storage
+   * Returns used memory information in the storage
    */
-  getAvailableSpace(): {
-    limit: number;
-    used: number;
+  getUsedMemory(): {
+    memoryLimit: number;
+    memoryUsed: number;
   };
 
   /**

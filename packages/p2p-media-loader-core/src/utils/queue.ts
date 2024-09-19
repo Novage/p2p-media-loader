@@ -17,6 +17,7 @@ export function* generateQueue(
   playback: Readonly<Playback>,
   playbackConfig: PlaybackTimeWindowsConfig,
   currentP2PLoader: P2PLoader,
+  availablePercentMemory: number,
 ): Generator<QueueItem, void> {
   const { runtimeId, stream } = lastRequestedSegment;
 
@@ -38,6 +39,7 @@ export function* generateQueue(
     playback,
     playbackConfig,
     currentP2PLoader,
+    availablePercentMemory,
   );
   if (isNotActualStatuses(firstStatuses)) {
     const next = queueSegments.next();
@@ -54,6 +56,7 @@ export function* generateQueue(
       playback,
       playbackConfig,
       currentP2PLoader,
+      availablePercentMemory,
     );
 
     if (isNotActualStatuses(secondStatuses)) return;
@@ -70,6 +73,7 @@ export function* generateQueue(
       playback,
       playbackConfig,
       currentP2PLoader,
+      availablePercentMemory,
     );
     if (isNotActualStatuses(statuses)) break;
     yield { segment, statuses };

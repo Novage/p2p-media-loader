@@ -62,30 +62,44 @@ export function getSegmentAvgDuration(stream: StreamWithSegments) {
   return sumDuration / size;
 }
 
-export function isSegmentActualInPlayback(
-  segment: Readonly<SegmentWithStream>,
-  playback: Playback,
+function calculateTimeWindows(
   timeWindowsConfig: PlaybackTimeWindowsConfig,
-): boolean {
+  availableMemoryInPercent: number,
+) {
   const {
-    isHighDemand = false,
-    isHttpDownloadable = false,
-    isP2PDownloadable = false,
-  } = getSegmentPlaybackStatuses(segment, playback, timeWindowsConfig);
-  return isHighDemand || isHttpDownloadable || isP2PDownloadable;
+    highDemandTimeWindow,
+    httpDownloadTimeWindow,
+    p2pDownloadTimeWindow,
+  } = timeWindowsConfig;
+
+  const result = {
+    highDemandTimeWindow,
+    httpDownloadTimeWindow,
+    p2pDownloadTimeWindow,
+  };
+
+  if (availableMemoryInPercent <= 5) {
+    result.httpDownloadTimeWindow = 0;
+    result.p2pDownloadTimeWindow = 0;
+  } else if (availableMemoryInPercent <= 10) {
+    result.p2pDownloadTimeWindow = result.httpDownloadTimeWindow;
+  }
+
+  return result;
 }
 
 export function getSegmentPlaybackStatuses(
   segment: SegmentWithStream,
   playback: Playback,
   timeWindowsConfig: PlaybackTimeWindowsConfig,
-  currentP2PLoader?: P2PLoader,
+  currentP2PLoader: P2PLoader,
+  availableMemoryPercent: number,
 ): SegmentPlaybackStatuses {
   const {
     highDemandTimeWindow,
     httpDownloadTimeWindow,
     p2pDownloadTimeWindow,
-  } = timeWindowsConfig;
+  } = calculateTimeWindows(timeWindowsConfig, availableMemoryPercent);
 
   return {
     isHighDemand: isSegmentInTimeWindow(
@@ -100,8 +114,7 @@ export function getSegmentPlaybackStatuses(
     ),
     isP2PDownloadable:
       isSegmentInTimeWindow(segment, playback, p2pDownloadTimeWindow) &&
-      (!currentP2PLoader ||
-        currentP2PLoader.isSegmentLoadingOrLoadedBySomeone(segment)),
+      currentP2PLoader.isSegmentLoadingOrLoadedBySomeone(segment),
   };
 }
 

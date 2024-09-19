@@ -390,12 +390,14 @@ export class HybridLoader {
       return;
     }
 
+    const availableMemoryPercent = this.getAvailableMemoryPercent();
     const segmentsToLoad: SegmentWithStream[] = [];
     for (const { segment, statuses } of QueueUtils.generateQueue(
       this.lastRequestedSegment,
       this.playback,
       this.config,
       this.p2pLoaders.currentLoader,
+      availableMemoryPercent,
     )) {
       const swarmId = this.config.swarmId ?? this.streamManifestUrl;
       const streamSwarmId = StreamUtils.getStreamSwarmId(
@@ -490,16 +492,24 @@ export class HybridLoader {
     return false;
   }
 
+  private getAvailableMemoryPercent(): number {
+    const { memoryLimit, memoryUsed } = this.segmentStorage.getUsedMemory();
+    return 100 - (memoryUsed / memoryLimit) * 100;
+  }
+
   private generateQueue() {
     const queue: QueueItem[] = [];
     const queueSegmentIds = new Set<string>();
     let maxPossibleLength = 0;
     let alreadyLoadedCount = 0;
+
+    const availableMemoryPercent = this.getAvailableMemoryPercent();
     for (const item of QueueUtils.generateQueue(
       this.lastRequestedSegment,
       this.playback,
       this.config,
       this.p2pLoaders.currentLoader,
+      availableMemoryPercent,
     )) {
       maxPossibleLength++;
       const { segment } = item;
