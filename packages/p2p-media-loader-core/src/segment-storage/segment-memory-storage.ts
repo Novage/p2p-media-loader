@@ -106,7 +106,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
     streamType: StreamType,
     isLiveStream: boolean,
   ) {
-    void this.clear(isLiveStream, data.byteLength, streamId);
+    void this.clear(isLiveStream, data.byteLength);
 
     const storageId = getStorageItemId(streamId, segmentId);
     this.cache.set(storageId, {
@@ -139,19 +139,22 @@ export class SegmentMemoryStorage implements SegmentStorage {
   }
 
   getUsedMemory() {
-    if (!this.lastRequestedSegment) {
+    if (!this.lastRequestedSegment || !this.currentPlayback) {
       return {
         memoryLimit: this.segmentsMemoryStorageLimit,
         memoryUsed: this.currentMemoryStorageSize,
       };
     }
-    const { streamId, isLiveStream } = this.lastRequestedSegment;
-    const segmentsToRemove = this.findSegmentsToRemove(isLiveStream, streamId);
+    const PlaybackPosition = this.currentPlayback.position;
 
-    const potentialFreeSpace = segmentsToRemove.reduce((total, segmentId) => {
-      const segment = this.cache.get(segmentId);
-      return segment ? total + segment.data.byteLength : total;
-    }, 0);
+    let potentialFreeSpace = 0;
+    for (const segmentData of this.cache.values()) {
+      const { endTime } = segmentData;
+
+      if (PlaybackPosition <= endTime) continue;
+
+      potentialFreeSpace += segmentData.data.byteLength / BYTES_PER_MB;
+    }
 
     const usedMemoryInMB =
       this.currentMemoryStorageSize - potentialFreeSpace / BYTES_PER_MB;
@@ -181,30 +184,53 @@ export class SegmentMemoryStorage implements SegmentStorage {
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
-  private async clear(
-    isLiveStream: boolean,
-    segmentByteLength: number,
-    streamId: string,
-  ) {
+  private async clear(isLiveStream: boolean, newSegmentSize: number) {
     if (
       !this.currentPlayback ||
       !this.mainStreamConfig ||
       !this.secondaryStreamConfig ||
       !this.coreConfig
     ) {
-      return false;
+      return;
     }
 
-    const isMemoryLimitReached =
-      this.currentMemoryStorageSize + segmentByteLength / BYTES_PER_MB >
-      this.segmentsMemoryStorageLimit;
+    const isMemoryLimitReached = this.isMemoryLimitReached(newSegmentSize);
 
     if (!isMemoryLimitReached && !isLiveStream) return;
 
-    const segmentsToRemove = this.findSegmentsToRemove(isLiveStream, streamId);
-    const affectedStreams = this.removeSegmentsFromCache(segmentsToRemove);
+    const affectedStreams = new Set<string>();
+    const sortedCache = Array.from(this.cache.values()).sort(
+      (a, b) => a.startTime - b.startTime,
+    );
+
+    for (const segmentData of sortedCache) {
+      const { streamId, segmentId } = segmentData;
+      const storageId = getStorageItemId(streamId, segmentId);
+
+      const shouldRemove = this.shouldRemoveSegment(
+        segmentData,
+        isLiveStream,
+        this.currentPlayback.position,
+      );
+
+      if (!shouldRemove) continue;
+
+      this.cache.delete(storageId);
+      this.updateMemoryStorageSize(segmentData.data.byteLength);
+      affectedStreams.add(streamId);
+      this.logger(`Removed segment ${segmentId} from stream ${streamId}`);
+
+      if (!this.isMemoryLimitReached(newSegmentSize) && !isLiveStream) break;
+    }
 
     this.sendUpdatesToAffectedStreams(affectedStreams);
+  }
+
+  private isMemoryLimitReached(segmentByteLength: number) {
+    return (
+      this.currentMemoryStorageSize + segmentByteLength / BYTES_PER_MB >
+      this.segmentsMemoryStorageLimit
+    );
   }
 
   setUpdateEventDispatcher(eventDispatcher: (streamId: string) => void) {
@@ -212,6 +238,8 @@ export class SegmentMemoryStorage implements SegmentStorage {
   }
 
   private sendUpdatesToAffectedStreams(affectedStreams: Set<string>) {
+    if (affectedStreams.size === 0) return;
+
     affectedStreams.forEach((stream) => {
       if (!this.dispatchStorageUpdatedEvent) {
         throw new Error("dispatchStorageUpdatedEvent is not set");
@@ -219,26 +247,6 @@ export class SegmentMemoryStorage implements SegmentStorage {
 
       this.dispatchStorageUpdatedEvent(stream);
     });
-  }
-
-  private removeSegmentsFromCache(segmentsToRemove: string[]) {
-    const affectedStreams = new Set<string>();
-
-    for (const segmentId of segmentsToRemove) {
-      const segmentData = this.cache.get(segmentId);
-      if (!segmentData) continue;
-
-      this.cache.delete(segmentId);
-      this.updateMemoryStorageSize(segmentData.data.byteLength);
-
-      this.logger(
-        `remove segment: ${segmentData.segmentId} from ${segmentData.streamId}`,
-      );
-
-      affectedStreams.add(segmentData.streamId);
-    }
-
-    return affectedStreams;
   }
 
   private updateMemoryStorageSize(
@@ -254,62 +262,27 @@ export class SegmentMemoryStorage implements SegmentStorage {
     }
   }
 
-  private findSegmentsToRemove(
-    isLiveStream: boolean = false,
-    currentStreamId: string,
-  ) {
-    if (
-      !this.currentPlayback ||
-      !this.mainStreamConfig ||
-      !this.secondaryStreamConfig ||
-      !this.coreConfig
-    ) {
-      return [];
-    }
-
-    const obsoleteSegments: string[] = [];
-    const playbackPosition = this.currentPlayback.position;
-
-    for (const segmentData of this.cache.values()) {
-      const { streamId, segmentId } = segmentData;
-      const storageId = getStorageItemId(streamId, segmentId);
-
-      const shouldRemove = this.shouldRemoveSegment(
-        segmentData,
-        isLiveStream,
-        currentStreamId,
-        playbackPosition,
-      );
-
-      if (shouldRemove) obsoleteSegments.push(storageId);
-    }
-
-    return obsoleteSegments;
-  }
-
   private shouldRemoveSegment(
     segmentData: SegmentDataItem,
     isLiveStream: boolean,
-    currentStreamId: string,
     currentPlaybackPosition: number,
   ): boolean {
-    const { streamId, endTime, streamType } = segmentData;
+    const { endTime, streamType } = segmentData;
     const highDemandTimeWindow = this.getStreamTimeWindow(
       streamType,
       "highDemandTimeWindow",
     );
 
     if (currentPlaybackPosition <= endTime) return false;
-    if (streamId !== currentStreamId) return true;
-    if (
-      isLiveStream &&
-      currentPlaybackPosition > highDemandTimeWindow + endTime
-    ) {
-      return true;
-    }
-    if (!isLiveStream) return true;
 
-    return false;
+    if (isLiveStream) {
+      if (currentPlaybackPosition > highDemandTimeWindow + endTime) {
+        return true;
+      }
+      return false;
+    }
+
+    return true;
   }
 
   private setMemoryStorageLimit() {
