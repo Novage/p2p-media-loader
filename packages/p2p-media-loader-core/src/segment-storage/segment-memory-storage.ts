@@ -26,12 +26,6 @@ type LastRequestedSegmentInfo = {
   isLiveStream: boolean;
 };
 
-type ObsoleteSegments = {
-  live: string[];
-  vod: string[];
-  vodDifferentQuality: string[];
-};
-
 const getStorageItemId = (streamId: string, segmentId: number) =>
   `${streamId}|${segmentId}`;
 
@@ -273,43 +267,49 @@ export class SegmentMemoryStorage implements SegmentStorage {
       return [];
     }
 
-    const obsoleteSegments: ObsoleteSegments = {
-      live: [],
-      vod: [],
-      vodDifferentQuality: [],
-    };
+    const obsoleteSegments: string[] = [];
     const playbackPosition = this.currentPlayback.position;
 
     for (const segmentData of this.cache.values()) {
-      const { streamId, segmentId, endTime, streamType } = segmentData;
+      const { streamId, segmentId } = segmentData;
       const storageId = getStorageItemId(streamId, segmentId);
-      const highDemandTimeWindow = this.getStreamTimeWindow(
-        streamType,
-        "highDemandTimeWindow",
+
+      const shouldRemove = this.shouldRemoveSegment(
+        segmentData,
+        isLiveStream,
+        currentStreamId,
+        playbackPosition,
       );
 
-      if (playbackPosition <= endTime) continue;
-
-      if (isLiveStream) {
-        if (playbackPosition > endTime + highDemandTimeWindow) {
-          obsoleteSegments.live.push(storageId);
-        }
-        continue;
-      }
-
-      if (streamId !== currentStreamId) {
-        obsoleteSegments.vodDifferentQuality.push(storageId);
-        continue;
-      }
-
-      obsoleteSegments.vod.push(storageId);
+      if (shouldRemove) obsoleteSegments.push(storageId);
     }
 
-    if (obsoleteSegments.live.length > 0) return obsoleteSegments.live;
-    if (obsoleteSegments.vodDifferentQuality.length > 0) {
-      return obsoleteSegments.vodDifferentQuality;
+    return obsoleteSegments;
+  }
+
+  private shouldRemoveSegment(
+    segmentData: SegmentDataItem,
+    isLiveStream: boolean,
+    currentStreamId: string,
+    currentPlaybackPosition: number,
+  ): boolean {
+    const { streamId, endTime, streamType } = segmentData;
+    const highDemandTimeWindow = this.getStreamTimeWindow(
+      streamType,
+      "highDemandTimeWindow",
+    );
+
+    if (currentPlaybackPosition <= endTime) return false;
+    if (streamId !== currentStreamId) return true;
+    if (
+      isLiveStream &&
+      currentPlaybackPosition > highDemandTimeWindow + endTime
+    ) {
+      return true;
     }
-    return obsoleteSegments.vod;
+    if (!isLiveStream) return true;
+
+    return false;
   }
 
   private setMemoryStorageLimit() {
