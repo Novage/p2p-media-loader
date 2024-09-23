@@ -1,6 +1,12 @@
 import { CommonCoreConfig, StreamConfig, StreamType } from "../types.js";
 import debug from "debug";
 import { SegmentStorage } from "./index.js";
+import {
+  isAndroid,
+  isIPadOrIPhone,
+  isAndroidWebview,
+  getStorageItemId,
+} from "./utils.js";
 
 type SegmentDataItem = {
   segmentId: number;
@@ -8,7 +14,7 @@ type SegmentDataItem = {
   data: ArrayBuffer;
   startTime: number;
   endTime: number;
-  streamType: string;
+  streamType: StreamType;
 };
 
 type Playback = {
@@ -25,16 +31,6 @@ type LastRequestedSegmentInfo = {
   streamType: StreamType;
   isLiveStream: boolean;
 };
-
-const getStorageItemId = (streamId: string, segmentId: number) =>
-  `${streamId}|${segmentId}`;
-
-const isAndroid = (ua: string) => /Android/i.test(ua);
-
-const isIPadOrIPhone = (ua: string) => /iPad|iPhone/i.test(ua);
-
-const isAndroidWebview = (ua: string) =>
-  /Android/i.test(ua) && !/Chrome|Firefox/i.test(ua);
 
 const BYTES_PER_MB = 1048576;
 
@@ -117,7 +113,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
       endTime,
       streamType,
     });
-    this.updateMemoryStorageSize(data.byteLength, true);
+    this.increaseMemoryStorageSize(data.byteLength);
 
     this.logger(`add segment: ${segmentId} to ${streamId}`);
 
@@ -145,19 +141,18 @@ export class SegmentMemoryStorage implements SegmentStorage {
         memoryUsed: this.currentMemoryStorageSize,
       };
     }
-    const PlaybackPosition = this.currentPlayback.position;
+    const playbackPosition = this.currentPlayback.position;
 
     let potentialFreeSpace = 0;
     for (const segmentData of this.cache.values()) {
       const { endTime } = segmentData;
 
-      if (PlaybackPosition <= endTime) continue;
+      if (playbackPosition <= endTime) continue;
 
       potentialFreeSpace += segmentData.data.byteLength / BYTES_PER_MB;
     }
 
-    const usedMemoryInMB =
-      this.currentMemoryStorageSize - potentialFreeSpace / BYTES_PER_MB;
+    const usedMemoryInMB = this.currentMemoryStorageSize - potentialFreeSpace;
 
     return {
       memoryLimit: this.segmentsMemoryStorageLimit,
@@ -215,8 +210,8 @@ export class SegmentMemoryStorage implements SegmentStorage {
 
       if (!shouldRemove) continue;
 
+      this.decreaseMemoryStorageSize(segmentData.data.byteLength);
       this.cache.delete(storageId);
-      this.updateMemoryStorageSize(segmentData.data.byteLength);
       affectedStreams.add(streamId);
       this.logger(`Removed segment ${segmentId} from stream ${streamId}`);
 
@@ -249,17 +244,12 @@ export class SegmentMemoryStorage implements SegmentStorage {
     });
   }
 
-  private updateMemoryStorageSize(
-    byteLength: number,
-    isAddition: boolean = false,
-  ): void {
-    const changeInMB = byteLength / BYTES_PER_MB;
+  private increaseMemoryStorageSize(byteLength: number) {
+    this.currentMemoryStorageSize += byteLength / BYTES_PER_MB;
+  }
 
-    if (isAddition) {
-      this.currentMemoryStorageSize += changeInMB;
-    } else {
-      this.currentMemoryStorageSize -= changeInMB;
-    }
+  private decreaseMemoryStorageSize(byteLength: number) {
+    this.currentMemoryStorageSize -= byteLength / BYTES_PER_MB;
   }
 
   private shouldRemoveSegment(
@@ -276,10 +266,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
     if (currentPlaybackPosition <= endTime) return false;
 
     if (isLiveStream) {
-      if (currentPlaybackPosition > highDemandTimeWindow + endTime) {
-        return true;
-      }
-      return false;
+      return currentPlaybackPosition > highDemandTimeWindow + endTime;
     }
 
     return true;
@@ -303,15 +290,12 @@ export class SegmentMemoryStorage implements SegmentStorage {
     streamType: string,
     configKey: "highDemandTimeWindow" | "httpDownloadTimeWindow",
   ): number {
-    if (!this.mainStreamConfig || !this.secondaryStreamConfig) {
-      return 0;
-    }
-
     const config =
       streamType === "main"
         ? this.mainStreamConfig
         : this.secondaryStreamConfig;
-    return config[configKey];
+
+    return config?.[configKey] ?? 0;
   }
 
   public destroy() {
