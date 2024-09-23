@@ -1,4 +1,4 @@
-import { SegmentsStorage } from "./segments-storage/index.js";
+import { SegmentStorage } from "./segment-storage/index.js";
 
 /** Represents the types of streams available, either primary (main) or secondary. */
 export type StreamType = "main" | "secondary";
@@ -115,36 +115,32 @@ export type DynamicCoreConfig = Partial<
 /** Represents the configuration for the Core functionality that is common to all streams. */
 export type CommonCoreConfig = {
   /**
-   * Maximum number of segments to store in the cache.
-   * Has to be less then httpDownloadTimeWindow and p2pDownloadTimeWindow.
-   * If set to 0, the cache is unlimited.
+   * Defines the memory storage limit for media segments, in MB.
    *
    * @default
    * ```typescript
-   * cachedSegmentsCount: 0
+   * segmentsMemoryStorageLimit: undefined
    * ```
+   *
+   * - When `undefined`, the default limit is determined based on the device type and browser:
+   *    - Desktop: 4000 MB
+   *    - Android: 2000 MB
+   *    - iOS: 1000 MB
+   *    - Android WebView: 1000 MB
+   *    - iOS WebView: 1000 MB
+   *
    */
-  cachedSegmentsCount: number;
+  segmentsMemoryStorageLimit: number | undefined;
 
   /**
-   * Custom storage class for VOD segments.
+   * Optional custom storage factory for the segments storage.
    *
    * @default
    * ```typescript
-   * vodSegmentsStorage: undefined
+   * customSegmentStorageFactory: undefined
    * ```
    */
-  vodSegmentsStorage?: new () => SegmentsStorage;
-
-  /**
-   * Custom storage class for live segments.
-   *
-   * @default
-   * ```typescript
-   * liveSegmentsStorage: undefined
-   * ```
-   */
-  liveSegmentsStorage?: new () => SegmentsStorage;
+  customSegmentStorageFactory?: (isLive: boolean) => SegmentStorage;
 };
 
 /**
