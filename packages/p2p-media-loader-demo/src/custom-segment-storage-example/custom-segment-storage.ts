@@ -1,13 +1,10 @@
 import {
   CommonCoreConfig,
-  SegmentsStorage,
+  SegmentStorage,
   StreamConfig,
+  StreamType,
 } from "p2p-media-loader-core";
 import { P2PLoaderIndexedDB } from "./p2p-db";
-
-type StorageEventHandlers = {
-  [key in `onStorageUpdated-${string}`]: () => void;
-};
 
 type SegmentDataItem = {
   storageId: string;
@@ -24,15 +21,20 @@ type LastRequestedSegmentInfo = {
   segmentId: number;
   startTime: number;
   endTime: number;
+  swarmId: string;
+  streamType: StreamType;
+  isLiveStream: boolean;
 };
 
 type SegmentInfoItem = {
   storageId: string;
+  dataLength: number;
   streamId: string;
   segmentId: number;
   streamType: string;
   startTime: number;
   endTime: number;
+  swarmId: string;
 };
 
 function getStorageItemId(streamId: string, segmentId: number) {
@@ -43,17 +45,22 @@ const INFO_ITEMS_STORE_NAME = "segmentInfo";
 const DATA_ITEMS_STORE_NAME = "segmentData";
 const DB_NAME = "p2p-media-loader";
 const DB_VERSION = 1;
+const BYTES_PER_MB = 1048576;
 
-export class CustomSegmentStorage implements SegmentsStorage {
-  private storageSegmentsCount = 0;
+export class CustomSegmentStorage implements SegmentStorage {
+  private segmentsMemoryStorageLimit = 100;
+  private currentMemoryStorageSize = 0;
+
   private storageConfig?: CommonCoreConfig;
   private mainStreamConfig?: StreamConfig;
   private secondaryStreamConfig?: StreamConfig;
-  private cacheMap = new Map<string, Map<number, SegmentInfoItem>>();
-  private readonly eventTarget = new EventTarget<StorageEventHandlers>();
+  private cache = new Map<string, SegmentInfoItem>();
+
   private currentPlayback?: Playback;
-  private lastRequestedSegmentInfo?: LastRequestedSegmentInfo; // can be used to implement custom logic for clearing storage
+  private lastRequestedSegment?: LastRequestedSegmentInfo;
   private db: P2PLoaderIndexedDB;
+
+  private dispatchStorageUpdatedEvent?: (streamId: string) => void;
 
   constructor() {
     this.db = new P2PLoaderIndexedDB(
@@ -73,12 +80,18 @@ export class CustomSegmentStorage implements SegmentsStorage {
     segmentId: number,
     startTime: number,
     endTime: number,
+    swarmId: string,
+    streamType: StreamType,
+    isLiveStream: boolean,
   ): void {
-    this.lastRequestedSegmentInfo = {
+    this.lastRequestedSegment = {
       streamId,
       segmentId,
       startTime,
       endTime,
+      swarmId,
+      streamType,
+      isLiveStream,
     };
   }
 
@@ -91,7 +104,7 @@ export class CustomSegmentStorage implements SegmentsStorage {
     this.mainStreamConfig = mainStreamConfig;
     this.secondaryStreamConfig = secondaryStreamConfig;
 
-    // await this.dbWrapper.deleteDatabase();
+    await this.db.deleteDatabase();
     await this.db.openDatabase();
     await this.loadCacheMap();
   }
@@ -102,8 +115,8 @@ export class CustomSegmentStorage implements SegmentsStorage {
     data: ArrayBuffer,
     startTime: number,
     endTime: number,
-    streamType: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    swarmId: string,
+    streamType: StreamType,
     _isLiveStream: boolean,
   ): Promise<void> {
     const storageId = getStorageItemId(streamId, segmentId);
@@ -113,22 +126,29 @@ export class CustomSegmentStorage implements SegmentsStorage {
     };
     const segmentInfoItem = {
       storageId,
+      dataLength: data.byteLength,
       streamId,
       segmentId,
       streamType,
       startTime,
       endTime,
+      swarmId,
     };
 
-    this.updateCacheMap(segmentInfoItem);
-
+    await this.clear(swarmId, data.byteLength);
     await Promise.all([
       this.db.put(DATA_ITEMS_STORE_NAME, segmentDataItem),
       this.db.put(INFO_ITEMS_STORE_NAME, segmentInfoItem),
     ]);
 
-    this.dispatchStorageUpdatedEvent(segmentInfoItem.streamId);
-    void this.clear(segmentInfoItem.streamId);
+    console.log(`Stored segment ${segmentId}`);
+
+    this.cache.set(storageId, segmentInfoItem);
+    this.increaseMemoryStorageSize(data.byteLength);
+
+    if (this.dispatchStorageUpdatedEvent) {
+      this.dispatchStorageUpdatedEvent(streamId);
+    }
   }
 
   async getSegmentData(
@@ -144,63 +164,88 @@ export class CustomSegmentStorage implements SegmentsStorage {
     return result?.data;
   }
 
+  getUsedMemory() {
+    const defaultUsedMemory = {
+      memoryLimit: this.segmentsMemoryStorageLimit,
+      memoryUsed: this.currentMemoryStorageSize,
+    };
+
+    if (!this.lastRequestedSegment || !this.currentPlayback) {
+      return defaultUsedMemory;
+    }
+
+    const playbackPosition = this.currentPlayback.position;
+    const currentSwarmId = this.lastRequestedSegment.swarmId;
+
+    let potentialFreeMemory = 0;
+    for (const segment of this.cache.values()) {
+      if (
+        segment.swarmId !== currentSwarmId ||
+        playbackPosition > segment.endTime
+      ) {
+        potentialFreeMemory += segment.dataLength;
+      }
+    }
+
+    const potentialFreeMemoryInMB = potentialFreeMemory / BYTES_PER_MB;
+    const usedMemoryInMB =
+      this.currentMemoryStorageSize - potentialFreeMemoryInMB;
+
+    console.log("potentialFreeMemory", potentialFreeMemoryInMB);
+    console.log("currentMemoryStorageSize", usedMemoryInMB);
+
+    return {
+      memoryLimit: this.segmentsMemoryStorageLimit,
+      memoryUsed: usedMemoryInMB,
+    };
+  }
+
   hasSegment(streamId: string, segmentId: number): boolean {
-    const streamCache = this.cacheMap.get(streamId);
-    return streamCache?.has(segmentId) ?? false;
+    const storageId = getStorageItemId(streamId, segmentId);
+    return this.cache.has(storageId);
   }
 
   getStoredSegmentIds(streamId: string): number[] {
-    const streamCache = this.cacheMap.get(streamId);
-    if (!streamCache) return [];
+    const storedSegments: number[] = [];
 
-    return Array.from(streamCache.keys(), (key) => key);
-  }
+    for (const segment of this.cache.values()) {
+      if (segment.streamId === streamId) {
+        storedSegments.push(segment.segmentId);
+      }
+    }
 
-  subscribeOnUpdate(streamId: string, listener: () => void): void {
-    this.eventTarget.addEventListener(`onStorageUpdated-${streamId}`, listener);
-  }
-
-  unsubscribeFromUpdate(streamId: string, listener: () => void): void {
-    this.eventTarget.removeEventListener(
-      `onStorageUpdated-${streamId}`,
-      listener,
-    );
+    return storedSegments;
   }
 
   destroy() {
     this.db.closeDatabase();
-    this.cacheMap.clear();
+    this.cache.clear();
   }
 
-  private dispatchStorageUpdatedEvent(streamId: string) {
-    this.eventTarget.dispatchEvent(`onStorageUpdated-${streamId}`);
+  setUpdateEventDispatcher(eventDispatcher: (streamId: string) => void) {
+    this.dispatchStorageUpdatedEvent = eventDispatcher;
   }
 
   private async loadCacheMap() {
     const result = await this.db.getAll<SegmentInfoItem>(INFO_ITEMS_STORE_NAME);
 
     result.forEach((item) => {
-      if (!this.cacheMap.has(item.streamId)) {
-        this.cacheMap.set(item.streamId, new Map<number, SegmentInfoItem>());
-      }
-      this.cacheMap.get(item.streamId)?.set(item.segmentId, item);
-      this.storageSegmentsCount++;
+      const storageId = getStorageItemId(item.streamId, item.segmentId);
+      this.cache.set(storageId, item);
+
+      this.increaseMemoryStorageSize(item.dataLength);
     });
   }
 
-  private updateCacheMap(segmentInfoItem: SegmentInfoItem) {
-    if (!this.cacheMap.has(segmentInfoItem.streamId)) {
-      this.cacheMap.set(
-        segmentInfoItem.streamId,
-        new Map<number, SegmentInfoItem>(),
-      );
-    }
-
-    const streamCache = this.cacheMap.get(segmentInfoItem.streamId);
-    streamCache?.set(segmentInfoItem.segmentId, segmentInfoItem);
+  private increaseMemoryStorageSize(dataLength: number) {
+    this.currentMemoryStorageSize += dataLength / BYTES_PER_MB;
   }
 
-  private async clear(activeStreamId: string) {
+  private decreaseMemoryStorageSize(dataLength: number) {
+    this.currentMemoryStorageSize -= dataLength / BYTES_PER_MB;
+  }
+
+  private async clear(swarmId: string, newSegmentSize: number) {
     if (
       !this.storageConfig ||
       !this.mainStreamConfig ||
@@ -209,148 +254,91 @@ export class CustomSegmentStorage implements SegmentsStorage {
     ) {
       return;
     }
-    const cachedSegmentsCount = this.storageConfig.cachedSegmentsCount;
-    if (this.storageSegmentsCount + 1 <= cachedSegmentsCount) return;
 
-    const currentPlaybackPosition = this.currentPlayback.position;
+    const playbackPosition = this.currentPlayback.position;
     const affectedStreams = new Set<string>();
-    const segmentsStorageIdsToRemove: string[] = [];
 
-    const tryRemoveSegment = (
-      segmentInfoItem: SegmentInfoItem,
-      streamCache: Map<number, SegmentInfoItem>,
-    ) => {
-      const { streamType, endTime, streamId, storageId } = segmentInfoItem;
+    if (!this.isMemoryLimitReached(newSegmentSize)) return;
 
-      const httpDownloadTimeWindow = this.getStreamTimeWindow(
-        streamType,
-        "httpDownloadTimeWindow",
-      );
-      const highDemandTimeWindow = this.getStreamTimeWindow(
-        streamType,
-        "highDemandTimeWindow",
-      );
+    const segmentsInCurrentSwarm: SegmentInfoItem[] = [];
+    const otherSegments: SegmentInfoItem[] = [];
 
-      const isPastThreshold =
-        endTime <
-        currentPlaybackPosition -
-          (httpDownloadTimeWindow - highDemandTimeWindow) * 1.05;
-
-      if (isPastThreshold) {
-        this.storageSegmentsCount--;
-        streamCache.delete(segmentInfoItem.segmentId);
-        segmentsStorageIdsToRemove.push(storageId);
-        affectedStreams.add(streamId);
+    for (const segment of this.cache.values()) {
+      if (segment.swarmId === swarmId && playbackPosition > segment.endTime) {
+        segmentsInCurrentSwarm.push(segment);
+      } else {
+        otherSegments.push(segment);
       }
-    };
+    }
 
-    const streamCache = this.cacheMap.get(activeStreamId);
-    if (!streamCache) return;
+    if (otherSegments.length !== 0) {
+      const memoryFreed = await this.removeSegments(
+        otherSegments,
+        affectedStreams,
+        newSegmentSize,
+      );
 
-    streamCache.forEach((segmentInfoItem) =>
-      tryRemoveSegment(segmentInfoItem, streamCache),
+      if (memoryFreed) {
+        this.sendUpdatesToAffectedStreams(affectedStreams);
+        return;
+      }
+    }
+
+    const sortedSegments = segmentsInCurrentSwarm.sort(
+      (a, b) => a.endTime - b.endTime,
     );
 
-    if (segmentsStorageIdsToRemove.length === 0) {
-      for (const [streamId, streamCache] of this.cacheMap) {
-        if (streamId === activeStreamId) continue;
-        streamCache.forEach((segmentInfoItem) =>
-          tryRemoveSegment(segmentInfoItem, streamCache),
-        );
+    await this.removeSegments(sortedSegments, affectedStreams, newSegmentSize);
+
+    this.sendUpdatesToAffectedStreams(affectedStreams);
+  }
+
+  private async removeSegments(
+    segments: SegmentInfoItem[],
+    affectedStreams: Set<string>,
+    newSegmentSize: number,
+  ) {
+    for (const segment of segments) {
+      try {
+        await this.removeSegmentFromStorage(segment.storageId);
+        this.cache.delete(segment.storageId);
+        this.decreaseMemoryStorageSize(segment.dataLength);
+        affectedStreams.add(segment.streamId);
+        console.log(`Removed segment ${segment.segmentId}`);
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error(`Failed to remove segment ${segment.storageId}:`, error);
+      }
+
+      if (!this.isMemoryLimitReached(newSegmentSize)) {
+        break;
       }
     }
 
-    await this.removeSegmentsFromStorage(segmentsStorageIdsToRemove);
+    return !this.isMemoryLimitReached(newSegmentSize);
+  }
 
-    affectedStreams.forEach((stream) =>
-      this.dispatchStorageUpdatedEvent(stream),
+  private isMemoryLimitReached(segmentByteLength: number) {
+    return (
+      this.currentMemoryStorageSize + segmentByteLength / BYTES_PER_MB >
+      this.segmentsMemoryStorageLimit
     );
   }
 
-  private async removeSegmentsFromStorage(
-    segmentsStorageIds: string[],
-  ): Promise<void> {
-    const promises = segmentsStorageIds.flatMap((storageId) => [
-      this.db.delete(DATA_ITEMS_STORE_NAME, storageId),
-      this.db.delete(INFO_ITEMS_STORE_NAME, storageId),
-    ]);
-    await Promise.all(promises);
-  }
+  private sendUpdatesToAffectedStreams(affectedStreams: Set<string>) {
+    if (affectedStreams.size === 0) return;
 
-  private getStreamTimeWindow(
-    streamType: string,
-    configKey: "highDemandTimeWindow" | "httpDownloadTimeWindow",
-  ): number {
-    if (!this.mainStreamConfig || !this.secondaryStreamConfig) {
-      throw new Error("Stream config is not initialized");
-    }
-
-    const config =
-      streamType === "main"
-        ? this.mainStreamConfig
-        : this.secondaryStreamConfig;
-    return config[configKey];
-  }
-}
-
-class EventTarget<
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  EventTypesMap extends { [key: string]: (...args: any[]) => unknown },
-> {
-  private events = new Map<
-    keyof EventTypesMap,
-    EventTypesMap[keyof EventTypesMap][]
-  >();
-
-  public dispatchEvent<K extends keyof EventTypesMap>(
-    eventName: K,
-    ...args: Parameters<EventTypesMap[K]>
-  ) {
-    const listeners = this.events.get(eventName);
-    if (!listeners) return;
-    for (const listener of listeners) {
-      listener(...args);
-    }
-  }
-
-  public getEventDispatcher<K extends keyof EventTypesMap>(eventName: K) {
-    let listeners = this.events.get(eventName);
-    if (!listeners) {
-      listeners = [];
-      this.events.set(eventName, listeners);
-    }
-
-    const definedListeners = listeners;
-
-    return (...args: Parameters<EventTypesMap[K]>) => {
-      for (const listener of definedListeners) {
-        listener(...args);
+    affectedStreams.forEach((stream) => {
+      if (!this.dispatchStorageUpdatedEvent) {
+        throw new Error("dispatchStorageUpdatedEvent is not set");
       }
-    };
+
+      this.dispatchStorageUpdatedEvent(stream);
+    });
   }
 
-  public addEventListener<K extends keyof EventTypesMap>(
-    eventName: K,
-    listener: EventTypesMap[K],
-  ) {
-    const listeners = this.events.get(eventName);
-    if (!listeners) {
-      this.events.set(eventName, [listener]);
-    } else {
-      listeners.push(listener);
-    }
-  }
-
-  public removeEventListener<K extends keyof EventTypesMap>(
-    eventName: K,
-    listener: EventTypesMap[K],
-  ) {
-    const listeners = this.events.get(eventName);
-    if (listeners) {
-      const index = listeners.indexOf(listener);
-      if (index !== -1) {
-        listeners.splice(index, 1);
-      }
-    }
+  private async removeSegmentFromStorage(storageId: string): Promise<void> {
+    await this.db.delete(DATA_ITEMS_STORE_NAME, storageId);
+    await this.db.delete(INFO_ITEMS_STORE_NAME, storageId);
   }
 }
