@@ -125,9 +125,9 @@ export class HybridLoader {
 
       if (hasSegment) {
         const data = await this.segmentStorage.getSegmentData(
+          swarmId,
           streamSwarmId,
           segment.externalId,
-          swarmId,
         );
         if (data) {
           const { queueDownloadRatio } = this.generateQueue();

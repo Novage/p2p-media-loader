@@ -148,9 +148,9 @@ export class P2PLoader {
     const streamSwarmId = StreamUtils.getStreamSwarmId(swarmId, this.stream);
 
     const segmentData = await this.segmentStorage.getSegmentData(
-      streamSwarmId,
-      segmentExternalId,
       swarmId,
+      streamSwarmId,
+      segment.externalId,
     );
     if (!segmentData) {
       peer.sendSegmentAbsentCommand(segmentExternalId, requestId);
