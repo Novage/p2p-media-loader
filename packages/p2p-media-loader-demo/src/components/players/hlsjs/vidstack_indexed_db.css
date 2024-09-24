@@ -10,3 +10,13 @@
   margin: 0;
   color: #8a6d3b;
 }
+
+.source-code-link {
+  color: #0275d8;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.source-code-link:hover {
+  text-decoration: underline;
+}
