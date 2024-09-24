@@ -380,8 +380,9 @@ export class HybridLoader {
   }
 
   private loadRandomThroughHttp() {
-    const availableMemoryPercent = this.getAvailableMemoryPercent();
-    if (availableMemoryPercent <= 10) return;
+    const availableStorageCapacityPercent =
+      this.getAvailableStorageCapacityPercent();
+    if (availableStorageCapacityPercent <= 10) return;
 
     const { simultaneousHttpDownloads, httpErrorRetries } = this.config;
     const p2pLoader = this.p2pLoaders.currentLoader;
@@ -399,7 +400,7 @@ export class HybridLoader {
       this.playback,
       this.config,
       this.p2pLoaders.currentLoader,
-      availableMemoryPercent,
+      availableStorageCapacityPercent,
     )) {
       const swarmId = this.config.swarmId ?? this.streamManifestUrl;
       const streamSwarmId = StreamUtils.getStreamSwarmId(
@@ -494,9 +495,9 @@ export class HybridLoader {
     return false;
   }
 
-  private getAvailableMemoryPercent(): number {
-    const { memoryLimit, memoryUsed } = this.segmentStorage.getUsedMemory();
-    return 100 - (memoryUsed / memoryLimit) * 100;
+  private getAvailableStorageCapacityPercent(): number {
+    const { totalCapacity, usedCapacity } = this.segmentStorage.getUsage();
+    return 100 - (usedCapacity / totalCapacity) * 100;
   }
 
   private generateQueue() {
@@ -505,13 +506,14 @@ export class HybridLoader {
     let maxPossibleLength = 0;
     let alreadyLoadedCount = 0;
 
-    const availableMemoryPercent = this.getAvailableMemoryPercent();
+    const availableStorageCapacityPercent =
+      this.getAvailableStorageCapacityPercent();
     for (const item of QueueUtils.generateQueue(
       this.lastRequestedSegment,
       this.playback,
       this.config,
       this.p2pLoaders.currentLoader,
-      availableMemoryPercent,
+      availableStorageCapacityPercent,
     )) {
       maxPossibleLength++;
       const { segment } = item;

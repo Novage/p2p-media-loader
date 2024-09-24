@@ -30,7 +30,7 @@ import { SegmentStorage } from "./segment-storage/index.js";
 export class Core<TStream extends Stream = Stream> {
   /** Default configuration for common core settings. */
   static readonly DEFAULT_COMMON_CORE_CONFIG: CommonCoreConfig = {
-    segmentsMemoryStorageLimit: undefined,
+    segmentMemoryStorageLimit: undefined,
     customSegmentStorageFactory: undefined,
   };
 

@@ -119,7 +119,7 @@ export type CommonCoreConfig = {
    *
    * @default
    * ```typescript
-   * segmentsMemoryStorageLimit: undefined
+   * segmentMemoryStorageLimit: undefined
    * ```
    *
    * - When `undefined`, the default limit is determined based on the device type and browser:
@@ -130,7 +130,7 @@ export type CommonCoreConfig = {
    *    - iOS WebView: 1000 MB
    *
    */
-  segmentsMemoryStorageLimit: number | undefined;
+  segmentMemoryStorageLimit: number | undefined;
 
   /**
    * Optional custom storage factory for the segments storage.

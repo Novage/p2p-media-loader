@@ -36,7 +36,7 @@ const BYTES_PER_MB = 1048576;
 
 export class SegmentMemoryStorage implements SegmentStorage {
   private readonly userAgent = navigator.userAgent;
-  private segmentsMemoryStorageLimit = 4000;
+  private segmentMemoryStorageLimit = 4000;
   private currentMemoryStorageSize = 0;
 
   private cache = new Map<string, SegmentDataItem>();
@@ -134,11 +134,11 @@ export class SegmentMemoryStorage implements SegmentStorage {
     return dataItem.data;
   }
 
-  getUsedMemory() {
+  getUsage() {
     if (!this.lastRequestedSegment || !this.currentPlayback) {
       return {
-        memoryLimit: this.segmentsMemoryStorageLimit,
-        memoryUsed: this.currentMemoryStorageSize,
+        totalCapacity: this.segmentMemoryStorageLimit,
+        usedCapacity: this.currentMemoryStorageSize,
       };
     }
     const playbackPosition = this.currentPlayback.position;
@@ -155,8 +155,8 @@ export class SegmentMemoryStorage implements SegmentStorage {
     const usedMemoryInMB = this.currentMemoryStorageSize - potentialFreeSpace;
 
     return {
-      memoryLimit: this.segmentsMemoryStorageLimit,
-      memoryUsed: usedMemoryInMB,
+      totalCapacity: this.segmentMemoryStorageLimit,
+      usedCapacity: usedMemoryInMB,
     };
   }
 
@@ -224,7 +224,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
   private isMemoryLimitReached(segmentByteLength: number) {
     return (
       this.currentMemoryStorageSize + segmentByteLength / BYTES_PER_MB >
-      this.segmentsMemoryStorageLimit
+      this.segmentMemoryStorageLimit
     );
   }
 
@@ -273,16 +273,16 @@ export class SegmentMemoryStorage implements SegmentStorage {
   }
 
   private setMemoryStorageLimit() {
-    if (this.coreConfig && this.coreConfig.segmentsMemoryStorageLimit) {
-      this.segmentsMemoryStorageLimit =
-        this.coreConfig.segmentsMemoryStorageLimit;
+    if (this.coreConfig && this.coreConfig.segmentMemoryStorageLimit) {
+      this.segmentMemoryStorageLimit =
+        this.coreConfig.segmentMemoryStorageLimit;
       return;
     }
 
     if (isAndroidWebview(this.userAgent) || isIPadOrIPhone(this.userAgent)) {
-      this.segmentsMemoryStorageLimit = 1000;
+      this.segmentMemoryStorageLimit = 1000;
     } else if (isAndroid(this.userAgent)) {
-      this.segmentsMemoryStorageLimit = 2000;
+      this.segmentMemoryStorageLimit = 2000;
     }
   }
 

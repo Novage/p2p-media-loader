@@ -77,9 +77,9 @@ export interface SegmentStorage {
   /**
    * Returns used memory information in the storage
    */
-  getUsedMemory(): {
-    memoryLimit: number;
-    memoryUsed: number;
+  getUsage(): {
+    totalCapacity: number;
+    usedCapacity: number;
   };
 
   /**
