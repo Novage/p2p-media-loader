@@ -221,8 +221,8 @@ export class SegmentMemoryStorage implements SegmentStorage {
     );
   }
 
-  setSegmentChangeCallback(eventDispatcher: (streamId: string) => void) {
-    this.segmentChangeCallback = eventDispatcher;
+  setSegmentChangeCallback(callback: (streamId: string) => void) {
+    this.segmentChangeCallback = callback;
   }
 
   private sendUpdatesToAffectedStreams(affectedStreams: Set<string>) {
