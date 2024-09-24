@@ -49,7 +49,7 @@ export class P2PLoader {
       `onStorageUpdated-${streamSwarmId}`,
       this.broadcastAnnouncement,
     );
-    this.segmentStorage.setUpdateEventDispatcher((streamId: string) => {
+    this.segmentStorage.setSegmentChangeCallback((streamId: string) => {
       this.eventTarget.dispatchEvent(`onStorageUpdated-${streamId}`);
     });
 
@@ -100,8 +100,8 @@ export class P2PLoader {
     const streamSwarmId = StreamUtils.getStreamSwarmId(swarmId, this.stream);
 
     const loaded: number[] = this.segmentStorage.getStoredSegmentIds(
-      streamSwarmId,
       swarmId,
+      streamSwarmId,
     );
     const httpLoading: number[] = [];
 

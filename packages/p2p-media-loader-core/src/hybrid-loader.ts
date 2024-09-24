@@ -106,11 +106,11 @@ export class HybridLoader {
     const streamSwarmId = StreamUtils.getStreamSwarmId(swarmId, stream);
 
     this.segmentStorage.onSegmentRequested(
+      swarmId,
       streamSwarmId,
       segment.externalId,
       segment.startTime,
       segment.endTime,
-      swarmId,
       stream.type,
       this.streamDetails.isLive,
     );
@@ -118,9 +118,9 @@ export class HybridLoader {
 
     try {
       const hasSegment = this.segmentStorage.hasSegment(
+        swarmId,
         streamSwarmId,
         segment.externalId,
-        swarmId,
       );
 
       if (hasSegment) {
@@ -211,12 +211,12 @@ export class HybridLoader {
           const streamSwarmId = StreamUtils.getStreamSwarmId(swarmId, stream);
 
           void this.segmentStorage.storeSegment(
+            swarmId,
             streamSwarmId,
             segment.externalId,
             request.data,
             segment.startTime,
             segment.endTime,
-            swarmId,
             segment.stream.type,
             this.streamDetails.isLive,
           );
@@ -412,9 +412,9 @@ export class HybridLoader {
         !statuses.isHttpDownloadable ||
         statuses.isP2PDownloadable ||
         this.segmentStorage.hasSegment(
+          swarmId,
           streamSwarmId,
           segment.externalId,
-          swarmId,
         )
       ) {
         continue;
@@ -526,9 +526,9 @@ export class HybridLoader {
 
       if (
         this.segmentStorage.hasSegment(
+          swarmId,
           streamSwarmId,
           segment.externalId,
-          swarmId,
         ) ||
         this.requests.get(segment)?.status === "succeed"
       ) {

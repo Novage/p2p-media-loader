@@ -22,42 +22,42 @@ export interface SegmentStorage {
 
   /**
    * Provides segment request information from player
+   * @param swarmId - Swarm identifier
    * @param streamId - Stream identifier
    * @param segmentId - Segment identifier
    * @param startTime - Segment start time
    * @param endTime - Segment end time
-   * @param swarmId - Swarm identifier
    * @param streamType - Stream type
    * @param isLiveStream - Is live stream
    */
   onSegmentRequested(
+    swarmId: string,
     streamId: string,
     segmentId: number,
     startTime: number,
     endTime: number,
-    swarmId: string,
     streamType: StreamType,
     isLiveStream: boolean,
   ): void;
 
   /**
    * Stores segment data
+   * @param swarmId - Swarm identifier
    * @param streamId - Stream identifier
    * @param segmentId - Segment identifier
    * @param data - Segment data
    * @param startTime - Segment start time
    * @param endTime - Segment end time
-   * @param swarmId - Swarm identifier
    * @param streamType - Stream type
    * @param isLiveStream - Is live stream
    */
   storeSegment(
+    swarmId: string,
     streamId: string,
     segmentId: number,
     data: ArrayBuffer,
     startTime: number,
     endTime: number,
-    swarmId: string,
     streamType: StreamType,
     isLiveStream: boolean,
   ): Promise<void>;
@@ -84,24 +84,24 @@ export interface SegmentStorage {
 
   /**
    * Returns true if segment is in storage
+   * @param swarmId - Swarm identifier
    * @param streamId - Stream identifier
    * @param segmentId - Segment identifier
-   * @param swarmId - Swarm identifier
    */
-  hasSegment(streamId: string, segmentId: number, swarmId: string): boolean;
+  hasSegment(swarmId: string, streamId: string, segmentId: number): boolean;
 
   /**
    * Returns segment IDs of a stream that are stored in the storage
-   * @param streamId - Stream identifier
    * @param swarmId - Swarm identifier
+   * @param streamId - Stream identifier
    */
-  getStoredSegmentIds(streamId: string, swarmId: string): number[];
+  getStoredSegmentIds(swarmId: string, streamId: string): number[];
 
   /**
-   * Sets event dispatcher for storage update
-   * @param eventDispatcher - Event dispatcher
+   * Sets segment change callback function
+   * @param callback - Callback function that has to be called when segments appear or disappear in the storage
    */
-  setUpdateEventDispatcher(eventDispatcher: (streamId: string) => void): void;
+  setSegmentChangeCallback(callback: (streamId: string) => void): void;
 
   /**
    * Function to destroy storage
