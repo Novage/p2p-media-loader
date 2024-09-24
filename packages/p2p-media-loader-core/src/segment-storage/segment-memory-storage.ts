@@ -162,7 +162,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
     return segment !== undefined;
   }
 
-  getStoredSegmentIds(streamId: string, _swarmId: string) {
+  getStoredSegmentIds(_swarmId: string, streamId: string) {
     const externalIds: number[] = [];
 
     for (const { segmentId, streamId: streamCacheId } of this.cache.values()) {
