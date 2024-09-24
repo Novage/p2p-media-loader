@@ -115,7 +115,7 @@ export type DynamicCoreConfig = Partial<
 /** Represents the configuration for the Core functionality that is common to all streams. */
 export type CommonCoreConfig = {
   /**
-   * Defines the memory storage limit for media segments, in MB.
+   * Defines the memory storage limit for media segments, in MiB.
    *
    * @default
    * ```typescript
@@ -123,11 +123,11 @@ export type CommonCoreConfig = {
    * ```
    *
    * - When `undefined`, the default limit is determined based on the device type and browser:
-   *    - Desktop: 4000 MB
-   *    - Android: 2000 MB
-   *    - iOS: 1000 MB
-   *    - Android WebView: 1000 MB
-   *    - iOS WebView: 1000 MB
+   *    - Desktop: 4000 MiB
+   *    - Android: 2000 MiB
+   *    - iOS: 1000 MiB
+   *    - Android WebView: 1000 MiB
+   *    - iOS WebView: 1000 MiB
    *
    */
   segmentMemoryStorageLimit: number | undefined;

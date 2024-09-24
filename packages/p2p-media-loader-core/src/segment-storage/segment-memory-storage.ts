@@ -32,7 +32,7 @@ type LastRequestedSegmentInfo = {
   isLiveStream: boolean;
 };
 
-const BYTES_PER_MB = 1048576;
+const BYTES_PER_MiB = 1048576;
 
 export class SegmentMemoryStorage implements SegmentStorage {
   private readonly userAgent = navigator.userAgent;
@@ -46,7 +46,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
   private secondaryStreamConfig?: StreamConfig;
   private currentPlayback?: Playback;
   private lastRequestedSegment?: LastRequestedSegmentInfo;
-  private dispatchStorageUpdatedEvent?: (streamId: string) => void;
+  private segmentChangeCallback?: (streamId: string) => void;
 
   constructor() {
     this.logger = debug("p2pml-core:segment-memory-storage");
@@ -72,11 +72,11 @@ export class SegmentMemoryStorage implements SegmentStorage {
   }
 
   onSegmentRequested(
+    swarmId: string,
     streamId: string,
     segmentId: number,
     startTime: number,
     endTime: number,
-    swarmId: string,
     streamType: StreamType,
     isLiveStream: boolean,
   ): void {
@@ -93,16 +93,16 @@ export class SegmentMemoryStorage implements SegmentStorage {
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async storeSegment(
+    _swarmId: string,
     streamId: string,
     segmentId: number,
     data: ArrayBuffer,
     startTime: number,
     endTime: number,
-    _swarmId: string,
     streamType: StreamType,
     isLiveStream: boolean,
   ) {
-    void this.clear(isLiveStream, data.byteLength);
+    this.clear(isLiveStream, data.byteLength);
 
     const storageId = getStorageItemId(streamId, segmentId);
     this.cache.set(storageId, {
@@ -113,15 +113,14 @@ export class SegmentMemoryStorage implements SegmentStorage {
       endTime,
       streamType,
     });
-    this.increaseMemoryStorageSize(data.byteLength);
 
     this.logger(`add segment: ${segmentId} to ${streamId}`);
 
-    if (!this.dispatchStorageUpdatedEvent) {
+    if (!this.segmentChangeCallback) {
       throw new Error("dispatchStorageUpdatedEvent is not set");
     }
 
-    this.dispatchStorageUpdatedEvent(streamId);
+    this.segmentChangeCallback(streamId);
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
@@ -143,24 +142,20 @@ export class SegmentMemoryStorage implements SegmentStorage {
     }
     const playbackPosition = this.currentPlayback.position;
 
-    let potentialFreeSpace = 0;
-    for (const segmentData of this.cache.values()) {
-      const { endTime } = segmentData;
+    let calculatedUsedCapacity = 0;
+    for (const { endTime, data } of this.cache.values()) {
+      if (playbackPosition > endTime) continue;
 
-      if (playbackPosition <= endTime) continue;
-
-      potentialFreeSpace += segmentData.data.byteLength / BYTES_PER_MB;
+      calculatedUsedCapacity += data.byteLength;
     }
-
-    const usedMemoryInMB = this.currentMemoryStorageSize - potentialFreeSpace;
 
     return {
       totalCapacity: this.segmentMemoryStorageLimit,
-      usedCapacity: usedMemoryInMB,
+      usedCapacity: calculatedUsedCapacity / BYTES_PER_MiB,
     };
   }
 
-  hasSegment(streamId: string, externalId: number, _swarmId: string) {
+  hasSegment(_swarmId: string, streamId: string, externalId: number) {
     const segmentStorageId = getStorageItemId(streamId, externalId);
     const segment = this.cache.get(segmentStorageId);
 
@@ -178,8 +173,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
     return externalIds;
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  private async clear(isLiveStream: boolean, newSegmentSize: number) {
+  private clear(isLiveStream: boolean, newSegmentSize: number) {
     if (
       !this.currentPlayback ||
       !this.mainStreamConfig ||
@@ -210,7 +204,6 @@ export class SegmentMemoryStorage implements SegmentStorage {
 
       if (!shouldRemove) continue;
 
-      this.decreaseMemoryStorageSize(segmentData.data.byteLength);
       this.cache.delete(storageId);
       affectedStreams.add(streamId);
       this.logger(`Removed segment ${segmentId} from stream ${streamId}`);
@@ -223,33 +216,25 @@ export class SegmentMemoryStorage implements SegmentStorage {
 
   private isMemoryLimitReached(segmentByteLength: number) {
     return (
-      this.currentMemoryStorageSize + segmentByteLength / BYTES_PER_MB >
+      this.currentMemoryStorageSize + segmentByteLength / BYTES_PER_MiB >
       this.segmentMemoryStorageLimit
     );
   }
 
-  setUpdateEventDispatcher(eventDispatcher: (streamId: string) => void) {
-    this.dispatchStorageUpdatedEvent = eventDispatcher;
+  setSegmentChangeCallback(eventDispatcher: (streamId: string) => void) {
+    this.segmentChangeCallback = eventDispatcher;
   }
 
   private sendUpdatesToAffectedStreams(affectedStreams: Set<string>) {
     if (affectedStreams.size === 0) return;
 
     affectedStreams.forEach((stream) => {
-      if (!this.dispatchStorageUpdatedEvent) {
+      if (!this.segmentChangeCallback) {
         throw new Error("dispatchStorageUpdatedEvent is not set");
       }
 
-      this.dispatchStorageUpdatedEvent(stream);
+      this.segmentChangeCallback(stream);
     });
-  }
-
-  private increaseMemoryStorageSize(byteLength: number) {
-    this.currentMemoryStorageSize += byteLength / BYTES_PER_MB;
-  }
-
-  private decreaseMemoryStorageSize(byteLength: number) {
-    this.currentMemoryStorageSize -= byteLength / BYTES_PER_MB;
   }
 
   private shouldRemoveSegment(
