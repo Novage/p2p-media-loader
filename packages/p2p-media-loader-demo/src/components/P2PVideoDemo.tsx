@@ -20,6 +20,7 @@ import { ShakaPlyr } from "./players/shaka/ShakaPlyr";
 import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 import { HlsjsVidstack } from "./players/hlsjs/HlsjsVidstack";
 import { PeerDetails } from "p2p-media-loader-core";
+import { HlsjsVidstackIndexedDB } from "./players/hlsjs/HlsjsVidstackIndexedDB";
 
 type DemoProps = {
   debugToolsEnabled?: boolean;
@@ -45,6 +46,7 @@ const playerComponents = {
   clappr_hls: HlsjsClapprPlayer,
   dplayer_hls: HlsjsDPlayer,
   hlsjs_hls: HlsjsPlayer,
+  vidstack_indexeddb_hls: HlsjsVidstackIndexedDB,
   shaka: Shaka,
   dplayer_shaka: ShakaDPlayer,
   clappr_shaka: ShakaClappr,
