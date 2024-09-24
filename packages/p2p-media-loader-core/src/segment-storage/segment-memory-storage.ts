@@ -124,7 +124,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
-  async getSegmentData(streamId: string, segmentId: number, _swarmId: string) {
+  async getSegmentData(_swarmId: string, streamId: string, segmentId: number) {
     const segmentStorageId = getStorageItemId(streamId, segmentId);
     const dataItem = this.cache.get(segmentStorageId);
 

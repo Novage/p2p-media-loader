@@ -64,14 +64,14 @@ export interface SegmentStorage {
 
   /**
    * Returns segment data
+   * @param swarmId - Swarm identifier
    * @param streamId - Stream identifier
    * @param segmentId - Segment identifier
-   * @param swarmId - Swarm identifier
    */
   getSegmentData(
+    swarmId: string,
     streamId: string,
     segmentId: number,
-    swarmId: string,
   ): Promise<ArrayBuffer | undefined>;
 
   /**
