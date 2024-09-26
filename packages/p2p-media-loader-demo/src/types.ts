@@ -22,6 +22,7 @@ export type PlayerName = (typeof PLAYERS)[PlayerKey];
 export type PlayerProps = {
   streamUrl: string;
   announceTrackers: string[];
+  swarmId?: string;
 } & Partial<
   Pick<
     CoreEventMap,
@@ -29,4 +30,7 @@ export type PlayerProps = {
   >
 >;
 
-export type PlayerEvents = Omit<PlayerProps, "streamUrl" | "announceTrackers">;
+export type PlayerEvents = Omit<
+  PlayerProps,
+  "streamUrl" | "announceTrackers" | "swarmId"
+>;

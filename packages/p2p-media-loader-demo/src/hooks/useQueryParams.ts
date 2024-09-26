@@ -8,6 +8,7 @@ const defaultParams: QueryParamsType = {
   streamUrl: DEFAULT_STREAM,
   trackers: DEFAULT_TRACKERS,
   debug: "",
+  swarmId: "",
 };
 
 function getInitialParams(searchParams: URLSearchParams): QueryParamsType {

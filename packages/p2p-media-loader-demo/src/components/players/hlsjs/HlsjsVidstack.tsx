@@ -19,6 +19,7 @@ import Hls from "hls.js";
 export const HlsjsVidstack = ({
   streamUrl,
   announceTrackers,
+  swarmId,
   onPeerConnect,
   onPeerClose,
   onChunkDownloaded,
@@ -35,6 +36,7 @@ export const HlsjsVidstack = ({
           p2p: {
             core: {
               announceTrackers,
+              swarmId,
             },
             onHlsJsCreated: (hls) => {
               subscribeToUiEvents({
@@ -57,6 +59,7 @@ export const HlsjsVidstack = ({
       onChunkUploaded,
       onPeerConnect,
       onPeerClose,
+      swarmId,
     ],
   );
 

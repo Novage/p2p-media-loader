@@ -8,6 +8,7 @@ import Hls from "hls.js";
 export const HlsjsPlayer = ({
   streamUrl,
   announceTrackers,
+  swarmId,
   onPeerConnect,
   onPeerClose,
   onChunkDownloaded,
@@ -30,6 +31,7 @@ export const HlsjsPlayer = ({
       p2p: {
         core: {
           announceTrackers,
+          swarmId,
         },
         onHlsJsCreated(hls) {
           subscribeToUiEvents({
@@ -59,6 +61,7 @@ export const HlsjsPlayer = ({
     onChunkUploaded,
     streamUrl,
     announceTrackers,
+    swarmId,
   ]);
 
   const updateQualityOptions = (hls: Hls, selectElement: HTMLSelectElement) => {

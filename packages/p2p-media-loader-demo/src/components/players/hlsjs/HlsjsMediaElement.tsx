@@ -9,6 +9,7 @@ import { PlayerProps } from "../../../types";
 export const HlsjsMediaElement = ({
   streamUrl,
   announceTrackers,
+  swarmId,
   onPeerConnect,
   onPeerClose,
   onChunkDownloaded,
@@ -49,6 +50,7 @@ export const HlsjsMediaElement = ({
           },
           core: {
             announceTrackers,
+            swarmId,
           },
         },
       },
@@ -70,6 +72,7 @@ export const HlsjsMediaElement = ({
     onPeerConnect,
     onPeerClose,
     streamUrl,
+    swarmId,
   ]);
 
   return isHlsSupported ? (

@@ -8,6 +8,7 @@ import shaka from "./shaka-import";
 export const ShakaDPlayer = ({
   streamUrl,
   announceTrackers,
+  swarmId,
   onPeerConnect,
   onPeerClose,
   onChunkDownloaded,
@@ -32,6 +33,7 @@ export const ShakaDPlayer = ({
       {
         core: {
           announceTrackers,
+          swarmId,
         },
       },
       shaka,
@@ -73,6 +75,7 @@ export const ShakaDPlayer = ({
     onPeerConnect,
     onPeerClose,
     streamUrl,
+    swarmId,
   ]);
 
   return isShakaSupported ? (

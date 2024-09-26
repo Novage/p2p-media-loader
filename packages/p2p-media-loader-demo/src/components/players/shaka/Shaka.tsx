@@ -8,6 +8,7 @@ import { createVideoElements, subscribeToUiEvents } from "../utils";
 export const Shaka = ({
   streamUrl,
   announceTrackers,
+  swarmId,
   onPeerConnect,
   onPeerClose,
   onChunkDownloaded,
@@ -61,6 +62,7 @@ export const Shaka = ({
         {
           core: {
             announceTrackers,
+            swarmId,
           },
         },
         shaka,
@@ -109,6 +111,7 @@ export const Shaka = ({
     onPeerConnect,
     onPeerClose,
     streamUrl,
+    swarmId,
   ]);
 
   return isShakaSupported ? (

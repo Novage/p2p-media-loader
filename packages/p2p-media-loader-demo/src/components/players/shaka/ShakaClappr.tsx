@@ -15,6 +15,7 @@ const SCRIPTS = [
 export const ShakaClappr = ({
   streamUrl,
   announceTrackers,
+  swarmId,
   onPeerConnect,
   onPeerClose,
   onChunkDownloaded,
@@ -61,6 +62,7 @@ export const ShakaClappr = ({
     const shakaP2PEngine = new ShakaP2PEngine({
       core: {
         announceTrackers,
+        swarmId,
       },
     });
 
@@ -103,6 +105,7 @@ export const ShakaClappr = ({
     onPeerConnect,
     onPeerClose,
     streamUrl,
+    swarmId,
   ]);
 
   return isShakaSupported ? (
