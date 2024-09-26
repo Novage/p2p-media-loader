@@ -15,7 +15,7 @@ import {
 import { BandwidthCalculators, StreamDetails } from "./internal-types.js";
 import * as StreamUtils from "./utils/stream.js";
 import { BandwidthCalculator } from "./bandwidth-calculator.js";
-import { SegmentsMemoryStorage } from "./segments-storage.js";
+import { SegmentMemoryStorage } from "./segment-storage/segment-memory-storage.js";
 import { EventTarget } from "./utils/event-target.js";
 import {
   overrideConfig,
@@ -24,13 +24,14 @@ import {
   filterUndefinedProps,
 } from "./utils/utils.js";
 import { TRACKER_CLIENT_VERSION_PREFIX } from "./utils/peer.js";
+import { SegmentStorage } from "./segment-storage/index.js";
 
 /** Core class for managing media streams loading via P2P. */
 export class Core<TStream extends Stream = Stream> {
   /** Default configuration for common core settings. */
   static readonly DEFAULT_COMMON_CORE_CONFIG: CommonCoreConfig = {
-    cachedSegmentExpiration: undefined,
-    cachedSegmentsCount: 0,
+    segmentMemoryStorageLimit: undefined,
+    customSegmentStorageFactory: undefined,
   };
 
   /** Default configuration for stream settings. */
@@ -74,7 +75,7 @@ export class Core<TStream extends Stream = Stream> {
     all: new BandwidthCalculator(),
     http: new BandwidthCalculator(),
   };
-  private segmentStorage?: SegmentsMemoryStorage;
+  private segmentStorage?: SegmentStorage;
   private mainStreamLoader?: HybridLoader;
   private secondaryStreamLoader?: HybridLoader;
   private streamDetails: StreamDetails = {
@@ -280,10 +281,7 @@ export class Core<TStream extends Stream = Stream> {
       throw new Error("Manifest response url is not defined");
     }
 
-    if (!this.segmentStorage) {
-      this.segmentStorage = new SegmentsMemoryStorage(this.commonCoreConfig);
-      await this.segmentStorage.initialize();
-    }
+    await this.initializeSegmentStorage();
 
     const segment = this.identifySegment(segmentRuntimeId);
 
@@ -327,7 +325,7 @@ export class Core<TStream extends Stream = Stream> {
   }
 
   /**
-   * Updates the 'isLive' status of the stream.
+   * Updates the 'isLive' status of the stream
    *
    * @param isLive - Boolean indicating whether the stream is live.
    */
@@ -372,12 +370,36 @@ export class Core<TStream extends Stream = Stream> {
     this.streams.clear();
     this.mainStreamLoader?.destroy();
     this.secondaryStreamLoader?.destroy();
-    void this.segmentStorage?.destroy();
+    this.segmentStorage?.destroy();
     this.mainStreamLoader = undefined;
     this.secondaryStreamLoader = undefined;
     this.segmentStorage = undefined;
     this.manifestResponseUrl = undefined;
     this.streamDetails = { isLive: false, activeLevelBitrate: 0 };
+  }
+
+  private async initializeSegmentStorage() {
+    if (this.segmentStorage) return;
+
+    const isLive = this.streamDetails.isLive;
+    const createCustomStorage =
+      this.commonCoreConfig.customSegmentStorageFactory;
+
+    if (createCustomStorage && typeof createCustomStorage !== "function") {
+      throw new Error("Storage configuration is invalid");
+    }
+
+    const segmentStorage = createCustomStorage
+      ? createCustomStorage(isLive)
+      : new SegmentMemoryStorage();
+
+    await segmentStorage.initialize(
+      this.commonCoreConfig,
+      this.mainStreamConfig,
+      this.secondaryStreamConfig,
+    );
+
+    this.segmentStorage = segmentStorage;
   }
 
   private identifySegment(segmentRuntimeId: string): SegmentWithStream {
@@ -439,7 +461,7 @@ export class Core<TStream extends Stream = Stream> {
       throw new Error("Manifest response url is not defined");
     }
 
-    if (!this.segmentStorage?.isInitialized) {
+    if (!this.segmentStorage) {
       throw new Error("Segment storage is not initialized");
     }
 

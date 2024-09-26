@@ -5,11 +5,12 @@ import {
   Stream,
   StreamConfig,
   StreamWithSegments,
+  SegmentStorage,
 } from "../index.js";
 import { RequestsContainer } from "../requests/request-container.js";
-import { SegmentsMemoryStorage } from "../segments-storage.js";
 import * as LoggerUtils from "../utils/logger.js";
 import { EventTarget } from "../utils/event-target.js";
+import * as StreamUtils from "../utils/stream.js";
 
 type P2PLoaderContainerItem = {
   stream: Stream;
@@ -27,7 +28,7 @@ export class P2PLoadersContainer {
     private readonly streamManifestUrl: string,
     stream: StreamWithSegments,
     private readonly requests: RequestsContainer,
-    private readonly segmentStorage: SegmentsMemoryStorage,
+    private readonly segmentStorage: SegmentStorage,
     private readonly config: StreamConfig,
     private readonly eventTarget: EventTarget<CoreEventMap>,
     private onSegmentAnnouncement: () => void,
@@ -64,8 +65,14 @@ export class P2PLoadersContainer {
   changeCurrentLoader(stream: StreamWithSegments) {
     const loaderItem = this.loaders.get(stream.runtimeId);
     if (this._currentLoaderItem) {
-      const ids = this.segmentStorage.getStoredSegmentExternalIdsOfStream(
+      const swarmId = this.config.swarmId ?? this.streamManifestUrl;
+      const streamSwarmId = StreamUtils.getStreamSwarmId(
+        swarmId,
         this._currentLoaderItem.stream,
+      );
+      const ids = this.segmentStorage.getStoredSegmentIds(
+        swarmId,
+        streamSwarmId,
       );
       if (!ids.length) this.destroyAndRemoveLoader(this._currentLoaderItem);
       else this.setLoaderDestroyTimeout(this._currentLoaderItem);
