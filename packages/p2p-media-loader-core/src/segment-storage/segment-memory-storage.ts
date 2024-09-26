@@ -36,7 +36,7 @@ const BYTES_PER_MiB = 1048576;
 
 export class SegmentMemoryStorage implements SegmentStorage {
   private readonly userAgent = navigator.userAgent;
-  private segmentMemoryStorageLimit = 4000;
+  private segmentMemoryStorageLimit = 4 * 1024;
   private currentMemoryStorageSize = 0;
 
   private cache = new Map<string, SegmentDataItem>();
@@ -265,9 +265,9 @@ export class SegmentMemoryStorage implements SegmentStorage {
     }
 
     if (isAndroidWebview(this.userAgent) || isIPadOrIPhone(this.userAgent)) {
-      this.segmentMemoryStorageLimit = 1000;
+      this.segmentMemoryStorageLimit = 1024;
     } else if (isAndroid(this.userAgent)) {
-      this.segmentMemoryStorageLimit = 2000;
+      this.segmentMemoryStorageLimit = 2 * 1024;
     }
   }
 

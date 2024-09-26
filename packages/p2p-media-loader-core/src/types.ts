@@ -123,11 +123,11 @@ export type CommonCoreConfig = {
    * ```
    *
    * - When `undefined`, the default limit is determined based on the device type and browser:
-   *    - Desktop: 4000 MiB
-   *    - Android: 2000 MiB
-   *    - iOS: 1000 MiB
-   *    - Android WebView: 1000 MiB
-   *    - iOS WebView: 1000 MiB
+   *    - Desktop: 4096 MiB
+   *    - Android: 2048 MiB
+   *    - iOS: 1024 MiB
+   *    - Android WebView: 1024 MiB
+   *    - iOS WebView: 1024 MiB
    *
    */
   segmentMemoryStorageLimit: number | undefined;
