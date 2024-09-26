@@ -9,6 +9,7 @@ import { createVideoElements, subscribeToUiEvents } from "../utils";
 export const HlsjsPlyr = ({
   streamUrl,
   announceTrackers,
+  swarmId,
   onPeerConnect,
   onPeerClose,
   onChunkDownloaded,
@@ -37,6 +38,7 @@ export const HlsjsPlyr = ({
       p2p: {
         core: {
           announceTrackers,
+          swarmId,
         },
         onHlsJsCreated(hls) {
           subscribeToUiEvents({
@@ -88,6 +90,7 @@ export const HlsjsPlyr = ({
     onPeerConnect,
     onPeerClose,
     streamUrl,
+    swarmId,
   ]);
 
   return isHlsSupported ? (

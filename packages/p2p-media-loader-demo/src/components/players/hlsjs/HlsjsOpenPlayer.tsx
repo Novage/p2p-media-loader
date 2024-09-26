@@ -9,6 +9,7 @@ import { createVideoElements, subscribeToUiEvents } from "../utils";
 export const HlsjsOpenPlayer = ({
   streamUrl,
   announceTrackers,
+  swarmId,
   onPeerConnect,
   onPeerClose,
   onChunkDownloaded,
@@ -58,7 +59,8 @@ export const HlsjsOpenPlayer = ({
               });
             },
             core: {
-              trackers: announceTrackers,
+              announceTrackers,
+              swarmId,
             },
           },
         },
@@ -103,6 +105,7 @@ export const HlsjsOpenPlayer = ({
     onPeerConnect,
     onPeerClose,
     streamUrl,
+    swarmId,
   ]);
 
   return isHlsSupported ? (

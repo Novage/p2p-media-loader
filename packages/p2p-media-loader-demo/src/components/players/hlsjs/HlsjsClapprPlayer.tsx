@@ -14,6 +14,7 @@ const SCRIPTS = [
 export const HlsjsClapprPlayer = ({
   streamUrl,
   announceTrackers,
+  swarmId,
   onPeerConnect,
   onPeerClose,
   onChunkDownloaded,
@@ -35,6 +36,7 @@ export const HlsjsClapprPlayer = ({
     const engine = new HlsJsP2PEngine({
       core: {
         announceTrackers,
+        swarmId,
       },
     });
 
@@ -79,6 +81,7 @@ export const HlsjsClapprPlayer = ({
     onPeerConnect,
     onPeerClose,
     streamUrl,
+    swarmId,
   ]);
 
   return isHlsSupported ? (
