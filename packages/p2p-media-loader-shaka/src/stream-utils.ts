@@ -75,14 +75,12 @@ export function getSegmentInfoFromReference(
   };
 }
 
-export function getStreamLastMediaSequence(
-  stream: StreamWithReadonlySegments,
-): number | undefined {
+export function getStreamLastMediaSequence(stream: StreamWithReadonlySegments) {
   const { shakaStream } = stream;
   const map = shakaStream.mediaSequenceTimeMap;
   if (!map) return;
 
-  const firstMediaSequence = map.keys().next().value as number | undefined;
+  const firstMediaSequence = map.keys().next().value;
   if (firstMediaSequence === undefined) return;
   return firstMediaSequence + map.size - 1;
 }

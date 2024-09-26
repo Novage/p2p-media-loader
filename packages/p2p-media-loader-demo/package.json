@@ -47,27 +47,27 @@
     "clean-with-modules": "rimraf node_modules && pnpm clean"
   },
   "dependencies": {
-    "@vidstack/react": "^1.11.24",
+    "@vidstack/react": "^1.12.11",
     "d3": "^7.9.0",
     "dplayer": "^1.27.1",
-    "hls.js": "^1.5.14",
+    "hls.js": "^1.5.15",
     "mediaelement": "^7.0.5",
-    "openplayerjs": "^2.14.4",
+    "openplayerjs": "^2.14.5",
     "p2p-media-loader-core": "workspace:*",
     "p2p-media-loader-hlsjs": "workspace:*",
     "p2p-media-loader-shaka": "workspace:*",
     "plyr": "^3.7.8",
-    "shaka-player": "^4.10.9"
+    "shaka-player": "^4.11.6"
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",
     "@types/dplayer": "^1.25.5",
-    "@types/react": "^18.3.3",
+    "@types/react": "^18.3.9",
     "@types/react-dom": "^18.3.0",
     "cpy-cli": "^5.0.0",
-    "eslint-plugin-react": "^7.35.0",
+    "eslint-plugin-react": "^7.36.1",
     "eslint-plugin-react-hooks": "^4.6.2",
-    "eslint-plugin-react-refresh": "^0.4.9",
+    "eslint-plugin-react-refresh": "^0.4.12",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
