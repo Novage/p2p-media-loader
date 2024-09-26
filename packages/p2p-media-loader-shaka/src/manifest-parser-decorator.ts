@@ -218,7 +218,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
 
     // For version 4.2; Retrieving mediaSequence map for each HLS playlist
     const manifestVariantsMap = maps.find((map) => {
-      const item = map.values().next().value as unknown;
+      const item = map.values().next().value;
 
       return (
         // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
@@ -237,8 +237,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       const mediaSequenceTimeMap = getMapPropertiesFromObject(
         variant as Record<string, unknown>,
       ).find((map) => {
-        const [key, value] =
-          (map.entries().next().value as [unknown, unknown] | undefined) ?? [];
+        const [key, value] = map.entries().next().value ?? [];
         return typeof key === "number" && typeof value === "number";
       });
 
