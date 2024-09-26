@@ -23,6 +23,7 @@ import { PeerDetails } from "p2p-media-loader-core";
 import { HlsjsVidstackIndexedDB } from "./players/hlsjs/HlsjsVidstackIndexedDB";
 
 type DemoProps = {
+  streamUrl?: string;
   debugToolsEnabled?: boolean;
 };
 
@@ -55,7 +56,10 @@ const playerComponents = {
   vidstack_hls: HlsjsVidstack,
 };
 
-export const P2PVideoDemo = ({ debugToolsEnabled = false }: DemoProps) => {
+export const P2PVideoDemo = ({
+  streamUrl,
+  debugToolsEnabled = false,
+}: DemoProps) => {
   const data = useRef<DownloadStats>({
     httpDownloaded: 0,
     p2pDownloaded: 0,
@@ -117,7 +121,7 @@ export const P2PVideoDemo = ({ debugToolsEnabled = false }: DemoProps) => {
 
     return PlayerComponent ? (
       <PlayerComponent
-        streamUrl={queryParams.streamUrl}
+        streamUrl={streamUrl ?? queryParams.streamUrl}
         announceTrackers={trackers}
         onPeerConnect={onPeerConnect}
         onPeerClose={onPeerClose}
