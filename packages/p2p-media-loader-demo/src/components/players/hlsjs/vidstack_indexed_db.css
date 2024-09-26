@@ -1,0 +1,22 @@
+.notice {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid #f0ad4e;
+  background-color: #fcf8e3;
+  border-radius: 4px;
+}
+
+.notice p {
+  margin: 0;
+  color: #8a6d3b;
+}
+
+.source-code-link {
+  color: #0275d8;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.source-code-link:hover {
+  text-decoration: underline;
+}
