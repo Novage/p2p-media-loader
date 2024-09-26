@@ -20,8 +20,10 @@ import { ShakaPlyr } from "./players/shaka/ShakaPlyr";
 import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 import { HlsjsVidstack } from "./players/hlsjs/HlsjsVidstack";
 import { PeerDetails } from "p2p-media-loader-core";
+import { HlsjsVidstackIndexedDB } from "./players/hlsjs/HlsjsVidstackIndexedDB";
 
 type DemoProps = {
+  streamUrl?: string;
   debugToolsEnabled?: boolean;
 };
 
@@ -45,6 +47,7 @@ const playerComponents = {
   clappr_hls: HlsjsClapprPlayer,
   dplayer_hls: HlsjsDPlayer,
   hlsjs_hls: HlsjsPlayer,
+  vidstack_indexeddb_hls: HlsjsVidstackIndexedDB,
   shaka: Shaka,
   dplayer_shaka: ShakaDPlayer,
   clappr_shaka: ShakaClappr,
@@ -53,7 +56,10 @@ const playerComponents = {
   vidstack_hls: HlsjsVidstack,
 };
 
-export const P2PVideoDemo = ({ debugToolsEnabled = false }: DemoProps) => {
+export const P2PVideoDemo = ({
+  streamUrl,
+  debugToolsEnabled = false,
+}: DemoProps) => {
   const data = useRef<DownloadStats>({
     httpDownloaded: 0,
     p2pDownloaded: 0,
@@ -115,7 +121,7 @@ export const P2PVideoDemo = ({ debugToolsEnabled = false }: DemoProps) => {
 
     return PlayerComponent ? (
       <PlayerComponent
-        streamUrl={queryParams.streamUrl}
+        streamUrl={streamUrl ?? queryParams.streamUrl}
         announceTrackers={trackers}
         swarmId={queryParams.swarmId === "" ? undefined : queryParams.swarmId}
         onPeerConnect={onPeerConnect}

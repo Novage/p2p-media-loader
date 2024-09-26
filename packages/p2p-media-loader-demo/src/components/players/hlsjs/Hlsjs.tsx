@@ -1,4 +1,4 @@
-import "./Hlsjs.css";
+import "./hlsjs.css";
 import { useEffect, useRef, useState } from "react";
 import { PlayerProps } from "../../../types";
 import { subscribeToUiEvents } from "../utils";
