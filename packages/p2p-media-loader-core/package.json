@@ -56,13 +56,13 @@
   "dependencies": {
     "@types/debug": "^4.1.12",
     "bittorrent-tracker": "^11.1.2",
-    "debug": "^4.3.6",
+    "debug": "^4.3.7",
     "nano-md5": "^1.0.5"
   },
   "devDependencies": {
     "@rollup/plugin-terser": "^0.4.4",
     "@types/streamx": "^2.9.5",
     "vite-plugin-node-polyfills": "^0.22.0",
-    "vitest": "^2.0.5"
+    "vitest": "^2.1.1"
   }
 }
