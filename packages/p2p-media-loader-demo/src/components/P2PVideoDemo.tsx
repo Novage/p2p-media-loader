@@ -66,7 +66,7 @@ export const P2PVideoDemo = ({
     p2pUploaded: 0,
   });
 
-  const { queryParams, setURLQueryParams } = useQueryParams();
+  const { queryParams, setURLQueryParams } = useQueryParams(streamUrl);
 
   const trackers = useMemo(
     () => queryParams.trackers.split(","),
@@ -121,7 +121,7 @@ export const P2PVideoDemo = ({
 
     return PlayerComponent ? (
       <PlayerComponent
-        streamUrl={streamUrl ?? queryParams.streamUrl}
+        streamUrl={queryParams.streamUrl}
         announceTrackers={trackers}
         swarmId={queryParams.swarmId === "" ? undefined : queryParams.swarmId}
         onPeerConnect={onPeerConnect}
