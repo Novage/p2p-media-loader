@@ -37,7 +37,7 @@ const BYTES_PER_MiB = 1048576;
 export class SegmentMemoryStorage implements SegmentStorage {
   private readonly userAgent = navigator.userAgent;
   private segmentMemoryStorageLimit = 4 * 1024;
-  private currentMemoryStorageSize = 0;
+  private currentStorageUsage = 0;
 
   private cache = new Map<string, SegmentDataItem>();
   private readonly logger: debug.Debugger;
@@ -113,6 +113,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
       endTime,
       streamType,
     });
+    this.increaseStorageUsage(data.byteLength);
 
     this.logger(`add segment: ${segmentId} to ${streamId}`);
 
@@ -137,7 +138,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
     if (!this.lastRequestedSegment || !this.currentPlayback) {
       return {
         totalCapacity: this.segmentMemoryStorageLimit,
-        usedCapacity: this.currentMemoryStorageSize,
+        usedCapacity: this.currentStorageUsage,
       };
     }
     const playbackPosition = this.currentPlayback.position;
@@ -193,7 +194,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
     );
 
     for (const segmentData of sortedCache) {
-      const { streamId, segmentId } = segmentData;
+      const { streamId, segmentId, data } = segmentData;
       const storageId = getStorageItemId(streamId, segmentId);
 
       const shouldRemove = this.shouldRemoveSegment(
@@ -206,6 +207,8 @@ export class SegmentMemoryStorage implements SegmentStorage {
 
       this.cache.delete(storageId);
       affectedStreams.add(streamId);
+      this.decreaseStorageUsage(data.byteLength);
+
       this.logger(`Removed segment ${segmentId} from stream ${streamId}`);
 
       if (!this.isMemoryLimitReached(newSegmentSize) && !isLiveStream) break;
@@ -216,7 +219,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
 
   private isMemoryLimitReached(segmentByteLength: number) {
     return (
-      this.currentMemoryStorageSize + segmentByteLength / BYTES_PER_MiB >
+      this.currentStorageUsage + segmentByteLength / BYTES_PER_MiB >
       this.segmentMemoryStorageLimit
     );
   }
@@ -255,6 +258,14 @@ export class SegmentMemoryStorage implements SegmentStorage {
     }
 
     return true;
+  }
+
+  private increaseStorageUsage(segmentByteLength: number) {
+    this.currentStorageUsage += segmentByteLength / BYTES_PER_MiB;
+  }
+
+  private decreaseStorageUsage(segmentByteLength: number) {
+    this.currentStorageUsage -= segmentByteLength / BYTES_PER_MiB;
   }
 
   private setMemoryStorageLimit() {
