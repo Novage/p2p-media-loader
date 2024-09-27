@@ -1,32 +1,37 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { DEFAULT_STREAM, DEFAULT_TRACKERS, PLAYERS } from "../constants";
 
 type QueryParamsType = Record<string, string>;
 
-const defaultParams: QueryParamsType = {
-  player: Object.keys(PLAYERS)[0],
-  streamUrl: DEFAULT_STREAM,
-  trackers: DEFAULT_TRACKERS,
-  debug: "",
-  swarmId: "",
-};
-
-function getInitialParams(searchParams: URLSearchParams): QueryParamsType {
+function getInitialParams(
+  searchParams: URLSearchParams,
+  defaultParams: QueryParamsType,
+): QueryParamsType {
   return Object.keys(defaultParams).reduce((params, key) => {
     params[key] = searchParams.get(key) ?? defaultParams[key];
     return params;
   }, {} as QueryParamsType);
 }
 
-export function useQueryParams() {
+export function useQueryParams(streamUri?: string) {
+  const defaultParams = useMemo(() => {
+    return {
+      player: Object.keys(PLAYERS)[0],
+      streamUrl: streamUri ?? DEFAULT_STREAM,
+      trackers: DEFAULT_TRACKERS,
+      debug: "",
+      swarmId: "",
+    } as QueryParamsType;
+  }, [streamUri]);
+
   const searchParamsRef = useRef(new URLSearchParams(window.location.search));
   const [queryParams, setQueryParams] = useState<QueryParamsType>(() =>
-    getInitialParams(searchParamsRef.current),
+    getInitialParams(searchParamsRef.current, defaultParams),
   );
 
   const updateQueryParamsFromURL = useCallback(() => {
     const searchParams = searchParamsRef.current;
-    const newParams = getInitialParams(searchParams);
+    const newParams = getInitialParams(searchParams, defaultParams);
 
     setQueryParams((prevParams) => {
       const hasChanges = Object.keys(newParams).some(
@@ -34,7 +39,7 @@ export function useQueryParams() {
       );
       return hasChanges ? newParams : prevParams;
     });
-  }, []);
+  }, [defaultParams]);
 
   const setURLQueryParams = useCallback(
     (newParams: Partial<QueryParamsType>) => {
@@ -60,7 +65,7 @@ export function useQueryParams() {
 
       updateQueryParamsFromURL();
     },
-    [updateQueryParamsFromURL],
+    [defaultParams, updateQueryParamsFromURL],
   );
 
   useEffect(() => {
