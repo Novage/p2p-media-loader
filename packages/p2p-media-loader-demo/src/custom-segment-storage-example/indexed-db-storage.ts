@@ -48,8 +48,8 @@ const DB_VERSION = 1;
 const BYTES_PER_MB = 1048576;
 
 export class IndexedDbStorage implements SegmentStorage {
-  private segmentsMemoryStorageLimit = 4000; // 4 GB
-  private currentMemoryStorageSize = 0; // current memory storage size in MB
+  private segmentsMemoryStorageLimit = 4096; // memory storage limit in MiB
+  private currentMemoryStorageSize = 0; // current memory storage size in MiB
 
   private storageConfig?: CommonCoreConfig;
   private mainStreamConfig?: StreamConfig;
@@ -162,7 +162,6 @@ export class IndexedDbStorage implements SegmentStorage {
       // eslint-disable-next-line no-console
       console.error(`Failed to store segment ${segmentId}:`, error);
       throw error;
-      // Optionally, implement retry logic or other error recovery mechanisms
     }
   }
 
@@ -200,7 +199,7 @@ export class IndexedDbStorage implements SegmentStorage {
     return this.cache.has(storageId);
   }
 
-  getStoredSegmentIds(streamId: string) {
+  getStoredSegmentIds(_swarmId: string, streamId: string) {
     const storedSegments: number[] = [];
 
     for (const segment of this.cache.values()) {
