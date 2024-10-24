@@ -164,6 +164,7 @@ export class Peer {
           (await this.peerConfig.validateP2PSegment?.(
             request.segment.url,
             request.segment.byteRange,
+            request.data!
           )) ?? true;
 
         if (this.downloadingContext !== downloadingContext) return;
