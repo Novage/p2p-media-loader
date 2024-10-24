@@ -155,7 +155,6 @@ export type CommonCoreConfig = {
  *  httpDownloadTimeWindow: 3000,
  *  p2pDownloadTimeWindow: 6000,
  *  swarmId: "custom swarm ID for video stream",
- *  cashedSegmentsCount: 1000,
  * }
  * ```
  *
