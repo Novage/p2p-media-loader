@@ -155,7 +155,6 @@ export type CommonCoreConfig = {
  *  httpDownloadTimeWindow: 3000,
  *  p2pDownloadTimeWindow: 6000,
  *  swarmId: "custom swarm ID for video stream",
- *  cashedSegmentsCount: 1000,
  * }
  * ```
  *
@@ -380,6 +379,7 @@ export type StreamConfig = {
    * Optional function to validate a P2P segment before fully integrating it into the playback buffer.
    * @param url URL of the segment to validate.
    * @param byteRange Optional byte range of the segment.
+   * @param data: Downloaded segment data.
    * @returns A promise that resolves with a boolean indicating if the segment is valid.
    *
    * @default
@@ -387,7 +387,7 @@ export type StreamConfig = {
    * validateP2PSegment: undefined
    * ```
    */
-  validateP2PSegment?: (url: string, byteRange?: ByteRange) => Promise<boolean>;
+  validateP2PSegment?: (url: string, byteRange: ByteRange | undefined, data: ArrayBuffer) => Promise<boolean>;
 
   /**
    * Optional function to customize the setup of HTTP requests for segment downloads.

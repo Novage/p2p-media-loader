@@ -141,6 +141,7 @@ export class Peer {
         const { request, controls } = downloadingContext;
 
         const isWrongSegment =
+          !request.data ||
           downloadingContext.request.segment.externalId !== command.i ||
           downloadingContext.requestId !== command.r;
 
@@ -164,6 +165,7 @@ export class Peer {
           (await this.peerConfig.validateP2PSegment?.(
             request.segment.url,
             request.segment.byteRange,
+            request.data
           )) ?? true;
 
         if (this.downloadingContext !== downloadingContext) return;
