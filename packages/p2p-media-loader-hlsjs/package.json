@@ -33,8 +33,17 @@
   "exports": "./src/index.ts",
   "types": "./src/index.ts",
   "publishConfig": {
-    "exports": "./lib/index.js",
-    "types": "./lib/index.d.ts"
+    "types": "./lib/index.d.ts",
+    "exports": {
+      ".": {
+        "default": "./dist/p2p-media-loader-hlsjs.es.js",
+        "types": "./lib/index.d.ts"
+      },
+      "./lib": {
+        "default": "./lib/index.js",
+        "types": "./lib/index.d.ts"
+      }
+    }
   },
   "sideEffects": false,
   "type": "module",
