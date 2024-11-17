@@ -1,5 +1,3 @@
-// @ts-check
-
 import globals from "globals";
 import eslint from "@eslint/js";
 import tsEslint from "typescript-eslint";
