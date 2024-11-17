@@ -56,6 +56,6 @@
   },
   "devDependencies": {
     "@rollup/plugin-terser": "^0.4.4",
-    "shaka-player": "^4.11.6"
+    "shaka-player": "^4.12.0"
   }
 }

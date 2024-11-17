@@ -55,6 +55,6 @@
   },
   "devDependencies": {
     "@rollup/plugin-terser": "^0.4.4",
-    "hls.js": "^1.5.15"
+    "hls.js": "^1.5.17"
   }
 }
