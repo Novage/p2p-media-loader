@@ -1,6 +1,6 @@
 import "openplayerjs/dist/openplayer.min.css";
 import OpenPlayerJS from "openplayerjs";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { PlayerProps } from "../../../types";
 import { HlsJsP2PEngine, HlsWithP2PInstance } from "p2p-media-loader-hlsjs";
 import Hls from "hls.js";
@@ -15,16 +15,10 @@ export const HlsjsOpenPlayer = ({
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
-  const [isHlsSupported, setIsHlsSupported] = useState(true);
-
   const playerContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!playerContainerRef.current) return;
-    if (!Hls.isSupported()) {
-      setIsHlsSupported(false);
-      return;
-    }
+    if (!playerContainerRef.current || !Hls.isSupported()) return;
 
     window.Hls = HlsJsP2PEngine.injectMixin(Hls);
 
@@ -108,7 +102,7 @@ export const HlsjsOpenPlayer = ({
     swarmId,
   ]);
 
-  return isHlsSupported ? (
+  return Hls.isSupported() ? (
     <div ref={playerContainerRef} className="player-container" />
   ) : (
     <div className="error-message">

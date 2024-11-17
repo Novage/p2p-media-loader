@@ -41,7 +41,7 @@ function useLocalStorageItem<T>(
   storageItemToValue: (storageItem: string | null) => T,
 ): [T, React.Dispatch<React.SetStateAction<T>>] {
   const [value, setValue] = useState<T>(
-    storageItemToValue(localStorage[prop] as string | null) ?? initValue,
+    () => storageItemToValue(localStorage[prop] as string | null) ?? initValue,
   );
   const setValueExternal = useCallback(
     (value: T | ((prev: T) => T)) => {

@@ -24,7 +24,6 @@ export const ShakaClappr = ({
   useScripts(SCRIPTS);
 
   const [isClapprLoaded, setIsClapprLoaded] = useState(false);
-  const [isShakaSupported, setIsShakaSupported] = useState(true);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -56,9 +55,11 @@ export const ShakaClappr = ({
   }, []);
 
   useEffect(() => {
-    if (!containerRef.current || !isClapprLoaded) return;
-    if (!window.shaka.Player.isBrowserSupported()) {
-      setIsShakaSupported(false);
+    if (
+      !containerRef.current ||
+      !isClapprLoaded ||
+      !window.shaka.Player.isBrowserSupported()
+    ) {
       return;
     }
 
@@ -111,7 +112,7 @@ export const ShakaClappr = ({
     swarmId,
   ]);
 
-  return isShakaSupported ? (
+  return window.shaka.Player.isBrowserSupported() ? (
     <div ref={containerRef} id="clappr-player" />
   ) : (
     <div className="error-message">

@@ -1,6 +1,6 @@
 import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 import { PlayerProps } from "../../../types";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import DPlayer from "dplayer";
 import { subscribeToUiEvents } from "../utils";
 import shaka from "./shaka-import";
@@ -14,8 +14,6 @@ export const ShakaDPlayer = ({
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
-  const [isShakaSupported, setIsShakaSupported] = useState(true);
-
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -24,10 +22,7 @@ export const ShakaDPlayer = ({
   }, []);
 
   useEffect(() => {
-    if (!shaka.Player.isBrowserSupported()) {
-      setIsShakaSupported(false);
-      return;
-    }
+    if (!shaka.Player.isBrowserSupported()) return;
 
     const shakaP2PEngine = new ShakaP2PEngine(
       {
@@ -78,7 +73,7 @@ export const ShakaDPlayer = ({
     swarmId,
   ]);
 
-  return isShakaSupported ? (
+  return window.shaka.Player.isBrowserSupported() ? (
     <div ref={containerRef} className="video-container">
       <video playsInline autoPlay muted />
     </div>

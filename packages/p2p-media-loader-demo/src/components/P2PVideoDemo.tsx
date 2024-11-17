@@ -134,6 +134,9 @@ export const P2PVideoDemo = ({
     ) : null;
   };
 
+  const isDebugToolsEnabled =
+    debugToolsEnabled || queryParams.debug === DEBUG_COMPONENT_ENABLED;
+
   return (
     <>
       <div className="demo-container">
@@ -165,9 +168,7 @@ export const P2PVideoDemo = ({
           )}
         </div>
       </div>
-      {(debugToolsEnabled || queryParams.debug === DEBUG_COMPONENT_ENABLED) && (
-        <DebugTools />
-      )}
+      {isDebugToolsEnabled && <DebugTools />}
     </>
   );
 };
