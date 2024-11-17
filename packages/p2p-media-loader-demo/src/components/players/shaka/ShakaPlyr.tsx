@@ -44,7 +44,7 @@ export const ShakaPlyr = ({
       isCleanedUp = true;
       shakaP2PEngine?.destroy();
       void playerShaka?.destroy();
-      void plyrPlayer?.destroy();
+      plyrPlayer?.destroy();
       videoContainer.remove();
     };
 

@@ -206,10 +206,10 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     if (videoMap && audioMap) {
       for (const variant of variants) {
         const { video: videoStream, audio: audioStream } = variant;
-        if (videoStream && videoMap) {
+        if (videoStream) {
           (videoStream as HookedStream).mediaSequenceTimeMap = videoMap;
         }
-        if (audioStream && audioMap) {
+        if (audioStream) {
           (audioStream as HookedStream).mediaSequenceTimeMap = videoMap;
         }
       }

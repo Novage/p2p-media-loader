@@ -5,8 +5,9 @@ import type {
   ManifestLoadedData,
   LevelSwitchingData,
   PlaylistLevelType,
+  HlsConfig,
+  Events,
 } from "hls.js";
-import type { HlsConfig, Events } from "hls.js";
 import { FragmentLoaderBase } from "./fragment-loader.js";
 import { PlaylistLoaderBase } from "./playlist-loader.js";
 import { SegmentManager } from "./segment-mananger.js";
@@ -177,10 +178,10 @@ export class HlsJsP2PEngine {
    * provides the Hls.js P2P specific configuration for Hls.js loaders.
    * @returns An object with fragment loader (fLoader) and playlist loader (pLoader).
    */
-  getConfigForHlsJs<F = unknown, P = unknown>(): { fLoader: F; pLoader: P } {
+  getConfigForHlsJs(): { fLoader: unknown; pLoader: unknown } {
     return {
-      fLoader: this.createFragmentLoaderClass() as F,
-      pLoader: this.createPlaylistLoaderClass() as P,
+      fLoader: this.createFragmentLoaderClass(),
+      pLoader: this.createPlaylistLoaderClass(),
     };
   }
 
@@ -286,6 +287,7 @@ export class HlsJsP2PEngine {
   };
 
   private handleManifestLoaded = (event: string, data: ManifestLoadedData) => {
+    // eslint-disable-next-line prefer-destructuring
     const networkDetails: unknown = data.networkDetails;
     if (networkDetails instanceof XMLHttpRequest) {
       this.core.setManifestResponseUrl(networkDetails.responseURL);
@@ -348,7 +350,7 @@ export class HlsJsP2PEngine {
   };
 
   private createFragmentLoaderClass() {
-    const core = this.core;
+    const { core } = this;
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const engine = this;
 

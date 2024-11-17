@@ -11,7 +11,7 @@ const endFrames = [commandFrameEnd, commandDivFrameEnd];
 const commandFramesLength = commandFrameStart.length + commandFrameEnd.length;
 
 export function isCommandChunk(buffer: Uint8Array) {
-  const length = commandFrameStart.length;
+  const { length } = commandFrameStart;
   const bufferEndingToCompare = buffer.slice(-length);
   return (
     startFrames.some((frame) =>
@@ -154,8 +154,7 @@ export class BinaryCommandCreator {
 
 export function deserializeCommand(bytes: Uint8Array): PeerCommand {
   const [commandCode] = bytes;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const deserializedCommand: { [key: string]: any } = {
+  const deserializedCommand: Record<string, unknown> = {
     c: commandCode,
   };
 

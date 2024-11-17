@@ -7,10 +7,10 @@ function getInitialParams(
   searchParams: URLSearchParams,
   defaultParams: QueryParamsType,
 ): QueryParamsType {
-  return Object.keys(defaultParams).reduce((params, key) => {
+  return Object.keys(defaultParams).reduce<QueryParamsType>((params, key) => {
     params[key] = searchParams.get(key) ?? defaultParams[key];
     return params;
-  }, {} as QueryParamsType);
+  }, {});
 }
 
 export function useQueryParams(streamUri?: string) {
@@ -46,11 +46,7 @@ export function useQueryParams(streamUri?: string) {
       const searchParams = searchParamsRef.current;
 
       Object.entries(newParams).forEach(([key, value]) => {
-        if (
-          value === null ||
-          value === undefined ||
-          value === defaultParams[key]
-        ) {
+        if (value == undefined || value === defaultParams[key]) {
           searchParams.delete(key);
         } else {
           searchParams.set(key, value);

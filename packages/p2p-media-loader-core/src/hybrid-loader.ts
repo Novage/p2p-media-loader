@@ -59,10 +59,6 @@ export class HybridLoader {
       this.eventTarget,
     );
 
-    if (!this.segmentStorage) {
-      throw new Error("Segment storage is not initialized.");
-    }
-
     this.p2pLoaders = new P2PLoadersContainer(
       this.streamManifestUrl,
       this.lastRequestedSegment.stream,
@@ -193,7 +189,7 @@ export class HybridLoader {
           }
           break;
 
-        case "succeed":
+        case "succeed": {
           if (!request.data || !type) break;
           if (type === "http") {
             this.p2pLoaders.currentLoader.broadcastAnnouncement();
@@ -221,7 +217,7 @@ export class HybridLoader {
             this.streamDetails.isLive,
           );
           break;
-
+        }
         case "failed":
           if (type === "http" && !isHandledByProcessQueue) {
             this.p2pLoaders.currentLoader.broadcastAnnouncement();
@@ -347,11 +343,14 @@ export class HybridLoader {
         if (this.requests.executingP2PCount < simultaneousP2PDownloads) {
           this.loadThroughP2P(segment);
         } else if (
-          this.p2pLoaders.currentLoader.isSegmentLoadedBySomeone(segment) &&
-          this.abortLastP2PLoadingInQueueAfterItem(queue, segment) &&
-          this.requests.executingP2PCount < simultaneousP2PDownloads
+          this.p2pLoaders.currentLoader.isSegmentLoadedBySomeone(segment)
         ) {
-          this.loadThroughP2P(segment);
+          if (
+            this.abortLastP2PLoadingInQueueAfterItem(queue, segment) &&
+            this.requests.executingP2PCount < simultaneousP2PDownloads
+          ) {
+            this.loadThroughP2P(segment);
+          }
         }
       }
     }
@@ -424,7 +423,7 @@ export class HybridLoader {
         request &&
         (request.status === "loading" ||
           request.status === "succeed" ||
-          (request.failedAttempts.httpAttemptsCount ?? 0) >= httpErrorRetries)
+          request.failedAttempts.httpAttemptsCount >= httpErrorRetries)
       ) {
         continue;
       }
@@ -543,7 +542,7 @@ export class HybridLoader {
       queue,
       queueSegmentIds,
       maxPossibleLength,
-      alreadyLoadedCount: alreadyLoadedCount,
+      alreadyLoadedCount,
       queueDownloadRatio:
         maxPossibleLength !== 0 ? alreadyLoadedCount / maxPossibleLength : 0,
     };
@@ -600,7 +599,7 @@ export class HybridLoader {
       this.engineRequest?.markAsShouldBeStartedImmediately();
     }
     this.segmentStorage.onPlaybackUpdated(position, rate);
-    void this.requestProcessQueueMicrotask(isPositionSignificantlyChanged);
+    this.requestProcessQueueMicrotask(isPositionSignificantlyChanged);
   }
 
   updateStream(stream: StreamWithSegments) {

@@ -1,6 +1,5 @@
 import * as Utils from "./stream-utils.js";
-import { StreamInfo } from "./types.js";
-import { Shaka, Stream } from "./types.js";
+import { StreamInfo, Shaka, Stream } from "./types.js";
 import {
   Core,
   CoreRequestError,
@@ -62,7 +61,7 @@ export class Loader {
 
     if (
       !this.core.hasSegment(segmentRuntimeId) ||
-      isSegmentDownloadableByP2PCore === false
+      !isSegmentDownloadableByP2PCore
     ) {
       return this.defaultLoad() as LoadingHandlerResult;
     }
@@ -98,9 +97,10 @@ export class Loader {
       }
     };
 
-    return new this.shaka.util.AbortableOperation(loadSegment(), () =>
-      Promise.resolve(this.core.abortSegmentLoading(segmentRuntimeId)),
-    );
+    return new this.shaka.util.AbortableOperation(loadSegment(), () => {
+      this.core.abortSegmentLoading(segmentRuntimeId);
+      return Promise.resolve();
+    });
   }
 
   private setManifestResponseUrl(responseUrl: string) {

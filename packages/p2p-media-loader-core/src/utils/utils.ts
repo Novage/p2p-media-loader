@@ -1,6 +1,6 @@
 import { CommonCoreConfig, CoreConfig, StreamConfig } from "../types.js";
 
-export function getControlledPromise<T>() {
+export function getControlledPromise<T = void>() {
   let resolve: (value: T) => void;
   let reject: (reason?: unknown) => void;
   const promise = new Promise<T>((res, rej) => {
@@ -122,7 +122,7 @@ type RecursivePartial<T> = {
 
 export function overrideConfig<T>(
   target: T,
-  updates: RecursivePartial<T>,
+  updates: RecursivePartial<T> | null,
   defaults: RecursivePartial<T> = {} as RecursivePartial<T>,
 ): T {
   if (
@@ -134,7 +134,7 @@ export function overrideConfig<T>(
     return target;
   }
 
-  (Object.keys(updates) as Array<keyof T>).forEach((key) => {
+  (Object.keys(updates) as (keyof T)[]).forEach((key) => {
     if (key === "__proto__" || key === "constructor" || key === "prototype") {
       throw new Error(`Attempt to modify restricted property '${String(key)}'`);
     }
@@ -163,7 +163,8 @@ type MergeConfigsToTypeOptions = {
   specificStreamConfig?: Partial<StreamConfig>;
 };
 
-export function mergeAndFilterConfig<T>(options: MergeConfigsToTypeOptions): T {
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
+export function mergeAndFilterConfig<T>(options: MergeConfigsToTypeOptions) {
   const { defaultConfig, baseConfig = {}, specificStreamConfig = {} } = options;
 
   const mergedConfig = deepCopy({
@@ -172,7 +173,7 @@ export function mergeAndFilterConfig<T>(options: MergeConfigsToTypeOptions): T {
     ...specificStreamConfig,
   });
 
-  const keysOfT = Object.keys(defaultConfig) as Array<keyof T>;
+  const keysOfT = Object.keys(defaultConfig) as (keyof T)[];
   const filteredConfig: Partial<T> = {};
 
   keysOfT.forEach((key) => {

@@ -53,7 +53,7 @@ export const HlsjsPlyr = ({
     });
 
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
-      const levels = hls.levels;
+      const { levels } = hls;
 
       const quality: Options["quality"] = {
         default: levels[levels.length - 1].height,

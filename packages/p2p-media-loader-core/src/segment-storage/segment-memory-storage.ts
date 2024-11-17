@@ -269,7 +269,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
   }
 
   private setMemoryStorageLimit() {
-    if (this.coreConfig && this.coreConfig.segmentMemoryStorageLimit) {
+    if (this.coreConfig?.segmentMemoryStorageLimit) {
       this.segmentMemoryStorageLimit =
         this.coreConfig.segmentMemoryStorageLimit;
       return;

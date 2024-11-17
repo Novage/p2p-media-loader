@@ -1,6 +1,6 @@
 export class EventTarget<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  EventTypesMap extends { [key: string]: (...args: any[]) => unknown },
+  EventTypesMap extends Record<string, (...args: any[]) => unknown>,
 > {
   private events = new Map<
     keyof EventTypesMap,

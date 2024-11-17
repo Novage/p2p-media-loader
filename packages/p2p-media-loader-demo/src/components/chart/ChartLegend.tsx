@@ -1,6 +1,8 @@
+import { ReactElement } from "react";
+
 type LegendItem = {
   color: string;
-  content: string | JSX.Element;
+  content: string | ReactElement;
 };
 
 type ChartLegendProps = {

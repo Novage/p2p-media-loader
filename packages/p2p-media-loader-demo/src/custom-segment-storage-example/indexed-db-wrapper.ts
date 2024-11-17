@@ -39,7 +39,7 @@ export class IndexedDbWrapper {
     );
   }
 
-  async put<T>(storeName: string, item: T): Promise<void> {
+  async put(storeName: string, item: unknown): Promise<void> {
     await this.performTransaction(storeName, "readwrite", (store) =>
       store.put(item),
     );

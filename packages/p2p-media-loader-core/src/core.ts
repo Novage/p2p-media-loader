@@ -112,13 +112,13 @@ export class Core<TStream extends Stream = Stream> {
     this.mainStreamConfig = mergeAndFilterConfig<StreamConfig>({
       defaultConfig: Core.DEFAULT_STREAM_CONFIG,
       baseConfig: filteredConfig,
-      specificStreamConfig: filteredConfig?.mainStream,
+      specificStreamConfig: filteredConfig.mainStream,
     });
 
     this.secondaryStreamConfig = mergeAndFilterConfig<StreamConfig>({
       defaultConfig: Core.DEFAULT_STREAM_CONFIG,
       baseConfig: filteredConfig,
-      specificStreamConfig: filteredConfig?.secondaryStream,
+      specificStreamConfig: filteredConfig.secondaryStream,
     });
   }
 
@@ -381,7 +381,7 @@ export class Core<TStream extends Stream = Stream> {
   private async initializeSegmentStorage() {
     if (this.segmentStorage) return;
 
-    const isLive = this.streamDetails.isLive;
+    const { isLive } = this.streamDetails;
     const createCustomStorage =
       this.commonCoreConfig.customSegmentStorageFactory;
 

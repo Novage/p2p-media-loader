@@ -309,7 +309,7 @@ export class Request {
     if (!this.currentAttempt || !this.progress) return;
     this.notReceivingBytesTimeout.restart();
 
-    const byteLength = chunk.byteLength;
+    const { byteLength } = chunk;
     const { all: allBC, http: httpBC } = this.bandwidthCalculators;
     allBC.addBytes(byteLength);
     if (this.currentAttempt.downloadSource === "http") {

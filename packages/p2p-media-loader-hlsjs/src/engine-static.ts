@@ -18,11 +18,13 @@ export function injectMixin<
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     constructor(...args: any[]) {
-      const config = args[0] as {
-        p2p?: PartialHlsJsP2PEngineConfig & {
-          onHlsJsCreated?: (hls: InstanceType<HlsJsConstructor>) => void;
-        };
-      } & Record<string, unknown>;
+      const config = args[0] as
+        | ({
+            p2p?: PartialHlsJsP2PEngineConfig & {
+              onHlsJsCreated?: (hls: InstanceType<HlsJsConstructor>) => void;
+            };
+          } & Record<string, unknown>)
+        | undefined;
 
       const { p2p, ...hlsJsConfig } = config ?? {};
 

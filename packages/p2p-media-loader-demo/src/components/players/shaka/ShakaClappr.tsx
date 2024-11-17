@@ -33,9 +33,11 @@ export const ShakaClappr = ({
 
     const checkClapprLoaded = () => {
       if (
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         window.Clappr &&
         window.LevelSelector &&
         window.DashShakaPlayback &&
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         window.shaka.Player
       ) {
         if (intervalId) clearInterval(intervalId);
@@ -47,7 +49,8 @@ export const ShakaClappr = ({
     intervalId = setInterval(checkClapprLoaded, 200);
 
     return () => {
-      if (intervalId) clearInterval(intervalId);
+      clearInterval(intervalId);
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (window.shaka) ShakaP2PEngine.unregisterPlugins();
     };
   }, []);
