@@ -82,10 +82,11 @@ export const HlsjsVidstackIndexedDB = ({
         <p>
           <strong>Note:</strong> Clearing of stored video segments is not
           implemented in this example. To remove cached segments, please clear
-          your browser's IndexedDB manually.{" "}
+          your browser&apos;s IndexedDB manually.{" "}
           <a
             href="https://github.com/Novage/p2p-media-loader/tree/main/packages/p2p-media-loader-demo/src/custom-segment-storage-example"
             target="_blank"
+            rel="noreferrer"
             className="source-code-link"
           >
             View Source Code

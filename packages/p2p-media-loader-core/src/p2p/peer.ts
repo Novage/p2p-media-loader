@@ -134,7 +134,7 @@ export class Peer {
         break;
 
       case PeerCommandType.SegmentDataSendingCompleted: {
-        const downloadingContext = this.downloadingContext;
+        const { downloadingContext } = this;
 
         if (!downloadingContext?.isSegmentDataCommandReceived) return;
 
@@ -185,20 +185,21 @@ export class Peer {
       case PeerCommandType.SegmentAbsent:
         if (
           this.downloadingContext?.request.segment.externalId === command.i &&
-          this.downloadingContext?.requestId === command.r
+          this.downloadingContext.requestId === command.r
         ) {
           this.cancelSegmentDownloading("peer-segment-absent");
           this.loadedSegments.delete(command.i);
         }
         break;
 
-      case PeerCommandType.CancelSegmentRequest:
+      case PeerCommandType.CancelSegmentRequest: {
         const uploadingRequestId = this.peerProtocol.getUploadingRequestId();
 
         if (uploadingRequestId !== command.r) break;
 
         this.peerProtocol.stopUploadingSegmentData();
         break;
+      }
     }
   };
 
@@ -352,7 +353,7 @@ export class Peer {
       error,
     });
 
-    const code = (error as { code?: string }).code;
+    const { code } = error as { code?: string };
 
     if (code === "ERR_DATA_CHANNEL") {
       this.destroy();

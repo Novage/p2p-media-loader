@@ -41,7 +41,7 @@
   "scripts": {
     "build": "rimraf lib build && tsc && pnpm copy-css",
     "copy-css": "cpy \"src/**/*.css\" \"./lib/\" --parents",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint src --report-unused-disable-directives --max-warnings 0",
     "type-check": "tsc --noEmit",
     "clean": "rimraf lib dist build p2p-media-loader-demo-*.tgz",
     "clean-with-modules": "rimraf node_modules && pnpm clean"

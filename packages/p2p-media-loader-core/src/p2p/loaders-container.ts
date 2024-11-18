@@ -21,7 +21,7 @@ type P2PLoaderContainerItem = {
 
 export class P2PLoadersContainer {
   private readonly loaders = new Map<string, P2PLoaderContainerItem>();
-  private _currentLoaderItem!: P2PLoaderContainerItem;
+  private _currentLoaderItem: P2PLoaderContainerItem;
   private readonly logger = debug("p2pml-core:p2p-loaders-container");
 
   constructor(
@@ -33,7 +33,10 @@ export class P2PLoadersContainer {
     private readonly eventTarget: EventTarget<CoreEventMap>,
     private onSegmentAnnouncement: () => void,
   ) {
-    this.changeCurrentLoader(stream);
+    this._currentLoaderItem = this.findOrCreateLoaderForStream(stream);
+    this.logger(
+      `set current p2p loader: ${LoggerUtils.getStreamString(stream)}`,
+    );
   }
 
   private createLoader(stream: StreamWithSegments): P2PLoaderContainerItem {
@@ -62,30 +65,31 @@ export class P2PLoadersContainer {
     };
   }
 
-  changeCurrentLoader(stream: StreamWithSegments) {
+  private findOrCreateLoaderForStream(stream: StreamWithSegments) {
     const loaderItem = this.loaders.get(stream.runtimeId);
-    if (this._currentLoaderItem) {
-      const swarmId = this.config.swarmId ?? this.streamManifestUrl;
-      const streamSwarmId = StreamUtils.getStreamSwarmId(
-        swarmId,
-        this._currentLoaderItem.stream,
-      );
-      const ids = this.segmentStorage.getStoredSegmentIds(
-        swarmId,
-        streamSwarmId,
-      );
-      if (!ids.length) this.destroyAndRemoveLoader(this._currentLoaderItem);
-      else this.setLoaderDestroyTimeout(this._currentLoaderItem);
-    }
     if (loaderItem) {
-      this._currentLoaderItem = loaderItem;
       clearTimeout(loaderItem.destroyTimeoutId);
       loaderItem.destroyTimeoutId = undefined;
+      return loaderItem;
     } else {
       const loader = this.createLoader(stream);
       this.loaders.set(stream.runtimeId, loader);
-      this._currentLoaderItem = loader;
+      return loader;
     }
+  }
+
+  changeCurrentLoader(stream: StreamWithSegments) {
+    const swarmId = this.config.swarmId ?? this.streamManifestUrl;
+    const streamSwarmId = StreamUtils.getStreamSwarmId(
+      swarmId,
+      this._currentLoaderItem.stream,
+    );
+    const ids = this.segmentStorage.getStoredSegmentIds(swarmId, streamSwarmId);
+    if (!ids.length) this.destroyAndRemoveLoader(this._currentLoaderItem);
+    else this.setLoaderDestroyTimeout(this._currentLoaderItem);
+
+    this._currentLoaderItem = this.findOrCreateLoaderForStream(stream);
+
     this.logger(
       `change current p2p loader: ${LoggerUtils.getStreamString(stream)}`,
     );

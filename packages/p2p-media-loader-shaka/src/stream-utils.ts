@@ -47,7 +47,7 @@ export function getSegmentRuntimeId(
 export function getByteRangeFromHeaderString(
   rangeStr: string | undefined,
 ): ByteRange | undefined {
-  if (!rangeStr || !rangeStr.includes("bytes=")) return undefined;
+  if (!rangeStr?.includes("bytes=")) return undefined;
 
   const range = rangeStr
     .split("=")[1]

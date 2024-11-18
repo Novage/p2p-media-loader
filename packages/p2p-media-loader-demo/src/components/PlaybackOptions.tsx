@@ -39,60 +39,61 @@ export const PlaybackOptions = ({
   };
 
   return (
-    <>
-      <div className="playback-options">
-        <div className="option-group">
-          <label htmlFor="streamUrl">
-            Video URL{isHttps ? " (HTTPS only)" : ""}:
-          </label>
-          <input
-            key={streamUrl}
-            className="item"
-            defaultValue={streamUrl}
-            id="streamUrl"
-            ref={streamUrlInputRef}
-          ></input>
-        </div>
+    <div className="playback-options">
+      <div className="option-group">
+        <label htmlFor="streamUrl">
+          Video URL{isHttps ? " (HTTPS only)" : ""}:
+        </label>
+        <input
+          key={streamUrl}
+          className="item"
+          defaultValue={streamUrl}
+          id="streamUrl"
+          ref={streamUrlInputRef}
+        ></input>
+      </div>
 
-        <div className="option-group">
-          <label htmlFor="player">Player:</label>
-          <select
-            className="item"
-            key={String(currentPlayer)}
-            ref={playerSelectRef}
-            id="player"
-            defaultValue={String(currentPlayer)}
-          >
-            <optgroup label="Hls.js P2P Engine (HLS Only)">
-              {Object.entries(hlsPlayers).map(([key, name]) => (
+      <div className="option-group">
+        <label htmlFor="player">Player:</label>
+        <select
+          className="item"
+          key={String(currentPlayer)}
+          ref={playerSelectRef}
+          id="player"
+          defaultValue={String(currentPlayer)}
+        >
+          <optgroup label="Hls.js P2P Engine (HLS Only)">
+            {Object.entries(hlsPlayers).map(([key, name]) => (
+              <option key={key} value={key}>
+                {name}
+              </option>
+            ))}
+          </optgroup>
+          {Object.keys(shakaPlayers).length > 0 && (
+            <optgroup label="Shaka Players">
+              {Object.entries(shakaPlayers).map(([key, name]) => (
                 <option key={key} value={key}>
                   {name}
                 </option>
               ))}
             </optgroup>
-            {Object.keys(shakaPlayers).length > 0 && (
-              <optgroup label="Shaka Players">
-                {Object.entries(shakaPlayers).map(([key, name]) => (
-                  <option key={key} value={key}>
-                    {name}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-          </select>
-        </div>
-
-        <div className="button-group">
-          <button onClick={handleApply}>Apply</button>
-          <button
-            onClick={() => {
-              window.open(window.location.href, "_blank");
-            }}
-          >
-            Create new peer
-          </button>
-        </div>
+          )}
+        </select>
       </div>
-    </>
+
+      <div className="button-group">
+        <button type="button" onClick={handleApply}>
+          Apply
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            window.open(window.location.href, "_blank");
+          }}
+        >
+          Create new peer
+        </button>
+      </div>
+    </div>
   );
 };

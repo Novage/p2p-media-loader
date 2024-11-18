@@ -102,7 +102,7 @@ export class P2PTrackerClient {
     }
 
     peerConnection.on("connect", () => {
-      if (!peerItem || peerItem.peer) return;
+      if (peerItem.peer) return;
 
       for (const connection of peerItem.potentialConnections) {
         if (connection !== peerConnection) connection.destroy();
@@ -148,7 +148,7 @@ export class P2PTrackerClient {
 
   *peers() {
     for (const peerItem of this._peers.values()) {
-      if (peerItem?.peer) yield peerItem.peer;
+      if (peerItem.peer) yield peerItem.peer;
     }
   }
 

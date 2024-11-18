@@ -1,5 +1,5 @@
 import "plyr/dist/plyr.css";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import shaka from "../shaka/shaka-import";
 import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 import { PlayerProps } from "../../../types";
@@ -15,8 +15,6 @@ export const ShakaPlyr = ({
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
-  const [isShakaSupported, setIsShakaSupported] = useState(true);
-
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -25,11 +23,7 @@ export const ShakaPlyr = ({
   }, []);
 
   useEffect(() => {
-    if (!containerRef.current) return;
-    if (!shaka.Player.isBrowserSupported()) {
-      setIsShakaSupported(false);
-      return;
-    }
+    if (!containerRef.current || !shaka.Player.isBrowserSupported()) return;
 
     const { videoContainer, videoElement } = createVideoElements();
 
@@ -44,7 +38,7 @@ export const ShakaPlyr = ({
       isCleanedUp = true;
       shakaP2PEngine?.destroy();
       void playerShaka?.destroy();
-      void plyrPlayer?.destroy();
+      plyrPlayer?.destroy();
       videoContainer.remove();
     };
 
@@ -132,7 +126,7 @@ export const ShakaPlyr = ({
     swarmId,
   ]);
 
-  return isShakaSupported ? (
+  return shaka.Player.isBrowserSupported() ? (
     <div ref={containerRef} />
   ) : (
     <div className="error-message">

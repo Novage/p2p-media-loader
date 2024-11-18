@@ -1,6 +1,6 @@
 import "plyr/dist/plyr.css";
 import Plyr, { Options } from "plyr";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { PlayerProps } from "../../../types";
 import Hls from "hls.js";
 import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
@@ -15,16 +15,10 @@ export const HlsjsPlyr = ({
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
-  const [isHlsSupported, setIsHlsSupported] = useState(true);
-
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!containerRef.current) return;
-    if (!Hls.isSupported()) {
-      setIsHlsSupported(false);
-      return;
-    }
+    if (!containerRef.current || !Hls.isSupported()) return;
 
     let player: Plyr | undefined;
 
@@ -53,7 +47,7 @@ export const HlsjsPlyr = ({
     });
 
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
-      const levels = hls.levels;
+      const { levels } = hls;
 
       const quality: Options["quality"] = {
         default: levels[levels.length - 1].height,
@@ -93,7 +87,7 @@ export const HlsjsPlyr = ({
     swarmId,
   ]);
 
-  return isHlsSupported ? (
+  return Hls.isSupported() ? (
     <div ref={containerRef} />
   ) : (
     <div className="error-message">

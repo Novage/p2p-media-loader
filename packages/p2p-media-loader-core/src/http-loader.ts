@@ -1,9 +1,13 @@
-import { CoreConfig, CoreEventMap } from "./types.js";
+import {
+  CoreConfig,
+  CoreEventMap,
+  RequestError,
+  HttpRequestErrorType,
+} from "./types.js";
 import {
   Request as SegmentRequest,
   RequestControls,
 } from "./requests/request.js";
-import { RequestError, HttpRequestErrorType } from "./types.js";
 import { EventTarget } from "./utils/event-target.js";
 
 type HttpConfig = Pick<
@@ -191,10 +195,10 @@ async function* readStream(
   }
 }
 
+const rangeHeaderRegex = /^bytes (?:(?:(\d+)|)-(?:(\d+)|)|\*)\/(?:(\d+)|\*)$/;
+
 function parseContentRangeHeader(headerValue: string) {
-  const match = headerValue
-    .trim()
-    .match(/^bytes (?:(?:(\d+)|)-(?:(\d+)|)|\*)\/(?:(\d+)|\*)$/);
+  const match = rangeHeaderRegex.exec(headerValue.trim());
   if (!match) return;
 
   const [, from, to, total] = match;

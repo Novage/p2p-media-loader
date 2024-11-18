@@ -24,7 +24,6 @@ export const ShakaClappr = ({
   useScripts(SCRIPTS);
 
   const [isClapprLoaded, setIsClapprLoaded] = useState(false);
-  const [isShakaSupported, setIsShakaSupported] = useState(true);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -33,9 +32,11 @@ export const ShakaClappr = ({
 
     const checkClapprLoaded = () => {
       if (
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         window.Clappr &&
         window.LevelSelector &&
         window.DashShakaPlayback &&
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         window.shaka.Player
       ) {
         if (intervalId) clearInterval(intervalId);
@@ -47,15 +48,18 @@ export const ShakaClappr = ({
     intervalId = setInterval(checkClapprLoaded, 200);
 
     return () => {
-      if (intervalId) clearInterval(intervalId);
+      clearInterval(intervalId);
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (window.shaka) ShakaP2PEngine.unregisterPlugins();
     };
   }, []);
 
   useEffect(() => {
-    if (!containerRef.current || !isClapprLoaded) return;
-    if (!window.shaka.Player.isBrowserSupported()) {
-      setIsShakaSupported(false);
+    if (
+      !containerRef.current ||
+      !isClapprLoaded ||
+      !window.shaka.Player.isBrowserSupported()
+    ) {
       return;
     }
 
@@ -108,7 +112,7 @@ export const ShakaClappr = ({
     swarmId,
   ]);
 
-  return isShakaSupported ? (
+  return window.shaka.Player.isBrowserSupported() ? (
     <div ref={containerRef} id="clappr-player" />
   ) : (
     <div className="error-message">

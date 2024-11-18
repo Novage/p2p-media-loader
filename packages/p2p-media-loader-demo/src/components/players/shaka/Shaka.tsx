@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 import { PlayerProps } from "../../../types";
 import "shaka-player/dist/controls.css";
@@ -14,8 +14,6 @@ export const Shaka = ({
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
-  const [isShakaSupported, setIsShakaSupported] = useState(true);
-
   const playerContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -24,9 +22,7 @@ export const Shaka = ({
   }, []);
 
   useEffect(() => {
-    if (!playerContainerRef.current) return;
-    if (!shaka.Player.isBrowserSupported()) {
-      setIsShakaSupported(false);
+    if (!playerContainerRef.current || !shaka.Player.isBrowserSupported()) {
       return;
     }
 
@@ -114,7 +110,7 @@ export const Shaka = ({
     swarmId,
   ]);
 
-  return isShakaSupported ? (
+  return shaka.Player.isBrowserSupported() ? (
     <div ref={playerContainerRef}></div>
   ) : (
     <div className="error-message">

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { PlayerProps } from "../../../types";
 import DPlayer from "dplayer";
 import { subscribeToUiEvents } from "../utils";
@@ -14,15 +14,10 @@ export const HlsjsDPlayer = ({
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
-  const [isHlsSupported, setIsHlsSupported] = useState(true);
-
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!Hls.isSupported()) {
-      setIsHlsSupported(false);
-      return;
-    }
+    if (!Hls.isSupported()) return;
 
     const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
 
@@ -75,7 +70,7 @@ export const HlsjsDPlayer = ({
     swarmId,
   ]);
 
-  return isHlsSupported ? (
+  return Hls.isSupported() ? (
     <div ref={containerRef} className="video-container">
       <video playsInline autoPlay muted />
     </div>

@@ -37,7 +37,6 @@ export class SegmentManager {
   }
 
   updatePlaylist(data: LevelUpdatedData | AudioTrackLoadedData) {
-    if (!data.details) return;
     const {
       details: { url, fragments, live },
     } = data;

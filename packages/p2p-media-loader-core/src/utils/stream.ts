@@ -53,7 +53,7 @@ export function getStreamId(stream: Stream) {
 export function getSegmentAvgDuration(stream: StreamWithSegments) {
   const { segments } = stream;
   let sumDuration = 0;
-  const size = segments.size;
+  const { size } = segments;
   for (const segment of segments.values()) {
     const duration = segment.endTime - segment.startTime;
     sumDuration += duration;

@@ -70,7 +70,7 @@ export class PeerProtocol {
       throw new Error(`Some segment data is already uploading.`);
     }
     const chunks = getBufferChunks(data, this.peerConfig.webRtcMaxMessageSize);
-    const { promise, resolve, reject } = Utils.getControlledPromise<void>();
+    const { promise, resolve, reject } = Utils.getControlledPromise();
 
     let isUploadingSegmentData = false;
 

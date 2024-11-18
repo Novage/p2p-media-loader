@@ -54,7 +54,7 @@ const playerComponents = {
   mediaElement_hls: HlsjsMediaElement,
   plyr_shaka: ShakaPlyr,
   vidstack_hls: HlsjsVidstack,
-};
+} as const;
 
 export const P2PVideoDemo = ({
   streamUrl,
@@ -117,7 +117,9 @@ export const P2PVideoDemo = ({
   };
 
   const renderPlayer = () => {
-    const PlayerComponent = playerComponents[queryParams.player as PlayerKey];
+    const PlayerComponent = playerComponents[
+      queryParams.player as PlayerKey
+    ] as (typeof playerComponents)[PlayerKey] | undefined;
 
     return PlayerComponent ? (
       <PlayerComponent
@@ -131,6 +133,9 @@ export const P2PVideoDemo = ({
       />
     ) : null;
   };
+
+  const isDebugToolsEnabled =
+    debugToolsEnabled || queryParams.debug === DEBUG_COMPONENT_ENABLED;
 
   return (
     <>
@@ -163,9 +168,7 @@ export const P2PVideoDemo = ({
           )}
         </div>
       </div>
-      {(debugToolsEnabled || queryParams.debug === DEBUG_COMPONENT_ENABLED) && (
-        <DebugTools />
-      )}
+      {isDebugToolsEnabled && <DebugTools />}
     </>
   );
 };

@@ -49,7 +49,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     this.context = context;
     this.config = config;
     this.#callbacks = callbacks;
-    const stats = this.stats;
+    const { stats } = this;
 
     const { rangeStart: start, rangeEnd: end } = context;
     const byteRange = Utils.getByteRange(
@@ -64,11 +64,11 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
 
     if (
       !this.#core.hasSegment(this.#segmentId) ||
-      isSegmentDownloadableByP2PCore === false
+      !isSegmentDownloadableByP2PCore
     ) {
       this.#defaultLoader = this.#createDefaultLoader();
       this.#defaultLoader.stats = this.stats;
-      this.#defaultLoader?.load(context, config, callbacks);
+      this.#defaultLoader.load(context, config, callbacks);
       return;
     }
 
@@ -80,7 +80,8 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
         loadedBytes,
         performance.now(),
       );
-      stats.total = stats.loaded = loadedBytes;
+      stats.total = loadedBytes;
+      stats.loaded = loadedBytes;
 
       if (callbacks.onProgress) {
         callbacks.onProgress(

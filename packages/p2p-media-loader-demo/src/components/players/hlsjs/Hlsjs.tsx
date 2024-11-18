@@ -1,5 +1,5 @@
 import "./hlsjs.css";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { PlayerProps } from "../../../types";
 import { subscribeToUiEvents } from "../utils";
 import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
@@ -14,17 +14,11 @@ export const HlsjsPlayer = ({
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
-  const [isHlsSupported, setIsHlsSupported] = useState(true);
-
   const videoRef = useRef<HTMLVideoElement>(null);
   const qualityRef = useRef<HTMLSelectElement>(null);
 
   useEffect(() => {
-    if (!videoRef.current) return;
-    if (!Hls.isSupported()) {
-      setIsHlsSupported(false);
-      return;
-    }
+    if (!videoRef.current || !Hls.isSupported()) return;
 
     const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
     const hls = new HlsWithP2P({
@@ -82,7 +76,7 @@ export const HlsjsPlayer = ({
     }
   };
 
-  return isHlsSupported ? (
+  return Hls.isSupported() ? (
     <div className="video-container">
       <video
         ref={videoRef}

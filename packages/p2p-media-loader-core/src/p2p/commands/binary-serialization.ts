@@ -182,7 +182,7 @@ export class ResizableUint8Array {
     this.bytes[position === "start" ? "unshift" : "push"](bytesToAdd);
   }
 
-  getBytesChunks(): ReadonlyArray<Uint8Array> {
+  getBytesChunks(): readonly Uint8Array[] {
     return this.bytes;
   }
 

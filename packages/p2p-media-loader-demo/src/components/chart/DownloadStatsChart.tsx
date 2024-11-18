@@ -34,7 +34,9 @@ type StoredData = {
 } & DownloadStats;
 
 export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
-  const [data, setData] = useState<ChartsData[]>(generateInitialStackedData());
+  const [data, setData] = useState<ChartsData[]>(() =>
+    generateInitialStackedData(),
+  );
 
   const [storedData, setStoredData] = useState<StoredData>({
     totalDownloaded: 0,

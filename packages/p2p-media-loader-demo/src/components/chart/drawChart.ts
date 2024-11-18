@@ -25,7 +25,7 @@ export const drawChart = (svgElement: SVGSVGElement, data: ChartsData[]) => {
   const maxP2PUploadValue = d3.min(data, (d) => d.p2pUploaded);
 
   const defaultDomain = [0, 1];
-  const extentDomain = d3.extent(data, (d) => d.seconds) as [number, number];
+  const extentDomain = d3.extent(data, (d) => d.seconds);
 
   const xScale = d3
     .scaleLinear()

@@ -1,5 +1,5 @@
 import "../clappr.css";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { PlayerProps } from "../../../types";
 import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 import { subscribeToUiEvents } from "../utils";
@@ -22,14 +22,10 @@ export const HlsjsClapprPlayer = ({
 }: PlayerProps) => {
   const areScriptsLoaded = useScripts(SCRIPTS);
 
-  const [isHlsSupported, setIsHlsSupported] = useState(true);
-
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!containerRef.current || !areScriptsLoaded) return;
-    if (!Hls.isSupported()) {
-      setIsHlsSupported(false);
+    if (!containerRef.current || !areScriptsLoaded || !Hls.isSupported()) {
       return;
     }
 
@@ -84,7 +80,7 @@ export const HlsjsClapprPlayer = ({
     swarmId,
   ]);
 
-  return isHlsSupported ? (
+  return Hls.isSupported() ? (
     <div ref={containerRef} id="clappr-player" />
   ) : (
     <div className="error-message">

@@ -12,9 +12,8 @@ import * as Utils from "../utils/utils.js";
 import { EventTarget } from "../utils/event-target.js";
 import { SegmentStorage } from "../segment-storage/index.js";
 
-export type EventTargetMap = {
-  [key in `onStorageUpdated-${string}`]: () => void;
-} & CoreEventMap;
+export type EventTargetMap = Record<`onStorageUpdated-${string}`, () => void> &
+  CoreEventMap;
 
 export class P2PLoader {
   private readonly trackerClient: P2PTrackerClient;
@@ -67,8 +66,8 @@ export class P2PLoader {
       }
     }
 
+    if (peersWithSegment.length === 0) return;
     const peer = Utils.getRandomItem(peersWithSegment);
-    if (!peer) return;
 
     const request = this.requests.getOrCreateRequest(segment);
     peer.downloadSegment(request);
