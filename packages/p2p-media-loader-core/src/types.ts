@@ -188,7 +188,7 @@ export type CoreConfig = Partial<StreamConfig> &
 /** Configuration options for the Core functionality, including network and processing parameters. */
 export type StreamConfig = {
   /**
-   * Indicates if Peer-to-Peer (P2P) upload is disabled for the stream.
+   * Controls if peer-to-peer upload is disabled for the stream.
    * If `true`, the stream only downloads segments without uploading to peers.
    *
    * @default
@@ -198,8 +198,7 @@ export type StreamConfig = {
    */
   isP2PUploadDisabled: boolean;
   /**
-   * Indicates whether Peer-to-Peer (P2P) functionality is disabled for the stream.
-   * If set to true, P2P functionality is disabled for the stream.
+   * Controls whether peer-to-peer functionality is disabled for the stream.
    *
    * @default
    * ```typescript
