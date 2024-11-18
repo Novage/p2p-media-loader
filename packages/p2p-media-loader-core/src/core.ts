@@ -36,6 +36,7 @@ export class Core<TStream extends Stream = Stream> {
 
   /** Default configuration for stream settings. */
   static readonly DEFAULT_STREAM_CONFIG: StreamConfig = {
+    isP2PUploadDisabled: false,
     isP2PDisabled: false,
     simultaneousHttpDownloads: 2,
     simultaneousP2PDownloads: 3,
@@ -162,6 +163,9 @@ export class Core<TStream extends Stream = Stream> {
     if (this.secondaryStreamConfig.isP2PDisabled) {
       this.destroyStreamLoader("secondary");
     }
+
+    this.mainStreamLoader?.sendBroadcastAnnouncement();
+    this.secondaryStreamLoader?.sendBroadcastAnnouncement();
   }
 
   /**

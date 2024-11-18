@@ -80,7 +80,8 @@ export type DynamicStreamProperties =
   | "p2pErrorRetries"
   | "validateP2PSegment"
   | "httpRequestSetup"
-  | "isP2PDisabled";
+  | "isP2PDisabled"
+  | "isP2PUploadDisabled";
 
 /**
  * Represents a dynamically modifiable configuration, allowing updates to selected CoreConfig properties at runtime.
@@ -186,6 +187,16 @@ export type CoreConfig = Partial<StreamConfig> &
 
 /** Configuration options for the Core functionality, including network and processing parameters. */
 export type StreamConfig = {
+  /**
+   * Indicates if Peer-to-Peer (P2P) upload is disabled for the stream.
+   * If `true`, the stream only downloads segments without uploading to peers.
+   *
+   * @default
+   * ```typescript
+   * isP2PUploadDisabled: false
+   * ```
+   */
+  isP2PUploadDisabled: boolean;
   /**
    * Indicates whether Peer-to-Peer (P2P) functionality is disabled for the stream.
    * If set to true, P2P functionality is disabled for the stream.
@@ -387,7 +398,11 @@ export type StreamConfig = {
    * validateP2PSegment: undefined
    * ```
    */
-  validateP2PSegment?: (url: string, byteRange: ByteRange | undefined, data: ArrayBuffer) => Promise<boolean>;
+  validateP2PSegment?: (
+    url: string,
+    byteRange: ByteRange | undefined,
+    data: ArrayBuffer,
+  ) => Promise<boolean>;
 
   /**
    * Optional function to customize the setup of HTTP requests for segment downloads.

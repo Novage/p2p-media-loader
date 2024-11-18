@@ -114,12 +114,16 @@ export class P2PLoader {
   }
 
   private onPeerConnected = (peer: Peer) => {
+    if (this.config.isP2PUploadDisabled) return;
+
     const { httpLoading, loaded } = this.getSegmentsAnnouncement();
     peer.sendSegmentsAnnouncementCommand(loaded, httpLoading);
   };
 
   broadcastAnnouncement = () => {
-    if (this.isAnnounceMicrotaskCreated) return;
+    if (this.isAnnounceMicrotaskCreated || this.config.isP2PUploadDisabled) {
+      return;
+    }
 
     this.isAnnounceMicrotaskCreated = true;
     queueMicrotask(() => {
@@ -142,6 +146,10 @@ export class P2PLoader {
       segmentExternalId,
     );
     if (!segment) return;
+    if (this.config.isP2PUploadDisabled) {
+      peer.sendSegmentAbsentCommand(segmentExternalId, requestId);
+      return;
+    }
 
     const swarmId = this.config.swarmId ?? this.streamManifestUrl;
     const streamSwarmId = StreamUtils.getStreamSwarmId(swarmId, this.stream);
