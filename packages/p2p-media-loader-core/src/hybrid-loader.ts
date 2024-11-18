@@ -189,7 +189,7 @@ export class HybridLoader {
           }
           break;
 
-        case "succeed":
+        case "succeed": {
           if (!type) break;
           if (type === "http") {
             this.p2pLoaders.currentLoader.broadcastAnnouncement();
@@ -218,6 +218,7 @@ export class HybridLoader {
           );
           break;
         }
+
         case "failed":
           if (type === "http" && !isHandledByProcessQueue) {
             this.p2pLoaders.currentLoader.broadcastAnnouncement();
