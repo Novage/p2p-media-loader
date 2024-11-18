@@ -189,8 +189,8 @@ export class HybridLoader {
           }
           break;
 
-        case "succeed": {
-          if (!request.data || !type) break;
+        case "succeed":
+          if (!type) break;
           if (type === "http") {
             this.p2pLoaders.currentLoader.broadcastAnnouncement();
           }

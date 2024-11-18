@@ -100,6 +100,7 @@ export class Request {
     this._loadedBytes = 0;
     this.bytes = [];
     this._totalBytes = undefined;
+    this.finalData = undefined;
   }
 
   get status() {
@@ -123,8 +124,7 @@ export class Request {
     return this._totalBytes;
   }
 
-  get data(): ArrayBuffer | undefined {
-    if (this.status !== "succeed") return;
+  get data(): ArrayBuffer {
     if (!this.finalData) this.finalData = Utils.joinChunks(this.bytes);
     return this.finalData;
   }
@@ -284,12 +284,11 @@ export class Request {
 
     this.manageBandwidthCalculatorsState("stop");
     this.notReceivingBytesTimeout.clear();
-    this.finalData = Utils.joinChunks(this.bytes);
     this.setStatus("succeed");
     this._totalBytes = this._loadedBytes;
     this.onSegmentLoaded({
       segmentUrl: this.segment.url,
-      bytesLength: this.finalData.byteLength,
+      bytesLength: this.data.byteLength,
       downloadSource: this.currentAttempt.downloadSource,
       peerId:
         this.currentAttempt.downloadSource === "p2p"

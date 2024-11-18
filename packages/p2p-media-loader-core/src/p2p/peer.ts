@@ -141,7 +141,6 @@ export class Peer {
         const { request, controls } = downloadingContext;
 
         const isWrongSegment =
-          !request.data ||
           downloadingContext.request.segment.externalId !== command.i ||
           downloadingContext.requestId !== command.r;
 
