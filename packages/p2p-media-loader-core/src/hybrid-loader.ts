@@ -132,6 +132,7 @@ export class HybridLoader {
         }
       }
 
+      this.engineRequest?.abort();
       this.engineRequest = engineRequest;
     } catch {
       engineRequest.reject();
