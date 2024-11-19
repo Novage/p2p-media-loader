@@ -11,6 +11,8 @@ import {
   CommonCoreConfig,
   StreamConfig,
   DefinedCoreConfig,
+  StreamType,
+  DynamicStreamConfig,
 } from "./types.js";
 import { BandwidthCalculators, StreamDetails } from "./internal-types.js";
 import * as StreamUtils from "./utils/stream.js";
@@ -144,8 +146,8 @@ export class Core<TStream extends Stream = Stream> {
    * @example
    * // Example of dynamically updating the download time windows and timeout settings.
    * const dynamicConfig = {
-   *   httpDownloadTimeWindowMs: 60,  // Set HTTP download time window to 60 seconds
-   *   p2pDownloadTimeWindowMs: 60,   // Set P2P download time window to 60 seconds
+   *   httpDownloadTimeWindow: 60,  // Set HTTP download time window to 60 seconds
+   *   p2pDownloadTimeWindow: 60,   // Set P2P download time window to 60 seconds
    *   httpNotReceivingBytesTimeoutMs: 1500,  // Set HTTP timeout to 1500 milliseconds
    *   p2pNotReceivingBytesTimeoutMs: 1500    // Set P2P timeout to 1500 milliseconds
    * };
@@ -154,18 +156,71 @@ export class Core<TStream extends Stream = Stream> {
   applyDynamicConfig(dynamicConfig: DynamicCoreConfig) {
     const { mainStream, secondaryStream } = dynamicConfig;
 
+    const mainStreamConfigCopy = deepCopy(this.mainStreamConfig);
+    const secondaryStreamConfigCopy = deepCopy(this.secondaryStreamConfig);
+
     this.overrideAllConfigs(dynamicConfig, mainStream, secondaryStream);
 
-    if (this.mainStreamConfig.isP2PDisabled) {
-      this.destroyStreamLoader("main");
+    this.processSpecificDynamicConfigParams(
+      mainStreamConfigCopy,
+      dynamicConfig,
+      "main",
+    );
+    this.processSpecificDynamicConfigParams(
+      secondaryStreamConfigCopy,
+      dynamicConfig,
+      "secondary",
+    );
+  }
+
+  private processSpecificDynamicConfigParams(
+    prevConfig: StreamConfig,
+    updatedConfig: DynamicCoreConfig,
+    streamType: StreamType,
+  ) {
+    const isP2PDisabled = this.getUpdatedStreamProperty(
+      "isP2PDisabled",
+      updatedConfig,
+      streamType,
+    );
+
+    if (
+      isP2PDisabled !== undefined &&
+      prevConfig.isP2PDisabled !== isP2PDisabled
+    ) {
+      this.destroyStreamLoader(streamType);
     }
 
-    if (this.secondaryStreamConfig.isP2PDisabled) {
-      this.destroyStreamLoader("secondary");
-    }
+    const isP2PUploadDisabled = this.getUpdatedStreamProperty(
+      "isP2PUploadDisabled",
+      updatedConfig,
+      streamType,
+    );
 
-    this.mainStreamLoader?.sendBroadcastAnnouncement();
-    this.secondaryStreamLoader?.sendBroadcastAnnouncement();
+    if (
+      isP2PUploadDisabled !== undefined &&
+      prevConfig.isP2PUploadDisabled !== isP2PUploadDisabled
+    ) {
+      const streamLoader =
+        streamType === "main"
+          ? this.mainStreamLoader
+          : this.secondaryStreamLoader;
+
+      streamLoader?.sendBroadcastAnnouncement(isP2PUploadDisabled);
+    }
+  }
+
+  private getUpdatedStreamProperty<K extends keyof DynamicStreamConfig>(
+    propertyName: K,
+    updatedConfig: DynamicCoreConfig,
+    streamType: StreamType,
+  ): DynamicStreamConfig[K] | undefined {
+    const updatedStreamConfig =
+      streamType === "main"
+        ? updatedConfig.mainStream
+        : updatedConfig.secondaryStream;
+
+    return updatedStreamConfig?.[propertyName] ?? updatedConfig[propertyName];
   }
 
   /**
@@ -440,7 +495,7 @@ export class Core<TStream extends Stream = Stream> {
     }
   }
 
-  private destroyStreamLoader(streamType: "main" | "secondary") {
+  private destroyStreamLoader(streamType: StreamType) {
     if (streamType === "main") {
       this.mainStreamLoader?.destroy();
       this.mainStreamLoader = undefined;

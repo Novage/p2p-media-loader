@@ -108,10 +108,15 @@ export type DynamicCoreConfig = Partial<
 > &
   Partial<CommonCoreConfig> & {
     /** Optional dynamic configuration for the main stream. */
-    mainStream?: Partial<Pick<StreamConfig, DynamicStreamProperties>>;
+    mainStream?: DynamicStreamConfig;
     /** Optional dynamic configuration for the secondary stream. */
-    secondaryStream?: Partial<Pick<StreamConfig, DynamicStreamProperties>>;
+    secondaryStream?: DynamicStreamConfig;
   };
+
+/** Represents a partial configuration for a stream with dynamic properties. */
+export type DynamicStreamConfig = Partial<
+  Pick<StreamConfig, DynamicStreamProperties>
+>;
 
 /** Represents the configuration for the Core functionality that is common to all streams. */
 export type CommonCoreConfig = {

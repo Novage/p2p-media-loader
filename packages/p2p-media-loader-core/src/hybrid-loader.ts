@@ -583,8 +583,10 @@ export class HybridLoader {
     this.levelChangedTimestamp = performance.now();
   }
 
-  sendBroadcastAnnouncement() {
-    this.p2pLoaders.currentLoader.broadcastAnnouncement();
+  sendBroadcastAnnouncement(sendEmptySegmentsAnnouncement = false) {
+    this.p2pLoaders.currentLoader.broadcastAnnouncement(
+      sendEmptySegmentsAnnouncement,
+    );
   }
 
   updatePlayback(position: number, rate: number) {
