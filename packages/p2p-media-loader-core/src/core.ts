@@ -184,10 +184,7 @@ export class Core<TStream extends Stream = Stream> {
       streamType,
     );
 
-    if (
-      isP2PDisabled !== undefined &&
-      prevConfig.isP2PDisabled !== isP2PDisabled
-    ) {
+    if (isP2PDisabled && prevConfig.isP2PDisabled !== isP2PDisabled) {
       this.destroyStreamLoader(streamType);
     }
 
