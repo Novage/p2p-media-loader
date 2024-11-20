@@ -121,14 +121,16 @@ export class P2PLoader {
   };
 
   broadcastAnnouncement = (sendEmptyAnnouncement = false) => {
+    if (sendEmptyAnnouncement) {
+      this.sendSegmentsAnnouncement([], []);
+      return;
+    }
+
     if (this.isAnnounceMicrotaskCreated || this.config.isP2PUploadDisabled) {
       return;
     }
 
-    const { loaded, httpLoading } = sendEmptyAnnouncement
-      ? { loaded: [], httpLoading: [] }
-      : this.getSegmentsAnnouncement();
-
+    const { loaded, httpLoading } = this.getSegmentsAnnouncement();
     this.sendSegmentsAnnouncement(loaded, httpLoading);
   };
 
