@@ -80,7 +80,8 @@ export type DynamicStreamProperties =
   | "p2pErrorRetries"
   | "validateP2PSegment"
   | "httpRequestSetup"
-  | "isP2PDisabled";
+  | "isP2PDisabled"
+  | "isP2PUploadDisabled";
 
 /**
  * Represents a dynamically modifiable configuration, allowing updates to selected CoreConfig properties at runtime.
@@ -107,10 +108,15 @@ export type DynamicCoreConfig = Partial<
 > &
   Partial<CommonCoreConfig> & {
     /** Optional dynamic configuration for the main stream. */
-    mainStream?: Partial<Pick<StreamConfig, DynamicStreamProperties>>;
+    mainStream?: DynamicStreamConfig;
     /** Optional dynamic configuration for the secondary stream. */
-    secondaryStream?: Partial<Pick<StreamConfig, DynamicStreamProperties>>;
+    secondaryStream?: DynamicStreamConfig;
   };
+
+/** Represents a partial configuration for a stream with dynamic properties. */
+export type DynamicStreamConfig = Partial<
+  Pick<StreamConfig, DynamicStreamProperties>
+>;
 
 /** Represents the configuration for the Core functionality that is common to all streams. */
 export type CommonCoreConfig = {
@@ -187,8 +193,17 @@ export type CoreConfig = Partial<StreamConfig> &
 /** Configuration options for the Core functionality, including network and processing parameters. */
 export type StreamConfig = {
   /**
-   * Indicates whether Peer-to-Peer (P2P) functionality is disabled for the stream.
-   * If set to true, P2P functionality is disabled for the stream.
+   * Controls if peer-to-peer upload is disabled for the stream.
+   * If `true`, the stream only downloads segments without uploading to peers.
+   *
+   * @default
+   * ```typescript
+   * isP2PUploadDisabled: false
+   * ```
+   */
+  isP2PUploadDisabled: boolean;
+  /**
+   * Controls whether peer-to-peer functionality is disabled for the stream.
    *
    * @default
    * ```typescript

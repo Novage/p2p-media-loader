@@ -114,16 +114,33 @@ export class P2PLoader {
   }
 
   private onPeerConnected = (peer: Peer) => {
+    if (this.config.isP2PUploadDisabled) return;
+
     const { httpLoading, loaded } = this.getSegmentsAnnouncement();
     peer.sendSegmentsAnnouncementCommand(loaded, httpLoading);
   };
 
-  broadcastAnnouncement = () => {
-    if (this.isAnnounceMicrotaskCreated) return;
+  broadcastAnnouncement = (sendEmptyAnnouncement = false) => {
+    if (sendEmptyAnnouncement) {
+      this.sendSegmentsAnnouncement([], []);
+      return;
+    }
 
+    if (this.isAnnounceMicrotaskCreated || this.config.isP2PUploadDisabled) {
+      return;
+    }
+
+    const { loaded, httpLoading } = this.getSegmentsAnnouncement();
+    this.sendSegmentsAnnouncement(loaded, httpLoading);
+  };
+
+  private sendSegmentsAnnouncement = (
+    loaded: number[],
+    httpLoading: number[],
+  ) => {
     this.isAnnounceMicrotaskCreated = true;
+
     queueMicrotask(() => {
-      const { httpLoading, loaded } = this.getSegmentsAnnouncement();
       for (const peer of this.trackerClient.peers()) {
         peer.sendSegmentsAnnouncementCommand(loaded, httpLoading);
       }
@@ -142,6 +159,10 @@ export class P2PLoader {
       segmentExternalId,
     );
     if (!segment) return;
+    if (this.config.isP2PUploadDisabled) {
+      peer.sendSegmentAbsentCommand(segmentExternalId, requestId);
+      return;
+    }
 
     const swarmId = this.config.swarmId ?? this.streamManifestUrl;
     const streamSwarmId = StreamUtils.getStreamSwarmId(swarmId, this.stream);
