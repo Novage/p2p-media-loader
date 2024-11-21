@@ -316,12 +316,14 @@ export class ShakaP2PEngine {
     };
     NetworkingEngine.registerScheme("http", handleLoading);
     NetworkingEngine.registerScheme("https", handleLoading);
+    NetworkingEngine.registerScheme("data", handleLoading);
   }
 
   private static unregisterNetworkingEngineSchemes(shaka: Shaka) {
     const { NetworkingEngine } = shaka.net;
     NetworkingEngine.unregisterScheme("http");
     NetworkingEngine.unregisterScheme("https");
+    NetworkingEngine.unregisterScheme("data");
   }
 
   /**
