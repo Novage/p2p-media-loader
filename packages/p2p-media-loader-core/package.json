@@ -35,7 +35,12 @@
   "exports": "./src/index.ts",
   "types": "./src/index.ts",
   "publishConfig": {
-    "exports": "./lib/index.js",
+    "exports": {
+      ".": {
+        "p2pml:core-as-bundle": "./dist/p2p-media-loader-core.es.js",
+        "import": "./lib/index.js"
+      }
+    },
     "types": "./lib/index.d.ts"
   },
   "sideEffects": false,
