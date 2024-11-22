@@ -1,6 +1,6 @@
 {
   "name": "p2p-media-loader-hlsjs",
-  "version": "1.0.0",
+  "version": "2.1.0",
   "description": "P2P Media Loader hls.js integration",
   "license": "Apache-2.0",
   "author": "Novage",

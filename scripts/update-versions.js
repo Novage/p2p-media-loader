@@ -1,5 +1,9 @@
-const fs = require("fs");
-const path = require("path");
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const packages = [
   "../packages/p2p-media-loader-core/package.json",
@@ -11,7 +15,7 @@ const packages = [
 const versionFile = "../packages/p2p-media-loader-core/src/utils/version.ts";
 
 function updateVersionFile(versionFilePath, newVersion) {
-  const fullPath = path.resolve(versionFilePath);
+  const fullPath = path.resolve(__dirname, versionFilePath);
   let fileContent = fs.readFileSync(fullPath, "utf8");
 
   fileContent = fileContent.replace(/"(.*?)"/, `"${newVersion}"`);
@@ -20,8 +24,8 @@ function updateVersionFile(versionFilePath, newVersion) {
 }
 
 function updateVersion(packagePath, newVersion) {
-  const fullPath = path.resolve(packagePath);
-  const packageJson = require(fullPath);
+  const fullPath = path.resolve(__dirname, packagePath);
+  const packageJson = JSON.parse(fs.readFileSync(fullPath, "utf8"));
   const updatedPackageJson = { ...packageJson, version: newVersion };
   fs.writeFileSync(
     fullPath,
