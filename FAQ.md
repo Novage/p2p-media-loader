@@ -135,7 +135,7 @@ const hls = new HlsWithP2P({
 
 ## How to see that P2P is actually working?
 
-The easiest way is to subscribe to P2P [events](https://novage.github.io/p2p-media-loader/docs/v2.0/types/p2p_media_loader_core.CoreEventMap.html) and log them:
+The easiest way is to subscribe to P2P [events](https://novage.github.io/p2p-media-loader/docs/v2.1.0/types/p2p_media_loader_core.CoreEventMap.html) and log them:
 
 ```javascript
 const engine = new HlsJsP2PEngine();
