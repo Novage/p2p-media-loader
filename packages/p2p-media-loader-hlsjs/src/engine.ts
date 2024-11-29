@@ -61,6 +61,8 @@ export type HlsWithP2PConfig<HlsType extends abstract new () => unknown> =
     };
   };
 
+const MAX_LIVE_SYNC_DURATION = 120;
+
 /**
  * Represents a P2P (peer-to-peer) engine for HLS (HTTP Live Streaming) to enhance media streaming efficiency.
  * This class integrates P2P technologies into HLS.js, enabling the distribution of media segments via a peer network
@@ -307,24 +309,44 @@ export class HlsJsP2PEngine {
   ) => {
     if (
       this.currentHlsInstance &&
-      this.currentHlsInstance.config.liveSyncDurationCount !==
-        data.details.fragments.length - 1 &&
       data.details.live &&
       data.details.fragments[0].type === ("main" as PlaylistLevelType) &&
       !this.currentHlsInstance.userConfig.liveSyncDuration &&
       !this.currentHlsInstance.userConfig.liveSyncDurationCount &&
       data.details.fragments.length > 4
     ) {
-      this.debug(
-        `set liveSyncDurationCount ${data.details.fragments.length - 1}`,
-      );
-      this.currentHlsInstance.config.liveSyncDurationCount =
-        data.details.fragments.length - 1;
+      this.updateLiveSyncDurationCount(data);
     }
 
     this.core.setIsLive(data.details.live);
     this.segmentManager.updatePlaylist(data);
   };
+
+  private updateLiveSyncDurationCount(
+    data: LevelUpdatedData | AudioTrackLoadedData,
+  ) {
+    const fragmentDuration = data.details.targetduration;
+
+    const maxLiveSyncCount = Math.floor(
+      MAX_LIVE_SYNC_DURATION / fragmentDuration,
+    );
+    const newLiveSyncDurationCount = Math.min(
+      data.details.fragments.length - 1,
+      maxLiveSyncCount,
+    );
+
+    if (
+      this.currentHlsInstance &&
+      this.currentHlsInstance.config.liveSyncDurationCount !==
+        newLiveSyncDurationCount
+    ) {
+      this.debug(
+        `Setting liveSyncDurationCount to ${newLiveSyncDurationCount}`,
+      );
+      this.currentHlsInstance.config.liveSyncDurationCount =
+        newLiveSyncDurationCount;
+    }
+  }
 
   private handleMediaAttached = () => {
     this.updateMediaElementEventHandlers("register");
