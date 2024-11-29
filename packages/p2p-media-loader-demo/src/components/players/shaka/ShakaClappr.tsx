@@ -1,9 +1,10 @@
 import "../clappr.css";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { PlayerProps } from "../../../types";
 import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 import { subscribeToUiEvents } from "../utils";
 import { useScripts } from "../../../hooks/useScripts";
+import { Loader } from "../loader/Loader";
 
 const SCRIPTS = [
   "https://cdn.jsdelivr.net/npm/shaka-player@~4/dist/shaka-player.compiled.min.js",
@@ -21,43 +22,21 @@ export const ShakaClappr = ({
   onChunkDownloaded,
   onChunkUploaded,
 }: PlayerProps) => {
-  useScripts(SCRIPTS);
-
-  const [isClapprLoaded, setIsClapprLoaded] = useState(false);
+  const areScriptsLoaded = useScripts(SCRIPTS);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    let intervalId: NodeJS.Timeout | null = null;
+    if (!areScriptsLoaded) return;
 
-    const checkClapprLoaded = () => {
-      if (
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        window.Clappr &&
-        window.LevelSelector &&
-        window.DashShakaPlayback &&
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        window.shaka.Player
-      ) {
-        if (intervalId) clearInterval(intervalId);
-        setIsClapprLoaded(true);
-        ShakaP2PEngine.registerPlugins();
-      }
-    };
-
-    intervalId = setInterval(checkClapprLoaded, 200);
-
-    return () => {
-      clearInterval(intervalId);
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      if (window.shaka) ShakaP2PEngine.unregisterPlugins();
-    };
-  }, []);
+    ShakaP2PEngine.registerPlugins(window.shaka);
+    return () => ShakaP2PEngine.unregisterPlugins(window.shaka);
+  }, [areScriptsLoaded]);
 
   useEffect(() => {
     if (
+      !areScriptsLoaded ||
       !containerRef.current ||
-      !isClapprLoaded ||
       !window.shaka.Player.isBrowserSupported()
     ) {
       return;
@@ -102,7 +81,6 @@ export const ShakaClappr = ({
     };
     /* eslint-enable  */
   }, [
-    isClapprLoaded,
     announceTrackers,
     onChunkDownloaded,
     onChunkUploaded,
@@ -110,7 +88,12 @@ export const ShakaClappr = ({
     onPeerClose,
     streamUrl,
     swarmId,
+    areScriptsLoaded,
   ]);
+
+  if (!areScriptsLoaded) {
+    return <Loader />;
+  }
 
   return window.shaka.Player.isBrowserSupported() ? (
     <div ref={containerRef} id="clappr-player" />
