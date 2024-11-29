@@ -73,7 +73,7 @@ export const ShakaDPlayer = ({
     swarmId,
   ]);
 
-  return window.shaka.Player.isBrowserSupported() ? (
+  return shaka.Player.isBrowserSupported() ? (
     <div ref={containerRef} className="video-container">
       <video playsInline autoPlay muted />
     </div>
