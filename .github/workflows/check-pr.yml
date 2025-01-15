@@ -18,10 +18,16 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: latest
 
+
+    # Print out Node.js and PNPM versions
+      - run: node -v
+      - run: pnpm -v
+      
       - run: pnpm i
       - run: pnpm lint
       - run: pnpm build
       - run: npx tsc
+
       
