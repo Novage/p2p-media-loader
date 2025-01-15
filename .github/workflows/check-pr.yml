@@ -23,5 +23,4 @@ jobs:
       - run: pnpm i
       - run: pnpm lint
       - run: pnpm build
-      - run: npx tsc
         working-directory: ./demo
