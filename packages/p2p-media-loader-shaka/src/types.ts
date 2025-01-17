@@ -50,6 +50,7 @@ declare global {
     interface SegmentIndex {
       get(position: number): shaka.media.SegmentReference | null;
       getNumReferences(): number;
+      getNumEvicted(): number;
     }
   }
 }

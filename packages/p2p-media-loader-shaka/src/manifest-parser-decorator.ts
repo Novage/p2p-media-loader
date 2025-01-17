@@ -137,11 +137,15 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
         segmentIndex.get = originalGet;
         try {
           const referencesCount = segmentIndex.getNumReferences();
-          const firstItemReference = segmentIndex.get(0);
-          const lastItemReference = segmentIndex.get(referencesCount - 1);
+          const evictedReferencesCount = segmentIndex.getNumEvicted();
+          const lastReferenceIndex =
+            referencesCount - 1 + evictedReferencesCount;
+
+          const firstItemReference = segmentIndex.get(evictedReferencesCount);
+          const lastItemReference = segmentIndex.get(lastReferenceIndex);
 
           if (!firstItemReference || !lastItemReference) {
-            return reference;
+            throw new Error("Segment index is empty");
           }
 
           if (
@@ -159,7 +163,6 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
           this.debug(`Stream ${stream.id} is updated`);
         } catch {
           // This catch is intentionally left blank.
-          // [...segmentIndex] throws an error when segmentIndex inner array is empty
         } finally {
           // do not set custom get again is segment index is already read and stream is VOD
           if (
