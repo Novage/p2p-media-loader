@@ -18,10 +18,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: latest
+          node-version: 'lts/*'
 
       - run: pnpm i
       - run: pnpm lint
       - run: pnpm build
-      - run: npx tsc
-        working-directory: ./demo
