@@ -43,3 +43,13 @@ export type HookedNetworkingEngine = shaka.net.NetworkingEngine & {
 export type StreamWithReadonlySegments = Stream & {
   segments: ReadonlyMap<string, SegmentWithStream>;
 };
+
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace shaka.media {
+    interface SegmentIndex {
+      get(position: number): shaka.media.SegmentReference | null;
+      getNumReferences(): number;
+    }
+  }
+}
