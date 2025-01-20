@@ -161,9 +161,9 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
           stream.isSegmentIndexAlreadyRead = true;
           this.debug(`Stream ${stream.id} is updated`);
         } catch {
-          // This catch is intentionally left blank.
+          // Ignore an error when segmentIndex inner array is empty
         } finally {
-          // do not set custom get again is segment index is already read and stream is VOD
+          // Do not set custom get again if the segment index is already read and the stream is VOD
           if (
             !stream.isSegmentIndexAlreadyRead ||
             !!this.player?.isLive() ||
