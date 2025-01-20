@@ -14,7 +14,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   private player?: shaka.Player;
 
   constructor(
-    shaka: Readonly<Shaka>,
+    private readonly shaka: Readonly<Shaka>,
     private readonly originalManifestParser: shaka.extern.ManifestParser,
   ) {
     this.isHls = this.originalManifestParser instanceof shaka.hls.HlsParser;
@@ -136,7 +136,14 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
 
         segmentIndex.get = originalGet;
         try {
-          const references = [...segmentIndex];
+          const references = getReferencesArray(
+            segmentIndex as unknown as Record<string, unknown>,
+            this.shaka,
+          );
+          if (!references) {
+            throw new Error("Segment references not found");
+          }
+
           const firstItemReference = references[0];
           const lastItemReference = references[references.length - 1];
 
@@ -155,7 +162,6 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
           this.debug(`Stream ${stream.id} is updated`);
         } catch {
           // This catch is intentionally left blank.
-          // [...segmentIndex] throws an error when segmentIndex inner array is empty
         } finally {
           // do not set custom get again is segment index is already read and stream is VOD
           if (
@@ -260,6 +266,28 @@ export class DashManifestParser extends ManifestParserDecorator {
   public constructor(shaka: Shaka) {
     super(shaka, new shaka.dash.DashParser());
   }
+}
+
+function getReferencesArray(
+  obj: Record<string, unknown>,
+  shaka: Shaka,
+): shaka.media.SegmentReference[] | null {
+  for (const key in obj) {
+    if (
+      Array.isArray(obj[key]) &&
+      obj[key].length > 0 &&
+      obj[key][0] instanceof shaka.media.SegmentReference
+    ) {
+      return obj[key] as shaka.media.SegmentReference[];
+    } else if (typeof obj[key] === "object") {
+      const references = getReferencesArray(
+        obj[key] as Record<string, unknown>,
+        shaka,
+      );
+      if (references) return references;
+    }
+  }
+  return null;
 }
 
 function getMapPropertiesFromObject(object: Record<string, unknown>) {
