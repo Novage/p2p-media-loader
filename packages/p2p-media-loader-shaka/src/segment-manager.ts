@@ -32,26 +32,37 @@ export class SegmentManager {
     if (shakaStream.segmentIndex) this.updateStreamSegments(shakaStream);
   }
 
-  updateStreamSegments(shakaStream: HookedStream) {
+  updateStreamSegments(
+    shakaStream: HookedStream,
+    segmentReferences?: shaka.media.SegmentReference[],
+  ) {
     const stream = this.core.getStream(shakaStream.id.toString());
     if (!stream) return;
 
+    const { segmentIndex } = stream.shakaStream;
+    if (!segmentReferences && segmentIndex) {
+      try {
+        segmentReferences = [...segmentIndex];
+      } catch {
+        return;
+      }
+    }
+    if (!segmentReferences) return;
+
     if (this.streamInfo.protocol === "hls") {
-      this.processHlsSegmentReferences(stream);
+      this.processHlsSegmentReferences(stream, segmentReferences);
     } else {
-      this.processDashSegmentReferences(stream);
+      this.processDashSegmentReferences(stream, segmentReferences);
     }
   }
 
   private processDashSegmentReferences(
     managerStream: StreamWithReadonlySegments,
+    segmentReferences: shaka.media.SegmentReference[],
   ) {
-    const { segmentIndex } = managerStream.shakaStream;
-    if (!segmentIndex) return;
-
     const staleSegmentsIds = new Set(managerStream.segments.keys());
     const newSegments: Segment[] = [];
-    for (const reference of segmentIndex) {
+    for (const reference of segmentReferences) {
       const externalId = Math.trunc(
         reference.getStartTime() / SEGMENT_ID_RESOLUTION_IN_SECONDS,
       );
@@ -78,30 +89,22 @@ export class SegmentManager {
 
   private processHlsSegmentReferences(
     managerStream: StreamWithReadonlySegments,
+    segmentReferences: shaka.media.SegmentReference[],
   ) {
-    const { segmentIndex } = managerStream.shakaStream;
     const { segments } = managerStream;
-
-    if (!segmentIndex) return;
-
     const lastMediaSequence = Utils.getStreamLastMediaSequence(managerStream);
-    const segmentRefsCount = segmentIndex.getNumReferences();
 
     const newSegments: Segment[] = [];
     if (segments.size === 0) {
       const firstReferenceMediaSequence =
         lastMediaSequence === undefined
           ? 0
-          : lastMediaSequence - segmentRefsCount + 1;
+          : lastMediaSequence - segmentReferences.length + 1;
 
-      for (let i = 0; i < segmentRefsCount; i++) {
-        const reference = segmentIndex.get(i);
-
-        if (!reference) continue;
-
+      for (const [index, reference] of segmentReferences.entries()) {
         const segment = Utils.createSegment({
           segmentReference: reference,
-          externalId: firstReferenceMediaSequence + i,
+          externalId: firstReferenceMediaSequence + index,
         });
         newSegments.push(segment);
       }
@@ -112,13 +115,9 @@ export class SegmentManager {
     if (!lastMediaSequence) return;
     let mediaSequence = lastMediaSequence;
 
-    for (let i = segmentRefsCount - 1; i >= 0; i--) {
-      const reference = segmentIndex.get(i);
-      if (!reference) continue;
-
+    for (const reference of itemsBackwards(segmentReferences)) {
       const runtimeId = Utils.getSegmentRuntimeIdFromReference(reference);
       if (segments.has(runtimeId)) break;
-
       const segment = Utils.createSegment({
         runtimeId,
         segmentReference: reference,
@@ -142,6 +141,10 @@ export class SegmentManager {
       staleSegmentIds,
     );
   }
+}
+
+function* itemsBackwards<T>(items: T[]) {
+  for (let i = items.length - 1; i >= 0; i--) yield items[i];
 }
 
 function* nSegmentsBackwards(

@@ -136,13 +136,9 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
 
         segmentIndex.get = originalGet;
         try {
-          const referencesCount = segmentIndex.getNumReferences();
-          const firstItemReference = segmentIndex.get(0);
-          const lastItemReference = segmentIndex.get(referencesCount - 1);
-
-          if (!firstItemReference || !lastItemReference) {
-            return reference;
-          }
+          const references = [...segmentIndex];
+          const firstItemReference = references[0];
+          const lastItemReference = references[references.length - 1];
 
           if (
             firstItemReference === prevFirstItemReference &&
@@ -154,7 +150,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
           prevLastItemReference = lastItemReference;
 
           // Segment index have been updated
-          segmentManager.updateStreamSegments(stream);
+          segmentManager.updateStreamSegments(stream, references);
           stream.isSegmentIndexAlreadyRead = true;
           this.debug(`Stream ${stream.id} is updated`);
         } catch {
