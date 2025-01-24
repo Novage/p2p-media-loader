@@ -5,6 +5,7 @@ import {
   RequestError,
   RequestAbortErrorType,
   SegmentWithStream,
+  Segment,
 } from "../types.js";
 import * as StreamUtils from "../utils/stream.js";
 import * as Utils from "../utils/utils.js";
@@ -51,6 +52,17 @@ export type RequestStatus =
   | "succeed"
   | "failed"
   | "aborted";
+
+function mapSegmentWithStreamToSegment(segment: SegmentWithStream): Segment {
+  return {
+    runtimeId: segment.runtimeId,
+    externalId: segment.externalId,
+    url: segment.url,
+    byteRange: segment.byteRange,
+    startTime: segment.startTime,
+    endTime: segment.endTime,
+  };
+}
 
 export class Request {
   private currentAttempt?: RequestAttempt;
@@ -187,7 +199,7 @@ export class Request {
     );
 
     this.onSegmentStart({
-      segment: this.segment,
+      segment: mapSegmentWithStreamToSegment(this.segment),
       downloadSource: requestData.downloadSource,
       peerId:
         requestData.downloadSource === "p2p" ? requestData.peerId : undefined,
@@ -209,7 +221,7 @@ export class Request {
     );
     this._abortRequestCallback?.(new RequestError("abort"));
     this.onSegmentAbort({
-      segment: this.segment,
+      segment: mapSegmentWithStreamToSegment(this.segment),
       downloadSource: this.currentAttempt?.downloadSource,
       peerId:
         this.currentAttempt?.downloadSource === "p2p"
@@ -237,7 +249,7 @@ export class Request {
       error,
     });
     this.onSegmentError({
-      segment: this.segment,
+      segment: mapSegmentWithStreamToSegment(this.segment),
       error,
       downloadSource: this.currentAttempt.downloadSource,
       peerId:
@@ -264,7 +276,7 @@ export class Request {
       error,
     });
     this.onSegmentError({
-      segment: this.segment,
+      segment: mapSegmentWithStreamToSegment(this.segment),
       error,
       downloadSource: this.currentAttempt.downloadSource,
       peerId:
