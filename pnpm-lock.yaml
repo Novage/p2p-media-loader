@@ -11,6 +11,9 @@ importers:
       '@eslint-react/eslint-plugin':
         specifier: ^1.26.1
         version: 1.26.1(eslint@9.19.0)(ts-api-utils@2.0.1(typescript@5.7.3))(typescript@5.7.3)
+      '@eslint/js':
+        specifier: ^9.19.0
+        version: 9.19.0
       '@types/eslint__js':
         specifier: ^8.42.3
         version: 8.42.3
@@ -20,6 +23,15 @@ importers:
       eslint-plugin-import:
         specifier: ^2.31.0
         version: 2.31.0(@typescript-eslint/parser@8.23.0(eslint@9.19.0)(typescript@5.7.3))(eslint@9.19.0)
+      eslint-plugin-react:
+        specifier: ^7.37.4
+        version: 7.37.4(eslint@9.19.0)
+      eslint-plugin-react-hooks:
+        specifier: ^5.1.0
+        version: 5.1.0(eslint@9.19.0)
+      eslint-plugin-react-refresh:
+        specifier: ^0.4.18
+        version: 0.4.18(eslint@9.19.0)
       globals:
         specifier: ^15.14.0
         version: 15.14.0
