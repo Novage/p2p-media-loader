@@ -37,6 +37,8 @@ function isSafariOrWkWebview() {
 }
 
 export class P2PTrackerClient {
+  private static readonly PEER_ID_BY_INFO_HASH = new Map<string, string>();
+
   private readonly streamShortId: string;
   private readonly client: TrackerClient;
   private readonly _peers = new Map<string, PeerItem>();
@@ -52,7 +54,11 @@ export class P2PTrackerClient {
     const streamHash = PeerUtil.getStreamHash(streamSwarmId);
     this.streamShortId = LoggerUtils.getStreamString(stream);
 
-    const peerId = PeerUtil.generatePeerId(config.trackerClientVersionPrefix);
+    let peerId = P2PTrackerClient.PEER_ID_BY_INFO_HASH.get(streamHash);
+    if (!peerId) {
+      peerId = PeerUtil.generatePeerId(config.trackerClientVersionPrefix);
+      P2PTrackerClient.PEER_ID_BY_INFO_HASH.set(streamHash, peerId);
+    }
 
     this.client = new TrackerClient({
       infoHash: utf8ToUintArray(streamHash),
