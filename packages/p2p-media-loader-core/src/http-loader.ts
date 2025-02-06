@@ -151,9 +151,8 @@ export class HttpRequestExecutor {
           : undefined;
         if (contentRange) {
           const { from, to } = contentRange;
-          const totalBytes = to !== undefined && from !== undefined
-            ? to - from + 1
-            : undefined
+          const responseExpectedBytesLength =
+            to !== undefined && from !== undefined ? to - from + 1 : undefined;
 
           if (
             (totalBytes !== undefined && this.request.totalBytes !== totalBytes) ||
