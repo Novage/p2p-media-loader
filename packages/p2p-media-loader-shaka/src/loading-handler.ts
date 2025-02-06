@@ -30,7 +30,7 @@ export class Loader {
     const { RequestType } = this.shaka.net.NetworkingEngine;
     const [url, request, requestType] = args;
     if (requestType === RequestType.SEGMENT) {
-      return this.loadSegment(url, request.headers.Range);
+      return this.loadSegment(url, request);
     }
 
     const loading = this.defaultLoad() as LoadingHandlerResult;
@@ -50,8 +50,9 @@ export class Loader {
 
   private loadSegment(
     segmentUrl: string,
-    byteRangeString: string,
+    originalRequest: shaka.extern.Request,
   ): LoadingHandlerResult {
+    const byteRangeString = originalRequest.headers.Range;
     const segmentRuntimeId = Utils.getSegmentRuntimeId(
       segmentUrl,
       byteRangeString,
@@ -74,6 +75,7 @@ export class Loader {
         return {
           data,
           headers: {},
+          originalRequest,
           uri: segmentUrl,
           originalUri: segmentUrl,
           timeMs: getLoadingDurationBasedOnBandwidth(
