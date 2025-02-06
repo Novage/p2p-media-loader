@@ -57,7 +57,7 @@
     "p2p-media-loader-hlsjs": "workspace:*",
     "p2p-media-loader-shaka": "workspace:*",
     "plyr": "^3.7.8",
-    "shaka-player": "4.12.10"
+    "shaka-player": "^4.13.2"
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",

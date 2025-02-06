@@ -149,8 +149,8 @@ importers:
         specifier: ^3.7.8
         version: 3.7.8
       shaka-player:
-        specifier: 4.12.10
-        version: 4.12.10
+        specifier: ^4.13.2
+        version: 4.13.2
     devDependencies:
       '@types/d3':
         specifier: ^7.4.3
@@ -206,8 +206,8 @@ importers:
         specifier: ^0.4.4
         version: 0.4.4(rollup@4.34.3)
       shaka-player:
-        specifier: 4.12.10
-        version: 4.12.10
+        specifier: ^4.13.2
+        version: 4.13.2
 
 packages:
 
@@ -2774,8 +2774,8 @@ packages:
     resolution: {integrity: sha512-QMEp5B7cftE7APOjk5Y6xgrbWu+WkLVQwk8JNjZ8nKRciZaByEW6MubieAiToS7+dwvrjGhH8jRXz3MVd0AYqQ==}
     hasBin: true
 
-  shaka-player@4.12.10:
-    resolution: {integrity: sha512-5aiiWJ37xqPLQgMMG0/oPImLVLZRXZ7EkqVq6XaWK1Ll0v7sgtvPic19eAbD5LbOjNZu6pAuDv6h+DzVGVtzdw==}
+  shaka-player@4.13.2:
+    resolution: {integrity: sha512-LbdIJdRB8ZuBR2+MbU+N1cdeVNT/F57Hn+7alurxUm9jLZIXXM+qp/sQIfpoLChdrc+HU2fGI4q1NssHByV4Xw==}
     engines: {node: '>=18'}
 
   shebang-command@2.0.0:
@@ -6299,7 +6299,7 @@ snapshots:
       inherits: 2.0.4
       safe-buffer: 5.2.1
 
-  shaka-player@4.12.10:
+  shaka-player@4.13.2:
     dependencies:
       eme-encryption-scheme-polyfill: 2.2.1
 
