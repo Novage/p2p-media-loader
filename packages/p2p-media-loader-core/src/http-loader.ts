@@ -155,7 +155,8 @@ export class HttpRequestExecutor {
             to !== undefined && from !== undefined ? to - from + 1 : undefined;
 
           if (
-            (totalBytes !== undefined && this.request.totalBytes !== totalBytes) ||
+            (responseExpectedBytesLength !== undefined &&
+              this.expectedBytesLength !== responseExpectedBytesLength) ||
             (from !== undefined && requestByteRange.start !== from) ||
             (to !== undefined &&
               requestByteRange.end !== undefined &&
