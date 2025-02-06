@@ -27,6 +27,7 @@ import {
 } from "./utils/utils.js";
 import { TRACKER_CLIENT_VERSION_PREFIX } from "./utils/peer.js";
 import { SegmentStorage } from "./segment-storage/index.js";
+import { P2PTrackerClient } from "./p2p/tracker-client.js";
 
 /** Core class for managing media streams loading via P2P. */
 export class Core<TStream extends Stream = Stream> {
@@ -432,6 +433,7 @@ export class Core<TStream extends Stream = Stream> {
     this.segmentStorage = undefined;
     this.manifestResponseUrl = undefined;
     this.streamDetails = { isLive: false, activeLevelBitrate: 0 };
+    P2PTrackerClient.clearPeerIdCache();
   }
 
   private async initializeSegmentStorage() {

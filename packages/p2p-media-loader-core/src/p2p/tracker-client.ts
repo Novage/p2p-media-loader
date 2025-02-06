@@ -162,4 +162,8 @@ export class P2PTrackerClient {
     this.logger(`peer closed: ${peer.id}`);
     this._peers.delete(peer.id);
   };
+
+  static clearPeerIdCache() {
+    P2PTrackerClient.PEER_ID_BY_INFO_HASH.clear();
+  }
 }
