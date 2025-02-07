@@ -65,6 +65,7 @@ export class Core<TStream extends Stream = Stream> {
       ],
     },
     validateP2PSegment: undefined,
+    validateHTTPSegment: undefined,
     httpRequestSetup: undefined,
     swarmId: undefined,
   };
