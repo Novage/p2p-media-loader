@@ -97,15 +97,19 @@ export class P2PTrackerClient {
   ) => {
     const itemId = Peer.getPeerIdFromConnection(peerConnection);
     let peerItem = this._peers.get(itemId);
+
     if (peerItem?.peer) {
       peerConnection.destroy();
       return;
-    } else if (!peerItem) {
+    }
+
+    if (!peerItem) {
       peerItem = { potentialConnections: new Set() };
       peerConnection.idUtf8 = itemId;
-      peerItem.potentialConnections.add(peerConnection);
       this._peers.set(itemId, peerItem);
     }
+
+    peerItem.potentialConnections.add(peerConnection);
 
     peerConnection.on("connect", () => {
       if (peerItem.peer) return;
@@ -113,7 +117,9 @@ export class P2PTrackerClient {
       for (const connection of peerItem.potentialConnections) {
         if (connection !== peerConnection) connection.destroy();
       }
+
       peerItem.potentialConnections.clear();
+
       peerItem.peer = new Peer(
         peerConnection,
         {
