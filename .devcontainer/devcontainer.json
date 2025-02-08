@@ -11,10 +11,8 @@
     "ghcr.io/devcontainers/features/node:1": {}
   },
 
-  // Use 'forwardPorts' to make a list of ports inside the container available locally.
-  // "forwardPorts": [],
-  // Use 'postCreateCommand' to run commands after the container is created.
   "postCreateCommand": "pnpm install",
+  "postAttachCommand": "echo 'Welcome to your Codespace! Run `pnpm dev` to start development.'",
 
   // Configure tool-specific properties.
   "customizations": {
@@ -30,11 +28,14 @@
         },
         "[json]": {
           "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[jsonl]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[jsonc]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
         }
       }
     }
   }
-
-  // Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
-  // "remoteUser": "root"
 }
