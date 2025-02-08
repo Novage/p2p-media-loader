@@ -11,8 +11,7 @@
     "ghcr.io/devcontainers/features/node:1": {}
   },
 
-  "postCreateCommand": "pnpm install",
-  "postAttachCommand": "echo 'Welcome to your Codespace! Run `pnpm dev` to start development.'",
+  "postCreateCommand": "pnpm install && echo 'Welcome to your Codespace! Run `pnpm dev` to start development.'",
 
   // Configure tool-specific properties.
   "customizations": {
