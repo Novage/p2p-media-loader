@@ -9,7 +9,10 @@
   //   "ghcr.io/devcontainers/features/node:1": {}
   // },
 
-  "postCreateCommand": "pnpm install",
+  "postCreateCommand": {
+    "update pnpm": "npm add -g pnpm",
+    "dependencies": "npm pnpm install"
+  },
 
   "postAttachCommand": "# Welcome to your Codespace! Run `pnpm dev` to start development.",
 
