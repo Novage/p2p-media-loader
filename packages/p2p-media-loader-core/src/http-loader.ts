@@ -109,12 +109,12 @@ export class HttpRequestExecutor {
           this.request.data,
         )) ?? true;
 
-    if (!isValid) {
-      this.request.clearLoadedBytes();
-      throw new RequestError<"http-segment-validation-failed">(
-        "http-segment-validation-failed"
-      );
-    }
+      if (!isValid) {
+        this.request.clearLoadedBytes();
+        throw new RequestError<"http-segment-validation-failed">(
+          "http-segment-validation-failed",
+        );
+      }
 
       requestControls.completeOnSuccess();
     } catch (error) {
