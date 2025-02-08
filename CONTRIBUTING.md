@@ -54,14 +54,14 @@ If you prefer to develop without Codespaces, follow these steps:
    git checkout -b feature/your-feature
    ```
 
-4. Make Your Changes and commit them with a descriptive message.
+4. **Make your changes** and commit them with a descriptive message.
 
-5. Push Your Branch to GitHub:
+5. **Push your branch** to GitHub:
 
    ```bash
    git push origin feature/your-feature
    ```
 
-6. Open a Pull Request: Go to the repository on GitHub, click the “Compare & pull request” button, and fill out the PR template. Describe your changes clearly so reviewers know what you did and why.
+6. **Open a pull request**: Go to the repository on GitHub, click the “Compare & pull request” button, and fill out the PR template. Describe your changes clearly so reviewers know what you did and why.
 
 We’ll review your pull request, provide feedback if needed, and merge your changes once everything looks good.
