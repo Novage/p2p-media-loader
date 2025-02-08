@@ -11,7 +11,7 @@
 
   "postCreateCommand": {
     "update pnpm": "npm add -g pnpm",
-    "dependencies": "npm pnpm install"
+    "dependencies": "pnpm install"
   },
 
   "postAttachCommand": "# Welcome to your Codespace! Run `pnpm dev` to start development.",
