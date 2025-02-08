@@ -11,7 +11,7 @@
 
   "postCreateCommand": "pnpm install",
 
-  "postStartCommand": {
+  "postAttachCommand": {
     "welcome": "echo 'Welcome to your Codespace! Run `pnpm dev` to start development.'"
   },
 
