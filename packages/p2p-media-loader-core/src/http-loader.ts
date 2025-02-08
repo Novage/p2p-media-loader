@@ -12,7 +12,7 @@ import { EventTarget } from "./utils/event-target.js";
 
 type HttpConfig = Pick<
   CoreConfig,
-  "httpNotReceivingBytesTimeoutMs" | "httpRequestSetup"
+  "httpNotReceivingBytesTimeoutMs" | "httpRequestSetup" | "validateHTTPSegment"
 >;
 
 export class HttpRequestExecutor {
@@ -101,6 +101,21 @@ export class HttpRequestExecutor {
         this.requestControls.addLoadedChunk(chunk);
         this.onChunkDownloaded(chunk.byteLength, "http");
       }
+
+      const isValid =
+        (await this.httpConfig.validateHTTPSegment?.(
+          segment.url,
+          segment.byteRange,
+          this.request.data,
+        )) ?? true;
+
+    if (!isValid) {
+      this.request.clearLoadedBytes();
+      throw new RequestError<"http-segment-validation-failed">(
+        "http-segment-validation-failed"
+      );
+    }
+
       requestControls.completeOnSuccess();
     } catch (error) {
       this.handleError(error);

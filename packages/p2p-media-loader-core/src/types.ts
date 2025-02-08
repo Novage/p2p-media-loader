@@ -409,6 +409,24 @@ export type StreamConfig = {
   ) => Promise<boolean>;
 
   /**
+   * Optional function to validate a HTTP segment before fully integrating it into the playback buffer.
+   * @param url URL of the segment to validate.
+   * @param byteRange Optional byte range of the segment.
+   * @param data Downloaded segment data.
+   * @returns A promise that resolves with a boolean indicating if the segment is valid.
+   *
+   * @default
+   * ```typescript
+   * validateHTTPSegment: undefined
+   * ```
+   */
+  validateHTTPSegment?: (
+    url: string,
+    byteRange: ByteRange | undefined,
+    data: ArrayBuffer,
+  ) => Promise<boolean>;
+
+  /**
    * Optional function to customize the setup of HTTP requests for segment downloads.
    * @param segmentUrl URL of the segment.
    * @param segmentByteRange The range of bytes requested for the segment.
@@ -631,7 +649,8 @@ export type RequestAbortErrorType = "abort" | "bytes-receiving-timeout";
 export type HttpRequestErrorType =
   | "http-error"
   | "http-bytes-mismatch"
-  | "http-unexpected-status-code";
+  | "http-unexpected-status-code"
+  | "http-segment-validation-failed";
 
 /** Defines the types of errors specific to peer-to-peer requests. */
 export type PeerRequestErrorType =
