@@ -38,6 +38,7 @@ If you prefer to develop without Codespaces, follow these steps:
    ```
 
 3. **Start development** mode:
+
    ```bash
    pnpm dev
    ```
