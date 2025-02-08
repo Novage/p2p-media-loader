@@ -9,10 +9,9 @@
   //   "ghcr.io/devcontainers/features/node:1": {}
   // },
 
-  "postCreateCommand": {
-    "welcome": "sudo echo 'Welcome to your Codespace! Run `pnpm dev` to start development.' > /workspaces/.codespaces/shared/first-run-notice.txt",
-    "dependencies": "pnpm install"
-  },
+  "postCreateCommand": "pnpm install",
+
+  "postAttachCommand": "# Welcome to your Codespace! Run `pnpm dev` to start development.",
 
   // Configure tool-specific properties.
   "customizations": {
