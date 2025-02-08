@@ -1,4 +1,4 @@
-# Welcome to P2P Media Loader Contributing Guide
+# Welcome to the P2P Media Loader Contributing Guide
 
 Thank you for investing your time in contributing to our project! We appreciate every pull request, issue report, and suggestion you make to help improve **P2P Media Loader**.
 
@@ -10,14 +10,14 @@ Thank you for investing your time in contributing to our project! We appreciate 
 
 ## Using GitHub Codespaces
 
-The easiest way to contribute is to use **GitHub Codespaces**, which is already preconfigured in this repository.
+The easiest way to contribute is to use **GitHub Codespaces**, which are already preconfigured in this repository.
 
 1. **Fork** the repository (optional if you don’t have write access).
 2. **Create a Codespace** from the repository (click the green “Code” button, then choose **Codespaces**).
 3. Once the Codespace is ready, open the integrated terminal.
 4. Run `pnpm dev` to start the development environment.
 
-That’s it! All required dependencies and tools are pre-installed, so you can begin coding, testing, and debugging right away.
+That’s it! All required dependencies and tools are pre-installed, so you can begin coding, testing, and debugging immediately.
 
 ## Developing Locally
 
@@ -45,7 +45,9 @@ If you prefer to develop without Codespaces, follow these steps:
 
 ## Contributing Process
 
-1. **Open an issue**: If you find a bug or have a feature request, start by creating a new issue to discuss it.
+Please follow [GitHub flow](https://docs.github.com/en/get-started/using-github/github-flow) when collaborating on our project.
+
+1. **Open an issue**: If you find a bug or have a feature request, start by creating a new issue to discuss.
 
 2. **Fork the repository** (if you don’t have direct commit access).
 
@@ -65,4 +67,4 @@ If you prefer to develop without Codespaces, follow these steps:
 
 6. **Open a pull request**: Go to the repository on GitHub, click the “Compare & pull request” button, and fill out the PR template. Describe your changes clearly so reviewers know what you did and why.
 
-We’ll review your pull request, provide feedback if needed, and merge your changes once everything looks good.
+We’ll review your pull request, provide feedback, and merge your changes once everything looks good.
