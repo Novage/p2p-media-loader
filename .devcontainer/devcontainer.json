@@ -2,7 +2,7 @@
 // README at: https://github.com/devcontainers/templates/tree/main/src/typescript-node
 {
   // Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-  "image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
+  // "image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
 
   // Features to add to the dev container. More info: https://containers.dev/features.
   // "features": {
@@ -11,7 +11,7 @@
 
   "postCreateCommand": "pnpm install",
 
-  "postAttachCommand": {
+  "postStartCommand": {
     "welcome": "echo 'Welcome to your Codespace! Run `pnpm dev` to start development.'"
   },
 
