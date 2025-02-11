@@ -18,8 +18,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*'
+          node-version: "lts/*"
 
       - run: pnpm i
+      - run: pnpm type-check
       - run: pnpm lint
       - run: pnpm build
