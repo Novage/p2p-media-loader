@@ -19,7 +19,7 @@ This library enables the creation of a huge P2P mesh networks, also known as pee
 
 ## Documentation and important links
 
-- [API documentation](https://novage.github.io/p2p-media-loader/docs/v2.1.0/)
+- [API documentation](https://novage.github.io/p2p-media-loader/docs/v2.2/)
 - [P2P development, support & consulting](https://novage.com.ua/)
 - [Demo](http://novage.com.ua/p2p-media-loader/demo.html)
 - [Contributing to our project](https://github.com/Novage/p2p-media-loader/blob/main/CONTRIBUTING.md)
