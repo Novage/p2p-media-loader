@@ -4,20 +4,42 @@
 [![npm version](https://img.shields.io/npm/v/p2p-media-loader-core?logo=npm&logoColor=white)](https://npmjs.com/package/p2p-media-loader-core)
 [![jsDelivr hits (npm)](https://data.jsdelivr.com/v1/package/npm/p2p-media-loader-core/badge?style=rounded)](https://www.jsdelivr.com/package/npm/p2p-media-loader-core)
 
-**P2P Media Loader** is an open-source JavaScript library that leverages modern web browser features, such as HTML5 video and WebRTC, to enable media delivery over peer-to-peer (P2P) connections. It integrates smoothly with many popular HTML5 video players and works entirely without browser plugins or add-ons. Experience it in action with the [demo](http://novage.com.ua/p2p-media-loader/demo.html).
+**P2P Media Loader** is an open-source JavaScript library that uses modern browser technologies — like HTML5 video and WebRTC — to enable peer-to-peer (P2P) media delivery. It integrates seamlessly with popular HTML5 video players and requires no additional browser plugins or add-ons. Try the [demo](http://novage.com.ua/p2p-media-loader/demo.html) to see it in action.
 
-By leveraging P2P technology, it greatly reduces reliance on traditional content delivery network (CDN) resources, lowers costs, and enhances the ability to deliver media streams to a larger audience.
+This library makes it possible to build large-scale P2P mesh networks — often called peer-to-peer content delivery networks (P2P CDN), Hybrid CDN, Multi CDN, peer-to-peer television (P2PTV), or Enterprise Content Delivery Networks (eCDN) — enabling users who are watching the same live or on-demand (VOD) streams via HLS or MPEG-DASH to share traffic in real time.
 
-This library enables the creation of a huge P2P mesh networks, also known as peer-to-peer content delivery network (P2P CDN), peer-to-peer television (P2PTV), and Enterprise Content Delivery Network (eCDN), which allows traffic sharing among users who are simultaneously viewing the same live or video on demand (VOD) stream via HLS or MPEG-DASH protocols.
+## Why Use Hybrid CDN + P2P Delivery?
 
-## Related software
+- **Works Everywhere:**
+  P2P Media Loader **supports all modern desktop and mobile browsers** — Chrome, Safari, Edge, Firefox, and Opera — across Windows, macOS, Android, iOS, iPadOS, and Linux. Check out our [guide](https://novage.com.ua/blog/setting-up-p2p-video-on-a-web-page-in-5-minutes-for-free) to set up P2P video in five minutes. You can also [embed](https://novage.com.ua/blog/integrate-p2p-video-streaming-into-mobile-application) it into **native iOS and Android** apps and use it with **native players**.
+
+- **No Setup Cost and No Server Software Needed:**
+  For smaller setups (1,000–2,000 simultaneous viewers), public trackers alone can handle peer connections. This means you **don’t need to install or maintain any additional server-side components** in many cases. **Free** alternatives are available for larger setups too. Check our article on [running dedicated trackers](https://novage.com.ua/blog/p2p-video-delivery-for-up-to-100k-viewers-for-free).
+
+- **Reduced Load on Origin:**
+  Offloading requests from the CDN or media server to peers eases the strain on centralized infrastructure, increasing system reliability.
+
+- **Significant Cost Savings:**
+  With less bandwidth required from your primary video source, you can dramatically cut CDN or hosting expenses.
+
+- **Enhanced Total Bandwidth:**
+  When viewers share video data among themselves, they collectively expand overall network capacity, leading to smoother streaming for everyone.
+
+- **Flexible for Live & VOD:**
+  Whether you’re streaming live events or on-demand videos, P2P Media Loader supports both scenarios without added complexity.
+
+- **eCDN (Enterprise Content Delivery Network) Approach:**
+  In enterprise environments, you have full control over the internal network. This means peers can easily interconnect with minimal constraints, ensuring reliable, high-quality internal media delivery (e.g., multiple screens, desktops, and mobile devices across an organization) without straining external bandwidth or internal infrastructure.
+
+## Related Software
 
 - [wt-tracker](https://github.com/Novage/wt-tracker): a high-performance WebTorrent tracker for Node.js using [µWebSockets.js](https://github.com/uNetworking/uWebSockets.js).
-- [Aquatic](https://github.com/greatest-ape/aquatic): a high-performance BitTorrent tracker written in Rust.
-- [OpenWebtorrent Tracker](https://github.com/OpenWebTorrent/openwebtorrent-tracker): fast and simple webtorrent tracker written in C++ using [µWebSockets](https://github.com/uNetworking/uWebSockets).
-- [bittorrent-tracker](https://github.com/webtorrent/bittorrent-tracker): a simple, robust, BitTorrent tracker (client & server) implementation for Node.js and Web.
+- [Aquatic](https://github.com/greatest-ape/aquatic): a high-performance WebTorrent and BitTorrent tracker written in Rust.
+- [bittorrent-tracker](https://github.com/webtorrent/bittorrent-tracker): official WebTorrent tracker implementation for Node.js.
 
-## Documentation and important links
+## Documentation and Important Links
+
+- Guides [for HTML pages and web apps](https://novage.com.ua/blog/setting-up-p2p-video-on-a-web-page-in-5-minutes-for-free) and [for native mobile apps](https://novage.com.ua/blog/integrate-p2p-video-streaming-into-mobile-application)
 
 - [API documentation](https://novage.github.io/p2p-media-loader/docs/v2.2/)
 - [P2P development, support & consulting](https://novage.com.ua/)
@@ -35,7 +57,16 @@ This library enables the creation of a huge P2P mesh networks, also known as pee
   - [Hls.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/dist/)
   - [Shaka Player integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@latest/dist/)
 
-## Key features
+## Web Browsers Support
+
+- **Chrome** on desktops and Android
+- **Firefox** on desktops and Android
+- **Sarafi** on macOS
+- **Safari** on iPadOS (iPad)
+- **Safari** on iOS (iPhone, iOS version 17.1+ required)
+- **Edge** on Windows
+
+## Key Features
 
 - Supports live and VOD streams over HLS or MPEG-DASH protocols
 - Supports multiple HTML5 video players and engines:
@@ -46,16 +77,16 @@ This library enables the creation of a huge P2P mesh networks, also known as pee
   - WebTorrent trackers - [https://tracker.novage.com.ua/](https://tracker.novage.com.ua/), [https://tracker.webtorrent.dev/](https://tracker.webtorrent.dev/), [https://openwebtorrent.com/](https://openwebtorrent.com/)
   - STUN servers - [Public STUN server list](https://gist.github.com/mondain/b0ec1cf5f60ae726202e)
 
-## Key components of the P2P network
+## Key Components of the P2P Network
 
 All the components of the P2P network are free and open-source.
 
 ![P2P Media Loader network](https://raw.githubusercontent.com/Novage/p2p-media-loader/gh-pages/images/p2p-media-loader-network.png)
 
-**P2P Media Loader** web browser [requirements](#web-browsers-support) are:<br>
+**P2P Media Loader** required browser features are:<br>
 
-- **WebRTC Data Channels** support to exchange data between peers
-- **Media Source Extensions** are required by Hls.js and Shaka Player engines for media playback
+- [WebRTC Data Channels](https://caniuse.com/mdn-api_rtcdatachannel) to exchange data between peers
+- [Media Source Extensions](https://caniuse.com/mediasource) or [Managed Media Source](https://caniuse.com/mdn-api_managedmediasource) are required by Hls.js and Shaka Player engines for media playback
 
 [**STUN**](https://en.wikipedia.org/wiki/STUN) server is used by [WebRTC](https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API) to gather [ICE](https://en.wikipedia.org/wiki/Interactive_Connectivity_Establishment) candidates.
 There are many running public servers available on [Public STUN server list](https://gist.github.com/mondain/b0ec1cf5f60ae726202e).
@@ -78,19 +109,3 @@ Subsequently, **P2P Media Loader** transmits media stream details and connection
 **P2P Media Loader** then connects with these peers to download additional media segments and simultaneously shares segments that it has already downloaded.
 
 Periodically, random peers in the P2P swarm download new segments over HTTP(S) and distribute them to others via P2P.
-
-## Web browsers support
-
-### P2P Media Loader required browser features
-
-- [WebRTC Data Channels](https://caniuse.com/mdn-api_rtcdatachannel)
-- [Media Source Extensions](https://caniuse.com/mediasource) or [Managed Media Source](https://caniuse.com/mdn-api_managedmediasource)
-
-### The features are fully supported across the most popular browsers
-
-- Chrome
-- Firefox
-- macOS Safari
-- iPadOS Safari (iPad)
-- iOS Safari (iPhone, iOS version 17.1+)
-- Edge
