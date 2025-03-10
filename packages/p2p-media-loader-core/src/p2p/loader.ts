@@ -89,8 +89,8 @@ export class P2PLoader {
 
   get connectedPeerCount() {
     let count = 0;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    for (const peer of this.trackerClient.peers()) count++;
+    const iterator = this.trackerClient.peers();
+    while (!iterator.next().done) count++;
     return count;
   }
 

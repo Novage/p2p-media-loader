@@ -16,11 +16,6 @@ declare module "bittorrent-tracker" {
     ): void;
 
     start(): void;
-
-    complete(): void;
-
-    update(data?: object): void;
-
     destroy(): void;
   }
 
