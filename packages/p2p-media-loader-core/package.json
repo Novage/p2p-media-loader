@@ -68,6 +68,6 @@
     "@rollup/plugin-terser": "^0.4.4",
     "@types/streamx": "^2.9.5",
     "vite-plugin-node-polyfills": "^0.23.0",
-    "vitest": "^3.0.5"
+    "vitest": "^3.0.8"
   }
 }
