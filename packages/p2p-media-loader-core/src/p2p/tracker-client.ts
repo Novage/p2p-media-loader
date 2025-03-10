@@ -82,14 +82,16 @@ export class P2PTrackerClient {
 
   destroy() {
     this.client.destroy();
+
     for (const { peer, potentialConnections } of this._peers.values()) {
       peer?.destroy();
       for (const connection of potentialConnections) {
         connection.destroy();
       }
     }
+
     this._peers.clear();
-    this.logger(`destroy client; stream: ${this.streamShortId}`);
+    this.logger("destroy client; stream:", this.streamShortId);
   }
 
   private onReceivePeerConnection: TrackerClientEvents["peer"] = (
@@ -141,8 +143,7 @@ export class P2PTrackerClient {
   private onTrackerClientWarning: TrackerClientEvents["warning"] = (
     warning,
   ) => {
-    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-    this.logger(`tracker warning (${this.streamShortId}: ${warning})`);
+    this.logger("tracker warning %s:", this.streamShortId, warning);
     this.eventTarget.getEventDispatcher("onTrackerWarning")({
       streamType: this.stream.type,
       warning,
@@ -150,8 +151,7 @@ export class P2PTrackerClient {
   };
 
   private onTrackerClientError: TrackerClientEvents["error"] = (error) => {
-    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-    this.logger(`tracker error (${this.streamShortId}: ${error})`);
+    this.logger("tracker error in stream %s:", this.streamShortId, error);
     this.eventTarget.getEventDispatcher("onTrackerError")({
       streamType: this.stream.type,
       error,
