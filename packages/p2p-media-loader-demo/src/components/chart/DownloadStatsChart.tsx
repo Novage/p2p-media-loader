@@ -55,8 +55,6 @@ export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
 
   useEffect(() => {
     const intervalID = setInterval(() => {
-      if (!downloadStatsRef.current) return;
-
       const { httpDownloaded, p2pDownloaded, p2pUploaded } =
         downloadStatsRef.current;
 
