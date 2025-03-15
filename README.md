@@ -12,22 +12,16 @@ This library makes it possible to build large-scale P2P mesh networks — often 
 
 - **Works Everywhere:**
   P2P Media Loader **supports all modern desktop and mobile browsers** — Chrome, Safari, Edge, Firefox, and Opera — across Windows, macOS, Android, iOS, iPadOS, and Linux. Check out our [guide](https://novage.com.ua/blog/setting-up-p2p-video-on-a-web-page-in-5-minutes-for-free) to set up P2P video in five minutes. You can also [embed](https://novage.com.ua/blog/integrate-p2p-video-streaming-into-mobile-application) it into **native iOS and Android** apps and use it with **native players**.
-
 - **No Setup Cost and No Server Software Needed:**
   For smaller setups (1,000–2,000 simultaneous viewers), public trackers alone can handle peer connections. This means you **don’t need to install or maintain any additional server-side components** in many cases. **Free** alternatives are available for larger setups that can handle 100k simultaneous peers and above. Check our article on [running dedicated trackers](https://novage.com.ua/blog/p2p-video-delivery-for-up-to-100k-viewers-for-free).
-
 - **Reduced Load on Origin:**
   Offloading requests from the CDN or media server to peers eases the strain on centralized infrastructure, increasing system reliability.
-
 - **Significant Cost Savings:**
   With less bandwidth required from your primary video source, you can dramatically cut CDN or hosting expenses.
-
 - **Enhanced Total Bandwidth:**
   When viewers share video data among themselves, they collectively expand overall network capacity, leading to smoother streaming for everyone.
-
 - **Flexible for Live & VOD:**
   Whether you’re streaming live events or on-demand videos, P2P Media Loader supports both scenarios without added complexity.
-
 - **eCDN (Enterprise Content Delivery Network) Approach:**
   In enterprise environments, you have full control over the internal network. This means peers can easily interconnect with minimal constraints, ensuring reliable, high-quality internal media delivery (e.g., multiple screens, desktops, and mobile devices across an organization) without straining external bandwidth or internal infrastructure.
 
@@ -40,7 +34,6 @@ This library makes it possible to build large-scale P2P mesh networks — often 
 ## Documentation and Important Links
 
 - Guides [for HTML pages and web apps](https://novage.com.ua/blog/setting-up-p2p-video-on-a-web-page-in-5-minutes-for-free) and [for native mobile apps](https://novage.com.ua/blog/integrate-p2p-video-streaming-into-mobile-application)
-
 - [API documentation](https://novage.github.io/p2p-media-loader/docs/v2.2/)
 - [P2P development, support & consulting](https://novage.com.ua/)
 - [Demo](http://novage.com.ua/p2p-media-loader/demo.html)
