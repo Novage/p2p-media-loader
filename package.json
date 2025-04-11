@@ -28,7 +28,7 @@
     "typedoc-material-theme": "^1.3.0",
     "typescript": "^5.8.2",
     "typescript-eslint": "^8.26.0",
-    "vite": "^6.2.1"
+    "vite": "^6.2.6"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
