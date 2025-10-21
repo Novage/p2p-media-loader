@@ -17,6 +17,24 @@ export const HlsjsPlayer = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const qualityRef = useRef<HTMLSelectElement>(null);
 
+  const updateQualityOptions = (hls: Hls, selectElement: HTMLSelectElement) => {
+    if (hls.levels.length < 2) {
+      selectElement.style.display = "none";
+    } else {
+      selectElement.style.display = "block";
+      selectElement.options.length = 0;
+      selectElement.add(new Option("Auto", "-1"));
+      hls.levels.forEach((level, index) => {
+        const label = `${level.height}p (${Math.round(level.bitrate / 1000)}k)`;
+        selectElement.add(new Option(label, index.toString()));
+      });
+
+      selectElement.addEventListener("change", () => {
+        hls.currentLevel = parseInt(selectElement.value);
+      });
+    }
+  };
+
   useEffect(() => {
     if (!videoRef.current || !Hls.isSupported()) return;
 
@@ -57,24 +75,6 @@ export const HlsjsPlayer = ({
     announceTrackers,
     swarmId,
   ]);
-
-  const updateQualityOptions = (hls: Hls, selectElement: HTMLSelectElement) => {
-    if (hls.levels.length < 2) {
-      selectElement.style.display = "none";
-    } else {
-      selectElement.style.display = "block";
-      selectElement.options.length = 0;
-      selectElement.add(new Option("Auto", "-1"));
-      hls.levels.forEach((level, index) => {
-        const label = `${level.height}p (${Math.round(level.bitrate / 1000)}k)`;
-        selectElement.add(new Option(label, index.toString()));
-      });
-
-      selectElement.addEventListener("change", () => {
-        hls.currentLevel = parseInt(selectElement.value);
-      });
-    }
-  };
 
   return Hls.isSupported() ? (
     <div className="video-container">
