@@ -22,6 +22,8 @@ export const CommonReactConfig = defineConfig([
       "@eslint-react/avoid-shorthand-fragment": "off",
       "@eslint-react/avoid-shorthand-boolean": "off",
       "@eslint-react/naming-convention/filename": "off",
+      "@eslint-react/prefer-namespace-import": "off",
+      "@eslint-react/dom/prefer-namespace-import": "off",
     },
     settings: {
       react: {
