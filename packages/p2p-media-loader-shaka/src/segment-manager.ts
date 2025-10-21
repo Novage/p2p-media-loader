@@ -42,7 +42,7 @@ export class SegmentManager {
     const { segmentIndex } = stream.shakaStream;
     if (!segmentReferences && segmentIndex) {
       try {
-        segmentReferences = [...segmentIndex];
+        segmentReferences = [...segmentIndex].filter((ref) => !!ref);
       } catch {
         return;
       }
