@@ -3,8 +3,10 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactPlugin from "eslint-plugin-react";
 import react from "@eslint-react/eslint-plugin";
+import { defineConfig } from "eslint/config";
 
-export const CommonReactConfig = /** @type {typeof CommonConfig} */ ([
+/** @type {typeof CommonConfig} */
+export const CommonReactConfig = defineConfig([
   ...CommonConfig,
   reactPlugin.configs.flat?.recommended,
   reactPlugin.configs.flat?.["jsx-runtime"],

@@ -1,6 +1,6 @@
 // @ts-check
 
-import tsEslint from "typescript-eslint";
 import { CommonReactConfig } from "../eslint.common.react.config.js";
+import { defineConfig } from "eslint/config";
 
-export default tsEslint.config(...CommonReactConfig);
+export default defineConfig(...CommonReactConfig);

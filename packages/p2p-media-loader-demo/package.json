@@ -50,26 +50,26 @@
     "@vidstack/react": "^1.12.13",
     "d3": "^7.9.0",
     "dplayer": "^1.27.1",
-    "hls.js": "^1.5.20",
+    "hls.js": "^1.6.13",
     "mediaelement": "^7.0.7",
-    "openplayerjs": "^2.14.8",
+    "openplayerjs": "^2.14.10",
     "p2p-media-loader-core": "workspace:*",
     "p2p-media-loader-hlsjs": "workspace:*",
     "p2p-media-loader-shaka": "workspace:*",
-    "plyr": "^3.7.8",
-    "shaka-player": "^4.13.8"
+    "plyr": "^3.8.3",
+    "shaka-player": "^4.16.6"
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",
     "@types/dplayer": "^1.25.5",
-    "@types/react": "^19.0.10",
-    "@types/react-dom": "^19.0.4",
-    "cpy-cli": "^5.0.0",
-    "eslint-plugin-react": "^7.37.4",
-    "eslint-plugin-react-hooks": "^5.2.0",
-    "eslint-plugin-react-refresh": "^0.4.19",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "cpy-cli": "^6.0.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.0",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
   },
   "peerDependencies": {
     "react": ">=16",
