@@ -137,7 +137,7 @@ export class Request {
   }
 
   get data(): ArrayBuffer {
-    this.finalData ??= Utils.joinChunks(this.bytes);
+    this.finalData ??= Utils.joinChunks(this.bytes).buffer as ArrayBuffer;
     return this.finalData;
   }
 
