@@ -134,8 +134,9 @@ export function overrideConfig<T>(
   }
 
   (Object.keys(updates) as (keyof T)[]).forEach((key) => {
+    const keyStr = typeof key === "symbol" ? key.toString() : String(key);
     if (key === "__proto__" || key === "constructor" || key === "prototype") {
-      throw new Error(`Attempt to modify restricted property '${String(key)}'`);
+      throw new Error(`Attempt to modify restricted property '${keyStr}'`);
     }
 
     const updateValue = updates[key];
