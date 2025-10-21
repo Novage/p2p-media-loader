@@ -278,7 +278,7 @@ export class Peer {
     this.peerProtocol.sendCommand(command);
     try {
       await this.peerProtocol.splitSegmentDataToChunksAndUploadAsync(
-        data as Uint8Array,
+        data,
         requestId,
       );
       this.sendSegmentDataSendingCompletedCommand(segment, requestId);

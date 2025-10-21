@@ -63,7 +63,7 @@ export class PeerProtocol {
   }
 
   async splitSegmentDataToChunksAndUploadAsync(
-    data: Uint8Array,
+    data: ArrayBuffer,
     requestId: number,
   ) {
     if (this.uploadingContext) {
