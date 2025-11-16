@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 import { PlayerProps } from "../../../types";
 import "shaka-player/dist/controls.css";
-import shaka from "./shaka-import";
+import { shaka, shakaUI, shakaType } from "./shaka-import";
 import { createVideoElements, subscribeToUiEvents } from "../utils";
 
 export const Shaka = ({
@@ -34,8 +34,8 @@ export const Shaka = ({
 
     let isCleanedUp = false;
     let shakaP2PEngine: ShakaP2PEngine | undefined;
-    let player: shaka.Player | undefined;
-    let ui: shaka.ui.Overlay | undefined;
+    let player: shakaType.Player | undefined;
+    let ui: shakaUI.ui.Overlay | undefined;
 
     const cleanup = () => {
       isCleanedUp = true;
@@ -48,8 +48,8 @@ export const Shaka = ({
 
     const setupPlayer = async () => {
       const playerInit = new shaka.Player();
-      const uiInit = new shaka.ui.Overlay(
-        playerInit,
+      const uiInit = new shakaUI.ui.Overlay(
+        playerInit as unknown as shakaUI.Player,
         videoContainer,
         videoElement,
       );

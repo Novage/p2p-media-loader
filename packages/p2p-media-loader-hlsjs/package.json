@@ -45,7 +45,7 @@
     "build:esm-min": "vite build --mode esm-min",
     "build:es": "tsc",
     "prettier": "prettier --write .",
-    "lint": "eslint src --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint src --report-unused-disable-directives --max-warnings 0 --flag unstable_native_nodejs_ts_config",
     "clean": "rimraf lib dist build p2p-media-loader-hlsjs-*.tgz",
     "clean-with-modules": "rimraf node_modules && pnpm clean",
     "type-check": "npx tsc --noEmit"
@@ -55,6 +55,6 @@
   },
   "devDependencies": {
     "@rollup/plugin-terser": "^0.4.4",
-    "hls.js": "^1.5.20"
+    "hls.js": "^1.6.14"
   }
 }

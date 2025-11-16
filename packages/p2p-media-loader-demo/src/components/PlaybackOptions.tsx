@@ -57,10 +57,10 @@ export const PlaybackOptions = ({
         <label htmlFor="player">Player:</label>
         <select
           className="item"
-          key={String(currentPlayer)}
+          key={currentPlayer}
           ref={playerSelectRef}
           id="player"
-          defaultValue={String(currentPlayer)}
+          defaultValue={currentPlayer}
         >
           <optgroup label="Hls.js P2P Engine (HLS Only)">
             {Object.entries(hlsPlayers).map(([key, name]) => (

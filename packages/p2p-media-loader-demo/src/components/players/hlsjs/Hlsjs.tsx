@@ -18,7 +18,7 @@ export const HlsjsPlayer = ({
   const qualityRef = useRef<HTMLSelectElement>(null);
 
   useEffect(() => {
-    if (!videoRef.current || !Hls.isSupported()) return;
+    if (!videoRef.current || !Hls.isSupported() || !qualityRef.current) return;
 
     const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
     const hls = new HlsWithP2P({
@@ -42,12 +42,32 @@ export const HlsjsPlayer = ({
     hls.attachMedia(videoRef.current);
     hls.loadSource(streamUrl);
 
-    hls.on(Hls.Events.MANIFEST_PARSED, () => {
-      if (!qualityRef.current) return;
-      updateQualityOptions(hls, qualityRef.current);
-    });
+    const qualityElement = qualityRef.current;
+    const updateQualityOptions = () => {
+      if (hls.levels.length < 2) {
+        qualityElement.style.display = "none";
+      } else {
+        qualityElement.style.display = "block";
+        qualityElement.options.length = 0;
+        qualityElement.add(new Option("Auto", "-1"));
 
-    return () => hls.destroy();
+        hls.levels.forEach((level, index) => {
+          const label = `${level.height}p (${Math.round(level.bitrate / 1000)}k)`;
+          qualityElement.add(new Option(label, index.toString()));
+        });
+      }
+    };
+    const onQualityChange = () =>
+      (hls.currentLevel = parseInt(qualityElement.value, 10));
+
+    qualityElement.addEventListener("change", onQualityChange);
+    hls.on(Hls.Events.MANIFEST_PARSED, updateQualityOptions);
+
+    return () => {
+      hls.off(Hls.Events.MANIFEST_PARSED, updateQualityOptions);
+      hls.destroy();
+      qualityElement.removeEventListener("change", onQualityChange);
+    };
   }, [
     onPeerConnect,
     onPeerClose,
@@ -57,24 +77,6 @@ export const HlsjsPlayer = ({
     announceTrackers,
     swarmId,
   ]);
-
-  const updateQualityOptions = (hls: Hls, selectElement: HTMLSelectElement) => {
-    if (hls.levels.length < 2) {
-      selectElement.style.display = "none";
-    } else {
-      selectElement.style.display = "block";
-      selectElement.options.length = 0;
-      selectElement.add(new Option("Auto", "-1"));
-      hls.levels.forEach((level, index) => {
-        const label = `${level.height}p (${Math.round(level.bitrate / 1000)}k)`;
-        selectElement.add(new Option(label, index.toString()));
-      });
-
-      selectElement.addEventListener("change", () => {
-        hls.currentLevel = parseInt(selectElement.value);
-      });
-    }
-  };
 
   return Hls.isSupported() ? (
     <div className="video-container">

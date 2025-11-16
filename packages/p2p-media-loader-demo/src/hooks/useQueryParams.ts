@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { DEFAULT_STREAM, DEFAULT_TRACKERS, PLAYERS } from "../constants";
 
 type QueryParamsType = Record<string, string>;
@@ -13,6 +13,9 @@ function getInitialParams(
   }, {});
 }
 
+const getCurrentSearchParams = () =>
+  new URLSearchParams(window.location.search);
+
 export function useQueryParams(streamUri?: string) {
   const defaultParams = useMemo(() => {
     return {
@@ -24,13 +27,12 @@ export function useQueryParams(streamUri?: string) {
     } as QueryParamsType;
   }, [streamUri]);
 
-  const searchParamsRef = useRef(new URLSearchParams(window.location.search));
   const [queryParams, setQueryParams] = useState<QueryParamsType>(() =>
-    getInitialParams(searchParamsRef.current, defaultParams),
+    getInitialParams(getCurrentSearchParams(), defaultParams),
   );
 
   const updateQueryParamsFromURL = useCallback(() => {
-    const searchParams = searchParamsRef.current;
+    const searchParams = getCurrentSearchParams();
     const newParams = getInitialParams(searchParams, defaultParams);
 
     setQueryParams((prevParams) => {
@@ -43,7 +45,7 @@ export function useQueryParams(streamUri?: string) {
 
   const setURLQueryParams = useCallback(
     (newParams: Partial<QueryParamsType>) => {
-      const searchParams = searchParamsRef.current;
+      const searchParams = getCurrentSearchParams();
 
       Object.entries(newParams).forEach(([key, value]) => {
         if (value == undefined || value === defaultParams[key]) {
@@ -65,15 +67,10 @@ export function useQueryParams(streamUri?: string) {
   );
 
   useEffect(() => {
-    const handlePopState = () => {
-      searchParamsRef.current = new URLSearchParams(window.location.search);
-      updateQueryParamsFromURL();
-    };
-
-    window.addEventListener("popstate", handlePopState);
+    window.addEventListener("popstate", updateQueryParamsFromURL);
 
     return () => {
-      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("popstate", updateQueryParamsFromURL);
     };
   }, [updateQueryParamsFromURL]);
 

@@ -52,7 +52,7 @@
     "build:esm-min": "vite build --mode esm-min",
     "build:es": "tsc",
     "prettier": "prettier --write .",
-    "lint": "eslint src --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint src --report-unused-disable-directives --max-warnings 0 --flag unstable_native_nodejs_ts_config",
     "clean": "rimraf lib dist build p2p-media-loader-core-*.tgz",
     "clean-with-modules": "rimraf node_modules && pnpm clean",
     "type-check": "npx tsc --noEmit",
@@ -60,14 +60,14 @@
   },
   "dependencies": {
     "@types/debug": "^4.1.12",
-    "bittorrent-tracker": "^11.2.1",
-    "debug": "^4.4.0",
+    "bittorrent-tracker": "^11.2.2",
+    "debug": "^4.4.3",
     "nano-md5": "^1.0.5"
   },
   "devDependencies": {
     "@rollup/plugin-terser": "^0.4.4",
     "@types/streamx": "^2.9.5",
-    "vite-plugin-node-polyfills": "^0.23.0",
-    "vitest": "^3.0.8"
+    "vite-plugin-node-polyfills": "^0.24.0",
+    "vitest": "^4.0.9"
   }
 }

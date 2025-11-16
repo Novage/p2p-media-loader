@@ -1,3 +1,4 @@
+import type shaka from "shaka-player/dist/shaka-player.compiled.d.ts";
 import * as Utils from "./stream-utils.js";
 import {
   HookedStream,
@@ -42,7 +43,7 @@ export class SegmentManager {
     const { segmentIndex } = stream.shakaStream;
     if (!segmentReferences && segmentIndex) {
       try {
-        segmentReferences = [...segmentIndex];
+        segmentReferences = [...segmentIndex].filter((ref) => !!ref);
       } catch {
         return;
       }

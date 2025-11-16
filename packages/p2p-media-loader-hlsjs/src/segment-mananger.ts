@@ -54,7 +54,6 @@ export class SegmentManager {
         start: startTime,
         end: endTime,
       } = fragment;
-      if (sn === "initSegment") return;
 
       const [start, end] = fragByteRange;
       const byteRange = Utils.getByteRange(

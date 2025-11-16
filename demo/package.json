@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "eslint src --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint src --report-unused-disable-directives --max-warnings 0 --flag unstable_native_nodejs_ts_config",
     "preview": "vite preview",
     "prettier": "prettier --write .",
     "type-check": "npx tsc --noEmit",
@@ -18,16 +18,16 @@
     "p2p-media-loader-demo": "workspace:*",
     "p2p-media-loader-hlsjs": "workspace:*",
     "p2p-media-loader-shaka": "workspace:*",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
-    "@types/react": "^19.0.10",
-    "@types/react-dom": "^19.0.4",
-    "@vitejs/plugin-react": "^4.3.4",
-    "eslint-plugin-react": "^7.37.4",
-    "eslint-plugin-react-hooks": "^5.2.0",
-    "eslint-plugin-react-refresh": "^0.4.19",
-    "vite-plugin-node-polyfills": "^0.23.0"
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "vite-plugin-node-polyfills": "^0.24.0"
   }
 }

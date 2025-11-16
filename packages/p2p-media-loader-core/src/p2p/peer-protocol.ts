@@ -63,7 +63,7 @@ export class PeerProtocol {
   }
 
   async splitSegmentDataToChunksAndUploadAsync(
-    data: Uint8Array,
+    data: ArrayBuffer,
     requestId: number,
   ) {
     if (this.uploadingContext) {
@@ -118,15 +118,13 @@ export class PeerProtocol {
   }
 
   private receivingCommandBytes(buffer: Uint8Array) {
-    if (!this.commandChunks) {
-      this.commandChunks = new Command.BinaryCommandChunksJoiner(
-        (commandBuffer) => {
-          this.commandChunks = undefined;
-          const command = Command.deserializeCommand(commandBuffer);
-          this.eventHandlers.onCommandReceived(command);
-        },
-      );
-    }
+    this.commandChunks ??= new Command.BinaryCommandChunksJoiner(
+      (commandBuffer) => {
+        this.commandChunks = undefined;
+        const command = Command.deserializeCommand(commandBuffer);
+        this.eventHandlers.onCommandReceived(command);
+      },
+    );
     try {
       this.commandChunks.addCommandChunk(buffer);
     } catch (err) {

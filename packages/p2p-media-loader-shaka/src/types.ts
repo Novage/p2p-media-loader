@@ -1,3 +1,4 @@
+import type shaka from "shaka-player/dist/shaka-player.compiled.d.ts";
 import type {
   Stream as CoreStream,
   Core,
@@ -22,7 +23,7 @@ export type Stream = CoreStream & {
   shakaStream: HookedStream;
 };
 
-export type Shaka = typeof window.shaka;
+export type Shaka = typeof shaka;
 
 export type P2PMLShakaData = {
   player: shaka.Player;

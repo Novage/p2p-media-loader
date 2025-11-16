@@ -17,13 +17,9 @@ export function getControlledPromise<T = void>() {
   };
 }
 
-export function joinChunks(
-  chunks: Uint8Array[],
-  totalBytes?: number,
-): Uint8Array {
-  if (totalBytes === undefined) {
-    totalBytes = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
-  }
+export function joinChunks(chunks: Uint8Array[], totalBytes?: number) {
+  totalBytes ??= chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+
   const buffer = new Uint8Array(totalBytes);
   let offset = 0;
   for (const chunk of chunks) {
@@ -135,8 +131,9 @@ export function overrideConfig<T>(
   }
 
   (Object.keys(updates) as (keyof T)[]).forEach((key) => {
+    const keyStr = typeof key === "symbol" ? key.toString() : String(key);
     if (key === "__proto__" || key === "constructor" || key === "prototype") {
-      throw new Error(`Attempt to modify restricted property '${String(key)}'`);
+      throw new Error(`Attempt to modify restricted property '${keyStr}'`);
     }
 
     const updateValue = updates[key];
