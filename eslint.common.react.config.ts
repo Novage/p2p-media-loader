@@ -7,7 +7,7 @@ import { defineConfig } from "eslint/config";
 
 export const CommonReactConfig = defineConfig([
   CommonConfig,
-  reactHooks.configs.flat.redommended,
+  reactHooks.configs.flat.recommended,
   reactPlugin.configs.flat.recommended,
   reactPlugin.configs.flat["jsx-runtime"],
   reactRefresh.configs.vite,
@@ -18,8 +18,6 @@ export const CommonReactConfig = defineConfig([
       "@eslint-react/avoid-shorthand-fragment": "off",
       "@eslint-react/avoid-shorthand-boolean": "off",
       "@eslint-react/naming-convention/filename": "off",
-      "@eslint-react/prefer-namespace-import": "off",
-      "@eslint-react/dom/prefer-namespace-import": "off",
     },
     settings: {
       react: {

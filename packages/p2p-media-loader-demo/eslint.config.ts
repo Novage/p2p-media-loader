@@ -1,5 +1,3 @@
-// @ts-check
-
 import { CommonReactConfig } from "../../eslint.common.react.config.ts";
 import { defineConfig } from "eslint/config";
 
