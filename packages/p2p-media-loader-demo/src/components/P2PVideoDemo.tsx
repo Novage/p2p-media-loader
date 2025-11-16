@@ -1,3 +1,4 @@
+import type shakaType from "shaka-player/dist/shaka-player.compiled";
 import "./demo.css";
 import { PlaybackOptions } from "./PlaybackOptions";
 import { DEBUG_COMPONENT_ENABLED, PLAYERS } from "../constants";
@@ -31,7 +32,7 @@ type HlsWithP2PType = ReturnType<typeof HlsJsP2PEngine.injectMixin>;
 
 declare global {
   interface Window {
-    shaka?: unknown;
+    shaka: typeof shakaType;
     Hls?: HlsWithP2PType;
     LevelSelector: unknown;
     DashShakaPlayback: unknown;

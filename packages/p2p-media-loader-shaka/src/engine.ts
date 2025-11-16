@@ -1,4 +1,4 @@
-import "shaka-player/dist/shaka-player.compiled.d.ts";
+import type shaka from "shaka-player/dist/shaka-player.compiled.d.ts";
 import {
   HlsManifestParser,
   DashManifestParser,

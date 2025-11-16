@@ -1,23 +1,19 @@
-import { CommonConfig } from "./eslint.common.config.js";
+import { CommonConfig } from "./eslint.common.config.ts";
 import reactRefresh from "eslint-plugin-react-refresh";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactPlugin from "eslint-plugin-react";
 import react from "@eslint-react/eslint-plugin";
 import { defineConfig } from "eslint/config";
 
-/** @type {typeof CommonConfig} */
 export const CommonReactConfig = defineConfig([
-  ...CommonConfig,
-  reactPlugin.configs.flat?.recommended,
-  reactPlugin.configs.flat?.["jsx-runtime"],
-  react.configs.all,
+  CommonConfig,
+  reactHooks.configs.flat.redommended,
+  reactPlugin.configs.flat.recommended,
+  reactPlugin.configs.flat["jsx-runtime"],
+  reactRefresh.configs.vite,
+  react.configs["recommended-typescript"],
   {
-    plugins: {
-      "react-hooks": reactHooks,
-      "react-refresh": reactRefresh,
-    },
     rules: {
-      ...reactHooks.configs.recommended.rules,
       "import/extensions": "off",
       "@eslint-react/avoid-shorthand-fragment": "off",
       "@eslint-react/avoid-shorthand-boolean": "off",

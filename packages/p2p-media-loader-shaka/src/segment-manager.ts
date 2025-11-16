@@ -1,3 +1,4 @@
+import type shaka from "shaka-player/dist/shaka-player.compiled.d.ts";
 import * as Utils from "./stream-utils.js";
 import {
   HookedStream,

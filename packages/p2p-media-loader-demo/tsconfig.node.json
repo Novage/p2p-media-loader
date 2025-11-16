@@ -4,5 +4,5 @@
     "module": "ESNext",
     "moduleResolution": "Bundler"
   },
-  "include": ["eslint.config.js", "dummy.ts"]
+  "include": ["eslint.config.ts", "dummy.ts"]
 }

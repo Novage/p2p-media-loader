@@ -1,3 +1,4 @@
+import type shaka from "shaka-player/dist/shaka-player.compiled.d.ts";
 import { SegmentManager } from "./segment-manager.js";
 import {
   HookedStream,

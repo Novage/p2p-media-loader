@@ -1,9 +1,9 @@
+import { shaka, shakaType } from "./shaka-import";
 import "plyr/dist/plyr.css";
 import { useEffect, useRef } from "react";
-import shaka from "../shaka/shaka-import";
 import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 import { PlayerProps } from "../../../types";
-import Plyr, { Options } from "plyr";
+import * as Plyr from "plyr";
 import { createVideoElements, subscribeToUiEvents } from "../utils";
 
 export const ShakaPlyr = ({
@@ -30,7 +30,7 @@ export const ShakaPlyr = ({
     containerRef.current.appendChild(videoContainer);
 
     let plyrPlayer: Plyr | undefined;
-    let playerShaka: shaka.Player | undefined;
+    let playerShaka: shakaType.Player | undefined;
     let shakaP2PEngine: ShakaP2PEngine | undefined;
     let isCleanedUp = false;
 
@@ -87,7 +87,7 @@ export const ShakaPlyr = ({
       await shakaPlayerInit.load(streamUrl);
 
       const levels = shakaPlayerInit.getVariantTracks();
-      const quality: Options["quality"] = {
+      const quality: Plyr.Options["quality"] = {
         default: levels[levels.length - 1]?.height ?? 0,
         options: levels
           .map((level) => level.height)

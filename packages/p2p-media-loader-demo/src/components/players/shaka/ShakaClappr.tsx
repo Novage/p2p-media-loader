@@ -1,3 +1,4 @@
+import { shakaType } from "./shaka-import";
 import "../clappr.css";
 import { useEffect, useRef } from "react";
 import { PlayerProps } from "../../../types";
@@ -60,7 +61,7 @@ export const ShakaClappr = ({
       playback: {
         playInline: true,
       },
-      shakaOnBeforeLoad: (shakaPlayerInstance: shaka.Player) => {
+      shakaOnBeforeLoad: (shakaPlayerInstance: shakaType.Player) => {
         subscribeToUiEvents({
           engine: shakaP2PEngine,
           onPeerConnect,

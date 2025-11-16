@@ -3,15 +3,12 @@ import eslint from "@eslint/js";
 import tsEslint from "typescript-eslint";
 import { flatConfigs as importPlugin } from "eslint-plugin-import";
 import { defineConfig } from "eslint/config";
-import js from "@eslint/js";
 
-/** @type {(typeof tsEslint.configs.eslintRecommended)[]} */
 export const CommonConfig = defineConfig([
   eslint.configs.recommended,
+  tsEslint.configs.strictTypeChecked,
+  tsEslint.configs.stylisticTypeChecked,
   importPlugin.recommended,
-  tsEslint.configs.eslintRecommended,
-  ...tsEslint.configs.strictTypeChecked,
-  ...tsEslint.configs.stylisticTypeChecked,
   {
     languageOptions: {
       globals: {

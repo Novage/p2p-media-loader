@@ -1,9 +1,9 @@
+import { shaka } from "./shaka-import";
 import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 import { PlayerProps } from "../../../types";
 import { useEffect, useRef } from "react";
 import DPlayer from "dplayer";
 import { subscribeToUiEvents } from "../utils";
-import shaka from "./shaka-import";
 
 export const ShakaDPlayer = ({
   streamUrl,
