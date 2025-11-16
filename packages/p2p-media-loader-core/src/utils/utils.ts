@@ -17,10 +17,7 @@ export function getControlledPromise<T = void>() {
   };
 }
 
-export function joinChunks(
-  chunks: Uint8Array[],
-  totalBytes?: number,
-): Uint8Array {
+export function joinChunks(chunks: Uint8Array[], totalBytes?: number) {
   totalBytes ??= chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
 
   const buffer = new Uint8Array(totalBytes);
