@@ -36,6 +36,8 @@ export const ShakaDPlayer = ({
 
     const player = new DPlayer({
       container: containerRef.current,
+      autoplay: true,
+      volume: 0,
       video: {
         url: "",
         type: "customHlsOrDash",
@@ -74,9 +76,7 @@ export const ShakaDPlayer = ({
   ]);
 
   return shaka.Player.isBrowserSupported() ? (
-    <div ref={containerRef} className="video-container">
-      <video playsInline autoPlay muted />
-    </div>
+    <div ref={containerRef} className="video-container"></div>
   ) : (
     <div className="error-message">
       <h3>Shaka Player is not supported in this browser</h3>
