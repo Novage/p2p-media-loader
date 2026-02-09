@@ -97,7 +97,14 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
 
     let videoCount = 0;
     let audioCount = 0;
-    for (const variant of variants) {
+
+    const sortedVariants = [...variants].sort((a, b) => {
+      const bandDiff = a.bandwidth - b.bandwidth;
+      if (bandDiff !== 0) return bandDiff;
+
+      return a.id - b.id;
+    });
+    for (const variant of sortedVariants) {
       const { video, audio } = variant;
 
       if (video && !processedStreams.has(video.id)) {

@@ -17,7 +17,8 @@ export class SegmentManager {
     const { levels, audioTracks } = data;
     // in the case of audio only stream it is stored in levels
 
-    for (const [index, level] of levels.entries()) {
+    const sortedLevels = this.stabilizeStreamOrder([...levels]);
+    for (const [index, level] of sortedLevels.entries()) {
       const { url } = level;
       this.core.addStreamIfNoneExists({
         runtimeId: Array.isArray(url) ? (url as string[])[0] : url,
@@ -26,7 +27,8 @@ export class SegmentManager {
       });
     }
 
-    for (const [index, track] of audioTracks.entries()) {
+    const sortedAudioTracks = this.stabilizeStreamOrder([...audioTracks]);
+    for (const [index, track] of sortedAudioTracks.entries()) {
       const { url } = track;
       this.core.addStreamIfNoneExists({
         runtimeId: Array.isArray(url) ? (url as string[])[0] : url,
@@ -34,6 +36,20 @@ export class SegmentManager {
         index,
       });
     }
+  }
+
+  private stabilizeStreamOrder<
+    T extends { bitrate: number; url: string | string[] },
+  >(items: T[]): T[] {
+    return items.sort((a, b) => {
+      const bitDiff = a.bitrate - b.bitrate;
+      if (bitDiff !== 0) return bitDiff;
+
+      const urlA = Array.isArray(a.url) ? a.url[0] : a.url;
+      const urlB = Array.isArray(b.url) ? b.url[0] : b.url;
+
+      return urlA.localeCompare(urlB);
+    });
   }
 
   updatePlaylist(data: LevelUpdatedData | AudioTrackLoadedData) {
