@@ -53,7 +53,8 @@ export class BandwidthCalculator {
       totalBytes += this.bytes[i];
     }
 
-    return (totalBytes * 8000) / (lastItemTimestamp - lastCountedTimestamp);
+    const timeDiff = lastItemTimestamp - lastCountedTimestamp;
+    return timeDiff > 0 ? (totalBytes * 8000) / timeDiff : 0;
   }
 
   getBandwidth(
