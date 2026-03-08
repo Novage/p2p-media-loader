@@ -10,7 +10,7 @@ import type {
 } from "hls.js";
 import { FragmentLoaderBase } from "./fragment-loader.js";
 import { PlaylistLoaderBase } from "./playlist-loader.js";
-import { SegmentManager } from "./segment-mananger.js";
+import { SegmentManager } from "./segment-manager.js";
 import {
   CoreConfig,
   Core,
