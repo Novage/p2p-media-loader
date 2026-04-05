@@ -1,6 +1,6 @@
 import "./chart.css";
 import { useEffect, useRef, useState } from "react";
-import { DownloadStats, ChartsData, SvgDimensionsType } from "../../types";
+import { DownloadStats, ChartsData } from "../../types";
 import { COLORS } from "../../constants";
 import { ChartLegend } from "./ChartLegend";
 import { drawChart } from "./drawChart";
@@ -29,23 +29,19 @@ type StatsChartProps = {
   downloadStatsRef: React.RefObject<DownloadStats>;
 };
 
-type StoredData = {
-  totalDownloaded: number;
-} & DownloadStats;
-
 export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
   const [data, setData] = useState<ChartsData[]>(() =>
     generateInitialStackedData(),
   );
 
-  const [storedData, setStoredData] = useState<StoredData>({
+  const [storedData, setStoredData] = useState({
     totalDownloaded: 0,
     httpDownloaded: 0,
     p2pDownloaded: 0,
     p2pUploaded: 0,
   });
 
-  const [svgDimensions, setSvgDimensions] = useState<SvgDimensionsType>({
+  const [svgDimensions, setSvgDimensions] = useState({
     width: 0,
     height: 0,
   });

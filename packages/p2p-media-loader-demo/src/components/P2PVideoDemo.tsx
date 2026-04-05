@@ -8,7 +8,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { DownloadStatsChart } from "./chart/DownloadStatsChart";
 import { NodeNetwork } from "./nodeNetwork/NodeNetwork";
 import { DebugTools } from "./debugTools/DebugTools";
-import { DownloadStats, PlayerKey } from "../types";
+import { PlayerKey } from "../types";
 import { HlsjsDPlayer } from "./players/hlsjs/HlsjsDPLayer";
 import { HlsjsClapprPlayer } from "./players/hlsjs/HlsjsClapprPlayer";
 import { HlsjsPlyr } from "./players/hlsjs/HlsjsPlyr";
@@ -61,7 +61,7 @@ export const P2PVideoDemo = ({
   streamUrl,
   debugToolsEnabled = false,
 }: DemoProps) => {
-  const data = useRef<DownloadStats>({
+  const data = useRef({
     httpDownloaded: 0,
     p2pDownloaded: 0,
     p2pUploaded: 0,

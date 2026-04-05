@@ -54,7 +54,7 @@
     "p2p-media-loader-core": "workspace:*"
   },
   "devDependencies": {
-    "@rollup/plugin-terser": "^0.4.4",
-    "hls.js": "^1.6.14"
+    "@rollup/plugin-terser": "^1.0.0",
+    "hls.js": "^1.6.15"
   }
 }

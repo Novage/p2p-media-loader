@@ -81,10 +81,6 @@ export function* generateQueue(
 }
 
 function isNotActualStatuses(statuses: SegmentPlaybackStatuses) {
-  const {
-    isHighDemand = false,
-    isHttpDownloadable = false,
-    isP2PDownloadable = false,
-  } = statuses;
+  const { isHighDemand, isHttpDownloadable, isP2PDownloadable } = statuses;
   return !isHighDemand && !isHttpDownloadable && !isP2PDownloadable;
 }
