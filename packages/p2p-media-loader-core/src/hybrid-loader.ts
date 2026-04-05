@@ -36,7 +36,7 @@ export class HybridLoader {
   private storageCleanUpIntervalId?: number;
   private levelChangedTimestamp?: number;
   private lastQueueProcessingTimeStamp?: number;
-  private randomHttpDownloadInterval?: number;
+  private randomHttpDownloadTimeout?: number;
   private isProcessQueueMicrotaskCreated = false;
 
   constructor(
@@ -79,7 +79,7 @@ export class HybridLoader {
     const peersCount = this.p2pLoaders.currentLoader.connectedPeerCount;
     const randomTimeout =
       Math.random() * PEER_UPDATE_LATENCY * peersCount + PEER_UPDATE_LATENCY;
-    this.randomHttpDownloadInterval = window.setTimeout(() => {
+    this.randomHttpDownloadTimeout = window.setTimeout(() => {
       this.loadRandomThroughHttp();
       this.setIntervalLoading();
     }, randomTimeout);
@@ -618,7 +618,7 @@ export class HybridLoader {
 
   destroy() {
     clearInterval(this.storageCleanUpIntervalId);
-    clearInterval(this.randomHttpDownloadInterval);
+    clearTimeout(this.randomHttpDownloadTimeout);
     this.storageCleanUpIntervalId = undefined;
     this.engineRequest?.abort();
     this.requests.destroy();
