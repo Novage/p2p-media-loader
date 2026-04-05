@@ -95,7 +95,7 @@ export function generateStreamShortId({
     hash = (hash << 5) - hash + str.charCodeAt(i);
     hash |= 0;
   }
-  return Math.abs(hash).toString(36);
+  return (hash >>> 0).toString(36);
 }
 
 export function getStreamSwarmId(
