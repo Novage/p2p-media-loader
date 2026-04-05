@@ -27,7 +27,7 @@ export class SegmentManager {
       const isMissingMetadata = b === 0;
       const frameRate = level.attrs?.["FRAME-RATE"];
       const videoRange = level.attrs?.["VIDEO-RANGE"];
-
+      
       const index = generateStreamShortId({
         bitrate: b,
         codecs: isMissingMetadata ? undefined : videoCodec,
@@ -41,16 +41,6 @@ export class SegmentManager {
         type: "main",
         index,
       });
-      console.log(
-        ">>> HLS v",
-        b,
-        isMissingMetadata ? undefined : videoCodec,
-        isMissingMetadata ? undefined : width,
-        isMissingMetadata ? undefined : height,
-        isMissingMetadata ? undefined : frameRate,
-        isMissingMetadata ? undefined : videoRange,
-        index,
-      );
     }
 
     for (const track of audioTracks) {
@@ -68,8 +58,6 @@ export class SegmentManager {
         type: "secondary",
         index,
       });
-
-      console.log(">>> HLS a", 0, audioCodec, lang, channels, index);
     }
   }
 
