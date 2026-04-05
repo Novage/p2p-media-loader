@@ -127,8 +127,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
               .join(",")
           : undefined;
 
-        const frameRate = video.frameRate;
-        const videoRange = video.hdr;
+        const { frameRate, hdr: videoRange } = video;
 
         const index = generateStreamShortId({
           bitrate: variant.bandwidth,
@@ -142,7 +141,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       }
       if (audio && !processedStreams.has(audio.id)) {
         const isMain = !video; // audio-only master playlist variants
-        const name = audio.label || audio.originalId || undefined;
+        const name = audio.label ?? audio.originalId ?? undefined;
 
         const index = generateStreamShortId({
           bitrate: isMain ? variant.bandwidth : 0,

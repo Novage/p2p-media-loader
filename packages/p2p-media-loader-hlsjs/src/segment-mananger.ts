@@ -23,11 +23,11 @@ export class SegmentManager {
         level as LevelParsed & { maxBitrate?: number };
       // maxBitrate tracks the peak BANDWIDTH tag, whereas bitrate tracks AVERAGE-BANDWIDTH.
       // We prioritize maxBitrate to universally match Shaka's variant.bandwidth parsing.
-      const b = maxBitrate || bitrate;
+      const b = maxBitrate ?? bitrate;
       const isMissingMetadata = b === 0;
-      const frameRate = level.attrs?.["FRAME-RATE"];
-      const videoRange = level.attrs?.["VIDEO-RANGE"];
-      
+      const frameRate = level.attrs["FRAME-RATE"];
+      const videoRange = level.attrs["VIDEO-RANGE"];
+
       const index = generateStreamShortId({
         bitrate: b,
         codecs: isMissingMetadata ? undefined : videoCodec,
