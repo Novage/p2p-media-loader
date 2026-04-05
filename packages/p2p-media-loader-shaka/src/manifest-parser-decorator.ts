@@ -139,6 +139,16 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
           videoRange: isMissingMetadata ? undefined : videoRange,
         });
         processStream(video, "main", index);
+        console.log(
+          ">>> SHAKA v",
+          variant.bandwidth,
+          isMissingMetadata ? undefined : videoCodecs,
+          isMissingMetadata ? undefined : video.width,
+          isMissingMetadata ? undefined : video.height,
+          isMissingMetadata ? undefined : frameRate,
+          isMissingMetadata ? undefined : videoRange,
+          index,
+        );
       }
       if (audio && !processedStreams.has(audio.id)) {
         const isMain = !video; // audio-only master playlist variants
@@ -152,6 +162,15 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
           name: isMain ? undefined : name,
         });
         processStream(audio, isMain ? "main" : "secondary", index);
+        console.log(
+          ">>> SHAKA a",
+          isMain ? variant.bandwidth : 0,
+          isMain ? undefined : audio.codecs,
+          isMain ? undefined : audio.language,
+          isMain ? undefined : audio.channelsCount,
+          isMain ? undefined : name,
+          index,
+        );
       }
     }
   }
