@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 import { PlayerProps } from "../../../types";
 import * as PlyrModule from "plyr";
+import type Plyr from "plyr";
 import { createVideoElements, subscribeToUiEvents } from "../utils";
 
 export const ShakaPlyr = ({
