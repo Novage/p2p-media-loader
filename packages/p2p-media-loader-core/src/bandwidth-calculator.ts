@@ -58,7 +58,6 @@ export class BandwidthCalculator {
       totalBytes += this.bytes[i];
     }
 
-    // Use a minimum of 1ms to prevent division by zero for instantaneous downloads
     const timeDiff = Math.max(lastItemTimestamp - lastCountedTimestamp, MIN_TIME_DIFF_MS);
     return (totalBytes * 8000) / timeDiff;
   }
@@ -81,7 +80,6 @@ export class BandwidthCalculator {
       totalBytes += this.bytes[i];
     }
 
-    // Use a minimum of 1ms to prevent division by zero for instantaneous downloads
     const timeDiff = Math.max(now - lastCountedTimestamp, MIN_TIME_DIFF_MS);
     return (totalBytes * 8000) / timeDiff;
   }
