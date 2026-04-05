@@ -3,8 +3,9 @@ import type {
   ManifestLoadedData,
   LevelUpdatedData,
   AudioTrackLoadedData,
+  LevelParsed,
 } from "hls.js";
-import { Core, Segment } from "p2p-media-loader-core";
+import { Core, Segment, generateStreamShortId } from "p2p-media-loader-core";
 
 export class SegmentManager {
   core: Core;
@@ -17,9 +18,19 @@ export class SegmentManager {
     const { levels, audioTracks } = data;
     // in the case of audio only stream it is stored in levels
 
-    const sortedLevels = this.stabilizeStreamOrder([...levels]);
-    for (const [index, level] of sortedLevels.entries()) {
-      const { url } = level;
+    for (const level of levels) {
+      const { url, bitrate, maxBitrate, videoCodec, width, height } =
+        level as LevelParsed & { maxBitrate?: number };
+      // maxBitrate tracks the peak BANDWIDTH tag, whereas bitrate tracks AVERAGE-BANDWIDTH.
+      // We prioritize maxBitrate to universally match Shaka's variant.bandwidth parsing.
+      const b = maxBitrate || bitrate;
+      const isMissingMetadata = b === 0;
+      const index = generateStreamShortId({
+        bitrate: b,
+        codecs: isMissingMetadata ? undefined : videoCodec,
+        width: isMissingMetadata ? undefined : width,
+        height: isMissingMetadata ? undefined : height,
+      });
       this.core.addStreamIfNoneExists({
         runtimeId: Array.isArray(url) ? (url as string[])[0] : url,
         type: "main",
@@ -27,29 +38,21 @@ export class SegmentManager {
       });
     }
 
-    const sortedAudioTracks = this.stabilizeStreamOrder([...audioTracks]);
-    for (const [index, track] of sortedAudioTracks.entries()) {
-      const { url } = track;
+    for (const track of audioTracks) {
+      // Object properties vary across hls.js versions so we cast to any:
+      const { url, audioCodec, lang, channels } = track;
+      const index = generateStreamShortId({
+        bitrate: 0, // Match Shaka behavior for audio stream without variant
+        codecs: audioCodec,
+        language: lang,
+        channels,
+      });
       this.core.addStreamIfNoneExists({
         runtimeId: Array.isArray(url) ? (url as string[])[0] : url,
         type: "secondary",
         index,
       });
     }
-  }
-
-  private stabilizeStreamOrder<
-    T extends { bitrate: number; url: string | string[] },
-  >(items: T[]): T[] {
-    return items.sort((a, b) => {
-      const bitDiff = a.bitrate - b.bitrate;
-      if (bitDiff !== 0) return bitDiff;
-
-      const urlA = Array.isArray(a.url) ? a.url[0] : a.url;
-      const urlB = Array.isArray(b.url) ? b.url[0] : b.url;
-
-      return urlA.localeCompare(urlB);
-    });
   }
 
   updatePlaylist(data: LevelUpdatedData | AudioTrackLoadedData) {

@@ -6,7 +6,11 @@ import {
   HookedNetworkingEngine,
   P2PMLShakaData,
 } from "./types.js";
-import { StreamType, debug } from "p2p-media-loader-core";
+import {
+  StreamType,
+  debug,
+  generateStreamShortId,
+} from "p2p-media-loader-core";
 
 export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   private readonly debug = debug("p2pml-shaka:manifest-parser");
@@ -87,31 +91,60 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     const processStream = (
       stream: shaka.extern.Stream,
       type: StreamType,
-      order: number,
+      index: string,
     ) => {
       this.hookSegmentIndex(stream);
-      segmentManager.setStream(stream as HookedStream, type, order);
+      segmentManager.setStream(stream as HookedStream, type, index);
       processedStreams.add(stream.id);
       return true;
     };
 
-    let videoCount = 0;
-    let audioCount = 0;
-
-    const sortedVariants = [...variants].sort((a, b) => {
-      const bandDiff = a.bandwidth - b.bandwidth;
-      if (bandDiff !== 0) return bandDiff;
-
-      return a.id - b.id;
-    });
-    for (const variant of sortedVariants) {
+    for (const variant of variants) {
       const { video, audio } = variant;
 
       if (video && !processedStreams.has(video.id)) {
-        processStream(video, "main", videoCount++);
+        const isMissingMetadata = variant.bandwidth === 0;
+        // In muxed streams, Shaka natively includes audio codecs in the video codec array.
+        // We strip standard audio prefixes here to strictly match HLS.js's cleanly separated
+        // videoCodec parsing, ensuring peers on identical video tracks share P2P segments
+        // regardless of differently selected audio track descriptors.
+        const videoCodecs = video.codecs
+          ? video.codecs
+              .split(",")
+              .map((c) => c.trim())
+              .filter(
+                (c) =>
+                  ![
+                    "mp4a",
+                    "ac-3",
+                    "ec-3",
+                    "ec+3",
+                    "opus",
+                    "vorb",
+                    "flac",
+                  ].some((p) => c.toLowerCase().startsWith(p)),
+              )
+              .join(",")
+          : undefined;
+
+        const index = generateStreamShortId({
+          bitrate: variant.bandwidth,
+          codecs: isMissingMetadata ? undefined : videoCodecs,
+          width: isMissingMetadata ? undefined : video.width,
+          height: isMissingMetadata ? undefined : video.height,
+        });
+        processStream(video, "main", index);
       }
       if (audio && !processedStreams.has(audio.id)) {
-        processStream(audio, !video ? "main" : "secondary", audioCount++);
+        const isMain = !video; // audio-only master playlist variants
+
+        const index = generateStreamShortId({
+          bitrate: isMain ? variant.bandwidth : 0,
+          codecs: isMain ? undefined : audio.codecs,
+          language: isMain ? undefined : audio.language,
+          channels: isMain ? undefined : audio.channelsCount,
+        });
+        processStream(audio, isMain ? "main" : "secondary", index);
       }
     }
   }

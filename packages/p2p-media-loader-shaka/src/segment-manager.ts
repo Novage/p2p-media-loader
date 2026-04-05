@@ -23,7 +23,7 @@ export class SegmentManager {
     this.streamInfo = streamInfo;
   }
 
-  setStream(shakaStream: HookedStream, type: StreamType, index = -1) {
+  setStream(shakaStream: HookedStream, type: StreamType, index: string) {
     this.core.addStreamIfNoneExists({
       runtimeId: shakaStream.id.toString(),
       type,

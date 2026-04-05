@@ -20,6 +20,68 @@ export type PlaybackTimeWindowsConfig = Pick<
 
 const PEER_PROTOCOL_VERSION = "v2";
 
+/**
+ * Generates a short, stable alphanumeric ID for a stream based on its properties.
+ * Uses a djb2/Java-style string hash algorithm (hash * 31 + charCode) and encodes
+ * the resulting 32-bit integer into a Base36 string for compactness.
+ */
+export function generateStreamShortId({
+  bitrate,
+  codecs,
+  width,
+  height,
+  language,
+  channels,
+}: {
+  bitrate?: number | null;
+  codecs?: string | null;
+  width?: number | null;
+  height?: number | null;
+  language?: string | null;
+  channels?: string | number | null;
+}): string {
+  const normalizedCodecs = codecs
+    ? codecs
+        .split(",")
+        .map((c) => {
+          c = c.trim().toLowerCase();
+          // Normalize decimal RFC 4281 avc1 codecs to hex (e.g., avc1.66.30 -> avc1.42001e)
+          const parts = c.split(".");
+          if (
+            parts.length === 3 &&
+            (parts[0] === "avc1" || parts[0] === "avc")
+          ) {
+            const profile = parseInt(parts[1], 10);
+            const level = parseInt(parts[2], 10);
+            if (
+              !isNaN(profile) &&
+              !isNaN(level) &&
+              parts[1] === profile.toString() &&
+              parts[2] === level.toString()
+            ) {
+              const profileHex = profile.toString(16).padStart(2, "0");
+              const levelHex = level.toString(16).padStart(2, "0");
+              c = `${parts[0]}.${profileHex}00${levelHex}`;
+            }
+          }
+          return c;
+        })
+        .sort()
+        .join(",")
+    : "";
+  const normalizedLanguage =
+    language && language !== "und" ? language.slice(0, 2).toLowerCase() : "";
+  const normalizedChannels = channels ? channels.toString().split("/")[0] : "";
+
+  const str = `${bitrate ?? 0}-${normalizedCodecs}-${width ?? ""}-${height ?? ""}-${normalizedLanguage}-${normalizedChannels}`;
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(36);
+}
+
 export function getStreamSwarmId(
   swarmId: string,
   stream: Readonly<Stream>,
