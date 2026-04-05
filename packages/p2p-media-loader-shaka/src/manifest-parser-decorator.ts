@@ -127,22 +127,29 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
               .join(",")
           : undefined;
 
+        const frameRate = video.frameRate;
+        const videoRange = video.hdr;
+
         const index = generateStreamShortId({
           bitrate: variant.bandwidth,
           codecs: isMissingMetadata ? undefined : videoCodecs,
           width: isMissingMetadata ? undefined : video.width,
           height: isMissingMetadata ? undefined : video.height,
+          frameRate: isMissingMetadata ? undefined : frameRate,
+          videoRange: isMissingMetadata ? undefined : videoRange,
         });
         processStream(video, "main", index);
       }
       if (audio && !processedStreams.has(audio.id)) {
         const isMain = !video; // audio-only master playlist variants
+        const name = audio.label || audio.originalId || undefined;
 
         const index = generateStreamShortId({
           bitrate: isMain ? variant.bandwidth : 0,
           codecs: isMain ? undefined : audio.codecs,
           language: isMain ? undefined : audio.language,
           channels: isMain ? undefined : audio.channelsCount,
+          name: isMain ? undefined : name,
         });
         processStream(audio, isMain ? "main" : "secondary", index);
       }

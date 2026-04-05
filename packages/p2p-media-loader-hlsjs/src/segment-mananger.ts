@@ -25,11 +25,16 @@ export class SegmentManager {
       // We prioritize maxBitrate to universally match Shaka's variant.bandwidth parsing.
       const b = maxBitrate || bitrate;
       const isMissingMetadata = b === 0;
+      const frameRate = level.attrs?.["FRAME-RATE"];
+      const videoRange = level.attrs?.["VIDEO-RANGE"];
+      
       const index = generateStreamShortId({
         bitrate: b,
         codecs: isMissingMetadata ? undefined : videoCodec,
         width: isMissingMetadata ? undefined : width,
         height: isMissingMetadata ? undefined : height,
+        frameRate: isMissingMetadata ? undefined : frameRate,
+        videoRange: isMissingMetadata ? undefined : videoRange,
       });
       this.core.addStreamIfNoneExists({
         runtimeId: Array.isArray(url) ? (url as string[])[0] : url,
@@ -40,12 +45,13 @@ export class SegmentManager {
 
     for (const track of audioTracks) {
       // Object properties vary across hls.js versions so we cast to any:
-      const { url, audioCodec, lang, channels } = track;
+      const { url, audioCodec, lang, channels, name } = track;
       const index = generateStreamShortId({
         bitrate: 0, // Match Shaka behavior for audio stream without variant
         codecs: audioCodec,
         language: lang,
         channels,
+        name,
       });
       this.core.addStreamIfNoneExists({
         runtimeId: Array.isArray(url) ? (url as string[])[0] : url,
