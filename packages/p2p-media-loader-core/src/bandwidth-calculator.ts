@@ -1,3 +1,8 @@
+// Minimum time denominator in ms to prevent division by zero for instantaneous
+// downloads (e.g., from cache), maintaining a high bandwidth estimate so the
+// ABR doesn't downshift.
+const MIN_TIME_DIFF_MS = 1;
+
 export class BandwidthCalculator {
   private loadingsCount = 0;
   private readonly bytes: number[] = [];
@@ -54,8 +59,7 @@ export class BandwidthCalculator {
     }
 
     // Use a minimum of 1ms to prevent division by zero for instantaneous downloads
-    // (e.g., from cache), maintaining a high bandwidth estimate so the ABR doesn't downshift.
-    const timeDiff = Math.max(lastItemTimestamp - lastCountedTimestamp, 1);
+    const timeDiff = Math.max(lastItemTimestamp - lastCountedTimestamp, MIN_TIME_DIFF_MS);
     return (totalBytes * 8000) / timeDiff;
   }
 
@@ -77,9 +81,8 @@ export class BandwidthCalculator {
       totalBytes += this.bytes[i];
     }
 
-    // Use a minimum of 1ms to prevent division by zero for instantaneous downloads 
-    // (e.g., from cache), maintaining a high bandwidth estimate so the ABR doesn't downshift.
-    const timeDiff = Math.max(now - lastCountedTimestamp, 1);
+    // Use a minimum of 1ms to prevent division by zero for instantaneous downloads
+    const timeDiff = Math.max(now - lastCountedTimestamp, MIN_TIME_DIFF_MS);
     return (totalBytes * 8000) / timeDiff;
   }
 
