@@ -54,7 +54,7 @@ export type Stream = {
   readonly type: StreamType;
 
   /** Stream index in the manifest. */
-  readonly index: number;
+  readonly index: string;
 };
 
 /** Represents a defined Core configuration with specific settings for the main and secondary streams. */
