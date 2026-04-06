@@ -12,6 +12,16 @@ import {
   generateStreamShortId,
 } from "p2p-media-loader-core";
 
+const AUDIO_CODECS = [
+  "mp4a",
+  "ac-3",
+  "ec-3",
+  "ec+3",
+  "opus",
+  "vorb",
+  "flac",
+];
+
 export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   private readonly debug = debug("p2pml-shaka:manifest-parser");
   private readonly isHls: boolean;
@@ -111,19 +121,8 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
         const videoCodecs = video.codecs
           ? video.codecs
               .split(",")
-              .map((c) => c.trim())
-              .filter(
-                (c) =>
-                  ![
-                    "mp4a",
-                    "ac-3",
-                    "ec-3",
-                    "ec+3",
-                    "opus",
-                    "vorb",
-                    "flac",
-                  ].some((p) => c.toLowerCase().startsWith(p)),
-              )
+              .map((c) => c.trim().toLowerCase())
+              .filter((c) => !AUDIO_CODECS.some((p) => c.startsWith(p)))
               .join(",")
           : undefined;
 
