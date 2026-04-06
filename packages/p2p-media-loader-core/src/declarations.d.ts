@@ -49,5 +49,3 @@ declare module "nano-md5" {
 
   export default md5;
 }
-
-declare module "*.css";
