@@ -8,7 +8,6 @@ import {
   prepareGroups,
   createSimulation,
 } from "./network";
-import { SvgDimensionsType } from "../../types";
 
 type GraphNetworkProps = {
   peers: string[];
@@ -27,7 +26,7 @@ export const NodeNetwork = ({ peers }: GraphNetworkProps) => {
   const networkDataRef = useRef(DEFAULT_GRAPH_DATA);
   const simulationRef = useRef<d3.Simulation<Node, Link> | null>(null);
 
-  const [svgDimensions, setSvgDimensions] = useState<SvgDimensionsType>({
+  const [svgDimensions, setSvgDimensions] = useState({
     width: 0,
     height: 0,
   });

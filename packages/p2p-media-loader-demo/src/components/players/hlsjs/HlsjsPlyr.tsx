@@ -1,5 +1,5 @@
 import "plyr/dist/plyr.css";
-import Plyr, { Options } from "plyr";
+import * as PlyrModule from "plyr";
 import { useEffect, useRef } from "react";
 import { PlayerProps } from "../../../types";
 import Hls from "hls.js";
@@ -49,7 +49,7 @@ export const HlsjsPlyr = ({
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
       const { levels } = hls;
 
-      const quality: Options["quality"] = {
+      const quality: PlyrModule.Options["quality"] = {
         default: levels[levels.length - 1].height,
         options: levels.map((level) => level.height),
         forced: true,
@@ -62,7 +62,7 @@ export const HlsjsPlyr = ({
         },
       };
 
-      player = new Plyr(videoElement, {
+      player = new PlyrModule.default(videoElement, {
         quality,
         autoplay: true,
         muted: true,

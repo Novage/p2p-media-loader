@@ -109,7 +109,14 @@ export class ShakaP2PEngine {
       "manifest.dash.ignoreSuggestedPresentationDelay",
       true,
     );
-    this.player.configure("streaming.useNativeHlsOnSafari", false);
+
+    const versionMatch = /\d+/.exec(this.shaka.Player.version);
+    const versionMajor = parseInt(versionMatch ? versionMatch[0] : "0", 10);
+    if (versionMajor >= 5) {
+      this.player.configure("streaming.preferNativeHls", false);
+    } else {
+      this.player.configure("streaming.useNativeHlsOnSafari", false);
+    }
 
     this.updatePlayerEventHandlers("register");
   }
