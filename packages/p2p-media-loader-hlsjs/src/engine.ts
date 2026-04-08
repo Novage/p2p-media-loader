@@ -309,13 +309,23 @@ export class HlsJsP2PEngine {
   ) => {
     if (
       this.currentHlsInstance &&
-      data.details.live &&
       data.details.fragments[0].type === ("main" as PlaylistLevelType) &&
-      !this.currentHlsInstance.userConfig.liveSyncDuration &&
-      !this.currentHlsInstance.userConfig.liveSyncDurationCount &&
       data.details.fragments.length > 4
     ) {
-      this.updateLiveSyncDurationCount(data);
+      if (
+        data.details.live &&
+        !this.currentHlsInstance.userConfig.liveSyncDuration &&
+        !this.currentHlsInstance.userConfig.liveSyncDurationCount
+      ) {
+        this.updateLiveSyncDurationCount(data);
+      }
+
+      if (
+        !this.currentHlsInstance.userConfig.maxBufferLength &&
+        !this.currentHlsInstance.userConfig.maxMaxBufferLength
+      ) {
+        this.updateMaxBufferLength(data.details.targetduration);
+      }
     }
 
     this.core.setIsLive(data.details.live);
@@ -345,35 +355,39 @@ export class HlsJsP2PEngine {
       );
       this.currentHlsInstance.config.liveSyncDurationCount =
         newLiveSyncDurationCount;
+    }
+  }
 
-      const config = this.core.getConfig();
-      const highDemandTimeWindow = Math.max(
-        config.mainStream.highDemandTimeWindow,
-        config.secondaryStream.highDemandTimeWindow,
-      );
-      // Hls.js maxBufferLength dictates how many seconds AHEAD OF THE PLAYHEAD it buffers.
-      // To ensure Hls.js only buffers up to the highDemandTimeWindow and lets the
-      // background loader do all the advance fetching, we set p2pOptimalBufferLength
-      // directly equal to highDemandTimeWindow, but with a lower bound based on fragment duration.
-      const p2pOptimalBufferLength = Math.max(
-        fragmentDuration * 2,
-        highDemandTimeWindow,
-      );
+  private updateMaxBufferLength(fragmentDuration: number) {
+    if (!this.currentHlsInstance) return;
 
-      if (
-        this.currentHlsInstance.config.maxBufferLength > p2pOptimalBufferLength
-      ) {
-        this.debug(`Setting maxBufferLength to ${p2pOptimalBufferLength}`);
-        this.currentHlsInstance.config.maxBufferLength = p2pOptimalBufferLength;
-      }
-      if (
-        this.currentHlsInstance.config.maxMaxBufferLength >
-        p2pOptimalBufferLength
-      ) {
-        this.debug(`Setting maxMaxBufferLength to ${p2pOptimalBufferLength}`);
-        this.currentHlsInstance.config.maxMaxBufferLength =
-          p2pOptimalBufferLength;
-      }
+    const config = this.core.getConfig();
+    const highDemandTimeWindow = Math.max(
+      config.mainStream.highDemandTimeWindow,
+      config.secondaryStream.highDemandTimeWindow,
+    );
+    // Hls.js maxBufferLength dictates how many seconds AHEAD OF THE PLAYHEAD it buffers.
+    // To ensure Hls.js only buffers up to the highDemandTimeWindow and lets the
+    // background loader do all the advance fetching, we set p2pOptimalBufferLength
+    // directly equal to highDemandTimeWindow, but with a lower bound based on fragment duration.
+    const p2pOptimalBufferLength = Math.max(
+      fragmentDuration * 2,
+      highDemandTimeWindow,
+    );
+
+    if (
+      this.currentHlsInstance.config.maxBufferLength > p2pOptimalBufferLength
+    ) {
+      this.debug(`Setting maxBufferLength to ${p2pOptimalBufferLength}`);
+      this.currentHlsInstance.config.maxBufferLength = p2pOptimalBufferLength;
+    }
+
+    if (
+      this.currentHlsInstance.config.maxMaxBufferLength > p2pOptimalBufferLength
+    ) {
+      this.debug(`Setting maxMaxBufferLength to ${p2pOptimalBufferLength}`);
+      this.currentHlsInstance.config.maxMaxBufferLength =
+        p2pOptimalBufferLength;
     }
   }
 
