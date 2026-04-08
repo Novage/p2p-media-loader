@@ -345,6 +345,33 @@ export class HlsJsP2PEngine {
       );
       this.currentHlsInstance.config.liveSyncDurationCount =
         newLiveSyncDurationCount;
+
+      const config = this.core.getConfig();
+      const highDemandTimeWindow = Math.max(
+        config.mainStream.highDemandTimeWindow,
+        config.secondaryStream.highDemandTimeWindow,
+      );
+      
+      // Hls.js maxBufferLength dictates how many seconds AHEAD OF THE PLAYHEAD it buffers.
+      // To ensure Hls.js only buffers up to the highDemandTimeWindow and lets the
+      // background loader do all the advance fetching, we set p2pOptimalBufferLength
+      // directly equal to highDemandTimeWindow.
+      const p2pOptimalBufferLength = Math.max(1, highDemandTimeWindow);
+
+      if (
+        this.currentHlsInstance.config.maxBufferLength > p2pOptimalBufferLength
+      ) {
+        this.debug(`Setting maxBufferLength to ${p2pOptimalBufferLength}`);
+        this.currentHlsInstance.config.maxBufferLength = p2pOptimalBufferLength;
+      }
+      if (
+        this.currentHlsInstance.config.maxMaxBufferLength >
+        p2pOptimalBufferLength
+      ) {
+        this.debug(`Setting maxMaxBufferLength to ${p2pOptimalBufferLength}`);
+        this.currentHlsInstance.config.maxMaxBufferLength =
+          p2pOptimalBufferLength;
+      }
     }
   }
 
