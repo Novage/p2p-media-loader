@@ -130,19 +130,26 @@ export class P2PLoader {
       return;
     }
 
-    const { loaded, httpLoading } = this.getSegmentsAnnouncement();
-    this.sendSegmentsAnnouncement(loaded, httpLoading);
+    this.sendSegmentsAnnouncement();
   };
 
   private sendSegmentsAnnouncement = (
-    loaded: number[],
-    httpLoading: number[],
+    loaded?: number[],
+    httpLoading?: number[],
   ) => {
     this.isAnnounceMicrotaskCreated = true;
 
     queueMicrotask(() => {
+      const announcement =
+        loaded && httpLoading
+          ? { loaded, httpLoading }
+          : this.getSegmentsAnnouncement();
+
       for (const peer of this.trackerClient.peers()) {
-        peer.sendSegmentsAnnouncementCommand(loaded, httpLoading);
+        peer.sendSegmentsAnnouncementCommand(
+          announcement.loaded,
+          announcement.httpLoading,
+        );
       }
       this.isAnnounceMicrotaskCreated = false;
     });
