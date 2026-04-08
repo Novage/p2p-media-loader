@@ -351,7 +351,6 @@ export class HlsJsP2PEngine {
         config.mainStream.highDemandTimeWindow,
         config.secondaryStream.highDemandTimeWindow,
       );
-      
       // Hls.js maxBufferLength dictates how many seconds AHEAD OF THE PLAYHEAD it buffers.
       // To ensure Hls.js only buffers up to the highDemandTimeWindow and lets the
       // background loader do all the advance fetching, we set p2pOptimalBufferLength
