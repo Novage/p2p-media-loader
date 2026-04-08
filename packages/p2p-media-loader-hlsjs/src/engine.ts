@@ -354,8 +354,11 @@ export class HlsJsP2PEngine {
       // Hls.js maxBufferLength dictates how many seconds AHEAD OF THE PLAYHEAD it buffers.
       // To ensure Hls.js only buffers up to the highDemandTimeWindow and lets the
       // background loader do all the advance fetching, we set p2pOptimalBufferLength
-      // directly equal to highDemandTimeWindow.
-      const p2pOptimalBufferLength = Math.max(1, highDemandTimeWindow);
+      // directly equal to highDemandTimeWindow, but with a lower bound based on fragment duration.
+      const p2pOptimalBufferLength = Math.max(
+        fragmentDuration * 2,
+        highDemandTimeWindow,
+      );
 
       if (
         this.currentHlsInstance.config.maxBufferLength > p2pOptimalBufferLength
