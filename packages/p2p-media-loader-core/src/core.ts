@@ -55,7 +55,6 @@ export class Core<TStream extends Stream = Stream> {
     trackerClientVersionPrefix: TRACKER_CLIENT_VERSION_PREFIX,
     announceTrackers: [
       "wss://tracker.novage.com.ua",
-      "wss://tracker.webtorrent.dev",
       "wss://tracker.openwebtorrent.com",
     ],
     rtcConfig: {
