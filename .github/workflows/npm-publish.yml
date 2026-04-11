@@ -30,9 +30,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Extract version from tag
+      - name: Extract version and npm tag from git tag
         id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          if [[ "$VERSION" == *-* ]]; then
+            PRERELEASE="${VERSION#*-}"
+            NPM_TAG="${PRERELEASE%%.*}"
+            echo "NPM_TAG=$NPM_TAG" >> $GITHUB_ENV
+          else
+            echo "NPM_TAG=latest" >> $GITHUB_ENV
+          fi
 
       - name: Update package.json and WebTorrent client versions
         run: |
@@ -55,4 +64,4 @@ jobs:
 
       - name: Publish packages
         run: |
-          pnpm publish --provenance --access public --no-git-checks --filter './packages/**'
+          pnpm publish --provenance --access public --tag ${{ env.NPM_TAG }} --no-git-checks --filter './packages/**'
