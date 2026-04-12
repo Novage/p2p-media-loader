@@ -345,7 +345,7 @@ export type StreamConfig = {
 
   /**
    * Baseline throughput speed in bytes-per-second (bps) allocated to untested peers.
-   * Ensures new peers organically receive segments for benchmarking.
+   * Ensures new peers organically receive segments for benchmarking in peer speed weighting algorithm.
    *
    * @default
    * ```typescript
