@@ -310,6 +310,19 @@ export class HybridLoader {
         const isP2PLoadingRequest =
           request?.status === "loading" && request.downloadSource === "p2p";
 
+        const hasP2PFailedAttempt =
+          (request?.failedAttempts.p2pAttemptsCount ?? 0) > 0;
+
+        if (
+          !hasP2PFailedAttempt &&
+          this.p2pLoaders.currentLoader.isSegmentLoadedBySomeone(segment) &&
+          (isP2PLoadingRequest ||
+            this.requests.executingP2PCount < simultaneousP2PDownloads)
+        ) {
+          if (!isP2PLoadingRequest) this.loadThroughP2P(segment);
+          continue;
+        }
+
         if (this.requests.executingHttpCount < simultaneousHttpDownloads) {
           if (isP2PLoadingRequest) request.abortFromProcessQueue();
           this.loadThroughHttp(segment);
