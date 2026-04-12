@@ -357,15 +357,6 @@ export class HybridLoader {
 
         if (this.requests.executingP2PCount < simultaneousP2PDownloads) {
           this.loadThroughP2P(segment);
-        } else if (
-          this.p2pLoaders.currentLoader.isSegmentLoadedBySomeone(segment)
-        ) {
-          if (
-            this.abortLastP2PLoadingInQueueAfterItem(queue, segment) &&
-            this.requests.executingP2PCount < simultaneousP2PDownloads
-          ) {
-            this.loadThroughP2P(segment);
-          }
         }
       }
     }
