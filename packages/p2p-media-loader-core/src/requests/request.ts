@@ -373,6 +373,13 @@ class FailedRequestAttempts {
     );
   }
 
+  get p2pAttemptsCount() {
+    return this.attempts.reduce(
+      (sum, attempt) => (attempt.downloadSource === "p2p" ? sum + 1 : sum),
+      0,
+    );
+  }
+
   get lastAttempt(): Readonly<Required<RequestAttempt>> | undefined {
     return this.attempts[this.attempts.length - 1];
   }
