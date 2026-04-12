@@ -52,6 +52,8 @@ export class Core<TStream extends Stream = Stream> {
     httpNotReceivingBytesTimeoutMs: 3000,
     httpErrorRetries: 3,
     p2pErrorRetries: 3,
+    p2pPeerSpeedAveragingWindowMs: 15000,
+    p2pPeerSpeedBaselineBps: 100000,
     trackerClientVersionPrefix: TRACKER_CLIENT_VERSION_PREFIX,
     announceTrackers: [
       "wss://tracker.novage.com.ua",
