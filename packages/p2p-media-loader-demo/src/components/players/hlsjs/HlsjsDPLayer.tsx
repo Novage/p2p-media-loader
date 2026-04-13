@@ -59,12 +59,11 @@ export const HlsjsDPlayer = ({
     };
   }, [
     streamUrl,
-    announceTrackers,
+    coreOptions,
     onPeerConnect,
     onPeerClose,
     onChunkDownloaded,
     onChunkUploaded,
-    
   ]);
 
   return Hls.isSupported() ? (

@@ -20,7 +20,7 @@ import { IndexedDbStorage } from "../../../custom-segment-storage-example/indexe
 
 export const HlsjsVidstackIndexedDB = ({
   streamUrl,
-  announceTrackers,
+  coreOptions,
   onPeerConnect,
   onPeerClose,
   onChunkDownloaded,
@@ -38,7 +38,7 @@ export const HlsjsVidstackIndexedDB = ({
         const config: HlsWithP2PConfig<typeof Hls> = {
           p2p: {
             core: {
-              announceTrackers,
+              ...coreOptions,
               customSegmentStorageFactory: storageFactory,
             },
             onHlsJsCreated: (hls) => {
