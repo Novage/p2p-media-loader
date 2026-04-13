@@ -279,12 +279,10 @@ export class HybridLoader {
       this.p2pLoaders.currentLoader.connectedPeerCount === 0;
 
     if (isInitialHttpWait) {
-      if (this.initialHttpDelayTimeoutId === undefined) {
-        this.initialHttpDelayTimeoutId = window.setTimeout(() => {
-          this.initialHttpDelayTimeoutId = undefined;
-          this.requestProcessQueueMicrotask();
-        }, httpDownloadInitialTimeoutMs - timeSinceStart);
-      }
+      this.initialHttpDelayTimeoutId ??= window.setTimeout(() => {
+        this.initialHttpDelayTimeoutId = undefined;
+        this.requestProcessQueueMicrotask();
+      }, httpDownloadInitialTimeoutMs - timeSinceStart);
     }
 
     if (
