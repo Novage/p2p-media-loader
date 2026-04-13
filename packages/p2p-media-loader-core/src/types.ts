@@ -344,17 +344,6 @@ export type StreamConfig = {
   p2pPeerSpeedAveragingWindowMs: number;
 
   /**
-   * Baseline throughput speed in bytes-per-second (bps) allocated to untested peers.
-   * Ensures new peers organically receive segments for benchmarking in peer speed weighting algorithm.
-   *
-   * @default
-   * ```typescript
-   * p2pPeerSpeedBaselineBps: 100000
-   * ```
-   */
-  p2pPeerSpeedBaselineBps: number;
-
-  /**
    * List of URLs to the WebTorrent trackers used for announcing and discovering peers (i.e. WebRTC signaling).
    *
    * WARNING: In the Safari browser, only the first tracker will be used. Safari has issues with multiple trackers,

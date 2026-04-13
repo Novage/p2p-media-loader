@@ -80,10 +80,7 @@ export class P2PLoader {
       }
 
       if (maxSpeed > 0) {
-        const baseSpeed = Math.max(
-          this.config.p2pPeerSpeedBaselineBps,
-          maxSpeed * 0.1,
-        );
+        const baseSpeed = Math.max(1, maxSpeed * 0.1);
         selectedPeer = Utils.getWeightedRandomItem(peersWithSegment, (peer) =>
           Math.max(peer.downloadBandwidth, baseSpeed),
         );
