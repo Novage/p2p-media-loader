@@ -57,8 +57,8 @@ export const HlsjsVidstackIndexedDB = ({
       }
     },
     [
-      announceTrackers,
-      onChunkDownloaded,
+      coreOptions,
+    onChunkDownloaded,
       onChunkUploaded,
       onPeerConnect,
       onPeerClose,

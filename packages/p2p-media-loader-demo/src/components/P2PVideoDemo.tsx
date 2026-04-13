@@ -125,8 +125,11 @@ export const P2PVideoDemo = ({
     return PlayerComponent ? (
       <PlayerComponent
         streamUrl={queryParams.streamUrl}
-        announceTrackers={trackers}
-        swarmId={queryParams.swarmId === "" ? undefined : queryParams.swarmId}
+        coreOptions={{
+          announceTrackers: trackers,
+          swarmId: queryParams.swarmId === "" ? undefined : queryParams.swarmId,
+          httpDownloadInitialTimeoutMs: 5000
+        }}
         onPeerConnect={onPeerConnect}
         onPeerClose={onPeerClose}
         onChunkDownloaded={onChunkDownloaded}
