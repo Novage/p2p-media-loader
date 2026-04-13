@@ -84,10 +84,8 @@ export class P2PLoader {
           this.config.p2pPeerSpeedBaselineBps,
           maxSpeed * 0.1,
         );
-        selectedPeer = Utils.getWeightedRandomItem(
-          peersWithSegment,
-          (peer) =>
-            peer.downloadBandwidth > 0 ? peer.downloadBandwidth : baseSpeed,
+        selectedPeer = Utils.getWeightedRandomItem(peersWithSegment, (peer) =>
+          Math.max(peer.downloadBandwidth, baseSpeed),
         );
       } else {
         selectedPeer = Utils.getRandomItem(peersWithSegment);

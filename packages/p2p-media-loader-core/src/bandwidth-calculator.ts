@@ -100,4 +100,13 @@ export class BandwidthCalculator {
     this.loadingOnlyTimestamps.splice(0, samplesToRemove);
     this.timestamps.splice(0, samplesToRemove);
   }
+
+  clear() {
+    this.bytes.length = 0;
+    this.loadingOnlyTimestamps.length = 0;
+    this.timestamps.length = 0;
+    this.loadingsCount = 0;
+    this.noLoadingsTime = 0;
+    this.loadingsStoppedAt = 0;
+  }
 }

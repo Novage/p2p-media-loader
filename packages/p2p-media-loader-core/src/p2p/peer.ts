@@ -260,6 +260,11 @@ export class Peer {
             this.sendCancelSegmentRequestCommand(request.segment, requestId);
             this.downloadingErrors.push(error);
             this.bandwidthCalculator.stopLoading();
+            if (error.type !== "abort") {
+              this.bandwidthCalculator.clear();
+              this.cachedDownloadBandwidth.timestamp = 0;
+              this.logger(`cleared bandwidth history due to ${error.type}`);
+            }
             this.downloadingContext = undefined;
 
             const timeoutErrors = this.downloadingErrors.filter(
@@ -316,6 +321,9 @@ export class Peer {
     const error = new RequestError(type);
     controls.abortOnError(error);
     this.bandwidthCalculator.stopLoading();
+    this.bandwidthCalculator.clear();
+    this.cachedDownloadBandwidth.timestamp = 0;
+    this.logger(`cleared bandwidth history due to ${error.type}`);
     this.downloadingContext = undefined;
     this.downloadingErrors.push(error);
   }
