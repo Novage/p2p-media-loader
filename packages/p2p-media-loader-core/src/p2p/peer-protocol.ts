@@ -10,7 +10,6 @@ export type PeerConfig = Pick<
   | "webRtcMaxMessageSize"
   | "p2pErrorRetries"
   | "validateP2PSegment"
-  | "p2pPeerSpeedAveragingWindowMs"
 >;
 
 export class PeerProtocol {

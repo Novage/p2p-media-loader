@@ -84,10 +84,9 @@ export class Peer {
   get downloadBandwidth(): number {
     const now = performance.now();
     if (now - this.cachedDownloadBandwidth.timestamp > 1000) {
+      // Uses a 15-second tracking window to calculate a moving average of the peer's throughput speed
       this.cachedDownloadBandwidth.value =
-        this.bandwidthCalculator.getBandwidthLoadingOnly(
-          this.peerConfig.p2pPeerSpeedAveragingWindowMs / 1000,
-        );
+        this.bandwidthCalculator.getBandwidthLoadingOnly(15);
       this.cachedDownloadBandwidth.timestamp = now;
     }
     return this.cachedDownloadBandwidth.value;

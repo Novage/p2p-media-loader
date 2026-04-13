@@ -78,7 +78,6 @@ export type DynamicStreamProperties =
   | "httpNotReceivingBytesTimeoutMs"
   | "httpErrorRetries"
   | "p2pErrorRetries"
-  | "p2pPeerSpeedAveragingWindowMs"
   | "p2pPeerSpeedBaselineBps"
   | "validateP2PSegment"
   | "httpRequestSetup"
@@ -332,16 +331,6 @@ export type StreamConfig = {
    * ```
    */
   p2pErrorRetries: number;
-
-  /**
-   * Timespan window in milliseconds used to calculate a moving average of the peer's throughput speed.
-   *
-   * @default
-   * ```typescript
-   * p2pPeerSpeedAveragingWindowMs: 15000
-   * ```
-   */
-  p2pPeerSpeedAveragingWindowMs: number;
 
   /**
    * List of URLs to the WebTorrent trackers used for announcing and discovering peers (i.e. WebRTC signaling).
