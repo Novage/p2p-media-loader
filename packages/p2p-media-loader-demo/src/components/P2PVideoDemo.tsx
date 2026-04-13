@@ -128,7 +128,7 @@ export const P2PVideoDemo = ({
         coreOptions={{
           announceTrackers: trackers,
           swarmId: queryParams.swarmId === "" ? undefined : queryParams.swarmId,
-          httpDownloadInitialTimeoutMs: 10000,
+          httpDownloadInitialTimeoutMs: 5000,
         }}
         onPeerConnect={onPeerConnect}
         onPeerClose={onPeerClose}
