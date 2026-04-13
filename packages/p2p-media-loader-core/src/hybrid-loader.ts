@@ -37,7 +37,9 @@ export class HybridLoader {
   private levelChangedTimestamp?: number;
   private lastQueueProcessingTimeStamp?: number;
   private randomHttpDownloadTimeout?: number;
+  private initialHttpDelayTimeoutId?: number;
   private isProcessQueueMicrotaskCreated = false;
+  private readonly createdAt = performance.now();
 
   constructor(
     private streamManifestUrl: string,
@@ -267,9 +269,26 @@ export class HybridLoader {
       simultaneousHttpDownloads,
       simultaneousP2PDownloads,
       httpErrorRetries,
+      httpDownloadInitialTimeoutMs,
     } = this.config;
 
+    const timeSinceStart = performance.now() - this.createdAt;
+    const isInitialHttpWait =
+      httpDownloadInitialTimeoutMs > 0 &&
+      timeSinceStart < httpDownloadInitialTimeoutMs &&
+      this.p2pLoaders.currentLoader.connectedPeerCount === 0;
+
+    if (isInitialHttpWait) {
+      if (this.initialHttpDelayTimeoutId === undefined) {
+        this.initialHttpDelayTimeoutId = window.setTimeout(() => {
+          this.initialHttpDelayTimeoutId = undefined;
+          this.requestProcessQueueMicrotask();
+        }, httpDownloadInitialTimeoutMs - timeSinceStart);
+      }
+    }
+
     if (
+      !isInitialHttpWait &&
       this.engineRequest?.shouldBeStartedImmediately &&
       this.engineRequest.status === "pending" &&
       this.requests.executingHttpCount < simultaneousHttpDownloads
@@ -323,13 +342,17 @@ export class HybridLoader {
           continue;
         }
 
-        if (this.requests.executingHttpCount < simultaneousHttpDownloads) {
+        if (
+          !isInitialHttpWait &&
+          this.requests.executingHttpCount < simultaneousHttpDownloads
+        ) {
           if (isP2PLoadingRequest) request.abortFromProcessQueue();
           this.loadThroughHttp(segment);
           continue;
         }
 
         if (
+          !isInitialHttpWait &&
           this.abortLastHttpLoadingInQueueAfterItem(queue, segment) &&
           this.requests.executingHttpCount < simultaneousHttpDownloads
         ) {
@@ -632,6 +655,7 @@ export class HybridLoader {
   destroy() {
     clearInterval(this.storageCleanUpIntervalId);
     clearTimeout(this.randomHttpDownloadTimeout);
+    clearTimeout(this.initialHttpDelayTimeoutId);
     this.storageCleanUpIntervalId = undefined;
     this.engineRequest?.abort();
     this.requests.destroy();

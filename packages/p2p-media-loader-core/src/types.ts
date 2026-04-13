@@ -68,6 +68,7 @@ export type DefinedCoreConfig = CommonCoreConfig & {
 /** Represents a set of properties that can be dynamically modified at runtime. */
 export type DynamicStreamProperties =
   | "highDemandTimeWindow"
+  | "httpDownloadInitialTimeoutMs"
   | "httpDownloadTimeWindow"
   | "p2pDownloadTimeWindow"
   | "simultaneousHttpDownloads"
@@ -237,6 +238,18 @@ export type StreamConfig = {
    * ```
    */
   httpDownloadTimeWindow: number;
+
+  /**
+   * Time in milliseconds to delay the HTTP fallback for the very first segments.
+   * This gives the tracker time to discover peers when playback just started.
+   * If `0`, HTTP fallback happens immediately.
+   *
+   * @default
+   * ```typescript
+   * httpDownloadInitialTimeoutMs: 0
+   * ```
+   */
+  httpDownloadInitialTimeoutMs: number;
 
   /**
    * Defines the time window, in seconds, dedicated to pre-fetching media segments via Peer-to-Peer (P2P) downloads.
