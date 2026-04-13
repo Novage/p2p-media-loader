@@ -83,6 +83,7 @@ export class Peer {
 
   get downloadBandwidth(): number {
     const now = performance.now();
+    // Cache the array iteration math for 1000ms to preserve O(1) hot path efficiency during rapid queue segment evaluations
     if (now - this.cachedDownloadBandwidth.timestamp > 1000) {
       // Uses a 15-second tracking window to calculate a moving average of the peer's throughput speed
       this.cachedDownloadBandwidth.value =
