@@ -78,7 +78,6 @@ export type DynamicStreamProperties =
   | "httpNotReceivingBytesTimeoutMs"
   | "httpErrorRetries"
   | "p2pErrorRetries"
-  | "p2pPeerSpeedBaselineBps"
   | "validateP2PSegment"
   | "httpRequestSetup"
   | "isP2PDisabled"
