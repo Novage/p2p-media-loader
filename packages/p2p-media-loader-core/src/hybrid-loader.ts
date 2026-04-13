@@ -275,8 +275,7 @@ export class HybridLoader {
     const timeSinceStart = performance.now() - this.createdAt;
     const isInitialHttpWait =
       httpDownloadInitialTimeoutMs > 0 &&
-      timeSinceStart < httpDownloadInitialTimeoutMs &&
-      this.p2pLoaders.currentLoader.connectedPeerCount === 0;
+      timeSinceStart < httpDownloadInitialTimeoutMs;
 
     if (isInitialHttpWait) {
       this.initialHttpDelayTimeoutId ??= window.setTimeout(() => {
