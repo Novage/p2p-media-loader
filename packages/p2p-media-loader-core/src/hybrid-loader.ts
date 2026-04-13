@@ -414,6 +414,13 @@ export class HybridLoader {
   }
 
   private loadRandomThroughHttp() {
+    const { httpDownloadInitialTimeoutMs } = this.config;
+    const isInitialHttpWait =
+      httpDownloadInitialTimeoutMs > 0 &&
+      performance.now() - this.createdAt < httpDownloadInitialTimeoutMs;
+
+    if (isInitialHttpWait) return;
+
     const availableStorageCapacityPercent =
       this.getAvailableStorageCapacityPercent();
     if (availableStorageCapacityPercent <= 10) return;
