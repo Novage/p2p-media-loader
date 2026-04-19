@@ -16,8 +16,7 @@ const SCRIPTS = [
 
 export const ShakaClappr = ({
   streamUrl,
-  announceTrackers,
-  swarmId,
+  coreOptions,
   onPeerConnect,
   onPeerClose,
   onChunkDownloaded,
@@ -44,10 +43,7 @@ export const ShakaClappr = ({
     }
 
     const shakaP2PEngine = new ShakaP2PEngine({
-      core: {
-        announceTrackers,
-        swarmId,
-      },
+      core: coreOptions,
     });
 
     /* eslint-disable  */
@@ -82,13 +78,13 @@ export const ShakaClappr = ({
     };
     /* eslint-enable  */
   }, [
-    announceTrackers,
+    coreOptions,
     onChunkDownloaded,
     onChunkUploaded,
     onPeerConnect,
     onPeerClose,
     streamUrl,
-    swarmId,
+    
     areScriptsLoaded,
   ]);
 

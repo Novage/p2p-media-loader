@@ -9,8 +9,7 @@ import { createVideoElements, subscribeToUiEvents } from "../utils";
 
 export const ShakaPlyr = ({
   streamUrl,
-  announceTrackers,
-  swarmId,
+  coreOptions,
   onPeerConnect,
   onPeerClose,
   onChunkDownloaded,
@@ -46,10 +45,7 @@ export const ShakaPlyr = ({
     const initPlayer = async () => {
       const shakaP2PEngineInit = new ShakaP2PEngine(
         {
-          core: {
-            announceTrackers,
-            swarmId,
-          },
+          core: coreOptions,
         },
         shaka,
       );
@@ -118,13 +114,13 @@ export const ShakaPlyr = ({
 
     return () => cleanup();
   }, [
-    announceTrackers,
+    coreOptions,
     onChunkDownloaded,
     onChunkUploaded,
     onPeerConnect,
     onPeerClose,
     streamUrl,
-    swarmId,
+    
   ]);
 
   return shaka.Player.isBrowserSupported() ? (
