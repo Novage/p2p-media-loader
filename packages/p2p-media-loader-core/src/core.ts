@@ -44,6 +44,7 @@ export class Core<TStream extends Stream = Stream> {
     simultaneousHttpDownloads: 2,
     simultaneousP2PDownloads: 3,
     highDemandTimeWindow: 15,
+    httpDownloadInitialTimeoutMs: 0,
     httpDownloadTimeWindow: 3000,
     p2pDownloadTimeWindow: 6000,
     webRtcMaxMessageSize: 64 * 1024 - 1,

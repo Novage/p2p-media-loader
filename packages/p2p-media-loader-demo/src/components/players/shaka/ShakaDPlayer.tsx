@@ -7,8 +7,7 @@ import { subscribeToUiEvents } from "../utils";
 
 export const ShakaDPlayer = ({
   streamUrl,
-  announceTrackers,
-  swarmId,
+  coreOptions,
   onPeerConnect,
   onPeerClose,
   onChunkDownloaded,
@@ -26,10 +25,7 @@ export const ShakaDPlayer = ({
 
     const shakaP2PEngine = new ShakaP2PEngine(
       {
-        core: {
-          announceTrackers,
-          swarmId,
-        },
+        core: coreOptions,
       },
       shaka,
     );
@@ -66,13 +62,13 @@ export const ShakaDPlayer = ({
       player.destroy();
     };
   }, [
-    announceTrackers,
+    coreOptions,
     onChunkDownloaded,
     onChunkUploaded,
     onPeerConnect,
     onPeerClose,
     streamUrl,
-    swarmId,
+    
   ]);
 
   return shaka.Player.isBrowserSupported() ? (

@@ -8,8 +8,7 @@ import { PlayerProps } from "../../../types";
 
 export const HlsjsMediaElement = ({
   streamUrl,
-  announceTrackers,
-  swarmId,
+  coreOptions,
   onPeerConnect,
   onPeerClose,
   onChunkDownloaded,
@@ -48,10 +47,7 @@ export const HlsjsMediaElement = ({
               onChunkUploaded,
             });
           },
-          core: {
-            announceTrackers,
-            swarmId,
-          },
+          core: coreOptions,
         },
       },
     });
@@ -66,13 +62,13 @@ export const HlsjsMediaElement = ({
     };
     /* eslint-enable  */
   }, [
-    announceTrackers,
+    coreOptions,
     onChunkDownloaded,
     onChunkUploaded,
     onPeerConnect,
     onPeerClose,
     streamUrl,
-    swarmId,
+    
   ]);
 
   return isHlsSupported ? (

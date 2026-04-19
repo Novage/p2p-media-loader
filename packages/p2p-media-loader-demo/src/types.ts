@@ -21,8 +21,11 @@ export type PlayerName = (typeof PLAYERS)[PlayerKey];
 
 export type PlayerProps = {
   streamUrl: string;
-  announceTrackers: string[];
-  swarmId?: string;
+  coreOptions: {
+    announceTrackers: string[];
+    swarmId?: string;
+    httpDownloadInitialTimeoutMs?: number;
+  };
 } & Partial<
   Pick<
     CoreEventMap,
@@ -32,5 +35,5 @@ export type PlayerProps = {
 
 export type PlayerEvents = Omit<
   PlayerProps,
-  "streamUrl" | "announceTrackers" | "swarmId"
+  "streamUrl" | "coreOptions"
 >;

@@ -13,8 +13,7 @@ const SCRIPTS = [
 
 export const HlsjsClapprPlayer = ({
   streamUrl,
-  announceTrackers,
-  swarmId,
+  coreOptions,
   onPeerConnect,
   onPeerClose,
   onChunkDownloaded,
@@ -30,10 +29,7 @@ export const HlsjsClapprPlayer = ({
     }
 
     const engine = new HlsJsP2PEngine({
-      core: {
-        announceTrackers,
-        swarmId,
-      },
+      core: coreOptions,
     });
 
     subscribeToUiEvents({
@@ -71,13 +67,13 @@ export const HlsjsClapprPlayer = ({
     /* eslint-enable  */
   }, [
     areScriptsLoaded,
-    announceTrackers,
+    coreOptions,
     onChunkDownloaded,
     onChunkUploaded,
     onPeerConnect,
     onPeerClose,
     streamUrl,
-    swarmId,
+    
   ]);
 
   return Hls.isSupported() ? (
