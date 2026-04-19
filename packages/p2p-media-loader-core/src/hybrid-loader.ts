@@ -284,22 +284,54 @@ export class HybridLoader {
       }, httpDownloadInitialTimeoutMs - timeSinceStart);
     }
 
-    if (
-      !isInitialHttpWait &&
-      this.engineRequest?.shouldBeStartedImmediately &&
-      this.engineRequest.status === "pending" &&
-      this.requests.executingHttpCount < simultaneousHttpDownloads
-    ) {
-      const { segment } = this.engineRequest;
+    const { engineRequest } = this;
+    if (engineRequest) {
+      const { segment } = engineRequest;
       const request = this.requests.get(segment);
-      if (
-        !request ||
-        request.status === "not-started" ||
-        (request.status === "failed" &&
-          request.failedAttempts.httpAttemptsCount <
-            this.config.httpErrorRetries)
-      ) {
-        this.loadThroughHttp(segment);
+
+      const shouldStartLoadImmediatelyEngineRequest =
+        engineRequest.shouldBeStartedImmediately &&
+        engineRequest.status === "pending" &&
+        (!request ||
+          request.status === "not-started" ||
+          request.status === "failed");
+
+      if (shouldStartLoadImmediatelyEngineRequest) {
+        let isRequestHandled = false;
+
+        const hasP2PFailedAttempt =
+          (request?.failedAttempts.p2pAttemptsCount ?? 0) > 0;
+
+        const canLoadThroughP2P =
+          !hasP2PFailedAttempt &&
+          this.p2pLoaders.currentLoader.isSegmentLoadedBySomeone(segment);
+
+        if (canLoadThroughP2P) {
+          if (
+            this.requests.executingP2PCount < simultaneousP2PDownloads ||
+            // TODO: abort any P2P request
+            this.abortLastP2PLoadingInQueueAfterItem(queue, segment)
+          ) {
+            this.loadThroughP2P(segment);
+            isRequestHandled = true;
+          }
+        }
+
+        if (!isRequestHandled) {
+          const canLoadThrougHttp =
+            !isInitialHttpWait &&
+            (request?.failedAttempts.httpAttemptsCount ?? 0) < httpErrorRetries;
+
+          if (canLoadThrougHttp) {
+            if (
+              this.requests.executingHttpCount < simultaneousHttpDownloads ||
+              // TODO: abort any HTTP request
+              this.abortLastHttpLoadingInQueueAfterItem(queue, segment)
+            ) {
+              this.loadThroughHttp(segment);
+            }
+          }
+        }
       }
     }
 
@@ -307,85 +339,56 @@ export class HybridLoader {
       const { statuses, segment } = item;
       const request = this.requests.get(segment);
 
+      if (request?.status === "loading" || request?.status === "succeed") {
+        // if request is loading or succeed, we don't need to do anything
+        continue;
+      }
+
       if (statuses.isHighDemand) {
-        if (
-          request?.downloadSource === "http" &&
-          request.status === "loading"
-        ) {
-          continue;
-        }
-
-        if (
-          request?.downloadSource === "http" &&
-          request.status === "failed" &&
-          request.failedAttempts.httpAttemptsCount >= httpErrorRetries
-        ) {
-          continue;
-        }
-
-        const isP2PLoadingRequest =
-          request?.status === "loading" && request.downloadSource === "p2p";
-
         const hasP2PFailedAttempt =
           (request?.failedAttempts.p2pAttemptsCount ?? 0) > 0;
 
-        if (
+        // For high demand segments we prefer P2P only if someone has the segment and we don't have P2P failures yet
+        const canLoadThroughP2P =
           !hasP2PFailedAttempt &&
+          this.p2pLoaders.currentLoader.isSegmentLoadedBySomeone(segment);
+
+        if (canLoadThroughP2P) {
+          if (
+            this.requests.executingP2PCount < simultaneousP2PDownloads ||
+            this.abortLastP2PLoadingInQueueAfterItem(queue, segment)
+          ) {
+            this.loadThroughP2P(segment);
+            continue;
+          }
+        }
+
+        const canLoadThrougHttp =
+          !isInitialHttpWait &&
+          (request?.failedAttempts.httpAttemptsCount ?? 0) < httpErrorRetries;
+
+        if (canLoadThrougHttp) {
+          if (
+            this.requests.executingHttpCount < simultaneousHttpDownloads ||
+            this.abortLastHttpLoadingInQueueAfterItem(queue, segment)
+          ) {
+            this.loadThroughHttp(segment);
+            continue;
+          }
+        }
+
+        // if we have P2P failures, we still want to try to load through P2P if HTTP is not available
+        if (
           this.p2pLoaders.currentLoader.isSegmentLoadedBySomeone(segment) &&
-          (isP2PLoadingRequest ||
-            this.requests.executingP2PCount < simultaneousP2PDownloads)
-        ) {
-          if (!isP2PLoadingRequest) this.loadThroughP2P(segment);
-          continue;
-        }
-
-        if (
-          !isInitialHttpWait &&
-          this.requests.executingHttpCount < simultaneousHttpDownloads
-        ) {
-          if (isP2PLoadingRequest) request.abortFromProcessQueue();
-          this.loadThroughHttp(segment);
-          continue;
-        }
-
-        if (
-          !isInitialHttpWait &&
-          this.abortLastHttpLoadingInQueueAfterItem(queue, segment) &&
-          this.requests.executingHttpCount < simultaneousHttpDownloads
-        ) {
-          if (isP2PLoadingRequest) request.abortFromProcessQueue();
-          this.loadThroughHttp(segment);
-          continue;
-        }
-
-        if (isP2PLoadingRequest) continue;
-
-        if (this.requests.executingP2PCount < simultaneousP2PDownloads) {
-          this.loadThroughP2P(segment);
-          continue;
-        }
-
-        if (
-          this.abortLastP2PLoadingInQueueAfterItem(queue, segment) &&
-          this.requests.executingP2PCount < simultaneousP2PDownloads
+          (this.requests.executingP2PCount < simultaneousP2PDownloads ||
+            this.abortLastP2PLoadingInQueueAfterItem(queue, segment))
         ) {
           this.loadThroughP2P(segment);
           continue;
         }
       } else if (statuses.isP2PDownloadable) {
-        if (request?.status === "loading") continue;
-
         if (this.requests.executingP2PCount < simultaneousP2PDownloads) {
           this.loadThroughP2P(segment);
-        } else if (
-          this.p2pLoaders.currentLoader.isSegmentLoadedBySomeone(segment)
-        ) {
-          if (
-            this.abortLastP2PLoadingInQueueAfterItem(queue, segment) &&
-            this.requests.executingP2PCount < simultaneousP2PDownloads
-          ) {
-            this.loadThroughP2P(segment);
-          }
         }
       }
     }
