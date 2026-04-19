@@ -13,6 +13,7 @@ import * as Utils from "../utils/utils.js";
 import * as Command from "./commands/index.js";
 import { PeerProtocol, PeerConfig } from "./peer-protocol.js";
 import { EventTarget } from "../utils/event-target.js";
+import { BandwidthCalculator } from "../bandwidth-calculator.js";
 
 const { PeerCommandType } = Command;
 type PeerEventHandlers = {
@@ -40,6 +41,8 @@ export class Peer {
   private downloadingErrors: RequestError<
     PeerRequestErrorType | RequestAbortErrorType
   >[] = [];
+  private readonly bandwidthCalculator = new BandwidthCalculator();
+  private cachedDownloadBandwidth = { value: 0, timestamp: 0 };
   private logger = debug("p2pml-core:peer");
   private readonly onPeerClosed: CoreEventMap["onPeerClose"];
 
@@ -76,6 +79,18 @@ export class Peer {
 
   get downloadingSegment(): SegmentWithStream | undefined {
     return this.downloadingContext?.request.segment;
+  }
+
+  get downloadBandwidth(): number {
+    const now = performance.now();
+    // Cache the array iteration math for 1000ms to preserve O(1) hot path efficiency during rapid queue segment evaluations
+    if (now - this.cachedDownloadBandwidth.timestamp > 1000) {
+      // Uses a 15-second tracking window to calculate a moving average of the peer's throughput speed
+      this.cachedDownloadBandwidth.value =
+        this.bandwidthCalculator.getBandwidthLoadingOnly(15);
+      this.cachedDownloadBandwidth.timestamp = now;
+    }
+    return this.cachedDownloadBandwidth.value;
   }
 
   getSegmentStatus(
@@ -178,6 +193,7 @@ export class Peer {
 
         this.downloadingErrors = [];
         controls.completeOnSuccess();
+        this.bandwidthCalculator.stopLoading();
         this.downloadingContext = undefined;
         break;
       }
@@ -219,6 +235,8 @@ export class Peer {
       return;
     }
 
+    this.bandwidthCalculator.addBytes(chunk.byteLength);
+    this.cachedDownloadBandwidth.timestamp = 0; // invalidate cache
     controls.addLoadedChunk(chunk);
   };
 
@@ -226,6 +244,7 @@ export class Peer {
     if (this.downloadingContext) {
       throw new Error("Some segment already is downloading");
     }
+    this.bandwidthCalculator.startLoading();
     this.downloadingContext = {
       request: segmentRequest,
       requestId: Math.floor(Math.random() * 1000),
@@ -240,6 +259,12 @@ export class Peer {
             const { request, requestId } = this.downloadingContext;
             this.sendCancelSegmentRequestCommand(request.segment, requestId);
             this.downloadingErrors.push(error);
+            this.bandwidthCalculator.stopLoading();
+            if (error.type !== "abort") {
+              this.bandwidthCalculator.clear();
+              this.cachedDownloadBandwidth.timestamp = 0;
+              this.logger(`cleared bandwidth history due to ${error.type}`);
+            }
             this.downloadingContext = undefined;
 
             const timeoutErrors = this.downloadingErrors.filter(
@@ -295,6 +320,10 @@ export class Peer {
     this.logger(`cancel segment request ${segment.externalId} (${type})`);
     const error = new RequestError(type);
     controls.abortOnError(error);
+    this.bandwidthCalculator.stopLoading();
+    this.bandwidthCalculator.clear();
+    this.cachedDownloadBandwidth.timestamp = 0;
+    this.logger(`cleared bandwidth history due to ${error.type}`);
     this.downloadingContext = undefined;
     this.downloadingErrors.push(error);
   }

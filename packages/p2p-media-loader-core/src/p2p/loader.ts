@@ -67,10 +67,50 @@ export class P2PLoader {
     }
 
     if (peersWithSegment.length === 0) return;
-    const peer = Utils.getRandomItem(peersWithSegment);
+
+    let selectedPeer: Peer;
+
+    if (peersWithSegment.length === 1) {
+      selectedPeer = peersWithSegment[0];
+    } else {
+      let maxSpeed = 0;
+      for (const peer of peersWithSegment) {
+        const speed = peer.downloadBandwidth;
+        if (speed > maxSpeed) maxSpeed = speed;
+      }
+
+      if (maxSpeed > 0) {
+        const baseSpeed = Math.max(1, maxSpeed * 0.1);
+        let unprovenPeersCount = 0;
+        let provenPeersWeight = 0;
+
+        for (const peer of peersWithSegment) {
+          if (peer.downloadBandwidth <= baseSpeed) {
+            unprovenPeersCount++;
+          } else {
+            provenPeersWeight += peer.downloadBandwidth;
+          }
+        }
+
+        let adjustedBaseSpeed = baseSpeed;
+        if (
+          unprovenPeersCount > 0 &&
+          provenPeersWeight > 0 &&
+          unprovenPeersCount * baseSpeed > provenPeersWeight
+        ) {
+          adjustedBaseSpeed = provenPeersWeight / unprovenPeersCount;
+        }
+
+        selectedPeer = Utils.getWeightedRandomItem(peersWithSegment, (peer) =>
+          Math.max(peer.downloadBandwidth, adjustedBaseSpeed),
+        );
+      } else {
+        selectedPeer = Utils.getRandomItem(peersWithSegment);
+      }
+    }
 
     const request = this.requests.getOrCreateRequest(segment);
-    peer.downloadSegment(request);
+    selectedPeer.downloadSegment(request);
   }
 
   isSegmentLoadingOrLoadedBySomeone(segment: SegmentWithStream): boolean {
