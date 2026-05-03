@@ -244,6 +244,20 @@ export class Peer {
     if (this.downloadingContext) {
       throw new Error("Some segment already is downloading");
     }
+
+    const completed = segmentRequest.tryCompleteByLoadedBytes(
+      { downloadSource: "p2p", peerId: this.id },
+      {
+        notReceivingBytesTimeoutMs:
+          this.peerConfig.p2pNotReceivingBytesTimeoutMs,
+        abort: () => void 0,
+      },
+      this.peerConfig.validateP2PSegment,
+      "p2p-segment-validation-failed",
+    );
+
+    if (completed) return;
+
     this.bandwidthCalculator.startLoading();
     this.downloadingContext = {
       request: segmentRequest,
