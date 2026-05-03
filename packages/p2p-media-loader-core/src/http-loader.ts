@@ -102,7 +102,9 @@ export class HttpRequestExecutor {
 
       this.handleResponseHeaders(response);
 
-      if (!response.body) return;
+      if (!response.body) {
+        throw new RequestError("http-error", "Missing response body");
+      }
       requestControls.firstBytesReceived();
 
       const reader = response.body.getReader();
