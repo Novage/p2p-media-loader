@@ -38,6 +38,29 @@ export function getRandomItem<T>(items: T[]): T {
   return items[Math.floor(Math.random() * items.length)];
 }
 
+export function getWeightedRandomItem<T>(
+  items: T[],
+  weightAccessor: (item: T) => number,
+): T {
+  if (items.length === 0) throw new Error("Cannot get item from empty array");
+  if (items.length === 1) return items[0];
+
+  let totalWeight = 0;
+  const weights = items.map((item) => {
+    const weight = weightAccessor(item);
+    totalWeight += weight;
+    return weight;
+  });
+
+  let randomWeight = Math.random() * totalWeight;
+  for (let i = 0; i < items.length; i++) {
+    randomWeight -= weights[i];
+    if (randomWeight <= 0) return items[i];
+  }
+
+  return items[items.length - 1];
+}
+
 export function utf8ToUintArray(utf8String: string): Uint8Array {
   const encoder = new TextEncoder();
   const bytes = new Uint8Array(utf8String.length);
