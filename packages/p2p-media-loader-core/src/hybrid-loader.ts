@@ -301,19 +301,19 @@ export class HybridLoader {
         // Don't abort requests when processing engine request
         // to avoid race condition with aborts in the requests queue
 
-        const canLoadThrougHttp =
+        const canLoadThroughHttp =
           !isInitialHttpWait &&
           (request?.failedAttempts.httpAttemptsCount ?? 0) < httpErrorRetries &&
           this.requests.executingHttpCount < simultaneousHttpDownloads;
 
-        if (canLoadThrougHttp) {
+        if (canLoadThroughHttp) {
           this.loadThroughHttp(segment);
         } else {
-          const canLoadThrougP2P =
+          const canLoadThroughP2P =
             this.p2pLoaders.currentLoader.isSegmentLoadedBySomeone(segment) &&
             this.requests.executingP2PCount < simultaneousP2PDownloads;
 
-          if (canLoadThrougP2P) {
+          if (canLoadThroughP2P) {
             this.loadThroughP2P(segment);
           }
         }
@@ -361,8 +361,9 @@ export class HybridLoader {
         }
 
         const canLoadThroughP2P =
-          this.requests.executingP2PCount < simultaneousP2PDownloads ||
-          this.abortLastP2PLoadingInQueueAfterItem(queue, segment);
+          this.p2pLoaders.currentLoader.isSegmentLoadedBySomeone(segment) &&
+          (this.requests.executingP2PCount < simultaneousP2PDownloads ||
+            this.abortLastP2PLoadingInQueueAfterItem(queue, segment));
 
         if (canLoadThroughP2P) {
           this.loadThroughP2P(segment);
