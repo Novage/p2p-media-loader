@@ -229,11 +229,22 @@ export class Request {
     ) => Promise<boolean>,
     validationErrorType?: RequestErrorType,
   ) {
-    const isValid = await validate(
-      this.segment.url,
-      this.segment.byteRange,
-      this.data,
-    );
+    let isValid: boolean;
+    try {
+      isValid = await validate(
+        this.segment.url,
+        this.segment.byteRange,
+        this.data,
+      );
+    } catch (err) {
+      this.logger(
+        `${downloadSource} ${this.segment.externalId} validation threw for already-loaded bytes: ${String(err)}`,
+      );
+      isValid = false;
+    }
+
+    // Request may have been aborted by processQueue while validation ran.
+    if (this._status !== "loading") return;
 
     if (!isValid) {
       this.logger(
