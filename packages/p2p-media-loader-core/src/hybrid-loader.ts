@@ -327,7 +327,7 @@ export class HybridLoader {
       if (request?.status === "succeed") continue;
 
       if (statuses.isHighDemand) {
-        const canLoadThrougHttp =
+        const canLoadThroughHttp =
           !isInitialHttpWait &&
           (request?.failedAttempts.httpAttemptsCount ?? 0) < httpErrorRetries;
 
@@ -335,7 +335,7 @@ export class HybridLoader {
           // High-demand request is loading
 
           const shouldSwitchFromP2PToHttp =
-            canLoadThrougHttp &&
+            canLoadThroughHttp &&
             request.downloadSource === "p2p" &&
             (this.requests.executingHttpCount < simultaneousHttpDownloads ||
               this.abortLastHttpLoadingInQueueAfterItem(queue, segment));
@@ -351,7 +351,7 @@ export class HybridLoader {
         // High-demand request is not loading
 
         const shouldLoadThroughHttp =
-          canLoadThrougHttp &&
+          canLoadThroughHttp &&
           (this.requests.executingHttpCount < simultaneousHttpDownloads ||
             this.abortLastHttpLoadingInQueueAfterItem(queue, segment));
 
