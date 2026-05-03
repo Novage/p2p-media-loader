@@ -10,23 +10,23 @@ import { Core } from "../src/core";
 
 test("override configs", () => {
   const coreConfig: CoreConfig = {
-    cachedSegmentExpiration: 1200,
-    cachedSegmentsCount: 0,
+    highDemandTimeWindow: 1200,
+    httpDownloadTimeWindow: 0,
     mainStream: {
       simultaneousHttpDownloads: 3,
     },
   };
 
   const override: CoreConfig = {
-    cachedSegmentExpiration: undefined,
+    highDemandTimeWindow: undefined,
     secondaryStream: {
       simultaneousHttpDownloads: 5,
     },
   };
 
   const result: CoreConfig = {
-    cachedSegmentExpiration: undefined,
-    cachedSegmentsCount: 0,
+    highDemandTimeWindow: undefined,
+    httpDownloadTimeWindow: 0,
     mainStream: {
       simultaneousHttpDownloads: 3,
     },
@@ -37,13 +37,11 @@ test("override configs", () => {
 
 test("override common config", () => {
   const commonConfig: CommonCoreConfig = {
-    cachedSegmentExpiration: 1200,
-    cachedSegmentsCount: 999,
+    segmentMemoryStorageLimit: 1200,
   };
 
   const coreConfig: CoreConfig = {
-    cachedSegmentExpiration: undefined,
-    cachedSegmentsCount: undefined,
+    segmentMemoryStorageLimit: undefined,
     simultaneousHttpDownloads: 3,
     simultaneousP2PDownloads: 3,
     highDemandTimeWindow: 15,
@@ -74,8 +72,7 @@ test("override common config", () => {
   };
 
   const result: Partial<CommonCoreConfig> = {
-    cachedSegmentExpiration: undefined,
-    cachedSegmentsCount: 0,
+    segmentMemoryStorageLimit: undefined,
   };
 
   expect(
@@ -85,6 +82,9 @@ test("override common config", () => {
 
 test("override defined stream config", () => {
   const mainStreamConfig: StreamConfig = {
+    isP2PUploadDisabled: false,
+    isP2PDisabled: false,
+    httpDownloadInitialTimeoutMs: 3000,
     simultaneousHttpDownloads: 3,
     simultaneousP2PDownloads: 3,
     highDemandTimeWindow: 15,
@@ -109,13 +109,15 @@ test("override defined stream config", () => {
         { urls: "stun:global.stun.twilio.com:3478" },
       ],
     },
-    validateP2PSegment: async () => true,
+    validateP2PSegment: () => Promise.resolve(true),
     httpRequestSetup: undefined,
     swarmId: undefined,
   };
 
   const dynamicCoreConfig: DynamicCoreConfig = {
-    cachedSegmentExpiration: 1200,
+    isP2PUploadDisabled: false,
+    isP2PDisabled: false,
+    httpDownloadInitialTimeoutMs: 3000,
     highDemandTimeWindow: 45,
     httpDownloadTimeWindow: 5000,
     p2pDownloadTimeWindow: 10000,
@@ -136,6 +138,9 @@ test("override defined stream config", () => {
   };
 
   const result: StreamConfig = {
+    isP2PUploadDisabled: false,
+    isP2PDisabled: false,
+    httpDownloadInitialTimeoutMs: 3000,
     simultaneousHttpDownloads: 2,
     simultaneousP2PDownloads: 20,
     highDemandTimeWindow: 45,
@@ -167,6 +172,7 @@ test("override defined stream config", () => {
 
   function overrideConfigs(config: StreamConfig, override: DynamicCoreConfig) {
     overrideConfig(config, override);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     return overrideConfig(config, override.mainStream!);
   }
 
@@ -175,8 +181,6 @@ test("override defined stream config", () => {
 
 test("filter undefined props", () => {
   const coreConfig: CoreConfig = {
-    cachedSegmentExpiration: undefined,
-    cachedSegmentsCount: undefined,
     simultaneousHttpDownloads: 2,
     simultaneousP2PDownloads: 20,
     highDemandTimeWindow: 45,

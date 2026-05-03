@@ -19,7 +19,7 @@ export const CommonConfig = defineConfig([
       sourceType: "module",
 
       parserOptions: {
-        project: ["tsconfig.json", "tsconfig.node.json"],
+        projectService: true,
       },
     },
 

@@ -1,4 +1,10 @@
 import { defineConfig } from "eslint/config";
 import { CommonConfig } from "../../eslint.common.config.ts";
 
-export default defineConfig(...CommonConfig);
+export default defineConfig(CommonConfig, {
+  languageOptions: {
+    parserOptions: {
+      tsconfigRootDir: import.meta.dirname,
+    },
+  },
+});

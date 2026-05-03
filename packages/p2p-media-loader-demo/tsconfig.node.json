@@ -2,7 +2,10 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "module": "ESNext",
-    "moduleResolution": "Bundler"
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "emitDeclarationOnly": true
   },
-  "include": ["eslint.config.ts", "../../eslint.common.react.config.ts"]
+  "types": ["node"],
+  "include": ["eslint.config.ts", "../../eslint.common.config.ts", "../../eslint.common.react.config.ts"]
 }

@@ -142,7 +142,7 @@ type RecursivePartial<T> = {
 export function overrideConfig<T>(
   target: T,
   updates: RecursivePartial<T> | null,
-  defaults: RecursivePartial<T> = {} as RecursivePartial<T>,
+  defaults: RecursivePartial<T> = {},
 ): T {
   if (
     typeof target !== "object" ||

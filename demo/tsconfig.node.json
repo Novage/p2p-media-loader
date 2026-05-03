@@ -2,7 +2,10 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "module": "NodeNext",
-    "moduleResolution": "NodeNext"
+    "moduleResolution": "NodeNext",
+    "allowImportingTsExtensions": true,
+    "emitDeclarationOnly": true
   },
-  "include": ["vite.config.ts", "eslint.config.ts"]
+  "types": ["node"],
+  "include": ["vite.config.ts", "eslint.config.ts", "../eslint.common.config.ts", "../eslint.common.react.config.ts"]
 }
