@@ -16,7 +16,6 @@ type HttpConfig = Pick<
 >;
 
 export class HttpRequestExecutor {
-  private readonly requestControls: RequestControls;
   private readonly abortController = new AbortController();
   private readonly expectedBytesLength?: number;
   private readonly requestByteRange?: { start: number; end?: number };
@@ -33,6 +32,21 @@ export class HttpRequestExecutor {
     const { byteRange } = this.request.segment;
     if (byteRange) this.requestByteRange = { ...byteRange };
 
+    const startControls = {
+      abort: () => this.abortController.abort("abort"),
+      notReceivingBytesTimeoutMs:
+        this.httpConfig.httpNotReceivingBytesTimeoutMs,
+    };
+
+    const completed = this.request.tryCompleteByLoadedBytes(
+      { downloadSource: "http" },
+      startControls,
+      this.httpConfig.validateHTTPSegment,
+      "http-segment-validation-failed",
+    );
+
+    if (completed) return;
+
     if (request.loadedBytes !== 0) {
       this.requestByteRange = this.requestByteRange ?? { start: 0 };
       this.requestByteRange.start =
@@ -43,18 +57,14 @@ export class HttpRequestExecutor {
         this.request.totalBytes - this.request.loadedBytes;
     }
 
-    this.requestControls = this.request.start(
+    const requestControls = this.request.start(
       { downloadSource: "http" },
-      {
-        abort: () => this.abortController.abort("abort"),
-        notReceivingBytesTimeoutMs:
-          this.httpConfig.httpNotReceivingBytesTimeoutMs,
-      },
+      startControls,
     );
-    void this.fetch();
+    void this.fetch(requestControls);
   }
 
-  private async fetch() {
+  private async fetch(requestControls: RequestControls) {
     const { segment } = this.request;
     try {
       let request = await this.httpConfig.httpRequestSetup?.(
@@ -93,12 +103,11 @@ export class HttpRequestExecutor {
       this.handleResponseHeaders(response);
 
       if (!response.body) return;
-      const { requestControls } = this;
       requestControls.firstBytesReceived();
 
       const reader = response.body.getReader();
       for await (const chunk of readStream(reader)) {
-        this.requestControls.addLoadedChunk(chunk);
+        requestControls.addLoadedChunk(chunk);
         this.onChunkDownloaded(chunk.byteLength, "http");
       }
 
@@ -118,13 +127,13 @@ export class HttpRequestExecutor {
 
       requestControls.completeOnSuccess();
     } catch (error) {
-      this.handleError(error);
+      this.handleError(error, requestControls);
     }
   }
 
   private handleResponseHeaders(response: Response) {
     if (!response.ok) {
-      if (response.status === 406) {
+      if (response.status === 406 || response.status === 416) {
         this.request.clearLoadedBytes();
         throw new RequestError<"http-bytes-mismatch">(
           "http-bytes-mismatch",
@@ -190,7 +199,7 @@ export class HttpRequestExecutor {
     }
   }
 
-  private handleError(error: unknown) {
+  private handleError(error: unknown, requestControls: RequestControls) {
     if (error instanceof Error) {
       if (error.name !== "abort") return;
 
@@ -199,7 +208,7 @@ export class HttpRequestExecutor {
           ? (error as RequestError<HttpRequestErrorType>)
           : new RequestError("http-error", error.message);
 
-      this.requestControls.abortOnError(httpLoaderError);
+      requestControls.abortOnError(httpLoaderError);
     }
   }
 }

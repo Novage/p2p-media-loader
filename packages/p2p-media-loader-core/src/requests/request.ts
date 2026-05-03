@@ -4,6 +4,7 @@ import {
   CoreEventMap,
   RequestError,
   RequestAbortErrorType,
+  RequestErrorType,
   SegmentWithStream,
   Segment,
 } from "../types.js";
@@ -158,6 +159,97 @@ export class Request {
       throw new Error("Request total bytes value is already set");
     }
     this._totalBytes = value;
+  }
+
+  /**
+   * Checks if all bytes are already loaded and, if so, starts, validates,
+   * and completes the request without making a network request.
+   *
+   * Handles three cases:
+   * - loadedBytes === totalBytes: start → validate → complete (returns true)
+   * - loadedBytes > totalBytes: corrupted state → clearLoadedBytes (returns false)
+   * - otherwise: no-op (returns false)
+   *
+   * The request is started synchronously so that processQueue sees
+   * it as "loading" immediately. Validation runs as fire-and-forget.
+   *
+   * @returns true if the request was started and is being handled,
+   * false if caller should proceed with a normal download.
+   */
+  tryCompleteByLoadedBytes(
+    requestData: StartRequestParameters,
+    controls: {
+      notReceivingBytesTimeoutMs?: number;
+      abort: (errorType: RequestError<RequestAbortErrorType>) => void;
+    },
+    validate?: (
+      url: string,
+      byteRange: Segment["byteRange"],
+      data: ArrayBuffer,
+    ) => Promise<boolean>,
+    validationErrorType?: RequestErrorType,
+  ): boolean {
+    if (!this._totalBytes) return false;
+
+    if (this._loadedBytes > this._totalBytes) {
+      this.clearLoadedBytes();
+      return false;
+    }
+
+    if (this._loadedBytes !== this._totalBytes) return false;
+
+    // Start synchronously so the request is immediately in "loading" status.
+    const requestControls = this.start(requestData, controls);
+
+    // No network bytes will arrive in this path, so disable the timeout
+    // to prevent it from aborting the request during async validation.
+    this.notReceivingBytesTimeout.clear();
+
+    if (validate) {
+      void this.validateAndComplete(
+        requestData.downloadSource,
+        requestControls,
+        validate,
+        validationErrorType,
+      );
+    } else {
+      requestControls.completeOnSuccess();
+    }
+
+    return true;
+  }
+
+  private async validateAndComplete(
+    downloadSource: string,
+    requestControls: RequestControls,
+    validate: (
+      url: string,
+      byteRange: Segment["byteRange"],
+      data: ArrayBuffer,
+    ) => Promise<boolean>,
+    validationErrorType?: RequestErrorType,
+  ) {
+    const isValid = await validate(
+      this.segment.url,
+      this.segment.byteRange,
+      this.data,
+    );
+
+    if (!isValid) {
+      this.logger(
+        `${downloadSource} ${this.segment.externalId} validation failed for already-loaded bytes, clearing`,
+      );
+      this.clearLoadedBytes();
+      requestControls.abortOnError(
+        new RequestError(validationErrorType ?? "abort"),
+      );
+      return;
+    }
+
+    this.logger(
+      `${downloadSource} ${this.segment.externalId} validation passed for already-loaded bytes`,
+    );
+    requestControls.completeOnSuccess();
   }
 
   start(
