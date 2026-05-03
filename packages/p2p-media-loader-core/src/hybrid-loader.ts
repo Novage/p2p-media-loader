@@ -299,7 +299,7 @@ export class HybridLoader {
 
       if (shouldStartLoadImmediatelyEngineRequest) {
         // Don't abort requests when processing engine request
-        // to avoid race condion with aborts in the requests queue
+        // to avoid race condition with aborts in the requests queue
 
         const canLoadThrougHttp =
           !isInitialHttpWait &&
