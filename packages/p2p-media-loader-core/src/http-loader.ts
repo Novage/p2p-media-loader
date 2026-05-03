@@ -200,9 +200,11 @@ export class HttpRequestExecutor {
   }
 
   private handleError(error: unknown, requestControls: RequestControls) {
-    if (error instanceof Error) {
-      if (error.name !== "abort") return;
+    // Abort-initiated errors: the Request already transitioned its own
+    // status via abortFromProcessQueue/abortOnTimeout, nothing to do here.
+    if (this.abortController.signal.aborted) return;
 
+    if (error instanceof Error) {
       const httpLoaderError =
         error instanceof RequestError
           ? (error as RequestError<HttpRequestErrorType>)
