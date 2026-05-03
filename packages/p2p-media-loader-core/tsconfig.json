@@ -6,5 +6,5 @@
     "tsBuildInfoFile": "./build/.tsbuildinfo"
   },
   "include": ["src/**/*"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "references": [{ "path": "./tsconfig.test.json" }, { "path": "./tsconfig.node.json" }]
 }

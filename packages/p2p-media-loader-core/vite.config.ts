@@ -1,13 +1,12 @@
 import { defineConfig } from "vite";
 import type { UserConfig } from "vite";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
-import terser from "@rollup/plugin-terser";
 
 const getESMConfig = ({ minify }: { minify: boolean }): UserConfig => {
   return {
     build: {
       emptyOutDir: false,
-      minify: minify ? "esbuild" : false,
+      minify,
       sourcemap: true,
       lib: {
         name: "p2pml.core",
@@ -18,14 +17,7 @@ const getESMConfig = ({ minify }: { minify: boolean }): UserConfig => {
       },
     },
     plugins: [
-      nodePolyfills(),
-      minify
-        ? terser({
-            format: {
-              comments: false,
-            },
-          })
-        : undefined,
+      nodePolyfills()
     ],
   };
 };

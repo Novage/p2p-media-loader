@@ -17,14 +17,14 @@ const getCurrentSearchParams = () =>
   new URLSearchParams(window.location.search);
 
 export function useQueryParams(streamUri?: string) {
-  const defaultParams = useMemo(() => {
+  const defaultParams = useMemo<QueryParamsType>(() => {
     return {
       player: Object.keys(PLAYERS)[0],
       streamUrl: streamUri ?? DEFAULT_STREAM,
       trackers: DEFAULT_TRACKERS,
       debug: "",
       swarmId: "",
-    } as QueryParamsType;
+    };
   }, [streamUri]);
 
   const [queryParams, setQueryParams] = useState<QueryParamsType>(() =>

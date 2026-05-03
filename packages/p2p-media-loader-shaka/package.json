@@ -55,7 +55,6 @@
     "p2p-media-loader-core": "workspace:*"
   },
   "devDependencies": {
-    "@rollup/plugin-terser": "^1.0.0",
     "shaka-player": "^5.0.9"
   }
 }

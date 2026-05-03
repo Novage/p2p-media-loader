@@ -104,7 +104,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       index: string,
     ) => {
       this.hookSegmentIndex(stream);
-      segmentManager.setStream(stream as HookedStream, type, index);
+      segmentManager.setStream(stream, type, index);
       processedStreams.add(stream.id);
       return true;
     };

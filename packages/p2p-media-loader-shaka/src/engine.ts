@@ -200,8 +200,8 @@ export class ShakaP2PEngine {
     const { player } = this;
     if (!player) return;
 
-    const networkingEngine =
-      player.getNetworkingEngine() as HookedNetworkingEngine | null;
+    const networkingEngine: HookedNetworkingEngine | null =
+      player.getNetworkingEngine();
     if (networkingEngine) {
       if (type === "register") {
         const p2pml: P2PMLShakaData = {
