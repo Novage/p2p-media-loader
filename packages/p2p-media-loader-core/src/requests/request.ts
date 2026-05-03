@@ -182,12 +182,14 @@ export class Request {
       notReceivingBytesTimeoutMs?: number;
       abort: (errorType: RequestError<RequestAbortErrorType>) => void;
     },
-    validate?: (
-      url: string,
-      byteRange: Segment["byteRange"],
-      data: ArrayBuffer,
-    ) => Promise<boolean>,
-    validationErrorType?: RequestErrorType,
+    validate:
+      | ((
+          url: string,
+          byteRange: Segment["byteRange"],
+          data: ArrayBuffer,
+        ) => Promise<boolean>)
+      | undefined,
+    validationErrorType: RequestErrorType,
   ): boolean {
     if (!this._totalBytes) return false;
 
@@ -227,7 +229,7 @@ export class Request {
       byteRange: Segment["byteRange"],
       data: ArrayBuffer,
     ) => Promise<boolean>,
-    validationErrorType?: RequestErrorType,
+    validationErrorType: RequestErrorType,
   ) {
     let isValid: boolean;
     try {
@@ -251,9 +253,7 @@ export class Request {
         `${downloadSource} ${this.segment.externalId} validation failed for already-loaded bytes, clearing`,
       );
       this.clearLoadedBytes();
-      requestControls.abortOnError(
-        new RequestError(validationErrorType ?? "abort"),
-      );
+      requestControls.abortOnError(new RequestError(validationErrorType));
       return;
     }
 
@@ -341,33 +341,19 @@ export class Request {
     this.throwErrorIfNotLoadingStatus();
     if (!this.currentAttempt) return;
 
-    this.setStatus("failed");
     const error = new RequestError("bytes-receiving-timeout");
     this._abortRequestCallback?.(error);
-    this.logger(
-      `${this.downloadSource} ${this.segment.externalId} failed ${error.type}`,
-    );
-    this._failedAttempts.add({
-      ...this.currentAttempt,
-      error,
-    });
-    this.onSegmentError({
-      segment: mapSegmentWithStreamToSegment(this.segment),
-      error,
-      downloadSource: this.currentAttempt.downloadSource,
-      peerId:
-        this.currentAttempt.downloadSource === "p2p"
-          ? this.currentAttempt.peerId
-          : undefined,
-      streamType: this.segment.stream.type,
-    });
-    this.notReceivingBytesTimeout.clear();
-    this.manageBandwidthCalculatorsState("stop");
-    this.requestProcessQueueCallback();
+    this.handleFailure(error);
   };
 
   private abortOnError = (error: RequestError) => {
     this.throwErrorIfNotLoadingStatus();
+    if (!this.currentAttempt) return;
+
+    this.handleFailure(error);
+  };
+
+  private handleFailure = (error: RequestError) => {
     if (!this.currentAttempt) return;
 
     this.setStatus("failed");
