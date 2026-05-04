@@ -175,12 +175,9 @@ export class Peer {
           return;
         }
 
-        const isValid =
-          (await this.peerConfig.validateP2PSegment?.(
-            request.segment.url,
-            request.segment.byteRange,
-            request.data,
-          )) ?? true;
+        const isValid = await request.validateData(
+          this.peerConfig.validateP2PSegment,
+        );
 
         if (this.downloadingContext !== downloadingContext) return;
 

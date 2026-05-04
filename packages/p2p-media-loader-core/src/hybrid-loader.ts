@@ -397,7 +397,8 @@ export class HybridLoader {
 
   private loadThroughHttp(segment: SegmentWithStream) {
     const request = this.requests.getOrCreateRequest(segment);
-    new HttpRequestExecutor(request, this.config, this.eventTarget);
+    const executor = new HttpRequestExecutor(request, this.config, this.eventTarget);
+    executor.execute();
     this.p2pLoaders.currentLoader.broadcastAnnouncement();
   }
 

@@ -17,8 +17,8 @@ type HttpConfig = Pick<
 
 export class HttpRequestExecutor {
   private readonly abortController = new AbortController();
-  private readonly expectedBytesLength?: number;
-  private readonly requestByteRange?: { start: number; end?: number };
+  private expectedBytesLength?: number;
+  private requestByteRange?: { start: number; end?: number };
   private readonly onChunkDownloaded: CoreEventMap["onChunkDownloaded"];
 
   constructor(
@@ -31,7 +31,9 @@ export class HttpRequestExecutor {
 
     const { byteRange } = this.request.segment;
     if (byteRange) this.requestByteRange = { ...byteRange };
+  }
 
+  execute() {
     const startControls = {
       abort: () => this.abortController.abort("abort"),
       notReceivingBytesTimeoutMs:
@@ -47,10 +49,10 @@ export class HttpRequestExecutor {
 
     if (completed) return;
 
-    if (request.loadedBytes !== 0) {
+    if (this.request.loadedBytes !== 0) {
       this.requestByteRange = this.requestByteRange ?? { start: 0 };
       this.requestByteRange.start =
-        this.requestByteRange.start + request.loadedBytes;
+        this.requestByteRange.start + this.request.loadedBytes;
     }
     if (this.request.totalBytes) {
       this.expectedBytesLength =
@@ -113,12 +115,9 @@ export class HttpRequestExecutor {
         this.onChunkDownloaded(chunk.byteLength, "http");
       }
 
-      const isValid =
-        (await this.httpConfig.validateHTTPSegment?.(
-          segment.url,
-          segment.byteRange,
-          this.request.data,
-        )) ?? true;
+      const isValid = await this.request.validateData(
+        this.httpConfig.validateHTTPSegment,
+      );
 
       if (!isValid) {
         this.request.clearLoadedBytes();

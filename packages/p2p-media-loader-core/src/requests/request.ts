@@ -194,6 +194,9 @@ export class Request {
     if (!this._totalBytes) return false;
 
     if (this._loadedBytes > this._totalBytes) {
+      this.logger(
+        `${requestData.downloadSource} ${this.segment.externalId} loaded bytes overflow: ${this._loadedBytes} > ${this._totalBytes}, clearing`,
+      );
       this.clearLoadedBytes();
       return false;
     }
@@ -221,8 +224,28 @@ export class Request {
     return true;
   }
 
+  async validateData(
+    validate?: (
+      url: string,
+      byteRange: Segment["byteRange"],
+      data: ArrayBuffer,
+    ) => Promise<boolean>,
+  ): Promise<boolean> {
+    if (!validate) return true;
+    try {
+      return await validate(
+        this.segment.url,
+        this.segment.byteRange,
+        this.data,
+      );
+    } catch (err) {
+      this.logger(`validation threw an error: ${String(err)}`);
+      return false;
+    }
+  }
+
   private async validateAndComplete(
-    downloadSource: string,
+    downloadSource: "http" | "p2p",
     requestControls: RequestControls,
     validate: (
       url: string,
@@ -231,19 +254,7 @@ export class Request {
     ) => Promise<boolean>,
     validationErrorType: RequestErrorType,
   ) {
-    let isValid: boolean;
-    try {
-      isValid = await validate(
-        this.segment.url,
-        this.segment.byteRange,
-        this.data,
-      );
-    } catch (err) {
-      this.logger(
-        `${downloadSource} ${this.segment.externalId} validation threw for already-loaded bytes: ${String(err)}`,
-      );
-      isValid = false;
-    }
+    const isValid = await this.validateData(validate);
 
     // Request may have been aborted by processQueue while validation ran.
     if (this._status !== "loading") return;
