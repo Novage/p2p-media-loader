@@ -136,6 +136,13 @@ export class HybridLoader {
 
       this.engineRequest?.abort();
       this.engineRequest = engineRequest;
+
+      // If the engine explicitly requests a segment that previously failed during
+      // background pre-fetching, clear its error history so it can be retried.
+      const request = this.requests.get(segment);
+      if (request?.status === "failed") {
+        request.failedAttempts.clear();
+      }
     } catch {
       engineRequest.reject();
     } finally {
