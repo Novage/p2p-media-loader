@@ -117,6 +117,15 @@ export const P2PVideoDemo = ({
     setURLQueryParams({ streamUrl: url, player });
   };
 
+  const coreOptions = useMemo(
+    () => ({
+      announceTrackers: trackers,
+      swarmId: queryParams.swarmId === "" ? undefined : queryParams.swarmId,
+      httpDownloadInitialTimeoutMs: 3000,
+    }),
+    [trackers, queryParams.swarmId],
+  );
+
   const renderPlayer = () => {
     const PlayerComponent = playerComponents[
       queryParams.player as PlayerKey
@@ -125,11 +134,7 @@ export const P2PVideoDemo = ({
     return PlayerComponent ? (
       <PlayerComponent
         streamUrl={queryParams.streamUrl}
-        coreOptions={{
-          announceTrackers: trackers,
-          swarmId: queryParams.swarmId === "" ? undefined : queryParams.swarmId,
-          httpDownloadInitialTimeoutMs: 3000,
-        }}
+        coreOptions={coreOptions}
         onPeerConnect={onPeerConnect}
         onPeerClose={onPeerClose}
         onChunkDownloaded={onChunkDownloaded}
