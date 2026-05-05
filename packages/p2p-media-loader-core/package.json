@@ -61,8 +61,7 @@
   "dependencies": {
     "@types/debug": "^4.1.13",
     "bittorrent-tracker": "^11.2.2",
-    "debug": "^4.4.3",
-    "nano-md5": "^1.0.5"
+    "debug": "^4.4.3"
   },
   "devDependencies": {
     "@types/streamx": "^2.9.5",

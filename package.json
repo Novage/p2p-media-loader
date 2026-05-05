@@ -15,7 +15,8 @@
     "prettier": "pnpm --recursive prettier",
     "type-check": "pnpm --recursive type-check",
     "dev": "pnpm --filter './demo' dev",
-    "create-doc": "pnpm typedoc"
+    "create-doc": "pnpm typedoc",
+    "test": "pnpm --recursive test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -28,7 +29,7 @@
     "typedoc": "^0.28.19",
     "typedoc-material-theme": "^1.4.1",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.59.1",
+    "typescript-eslint": "^8.59.2",
     "vite": "^8.0.10"
   },
   "pnpm": {

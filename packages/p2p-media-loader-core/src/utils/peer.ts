@@ -1,4 +1,4 @@
-import md5 from "nano-md5";
+import { sha1 } from "./hash.js";
 import { PACKAGE_VERSION } from "./version.js";
 
 export const TRACKER_CLIENT_VERSION_PREFIX = `-PM${formatVersion(PACKAGE_VERSION)}-`;
@@ -8,10 +8,10 @@ const HASH_SYMBOLS =
 const PEER_ID_LENGTH = 20;
 
 export function getStreamHash(streamId: string): string {
-  // slice one byte to have 15 bytes binary string
-  const binary15BytesHashString = md5.fromUtf8(streamId).slice(1);
-  const base64Hash20CharsString = btoa(binary15BytesHashString);
-  return base64Hash20CharsString;
+  // We use exactly 15 bytes of entropy because 15 bytes encoded 
+  // as Base64 results in exactly 20 characters (with no padding).
+  // BitTorrent tracker `infoHash` MUST be exactly 20 characters/bytes.
+  return btoa(sha1(streamId).slice(0, 15));
 }
 
 export function generatePeerId(trackerClientVersionPrefix: string): string {
