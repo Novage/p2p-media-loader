@@ -8,6 +8,7 @@ const HASH_SYMBOLS =
 const PEER_ID_LENGTH = 20;
 
 export function getStreamHash(streamId: string): string {
+  // A BitTorrent tracker `infoHash` MUST be exactly 20 bytes.
   // We take 15 bytes of the binary SHA-1 and encode it to Base64.
   // This produces exactly a 20-character ASCII string (no padding).
   // In this codebase, the tracker client uses utf8ToUintArray() on this string,
