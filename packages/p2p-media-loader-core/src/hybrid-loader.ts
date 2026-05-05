@@ -33,7 +33,6 @@ export class HybridLoader {
   private readonly playback: Playback;
   private readonly segmentAvgDuration: number;
   private readonly logger: debug.Debugger;
-  private storageCleanUpIntervalId?: number;
   private levelChangedTimestamp?: number;
   private lastQueueProcessingTimeStamp?: number;
   private randomHttpDownloadTimeout?: number;
@@ -143,7 +142,11 @@ export class HybridLoader {
       if (request?.status === "failed") {
         request.failedAttempts.clear();
       }
-    } catch {
+    } catch (error) {
+      this.logger(
+        `request failed for ${LoggerUtils.getSegmentString(segment)} in ${LoggerUtils.getStreamString(stream)}`,
+        error,
+      );
       engineRequest.reject();
     } finally {
       this.requestProcessQueueMicrotask();
@@ -661,10 +664,8 @@ export class HybridLoader {
   }
 
   destroy() {
-    clearInterval(this.storageCleanUpIntervalId);
     clearTimeout(this.randomHttpDownloadTimeout);
     clearTimeout(this.initialHttpDelayTimeoutId);
-    this.storageCleanUpIntervalId = undefined;
     this.engineRequest?.abort();
     this.requests.destroy();
     this.p2pLoaders.destroy();
