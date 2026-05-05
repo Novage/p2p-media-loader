@@ -62,10 +62,7 @@ export function getWeightedRandomItem<T>(
 }
 
 export function utf8ToUintArray(utf8String: string): Uint8Array {
-  const encoder = new TextEncoder();
-  const bytes = new Uint8Array(utf8String.length);
-  encoder.encodeInto(utf8String, bytes);
-  return bytes;
+  return new TextEncoder().encode(utf8String);
 }
 
 export function hexToUtf8(hexString: string) {

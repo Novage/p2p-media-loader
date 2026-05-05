@@ -6,6 +6,7 @@ import {
 } from "../types.js";
 import { Playback } from "../internal-types.js";
 import { P2PLoader } from "../p2p/loader.js";
+import { sha1 } from "./hash.js";
 
 export type SegmentPlaybackStatuses = {
   isHighDemand: boolean;
@@ -33,9 +34,8 @@ export type GenerateStreamShortIdProps = {
 };
 
 /**
- * Generates a short, stable alphanumeric ID for a stream based on its properties.
- * Uses a djb2/Java-style string hash algorithm (hash * 31 + charCode) and encodes
- * the resulting 32-bit integer into a Base36 string for compactness.
+ * Generates a stable, unique string ID for a stream based on its properties.
+ * Uses a SHA-1 hash to avoid collisions and encodes the result to standard Base64.
  */
 export function generateStreamShortId({
   bitrate,
@@ -91,12 +91,8 @@ export function generateStreamShortId({
     : "";
 
   const str = `${bitrate ?? 0}-${normalizedCodecs}-${width ?? ""}-${height ?? ""}-${normalizedLanguage}-${normalizedChannels}-${normalizedName}-${normalizedFrameRate}-${normalizedVideoRange}`;
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = (hash << 5) - hash + str.charCodeAt(i);
-    hash |= 0;
-  }
-  return (hash >>> 0).toString(36);
+
+  return btoa(sha1(str));
 }
 
 export function getStreamSwarmId(
