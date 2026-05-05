@@ -6,25 +6,25 @@ describe("hash.ts", () => {
   describe("sha1", () => {
     it("should correctly hash a simple string", () => {
       const testStr = "hello world123!@#";
-      const nodeHash = crypto.createHash("sha1").update(testStr).digest("latin1");
+      const nodeHash = crypto.createHash("sha1").update(testStr).digest().toString("latin1");
       expect(sha1(testStr)).toBe(nodeHash);
     });
 
     it("should correctly hash an empty string", () => {
       const testStr = "";
-      const nodeHash = crypto.createHash("sha1").update(testStr).digest("latin1");
+      const nodeHash = crypto.createHash("sha1").update(testStr).digest().toString("latin1");
       expect(sha1(testStr)).toBe(nodeHash);
     });
 
     it("should correctly hash a long string", () => {
       const testStr = "a".repeat(1000);
-      const nodeHash = crypto.createHash("sha1").update(testStr).digest("latin1");
+      const nodeHash = crypto.createHash("sha1").update(testStr).digest().toString("latin1");
       expect(sha1(testStr)).toBe(nodeHash);
     });
 
     it("should correctly hash strings with non-ASCII characters", () => {
       const testStr = "привіт світ 🔥";
-      const nodeHash = crypto.createHash("sha1").update(testStr).digest("latin1");
+      const nodeHash = crypto.createHash("sha1").update(testStr).digest().toString("latin1");
       expect(sha1(testStr)).toBe(nodeHash);
     });
 
