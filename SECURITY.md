@@ -14,7 +14,7 @@ The following table lists the versions of `p2p-media-loader` that are currently 
 
 Please do not report security vulnerabilities through public GitHub issues.
 
-Instead, please report them using GitHub's private vulnerability reporting feature. You can do this by navigating to the **Security** tab of this repository and selecting **Report a vulnerability** under the **Advisories** section.
+Instead, please report them using GitHub's private vulnerability reporting feature. You can do this by navigating to the **Security and quality** tab of this repository, and then clicking the **Report a vulnerability** button.
 
 Alternatively, you can reach out directly to the maintainers at Novage via our [website](https://novage.com.ua/).
 
