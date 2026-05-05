@@ -404,7 +404,11 @@ export class HybridLoader {
 
   private loadThroughHttp(segment: SegmentWithStream) {
     const request = this.requests.getOrCreateRequest(segment);
-    const executor = new HttpRequestExecutor(request, this.config, this.eventTarget);
+    const executor = new HttpRequestExecutor(
+      request,
+      this.config,
+      this.eventTarget,
+    );
     executor.execute();
     this.p2pLoaders.currentLoader.broadcastAnnouncement();
   }
@@ -593,7 +597,7 @@ export class HybridLoader {
   private getBandwidth(queueDownloadRatio: number) {
     const { http, all } = this.bandwidthCalculators;
     const { activeLevelBitrate } = this.streamDetails;
-    if (this.streamDetails.activeLevelBitrate === 0) {
+    if (activeLevelBitrate === 0) {
       return all.getBandwidthLoadingOnly(3);
     }
 
