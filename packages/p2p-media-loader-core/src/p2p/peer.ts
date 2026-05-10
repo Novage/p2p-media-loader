@@ -136,7 +136,7 @@ export class Peer {
           controls.firstBytesReceived();
 
           if (request.totalBytes === undefined) {
-            request.setTotalBytes(command.s);
+            request.setTotalBytes(request.loadedBytes + command.s);
           } else if (request.totalBytes - request.loadedBytes !== command.s) {
             request.clearLoadedBytes();
             this.sendCancelSegmentRequestCommand(request.segment, requestId);
