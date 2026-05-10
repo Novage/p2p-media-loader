@@ -136,7 +136,7 @@ export class HttpRequestExecutor {
       ) {
         throw new RequestError(
           "http-bytes-mismatch",
-          "HTTP response truncated",
+          `HTTP response truncated: received ${this.request.loadedBytes} of ${this.request.totalBytes} bytes`,
         );
       }
 
