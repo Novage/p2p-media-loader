@@ -126,9 +126,9 @@ export class HttpRequestExecutor {
         );
       }
 
-      // If the HTTP connection drops gracefully but prematurely, fetch yields done: true 
+      // If the HTTP connection drops gracefully but prematurely, fetch yields done: true
       // without throwing an error. We must verify that we received the full segment.
-      // If truncated, we throw without clearing loaded bytes to allow the next 
+      // If truncated, we throw without clearing loaded bytes to allow the next
       // download attempt to resume from the current offset using HTTP Range requests.
       if (
         this.request.totalBytes !== undefined &&
