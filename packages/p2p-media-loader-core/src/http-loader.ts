@@ -115,17 +115,6 @@ export class HttpRequestExecutor {
         this.onChunkDownloaded(chunk.byteLength, "http");
       }
 
-      const isValid = await this.request.validateData(
-        this.httpConfig.validateHTTPSegment,
-      );
-
-      if (!isValid) {
-        this.request.clearLoadedBytes();
-        throw new RequestError<"http-segment-validation-failed">(
-          "http-segment-validation-failed",
-        );
-      }
-
       // If the HTTP connection drops gracefully but prematurely, fetch yields done: true
       // without throwing an error. We must verify that we received the full segment.
       // If truncated, we throw without clearing loaded bytes to allow the next
@@ -137,6 +126,17 @@ export class HttpRequestExecutor {
         throw new RequestError(
           "http-bytes-mismatch",
           `HTTP response truncated: received ${this.request.loadedBytes} of ${this.request.totalBytes} bytes`,
+        );
+      }
+
+      const isValid = await this.request.validateData(
+        this.httpConfig.validateHTTPSegment,
+      );
+
+      if (!isValid) {
+        this.request.clearLoadedBytes();
+        throw new RequestError<"http-segment-validation-failed">(
+          "http-segment-validation-failed",
         );
       }
 
