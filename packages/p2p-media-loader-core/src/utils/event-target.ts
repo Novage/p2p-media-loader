@@ -58,4 +58,8 @@ export class EventTarget<
       }
     }
   }
+
+  public clear(): void {
+    this.events.clear();
+  }
 }
