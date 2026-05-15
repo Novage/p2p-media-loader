@@ -5,7 +5,7 @@ export type WebSocketClientEventMap = {
   disconnected: () => void;
   reconnecting: () => void;
   error: (error: Event) => void;
-  message: (data: ArrayBuffer) => void;
+  message: (data: ArrayBuffer | string) => void;
 };
 
 export type WebSocketClientState =
@@ -144,7 +144,7 @@ export class WebSocketClient {
     this.#eventTarget.dispatchEvent("error", event);
   };
 
-  #onMessage = (event: MessageEvent<ArrayBuffer>): void => {
+  #onMessage = (event: MessageEvent<ArrayBuffer | string>): void => {
     if (this.#state === "disposed") return;
     this.#eventTarget.dispatchEvent("message", event.data);
   };

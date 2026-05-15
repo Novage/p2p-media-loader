@@ -166,13 +166,13 @@ export class WebTorrentClient {
     this.#announceIntervalSeconds = null;
   };
 
-  #onWsMessage = (data: ArrayBuffer): void => {
+  #onWsMessage = (data: ArrayBuffer | string): void => {
     if (this.#destroyed) return;
 
     let msg: unknown;
 
     try {
-      const text = new TextDecoder().decode(data);
+      const text = typeof data === "string" ? data : new TextDecoder().decode(data);
       msg = JSON.parse(text) as unknown;
     } catch (err: unknown) {
       this.#eventTarget.dispatchEvent(
