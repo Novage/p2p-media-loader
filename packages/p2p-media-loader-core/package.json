@@ -53,19 +53,15 @@
     "build:es": "tsc",
     "prettier": "prettier --write .",
     "lint": "eslint src --report-unused-disable-directives --max-warnings 0 --flag unstable_native_nodejs_ts_config",
-    "clean": "rimraf lib dist build p2p-media-loader-core-*.tgz",
-    "clean-with-modules": "rimraf node_modules && pnpm clean",
+    "clean-build": "rimraf lib dist build p2p-media-loader-core-*.tgz",
     "type-check": "npx tsc --noEmit",
     "test": "vitest"
   },
   "dependencies": {
     "@types/debug": "^4.1.13",
-    "bittorrent-tracker": "^11.2.2",
     "debug": "^4.4.3"
   },
   "devDependencies": {
-    "@types/streamx": "^2.9.5",
-    "vite-plugin-node-polyfills": "^0.26.0",
     "vitest": "^4.1.5"
   }
 }

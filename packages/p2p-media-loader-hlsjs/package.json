@@ -46,8 +46,7 @@
     "build:es": "tsc",
     "prettier": "prettier --write .",
     "lint": "eslint src --report-unused-disable-directives --max-warnings 0 --flag unstable_native_nodejs_ts_config",
-    "clean": "rimraf lib dist build p2p-media-loader-hlsjs-*.tgz",
-    "clean-with-modules": "rimraf node_modules && pnpm clean",
+    "clean-build": "rimraf lib dist build p2p-media-loader-hlsjs-*.tgz",
     "type-check": "npx tsc --noEmit"
   },
   "dependencies": {
