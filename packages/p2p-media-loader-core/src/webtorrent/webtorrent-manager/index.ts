@@ -1,4 +1,5 @@
 import { EventTarget } from "../../utils/event-target.js";
+import { getRTCErrorMessage } from "../utils.js";
 import { WebTorrentClient } from "../webtorrent-client/index.js";
 import { WebTorrentSocketPool } from "../webtorrent-socket-pool/index.js";
 
@@ -30,10 +31,14 @@ export type WebTorrentManagerEventMap = {
     connection: RTCPeerConnection;
     channel: RTCDataChannel;
     trackerUrl: string;
-    close: () => void;
+    close: (error?: string) => void;
   }) => void;
-  peerDisconnected: (event: { peerId: string }) => void;
-  peerError: (event: {
+  peerDisconnected: (event: {
+    peerId: string;
+    reason: string;
+    isError: boolean;
+  }) => void;
+  peerConnectFailed: (event: {
     peerId: string;
     trackerUrl: string;
     error: string;
@@ -223,13 +228,17 @@ export class WebTorrentManager {
     for (const [peerId, peer] of connectedSnapshot) {
       peer.cleanup();
       peer.connection.close();
-      this.#eventTarget.dispatchEvent("peerDisconnected", { peerId });
+      this.#eventTarget.dispatchEvent("peerDisconnected", {
+        peerId,
+        reason: "Manager destroyed",
+        isError: false,
+      });
     }
 
     this.#eventTarget.clear();
   }
 
-  #closePeer(peerId: string): void {
+  #closePeer(peerId: string, reason: string, isError: boolean): void {
     if (this.#destroyed) return;
 
     const connected = this.#connectedPeers.get(peerId);
@@ -237,7 +246,11 @@ export class WebTorrentManager {
       connected.cleanup();
       connected.connection.close();
       this.#connectedPeers.delete(peerId);
-      this.#eventTarget.dispatchEvent("peerDisconnected", { peerId });
+      this.#eventTarget.dispatchEvent("peerDisconnected", {
+        peerId,
+        reason,
+        isError,
+      });
     }
   }
 
@@ -328,6 +341,10 @@ export class WebTorrentManager {
             "close",
             onChannelCloseBound,
           );
+          connectingPeer.channel.removeEventListener(
+            "closing",
+            onChannelCloseBound,
+          );
         }
       }
     };
@@ -335,10 +352,10 @@ export class WebTorrentManager {
     this.#connectingPeers.set(peerId, connectingPeer);
 
     const fail = (reason: string) => {
+      if (!this.#connectingPeers.delete(peerId)) return;
       cleanup();
       connection.close();
-      this.#connectingPeers.delete(peerId);
-      this.#eventTarget.dispatchEvent("peerError", {
+      this.#eventTarget.dispatchEvent("peerConnectFailed", {
         peerId,
         trackerUrl,
         error: reason,
@@ -390,6 +407,7 @@ export class WebTorrentManager {
         dataChannel.addEventListener("open", onChannelOpenBound);
         dataChannel.addEventListener("error", onChannelErrorBound);
         dataChannel.addEventListener("close", onChannelCloseBound);
+        dataChannel.addEventListener("closing", onChannelCloseBound);
       }
     };
 
@@ -411,25 +429,49 @@ export class WebTorrentManager {
       isTerminalConnectionState(connection.iceConnectionState)
     ) {
       connection.close();
+      this.#eventTarget.dispatchEvent("peerConnectFailed", {
+        peerId,
+        trackerUrl,
+        error: "Connection failed during promotion",
+      });
       return;
     }
 
+    const onDisconnect = (reason: string, isError: boolean) =>
+      this.#closePeer(peerId, reason, isError);
+
     const onConnectionStateChange = () => {
       if (isTerminalConnectionState(connection.connectionState)) {
-        onDisconnect();
+        onDisconnect(
+          `Connection state became ${connection.connectionState}`,
+          true,
+        );
       }
     };
 
     const onIceConnectionStateChange = () => {
       if (isTerminalConnectionState(connection.iceConnectionState)) {
-        onDisconnect();
+        onDisconnect(
+          `ICE connection state became ${connection.iceConnectionState}`,
+          true,
+        );
       }
+    };
+
+    const onChannelClose = () =>
+      onDisconnect("Data channel closed", false);
+    const onChannelClosing = () =>
+      onDisconnect("Data channel closing", false);
+    const onChannelError = (event: Event) => {
+      const msg = getRTCErrorMessage(event, "Data channel error");
+      onDisconnect(`Data channel error: ${msg}`, true);
     };
 
     // Indirection so that cleanup() can null out the reference. Without this,
     // the close() closure exposed in the peerConnected event would capture
     // `this` permanently, preventing GC of the manager after destruction.
-    let closeRef: (() => void) | null = () => this.#closePeer(peerId);
+    let closeRef: ((error?: string) => void) | null = (error) =>
+      this.#closePeer(peerId, error ?? "Closed by consumer", !!error);
 
     const cleanup = () => {
       closeRef = null;
@@ -441,17 +483,9 @@ export class WebTorrentManager {
         "iceconnectionstatechange",
         onIceConnectionStateChange,
       );
-      channel.removeEventListener("close", onDisconnect);
-      channel.removeEventListener("error", onDisconnect);
-    };
-
-    const onDisconnect = () => {
-      const connected = this.#connectedPeers.get(peerId);
-      if (!connected) return;
-      cleanup();
-      connected.connection.close();
-      this.#connectedPeers.delete(peerId);
-      this.#eventTarget.dispatchEvent("peerDisconnected", { peerId });
+      channel.removeEventListener("close", onChannelClose);
+      channel.removeEventListener("closing", onChannelClosing);
+      channel.removeEventListener("error", onChannelError);
     };
 
     this.#connectedPeers.set(peerId, {
@@ -468,15 +502,16 @@ export class WebTorrentManager {
       "iceconnectionstatechange",
       onIceConnectionStateChange,
     );
-    channel.addEventListener("close", onDisconnect);
-    channel.addEventListener("error", onDisconnect);
+    channel.addEventListener("close", onChannelClose);
+    channel.addEventListener("closing", onChannelClosing);
+    channel.addEventListener("error", onChannelError);
 
     this.#eventTarget.dispatchEvent("peerConnected", {
       peerId,
       connection,
       channel,
       trackerUrl,
-      close: () => closeRef?.(),
+      close: (error?: string) => closeRef?.(error),
     });
   }
 }

@@ -41,9 +41,9 @@ interface WebTorrentManagerConfig {
 
 The Manager aggregates events from all child clients and forwards them.
 
-- `peerConnected` (payload: `{ peerId: string, connection: RTCPeerConnection, channel: RTCDataChannel, trackerUrl: string, close: () => void }`): Fired when a peer finishes WebRTC signaling on *any* tracker and its Data Channel is successfully opened.
-- `peerDisconnected` (payload: `{ peerId: string }`): Fired when a fully connected peer is closed, either due to an unexpected disconnect (e.g. network loss) or a manual call to `peer.close()`.
-- `peerError` (payload: `{ peerId: string, trackerUrl: string, error: string }`): Fired if a signaled peer fails to connect or its data channel fails to open.
+- `peerConnected` (payload: `{ peerId: string, connection: RTCPeerConnection, channel: RTCDataChannel, trackerUrl: string, close: (error?: string) => void }`): Fired when a peer finishes WebRTC signaling on *any* tracker and its Data Channel is successfully opened.
+- `peerDisconnected` (payload: `{ peerId: string, error?: string }`): Fired when a fully connected peer is closed, either due to an unexpected disconnect (e.g. network loss) or a manual call to `peer.close()`.
+- `peerConnectFailed` (payload: `{ peerId: string, trackerUrl: string, error: string }`): Fired if a signaled peer fails to connect or its data channel fails to open.
 - `warning` (payload: `{ trackerUrl: string, warning: string }`): Aggregated tracker warnings.
 - `error` (payload: `{ trackerUrl: string, error: string }`): Aggregated tracker errors (both WebSocket level and WebTorrent level).
 
@@ -87,7 +87,7 @@ const claimPeer = (remotePeerId: string, timeout: number) => {
 When a child `WebTorrentClient` emits a `peerSignaled` event, the Manager updates the existing reserved entry in the `connectingPeers` collection with the actual `RTCPeerConnection` and listens to the `RTCDataChannel` state changes. 
 A **15-second timeout** is applied to wait for the data channel to fully open.
 If the data channel successfully opens within the timeout, the Manager removes the peer from `connectingPeers`, stores it in `connectedPeers`, and emits a `peerConnected` event with the established channel. 
-If the connection times out, fails, or the data channel fails to open, the Manager cleans up the connection, removes it from `connectingPeers`, and emits a `peerError` event for outside logging.
+If the connection times out, fails, or the data channel fails to open, the Manager cleans up the connection, removes it from `connectingPeers`, and emits a `peerConnectFailed` event for outside logging.
 
 Once connected, the Manager continues to listen to lifecycle events (`connectionstatechange`, `iceconnectionstatechange`, and data channel `close`/`error`). If the connection drops unexpectedly (e.g. the remote peer crashes), the Manager synchronously extracts the peer from its internal map, closes the connection, and emits a `peerDisconnected` event. 
 

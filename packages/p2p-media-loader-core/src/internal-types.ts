@@ -1,5 +1,3 @@
-/// <reference types="./declarations.d.ts" />
-
 import { BandwidthCalculator } from "./bandwidth-calculator.js";
 
 export type Playback = {

@@ -1,4 +1,5 @@
 import { HybridLoader } from "./hybrid-loader.js";
+import debug from "debug";
 import {
   Stream,
   CoreConfig,
@@ -27,7 +28,7 @@ import {
 } from "./utils/utils.js";
 import { TRACKER_CLIENT_VERSION_PREFIX } from "./utils/peer.js";
 import { SegmentStorage } from "./segment-storage/index.js";
-import { P2PTrackerClient } from "./p2p/tracker-client.js";
+import { WebTorrentSocketPool } from "./webtorrent/webtorrent-socket-pool/index.js";
 
 /** Core class for managing media streams loading via P2P. */
 export class Core<TStream extends Stream = Stream> {
@@ -81,6 +82,8 @@ export class Core<TStream extends Stream = Stream> {
     http: new BandwidthCalculator(),
   };
   private segmentStorage?: SegmentStorage;
+  private readonly webTorrentSocketPool = new WebTorrentSocketPool();
+  private readonly socketPoolLogger = debug("p2pml-core:webtorrent-socket-pool");
   private mainStreamLoader?: HybridLoader;
   private secondaryStreamLoader?: HybridLoader;
   private streamDetails: StreamDetails = {
@@ -124,6 +127,10 @@ export class Core<TStream extends Stream = Stream> {
       defaultConfig: Core.DEFAULT_STREAM_CONFIG,
       baseConfig: filteredConfig,
       specificStreamConfig: filteredConfig.secondaryStream,
+    });
+
+    this.webTorrentSocketPool.addEventListener("error", (error, url) => {
+      this.socketPoolLogger(`WebSocket error for tracker url ${url}:`, error);
     });
   }
 
@@ -428,13 +435,14 @@ export class Core<TStream extends Stream = Stream> {
     this.streams.clear();
     this.mainStreamLoader?.destroy();
     this.secondaryStreamLoader?.destroy();
+    this.segmentStorage?.setSegmentChangeCallback(undefined);
     this.segmentStorage?.destroy();
     this.mainStreamLoader = undefined;
     this.secondaryStreamLoader = undefined;
     this.segmentStorage = undefined;
     this.manifestResponseUrl = undefined;
     this.streamDetails = { isLive: false, activeLevelBitrate: 0 };
-    P2PTrackerClient.clearPeerIdCache();
+    this.webTorrentSocketPool.destroy();
   }
 
   private async initializeSegmentStorage() {
@@ -457,6 +465,14 @@ export class Core<TStream extends Stream = Stream> {
       this.mainStreamConfig,
       this.secondaryStreamConfig,
     );
+
+    segmentStorage.setSegmentChangeCallback((streamId: string) => {
+      (
+        this.eventTarget as unknown as EventTarget<
+          CoreEventMap & Record<`onStorageUpdated-${string}`, () => void>
+        >
+      ).dispatchEvent(`onStorageUpdated-${streamId}`);
+    });
 
     this.segmentStorage = segmentStorage;
   }
@@ -536,6 +552,7 @@ export class Core<TStream extends Stream = Stream> {
       streamConfig,
       this.bandwidthCalculators,
       this.segmentStorage,
+      this.webTorrentSocketPool,
       this.eventTarget,
     );
   }

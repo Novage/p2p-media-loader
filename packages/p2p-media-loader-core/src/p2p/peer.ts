@@ -1,4 +1,3 @@
-import { PeerConnection } from "bittorrent-tracker";
 import debug from "debug";
 import { Request, RequestControls } from "../requests/request.js";
 import {
@@ -7,17 +6,13 @@ import {
   RequestError,
   RequestAbortErrorType,
   SegmentWithStream,
-  StreamType,
 } from "../types.js";
-import * as Utils from "../utils/utils.js";
 import * as Command from "./commands/index.js";
 import { PeerProtocol, PeerConfig } from "./peer-protocol.js";
 import { EventTarget } from "../utils/event-target.js";
 import { BandwidthCalculator } from "../bandwidth-calculator.js";
-
 const { PeerCommandType } = Command;
 type PeerEventHandlers = {
-  onPeerClosed: (peer: Peer) => void;
   onSegmentRequested: (
     peer: Peer,
     segmentId: number,
@@ -28,7 +23,6 @@ type PeerEventHandlers = {
 };
 
 export class Peer {
-  readonly id: string;
   private readonly peerProtocol;
   private downloadingContext?: {
     request: Request;
@@ -44,37 +38,35 @@ export class Peer {
   private readonly bandwidthCalculator = new BandwidthCalculator();
   private cachedDownloadBandwidth = { value: 0, timestamp: 0 };
   private logger = debug("p2pml-core:peer");
-  private readonly onPeerClosed: CoreEventMap["onPeerClose"];
+  private nextRequestId = 0;
+  private isDestroyed = false;
+
+  // Required to suppress TypeScrypt error: Unnecessary conditional, value is always falsy
+  private checkIsDestroyed() {
+    return this.isDestroyed;
+  }
 
   constructor(
-    private readonly connection: PeerConnection,
+    public readonly id: string,
+    readonly channel: RTCDataChannel,
+    private readonly closeConnection: (error?: string) => void,
     private readonly eventHandlers: PeerEventHandlers,
     private readonly peerConfig: PeerConfig,
-    private readonly streamType: StreamType,
-    private readonly eventTarget: EventTarget<CoreEventMap>,
+    readonly eventTarget: EventTarget<CoreEventMap>,
   ) {
-    this.onPeerClosed = eventTarget.getEventDispatcher("onPeerClose");
-
-    this.id = Peer.getPeerIdFromConnection(connection);
     this.peerProtocol = new PeerProtocol(
-      connection,
+      channel,
       peerConfig,
       {
         onSegmentChunkReceived: this.onSegmentChunkReceived,
-        // eslint-disable-next-line @typescript-eslint/no-misused-promises
-        onCommandReceived: this.onCommandReceived,
+        onCommandReceived: (command) =>
+          void this.onCommandReceived(command).catch((error: unknown) => {
+            this.logger("error processing command %O: %O", command, error);
+          }),
       },
       eventTarget,
+      id,
     );
-    eventTarget.getEventDispatcher("onPeerConnect")({
-      peerId: this.id,
-      streamType,
-    });
-
-    connection.on("error", this.onConnectionError);
-    connection.on("close", this.onPeerConnectionClosed);
-    connection.on("end", this.onPeerConnectionClosed);
-    connection.on("finish", this.onPeerConnectionClosed);
   }
 
   get downloadingSegment(): SegmentWithStream | undefined {
@@ -143,7 +135,7 @@ export class Peer {
             this.cancelSegmentDownloading(
               "peer-response-bytes-length-mismatch",
             );
-            this.destroy();
+            this.destroy(false, "Peer response bytes length mismatch");
           }
         }
         break;
@@ -162,7 +154,7 @@ export class Peer {
         if (isWrongSegment) {
           request.clearLoadedBytes();
           this.cancelSegmentDownloading("peer-protocol-violation");
-          this.destroy();
+          this.destroy(false, "Peer protocol violation");
           return;
         }
 
@@ -171,7 +163,7 @@ export class Peer {
         if (isWrongBytes) {
           request.clearLoadedBytes();
           this.cancelSegmentDownloading("peer-response-bytes-length-mismatch");
-          this.destroy();
+          this.destroy(false, "Peer response bytes length mismatch");
           return;
         }
 
@@ -179,12 +171,13 @@ export class Peer {
           this.peerConfig.validateP2PSegment,
         );
 
+        if (this.isDestroyed) return;
         if (this.downloadingContext !== downloadingContext) return;
 
         if (!isValid) {
           request.clearLoadedBytes();
           this.cancelSegmentDownloading("p2p-segment-validation-failed");
-          this.destroy();
+          this.destroy(false, "P2P segment validation failed");
           return;
         }
 
@@ -228,7 +221,7 @@ export class Peer {
     if (isOverflow) {
       request.clearLoadedBytes();
       this.cancelSegmentDownloading("peer-response-bytes-length-mismatch");
-      this.destroy();
+      this.destroy(false, "Peer response bytes length mismatch");
       return;
     }
 
@@ -238,6 +231,7 @@ export class Peer {
   };
 
   downloadSegment(segmentRequest: Request) {
+    if (this.isDestroyed) return;
     if (this.downloadingContext) {
       throw new Error("Some segment already is downloading");
     }
@@ -258,7 +252,7 @@ export class Peer {
     this.bandwidthCalculator.startLoading();
     this.downloadingContext = {
       request: segmentRequest,
-      requestId: Math.floor(Math.random() * 1000),
+      requestId: (this.nextRequestId = (this.nextRequestId + 1) % 1000),
       isSegmentDataCommandReceived: false,
       controls: segmentRequest.start(
         { downloadSource: "p2p", peerId: this.id },
@@ -283,7 +277,7 @@ export class Peer {
             );
 
             if (timeoutErrors.length >= this.peerConfig.p2pErrorRetries) {
-              this.destroy();
+              this.destroy(false, "Too many timeout errors");
             }
           },
         },
@@ -301,8 +295,9 @@ export class Peer {
   async uploadSegmentData(
     segment: SegmentWithStream,
     requestId: number,
-    data: ArrayBuffer,
+    data: ArrayBuffer | ArrayBufferView<ArrayBuffer>,
   ) {
+    if (this.isDestroyed) return;
     const { externalId } = segment;
     this.logger(`send segment ${segment.externalId} to ${this.id}`);
     const command: Command.PeerSendSegmentCommand = {
@@ -317,6 +312,7 @@ export class Peer {
         data,
         requestId,
       );
+      if (this.checkIsDestroyed()) return;
       this.sendSegmentDataSendingCompletedCommand(segment, requestId);
       this.logger(`segment ${externalId} has been sent to ${this.id}`);
     } catch {
@@ -381,39 +377,16 @@ export class Peer {
     });
   }
 
-  private onPeerConnectionClosed = () => {
-    this.destroy();
-  };
+  destroy = (isConnectionClosed = false, error?: string) => {
+    if (this.isDestroyed) return;
+    this.isDestroyed = true;
 
-  private onConnectionError = (error: Error) => {
-    this.logger(`peer connection error ${this.id} %O`, error);
-    this.eventTarget.getEventDispatcher("onPeerError")({
-      peerId: this.id,
-      streamType: this.streamType,
-      error,
-    });
-
-    const { code } = error as { code?: string };
-
-    if (code === "ERR_DATA_CHANNEL") {
-      this.destroy();
-    } else if (code === "ERR_CONNECTION_FAILURE") {
-      this.destroy();
-    }
-  };
-
-  destroy = () => {
     this.cancelSegmentDownloading("peer-closed");
-    this.connection.destroy();
-    this.eventHandlers.onPeerClosed(this);
-    this.onPeerClosed({
-      peerId: this.id,
-      streamType: this.streamType,
-    });
+    this.peerProtocol.destroy();
+
+    if (!isConnectionClosed) {
+      this.closeConnection(error);
+    }
     this.logger(`peer closed ${this.id}`);
   };
-
-  static getPeerIdFromConnection(connection: PeerConnection) {
-    return Utils.hexToUtf8(connection.id);
-  }
 }

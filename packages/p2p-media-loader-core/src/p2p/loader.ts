@@ -6,18 +6,28 @@ import {
   StreamWithSegments,
 } from "../types.js";
 import { RequestsContainer } from "../requests/request-container.js";
-import { P2PTrackerClient } from "./tracker-client.js";
+import { WebTorrentManager } from "../webtorrent/webtorrent-manager/index.js";
+import { WebTorrentSocketPool } from "../webtorrent/webtorrent-socket-pool/index.js";
 import * as StreamUtils from "../utils/stream.js";
 import * as Utils from "../utils/utils.js";
+import * as PeerUtil from "../utils/peer.js";
 import { EventTarget } from "../utils/event-target.js";
 import { SegmentStorage } from "../segment-storage/index.js";
+import debug from "debug";
 
 export type EventTargetMap = Record<`onStorageUpdated-${string}`, () => void> &
   CoreEventMap;
 
 export class P2PLoader {
-  private readonly trackerClient: P2PTrackerClient;
+  private static readonly PEER_ID_BY_INFO_HASH = new Map<string, string>();
+  private readonly webtorrentManager: WebTorrentManager;
+  private readonly peersMap = new Map<string, Peer>();
+  private readonly swarmId: string;
+  private readonly streamSwarmId: string;
   private isAnnounceMicrotaskCreated = false;
+  private readonly webtorrentManagerLogger = debug(
+    "p2pml-core:webtorrent-manager",
+  );
 
   constructor(
     private streamManifestUrl: string,
@@ -25,39 +35,86 @@ export class P2PLoader {
     private readonly requests: RequestsContainer,
     private readonly segmentStorage: SegmentStorage,
     private readonly config: StreamConfig,
+    private readonly webTorrentSocketPool: WebTorrentSocketPool,
     private readonly eventTarget: EventTarget<EventTargetMap>,
     private readonly onSegmentAnnouncement: () => void,
   ) {
-    const swarmId = this.config.swarmId ?? this.streamManifestUrl;
-    const streamSwarmId = StreamUtils.getStreamSwarmId(swarmId, this.stream);
-
-    this.trackerClient = new P2PTrackerClient(
-      streamSwarmId,
+    this.swarmId = this.config.swarmId ?? this.streamManifestUrl;
+    this.streamSwarmId = StreamUtils.getStreamSwarmId(
+      this.swarmId,
       this.stream,
-      {
-        onPeerConnected: this.onPeerConnected,
-        // eslint-disable-next-line @typescript-eslint/no-misused-promises
-        onSegmentRequested: this.onSegmentRequested,
-        onSegmentsAnnouncement: this.onSegmentAnnouncement,
-      },
-      this.config,
-      this.eventTarget,
     );
 
-    this.eventTarget.addEventListener(
-      `onStorageUpdated-${streamSwarmId}`,
-      this.broadcastAnnouncement,
-    );
-    this.segmentStorage.setSegmentChangeCallback((streamId: string) => {
-      this.eventTarget.dispatchEvent(`onStorageUpdated-${streamId}`);
+    const streamHash = PeerUtil.getStreamHash(this.streamSwarmId);
+    let peerId = P2PLoader.PEER_ID_BY_INFO_HASH.get(streamHash);
+    if (!peerId) {
+      peerId = PeerUtil.generatePeerId(this.config.trackerClientVersionPrefix);
+      P2PLoader.PEER_ID_BY_INFO_HASH.set(streamHash, peerId);
+    }
+
+    this.webtorrentManager = new WebTorrentManager({
+      infoHash: streamHash,
+      peerId,
+      trackerUrls: this.config.announceTrackers,
+      rtcConfig: this.config.rtcConfig,
+      socketPool: this.webTorrentSocketPool,
     });
 
-    this.trackerClient.start();
+    this.webtorrentManager.addEventListener(
+      "peerConnected",
+      this.onPeerConnectedWebTorrent,
+    );
+
+    this.webtorrentManager.addEventListener(
+      "peerDisconnected",
+      this.onPeerDisconnectedWebTorrent,
+    );
+
+    this.webtorrentManager.addEventListener("peerConnectFailed", (event) => {
+      this.webtorrentManagerLogger(
+        `Peer connection failed (${event.peerId}) from tracker ${event.trackerUrl}:`,
+        event.error,
+      );
+      this.eventTarget.getEventDispatcher("onPeerError")({
+        peerId: event.peerId,
+        streamType: this.stream.type,
+        error: new Error(event.error),
+      });
+    });
+
+    this.webtorrentManager.addEventListener("warning", (event) => {
+      this.webtorrentManagerLogger(
+        `Tracker warning (${event.trackerUrl}):`,
+        event.warning,
+      );
+      this.eventTarget.getEventDispatcher("onTrackerWarning")({
+        streamType: this.stream.type,
+        warning: new Error(event.warning),
+      });
+    });
+
+    this.webtorrentManager.addEventListener("error", (event) => {
+      this.webtorrentManagerLogger(
+        `Tracker error (${event.trackerUrl}):`,
+        event.error,
+      );
+      this.eventTarget.getEventDispatcher("onTrackerError")({
+        streamType: this.stream.type,
+        error: new Error(event.error),
+      });
+    });
+
+    this.eventTarget.addEventListener(
+      `onStorageUpdated-${this.streamSwarmId}`,
+      this.broadcastAnnouncement,
+    );
+
+    this.webtorrentManager.start();
   }
 
   downloadSegment(segment: SegmentWithStream) {
     const peersWithSegment: Peer[] = [];
-    for (const peer of this.trackerClient.peers()) {
+    for (const peer of this.peersMap.values()) {
       if (
         !peer.downloadingSegment &&
         peer.getSegmentStatus(segment) === "loaded"
@@ -114,33 +171,33 @@ export class P2PLoader {
   }
 
   isSegmentLoadingOrLoadedBySomeone(segment: SegmentWithStream): boolean {
-    for (const peer of this.trackerClient.peers()) {
+    for (const peer of this.peersMap.values()) {
       if (peer.getSegmentStatus(segment)) return true;
     }
     return false;
   }
 
   isSegmentLoadedBySomeone(segment: SegmentWithStream): boolean {
-    for (const peer of this.trackerClient.peers()) {
+    for (const peer of this.peersMap.values()) {
       if (peer.getSegmentStatus(segment) === "loaded") return true;
     }
     return false;
   }
 
   get connectedPeerCount() {
-    let count = 0;
-    const iterator = this.trackerClient.peers();
-    while (!iterator.next().done) count++;
-    return count;
+    return this.peersMap.size;
+  }
+
+  *peers() {
+    for (const peer of this.peersMap.values()) {
+      yield peer;
+    }
   }
 
   private getSegmentsAnnouncement() {
-    const swarmId = this.config.swarmId ?? this.streamManifestUrl;
-    const streamSwarmId = StreamUtils.getStreamSwarmId(swarmId, this.stream);
-
     const loaded: number[] = this.segmentStorage.getStoredSegmentIds(
-      swarmId,
-      streamSwarmId,
+      this.swarmId,
+      this.streamSwarmId,
     );
     const httpLoading: number[] = [];
 
@@ -153,11 +210,80 @@ export class P2PLoader {
     return { loaded, httpLoading };
   }
 
-  private onPeerConnected = (peer: Peer) => {
+  private onPeerConnectedWebTorrent = (event: {
+    peerId: string;
+    channel: RTCDataChannel;
+    close: (error?: string) => void;
+  }) => {
+    this.webtorrentManagerLogger(`peerConnected: peerId=${event.peerId}`);
+    if (this.peersMap.has(event.peerId)) {
+      event.close();
+      return;
+    }
+
+    const peer = new Peer(
+      event.peerId,
+      event.channel,
+      event.close,
+      {
+        onSegmentRequested: (peer, segmentExternalId, requestId, byteFrom) => {
+          this.onSegmentRequested(
+            peer,
+            segmentExternalId,
+            requestId,
+            byteFrom,
+          ).catch((error: unknown) => {
+            this.webtorrentManagerLogger(
+              `Error in onSegmentRequested ${segmentExternalId} for peer ${peer.id}:`,
+              error,
+            );
+          });
+        },
+        onSegmentsAnnouncement: this.onSegmentAnnouncement,
+      },
+      this.config,
+      this.eventTarget,
+    );
+    this.peersMap.set(event.peerId, peer);
+
+    this.eventTarget.getEventDispatcher("onPeerConnect")({
+      peerId: event.peerId,
+      streamType: this.stream.type,
+    });
+
     if (this.config.isP2PUploadDisabled) return;
 
     const { httpLoading, loaded } = this.getSegmentsAnnouncement();
     peer.sendSegmentsAnnouncementCommand(loaded, httpLoading);
+  };
+
+  private onPeerDisconnectedWebTorrent = (event: {
+    peerId: string;
+    reason: string;
+    isError: boolean;
+  }) => {
+    this.webtorrentManagerLogger(
+      `peerDisconnected: peerId=${event.peerId} reason=${event.reason} isError=${event.isError}`,
+    );
+
+    const peer = this.peersMap.get(event.peerId);
+    if (!peer) return;
+
+    this.peersMap.delete(event.peerId);
+    peer.destroy(true);
+
+    if (event.isError) {
+      this.eventTarget.getEventDispatcher("onPeerError")({
+        peerId: event.peerId,
+        streamType: this.stream.type,
+        error: new Error(event.reason),
+      });
+    }
+
+    this.eventTarget.getEventDispatcher("onPeerClose")({
+      peerId: peer.id,
+      streamType: this.stream.type,
+    });
   };
 
   broadcastAnnouncement = (sendEmptyAnnouncement = false) => {
@@ -181,7 +307,7 @@ export class P2PLoader {
         ? {}
         : this.getSegmentsAnnouncement();
 
-      for (const peer of this.trackerClient.peers()) {
+      for (const peer of this.peersMap.values()) {
         peer.sendSegmentsAnnouncementCommand(loaded, httpLoading);
       }
       this.isAnnounceMicrotaskCreated = false;
@@ -204,14 +330,23 @@ export class P2PLoader {
       return;
     }
 
-    const swarmId = this.config.swarmId ?? this.streamManifestUrl;
-    const streamSwarmId = StreamUtils.getStreamSwarmId(swarmId, this.stream);
+    let segmentData: ArrayBuffer | undefined;
+    try {
+      segmentData = await this.segmentStorage.getSegmentData(
+        this.swarmId,
+        this.streamSwarmId,
+        segment.externalId,
+      );
+    } catch (error) {
+      this.webtorrentManagerLogger(
+        `Storage error for segment ${segmentExternalId} requested by peer ${peer.id}:`,
+        error,
+      );
+    }
 
-    const segmentData = await this.segmentStorage.getSegmentData(
-      swarmId,
-      streamSwarmId,
-      segment.externalId,
-    );
+    const peerClosedWhileAwait = !this.peersMap.has(peer.id);
+    if (peerClosedWhileAwait) return;
+
     if (!segmentData) {
       peer.sendSegmentAbsentCommand(segmentExternalId, requestId);
       return;
@@ -219,18 +354,23 @@ export class P2PLoader {
     await peer.uploadSegmentData(
       segment,
       requestId,
-      byteFrom !== undefined ? segmentData.slice(byteFrom) : segmentData,
+      byteFrom !== undefined
+        ? new Uint8Array(segmentData).subarray(byteFrom)
+        : segmentData,
     );
   };
 
   destroy() {
-    const swarmId = this.config.swarmId ?? this.streamManifestUrl;
-    const streamSwarmId = StreamUtils.getStreamSwarmId(swarmId, this.stream);
-
     this.eventTarget.removeEventListener(
-      `onStorageUpdated-${streamSwarmId}`,
+      `onStorageUpdated-${this.streamSwarmId}`,
       this.broadcastAnnouncement,
     );
-    this.trackerClient.destroy();
+
+    for (const peer of this.peersMap.values()) {
+      peer.destroy();
+    }
+    this.peersMap.clear();
+
+    this.webtorrentManager.destroy();
   }
 }

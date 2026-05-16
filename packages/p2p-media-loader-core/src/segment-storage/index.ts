@@ -101,7 +101,9 @@ export interface SegmentStorage {
    * Sets segment change callback function
    * @param callback - Callback function that has to be called when segments appear or disappear in the storage
    */
-  setSegmentChangeCallback(callback: (streamId: string) => void): void;
+  setSegmentChangeCallback(
+    callback: ((streamId: string) => void) | undefined,
+  ): void;
 
   /**
    * Function to destroy storage

@@ -22,6 +22,7 @@ import debug from "debug";
 import { QueueItem } from "./utils/queue.js";
 import { EventTarget } from "./utils/event-target.js";
 import { SegmentStorage } from "./segment-storage/index.js";
+import { WebTorrentSocketPool } from "./webtorrent/webtorrent-socket-pool/index.js";
 
 const FAILED_ATTEMPTS_CLEAR_INTERVAL = 60000;
 const PEER_UPDATE_LATENCY = 1000;
@@ -38,6 +39,7 @@ export class HybridLoader {
   private randomHttpDownloadTimeout?: number;
   private initialHttpDelayTimeoutId?: number;
   private isProcessQueueMicrotaskCreated = false;
+  private readonly swarmId: string;
   private readonly createdAt = performance.now();
 
   constructor(
@@ -47,9 +49,11 @@ export class HybridLoader {
     private readonly config: StreamConfig,
     private readonly bandwidthCalculators: BandwidthCalculators,
     private readonly segmentStorage: SegmentStorage,
+    private readonly webTorrentSocketPool: WebTorrentSocketPool,
     private readonly eventTarget: EventTarget<CoreEventMap>,
   ) {
     const activeStream = this.lastRequestedSegment.stream;
+    this.swarmId = this.config.swarmId ?? this.streamManifestUrl;
     this.playback = { position: this.lastRequestedSegment.startTime, rate: 1 };
     this.segmentAvgDuration = StreamUtils.getSegmentAvgDuration(activeStream);
     this.requests = new RequestsContainer(
@@ -66,6 +70,7 @@ export class HybridLoader {
       this.requests,
       this.segmentStorage,
       this.config,
+      this.webTorrentSocketPool,
       this.eventTarget,
       this.requestProcessQueueMicrotask,
     );
@@ -99,11 +104,10 @@ export class HybridLoader {
     }
     this.lastRequestedSegment = segment;
 
-    const swarmId = this.config.swarmId ?? this.streamManifestUrl;
-    const streamSwarmId = StreamUtils.getStreamSwarmId(swarmId, stream);
+    const streamSwarmId = StreamUtils.getStreamSwarmId(this.swarmId, stream);
 
     this.segmentStorage.onSegmentRequested(
-      swarmId,
+      this.swarmId,
       streamSwarmId,
       segment.externalId,
       segment.startTime,
@@ -115,14 +119,14 @@ export class HybridLoader {
 
     try {
       const hasSegment = this.segmentStorage.hasSegment(
-        swarmId,
+        this.swarmId,
         streamSwarmId,
         segment.externalId,
       );
 
       if (hasSegment) {
         const data = await this.segmentStorage.getSegmentData(
-          swarmId,
+          this.swarmId,
           streamSwarmId,
           segment.externalId,
         );
@@ -216,11 +220,10 @@ export class HybridLoader {
           }
           this.requests.remove(request);
 
-          const swarmId = this.config.swarmId ?? this.streamManifestUrl;
-          const streamSwarmId = StreamUtils.getStreamSwarmId(swarmId, stream);
+          const streamSwarmId = StreamUtils.getStreamSwarmId(this.swarmId, stream);
 
           void this.segmentStorage.storeSegment(
-            swarmId,
+            this.swarmId,
             streamSwarmId,
             segment.externalId,
             request.data,
@@ -450,9 +453,8 @@ export class HybridLoader {
       this.p2pLoaders.currentLoader,
       availableStorageCapacityPercent,
     )) {
-      const swarmId = this.config.swarmId ?? this.streamManifestUrl;
       const streamSwarmId = StreamUtils.getStreamSwarmId(
-        swarmId,
+        this.swarmId,
         segment.stream,
       );
 
@@ -460,7 +462,7 @@ export class HybridLoader {
         !statuses.isHttpDownloadable ||
         statuses.isP2PDownloadable ||
         this.segmentStorage.hasSegment(
-          swarmId,
+          this.swarmId,
           streamSwarmId,
           segment.externalId,
         )
@@ -566,15 +568,14 @@ export class HybridLoader {
       maxPossibleLength++;
       const { segment } = item;
 
-      const swarmId = this.config.swarmId ?? this.streamManifestUrl;
       const streamSwarmId = StreamUtils.getStreamSwarmId(
-        swarmId,
+        this.swarmId,
         segment.stream,
       );
 
       if (
         this.segmentStorage.hasSegment(
-          swarmId,
+          this.swarmId,
           streamSwarmId,
           segment.externalId,
         ) ||

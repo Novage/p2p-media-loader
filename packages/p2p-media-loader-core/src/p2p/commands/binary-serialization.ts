@@ -71,7 +71,7 @@ export function deserializeInt(bytes: Uint8Array) {
   const start = 1;
   const end = start + numberBytesLength;
   return {
-    number: bytesToInt(bytes.slice(start, end)),
+    number: bytesToInt(bytes.subarray(start, end)),
     byteLength: numberBytesLength + 1,
   };
 }
@@ -113,7 +113,7 @@ export function deserializeSimilarIntArray(bytes: Uint8Array) {
   const originalIntArr: bigint[] = [];
   for (let i = 0; i < commonPartArraysAmount; i++) {
     const { number: commonPartWithLength, byteLength } = deserializeInt(
-      bytes.slice(offset),
+      bytes.subarray(offset),
     );
     offset += byteLength;
     const arrayLength = commonPartWithLength & 0xffn;
@@ -130,13 +130,18 @@ export function deserializeSimilarIntArray(bytes: Uint8Array) {
 }
 
 export function serializeString(string: string) {
-  const { length } = string;
+  const encoded = new TextEncoder().encode(string);
+  const { length } = encoded;
+  if (length > 4095) {
+    throw new Error("String exceeds maximum length of 4095 bytes");
+  }
+
   const bytes = new ResizableUint8Array();
   bytes.push([
     (SerializedItem.String << 4) | ((length >> 8) & 0x0f),
     length & 0xff,
   ]);
-  bytes.push(new TextEncoder().encode(string));
+  bytes.push(encoded);
   return bytes.getBuffer();
 }
 
@@ -149,7 +154,7 @@ export function deserializeString(bytes: Uint8Array) {
     );
   }
   const length = ((codeByte & 0x0f) << 8) | lengthByte;
-  const stringBytes = bytes.slice(2, length + 2);
+  const stringBytes = bytes.subarray(2, length + 2);
   const string = new TextDecoder("utf8").decode(stringBytes);
   return { string, byteLength: length + 2 };
 }

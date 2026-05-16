@@ -11,6 +11,7 @@ import { RequestsContainer } from "../requests/request-container.js";
 import * as LoggerUtils from "../utils/logger.js";
 import { EventTarget } from "../utils/event-target.js";
 import * as StreamUtils from "../utils/stream.js";
+import { WebTorrentSocketPool } from "../webtorrent/webtorrent-socket-pool/index.js";
 
 type P2PLoaderContainerItem = {
   stream: Stream;
@@ -30,6 +31,7 @@ export class P2PLoadersContainer {
     private readonly requests: RequestsContainer,
     private readonly segmentStorage: SegmentStorage,
     private readonly config: StreamConfig,
+    private readonly webTorrentSocketPool: WebTorrentSocketPool,
     private readonly eventTarget: EventTarget<CoreEventMap>,
     private onSegmentAnnouncement: () => void,
   ) {
@@ -49,6 +51,7 @@ export class P2PLoadersContainer {
       this.requests,
       this.segmentStorage,
       this.config,
+      this.webTorrentSocketPool,
       this.eventTarget,
       () => {
         if (this._currentLoaderItem.loader === loader) {

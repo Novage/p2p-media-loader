@@ -1,4 +1,5 @@
 const MAX_BUFFERED_AMOUNT = 64 * 1024; // 64 KB, matching simple-peer
+import { getRTCErrorMessage } from "./utils.js";
 
 export class DataChannelSender {
   #currentSendContext?: { cancel: () => void };
@@ -9,7 +10,7 @@ export class DataChannelSender {
   ) {}
 
   async sendData(
-    data: ArrayBuffer,
+    data: ArrayBuffer | ArrayBufferView<ArrayBuffer>,
     onChunkSent?: (chunkSize: number) => void,
   ): Promise<void> {
     if (this.#currentSendContext) {
@@ -36,6 +37,7 @@ export class DataChannelSender {
       isSettled = true;
       this.#currentSendContext = undefined;
       this.channel.removeEventListener("bufferedamountlow", sendChunks);
+      this.channel.removeEventListener("closing", onClose);
       this.channel.removeEventListener("close", onClose);
       this.channel.removeEventListener("error", onError);
       return true;
@@ -54,11 +56,12 @@ export class DataChannelSender {
     const onError = (event: Event) => {
       if (!cleanup()) return;
 
-      // RTCErrorEvent may not be invoked by old browsers
-      const errEvent = event as { error?: { message?: string } };
-      const message = errEvent.error?.message ?? "Unknown error";
+      const message = getRTCErrorMessage(event, "Unknown error");
       reject(new Error(`Data channel error: ${message}`));
     };
+
+    const buffer = ArrayBuffer.isView(data) ? data.buffer : data;
+    const byteOffset = ArrayBuffer.isView(data) ? data.byteOffset : 0;
 
     const sendChunks = () => {
       if (isSettled) return;
@@ -83,7 +86,11 @@ export class DataChannelSender {
             this.maxMessageSize,
             data.byteLength - offset,
           );
-          const chunk = new Uint8Array(data, offset, bytesToSend);
+          const chunk = new Uint8Array(
+            buffer,
+            byteOffset + offset,
+            bytesToSend,
+          );
 
           this.channel.send(chunk);
           offset += bytesToSend;
@@ -102,6 +109,7 @@ export class DataChannelSender {
     };
 
     this.channel.addEventListener("bufferedamountlow", sendChunks);
+    this.channel.addEventListener("closing", onClose);
     this.channel.addEventListener("close", onClose);
     this.channel.addEventListener("error", onError);
 
