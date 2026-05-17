@@ -15,66 +15,78 @@ export type PeerConfig = Pick<
 const logger = debug("p2pml-core:peer-protocol");
 
 export class PeerProtocol {
-  private commandChunks?: Command.BinaryCommandChunksJoiner;
-  private dataChannelSender: DataChannelSender;
-  private uploadingRequestId?: number;
-  private readonly onChunkDownloaded: CoreEventMap["onChunkDownloaded"];
-  private readonly onChunkUploaded: CoreEventMap["onChunkUploaded"];
+  #commandChunks?: Command.BinaryCommandChunksJoiner;
+  #dataChannelSender: DataChannelSender;
+  #uploadingRequestId?: number;
+  readonly #onChunkDownloaded: CoreEventMap["onChunkDownloaded"];
+  readonly #onChunkUploaded: CoreEventMap["onChunkUploaded"];
+  readonly #channel: RTCDataChannel;
+  readonly #peerConfig: PeerConfig;
+  readonly #eventHandlers: {
+    onCommandReceived: (command: Command.PeerCommand) => void;
+    onSegmentChunkReceived: (data: Uint8Array) => void;
+  };
+  readonly #peerId: string;
 
   constructor(
-    private readonly channel: RTCDataChannel,
-    private readonly peerConfig: PeerConfig,
-    private readonly eventHandlers: {
+    channel: RTCDataChannel,
+    peerConfig: PeerConfig,
+    eventHandlers: {
       onCommandReceived: (command: Command.PeerCommand) => void;
       onSegmentChunkReceived: (data: Uint8Array) => void;
     },
     eventTarget: EventTarget<CoreEventMap>,
-    private readonly peerId: string,
+    peerId: string,
   ) {
-    this.dataChannelSender = new DataChannelSender(
+    this.#channel = channel;
+    this.#peerConfig = peerConfig;
+    this.#eventHandlers = eventHandlers;
+    this.#peerId = peerId;
+
+    this.#dataChannelSender = new DataChannelSender(
       channel,
       peerConfig.webRtcMaxMessageSize,
     );
-    this.onChunkDownloaded =
+    this.#onChunkDownloaded =
       eventTarget.getEventDispatcher("onChunkDownloaded");
-    this.onChunkUploaded = eventTarget.getEventDispatcher("onChunkUploaded");
+    this.#onChunkUploaded = eventTarget.getEventDispatcher("onChunkUploaded");
 
     if (channel.binaryType !== "arraybuffer") {
       throw new Error(
         `Expected binaryType "arraybuffer", got "${channel.binaryType}"`,
       );
     }
-    channel.addEventListener("message", this.onMessageReceived);
+    channel.addEventListener("message", this.#onMessageReceived);
   }
 
-  private onMessageReceived = (event: MessageEvent) => {
+  #onMessageReceived = (event: MessageEvent) => {
     // WebRTC data channel assumed to have binaryType = "arraybuffer"
     const data = new Uint8Array(event.data as ArrayBuffer);
     if (Command.isCommandChunk(data)) {
-      this.receivingCommandBytes(data);
+      this.#receivingCommandBytes(data);
     } else {
-      this.eventHandlers.onSegmentChunkReceived(data);
-      this.onChunkDownloaded(data.byteLength, "p2p", this.peerId);
+      this.#eventHandlers.onSegmentChunkReceived(data);
+      this.#onChunkDownloaded(data.byteLength, "p2p", this.#peerId);
     }
   };
 
   sendCommand(command: Command.PeerCommand) {
-    if (this.channel.readyState !== "open") {
+    if (this.#channel.readyState !== "open") {
       logger(
         "dropping command %d (channel state: %s)",
         command.c,
-        this.channel.readyState,
+        this.#channel.readyState,
       );
       return;
     }
 
     const binaryCommandBuffers = Command.serializePeerCommand(
       command,
-      this.peerConfig.webRtcMaxMessageSize,
+      this.#peerConfig.webRtcMaxMessageSize,
     );
     try {
       for (const buffer of binaryCommandBuffers) {
-        this.channel.send(buffer);
+        this.#channel.send(buffer);
       }
     } catch (err) {
       logger("error sending command: %O", err);
@@ -82,59 +94,59 @@ export class PeerProtocol {
   }
 
   stopUploadingSegmentData() {
-    this.dataChannelSender.cancel();
-    this.uploadingRequestId = undefined;
+    this.#dataChannelSender.cancel();
+    this.#uploadingRequestId = undefined;
   }
 
   getUploadingRequestId() {
-    return this.uploadingRequestId;
+    return this.#uploadingRequestId;
   }
 
   async splitSegmentDataToChunksAndUploadAsync(
     data: ArrayBuffer | ArrayBufferView<ArrayBuffer>,
     requestId: number,
   ) {
-    if (this.uploadingRequestId !== undefined) {
+    if (this.#uploadingRequestId !== undefined) {
       throw new Error(`Some segment data is already uploading.`);
     }
 
-    this.uploadingRequestId = requestId;
+    this.#uploadingRequestId = requestId;
 
     try {
-      await this.dataChannelSender.sendData(data, (chunkSize) => {
-        this.onChunkUploaded(chunkSize, this.peerId);
+      await this.#dataChannelSender.sendData(data, (chunkSize) => {
+        this.#onChunkUploaded(chunkSize, this.#peerId);
       });
     } finally {
-      if (this.uploadingRequestId === requestId) {
-        this.uploadingRequestId = undefined;
+      if (this.#uploadingRequestId === requestId) {
+        this.#uploadingRequestId = undefined;
       }
     }
   }
 
-  private receivingCommandBytes(buffer: Uint8Array) {
-    this.commandChunks ??= new Command.BinaryCommandChunksJoiner(
+  #receivingCommandBytes(buffer: Uint8Array) {
+    this.#commandChunks ??= new Command.BinaryCommandChunksJoiner(
       (commandBuffer) => {
-        this.commandChunks = undefined;
+        this.#commandChunks = undefined;
         try {
           const command = Command.deserializeCommand(commandBuffer);
-          this.eventHandlers.onCommandReceived(command);
+          this.#eventHandlers.onCommandReceived(command);
         } catch (err) {
           logger("error processing command: %O", err);
         }
       },
     );
     try {
-      this.commandChunks.addCommandChunk(buffer);
+      this.#commandChunks.addCommandChunk(buffer);
     } catch (err) {
       logger("error receiving command chunks: %O", err);
-      this.commandChunks = undefined;
+      this.#commandChunks = undefined;
     }
   }
 
   destroy() {
-    this.channel.removeEventListener("message", this.onMessageReceived);
-    this.dataChannelSender.cancel();
-    this.commandChunks = undefined;
-    this.uploadingRequestId = undefined;
+    this.#channel.removeEventListener("message", this.#onMessageReceived);
+    this.#dataChannelSender.cancel();
+    this.#commandChunks = undefined;
+    this.#uploadingRequestId = undefined;
   }
 }

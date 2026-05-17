@@ -172,7 +172,8 @@ export class WebTorrentClient {
     let msg: unknown;
 
     try {
-      const text = typeof data === "string" ? data : new TextDecoder().decode(data);
+      const text =
+        typeof data === "string" ? data : new TextDecoder().decode(data);
       msg = JSON.parse(text) as unknown;
     } catch (err: unknown) {
       this.#eventTarget.dispatchEvent(
@@ -283,8 +284,14 @@ export class WebTorrentClient {
     const offersCount = shouldGenerateOffers ? this.#config.offersCount : 0;
 
     // Generate offers in parallel to avoid sequential ICE gathering latency
-    const results = await Promise.allSettled(
-      Array.from({ length: offersCount }, () => this.#createOffer()),
+    // Don't use Promise.allSettled to support older browsers
+    const results = await Promise.all(
+      Array.from({ length: offersCount }, () =>
+        this.#createOffer().then(
+          (value) => value,
+          () => undefined,
+        ),
+      ),
     );
 
     if (this.#checkDestroyed()) return;
@@ -293,8 +300,8 @@ export class WebTorrentClient {
       [];
 
     for (const result of results) {
-      if (result.status === "fulfilled" && result.value) {
-        offers.push(result.value);
+      if (result) {
+        offers.push(result);
       }
     }
 

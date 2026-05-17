@@ -1,5 +1,8 @@
 import { joinChunks } from "../../utils/utils.js";
 
+const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder("utf8");
+
 // restricted up to 16 item types (4 bits to type definition)
 export const enum SerializedItem {
   Min = -1,
@@ -9,57 +12,53 @@ export const enum SerializedItem {
   Max,
 }
 
-function abs(num: bigint): bigint {
-  return num < 0 ? -num : num;
-}
-
-function getRequiredBytesForInt(num: bigint): number {
-  const binaryString = num.toString(2);
-  const necessaryBits = num < 0 ? binaryString.length : binaryString.length + 1;
+export function getRequiredBytesForInt(num: number): number {
+  if (num === 0) return 1;
+  const necessaryBits = Math.floor(Math.log2(Math.abs(num))) + 2;
   return Math.ceil(necessaryBits / 8);
 }
 
-function intToBytes(num: bigint): Uint8Array {
+function intToBytes(num: number): Uint8Array {
   const isNegative = num < 0;
   const bytesAmountNumber = getRequiredBytesForInt(num);
   const bytes = new Uint8Array(bytesAmountNumber);
-  const bytesAmount = BigInt(bytesAmountNumber);
 
-  num = abs(num);
+  num = Math.abs(num);
   for (let i = 0; i < bytesAmountNumber; i++) {
-    const shift = 8n * (bytesAmount - 1n - BigInt(i));
-    const byte = (num >> shift) & 0xffn;
-    bytes[i] = Number(byte);
+    const shift = 8 * (bytesAmountNumber - 1 - i);
+    const byte = Math.floor(num / Math.pow(2, shift)) & 0xff;
+    bytes[i] = byte;
   }
 
   if (isNegative) bytes[0] = bytes[0] | 0b10000000;
   return bytes;
 }
 
-function bytesToInt(bytes: Uint8Array): bigint {
-  const byteLength = BigInt(bytes.length);
-  const getNumberPart = (byte: number, i: number): bigint => {
-    const shift = 8n * (byteLength - 1n - BigInt(i));
-    return BigInt(byte) << shift;
+function bytesToInt(bytes: Uint8Array): number {
+  const byteLength = bytes.length;
+  const getNumberPart = (byte: number, i: number): number => {
+    const shift = 8 * (byteLength - 1 - i);
+    return byte * Math.pow(2, shift);
   };
 
   // ignore first bit of first byte as it is sign bit
   let number = getNumberPart(bytes[0] & 0b01111111, 0);
   for (let i = 1; i < byteLength; i++) {
-    number = getNumberPart(bytes[i], i) | number;
+    number += getNumberPart(bytes[i], i);
   }
   if ((bytes[0] & 0b10000000) >> 7 !== 0) number = -number;
 
   return number;
 }
 
-export function serializeInt(num: bigint): Uint8Array {
+export function serializeInt(num: number): Uint8Array {
   const numBytes = intToBytes(num);
   const numberMetadata = (SerializedItem.Int << 4) | numBytes.length;
   return new Uint8Array([numberMetadata, ...numBytes]);
 }
 
 export function deserializeInt(bytes: Uint8Array) {
+  if (bytes.length === 0) throw new Error("Buffer is too short");
   const metadata = bytes[0];
   const code: SerializedItem = metadata >> 4;
   if (code !== SerializedItem.Int) {
@@ -76,15 +75,15 @@ export function deserializeInt(bytes: Uint8Array) {
   };
 }
 
-export function serializeSimilarIntArray(numbers: bigint[]) {
-  const commonPartNumbersMap = new Map<bigint, ResizableUint8Array>();
+export function serializeSimilarIntArray(numbers: number[]) {
+  const commonPartNumbersMap = new Map<number, ResizableUint8Array>();
 
   for (const number of numbers) {
-    const common = number & ~0xffn;
-    const diffByte = number & 0xffn;
+    const diffByte = number & 0xff;
+    const common = number - diffByte;
     const bytes = commonPartNumbersMap.get(common) ?? new ResizableUint8Array();
     if (!bytes.length) commonPartNumbersMap.set(common, bytes);
-    bytes.push(Number(diffByte));
+    bytes.push(diffByte);
   }
 
   const result = new ResizableUint8Array();
@@ -92,7 +91,7 @@ export function serializeSimilarIntArray(numbers: bigint[]) {
 
   for (const [commonPart, binaryArray] of commonPartNumbersMap) {
     const { length } = binaryArray.getBytesChunks();
-    const commonPartWithLength = commonPart | (BigInt(length) & 0xffn);
+    const commonPartWithLength = commonPart + (length & 0xff);
     binaryArray.unshift(serializeInt(commonPartWithLength));
     result.push(binaryArray.getBuffer());
   }
@@ -101,6 +100,7 @@ export function serializeSimilarIntArray(numbers: bigint[]) {
 }
 
 export function deserializeSimilarIntArray(bytes: Uint8Array) {
+  if (bytes.length < 2) throw new Error("Buffer is too short");
   const [codeByte, commonPartArraysAmount] = bytes;
   const code: SerializedItem = codeByte >> 4;
   if (code !== SerializedItem.SimilarIntArray) {
@@ -110,18 +110,18 @@ export function deserializeSimilarIntArray(bytes: Uint8Array) {
   }
 
   let offset = 2;
-  const originalIntArr: bigint[] = [];
+  const originalIntArr: number[] = [];
   for (let i = 0; i < commonPartArraysAmount; i++) {
     const { number: commonPartWithLength, byteLength } = deserializeInt(
       bytes.subarray(offset),
     );
     offset += byteLength;
-    const arrayLength = commonPartWithLength & 0xffn;
-    const commonPart = commonPartWithLength & ~0xffn;
+    const arrayLength = commonPartWithLength & 0xff;
+    const commonPart = commonPartWithLength - arrayLength;
 
     for (let j = 0; j < arrayLength; j++) {
-      const diffPart = BigInt(bytes[offset]);
-      originalIntArr.push(commonPart | diffPart);
+      const diffPart = bytes[offset];
+      originalIntArr.push(commonPart + diffPart);
       offset++;
     }
   }
@@ -130,7 +130,7 @@ export function deserializeSimilarIntArray(bytes: Uint8Array) {
 }
 
 export function serializeString(string: string) {
-  const encoded = new TextEncoder().encode(string);
+  const encoded = textEncoder.encode(string);
   const { length } = encoded;
   if (length > 4095) {
     throw new Error("String exceeds maximum length of 4095 bytes");
@@ -146,6 +146,7 @@ export function serializeString(string: string) {
 }
 
 export function deserializeString(bytes: Uint8Array) {
+  if (bytes.length < 2) throw new Error("Buffer is too short");
   const [codeByte, lengthByte] = bytes;
   const code: SerializedItem = codeByte >> 4;
   if (code !== SerializedItem.String) {
@@ -155,26 +156,23 @@ export function deserializeString(bytes: Uint8Array) {
   }
   const length = ((codeByte & 0x0f) << 8) | lengthByte;
   const stringBytes = bytes.subarray(2, length + 2);
-  const string = new TextDecoder("utf8").decode(stringBytes);
+  const string = textDecoder.decode(stringBytes);
   return { string, byteLength: length + 2 };
 }
 
 export class ResizableUint8Array {
-  private bytes: Uint8Array[] = [];
-  private _length = 0;
+  #bytes: Uint8Array[] = [];
+  #length = 0;
 
   push(bytes: Uint8Array | number | number[]) {
-    this.addBytes(bytes, "end");
+    this.#addBytes(bytes, "end");
   }
 
   unshift(bytes: Uint8Array | number | number[]) {
-    this.addBytes(bytes, "start");
+    this.#addBytes(bytes, "start");
   }
 
-  private addBytes(
-    bytes: Uint8Array | number | number[],
-    position: "start" | "end",
-  ) {
+  #addBytes(bytes: Uint8Array | number | number[], position: "start" | "end") {
     let bytesToAdd: Uint8Array;
     if (bytes instanceof Uint8Array) {
       bytesToAdd = bytes;
@@ -183,19 +181,19 @@ export class ResizableUint8Array {
     } else {
       bytesToAdd = new Uint8Array([bytes]);
     }
-    this._length += bytesToAdd.length;
-    this.bytes[position === "start" ? "unshift" : "push"](bytesToAdd);
+    this.#length += bytesToAdd.length;
+    this.#bytes[position === "start" ? "unshift" : "push"](bytesToAdd);
   }
 
   getBytesChunks(): readonly Uint8Array[] {
-    return this.bytes;
+    return this.#bytes;
   }
 
   getBuffer(): Uint8Array {
-    return joinChunks(this.bytes, this._length);
+    return joinChunks(this.#bytes, this.#length);
   }
 
   get length() {
-    return this._length;
+    return this.#length;
   }
 }

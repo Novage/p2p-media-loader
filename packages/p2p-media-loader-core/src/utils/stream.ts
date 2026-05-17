@@ -67,8 +67,8 @@ export function generateStreamShortId({
               parts[1] === profile.toString() &&
               parts[2] === level.toString()
             ) {
-              const profileHex = profile.toString(16).padStart(2, "0");
-              const levelHex = level.toString(16).padStart(2, "0");
+              const profileHex = `00${profile.toString(16)}`.slice(-2);
+              const levelHex = `00${level.toString(16)}`.slice(-2);
               c = `${parts[0]}.${profileHex}00${levelHex}`;
             }
           }

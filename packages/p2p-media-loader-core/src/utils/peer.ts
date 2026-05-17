@@ -33,5 +33,7 @@ export function generatePeerId(trackerClientVersionPrefix: string): string {
 function formatVersion(versionString: string) {
   const splittedVersion = versionString.split(".");
 
-  return `${splittedVersion[0].padStart(2, "0")}${splittedVersion[1].padStart(2, "0")}`;
+  const v0 = `00${splittedVersion[0]}`.slice(-2);
+  const v1 = `00${splittedVersion[1]}`.slice(-2);
+  return `${v0}${v1}`;
 }
