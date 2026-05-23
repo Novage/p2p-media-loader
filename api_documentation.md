@@ -553,3 +553,78 @@ For more examples with npm packages, you may check our [React demo](https://gith
   initPlayer();
 </script>
 ```
+
+## Using P2P Media Loader for older browsers and Smart TVs (IIFE)
+
+For older environments that do not support ES modules (such as older Smart TVs and legacy browsers), you can use the IIFE builds. When using IIFE builds, the library components are exposed through global variables instead of ES module imports.
+
+The global variables are `window.p2pml.hlsjs` and `window.p2pml.shaka`.
+
+### Integrating P2P with raw Hls.js player (IIFE)
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/hls.js@~1/dist/hls.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/dist/p2p-media-loader-hlsjs.iife.min.js"></script>
+
+<script>
+  // Wait for the DOM and scripts to load
+  document.addEventListener("DOMContentLoaded", function () {
+    var videoElement = document.getElementById("video");
+    var streamUrl = "https://example.com/stream.m3u8";
+
+    if (Hls.isSupported()) {
+      // Access the engine from the global p2pml object
+      var HlsJsP2PEngine = window.p2pml.hlsjs.HlsJsP2PEngine;
+
+      var HlsWithP2P = HlsJsP2PEngine.injectMixin(window.Hls);
+      var hls = new HlsWithP2P({
+        p2p: {
+          core: {
+            swarmId: "Optional custom swarm ID for stream",
+            // Other P2P engine config parameters go here
+          },
+        },
+      });
+
+      hls.attachMedia(videoElement);
+      hls.loadSource(streamUrl);
+    }
+  });
+</script>
+```
+
+### Integrating P2P with Shaka Player (IIFE)
+
+```html
+<script src="https://unpkg.com/shaka-player/dist/shaka-player.compiled.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@latest/dist/p2p-media-loader-shaka.iife.min.js"></script>
+
+<script>
+  // Wait for the DOM and scripts to load
+  document.addEventListener("DOMContentLoaded", async function () {
+    if (shaka.Player.isBrowserSupported()) {
+      var videoElement = document.getElementById("video");
+      var streamUrl = "https://example.com/stream.mpd";
+
+      // Access the engine from the global p2pml object
+      var ShakaP2PEngine = window.p2pml.shaka.ShakaP2PEngine;
+
+      ShakaP2PEngine.registerPlugins();
+      var shakaP2PEngine = new ShakaP2PEngine({
+        p2p: {
+          core: {
+            swarmId: "Optional custom swarm ID for stream",
+            // Other P2P engine config parameters go here
+          },
+        },
+      });
+
+      var player = new shaka.Player();
+      await player.attach(videoElement);
+
+      shakaP2PEngine.bindShakaPlayer(player);
+      await player.load(streamUrl);
+    }
+  });
+</script>
+```

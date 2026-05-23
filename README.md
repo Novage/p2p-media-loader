@@ -49,6 +49,9 @@ This library makes it possible to build large-scale P2P mesh networks — often 
   - [Core](https://cdn.jsdelivr.net/npm/p2p-media-loader-core@latest/dist/)
   - [Hls.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/dist/)
   - [Shaka Player integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@latest/dist/)
+- IIFE builds CDN (for older browsers and Smart TVs)
+  - [Hls.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/dist/p2p-media-loader-hlsjs.iife.min.js)
+  - [Shaka Player integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@latest/dist/p2p-media-loader-shaka.iife.min.js)
 
 ## Web Browsers Support
 

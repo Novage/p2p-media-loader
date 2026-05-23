@@ -1,6 +1,7 @@
-const MAX_BUFFERED_AMOUNT = 64 * 1024; // 64 KB, matching simple-peer
 import { getPromiseWithResolvers } from "../utils/utils.js";
 import { getRTCErrorMessage } from "./utils.js";
+
+const MAX_BUFFERED_AMOUNT = 64 * 1024; // 64 KB, matching simple-peer
 
 export class DataChannelSender {
   #currentSendContext?: { cancel: () => void };
