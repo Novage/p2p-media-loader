@@ -83,7 +83,9 @@ export class Core<TStream extends Stream = Stream> {
   };
   private segmentStorage?: SegmentStorage;
   private readonly webTorrentSocketPool = new WebTorrentSocketPool();
-  private readonly socketPoolLogger = debug("p2pml-core:webtorrent-socket-pool");
+  private readonly socketPoolLogger = debug(
+    "p2pml-core:webtorrent-socket-pool",
+  );
   private mainStreamLoader?: HybridLoader;
   private secondaryStreamLoader?: HybridLoader;
   private streamDetails: StreamDetails = {

@@ -224,9 +224,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
     );
   }
 
-  setSegmentChangeCallback(
-    callback: ((streamId: string) => void) | undefined,
-  ) {
+  setSegmentChangeCallback(callback: ((streamId: string) => void) | undefined) {
     this.segmentChangeCallback = callback;
   }
 

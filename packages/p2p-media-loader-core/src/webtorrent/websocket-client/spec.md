@@ -8,10 +8,10 @@ A robust, universal WebSocket client. It automatically maintains the connection 
 
 ```typescript
 interface WebSocketClientConfig {
-  url: string;                  // The WebSocket endpoint to connect to
-  initialDelay?: number;        // The initial wait time before the first reconnection attempt. Default: 1000 (1s)
-  maxDelay?: number;            // The maximum wait time between reconnection attempts. Default: 30000 (30s)
-  jitterMultiplier?: number;    // A multiplier used to add randomness to the delay. Default: 0.2
+  url: string; // The WebSocket endpoint to connect to
+  initialDelay?: number; // The initial wait time before the first reconnection attempt. Default: 1000 (1s)
+  maxDelay?: number; // The maximum wait time between reconnection attempts. Default: 30000 (30s)
+  jitterMultiplier?: number; // A multiplier used to add randomness to the delay. Default: 0.2
 }
 ```
 
@@ -46,4 +46,3 @@ The client implements an `EventTarget` system emitting the following lifecycle e
    `jitter = baseDelay * jitterMultiplier`
    `delay = max(0, baseDelay + random(-jitter, jitter))`
 2. **Binary Compatibility**: Configures `binaryType = 'arraybuffer'` on the underlying native WebSocket to ensure compatible and efficient handling of arbitrary binary protocols.
-

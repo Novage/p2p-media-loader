@@ -455,9 +455,7 @@ export class WebTorrentClient {
 
       const sdp = pc.localDescription;
       if (!sdp) {
-        throw new Error(
-          "Failed to get local description after ICE gathering",
-        );
+        throw new Error("Failed to get local description after ICE gathering");
       }
 
       const payload = {

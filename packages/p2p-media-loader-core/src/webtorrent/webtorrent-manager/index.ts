@@ -479,10 +479,8 @@ export class WebTorrentManager {
       }
     };
 
-    const onChannelClose = () =>
-      onDisconnect("Data channel closed", false);
-    const onChannelClosing = () =>
-      onDisconnect("Data channel closing", false);
+    const onChannelClose = () => onDisconnect("Data channel closed", false);
+    const onChannelClosing = () => onDisconnect("Data channel closing", false);
     const onChannelError = (event: Event) => {
       const msg = getRTCErrorMessage(event, "Data channel error");
       onDisconnect(`Data channel error: ${msg}`, true);

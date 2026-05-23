@@ -25,9 +25,7 @@ export class P2PLoader {
   readonly #swarmId: string;
   readonly #streamSwarmId: string;
   #isAnnounceMicrotaskCreated = false;
-  readonly #webtorrentManagerLogger = debug(
-    "p2pml-core:webtorrent-manager",
-  );
+  readonly #webtorrentManagerLogger = debug("p2pml-core:webtorrent-manager");
 
   #streamManifestUrl: string;
   readonly #stream: StreamWithSegments;
@@ -48,7 +46,6 @@ export class P2PLoader {
     eventTarget: EventTarget<EventTargetMap>,
     onSegmentAnnouncement: () => void,
   ) {
-    
     this.#streamManifestUrl = streamManifestUrl;
     this.#stream = stream;
     this.#requests = requests;
