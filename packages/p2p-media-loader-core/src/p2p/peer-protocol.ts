@@ -103,6 +103,7 @@ export class PeerProtocol {
   }
 
   async splitSegmentDataToChunksAndUploadAsync(
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-arguments
     data: ArrayBuffer | ArrayBufferView<ArrayBuffer>,
     requestId: number,
   ) {

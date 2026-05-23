@@ -1,6 +1,6 @@
 import { CommonCoreConfig, CoreConfig, StreamConfig } from "../types.js";
 
-export function getControlledPromise<T = void>() {
+export function getPromiseWithResolvers<T = void>() {
   let resolve: (value: T) => void;
   let reject: (reason?: unknown) => void;
   const promise = new Promise<T>((res, rej) => {

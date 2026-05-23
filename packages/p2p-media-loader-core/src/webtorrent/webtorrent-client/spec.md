@@ -40,15 +40,17 @@ interface WebTorrentClientConfig {
 }
 ```
 
-### Properties
-- `state` (`'disconnected' | 'connecting' | 'connected' | 'error'`): Current connection state to the single tracker.
-
 ### Methods
+
 - `start(): void`: Begins the `announce` loop if the injected `WebSocketClient` is already connected, or waits for it to connect. It does not call `connect()` on the injected client.
-- `destroy(): void`: Complete teardown. Sends a final `event: "stopped"` announce to the tracker (if connected), clears all pending offers and timers, and removes all event listeners. Does NOT dispose the `WebSocketClient` as it may be pooled.
+- `destroy(): void`: Complete teardown. Sends a final `event: "stopped"` announce to the tracker (if connected), clears all pending offers and timers, removes all event listeners, and disposes the abort controllers. Does NOT dispose the `WebSocketClient` as it may be pooled.
+- `addEventListener<K extends keyof WebTorrentClientEventMap>(eventName: K, listener: WebTorrentClientEventMap[K]): void`: Registers an event listener.
+- `removeEventListener<K extends keyof WebTorrentClientEventMap>(eventName: K, listener: WebTorrentClientEventMap[K]): void`: Removes a registered event listener.
 
 ### Events
+
 - `peerSignaled` (payload: `{ peerId: string, connection: RTCPeerConnection, channel?: RTCDataChannel }`): Fired the exact moment WebRTC SDP signaling is complete. The Swarm Manager takes immediate ownership. Note: `channel` is only provided if we initiated the connection. If we received the offer, the Swarm Manager must listen for the `ondatachannel` event on the connection.
+- `peerSignalingFailed` (payload: `{ peerId: string, error: string }`): Fired if WebRTC SDP negotiation fails after a peer has been claimed (e.g., ICE gathering timeout or SDP application error), allowing the manager to release the claim.
 - `warning` (payload: `string`): Fired if the tracker returns a warning.
 - `error` (payload: `string`): Fired if the tracker returns an error, or if the underlying WebSocket encounters a failure.
 

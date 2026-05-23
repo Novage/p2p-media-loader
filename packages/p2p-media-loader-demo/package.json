@@ -43,7 +43,7 @@
     "copy-css": "cpy \"src/**/*.css\" \"./lib/\" --parents",
     "lint": "eslint src --report-unused-disable-directives --max-warnings 0 --flag unstable_native_nodejs_ts_config",
     "type-check": "npx tsc --noEmit",
-    "clean-build": "rimraf lib dist build p2p-media-loader-demo-*.tgz"
+    "clean:build": "rimraf lib dist build p2p-media-loader-demo-*.tgz"
   },
   "dependencies": {
     "@vidstack/react": "^1.12.13",

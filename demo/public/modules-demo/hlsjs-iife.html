@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+  <head>
+    <title>HLS.js with P2P Media Loader (IIFE)</title>
+
+    <!-- Load HLS.js -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@~1/dist/hls.min.js"></script>
+
+    <!-- Load P2P Media Loader IIFE bundle. This does not use type="module" -->
+    <!-- <script src="./hlsjs/p2p-media-loader-hlsjs.iife.js"></script> -->
+    <script src="./hlsjs/p2p-media-loader-hlsjs.iife.min.js"></script>
+  </head>
+  <body>
+    <h1>P2P Media Loader IIFE Bundle Test</h1>
+    <video id="video" width="640" controls autoplay></video>
+
+    <script>
+      const manifestUri = "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8";
+
+      function initApp() {
+        if (Hls.isSupported()) {
+          const video = document.getElementById("video");
+          
+          // The IIFE bundle exports its contents on the global variable defined in vite config
+          const { HlsJsP2PEngine } = window.p2pml.hlsjs;
+          
+          const HlsWithP2P = HlsJsP2PEngine.injectMixin(window.Hls);
+          const hls = new HlsWithP2P();
+          
+          hls.attachMedia(video);
+          hls.on(Hls.Events.ERROR, function (event, data) {
+            console.error("Error code", data.details, "object", data);
+          });
+          
+          try {
+            hls.loadSource(manifestUri);
+          } catch (e) {
+            console.error(e);
+          }
+        } else {
+          console.error("HLS not supported in this browser.");
+        }
+      }
+
+      document.addEventListener("DOMContentLoaded", initApp);
+    </script>
+  </body>
+</html>

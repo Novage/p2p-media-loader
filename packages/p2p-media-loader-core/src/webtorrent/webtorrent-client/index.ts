@@ -10,6 +10,7 @@ export type WebTorrentClientEventMap = {
     connection: RTCPeerConnection;
     channel?: RTCDataChannel;
   }) => void;
+  peerSignalingFailed: (event: { peerId: string; error: string }) => void;
   warning: (warning: string) => void;
   error: (error: string) => void;
 };
@@ -454,8 +455,9 @@ export class WebTorrentClient {
 
       const sdp = pc.localDescription;
       if (!sdp) {
-        pc.close();
-        return;
+        throw new Error(
+          "Failed to get local description after ICE gathering",
+        );
       }
 
       const payload = {
@@ -470,6 +472,10 @@ export class WebTorrentClient {
       this.#wsClient.send(JSON.stringify(payload));
     } catch (err) {
       pc.close();
+      this.#eventTarget.dispatchEvent("peerSignalingFailed", {
+        peerId: remotePeerId,
+        error: err instanceof Error ? err.message : String(err),
+      });
       throw err;
     } finally {
       this.#negotiatingConnections.delete(pc);
@@ -508,6 +514,10 @@ export class WebTorrentClient {
       if (this.#checkDestroyed()) return;
     } catch (err) {
       pending.connection.close();
+      this.#eventTarget.dispatchEvent("peerSignalingFailed", {
+        peerId: remotePeerId,
+        error: err instanceof Error ? err.message : String(err),
+      });
       throw err;
     } finally {
       this.#negotiatingConnections.delete(pending.connection);

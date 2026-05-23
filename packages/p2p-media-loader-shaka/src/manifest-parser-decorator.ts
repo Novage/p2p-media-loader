@@ -12,15 +12,7 @@ import {
   generateStreamShortId,
 } from "p2p-media-loader-core";
 
-const AUDIO_CODECS = [
-  "mp4a",
-  "ac-3",
-  "ec-3",
-  "ec+3",
-  "opus",
-  "vorb",
-  "flac",
-];
+const AUDIO_CODECS = ["mp4a", "ac-3", "ec-3", "ec+3", "opus", "vorb", "flac"];
 
 export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   private readonly debug = debug("p2pml-shaka:manifest-parser");
@@ -269,7 +261,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     }
 
     // For version 4.2; Retrieving mediaSequence map for each HLS playlist
-    const manifestVariantsMap = maps.find((map) => {
+    const manifestVariantsMap = maps.find((map: Map<unknown, unknown>) => {
       const item = map.values().next().value;
 
       return (
@@ -288,7 +280,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
 
       const mediaSequenceTimeMap = getMapPropertiesFromObject(
         variant as Record<string, unknown>,
-      ).find((map) => {
+      ).find((map: Map<unknown, unknown>) => {
         const [key, value] = map.entries().next().value ?? [];
         return typeof key === "number" && typeof value === "number";
       });
@@ -337,7 +329,10 @@ function getReferencesArray(
 }
 
 function getMapPropertiesFromObject(object: Record<string, unknown>) {
-  return Object.values(object).filter(
-    (property): property is Map<unknown, unknown> => property instanceof Map,
-  );
+  // TODO: rewrite to Object.values once the project is migrated to ES2017+
+  return Object.keys(object)
+    .map((key) => object[key])
+    .filter(
+      (property): property is Map<unknown, unknown> => property instanceof Map,
+    );
 }

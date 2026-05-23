@@ -110,9 +110,11 @@ export class HttpRequestExecutor {
       requestControls.firstBytesReceived();
 
       const reader = response.body.getReader();
-      for await (const chunk of readStream(reader)) {
-        requestControls.addLoadedChunk(chunk);
-        this.onChunkDownloaded(chunk.byteLength, "http");
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        requestControls.addLoadedChunk(value);
+        this.onChunkDownloaded(value.byteLength, "http");
       }
 
       // If the HTTP connection drops gracefully but prematurely, fetch yields done: true
@@ -227,16 +229,6 @@ export class HttpRequestExecutor {
 
       requestControls.abortOnError(httpLoaderError);
     }
-  }
-}
-
-async function* readStream(
-  reader: ReadableStreamDefaultReader<Uint8Array>,
-): AsyncGenerator<Uint8Array> {
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    yield value;
   }
 }
 

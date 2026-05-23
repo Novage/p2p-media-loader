@@ -87,6 +87,7 @@ export class BinaryCommandChunksJoiner {
 
 export class BinaryCommandCreator {
   readonly #bytes = new Serialization.ResizableUint8Array();
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-arguments
   #resultBuffers: Uint8Array<ArrayBuffer>[] = [];
   #status: "creating" | "completed" = "creating";
   readonly #maxChunkLength: number;
@@ -155,6 +156,7 @@ export class BinaryCommandCreator {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-arguments
   getResultBuffers(): Uint8Array<ArrayBuffer>[] {
     if (this.#status === "creating" || !this.#resultBuffers.length) {
       throw new Error("Command is not complete.");

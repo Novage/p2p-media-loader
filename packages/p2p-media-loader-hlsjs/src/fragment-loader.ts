@@ -83,16 +83,16 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       stats.total = loadedBytes;
       stats.loaded = loadedBytes;
 
+      // hls.js transfers the ArrayBuffer to a Web Worker for transmuxing, which
+      // detaches the ArrayBuffer and sets its byteLength to 0. We clone it here
+      // to keep our cached ArrayBuffer intact for seeding to other peers.
+      const engineData = this.#response.data.slice(0);
+
       if (callbacks.onProgress) {
-        callbacks.onProgress(
-          this.stats,
-          context,
-          this.#response.data,
-          undefined,
-        );
+        callbacks.onProgress(this.stats, context, engineData, undefined);
       }
       callbacks.onSuccess(
-        { data: this.#response.data, url: context.url },
+        { data: engineData, url: context.url },
         this.stats,
         context,
         undefined,
@@ -159,9 +159,10 @@ function getLoadingStat(
   loadedBytes: number,
   loadingEndTime: number,
 ) {
-  const timeForLoading = (loadedBytes * 8000) / targetBitrate;
-  const first = loadingEndTime - timeForLoading;
-  const start = first - DEFAULT_DOWNLOAD_LATENCY;
+  const timeForLoading =
+    targetBitrate > 0 ? (loadedBytes * 8000) / targetBitrate : 0;
+  const first = Math.max(0, loadingEndTime - timeForLoading);
+  const start = Math.max(0, first - DEFAULT_DOWNLOAD_LATENCY);
 
   return { start, first, end: loadingEndTime };
 }

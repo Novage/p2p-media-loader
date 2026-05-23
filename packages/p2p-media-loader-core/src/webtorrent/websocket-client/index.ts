@@ -96,6 +96,7 @@ export class WebSocketClient {
   }
 
   public send(
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-arguments
     data: string | ArrayBuffer | Blob | ArrayBufferView<ArrayBuffer>,
   ): void {
     if (this.#state !== "connected" || !this.#ws) {

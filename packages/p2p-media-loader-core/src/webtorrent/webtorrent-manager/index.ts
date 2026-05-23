@@ -163,6 +163,22 @@ export class WebTorrentManager {
           );
         };
 
+        const onPeerSignalingFailed = (event: {
+          peerId: string;
+          error: string;
+        }) => {
+          const peer = this.#connectingPeers.get(event.peerId);
+          if (peer?.status === "signaling") {
+            clearTimeout(peer.timeoutId);
+            this.#connectingPeers.delete(event.peerId);
+            this.#eventTarget.dispatchEvent("peerConnectFailed", {
+              peerId: event.peerId,
+              trackerUrl: url,
+              error: `Signaling failed: ${event.error}`,
+            });
+          }
+        };
+
         const onWarning = (warning: string) => {
           this.#eventTarget.dispatchEvent("warning", {
             trackerUrl: url,
@@ -175,11 +191,16 @@ export class WebTorrentManager {
         };
 
         client.addEventListener("peerSignaled", onPeerSignaled);
+        client.addEventListener("peerSignalingFailed", onPeerSignalingFailed);
         client.addEventListener("warning", onWarning);
         client.addEventListener("error", onError);
 
         const cleanupListeners = () => {
           client.removeEventListener("peerSignaled", onPeerSignaled);
+          client.removeEventListener(
+            "peerSignalingFailed",
+            onPeerSignalingFailed,
+          );
           client.removeEventListener("warning", onWarning);
           client.removeEventListener("error", onError);
         };

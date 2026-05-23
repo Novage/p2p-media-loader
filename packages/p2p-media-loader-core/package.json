@@ -53,7 +53,7 @@
     "build:es": "tsc",
     "prettier": "prettier --write .",
     "lint": "eslint src --report-unused-disable-directives --max-warnings 0 --flag unstable_native_nodejs_ts_config",
-    "clean-build": "rimraf lib dist build p2p-media-loader-core-*.tgz",
+    "clean:build": "rimraf lib dist build p2p-media-loader-core-*.tgz",
     "type-check": "npx tsc --noEmit",
     "test": "vitest"
   },

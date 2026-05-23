@@ -16,16 +16,16 @@ The pool implements an event target system (`EventTarget`) that emits global eve
 
 ## API Reference
 
-### `acquire(url: string)`
+### `acquire(url: string): { client: WebSocketClient; release: () => void }`
 Acquires a `WebSocketClient` for the given URL.
 - Returns an object containing:
   - `client`: The `WebSocketClient` instance.
   - `release`: A callback function to release the reference to the client. This callback is idempotent and gracefully handles multiple calls by only releasing once.
 
-### `addEventListener(eventName, listener)` / `removeEventListener(eventName, listener)`
+### `addEventListener<K extends keyof WebTorrentSocketPoolEventMap>(eventName: K, listener: WebTorrentSocketPoolEventMap[K]): void` / `removeEventListener<K extends keyof WebTorrentSocketPoolEventMap>(eventName: K, listener: WebTorrentSocketPoolEventMap[K]): void`
 Allows attaching and detaching event listeners to the pool.
 - Supported events:
-  - `error: (error: Event, url: string) => void` - Listen for underlying socket errors.
+  - `error`: `(error: Event, url: string) => void` - Listen for underlying socket errors.
 
-### `destroy()`
+### `destroy(): void`
 Forcefully disposes of all pooled `WebSocketClient` connections and cleans up all existing event listeners. It safely catches and logs any errors thrown during individual socket disposal.

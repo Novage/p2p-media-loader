@@ -45,7 +45,7 @@ export class Peer {
   readonly #eventHandlers: PeerEventHandlers;
   readonly #peerConfig: PeerConfig;
 
-  // Required to suppress TypeScrypt error: Unnecessary conditional, value is always falsy
+  // Required to suppress TypeScript error: Unnecessary conditional, value is always falsy
   #checkIsDestroyed() {
     return this.#isDestroyed;
   }
@@ -58,7 +58,6 @@ export class Peer {
     peerConfig: PeerConfig,
     readonly eventTarget: EventTarget<CoreEventMap>,
   ) {
-    
     this.#closeConnection = closeConnection;
     this.#eventHandlers = eventHandlers;
     this.#peerConfig = peerConfig;
@@ -304,11 +303,14 @@ export class Peer {
   async uploadSegmentData(
     segment: SegmentWithStream,
     requestId: number,
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-arguments
     data: ArrayBuffer | ArrayBufferView<ArrayBuffer>,
   ) {
     if (this.#isDestroyed) return;
     const { externalId } = segment;
-    this.#logger(`send segment ${segment.externalId} to ${this.id}`);
+    this.#logger(
+      `send segment ${segment.externalId} to ${this.id} (byteLength: ${data.byteLength})`,
+    );
     const command: Command.PeerSendSegmentCommand = {
       c: PeerCommandType.SegmentData,
       i: externalId,

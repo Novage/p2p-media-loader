@@ -1,0 +1,52 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Shaka Player with P2P Media Loader (IIFE)</title>
+
+    <!-- Load Shaka Player -->
+    <script src="https://cdn.jsdelivr.net/npm/shaka-player@~4/dist/shaka-player.compiled.min.js"></script>
+
+    <!-- Load P2P Media Loader IIFE bundle. This does not use type="module" -->
+    <!-- <script src="./shaka/p2p-media-loader-shaka.iife.js"></script> -->
+    <script src="./shaka/p2p-media-loader-shaka.iife.min.js"></script>
+  </head>
+  <body>
+    <h1>P2P Media Loader Shaka IIFE Bundle Test</h1>
+    <video id="video" width="640" controls autoplay></video>
+
+    <script>
+      const manifestUri = "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8";
+
+      async function initApp() {
+        if (shaka.Player.isBrowserSupported()) {
+          const video = document.getElementById("video");
+          
+          // The IIFE bundle exports its contents on the global variable defined in vite config
+          const { ShakaP2PEngine } = window.p2pml.shaka;
+          
+          ShakaP2PEngine.registerPlugins();
+          const engine = new ShakaP2PEngine();
+          
+          const player = new shaka.Player();
+          await player.attach(video);
+          
+          player.addEventListener("error", function(event) {
+            console.error("Error code", event.detail.code, "object", event.detail);
+          });
+          
+          engine.bindShakaPlayer(player);
+          
+          try {
+            await player.load(manifestUri);
+          } catch (e) {
+            console.error("Error code", e.code, "object", e);
+          }
+        } else {
+          console.error("Shaka Player not supported in this browser.");
+        }
+      }
+
+      document.addEventListener("DOMContentLoaded", initApp);
+    </script>
+  </body>
+</html>

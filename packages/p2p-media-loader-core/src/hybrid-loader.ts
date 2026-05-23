@@ -220,7 +220,14 @@ export class HybridLoader {
           }
           this.requests.remove(request);
 
-          const streamSwarmId = StreamUtils.getStreamSwarmId(this.swarmId, stream);
+          this.logger(
+            `succeed: ${LoggerUtils.getSegmentString(segment)} (byteLength: ${request.data.byteLength})`,
+          );
+
+          const streamSwarmId = StreamUtils.getStreamSwarmId(
+            this.swarmId,
+            stream,
+          );
 
           void this.segmentStorage.storeSegment(
             this.swarmId,

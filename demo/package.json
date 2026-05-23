@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "prettier": "prettier --write .",
     "type-check": "npx tsc --noEmit",
-    "clean-build": "rimraf dist"
+    "clean:build": "rimraf dist"
   },
   "dependencies": {
     "p2p-media-loader-core": "workspace:*",

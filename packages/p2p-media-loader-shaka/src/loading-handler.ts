@@ -117,7 +117,7 @@ function getLoadingDurationBasedOnBandwidth(
   bytesLoaded: number,
 ) {
   const bits = bytesLoaded * 8;
-  return Math.round(bits / bandwidth) * 1000;
+  return bandwidth > 0 ? Math.round(bits / bandwidth) * 1000 : 0;
 }
 
 function getSegmentRequest(): {
