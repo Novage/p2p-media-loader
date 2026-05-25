@@ -18,3 +18,14 @@ export function getRTCErrorMessage(
 ): string {
   return getRTCError(event, fallbackMessage).message;
 }
+
+export function isTerminalConnectionState(
+  state: RTCIceConnectionState | RTCPeerConnectionState,
+): boolean {
+  // "disconnected" is technically a transient ICE state that can recover,
+  // but for live video streaming we treat it as terminal: dropping the peer
+  // immediately and reconnecting via the tracker is faster than waiting for
+  // a stale connection to potentially recover.
+
+  return state === "failed" || state === "closed" || state === "disconnected";
+}

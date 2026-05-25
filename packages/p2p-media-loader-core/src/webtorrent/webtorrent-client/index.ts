@@ -1,23 +1,22 @@
 import { EventTarget } from "../../utils/event-target.js";
-import {
-  WebSocketClient,
-  WebSocketClientState,
-} from "../websocket-client/index.js";
+import { getPromiseWithResolvers } from "../../utils/utils.js";
+import { isTerminalConnectionState } from "../utils.js";
+import { WebSocketClient } from "../websocket-client/index.js";
 
 export type WebTorrentClientEventMap = {
-  peerSignaled: (event: {
+  peerConnected: (event: {
     peerId: string;
     connection: RTCPeerConnection;
-    channel?: RTCDataChannel;
+    channel: RTCDataChannel;
   }) => void;
-  peerSignalingFailed: (event: { peerId: string; error: string }) => void;
+  peerConnectFailed: (event: { peerId: string; error: string }) => void;
   warning: (warning: string) => void;
   error: (error: string) => void;
 };
 
-export type WebTorrentClientState = WebSocketClientState;
-
 const WEBTORRENT_DEFAULT_OFFER_TIMEOUT = 50000;
+const WEBTORRENT_DEFAULT_CONNECTION_TIMEOUT = 15000;
+const WEBTORRENT_DEFAULT_OFFERS_COUNT = 5;
 
 export interface WebTorrentClientConfig {
   wsClient: WebSocketClient;
@@ -27,7 +26,8 @@ export interface WebTorrentClientConfig {
   channelConfig?: RTCDataChannelInit;
   offerTimeout?: number;
   offersCount?: number;
-  claimPeer?: (peerId: string, timeout: number) => boolean;
+  connectionTimeout?: number;
+  claimPeer?: (peerId: string) => boolean;
   shouldGenerateOffers?: () => boolean;
 }
 
@@ -85,10 +85,21 @@ export class WebTorrentClient {
   readonly #negotiatingConnections = new Set<RTCPeerConnection>();
   readonly #destroyAbortController = new AbortController();
 
-  #announceIntervalId: ReturnType<typeof setInterval> | null = null;
+  #announceTimeoutId: ReturnType<typeof setTimeout> | null = null;
   #announceIntervalSeconds: number | null = null;
+  #announceRunId = 0;
   #trackerId: string | null = null;
-  #destroyed = false;
+  #started = false;
+
+  #isDestroyed(): boolean {
+    return this.#destroyAbortController.signal.aborted;
+  }
+
+  #throwIfDestroyed(): void {
+    if (this.#destroyAbortController.signal.aborted) {
+      throw new Error("Client destroyed");
+    }
+  }
 
   constructor(config: WebTorrentClientConfig) {
     this.#config = {
@@ -97,16 +108,14 @@ export class WebTorrentClient {
       rtcConfig: config.rtcConfig,
       channelConfig: config.channelConfig,
       offerTimeout: config.offerTimeout ?? WEBTORRENT_DEFAULT_OFFER_TIMEOUT,
-      offersCount: config.offersCount ?? 5,
+      offersCount: config.offersCount ?? WEBTORRENT_DEFAULT_OFFERS_COUNT,
+      connectionTimeout:
+        config.connectionTimeout ?? WEBTORRENT_DEFAULT_CONNECTION_TIMEOUT,
       claimPeer: config.claimPeer ?? (() => true),
       shouldGenerateOffers: config.shouldGenerateOffers ?? (() => true),
     };
 
     this.#wsClient = config.wsClient;
-
-    this.#wsClient.addEventListener("connected", this.#onWsConnected);
-    this.#wsClient.addEventListener("disconnected", this.#onWsDisconnected);
-    this.#wsClient.addEventListener("message", this.#onWsMessage);
   }
 
   public addEventListener<K extends keyof WebTorrentClientEventMap>(
@@ -124,7 +133,12 @@ export class WebTorrentClient {
   }
 
   public start(): void {
-    if (this.#destroyed) return;
+    if (this.#isDestroyed() || this.#started) return;
+    this.#started = true;
+
+    this.#wsClient.addEventListener("connected", this.#onWsConnected);
+    this.#wsClient.addEventListener("disconnected", this.#onWsDisconnected);
+    this.#wsClient.addEventListener("message", this.#onWsMessage);
 
     if (this.#wsClient.state === "connected") {
       this.#onWsConnected();
@@ -132,19 +146,23 @@ export class WebTorrentClient {
   }
 
   public destroy(): void {
-    if (this.#destroyed) return;
-    this.#destroyed = true;
-    this.#clearAnnounceInterval();
+    if (this.#isDestroyed()) return;
+    this.#destroyAbortController.abort();
+    this.#clearAnnounceTimeout();
 
     this.#sendStopped();
 
     this.#cleanupPendingOffers();
     this.#cleanupNegotiatingConnections();
-    this.#destroyAbortController.abort();
 
-    this.#wsClient.removeEventListener("connected", this.#onWsConnected);
-    this.#wsClient.removeEventListener("disconnected", this.#onWsDisconnected);
-    this.#wsClient.removeEventListener("message", this.#onWsMessage);
+    if (this.#started) {
+      this.#wsClient.removeEventListener("connected", this.#onWsConnected);
+      this.#wsClient.removeEventListener(
+        "disconnected",
+        this.#onWsDisconnected,
+      );
+      this.#wsClient.removeEventListener("message", this.#onWsMessage);
+    }
 
     this.#eventTarget.clear();
   }
@@ -155,6 +173,8 @@ export class WebTorrentClient {
 
     // Send the initial announce event
     this.#announce("started").catch((err: unknown) => {
+      if (this.#isDestroyed()) return;
+
       this.#eventTarget.dispatchEvent(
         "error",
         `Initial announce failed: ${String(err)}`,
@@ -163,12 +183,12 @@ export class WebTorrentClient {
   };
 
   #onWsDisconnected = (): void => {
-    this.#clearAnnounceInterval();
+    this.#clearAnnounceTimeout();
     this.#announceIntervalSeconds = null;
   };
 
   #onWsMessage = (data: ArrayBuffer | string): void => {
-    if (this.#destroyed) return;
+    if (this.#isDestroyed()) return;
 
     let msg: unknown;
 
@@ -189,11 +209,7 @@ export class WebTorrentClient {
 
     const warningMessage = dataObject["warning message"];
     if (typeof warningMessage === "string") {
-      try {
-        this.#eventTarget.dispatchEvent("warning", warningMessage);
-      } catch {
-        // Ignore user-land errors
-      }
+      this.#eventTarget.dispatchEvent("warning", warningMessage);
     }
 
     const failureReason = dataObject["failure reason"];
@@ -239,6 +255,7 @@ export class WebTorrentClient {
         peerId,
         offerId,
       }).catch((err: unknown) => {
+        if (this.#isDestroyed()) return;
         this.#eventTarget.dispatchEvent(
           "error",
           `Failed to handle offer: ${String(err)}`,
@@ -250,6 +267,7 @@ export class WebTorrentClient {
         peerId,
         offerId,
       }).catch((err: unknown) => {
+        if (this.#isDestroyed()) return;
         this.#eventTarget.dispatchEvent(
           "error",
           `Failed to handle answer: ${String(err)}`,
@@ -259,27 +277,46 @@ export class WebTorrentClient {
   };
 
   #scheduleAnnounce(intervalSeconds: number): void {
-    this.#clearAnnounceInterval();
+    this.#clearAnnounceTimeout();
     this.#announceIntervalSeconds = intervalSeconds;
-    this.#announceIntervalId = setInterval(() => {
-      this.#announce().catch((err: unknown) => {
+
+    const runId = ++this.#announceRunId;
+
+    const run = async () => {
+      try {
+        await this.#announce();
+      } catch (err: unknown) {
+        if (this.#isDestroyed()) return;
         this.#eventTarget.dispatchEvent(
           "error",
           `Announce failed: ${String(err)}`,
         );
-      });
-    }, intervalSeconds * 1000);
+      }
+
+      if (
+        !this.#isDestroyed() &&
+        this.#announceIntervalSeconds !== null &&
+        this.#announceRunId === runId
+      ) {
+        this.#announceTimeoutId = setTimeout(
+          run,
+          this.#announceIntervalSeconds * 1000,
+        );
+      }
+    };
+
+    this.#announceTimeoutId = setTimeout(run, intervalSeconds * 1000);
   }
 
-  #clearAnnounceInterval(): void {
-    if (this.#announceIntervalId !== null) {
-      clearInterval(this.#announceIntervalId);
-      this.#announceIntervalId = null;
+  #clearAnnounceTimeout(): void {
+    if (this.#announceTimeoutId !== null) {
+      clearTimeout(this.#announceTimeoutId);
+      this.#announceTimeoutId = null;
     }
   }
 
   async #announce(event?: "started"): Promise<void> {
-    if (this.#wsClient.state !== "connected") return;
+    if (this.#isDestroyed() || this.#wsClient.state !== "connected") return;
 
     const shouldGenerateOffers = this.#config.shouldGenerateOffers();
     const offersCount = shouldGenerateOffers ? this.#config.offersCount : 0;
@@ -295,7 +332,14 @@ export class WebTorrentClient {
       ),
     );
 
-    if (this.#checkDestroyed()) return;
+    if (this.#isDestroyed()) {
+      for (const result of results) {
+        if (result) {
+          this.#cleanupPendingOffer(result.offer_id);
+        }
+      }
+      return;
+    }
 
     const offers: { offer: { type: string; sdp: string }; offer_id: string }[] =
       [];
@@ -314,7 +358,7 @@ export class WebTorrentClient {
 
     try {
       this.#wsClient.send(JSON.stringify(payload));
-    } catch (err) {
+    } catch (err: unknown) {
       for (const offer of offers) {
         this.#cleanupPendingOffer(offer.offer_id);
       }
@@ -329,6 +373,8 @@ export class WebTorrentClient {
       }
     | undefined
   > {
+    if (this.#isDestroyed()) return undefined;
+
     let pc: RTCPeerConnection | undefined;
     try {
       pc = new RTCPeerConnection(this.#config.rtcConfig);
@@ -340,16 +386,16 @@ export class WebTorrentClient {
       );
 
       const offer = await pc.createOffer();
-      if (this.#checkDestroyed()) return undefined;
+      this.#throwIfDestroyed();
 
       await pc.setLocalDescription(offer);
-      if (this.#checkDestroyed()) return undefined;
+      this.#throwIfDestroyed();
 
       await this.#waitForIceGathering(pc);
-      if (this.#checkDestroyed()) return undefined;
+      this.#throwIfDestroyed();
 
       const sdp = pc.localDescription;
-      if (!sdp) {
+      if (!sdp?.sdp) {
         pc.close();
         return undefined;
       }
@@ -370,10 +416,12 @@ export class WebTorrentClient {
       };
     } catch (err: unknown) {
       pc?.close();
-      this.#eventTarget.dispatchEvent(
-        "error",
-        `Failed to create offer: ${String(err)}`,
-      );
+      if (!this.#isDestroyed()) {
+        this.#eventTarget.dispatchEvent(
+          "warning",
+          `Failed to create offer: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
       return undefined;
     } finally {
       if (pc) {
@@ -433,25 +481,28 @@ export class WebTorrentClient {
     peerId: remotePeerId,
     offerId: remoteOfferId,
   }: IncomingOffer): Promise<void> {
-    if (!this.#config.claimPeer(remotePeerId, this.#config.offerTimeout)) {
+    if (this.#isDestroyed()) return;
+
+    if (!this.#config.claimPeer(remotePeerId)) {
       return; // Reject offer silently
     }
 
-    const pc = new RTCPeerConnection(this.#config.rtcConfig);
-    this.#negotiatingConnections.add(pc);
-
+    let pc: RTCPeerConnection | undefined;
     try {
+      pc = new RTCPeerConnection(this.#config.rtcConfig);
+      this.#negotiatingConnections.add(pc);
+
       await pc.setRemoteDescription(new RTCSessionDescription(offerSdp));
-      if (this.#checkDestroyed()) return;
+      this.#throwIfDestroyed();
 
       const answer = await pc.createAnswer();
-      if (this.#checkDestroyed()) return;
+      this.#throwIfDestroyed();
 
       await pc.setLocalDescription(answer);
-      if (this.#checkDestroyed()) return;
+      this.#throwIfDestroyed();
 
       await this.#waitForIceGathering(pc);
-      if (this.#checkDestroyed()) return;
+      this.#throwIfDestroyed();
 
       const sdp = pc.localDescription;
       if (!sdp) {
@@ -468,21 +519,26 @@ export class WebTorrentClient {
       };
 
       this.#wsClient.send(JSON.stringify(payload));
-    } catch (err) {
-      pc.close();
-      this.#eventTarget.dispatchEvent("peerSignalingFailed", {
-        peerId: remotePeerId,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      throw err;
-    } finally {
-      this.#negotiatingConnections.delete(pc);
-    }
 
-    this.#eventTarget.dispatchEvent("peerSignaled", {
-      peerId: remotePeerId,
-      connection: pc,
-    });
+      const channel = await this.#waitForConnection(pc);
+      this.#throwIfDestroyed();
+
+      this.#eventTarget.dispatchEvent("peerConnected", {
+        peerId: remotePeerId,
+        connection: pc,
+        channel,
+      });
+    } catch (err: unknown) {
+      pc?.close();
+      if (!this.#isDestroyed()) {
+        this.#eventTarget.dispatchEvent("peerConnectFailed", {
+          peerId: remotePeerId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    } finally {
+      if (pc) this.#negotiatingConnections.delete(pc);
+    }
   }
 
   async #handleIncomingAnswer({
@@ -490,6 +546,8 @@ export class WebTorrentClient {
     peerId: remotePeerId,
     offerId: ourOfferId,
   }: IncomingAnswer): Promise<void> {
+    if (this.#isDestroyed()) return;
+
     const pending = this.#pendingOffers.get(ourOfferId);
     if (!pending) return; // Offer expired or invalid
 
@@ -497,7 +555,7 @@ export class WebTorrentClient {
     this.#pendingOffers.delete(ourOfferId);
     clearTimeout(pending.timeoutId);
 
-    if (!this.#config.claimPeer(remotePeerId, this.#config.offerTimeout)) {
+    if (!this.#config.claimPeer(remotePeerId)) {
       pending.connection.close();
       return; // Reject answer silently
     }
@@ -508,24 +566,30 @@ export class WebTorrentClient {
       await pending.connection.setRemoteDescription(
         new RTCSessionDescription(answerSdp),
       );
+      this.#throwIfDestroyed();
 
-      if (this.#checkDestroyed()) return;
+      const channel = await this.#waitForConnection(
+        pending.connection,
+        pending.channel,
+      );
+      this.#throwIfDestroyed();
+
+      this.#eventTarget.dispatchEvent("peerConnected", {
+        peerId: remotePeerId,
+        connection: pending.connection,
+        channel,
+      });
     } catch (err) {
       pending.connection.close();
-      this.#eventTarget.dispatchEvent("peerSignalingFailed", {
-        peerId: remotePeerId,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      throw err;
+      if (!this.#isDestroyed()) {
+        this.#eventTarget.dispatchEvent("peerConnectFailed", {
+          peerId: remotePeerId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     } finally {
       this.#negotiatingConnections.delete(pending.connection);
     }
-
-    this.#eventTarget.dispatchEvent("peerSignaled", {
-      peerId: remotePeerId,
-      connection: pending.connection,
-      channel: pending.channel,
-    });
   }
 
   #waitForIceGathering(pc: RTCPeerConnection): Promise<void> {
@@ -545,6 +609,7 @@ export class WebTorrentClient {
         clearTimeout(timeoutId);
         pc.removeEventListener("icegatheringstatechange", onGatheringChange);
         pc.removeEventListener("icecandidate", onIceCandidate);
+        pc.removeEventListener("signalingstatechange", onSignalingChange);
         this.#destroyAbortController.signal.removeEventListener(
           "abort",
           onAbort,
@@ -567,6 +632,13 @@ export class WebTorrentClient {
         }
       };
 
+      const onSignalingChange = () => {
+        if (pc.signalingState === "closed") {
+          cleanup();
+          reject(new Error("RTCPeerConnection closed"));
+        }
+      };
+
       const onAbort = () => {
         cleanup();
         reject(new Error("ICE gathering aborted due to teardown"));
@@ -579,22 +651,122 @@ export class WebTorrentClient {
 
       timeoutId = setTimeout(() => {
         cleanup();
-        reject(new Error("ICE gathering timed out"));
+        resolve(); // Use whatever candidates we have gathered so far
       }, WebTorrentClient.#ICE_GATHERING_TIMEOUT);
 
       pc.addEventListener("icegatheringstatechange", onGatheringChange);
       pc.addEventListener("icecandidate", onIceCandidate);
+      pc.addEventListener("signalingstatechange", onSignalingChange);
       this.#destroyAbortController.signal.addEventListener("abort", onAbort);
     });
   }
 
-  /**
-   * Opaque destroyed check for use after `await` boundaries.
-   * Using a method call prevents TypeScript's control-flow narrowing
-   * from incorrectly eliminating the check as "always falsy".
-   */
-  #checkDestroyed(): boolean {
-    return this.#destroyed;
+  #waitForConnection(
+    pc: RTCPeerConnection,
+    channel?: RTCDataChannel,
+  ): Promise<RTCDataChannel> {
+    const { promise, resolve, reject } =
+      getPromiseWithResolvers<RTCDataChannel>();
+
+    let timeoutId: ReturnType<typeof setTimeout> | undefined = undefined;
+    let boundChannel: RTCDataChannel | undefined = channel;
+
+    const cleanup = () => {
+      clearTimeout(timeoutId);
+      pc.removeEventListener("iceconnectionstatechange", rejectIfTerminalState);
+      pc.removeEventListener("connectionstatechange", rejectIfTerminalState);
+      pc.removeEventListener("datachannel", onDataChannel);
+
+      if (boundChannel) {
+        boundChannel.removeEventListener("open", onChannelOpen);
+        boundChannel.removeEventListener("error", onChannelError);
+        boundChannel.removeEventListener("close", onChannelClose);
+        boundChannel.removeEventListener("closing", onChannelClose);
+      }
+      this.#destroyAbortController.signal.removeEventListener("abort", onAbort);
+    };
+
+    const rejectIfTerminalState = () => {
+      if (isTerminalConnectionState(pc.iceConnectionState)) {
+        cleanup();
+        reject(new Error(`ICE connection ${pc.iceConnectionState}`));
+        return true;
+      }
+      if (isTerminalConnectionState(pc.connectionState)) {
+        cleanup();
+        reject(new Error(`Connection state ${pc.connectionState}`));
+        return true;
+      }
+      return false;
+    };
+
+    const onChannelOpen = () => {
+      cleanup();
+      if (boundChannel) {
+        resolve(boundChannel);
+      } else {
+        reject(new Error("Data channel missing on open"));
+      }
+    };
+
+    const onChannelError = () => {
+      cleanup();
+      reject(new Error("Data channel error"));
+    };
+
+    const onChannelClose = () => {
+      cleanup();
+      reject(new Error("Data channel closed prematurely"));
+    };
+
+    const bindDataChannel = (dc: RTCDataChannel) => {
+      boundChannel = dc;
+      if (dc.readyState === "open") {
+        onChannelOpen();
+      } else if (dc.readyState === "closed" || dc.readyState === "closing") {
+        onChannelClose();
+      } else {
+        dc.addEventListener("open", onChannelOpen);
+        dc.addEventListener("error", onChannelError);
+        dc.addEventListener("close", onChannelClose);
+        dc.addEventListener("closing", onChannelClose);
+      }
+    };
+
+    const onDataChannel = (event: RTCDataChannelEvent) => {
+      if (!boundChannel) {
+        bindDataChannel(event.channel);
+      }
+    };
+
+    const onAbort = () => {
+      cleanup();
+      reject(new Error("Connection aborted due to teardown"));
+    };
+
+    if (this.#destroyAbortController.signal.aborted) {
+      onAbort();
+      return promise;
+    }
+
+    if (rejectIfTerminalState()) return promise;
+
+    timeoutId = setTimeout(() => {
+      cleanup();
+      reject(new Error("Data channel open timeout"));
+    }, this.#config.connectionTimeout);
+
+    pc.addEventListener("iceconnectionstatechange", rejectIfTerminalState);
+    pc.addEventListener("connectionstatechange", rejectIfTerminalState);
+    this.#destroyAbortController.signal.addEventListener("abort", onAbort);
+
+    if (boundChannel) {
+      bindDataChannel(boundChannel);
+    } else {
+      pc.addEventListener("datachannel", onDataChannel);
+    }
+
+    return promise;
   }
 
   #cleanupPendingOffer(offerId: string, pending?: PendingOffer): void {

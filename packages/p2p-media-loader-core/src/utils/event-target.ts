@@ -14,7 +14,11 @@ export class EventTarget<
     const listeners = this.events.get(eventName);
     if (!listeners) return;
     for (const listener of listeners) {
-      listener(...args);
+      try {
+        listener(...args);
+      } catch {
+        // Swallow user-land errors to protect internal invariants
+      }
     }
   }
 
@@ -29,7 +33,11 @@ export class EventTarget<
 
     return (...args: Parameters<EventTypesMap[K]>) => {
       for (const listener of definedListeners) {
-        listener(...args);
+        try {
+          listener(...args);
+        } catch {
+          // Swallow user-land errors to protect internal invariants
+        }
       }
     };
   }

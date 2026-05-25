@@ -1,20 +1,7 @@
 import { EventTarget } from "../../utils/event-target.js";
-import { getRTCErrorMessage } from "../utils.js";
+import { getRTCErrorMessage, isTerminalConnectionState } from "../utils.js";
 import { WebTorrentClient } from "../webtorrent-client/index.js";
 import { WebTorrentSocketPool } from "../webtorrent-socket-pool/index.js";
-
-const DATA_CHANNEL_TIMEOUT = 15000;
-
-function isTerminalConnectionState(
-  state: RTCIceConnectionState | RTCPeerConnectionState,
-): boolean {
-  // "disconnected" is technically a transient ICE state that can recover,
-  // but for live video streaming we treat it as terminal: dropping the peer
-  // immediately and reconnecting via the tracker is faster than waiting for
-  // a stale connection to potentially recover.
-
-  return state === "failed" || state === "closed" || state === "disconnected";
-}
 
 export interface WebTorrentManagerConfig {
   infoHash: string;
@@ -35,6 +22,7 @@ export type WebTorrentManagerEventMap = {
   }) => void;
   peerDisconnected: (event: {
     peerId: string;
+    trackerUrl: string;
     reason: string;
     isError: boolean;
   }) => void;
@@ -47,24 +35,10 @@ export type WebTorrentManagerEventMap = {
   error: (event: { trackerUrl: string; error: string }) => void;
 };
 
-type ConnectingPeer =
-  | {
-      status: "signaling";
-      timeoutId: ReturnType<typeof setTimeout>;
-      connection?: undefined;
-    }
-  | {
-      status: "connecting";
-      connection: RTCPeerConnection;
-      channel?: RTCDataChannel;
-      timeoutId: ReturnType<typeof setTimeout>;
-      trackerUrl: string;
-      cleanup: () => void;
-    };
-
 type ConnectedPeer = {
   connection: RTCPeerConnection;
   channel: RTCDataChannel;
+  trackerUrl: string;
   cleanup: () => void;
 };
 
@@ -72,7 +46,7 @@ export class WebTorrentManager {
   readonly #config: WebTorrentManagerConfig;
   readonly #eventTarget = new EventTarget<WebTorrentManagerEventMap>();
 
-  readonly #connectingPeers = new Map<string, ConnectingPeer>();
+  readonly #connectingPeers = new Set<string>();
   readonly #connectedPeers = new Map<string, ConnectedPeer>();
 
   readonly #clients = new Set<{
@@ -84,7 +58,7 @@ export class WebTorrentManager {
   #destroyed = false;
   #started = false;
 
-  #claimPeer = (remotePeerId: string, timeout: number): boolean => {
+  #claimPeer = (remotePeerId: string): boolean => {
     if (this.#destroyed) return false;
 
     if (
@@ -94,17 +68,7 @@ export class WebTorrentManager {
       return false;
     }
 
-    const timeoutId = setTimeout(() => {
-      const peer = this.#connectingPeers.get(remotePeerId);
-      if (peer?.status === "signaling") {
-        this.#connectingPeers.delete(remotePeerId);
-      }
-    }, timeout);
-
-    this.#connectingPeers.set(remotePeerId, {
-      status: "signaling",
-      timeoutId,
-    });
+    this.#connectingPeers.add(remotePeerId);
     return true;
   };
 
@@ -150,31 +114,30 @@ export class WebTorrentManager {
           throw error;
         }
 
-        const onPeerSignaled = (event: {
+        const onPeerConnected = (event: {
           peerId: string;
           connection: RTCPeerConnection;
-          channel?: RTCDataChannel;
+          channel: RTCDataChannel;
         }) => {
-          this.#handlePeerSignaled(
-            url,
+          this.#connectingPeers.delete(event.peerId);
+          this.#addConnectedPeer(
             event.peerId,
             event.connection,
             event.channel,
+            url,
           );
         };
 
-        const onPeerSignalingFailed = (event: {
+        const onPeerConnectFailed = (event: {
           peerId: string;
           error: string;
         }) => {
-          const peer = this.#connectingPeers.get(event.peerId);
-          if (peer?.status === "signaling") {
-            clearTimeout(peer.timeoutId);
+          if (this.#connectingPeers.has(event.peerId)) {
             this.#connectingPeers.delete(event.peerId);
             this.#eventTarget.dispatchEvent("peerConnectFailed", {
               peerId: event.peerId,
               trackerUrl: url,
-              error: `Signaling failed: ${event.error}`,
+              error: `Connection failed: ${event.error}`,
             });
           }
         };
@@ -190,17 +153,14 @@ export class WebTorrentManager {
           this.#eventTarget.dispatchEvent("error", { trackerUrl: url, error });
         };
 
-        client.addEventListener("peerSignaled", onPeerSignaled);
-        client.addEventListener("peerSignalingFailed", onPeerSignalingFailed);
+        client.addEventListener("peerConnected", onPeerConnected);
+        client.addEventListener("peerConnectFailed", onPeerConnectFailed);
         client.addEventListener("warning", onWarning);
         client.addEventListener("error", onError);
 
         const cleanupListeners = () => {
-          client.removeEventListener("peerSignaled", onPeerSignaled);
-          client.removeEventListener(
-            "peerSignalingFailed",
-            onPeerSignalingFailed,
-          );
+          client.removeEventListener("peerConnected", onPeerConnected);
+          client.removeEventListener("peerConnectFailed", onPeerConnectFailed);
           client.removeEventListener("warning", onWarning);
           client.removeEventListener("error", onError);
         };
@@ -233,14 +193,6 @@ export class WebTorrentManager {
     }
     this.#clients.clear();
 
-    for (const peer of this.#connectingPeers.values()) {
-      if (peer.status === "connecting") {
-        peer.cleanup();
-      } else {
-        clearTimeout(peer.timeoutId);
-      }
-      peer.connection?.close();
-    }
     this.#connectingPeers.clear();
 
     const connectedSnapshot = [...this.#connectedPeers.entries()];
@@ -251,6 +203,7 @@ export class WebTorrentManager {
       peer.connection.close();
       this.#eventTarget.dispatchEvent("peerDisconnected", {
         peerId,
+        trackerUrl: peer.trackerUrl,
         reason: "Manager destroyed",
         isError: false,
       });
@@ -269,177 +222,14 @@ export class WebTorrentManager {
       this.#connectedPeers.delete(peerId);
       this.#eventTarget.dispatchEvent("peerDisconnected", {
         peerId,
+        trackerUrl: connected.trackerUrl,
         reason,
         isError,
       });
     }
   }
 
-  #handlePeerSignaled(
-    trackerUrl: string,
-    peerId: string,
-    connection: RTCPeerConnection,
-    channel?: RTCDataChannel,
-  ): void {
-    if (this.#destroyed) {
-      connection.close();
-      return;
-    }
-
-    const signalingPeer = this.#connectingPeers.get(peerId);
-    if (!signalingPeer) {
-      // It might have been rejected/closed already
-      connection.close();
-      return;
-    }
-
-    if (signalingPeer.status === "connecting") {
-      connection.close();
-      return;
-    }
-
-    // Clear the signaling-phase timeout before replacing the map entry below.
-    // The timeout callback only deletes "signaling" entries, so it would be a
-    // harmless no-op if it fired after the transition to "connecting". However,
-    // clearing it eagerly avoids unnecessary timer retention.
-    clearTimeout(signalingPeer.timeoutId);
-
-    const connectingPeer: ConnectingPeer = {
-      status: "connecting",
-      connection,
-      channel,
-      trackerUrl,
-      timeoutId: setTimeout(() => {
-        fail("Data channel open timeout");
-      }, DATA_CHANNEL_TIMEOUT),
-      cleanup: () => cleanup(),
-    };
-
-    let onChannelOpenBound: (() => void) | null = null;
-    let onChannelErrorBound: (() => void) | null = null;
-    let onChannelCloseBound: (() => void) | null = null;
-
-    const onIceConnectionStateChange = () => {
-      checkAndFail(connection.iceConnectionState, "ICE connection");
-    };
-
-    const onConnectionStateChange = () => {
-      checkAndFail(connection.connectionState, "Connection state");
-    };
-
-    const onDataChannel = (event: RTCDataChannelEvent) => {
-      if (connectingPeer.channel) return;
-      connectingPeer.channel = event.channel;
-      bindDataChannel(event.channel);
-    };
-
-    const cleanup = () => {
-      clearTimeout(connectingPeer.timeoutId);
-      connection.removeEventListener(
-        "iceconnectionstatechange",
-        onIceConnectionStateChange,
-      );
-      connection.removeEventListener(
-        "connectionstatechange",
-        onConnectionStateChange,
-      );
-      connection.removeEventListener("datachannel", onDataChannel);
-      if (connectingPeer.channel) {
-        if (onChannelOpenBound) {
-          connectingPeer.channel.removeEventListener(
-            "open",
-            onChannelOpenBound,
-          );
-        }
-        if (onChannelErrorBound) {
-          connectingPeer.channel.removeEventListener(
-            "error",
-            onChannelErrorBound,
-          );
-        }
-        if (onChannelCloseBound) {
-          connectingPeer.channel.removeEventListener(
-            "close",
-            onChannelCloseBound,
-          );
-          connectingPeer.channel.removeEventListener(
-            "closing",
-            onChannelCloseBound,
-          );
-        }
-      }
-    };
-
-    this.#connectingPeers.set(peerId, connectingPeer);
-
-    const fail = (reason: string) => {
-      if (!this.#connectingPeers.delete(peerId)) return;
-      cleanup();
-      connection.close();
-      this.#eventTarget.dispatchEvent("peerConnectFailed", {
-        peerId,
-        trackerUrl,
-        error: reason,
-      });
-    };
-
-    const checkAndFail = (
-      state: RTCIceConnectionState | RTCPeerConnectionState,
-      prefix: string,
-    ) => {
-      if (isTerminalConnectionState(state)) {
-        fail(`${prefix} ${state}`);
-        return true;
-      }
-      return false;
-    };
-
-    if (checkAndFail(connection.iceConnectionState, "ICE connection")) return;
-    if (checkAndFail(connection.connectionState, "Connection state")) return;
-
-    connection.addEventListener(
-      "iceconnectionstatechange",
-      onIceConnectionStateChange,
-    );
-    connection.addEventListener(
-      "connectionstatechange",
-      onConnectionStateChange,
-    );
-
-    const onChannelOpen = (dataChannel: RTCDataChannel) => {
-      cleanup();
-      this.#connectingPeers.delete(peerId);
-      this.#promoteToConnected(peerId, connection, dataChannel, trackerUrl);
-    };
-
-    const bindDataChannel = (dataChannel: RTCDataChannel) => {
-      if (dataChannel.readyState === "open") {
-        onChannelOpen(dataChannel);
-      } else if (
-        dataChannel.readyState === "closed" ||
-        dataChannel.readyState === "closing"
-      ) {
-        fail("Data channel closed prematurely");
-      } else {
-        onChannelOpenBound = () => onChannelOpen(dataChannel);
-        onChannelErrorBound = () => fail("Data channel error");
-        onChannelCloseBound = () => fail("Data channel closed prematurely");
-
-        dataChannel.addEventListener("open", onChannelOpenBound);
-        dataChannel.addEventListener("error", onChannelErrorBound);
-        dataChannel.addEventListener("close", onChannelCloseBound);
-        dataChannel.addEventListener("closing", onChannelCloseBound);
-      }
-    };
-
-    if (channel) {
-      bindDataChannel(channel);
-    } else {
-      connection.addEventListener("datachannel", onDataChannel);
-    }
-  }
-
-  #promoteToConnected(
+  #addConnectedPeer(
     peerId: string,
     connection: RTCPeerConnection,
     channel: RTCDataChannel,
@@ -510,6 +300,7 @@ export class WebTorrentManager {
     this.#connectedPeers.set(peerId, {
       connection,
       channel,
+      trackerUrl,
       cleanup,
     });
 

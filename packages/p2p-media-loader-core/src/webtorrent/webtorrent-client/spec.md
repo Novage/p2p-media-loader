@@ -11,7 +11,7 @@ The `WebTorrentClient` acts as a signaling layer using the `WebSocketClient` und
 1. **Strictly Browser Implementation**: Uses native browser `RTCPeerConnection` APIs without Node.js polyfills or dependencies.
 2. **Single Responsibility (SRP)**: Each instance manages exactly **one** WebSocket connection to a **single** tracker.
 3. **Early Deduplication**: To prevent duplicate peer connections across multiple tracker clients, it accepts a `claimPeer` callback to attempt to lock a `peer_id` for signaling, successfully deduplicating at the earliest possible stage.
-4. **Negotiate and Hand-Off**: The client handles WebRTC SDP signaling. The exact moment signaling finishes, it emits the negotiating objects to a higher layer (e.g., Swarm Manager) which takes ownership, waits for the connection to open, and handles the BitTorrent wire protocol.
+4. **Negotiate and Connect**: The client handles WebRTC SDP signaling and waits for the data channel to open. Once fully connected, it emits the connected objects to a higher layer (e.g., Swarm Manager) which takes ownership and handles the BitTorrent wire protocol.
 5. **Data Channel Configuration**: Matches the default behavior of the `bittorrent-tracker` (and `simple-peer`) npm packages, which create reliable, ordered Data Channels (empty `RTCDataChannelInit` config) unless explicitly overridden.
 6. **Optional WebSocket Pooling**: The `WebTorrentClient` does not create its own WebSocket connection. Instead, it accepts an injected `WebSocketClient` in its constructor. This allows higher layers to implement connection pooling (sharing a single WebSocket across multiple torrents to the same tracker) or manage the socket lifecycle independently.
 
@@ -30,11 +30,12 @@ interface WebTorrentClientConfig {
   channelConfig?: RTCDataChannelInit; // Optional Data Channel overrides
   offerTimeout?: number; // Time (in ms) to keep unanswered offers before destroying them. Default: 50000 (50s).
   offersCount?: number; // Maximum number of offers to generate per announce interval. Default: 5.
+  connectionTimeout?: number; // Time (in ms) to wait for the data channel to open. Default: 15000 (15s).
 
   // Callback invoked when a peer_id is discovered via an offer or answer.
-  // Attempts to claim the peer for the specified timeout duration.
+  // Attempts to claim the peer to prevent duplicate connections.
   // Return true to accept and connect, false if the peer is already claimed/connected.
-  claimPeer?: (peerId: string, timeout: number) => boolean;
+  claimPeer?: (peerId: string) => boolean;
 
   // Callback invoked before every announce to determine if new offers should be generated.
   // Return false to stop generating offers (numwant: 0), while still answering incoming offers.
@@ -51,8 +52,8 @@ interface WebTorrentClientConfig {
 
 ### Events
 
-- `peerSignaled` (payload: `{ peerId: string, connection: RTCPeerConnection, channel?: RTCDataChannel }`): Fired the exact moment WebRTC SDP signaling is complete. The Swarm Manager takes immediate ownership. Note: `channel` is only provided if we initiated the connection. If we received the offer, the Swarm Manager must listen for the `ondatachannel` event on the connection.
-- `peerSignalingFailed` (payload: `{ peerId: string, error: string }`): Fired if WebRTC SDP negotiation fails after a peer has been claimed (e.g., ICE gathering timeout or SDP application error), allowing the manager to release the claim.
+- `peerConnected` (payload: `{ peerId: string, connection: RTCPeerConnection, channel: RTCDataChannel }`): Fired when the peer finishes WebRTC signaling and its Data Channel is successfully opened. The Swarm Manager takes immediate ownership.
+- `peerConnectFailed` (payload: `{ peerId: string, error: string }`): Fired if WebRTC SDP negotiation fails or the data channel fails to open after a peer has been claimed (e.g., ICE gathering timeout or connection timeout), allowing the manager to release the claim.
 - `warning` (payload: `string`): Fired if the tracker returns a warning.
 - `error` (payload: `string`): Fired if the tracker returns an error, or if the underlying WebSocket encounters a failure.
 
@@ -64,8 +65,8 @@ interface WebTorrentClientConfig {
 
 Because the higher layer (e.g., Peer Manager) may spin up multiple `WebTorrentClient` instances for different public trackers, the same remote peer will likely be discovered multiple times. The client uses the injected `claimPeer` to deduplicate aggressively:
 
-1. **When Receiving an Offer:** The tracker JSON includes the remote `peer_id`. The client immediately calls `claimPeer(peer_id, offerTimeout)`. If it returns `false`, the client **ignores the JSON message entirely** and does not create an `RTCPeerConnection`.
-2. **When Receiving an Answer:** The tracker forwards an `answer` to a pending offer we sent. The JSON includes the remote `peer_id`. The client calls `claimPeer(peer_id, offerTimeout)`. If it returns `false`, the client **immediately closes** the pending `RTCPeerConnection` and discards the answer.
+1. **When Receiving an Offer:** The tracker JSON includes the remote `peer_id`. The client immediately calls `claimPeer(peer_id)`. If it returns `false`, the client **ignores the JSON message entirely** and does not create an `RTCPeerConnection`.
+2. **When Receiving an Answer:** The tracker forwards an `answer` to a pending offer we sent. The JSON includes the remote `peer_id`. The client calls `claimPeer(peer_id)`. If it returns `false`, the client **immediately closes** the pending `RTCPeerConnection` and discards the answer.
 
 ### Message Validation
 
@@ -182,7 +183,7 @@ Standard WebTorrent signaling **does not use Trickle ICE**. All ICE candidates m
 
 #### ICE Gathering Timeout
 
-ICE gathering can stall indefinitely if STUN/TURN servers are unreachable or the network is offline. To prevent this, the client enforces a **5-second timeout** on ICE gathering (matching `simple-peer`'s `ICECOMPLETE_TIMEOUT`). If gathering does not complete within 5 seconds, the promise is rejected and the caller closes the `RTCPeerConnection`. After any async ICE wait, the client also checks the `destroyed` flag to avoid acting on a torn-down instance.
+ICE gathering can stall indefinitely if STUN/TURN servers are unreachable or the network is offline. To prevent this, the client enforces a **5-second timeout** on ICE gathering (matching `simple-peer`'s `ICECOMPLETE_TIMEOUT`). If gathering does not complete within 5 seconds, the promise is resolved to use whatever candidates have been gathered so far. After any async ICE wait, the client also checks the `destroyed` flag to avoid acting on a torn-down instance.
 
 #### Initiating Connections (Sending Offers)
 
@@ -198,27 +199,25 @@ When generating offers, we do **not** know which peer will receive them. All off
 #### Receiving Offers
 
 1. The tracker sends an incoming `offer` originating from another peer. This payload **does** contain their `peer_id`.
-2. **Deduplication Check**: Call `claimPeer(peer_id, offerTimeout)`. Abort if `false`.
+2. **Deduplication Check**: Call `claimPeer(peer_id)`. Abort if `false`.
 3. The client creates a new `RTCPeerConnection` and calls `setRemoteDescription`.
 4. It creates an SDP answer, waits for ICE gathering, and sends it back to the tracker.
-5. **Immediate Hand-Off**: Signaling is complete. The client emits the `peerSignaled` event with `{ peerId, connection }` (no `channel` because it hasn't been established yet). The client forgets about this connection.
+5. **Wait for Connection**: Signaling is complete. The client waits for the data channel to open, then emits the `peerConnected` event with `{ peerId, connection, channel }`. The client then hands off ownership of the connection.
 
 #### Receiving Answers
 
 1. The tracker forwards an `answer` SDP to an `offer_id` we previously sent. This payload now reveals the remote `peer_id`.
-2. **Deduplication Check**: We finally know who answered! Call `claimPeer(peer_id, offerTimeout)`.
+2. **Deduplication Check**: We finally know who answered! Call `claimPeer(peer_id)`.
 3. If `claimPeer` returns `false` (we are already connected to them via another route), we look up the pending `RTCPeerConnection` by `offer_id`, immediately call `.close()`, clear the timeout, delete it, and abort.
 4. If `true`, the client applies `setRemoteDescription(answer)` to the pending connection and clears the timeout.
-5. **Immediate Hand-Off**: Signaling is complete. The client removes the connection from `pendingOffers` and emits the `peerSignaled` event with `{ peerId, connection, channel }`.
+5. **Wait for Connection**: Signaling is complete. The client removes the connection from `pendingOffers`, waits for the data channel to open, and emits the `peerConnected` event with `{ peerId, connection, channel }`.
 
-### Hand-Off (Strict SRP)
+### Hand-Off
 
-To maintain strict Single Responsibility, the `WebTorrentClient`'s job ends the exact millisecond the SDP negotiation finishes. It does **not** wait for the Data Channel to open, nor does it monitor ICE connection states. It emits the `peerSignaled` event and drops its internal reference.
+The `WebTorrentClient`'s job ends the exact millisecond the data channel is successfully opened. It emits the `peerConnected` event and drops its internal reference.
 
-The upper Peer Manager receives the negotiating objects and takes full responsibility for:
+The upper Peer Manager receives the connected objects and takes full responsibility for:
 
-1. If `channel` is provided (initiator), listening to `channel.onopen`.
-2. If `channel` is undefined (receiver), listening to `connection.ondatachannel` and then its `onopen` event.
-3. Listening to `connection.oniceconnectionstatechange` to detect failures.
-4. Setting timeouts for the connection attempt.
-5. Cleaning up its internal `connectingPeers` set if it fails.
+1. Listening to `channel.onclose` and `connection.onconnectionstatechange` to detect failures/drops.
+2. Handling the BitTorrent wire protocol messages over the data channel.
+3. Cleaning up its internal state if the connection closes.

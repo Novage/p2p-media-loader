@@ -42,7 +42,7 @@ interface WebTorrentManagerConfig {
 The Manager aggregates events from all child clients and forwards/handles them.
 
 - `peerConnected` (payload: `{ peerId: string, connection: RTCPeerConnection, channel: RTCDataChannel, trackerUrl: string, close: (error?: string) => void }`): Fired when a peer finishes WebRTC signaling on _any_ tracker and its Data Channel is successfully opened.
-- `peerDisconnected` (payload: `{ peerId: string, reason: string, isError: boolean }`): Fired when a fully connected peer is closed, either due to an unexpected disconnect (e.g., network loss), manager destruction, or a manual call to the peer's `close` callback.
+- `peerDisconnected` (payload: `{ peerId: string, trackerUrl: string, reason: string, isError: boolean }`): Fired when a fully connected peer is closed, either due to an unexpected disconnect (e.g., network loss), manager destruction, or a manual call to the peer's `close` callback.
 - `peerConnectFailed` (payload: `{ peerId: string, trackerUrl: string, error: string }`): Fired if a signaled peer fails to connect or its data channel fails to open.
 - `warning` (payload: `{ trackerUrl: string, warning: string }`): Aggregated tracker warnings.
 - `error` (payload: `{ trackerUrl: string, error: string }`): Aggregated tracker errors (both WebSocket level and WebTorrent level).
@@ -64,7 +64,7 @@ To adhere to the Single Source of Truth principle, the `WebTorrentManager` avoid
 It passes a bound `#claimPeer` callback into every `WebTorrentClient` it creates:
 
 ```typescript
-#claimPeer = (remotePeerId: string, timeout: number): boolean => {
+#claimPeer = (remotePeerId: string): boolean => {
   if (this.#destroyed) return false;
 
   if (
@@ -74,37 +74,19 @@ It passes a bound `#claimPeer` callback into every `WebTorrentClient` it creates
     return false;
   }
 
-  const timeoutId = setTimeout(() => {
-    const peer = this.#connectingPeers.get(remotePeerId);
-    if (peer?.status === "signaling") {
-      this.#connectingPeers.delete(remotePeerId);
-    }
-  }, timeout);
-
-  this.#connectingPeers.set(remotePeerId, {
-    status: "signaling",
-    timeoutId,
-  });
+  this.#connectingPeers.add(remotePeerId);
   return true;
 };
 ```
 
-_Note: If the WebRTC signaling fails (e.g. ICE gathering timeout), the `WebTorrentClient` emits a `peerSignalingFailed` event, and the Manager automatically cleans up the `"signaling"` state to allow future reconnection attempts. If the connection fails after signaling, or the upper layer rejects the peer later, the upper layer must invoke the `close()` callback (provided in the `peerConnected` payload) to cleanly close the connection and remove it from the internal collections._
+_Note: If the WebRTC connection fails (e.g. ICE gathering timeout or data channel timeout), the `WebTorrentClient` emits a `peerConnectFailed` event, and the Manager automatically deletes the peer from `#connectingPeers` to allow future reconnection attempts. If the connection fails after being fully established, or the upper layer rejects the peer later, the upper layer must invoke the `close()` callback (provided in the `peerConnected` payload) to cleanly close the connection and remove it from the internal collections._
 
 ### Peer Connection Lifecycle
 
-When a child `WebTorrentClient` emits a `peerSignaled` event, the Manager transitions the peer from the `"signaling"` state to the `"connecting"` state. It updates the entry in the `#connectingPeers` map with the actual `RTCPeerConnection` and starts listening to both `RTCPeerConnection` state events (`connectionstatechange`, `iceconnectionstatechange`) and the `RTCDataChannel` state.
+The `WebTorrentClient` fully encapsulates the WebRTC negotiation and data channel establishment. 
 
-#### Terminal States
-
-For live video streaming, the manager treats certain transient or failing states as terminal:
-
-- `failed`, `closed`, and `disconnected` states on either `connectionState` or `iceConnectionState` are treated as immediate terminal failure states. Dropping the peer immediately and reconnecting via a tracker is faster than waiting for a stale/disconnected connection to potentially recover.
-
-A **15-second timeout** (`DATA_CHANNEL_TIMEOUT`) is applied to wait for the data channel to fully open.
-
-- If the data channel successfully opens (or is already open) within the timeout, the Manager removes the peer from `#connectingPeers`, stores it in `#connectedPeers` (promoting it to `"connected"`), and dispatches the `peerConnected` event.
-- If the connection times out, enters a terminal state, or the data channel fails/closes prematurely, the Manager cleans up, closes the connection, deletes the peer from `#connectingPeers`, and dispatches a `peerConnectFailed` event.
+- If a peer successfully completes WebRTC signaling and its Data Channel opens, the client emits a `peerConnected` event. The Manager removes the peer from `#connectingPeers`, stores it in `#connectedPeers`, and dispatches its own `peerConnected` event upstream.
+- If a peer fails to connect (either during signaling or while waiting for the data channel), the client emits a `peerConnectFailed` event. The Manager removes the peer from `#connectingPeers` and forwards the `peerConnectFailed` event upstream.
 
 #### Connected Peer Lifecycle
 
