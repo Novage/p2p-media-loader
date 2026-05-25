@@ -318,7 +318,7 @@ export class P2PLoader {
   #sendSegmentsAnnouncement = (sendEmptyAnnouncement = false) => {
     this.#isAnnounceMicrotaskCreated = true;
 
-    queueMicrotask(() => {
+    Utils.queueMicrotask(() => {
       const { loaded = [], httpLoading = [] } = sendEmptyAnnouncement
         ? {}
         : this.#getSegmentsAnnouncement();

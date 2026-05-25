@@ -674,7 +674,6 @@ export class WebTorrentClient {
     const cleanup = () => {
       clearTimeout(timeoutId);
       pc.removeEventListener("iceconnectionstatechange", rejectIfTerminalState);
-      pc.removeEventListener("connectionstatechange", rejectIfTerminalState);
       pc.removeEventListener("datachannel", onDataChannel);
 
       if (boundChannel) {
@@ -690,11 +689,6 @@ export class WebTorrentClient {
       if (isTerminalConnectionState(pc.iceConnectionState)) {
         cleanup();
         reject(new Error(`ICE connection ${pc.iceConnectionState}`));
-        return true;
-      }
-      if (isTerminalConnectionState(pc.connectionState)) {
-        cleanup();
-        reject(new Error(`Connection state ${pc.connectionState}`));
         return true;
       }
       return false;
@@ -757,7 +751,6 @@ export class WebTorrentClient {
     }, this.#config.connectionTimeout);
 
     pc.addEventListener("iceconnectionstatechange", rejectIfTerminalState);
-    pc.addEventListener("connectionstatechange", rejectIfTerminalState);
     this.#destroyAbortController.signal.addEventListener("abort", onAbort);
 
     if (boundChannel) {

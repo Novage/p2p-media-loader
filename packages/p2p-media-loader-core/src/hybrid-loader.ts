@@ -169,7 +169,7 @@ export class HybridLoader {
     }
 
     this.isProcessQueueMicrotaskCreated = true;
-    queueMicrotask(() => {
+    Utils.queueMicrotask(() => {
       try {
         this.processQueue();
         this.lastQueueProcessingTimeStamp = now;

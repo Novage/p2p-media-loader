@@ -17,6 +17,10 @@ export function getPromiseWithResolvers<T = void>() {
   };
 }
 
+export function queueMicrotask(fn: () => void): void {
+  void Promise.resolve().then(fn);
+}
+
 export function joinChunks(chunks: Uint8Array[], totalBytes?: number) {
   totalBytes ??= chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
 

@@ -236,7 +236,6 @@ export class WebTorrentManager {
     trackerUrl: string,
   ): void {
     if (
-      isTerminalConnectionState(connection.connectionState) ||
       isTerminalConnectionState(connection.iceConnectionState)
     ) {
       connection.close();
@@ -250,15 +249,6 @@ export class WebTorrentManager {
 
     const onDisconnect = (reason: string, isError: boolean) =>
       this.#closePeer(peerId, reason, isError);
-
-    const onConnectionStateChange = () => {
-      if (isTerminalConnectionState(connection.connectionState)) {
-        onDisconnect(
-          `Connection state became ${connection.connectionState}`,
-          true,
-        );
-      }
-    };
 
     const onIceConnectionStateChange = () => {
       if (isTerminalConnectionState(connection.iceConnectionState)) {
@@ -285,10 +275,6 @@ export class WebTorrentManager {
     const cleanup = () => {
       closeRef = null;
       connection.removeEventListener(
-        "connectionstatechange",
-        onConnectionStateChange,
-      );
-      connection.removeEventListener(
         "iceconnectionstatechange",
         onIceConnectionStateChange,
       );
@@ -304,10 +290,6 @@ export class WebTorrentManager {
       cleanup,
     });
 
-    connection.addEventListener(
-      "connectionstatechange",
-      onConnectionStateChange,
-    );
     connection.addEventListener(
       "iceconnectionstatechange",
       onIceConnectionStateChange,

@@ -20,7 +20,7 @@ export function getRTCErrorMessage(
 }
 
 export function isTerminalConnectionState(
-  state: RTCIceConnectionState | RTCPeerConnectionState,
+  state: RTCIceConnectionState,
 ): boolean {
   // "disconnected" is technically a transient ICE state that can recover,
   // but for live video streaming we treat it as terminal: dropping the peer

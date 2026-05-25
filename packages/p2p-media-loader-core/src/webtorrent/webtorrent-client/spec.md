@@ -8,7 +8,7 @@ The `WebTorrentClient` acts as a signaling layer using the `WebSocketClient` und
 
 **Key Design Decisions:**
 
-1. **Strictly Browser Implementation**: Uses native browser `RTCPeerConnection` APIs without Node.js polyfills or dependencies.
+1. **Strictly Browser Implementation**: Uses native browser `RTCPeerConnection` APIs without Node.js polyfills or dependencies. Designed to support older browsers (down to Chrome 66+, legacy Safari, and older Smart TVs) by avoiding `RTCPeerConnection.connectionState` and using `queueMicrotask` fallback via Promises.
 2. **Single Responsibility (SRP)**: Each instance manages exactly **one** WebSocket connection to a **single** tracker.
 3. **Early Deduplication**: To prevent duplicate peer connections across multiple tracker clients, it accepts a `claimPeer` callback to attempt to lock a `peer_id` for signaling, successfully deduplicating at the earliest possible stage.
 4. **Negotiate and Connect**: The client handles WebRTC SDP signaling and waits for the data channel to open. Once fully connected, it emits the connected objects to a higher layer (e.g., Swarm Manager) which takes ownership and handles the BitTorrent wire protocol.
@@ -218,6 +218,6 @@ The `WebTorrentClient`'s job ends the exact millisecond the data channel is succ
 
 The upper Peer Manager receives the connected objects and takes full responsibility for:
 
-1. Listening to `channel.onclose` and `connection.onconnectionstatechange` to detect failures/drops.
+1. Listening to `channel.onclose` and `connection.oniceconnectionstatechange` to detect failures/drops.
 2. Handling the BitTorrent wire protocol messages over the data channel.
 3. Cleaning up its internal state if the connection closes.
