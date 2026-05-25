@@ -54,7 +54,7 @@ interface WebTorrentClientConfig {
 
 - `peerConnected` (payload: `{ peerId: string, connection: RTCPeerConnection, channel: RTCDataChannel }`): Fired when the peer finishes WebRTC signaling and its Data Channel is successfully opened. The Swarm Manager takes immediate ownership.
 - `peerConnectFailed` (payload: `{ peerId: string, error: string }`): Fired if WebRTC SDP negotiation fails or the data channel fails to open after a peer has been claimed (e.g., ICE gathering timeout or connection timeout), allowing the manager to release the claim.
-- `warning` (payload: `string`): Fired if the tracker returns a warning.
+- `warning` (payload: `string`): Fired if the tracker returns a warning, or if the client encounters a local recoverable issue during signaling or offer/answer creation.
 - `error` (payload: `string`): Fired if the tracker returns an error, or if the underlying WebSocket encounters a failure.
 
 ---
