@@ -184,7 +184,7 @@ export class WebTorrentManager {
     this.#destroyed = true;
 
     // Remove our listeners BEFORE destroying the client. This ensures that
-    // if client.destroy() synchronously dispatches events (e.g. peerSignaled),
+    // if client.destroy() synchronously dispatches events,
     // they won't reach this already-destroyed manager.
     for (const { client, releaseSocket, cleanupListeners } of this.#clients) {
       cleanupListeners();
