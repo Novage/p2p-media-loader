@@ -488,16 +488,9 @@ export class WebTorrentClient {
     }
 
     let pc: RTCPeerConnection | undefined;
-    let remoteChannel: RTCDataChannel | undefined;
-
-    const onDataChannel = (event: RTCDataChannelEvent) => {
-      remoteChannel = event.channel;
-    };
-
     try {
       pc = new RTCPeerConnection(this.#config.rtcConfig);
       this.#negotiatingConnections.add(pc);
-      pc.addEventListener("datachannel", onDataChannel);
 
       await pc.setRemoteDescription(new RTCSessionDescription(offerSdp));
       this.#throwIfDestroyed();
@@ -527,8 +520,7 @@ export class WebTorrentClient {
 
       this.#wsClient.send(JSON.stringify(payload));
 
-      pc.removeEventListener("datachannel", onDataChannel);
-      const channel = await this.#waitForConnection(pc, remoteChannel);
+      const channel = await this.#waitForConnection(pc);
       this.#throwIfDestroyed();
 
       this.#eventTarget.dispatchEvent("peerConnected", {
@@ -537,10 +529,7 @@ export class WebTorrentClient {
         channel,
       });
     } catch (err: unknown) {
-      if (pc) {
-        pc.removeEventListener("datachannel", onDataChannel);
-        pc.close();
-      }
+      pc?.close();
       if (!this.#isDestroyed()) {
         this.#eventTarget.dispatchEvent("peerConnectFailed", {
           peerId: remotePeerId,
