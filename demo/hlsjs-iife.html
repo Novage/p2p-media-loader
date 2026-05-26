@@ -235,16 +235,11 @@
         return mb.toFixed(2) + " MB";
       }
 
+      /* prettier-ignore */
       function updateUI() {
-        document.getElementById("http-downloaded").innerText = formatBytes(
-          stats.httpDownloaded
-        );
-        document.getElementById("p2p-downloaded").innerText = formatBytes(
-          stats.p2pDownloaded,
-        );
-        document.getElementById("p2p-uploaded").innerText = formatBytes(
-          stats.p2pUploaded,
-        );
+        document.getElementById("http-downloaded").innerText = formatBytes(stats.httpDownloaded);
+        document.getElementById("p2p-downloaded").innerText = formatBytes(stats.p2pDownloaded);
+        document.getElementById("p2p-uploaded").innerText = formatBytes(stats.p2pUploaded);
         document.getElementById("active-peers").innerText = stats.peers.length;
       }
 
@@ -297,25 +292,21 @@
           // Register P2P Media Loader events
           var p2pEngine = hls.p2pEngine;
           if (p2pEngine) {
-            p2pEngine.addEventListener(
-              "onChunkDownloaded",
-              function (bytesLength, downloadSource) {
-                if (downloadSource === "http") {
-                  stats.httpDownloaded += bytesLength;
-                } else if (downloadSource === "p2p") {
-                  stats.p2pDownloaded += bytesLength;
-                }
-                updateUI();
-              },
-            );
+            /* prettier-ignore */
+            p2pEngine.addEventListener("onChunkDownloaded", function (bytesLength, downloadSource) {
+              if (downloadSource === "http") {
+                stats.httpDownloaded += bytesLength;
+              } else if (downloadSource === "p2p") {
+                stats.p2pDownloaded += bytesLength;
+              }
+              updateUI();
+            });
 
-            p2pEngine.addEventListener(
-              "onChunkUploaded",
-              function (bytesLength) {
-                stats.p2pUploaded += bytesLength;
-                updateUI();
-              },
-            );
+            /* prettier-ignore */
+            p2pEngine.addEventListener("onChunkUploaded", function (bytesLength) {
+              stats.p2pUploaded += bytesLength;
+              updateUI();
+            });
 
             p2pEngine.addEventListener("onPeerConnect", function (params) {
               if (params.streamType === "main") {
