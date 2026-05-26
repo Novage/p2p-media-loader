@@ -1,0 +1,353 @@
+<!doctype html>
+<html>
+  <head>
+    <title>HLS.js with P2P Media Loader (IIFE)</title>
+
+    <!-- Load HLS.js -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@~1/dist/hls.min.js"></script>
+
+    <!-- Load P2P Media Loader IIFE bundle. This does not use type="module" -->
+    <!-- <script src="./hlsjs/p2p-media-loader-hlsjs.iife.js"></script> -->
+    <script src="./hlsjs/p2p-media-loader-hlsjs.iife.min.js"></script>
+
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #0f172a;
+        color: #f8fafc;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+          Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-height: 100vh;
+        box-sizing: border-box;
+      }
+      .container {
+        width: 100%;
+        max-width: 1100px;
+        padding: 40px 15px;
+        box-sizing: border-box;
+      }
+      h1 {
+        font-weight: 700;
+        font-size: 32px;
+        margin-top: 0;
+        margin-bottom: 30px;
+        background: linear-gradient(135deg, #38bdf8, #818cf8);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-align: center;
+        letter-spacing: -0.5px;
+      }
+      .content-wrapper {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 30px;
+        justify-content: center;
+        align-items: flex-start;
+      }
+      .player-section {
+        flex: 1 1 600px;
+        max-width: 640px;
+      }
+      .video-wrapper {
+        background-color: #020617;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow:
+          0 10px 25px -5px rgba(0, 0, 0, 0.5),
+          0 8px 10px -6px rgba(0, 0, 0, 0.5);
+        border: 1px solid #1e293b;
+        line-height: 0;
+      }
+      video {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+      .controls-card {
+        background-color: #1e293b;
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin-top: 20px;
+        box-shadow:
+          0 10px 25px -5px rgba(0, 0, 0, 0.4),
+          0 8px 10px -6px rgba(0, 0, 0, 0.4);
+        border: 1px solid #334155;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-sizing: border-box;
+      }
+      .controls-label {
+        font-size: 14px;
+        color: #94a3b8;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+      }
+      select {
+        background-color: #0f172a;
+        color: #f1f5f9;
+        border: 1px solid #475569;
+        border-radius: 6px;
+        padding: 8px 16px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        outline: none;
+      }
+      select:hover {
+        border-color: #38bdf8;
+      }
+      select:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .stats-section {
+        flex: 1 1 360px;
+        max-width: 400px;
+      }
+      .stats-card {
+        background-color: #1e293b;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow:
+          0 10px 25px -5px rgba(0, 0, 0, 0.4),
+          0 8px 10px -6px rgba(0, 0, 0, 0.4);
+        border: 1px solid #334155;
+      }
+      .stats-title {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 20px;
+        color: #38bdf8;
+        border-bottom: 2px solid #334155;
+        padding-bottom: 12px;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+      }
+      .stat-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 14px 0;
+        border-bottom: 1px solid #334155;
+      }
+      .stat-item:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+      }
+      .stat-label {
+        font-size: 14px;
+        color: #94a3b8;
+        font-weight: 500;
+      }
+      .stat-value {
+        font-size: 18px;
+        font-weight: 700;
+        font-family: monospace, monospace;
+      }
+      .highlight-http {
+        color: #f59e0b;
+      }
+      .highlight-p2p {
+        color: #10b981;
+      }
+      .highlight-upload {
+        color: #3b82f6;
+      }
+      .highlight-peers {
+        color: #ec4899;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>P2P Media Loader IIFE Bundle Test</h1>
+
+      <div class="content-wrapper">
+        <div class="player-section">
+          <div class="video-wrapper">
+            <video id="video" controls autoplay></video>
+          </div>
+
+          <div class="controls-card">
+            <div class="controls-label">Select Video Quality:</div>
+            <select id="quality-selector" disabled>
+              <option value="-1">Loading qualities...</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="stats-section">
+          <div class="stats-card">
+            <div class="stats-title">Stream Statistics</div>
+
+            <div class="stat-item">
+              <div class="stat-label">HTTP Downloaded</div>
+              <div class="stat-value highlight-http" id="http-downloaded">
+                0.00 MB
+              </div>
+            </div>
+
+            <div class="stat-item">
+              <div class="stat-label">P2P Downloaded</div>
+              <div class="stat-value highlight-p2p" id="p2p-downloaded">
+                0.00 MB
+              </div>
+            </div>
+
+            <div class="stat-item">
+              <div class="stat-label">P2P Uploaded</div>
+              <div class="stat-value highlight-upload" id="p2p-uploaded">
+                0.00 MB
+              </div>
+            </div>
+
+            <div class="stat-item">
+              <div class="stat-label">Active Peers</div>
+              <div class="stat-value highlight-peers" id="active-peers">0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      var manifestUri =
+        "https://fcc3ddae59ed.us-west-2.playback.live-video.net/api/video/v1/us-west-2.893648527354.channel.DmumNckWFTqz.m3u8";
+
+      var stats = {
+        httpDownloaded: 0,
+        p2pDownloaded: 0,
+        p2pUploaded: 0,
+        peers: [],
+      };
+
+      function formatBytes(bytes) {
+        if (bytes === 0) return "0.00 MB";
+        var mb = bytes / (1024 * 1024);
+        return mb.toFixed(2) + " MB";
+      }
+
+      function updateUI() {
+        document.getElementById("http-downloaded").innerText = formatBytes(
+          stats.httpDownloaded,
+        );
+        document.getElementById("p2p-downloaded").innerText = formatBytes(
+          stats.p2pDownloaded,
+        );
+        document.getElementById("p2p-uploaded").innerText = formatBytes(
+          stats.p2pUploaded,
+        );
+        document.getElementById("active-peers").innerText = stats.peers.length;
+      }
+
+      function initApp() {
+        if (Hls.isSupported()) {
+          var video = document.getElementById("video");
+
+          // The IIFE bundle exports its contents on the global variable defined in vite config
+          // Accessing variables explicitly to ensure ES5 compatibility (no ES6 destructuring)
+          var HlsJsP2PEngine = window.p2pml.hlsjs.HlsJsP2PEngine;
+
+          var HlsWithP2P = HlsJsP2PEngine.injectMixin(window.Hls);
+          var hls = new HlsWithP2P();
+
+          hls.attachMedia(video);
+          hls.on(Hls.Events.ERROR, function (event, data) {
+            console.error("Error code", data.details, "object", data);
+          });
+
+          // Populate quality levels when manifest is parsed
+          hls.on(Hls.Events.MANIFEST_PARSED, function () {
+            var select = document.getElementById("quality-selector");
+            select.innerHTML = '<option value="-1">Auto</option>';
+
+            var levels = hls.levels;
+            for (var i = 0; i < levels.length; i++) {
+              var level = levels[i];
+              var label = "";
+              if (level.height) {
+                label += level.height + "p";
+              } else if (level.bitrate) {
+                label += Math.round(level.bitrate / 1000) + " kbps";
+              } else {
+                label += "Quality " + (i + 1);
+              }
+
+              var option = document.createElement("option");
+              option.value = i;
+              option.text = label;
+              select.appendChild(option);
+            }
+
+            select.disabled = false;
+
+            select.addEventListener("change", function () {
+              hls.currentLevel = parseInt(select.value, 10);
+            });
+          });
+
+          // Register P2P Media Loader events
+          var p2pEngine = hls.p2pEngine;
+          if (p2pEngine) {
+            p2pEngine.addEventListener(
+              "onChunkDownloaded",
+              function (bytesLength, downloadSource) {
+                if (downloadSource === "http") {
+                  stats.httpDownloaded += bytesLength;
+                } else if (downloadSource === "p2p") {
+                  stats.p2pDownloaded += bytesLength;
+                }
+                updateUI();
+              },
+            );
+
+            p2pEngine.addEventListener(
+              "onChunkUploaded",
+              function (bytesLength) {
+                stats.p2pUploaded += bytesLength;
+                updateUI();
+              },
+            );
+
+            p2pEngine.addEventListener("onPeerConnect", function (params) {
+              if (params.streamType === "main") {
+                if (stats.peers.indexOf(params.peerId) === -1) {
+                  stats.peers.push(params.peerId);
+                  updateUI();
+                }
+              }
+            });
+
+            p2pEngine.addEventListener("onPeerClose", function (params) {
+              if (params.streamType === "main") {
+                var index = stats.peers.indexOf(params.peerId);
+                if (index !== -1) {
+                  stats.peers.splice(index, 1);
+                  updateUI();
+                }
+              }
+            });
+          }
+
+          try {
+            hls.loadSource(manifestUri);
+          } catch (e) {
+            console.error(e);
+          }
+        } else {
+          console.error("HLS not supported in this browser.");
+        }
+      }
+
+      document.addEventListener("DOMContentLoaded", initApp);
+    </script>
+  </body>
+</html>
