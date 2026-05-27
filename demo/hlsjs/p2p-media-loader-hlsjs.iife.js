@@ -2016,15 +2016,40 @@ this.p2pml.hlsjs = (function(exports) {
 	var globalObject = typeof window !== "undefined" ? window : void 0;
 	var PeerConnection = (_ref = (_globalObject$RTCPeer = globalObject === null || globalObject === void 0 ? void 0 : globalObject.RTCPeerConnection) !== null && _globalObject$RTCPeer !== void 0 ? _globalObject$RTCPeer : globalObject === null || globalObject === void 0 ? void 0 : globalObject.webkitRTCPeerConnection) !== null && _ref !== void 0 ? _ref : globalObject === null || globalObject === void 0 ? void 0 : globalObject.mozRTCPeerConnection;
 	var SessionDescription = (_ref2 = (_globalObject$RTCSess = globalObject === null || globalObject === void 0 ? void 0 : globalObject.RTCSessionDescription) !== null && _globalObject$RTCSess !== void 0 ? _globalObject$RTCSess : globalObject === null || globalObject === void 0 ? void 0 : globalObject.webkitRTCSessionDescription) !== null && _ref2 !== void 0 ? _ref2 : globalObject === null || globalObject === void 0 ? void 0 : globalObject.mozRTCSessionDescription;
+	/**
+	* Detects whether the current browser environment natively supports Promise-based WebRTC APIs
+	* (specifically pc.createOffer and pc.createAnswer).
+	*
+	* For example:
+	* - Chrome < 50: Callback-only for all WebRTC APIs.
+	* - Chrome 50: Promise support for setLocalDescription/setRemoteDescription, but callback-only for createOffer/createAnswer.
+	* - Chrome 51+: Promise support for all WebRTC APIs.
+	*
+	* Probing this statically once at startup prevents the need to repeatedly execute throw/catch blocks
+	* during runtime connection negotiations, avoiding unnecessary exception-handling overhead.
+	*/
+	var supportsPromiseWebRTC = (() => {
+		try {
+			const pc = new PeerConnection();
+			const p = pc.createOffer();
+			if (typeof (p === null || p === void 0 ? void 0 : p.then) === "function") {
+				pc.close();
+				return true;
+			}
+			pc.close();
+		} catch (_unused) {}
+		return false;
+	})();
+	console.log(">>>> supportsPromiseWebRTC", supportsPromiseWebRTC);
+	/**
+	* Safe, backward-compatible wrapper for RTCPeerConnection.createOffer.
+	*
+	* Falls back to legacy callback-based signature on older engines (like Chrome 50 and below)
+	* while leveraging native Promises on modern browsers, avoiding runtime throwing or exception latency.
+	*/
 	function safeCreateOffer(pc, options) {
+		if (supportsPromiseWebRTC) return pc.createOffer(options);
 		return new Promise((resolve, reject) => {
-			try {
-				const p = pc.createOffer(options);
-				if (p && typeof p.then === "function") {
-					p.then(resolve, reject);
-					return;
-				}
-			} catch (_unused) {}
 			try {
 				pc.createOffer((offer) => resolve(offer), (err) => reject(err), options);
 			} catch (err) {
@@ -2032,15 +2057,15 @@ this.p2pml.hlsjs = (function(exports) {
 			}
 		});
 	}
+	/**
+	* Safe, backward-compatible wrapper for RTCPeerConnection.createAnswer.
+	*
+	* Falls back to legacy callback-based signature on older engines (like Chrome 50 and below)
+	* while leveraging native Promises on modern browsers, avoiding runtime throwing or exception latency.
+	*/
 	function safeCreateAnswer(pc, options) {
+		if (supportsPromiseWebRTC) return pc.createAnswer(options);
 		return new Promise((resolve, reject) => {
-			try {
-				const p = pc.createAnswer(options);
-				if (p && typeof p.then === "function") {
-					p.then(resolve, reject);
-					return;
-				}
-			} catch (_unused2) {}
 			try {
 				pc.createAnswer((answer) => resolve(answer), (err) => reject(err), options);
 			} catch (err) {
@@ -2048,15 +2073,15 @@ this.p2pml.hlsjs = (function(exports) {
 			}
 		});
 	}
+	/**
+	* Safe, backward-compatible wrapper for RTCPeerConnection.setLocalDescription.
+	*
+	* Falls back to legacy callback-based signature on older engines (like Chrome < 50)
+	* while leveraging native Promises on modern browsers.
+	*/
 	function safeSetLocalDescription(pc, description) {
+		if (supportsPromiseWebRTC) return pc.setLocalDescription(description);
 		return new Promise((resolve, reject) => {
-			try {
-				const p = pc.setLocalDescription(description);
-				if (p && typeof p.then === "function") {
-					p.then(resolve, reject);
-					return;
-				}
-			} catch (_unused3) {}
 			try {
 				pc.setLocalDescription(description, () => resolve(), (err) => reject(err));
 			} catch (err) {
@@ -2064,15 +2089,15 @@ this.p2pml.hlsjs = (function(exports) {
 			}
 		});
 	}
+	/**
+	* Safe, backward-compatible wrapper for RTCPeerConnection.setRemoteDescription.
+	*
+	* Falls back to legacy callback-based signature on older engines (like Chrome < 50)
+	* while leveraging native Promises on modern browsers.
+	*/
 	function safeSetRemoteDescription(pc, description) {
+		if (supportsPromiseWebRTC) return pc.setRemoteDescription(description);
 		return new Promise((resolve, reject) => {
-			try {
-				const p = pc.setRemoteDescription(description);
-				if (p && typeof p.then === "function") {
-					p.then(resolve, reject);
-					return;
-				}
-			} catch (_unused4) {}
 			try {
 				pc.setRemoteDescription(description, () => resolve(), (err) => reject(err));
 			} catch (err) {
@@ -2337,7 +2362,7 @@ this.p2pml.hlsjs = (function(exports) {
 		});
 		try {
 			_classPrivateFieldGet2(_wsClient, this).send(JSON.stringify(payload));
-		} catch (_unused5) {}
+		} catch (_unused2) {}
 	}
 	function _buildAnnouncePayload({ numwant, offers, event }) {
 		const payload = {
