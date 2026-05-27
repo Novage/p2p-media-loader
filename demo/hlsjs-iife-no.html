@@ -249,10 +249,10 @@
 
           // The IIFE bundle exports its contents on the global variable defined in vite config
           // Accessing variables explicitly to ensure ES5 compatibility (no ES6 destructuring)
-          // var HlsJsP2PEngine = window.p2pml.hlsjs.HlsJsP2PEngine;
+          var HlsJsP2PEngine = window.p2pml.hlsjs.HlsJsP2PEngine;
 
-          // var HlsWithP2P = HlsJsP2PEngine.injectMixin(window.Hls);
-          var hls = new Hls();
+          var HlsWithP2P = HlsJsP2PEngine.injectMixin(window.Hls);
+          var hls = new HlsWithP2P();
 
           hls.attachMedia(video);
           hls.on(Hls.Events.ERROR, function (event, data) {
