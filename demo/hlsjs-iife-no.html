@@ -8,7 +8,7 @@
 
     <!-- Load P2P Media Loader IIFE bundle. This does not use type="module" -->
     <!-- <script src="./hlsjs/p2p-media-loader-hlsjs.iife.js"></script> -->
-    <script src="./hlsjs/p2p-media-loader-hlsjs.iife.min.js"></script>
+    <script src="./hlsjs/p2p-media-loader-hlsjs.iife.js"></script>
 
     <style>
       body {
@@ -252,7 +252,7 @@
           var HlsJsP2PEngine = window.p2pml.hlsjs.HlsJsP2PEngine;
 
           var HlsWithP2P = HlsJsP2PEngine.injectMixin(window.Hls);
-          var hls = new Hls();
+          var hls = new HlsWithP2P();
 
           hls.attachMedia(video);
           hls.on(Hls.Events.ERROR, function (event, data) {
