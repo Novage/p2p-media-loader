@@ -1,3 +1,4 @@
+"use strict";
 this.p2pml = this.p2pml || {};
 this.p2pml.hlsjs = (function(exports) {
 	Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
