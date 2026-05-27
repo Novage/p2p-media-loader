@@ -9,6 +9,10 @@ import {
   RequestControls,
 } from "./requests/request.js";
 import { EventTarget } from "./utils/event-target.js";
+import {
+  SafeAbortController,
+  isAbortControllerSupported,
+} from "./utils/abort-controller.js";
 
 type HttpConfig = Pick<
   CoreConfig,
@@ -16,10 +20,14 @@ type HttpConfig = Pick<
 >;
 
 export class HttpRequestExecutor {
-  private readonly abortController = new AbortController();
+  private readonly abortController = new SafeAbortController();
   private expectedBytesLength?: number;
   private requestByteRange?: { start: number; end?: number };
   private readonly onChunkDownloaded: CoreEventMap["onChunkDownloaded"];
+
+  private isAborted(): boolean {
+    return this.abortController.signal.aborted;
+  }
 
   constructor(
     private readonly request: SegmentRequest,
@@ -35,7 +43,7 @@ export class HttpRequestExecutor {
 
   execute() {
     const startControls = {
-      abort: () => this.abortController.abort("abort"),
+      abort: () => this.abortController.abort(),
       notReceivingBytesTimeoutMs:
         this.httpConfig.httpNotReceivingBytesTimeoutMs,
     };
@@ -68,32 +76,62 @@ export class HttpRequestExecutor {
 
   private async fetch(requestControls: RequestControls) {
     const { segment } = this.request;
+    let activeReader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+
+    if (this.isAborted()) {
+      return;
+    }
+
+    const onAbort = () => {
+      try {
+        activeReader?.cancel().catch(() => {
+          // Swallow stream cancel errors
+        });
+      } catch {
+        // Swallow stream cancel errors
+      }
+    };
+
+    this.abortController.signal.addEventListener("abort", onAbort);
+
+    const abortSignal = isAbortControllerSupported
+      ? (this.abortController.signal as AbortSignal)
+      : undefined;
+
     try {
       let request = await this.httpConfig.httpRequestSetup?.(
         segment.url,
         segment.byteRange,
-        this.abortController.signal,
+        abortSignal,
         this.requestByteRange,
       );
 
-      if (!request) {
-        const headers = new Headers(
-          this.requestByteRange
-            ? {
-                Range: `bytes=${this.requestByteRange.start}-${
-                  this.requestByteRange.end ?? ""
-                }`,
-              }
-            : undefined,
-        );
-
-        request = new Request(segment.url, {
-          headers,
-          signal: this.abortController.signal,
-        });
+      if (this.isAborted()) {
+        throw new DOMException("Request aborted", "AbortError");
       }
 
-      if (this.abortController.signal.aborted) {
+      if (!request) {
+        // Use default empty Headers constructor and set fields individually for compatibility
+        // with older browsers (e.g. Chrome < 47) that do not support passing an object parameter.
+        const headers = new Headers();
+        if (this.requestByteRange) {
+          headers.set(
+            "Range",
+            `bytes=${this.requestByteRange.start}-${
+              this.requestByteRange.end ?? ""
+            }`,
+          );
+        }
+
+        const requestOptions: RequestInit = { headers };
+        if (abortSignal) {
+          requestOptions.signal = abortSignal;
+        }
+
+        request = new Request(segment.url, requestOptions);
+      }
+
+      if (this.isAborted()) {
         throw new DOMException(
           "Request aborted before request fetch",
           "AbortError",
@@ -102,19 +140,44 @@ export class HttpRequestExecutor {
 
       const response = await window.fetch(request);
 
+      if (this.isAborted()) {
+        throw new DOMException("Request aborted", "AbortError");
+      }
+
       this.handleResponseHeaders(response);
 
-      if (!response.body) {
-        throw new RequestError("http-error", "Missing response body");
-      }
       requestControls.firstBytesReceived();
 
-      const reader = response.body.getReader();
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      if (!response.body || typeof response.body.getReader !== "function") {
+        // Fallback for older browsers (e.g. Chrome < 43) that do not support ReadableStream
+        // or response.body.getReader. Reads the entire segment into an ArrayBuffer instead.
+        const arrayBuffer = await response.arrayBuffer();
+        if (this.isAborted()) {
+          throw new DOMException("Request aborted", "AbortError");
+        }
+        const value = new Uint8Array(arrayBuffer);
         requestControls.addLoadedChunk(value);
         this.onChunkDownloaded(value.byteLength, "http");
+      } else {
+        const reader = response.body.getReader();
+        activeReader = reader;
+
+        for (;;) {
+          if (this.isAborted()) {
+            throw new DOMException("Request aborted", "AbortError");
+          }
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (this.isAborted()) {
+            throw new DOMException("Request aborted", "AbortError");
+          }
+          requestControls.addLoadedChunk(value);
+          this.onChunkDownloaded(value.byteLength, "http");
+        }
+      }
+
+      if (this.isAborted()) {
+        throw new DOMException("Request aborted", "AbortError");
       }
 
       // If the HTTP connection drops gracefully but prematurely, fetch yields done: true
@@ -135,6 +198,10 @@ export class HttpRequestExecutor {
         this.httpConfig.validateHTTPSegment,
       );
 
+      if (this.isAborted()) {
+        throw new DOMException("Request aborted", "AbortError");
+      }
+
       if (!isValid) {
         this.request.clearLoadedBytes();
         throw new RequestError<"http-segment-validation-failed">(
@@ -145,6 +212,8 @@ export class HttpRequestExecutor {
       requestControls.completeOnSuccess();
     } catch (error) {
       this.handleError(error, requestControls);
+    } finally {
+      this.abortController.signal.removeEventListener("abort", onAbort);
     }
   }
 
@@ -219,7 +288,7 @@ export class HttpRequestExecutor {
   private handleError(error: unknown, requestControls: RequestControls) {
     // Abort-initiated errors: the Request already transitioned its own
     // status via abortFromProcessQueue/abortOnTimeout, nothing to do here.
-    if (this.abortController.signal.aborted) return;
+    if (this.isAborted()) return;
 
     if (error instanceof Error) {
       const httpLoaderError =

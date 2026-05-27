@@ -2,6 +2,16 @@ import { EventTarget } from "../../utils/event-target.js";
 import { getPromiseWithResolvers } from "../../utils/utils.js";
 import { isTerminalConnectionState } from "../utils.js";
 import { WebSocketClient } from "../websocket-client/index.js";
+import { SafeAbortController } from "../../utils/abort-controller.js";
+
+import {
+  PeerConnection,
+  SessionDescription,
+  safeCreateOffer,
+  safeCreateAnswer,
+  safeSetLocalDescription,
+  safeSetRemoteDescription,
+} from "./webrtc-utils.js";
 
 export type WebTorrentClientEventMap = {
   peerConnected: (event: {
@@ -83,7 +93,7 @@ export class WebTorrentClient {
   readonly #eventTarget = new EventTarget<WebTorrentClientEventMap>();
   readonly #pendingOffers = new Map<string, PendingOffer>();
   readonly #negotiatingConnections = new Set<RTCPeerConnection>();
-  readonly #destroyAbortController = new AbortController();
+  readonly #destroyAbortController = new SafeAbortController();
 
   #announceTimeoutId: ReturnType<typeof setTimeout> | null = null;
   #announceIntervalSeconds: number | null = null;
@@ -377,7 +387,7 @@ export class WebTorrentClient {
 
     let pc: RTCPeerConnection | undefined;
     try {
-      pc = new RTCPeerConnection(this.#config.rtcConfig);
+      pc = new PeerConnection(this.#config.rtcConfig);
       this.#negotiatingConnections.add(pc);
 
       const channel = pc.createDataChannel(
@@ -385,10 +395,10 @@ export class WebTorrentClient {
         this.#config.channelConfig,
       );
 
-      const offer = await pc.createOffer();
+      const offer = await safeCreateOffer(pc);
       this.#throwIfDestroyed();
 
-      await pc.setLocalDescription(offer);
+      await safeSetLocalDescription(pc, offer);
       this.#throwIfDestroyed();
 
       await this.#waitForIceGathering(pc);
@@ -489,16 +499,16 @@ export class WebTorrentClient {
 
     let pc: RTCPeerConnection | undefined;
     try {
-      pc = new RTCPeerConnection(this.#config.rtcConfig);
+      pc = new PeerConnection(this.#config.rtcConfig);
       this.#negotiatingConnections.add(pc);
 
-      await pc.setRemoteDescription(new RTCSessionDescription(offerSdp));
+      await safeSetRemoteDescription(pc, new SessionDescription(offerSdp));
       this.#throwIfDestroyed();
 
-      const answer = await pc.createAnswer();
+      const answer = await safeCreateAnswer(pc);
       this.#throwIfDestroyed();
 
-      await pc.setLocalDescription(answer);
+      await safeSetLocalDescription(pc, answer);
       this.#throwIfDestroyed();
 
       await this.#waitForIceGathering(pc);
@@ -563,8 +573,9 @@ export class WebTorrentClient {
     this.#negotiatingConnections.add(pending.connection);
 
     try {
-      await pending.connection.setRemoteDescription(
-        new RTCSessionDescription(answerSdp),
+      await safeSetRemoteDescription(
+        pending.connection,
+        new SessionDescription(answerSdp),
       );
       this.#throwIfDestroyed();
 

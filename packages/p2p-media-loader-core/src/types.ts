@@ -444,7 +444,7 @@ export type StreamConfig = {
    * Optional function to customize the setup of HTTP requests for segment downloads.
    * @param segmentUrl URL of the segment.
    * @param segmentByteRange The range of bytes requested for the segment.
-   * @param requestAbortSignal An abort signal to cancel the request if needed.
+   * @param requestAbortSignal An abort signal to cancel the request if needed (undefined if AbortController is not supported by the browser).
    * @param requestByteRange Additional byte range for partial requests, if required.
    * @returns A promise that resolves with the configured request, or undefined if no customization should be made.
    *
@@ -456,7 +456,7 @@ export type StreamConfig = {
   httpRequestSetup?: (
     segmentUrl: string,
     segmentByteRange: ByteRange | undefined,
-    requestAbortSignal: AbortSignal,
+    requestAbortSignal: AbortSignal | undefined,
     requestByteRange: { start: number; end?: number } | undefined,
   ) => Promise<Request | undefined | null>;
 };
