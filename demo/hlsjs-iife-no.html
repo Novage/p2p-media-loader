@@ -252,7 +252,7 @@
           var HlsJsP2PEngine = window.p2pml.hlsjs.HlsJsP2PEngine;
 
           var HlsWithP2P = HlsJsP2PEngine.injectMixin(window.Hls);
-          var hls = new HlsWithP2P();
+          var hls = new Hls();
 
           hls.attachMedia(video);
           hls.on(Hls.Events.ERROR, function (event, data) {
