@@ -2016,6 +2016,70 @@ this.p2pml.hlsjs = (function(exports) {
 	var globalObject = typeof window !== "undefined" ? window : void 0;
 	var PeerConnection = (_ref = (_globalObject$RTCPeer = globalObject === null || globalObject === void 0 ? void 0 : globalObject.RTCPeerConnection) !== null && _globalObject$RTCPeer !== void 0 ? _globalObject$RTCPeer : globalObject === null || globalObject === void 0 ? void 0 : globalObject.webkitRTCPeerConnection) !== null && _ref !== void 0 ? _ref : globalObject === null || globalObject === void 0 ? void 0 : globalObject.mozRTCPeerConnection;
 	var SessionDescription = (_ref2 = (_globalObject$RTCSess = globalObject === null || globalObject === void 0 ? void 0 : globalObject.RTCSessionDescription) !== null && _globalObject$RTCSess !== void 0 ? _globalObject$RTCSess : globalObject === null || globalObject === void 0 ? void 0 : globalObject.webkitRTCSessionDescription) !== null && _ref2 !== void 0 ? _ref2 : globalObject === null || globalObject === void 0 ? void 0 : globalObject.mozRTCSessionDescription;
+	function safeCreateOffer(pc, options) {
+		return new Promise((resolve, reject) => {
+			try {
+				const p = pc.createOffer(options);
+				if (p && typeof p.then === "function") {
+					p.then(resolve, reject);
+					return;
+				}
+			} catch (_unused) {}
+			try {
+				pc.createOffer((offer) => resolve(offer), (err) => reject(err), options);
+			} catch (err) {
+				reject(err);
+			}
+		});
+	}
+	function safeCreateAnswer(pc, options) {
+		return new Promise((resolve, reject) => {
+			try {
+				const p = pc.createAnswer(options);
+				if (p && typeof p.then === "function") {
+					p.then(resolve, reject);
+					return;
+				}
+			} catch (_unused2) {}
+			try {
+				pc.createAnswer((answer) => resolve(answer), (err) => reject(err), options);
+			} catch (err) {
+				reject(err);
+			}
+		});
+	}
+	function safeSetLocalDescription(pc, description) {
+		return new Promise((resolve, reject) => {
+			try {
+				const p = pc.setLocalDescription(description);
+				if (p && typeof p.then === "function") {
+					p.then(resolve, reject);
+					return;
+				}
+			} catch (_unused3) {}
+			try {
+				pc.setLocalDescription(description, () => resolve(), (err) => reject(err));
+			} catch (err) {
+				reject(err);
+			}
+		});
+	}
+	function safeSetRemoteDescription(pc, description) {
+		return new Promise((resolve, reject) => {
+			try {
+				const p = pc.setRemoteDescription(description);
+				if (p && typeof p.then === "function") {
+					p.then(resolve, reject);
+					return;
+				}
+			} catch (_unused4) {}
+			try {
+				pc.setRemoteDescription(description, () => resolve(), (err) => reject(err));
+			} catch (err) {
+				reject(err);
+			}
+		});
+	}
 	var WEBTORRENT_DEFAULT_OFFER_TIMEOUT = 5e4;
 	var WEBTORRENT_DEFAULT_CONNECTION_TIMEOUT = 15e3;
 	var WEBTORRENT_DEFAULT_OFFERS_COUNT = 5;
@@ -2229,9 +2293,9 @@ this.p2pml.hlsjs = (function(exports) {
 				pc = new PeerConnection(_classPrivateFieldGet2(_config$4, _this3).rtcConfig);
 				_classPrivateFieldGet2(_negotiatingConnections, _this3).add(pc);
 				const channel = pc.createDataChannel("webtorrent", _classPrivateFieldGet2(_config$4, _this3).channelConfig);
-				const offer = yield pc.createOffer();
+				const offer = yield safeCreateOffer(pc);
 				_assertClassBrand(_WebTorrentClient_brand, _this3, _throwIfDestroyed).call(_this3);
-				yield pc.setLocalDescription(offer);
+				yield safeSetLocalDescription(pc, offer);
 				_assertClassBrand(_WebTorrentClient_brand, _this3, _throwIfDestroyed).call(_this3);
 				yield _assertClassBrand(_WebTorrentClient_brand, _this3, _waitForIceGathering).call(_this3, pc);
 				_assertClassBrand(_WebTorrentClient_brand, _this3, _throwIfDestroyed).call(_this3);
@@ -2273,7 +2337,7 @@ this.p2pml.hlsjs = (function(exports) {
 		});
 		try {
 			_classPrivateFieldGet2(_wsClient, this).send(JSON.stringify(payload));
-		} catch (_unused) {}
+		} catch (_unused5) {}
 	}
 	function _buildAnnouncePayload({ numwant, offers, event }) {
 		const payload = {
@@ -2298,11 +2362,11 @@ this.p2pml.hlsjs = (function(exports) {
 			try {
 				pc = new PeerConnection(_classPrivateFieldGet2(_config$4, _this4).rtcConfig);
 				_classPrivateFieldGet2(_negotiatingConnections, _this4).add(pc);
-				yield pc.setRemoteDescription(new SessionDescription(offerSdp));
+				yield safeSetRemoteDescription(pc, new SessionDescription(offerSdp));
 				_assertClassBrand(_WebTorrentClient_brand, _this4, _throwIfDestroyed).call(_this4);
-				const answer = yield pc.createAnswer();
+				const answer = yield safeCreateAnswer(pc);
 				_assertClassBrand(_WebTorrentClient_brand, _this4, _throwIfDestroyed).call(_this4);
-				yield pc.setLocalDescription(answer);
+				yield safeSetLocalDescription(pc, answer);
 				_assertClassBrand(_WebTorrentClient_brand, _this4, _throwIfDestroyed).call(_this4);
 				yield _assertClassBrand(_WebTorrentClient_brand, _this4, _waitForIceGathering).call(_this4, pc);
 				_assertClassBrand(_WebTorrentClient_brand, _this4, _throwIfDestroyed).call(_this4);
@@ -2352,7 +2416,7 @@ this.p2pml.hlsjs = (function(exports) {
 			}
 			_classPrivateFieldGet2(_negotiatingConnections, _this5).add(pending.connection);
 			try {
-				yield pending.connection.setRemoteDescription(new SessionDescription(answerSdp));
+				yield safeSetRemoteDescription(pending.connection, new SessionDescription(answerSdp));
 				_assertClassBrand(_WebTorrentClient_brand, _this5, _throwIfDestroyed).call(_this5);
 				const channel = yield _assertClassBrand(_WebTorrentClient_brand, _this5, _waitForConnection).call(_this5, pending.connection, pending.channel);
 				_assertClassBrand(_WebTorrentClient_brand, _this5, _throwIfDestroyed).call(_this5);
