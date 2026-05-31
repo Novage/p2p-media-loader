@@ -480,6 +480,12 @@ export type SegmentStartDetails = {
 
   /** The peer ID, if the segment is downloaded from a peer. */
   peerId: string | undefined;
+
+  /** The info hash of the swarm that the segment belongs to. */
+  infoHash: string;
+
+  /** The type of stream that the segment is associated with. */
+  streamType: StreamType;
 };
 
 /** Represents details about a segment error event. */
@@ -496,6 +502,9 @@ export type SegmentErrorDetails = {
   /** The peer ID, if the segment was downloaded from a peer. */
   peerId: string | undefined;
 
+  /** The info hash of the swarm that the segment belongs to. */
+  infoHash: string;
+
   /** The type of stream that the segment is associated with. */
   streamType: StreamType;
 };
@@ -511,14 +520,23 @@ export type SegmentAbortDetails = {
   /** The peer ID, if the segment was downloaded from a peer. */
   peerId: string | undefined;
 
+  /** The info hash of the swarm that the segment belongs to. */
+  infoHash: string;
+
   /** The type of stream that the segment is associated with. */
   streamType: StreamType;
 };
 
 /** Represents the details about a loaded segment. */
 export type SegmentLoadDetails = {
-  /** The URL of the loaded segment */
+  /**
+   * The URL of the loaded segment
+   * @deprecated Use `segment.url` instead
+   */
   segmentUrl: string;
+
+  /** The segment that the event is about. */
+  segment: Segment;
 
   /** The length of the segment in bytes. */
   bytesLength: number;
@@ -529,7 +547,10 @@ export type SegmentLoadDetails = {
   /** The peer ID, if the segment was downloaded from a peer. */
   peerId: string | undefined;
 
-  /** The segment that the event is about. */
+  /** The info hash of the swarm that the segment belongs to. */
+  infoHash: string;
+
+  /** The type of stream that the segment is associated with. */
   streamType: StreamType;
 };
 
@@ -537,6 +558,8 @@ export type SegmentLoadDetails = {
 export type PeerDetails = {
   /** The unique identifier for a peer in the network. */
   peerId: string;
+  /** The info hash of the swarm that the peer is part of. */
+  infoHash: string;
   /** The type of stream that the peer is connected to. */
   streamType: StreamType;
 };
@@ -545,6 +568,8 @@ export type PeerDetails = {
 export type PeerErrorDetails = {
   /** The unique identifier for a peer in the network. */
   peerId: string;
+  /** The info hash of the swarm that the peer is part of. */
+  infoHash: string;
   /** The type of stream that the peer is connected to. */
   streamType: StreamType;
   /** The error that occurred during the peer-to-peer connection. */
@@ -555,6 +580,8 @@ export type PeerErrorDetails = {
 export type TrackerErrorDetails = {
   /** The tracker URL. */
   trackerUrl: string;
+  /** The info hash of the swarm that the tracker is for. */
+  infoHash: string;
   /** The type of stream that the tracker is for. */
   streamType: StreamType;
   /** The error that occurred during the tracker request. */
@@ -564,10 +591,26 @@ export type TrackerErrorDetails = {
 export type TrackerWarningDetails = {
   /** The tracker URL. */
   trackerUrl: string;
+  /** The info hash of the swarm that the tracker is for. */
+  infoHash: string;
   /** The type of stream that the tracker is for. */
   streamType: StreamType;
   /** The warning that occurred during the tracker request. */
   warning: unknown;
+};
+
+/** Represents the details of a peer connection error event. */
+export type PeerConnectErrorDetails = {
+  /** The unique identifier for a peer in the network. */
+  peerId: string;
+  /** The info hash of the swarm that the peer is connected to. */
+  infoHash: string;
+  /** The type of stream that the peer is connected to. */
+  streamType: StreamType;
+  /** The tracker URL that the peer was discovered from. */
+  trackerUrl: string;
+  /** The error that occurred during the peer-to-peer connection. */
+  error: Error;
 };
 
 /**
@@ -611,6 +654,13 @@ export type CoreEventMap = {
   onPeerConnect: (params: PeerDetails) => void;
 
   /**
+   * Triggered when an error occurs while establishing a peer-to-peer connection.
+   *
+   * @param params - Contains details about the connection error and the peer.
+   */
+  onPeerConnectError: (params: PeerConnectErrorDetails) => void;
+
+  /**
    * Triggered when an existing peer-to-peer connection is closed.
    *
    * @param params - Contains details about the peer that the event is about.
@@ -624,26 +674,41 @@ export type CoreEventMap = {
    */
   onPeerError: (params: PeerErrorDetails) => void;
 
+  // Positional parameters instead of an object to avoid allocation on every
+  // chunk — this is a high-frequency event and allocations increase GC pressure.
   /**
    * Invoked after a chunk of data from a segment has been successfully downloaded.
    *
    * @param bytesLength - The size of the downloaded chunk in bytes.
    * @param downloadSource - The source of the download.
    * @param peerId - The peer ID of the peer that the event is about, if applicable.
+   * @param streamType - The type of stream that the chunk belongs to.
+   * @param infoHash - The info hash of the swarm that the chunk belongs to.
    */
   onChunkDownloaded: (
     bytesLength: number,
     downloadSource: DownloadSource,
-    peerId?: string,
+    peerId: string | undefined,
+    streamType: StreamType,
+    infoHash: string,
   ) => void;
 
+  // Positional parameters instead of an object to avoid allocation on every
+  // chunk — this is a high-frequency event and allocations increase GC pressure.
   /**
    * Called when a chunk of data has been successfully uploaded to a peer.
    *
    * @param bytesLength - The length of the segment in bytes.
    * @param peerId - The peer ID, if the segment was downloaded from a peer
+   * @param streamType - The type of stream that the chunk belongs to.
+   * @param infoHash - The info hash of the swarm that the chunk belongs to.
    */
-  onChunkUploaded: (bytesLength: number, peerId: string) => void;
+  onChunkUploaded: (
+    bytesLength: number,
+    peerId: string,
+    streamType: StreamType,
+    infoHash: string,
+  ) => void;
 
   /**
    * Called when an error occurs during the tracker request process.

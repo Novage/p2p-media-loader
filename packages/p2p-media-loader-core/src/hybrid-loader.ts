@@ -62,6 +62,7 @@ export class HybridLoader {
       this.playback,
       this.config,
       this.eventTarget,
+      this.swarmId,
     );
 
     this.p2pLoaders = new P2PLoadersContainer(

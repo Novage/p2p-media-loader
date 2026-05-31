@@ -57,6 +57,11 @@ const playerComponents = {
   vidstack_hls: HlsjsVidstack,
 } as const;
 
+type PeerState = {
+  peerId: string;
+  infoHash: string;
+};
+
 export const P2PVideoDemo = ({
   streamUrl,
   debugToolsEnabled = false,
@@ -74,7 +79,12 @@ export const P2PVideoDemo = ({
     [queryParams.trackers],
   );
 
-  const [peers, setPeers] = useState<string[]>([]);
+  const [peers, setPeers] = useState<PeerState[]>([]);
+
+  const uniquePeerIds = useMemo(
+    () => Array.from(new Set(peers.map((p) => p.peerId))),
+    [peers],
+  );
 
   const onChunkDownloaded = useCallback(
     (bytesLength: number, downloadSource: string) => {
@@ -100,7 +110,7 @@ export const P2PVideoDemo = ({
     if (params.streamType !== "main") return;
 
     setPeers((peers) => {
-      return [...peers, params.peerId];
+      return [...peers, { peerId: params.peerId, infoHash: params.infoHash }];
     });
   }, []);
 
@@ -108,7 +118,10 @@ export const P2PVideoDemo = ({
     if (params.streamType !== "main") return;
 
     setPeers((peers) => {
-      return peers.filter((peer) => peer !== params.peerId);
+      return peers.filter(
+        (peer) =>
+          !(peer.peerId === params.peerId && peer.infoHash === params.infoHash),
+      );
     });
   }, []);
 
@@ -163,7 +176,7 @@ export const P2PVideoDemo = ({
             />
           </div>
 
-          <NodeNetwork peers={peers} />
+          <NodeNetwork peers={uniquePeerIds} />
 
           {trackers.length > 0 && (
             <div className="trackers-container">

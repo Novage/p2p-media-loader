@@ -1,5 +1,5 @@
 import debug from "debug";
-import { CoreEventMap, StreamConfig } from "../types.js";
+import { CoreEventMap, StreamConfig, StreamType } from "../types.js";
 import * as Command from "./commands/index.js";
 import { EventTarget } from "../utils/event-target.js";
 import { DataChannelSender } from "../webtorrent/data-channel-sender.js";
@@ -10,7 +10,7 @@ export type PeerConfig = Pick<
   | "webRtcMaxMessageSize"
   | "p2pErrorRetries"
   | "validateP2PSegment"
->;
+> & { streamType: StreamType; infoHash: string };
 
 const logger = debug("p2pml-core:peer-protocol");
 
@@ -66,7 +66,13 @@ export class PeerProtocol {
       this.#receivingCommandBytes(data);
     } else {
       this.#eventHandlers.onSegmentChunkReceived(data);
-      this.#onChunkDownloaded(data.byteLength, "p2p", this.#peerId);
+      this.#onChunkDownloaded(
+        data.byteLength,
+        "p2p",
+        this.#peerId,
+        this.#peerConfig.streamType,
+        this.#peerConfig.infoHash,
+      );
     }
   };
 
@@ -115,7 +121,12 @@ export class PeerProtocol {
 
     try {
       await this.#dataChannelSender.sendData(data, (chunkSize) => {
-        this.#onChunkUploaded(chunkSize, this.#peerId);
+        this.#onChunkUploaded(
+          chunkSize,
+          this.#peerId,
+          this.#peerConfig.streamType,
+          this.#peerConfig.infoHash,
+        );
       });
     } finally {
       if (this.#uploadingRequestId === requestId) {

@@ -27,6 +27,7 @@ export class P2PLoader {
   #isAnnounceMicrotaskCreated = false;
   readonly #webtorrentManagerLogger = debug("p2pml-core:webtorrent-manager");
 
+  readonly #infoHash: string;
   #streamManifestUrl: string;
   readonly #stream: StreamWithSegments;
   readonly #requests: RequestsContainer;
@@ -35,6 +36,13 @@ export class P2PLoader {
   readonly #webTorrentSocketPool: WebTorrentSocketPool;
   readonly #eventTarget: EventTarget<EventTargetMap>;
   readonly #onSegmentAnnouncement: () => void;
+
+  readonly #onPeerConnect: CoreEventMap["onPeerConnect"];
+  readonly #onPeerConnectError: CoreEventMap["onPeerConnectError"];
+  readonly #onPeerClose: CoreEventMap["onPeerClose"];
+  readonly #onPeerError: CoreEventMap["onPeerError"];
+  readonly #onTrackerWarning: CoreEventMap["onTrackerWarning"];
+  readonly #onTrackerError: CoreEventMap["onTrackerError"];
 
   constructor(
     streamManifestUrl: string,
@@ -55,6 +63,13 @@ export class P2PLoader {
     this.#eventTarget = eventTarget;
     this.#onSegmentAnnouncement = onSegmentAnnouncement;
 
+    this.#onPeerConnect = eventTarget.getEventDispatcher("onPeerConnect");
+    this.#onPeerConnectError = eventTarget.getEventDispatcher("onPeerConnectError");
+    this.#onPeerClose = eventTarget.getEventDispatcher("onPeerClose");
+    this.#onPeerError = eventTarget.getEventDispatcher("onPeerError");
+    this.#onTrackerWarning = eventTarget.getEventDispatcher("onTrackerWarning");
+    this.#onTrackerError = eventTarget.getEventDispatcher("onTrackerError");
+
     this.#swarmId = this.#config.swarmId ?? this.#streamManifestUrl;
     this.#streamSwarmId = StreamUtils.getStreamSwarmId(
       this.#swarmId,
@@ -62,6 +77,8 @@ export class P2PLoader {
     );
 
     const streamHash = PeerUtil.getStreamHash(this.#streamSwarmId);
+    this.#infoHash = streamHash;
+
     let peerId = P2PLoader.#PEER_ID_BY_INFO_HASH.get(streamHash);
     if (!peerId) {
       peerId = PeerUtil.generatePeerId(this.#config.trackerClientVersionPrefix);
@@ -91,9 +108,11 @@ export class P2PLoader {
         `Peer connection failed (${event.peerId}) from tracker ${event.trackerUrl}:`,
         event.error,
       );
-      this.#eventTarget.getEventDispatcher("onPeerError")({
+      this.#onPeerConnectError({
         peerId: event.peerId,
+        infoHash: this.#infoHash,
         streamType: this.#stream.type,
+        trackerUrl: event.trackerUrl,
         error: new Error(event.error),
       });
     });
@@ -103,8 +122,9 @@ export class P2PLoader {
         `Tracker warning (${event.trackerUrl}):`,
         event.warning,
       );
-      this.#eventTarget.getEventDispatcher("onTrackerWarning")({
+      this.#onTrackerWarning({
         trackerUrl: event.trackerUrl,
+        infoHash: this.#infoHash,
         streamType: this.#stream.type,
         warning: new Error(event.warning),
       });
@@ -115,8 +135,9 @@ export class P2PLoader {
         `Tracker error (${event.trackerUrl}):`,
         event.error,
       );
-      this.#eventTarget.getEventDispatcher("onTrackerError")({
+      this.#onTrackerError({
         trackerUrl: event.trackerUrl,
+        infoHash: this.#infoHash,
         streamType: this.#stream.type,
         error: new Error(event.error),
       });
@@ -259,13 +280,21 @@ export class P2PLoader {
         },
         onSegmentsAnnouncement: this.#onSegmentAnnouncement,
       },
-      this.#config,
+      {
+        p2pNotReceivingBytesTimeoutMs: this.#config.p2pNotReceivingBytesTimeoutMs,
+        webRtcMaxMessageSize: this.#config.webRtcMaxMessageSize,
+        p2pErrorRetries: this.#config.p2pErrorRetries,
+        validateP2PSegment: this.#config.validateP2PSegment,
+        streamType: this.#stream.type,
+        infoHash: this.#infoHash,
+      },
       this.#eventTarget,
     );
     this.#peersMap.set(event.peerId, peer);
 
-    this.#eventTarget.getEventDispatcher("onPeerConnect")({
+    this.#onPeerConnect({
       peerId: event.peerId,
+      infoHash: this.#infoHash,
       streamType: this.#stream.type,
     });
 
@@ -291,15 +320,17 @@ export class P2PLoader {
     peer.destroy(true);
 
     if (event.isError) {
-      this.#eventTarget.getEventDispatcher("onPeerError")({
+      this.#onPeerError({
         peerId: event.peerId,
+        infoHash: this.#infoHash,
         streamType: this.#stream.type,
         error: new Error(event.reason),
       });
     }
 
-    this.#eventTarget.getEventDispatcher("onPeerClose")({
+    this.#onPeerClose({
       peerId: peer.id,
+      infoHash: this.#infoHash,
       streamType: this.#stream.type,
     });
   };
@@ -384,11 +415,16 @@ export class P2PLoader {
       this.broadcastAnnouncement,
     );
 
+    // webtorrentManager.destroy() internally clears its event target and dispatches
+    // synchronous "peerDisconnected" events for active peers. These events trigger
+    // our #onPeerDisconnectedWebTorrent handler, which destroys peer wrappers and
+    // removes them from #peersMap. We destroy webtorrentManager first to prevent
+    // redundant WebRTC connection closing calls during the manual peer cleanup loop.
+    this.#webtorrentManager.destroy();
+
     for (const peer of this.#peersMap.values()) {
       peer.destroy();
     }
     this.#peersMap.clear();
-
-    this.#webtorrentManager.destroy();
   }
 }

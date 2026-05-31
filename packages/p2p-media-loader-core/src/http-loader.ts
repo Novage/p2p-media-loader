@@ -157,7 +157,13 @@ export class HttpRequestExecutor {
         }
         const value = new Uint8Array(arrayBuffer);
         requestControls.addLoadedChunk(value);
-        this.onChunkDownloaded(value.byteLength, "http");
+        this.onChunkDownloaded(
+          value.byteLength,
+          "http",
+          undefined,
+          segment.stream.type,
+          this.request.infoHash,
+        );
       } else {
         const reader = response.body.getReader();
         activeReader = reader;
@@ -172,7 +178,13 @@ export class HttpRequestExecutor {
             throw new DOMException("Request aborted", "AbortError");
           }
           requestControls.addLoadedChunk(value);
-          this.onChunkDownloaded(value.byteLength, "http");
+          this.onChunkDownloaded(
+            value.byteLength,
+            "http",
+            undefined,
+            segment.stream.type,
+            this.request.infoHash,
+          );
         }
       }
 
