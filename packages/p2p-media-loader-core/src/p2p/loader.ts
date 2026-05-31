@@ -19,7 +19,6 @@ export type EventTargetMap = Record<`onStorageUpdated-${string}`, () => void> &
   CoreEventMap;
 
 export class P2PLoader {
-  static readonly #PEER_ID_BY_INFO_HASH = new Map<string, string>();
   readonly #webtorrentManager: WebTorrentManager;
   readonly #peersMap = new Map<string, Peer>();
   readonly #swarmId: string;
@@ -52,6 +51,7 @@ export class P2PLoader {
     config: StreamConfig,
     webTorrentSocketPool: WebTorrentSocketPool,
     eventTarget: EventTarget<EventTargetMap>,
+    peerId: string,
     onSegmentAnnouncement: () => void,
   ) {
     this.#streamManifestUrl = streamManifestUrl;
@@ -78,12 +78,6 @@ export class P2PLoader {
 
     const streamHash = PeerUtil.getStreamHash(this.#streamSwarmId);
     this.#infoHash = streamHash;
-
-    let peerId = P2PLoader.#PEER_ID_BY_INFO_HASH.get(streamHash);
-    if (!peerId) {
-      peerId = PeerUtil.generatePeerId(this.#config.trackerClientVersionPrefix);
-      P2PLoader.#PEER_ID_BY_INFO_HASH.set(streamHash, peerId);
-    }
 
     this.#webtorrentManager = new WebTorrentManager({
       infoHash: streamHash,

@@ -30,6 +30,7 @@ export class P2PLoadersContainer {
   readonly #config: StreamConfig;
   readonly #webTorrentSocketPool: WebTorrentSocketPool;
   readonly #eventTarget: EventTarget<CoreEventMap>;
+  readonly #peerId: string;
   #onSegmentAnnouncement: () => void;
 
   constructor(
@@ -40,6 +41,7 @@ export class P2PLoadersContainer {
     config: StreamConfig,
     webTorrentSocketPool: WebTorrentSocketPool,
     eventTarget: EventTarget<CoreEventMap>,
+    peerId: string,
     onSegmentAnnouncement: () => void,
   ) {
     this.#streamManifestUrl = streamManifestUrl;
@@ -48,6 +50,7 @@ export class P2PLoadersContainer {
     this.#config = config;
     this.#webTorrentSocketPool = webTorrentSocketPool;
     this.#eventTarget = eventTarget;
+    this.#peerId = peerId;
     this.#onSegmentAnnouncement = onSegmentAnnouncement;
 
     this.#currentLoaderItem = this.#findOrCreateLoaderForStream(stream);
@@ -68,6 +71,7 @@ export class P2PLoadersContainer {
       this.#config,
       this.#webTorrentSocketPool,
       this.#eventTarget,
+      this.#peerId,
       () => {
         if (this.#currentLoaderItem.loader === loader) {
           this.#onSegmentAnnouncement();

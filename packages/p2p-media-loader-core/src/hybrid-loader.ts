@@ -51,6 +51,7 @@ export class HybridLoader {
     private readonly segmentStorage: SegmentStorage,
     private readonly webTorrentSocketPool: WebTorrentSocketPool,
     private readonly eventTarget: EventTarget<CoreEventMap>,
+    private readonly peerId: string,
   ) {
     const activeStream = this.lastRequestedSegment.stream;
     this.swarmId = this.config.swarmId ?? this.streamManifestUrl;
@@ -73,6 +74,7 @@ export class HybridLoader {
       this.config,
       this.webTorrentSocketPool,
       this.eventTarget,
+      this.peerId,
       this.requestProcessQueueMicrotask,
     );
 

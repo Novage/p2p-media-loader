@@ -26,7 +26,7 @@ import {
   deepCopy,
   filterUndefinedProps,
 } from "./utils/utils.js";
-import { TRACKER_CLIENT_VERSION_PREFIX } from "./utils/peer.js";
+import { TRACKER_CLIENT_VERSION_PREFIX, generatePeerId } from "./utils/peer.js";
 import { SegmentStorage } from "./segment-storage/index.js";
 import { WebTorrentSocketPool } from "./webtorrent/webtorrent-socket-pool/index.js";
 
@@ -36,6 +36,7 @@ export class Core<TStream extends Stream = Stream> {
   static readonly DEFAULT_COMMON_CORE_CONFIG: CommonCoreConfig = {
     segmentMemoryStorageLimit: undefined,
     customSegmentStorageFactory: undefined,
+    trackerClientVersionPrefix: TRACKER_CLIENT_VERSION_PREFIX,
   };
 
   /** Default configuration for stream settings. */
@@ -54,7 +55,6 @@ export class Core<TStream extends Stream = Stream> {
     httpNotReceivingBytesTimeoutMs: 3000,
     httpErrorRetries: 3,
     p2pErrorRetries: 3,
-    trackerClientVersionPrefix: TRACKER_CLIENT_VERSION_PREFIX,
     announceTrackers: [
       "wss://tracker.novage.com.ua",
       "wss://tracker.openwebtorrent.com",
@@ -86,6 +86,7 @@ export class Core<TStream extends Stream = Stream> {
   private readonly socketPoolLogger = debug(
     "p2pml-core:webtorrent-socket-pool",
   );
+  private readonly peerId: string;
   private mainStreamLoader?: HybridLoader;
   private secondaryStreamLoader?: HybridLoader;
   private streamDetails: StreamDetails = {
@@ -130,6 +131,10 @@ export class Core<TStream extends Stream = Stream> {
       baseConfig: filteredConfig,
       specificStreamConfig: filteredConfig.secondaryStream,
     });
+
+    this.peerId = generatePeerId(
+      this.commonCoreConfig.trackerClientVersionPrefix,
+    );
 
     this.webTorrentSocketPool.addEventListener("error", (error, url) => {
       this.socketPoolLogger(`WebSocket error for tracker url ${url}:`, error);
@@ -556,6 +561,7 @@ export class Core<TStream extends Stream = Stream> {
       this.segmentStorage,
       this.webTorrentSocketPool,
       this.eventTarget,
+      this.peerId,
     );
   }
 }
