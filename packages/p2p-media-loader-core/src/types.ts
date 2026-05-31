@@ -553,6 +553,8 @@ export type PeerErrorDetails = {
 
 /** Represents the details of a tracker error event. */
 export type TrackerErrorDetails = {
+  /** The tracker URL. */
+  trackerUrl: string;
   /** The type of stream that the tracker is for. */
   streamType: StreamType;
   /** The error that occurred during the tracker request. */
@@ -560,6 +562,8 @@ export type TrackerErrorDetails = {
 };
 
 export type TrackerWarningDetails = {
+  /** The tracker URL. */
+  trackerUrl: string;
   /** The type of stream that the tracker is for. */
   streamType: StreamType;
   /** The warning that occurred during the tracker request. */

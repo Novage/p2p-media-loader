@@ -104,6 +104,7 @@ export class P2PLoader {
         event.warning,
       );
       this.#eventTarget.getEventDispatcher("onTrackerWarning")({
+        trackerUrl: event.trackerUrl,
         streamType: this.#stream.type,
         warning: new Error(event.warning),
       });
@@ -115,6 +116,7 @@ export class P2PLoader {
         event.error,
       );
       this.#eventTarget.getEventDispatcher("onTrackerError")({
+        trackerUrl: event.trackerUrl,
         streamType: this.#stream.type,
         error: new Error(event.error),
       });
