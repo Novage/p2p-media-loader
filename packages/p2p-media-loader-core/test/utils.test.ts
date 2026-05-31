@@ -38,6 +38,7 @@ test("override configs", () => {
 test("override common config", () => {
   const commonConfig: CommonCoreConfig = {
     segmentMemoryStorageLimit: 1200,
+    trackerClientVersionPrefix: "PM1000",
   };
 
   const coreConfig: CoreConfig = {
@@ -73,6 +74,7 @@ test("override common config", () => {
 
   const result: Partial<CommonCoreConfig> = {
     segmentMemoryStorageLimit: undefined,
+    trackerClientVersionPrefix: "PM1000",
   };
 
   expect(
@@ -96,7 +98,6 @@ test("override defined stream config", () => {
     httpNotReceivingBytesTimeoutMs: 1000,
     httpErrorRetries: 3,
     p2pErrorRetries: 3,
-    trackerClientVersionPrefix: "PM1000",
     announceTrackers: [
       "wss://tracker.webtorrent.dev",
       "wss://tracker.files.fm:7073/announce",
@@ -152,7 +153,6 @@ test("override defined stream config", () => {
     httpNotReceivingBytesTimeoutMs: 1500,
     httpErrorRetries: 2,
     p2pErrorRetries: 4,
-    trackerClientVersionPrefix: "PM1000",
     announceTrackers: [
       "wss://tracker.webtorrent.dev",
       "wss://tracker.files.fm:7073/announce",
