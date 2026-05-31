@@ -26,7 +26,7 @@ import {
   deepCopy,
   filterUndefinedProps,
 } from "./utils/utils.js";
-import { TRACKER_CLIENT_VERSION_PREFIX } from "./utils/peer.js";
+import { TRACKER_CLIENT_VERSION_PREFIX, generatePeerId } from "./utils/peer.js";
 import { SegmentStorage } from "./segment-storage/index.js";
 import { WebTorrentSocketPool } from "./webtorrent/webtorrent-socket-pool/index.js";
 
@@ -86,6 +86,7 @@ export class Core<TStream extends Stream = Stream> {
   private readonly socketPoolLogger = debug(
     "p2pml-core:webtorrent-socket-pool",
   );
+  private readonly peerId: string;
   private mainStreamLoader?: HybridLoader;
   private secondaryStreamLoader?: HybridLoader;
   private streamDetails: StreamDetails = {
@@ -130,6 +131,10 @@ export class Core<TStream extends Stream = Stream> {
       baseConfig: filteredConfig,
       specificStreamConfig: filteredConfig.secondaryStream,
     });
+
+    this.peerId = generatePeerId(
+      this.mainStreamConfig.trackerClientVersionPrefix,
+    );
 
     this.webTorrentSocketPool.addEventListener("error", (error, url) => {
       this.socketPoolLogger(`WebSocket error for tracker url ${url}:`, error);
@@ -556,6 +561,7 @@ export class Core<TStream extends Stream = Stream> {
       this.segmentStorage,
       this.webTorrentSocketPool,
       this.eventTarget,
+      this.peerId,
     );
   }
 }
