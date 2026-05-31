@@ -151,11 +151,10 @@ export type CommonCoreConfig = {
 
   /**
    * Prefix to use for the WebTorrent client version in tracker communications.
-   * If undefined, the default version prefix is used, which is calculated based on the package version.
    *
    * @default
    * ```typescript
-   * trackerClientVersionPrefix: undefined
+   * trackerClientVersionPrefix: `-PM${formattedPackageVersion}-`
    * ```
    */
   trackerClientVersionPrefix: string;
