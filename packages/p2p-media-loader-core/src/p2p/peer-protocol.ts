@@ -76,7 +76,7 @@ export class PeerProtocol {
         );
       }
     } catch (err) {
-      logger("error receiving segment chunk: %O", err);
+      logger("error handling data channel message: %O", err);
       this.#eventHandlers.onProtocolError(err);
     }
   };
