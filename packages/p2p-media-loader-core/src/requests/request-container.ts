@@ -40,7 +40,10 @@ export class RequestsContainer {
   getOrCreateRequest(segment: SegmentWithStream) {
     let request = this.requests.get(segment);
     if (!request) {
-      const streamSwarmId = StreamUtils.getStreamSwarmId(this.swarmId, segment.stream);
+      const streamSwarmId = StreamUtils.getStreamSwarmId(
+        this.swarmId,
+        segment.stream,
+      );
       const infoHash = PeerUtil.getStreamHash(streamSwarmId);
       request = new Request(
         segment,
@@ -79,7 +82,7 @@ export class RequestsContainer {
   destroy() {
     for (const request of this.requests.values()) {
       if (request.status !== "loading") continue;
-      request.abortFromProcessQueue();
+      request.cancel();
     }
     this.requests.clear();
   }

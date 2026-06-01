@@ -204,7 +204,7 @@ export class HybridLoader {
       switch (status) {
         case "loading":
           if (!queueSegmentIds.has(segment.runtimeId) && !engineRequest) {
-            request.abortFromProcessQueue();
+            request.cancel();
             this.requests.remove(request);
           }
           break;
@@ -364,7 +364,7 @@ export class HybridLoader {
               this.abortLastHttpLoadingInQueueAfterItem(queue, segment));
 
           if (shouldSwitchFromP2PToHttp) {
-            request.abortFromProcessQueue();
+            request.cancel();
             this.loadThroughHttp(segment);
           }
 
@@ -533,7 +533,7 @@ export class HybridLoader {
       if (itemSegment === segment) break;
       const request = this.requests.get(itemSegment);
       if (request?.downloadSource === "http" && request.status === "loading") {
-        request.abortFromProcessQueue();
+        request.cancel();
         return true;
       }
     }
@@ -548,7 +548,7 @@ export class HybridLoader {
       if (itemSegment === segment) break;
       const request = this.requests.get(itemSegment);
       if (request?.downloadSource === "p2p" && request.status === "loading") {
-        request.abortFromProcessQueue();
+        request.cancel();
         return true;
       }
     }

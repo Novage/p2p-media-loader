@@ -12,6 +12,12 @@ export type PeerConfig = Pick<
   | "validateP2PSegment"
 > & { streamType: StreamType; infoHash: string };
 
+export type PeerProtocolEventHandlers = {
+  onCommandReceived: (command: Command.PeerCommand) => void;
+  onSegmentChunkReceived: (data: Uint8Array) => void;
+  onProtocolError: (error: unknown) => void;
+};
+
 const logger = debug("p2pml-core:peer-protocol");
 
 export class PeerProtocol {
@@ -22,19 +28,13 @@ export class PeerProtocol {
   readonly #onChunkUploaded: CoreEventMap["onChunkUploaded"];
   readonly #channel: RTCDataChannel;
   readonly #peerConfig: PeerConfig;
-  readonly #eventHandlers: {
-    onCommandReceived: (command: Command.PeerCommand) => void;
-    onSegmentChunkReceived: (data: Uint8Array) => void;
-  };
+  readonly #eventHandlers: PeerProtocolEventHandlers;
   readonly #peerId: string;
 
   constructor(
     channel: RTCDataChannel,
     peerConfig: PeerConfig,
-    eventHandlers: {
-      onCommandReceived: (command: Command.PeerCommand) => void;
-      onSegmentChunkReceived: (data: Uint8Array) => void;
-    },
+    eventHandlers: PeerProtocolEventHandlers,
     eventTarget: EventTarget<CoreEventMap>,
     peerId: string,
   ) {
@@ -60,42 +60,40 @@ export class PeerProtocol {
   }
 
   #onMessageReceived = (event: MessageEvent) => {
-    // WebRTC data channel assumed to have binaryType = "arraybuffer"
-    const data = new Uint8Array(event.data as ArrayBuffer);
-    if (Command.isCommandChunk(data)) {
-      this.#receivingCommandBytes(data);
-    } else {
-      this.#eventHandlers.onSegmentChunkReceived(data);
-      this.#onChunkDownloaded(
-        data.byteLength,
-        "p2p",
-        this.#peerId,
-        this.#peerConfig.streamType,
-        this.#peerConfig.infoHash,
-      );
+    try {
+      // WebRTC data channel assumed to have binaryType = "arraybuffer"
+      const data = new Uint8Array(event.data as ArrayBuffer);
+      if (Command.isCommandChunk(data)) {
+        this.#receivingCommandBytes(data);
+      } else {
+        this.#eventHandlers.onSegmentChunkReceived(data);
+        this.#onChunkDownloaded(
+          data.byteLength,
+          "p2p",
+          this.#peerId,
+          this.#peerConfig.streamType,
+          this.#peerConfig.infoHash,
+        );
+      }
+    } catch (err) {
+      logger("error receiving segment chunk: %O", err);
+      this.#eventHandlers.onProtocolError(err);
     }
   };
 
   sendCommand(command: Command.PeerCommand) {
     if (this.#channel.readyState !== "open") {
-      logger(
-        "dropping command %d (channel state: %s)",
-        command.c,
-        this.#channel.readyState,
+      throw new Error(
+        `cannot send command ${command.c} (channel state: ${this.#channel.readyState})`,
       );
-      return;
     }
 
     const binaryCommandBuffers = Command.serializePeerCommand(
       command,
       this.#peerConfig.webRtcMaxMessageSize,
     );
-    try {
-      for (const buffer of binaryCommandBuffers) {
-        this.#channel.send(buffer);
-      }
-    } catch (err) {
-      logger("error sending command: %O", err);
+    for (const buffer of binaryCommandBuffers) {
+      this.#channel.send(buffer);
     }
   }
 
@@ -139,19 +137,29 @@ export class PeerProtocol {
     this.#commandChunks ??= new Command.BinaryCommandChunksJoiner(
       (commandBuffer) => {
         this.#commandChunks = undefined;
+        // Peers are expected to be the same version; a deserialization
+        // failure indicates a protocol-violating or buggy peer.
+        let command: Command.PeerCommand;
         try {
-          const command = Command.deserializeCommand(commandBuffer);
-          this.#eventHandlers.onCommandReceived(command);
+          command = Command.deserializeCommand(commandBuffer);
         } catch (err) {
-          logger("error processing command: %O", err);
+          logger("error deserializing command: %O", err);
+          // This synchronously triggers Peer.destroy() -> channel.close()
+          // from inside the onmessage handler, preventing further chunks from being processed.
+          this.#eventHandlers.onProtocolError(err);
+          return;
         }
+        this.#eventHandlers.onCommandReceived(command);
       },
     );
     try {
       this.#commandChunks.addCommandChunk(buffer);
     } catch (err) {
+      // Malformed chunk framing — same rationale as above.
       logger("error receiving command chunks: %O", err);
       this.#commandChunks = undefined;
+      // Triggers synchronous teardown inside the onmessage loop
+      this.#eventHandlers.onProtocolError(err);
     }
   }
 
