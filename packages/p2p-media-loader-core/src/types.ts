@@ -563,6 +563,38 @@ export type PeerDetails = {
   streamType: StreamType;
 };
 
+/** Represents the types of errors that can occur during a peer connection. */
+export type PeerErrorType =
+  | "transport-error"
+  | "protocol-violation"
+  | "bytes-length-mismatch"
+  | "validation-failed"
+  | "timeout"
+  | "connection-lost";
+
+/**
+ * Base class for domain-specific errors carrying a machine-readable type discriminator.
+ * @internal
+ */
+export abstract class TypedError<T extends string> extends Error {
+  readonly cause?: unknown;
+
+  constructor(
+    readonly type: T,
+    message?: string,
+    cause?: unknown,
+  ) {
+    super(message);
+    // Explicit assignment for ES6 compatibility (ErrorOptions with cause is ES2022)
+    this.cause = cause;
+  }
+}
+
+/** Represents an error that occurred during a peer connection. */
+export class PeerError extends TypedError<PeerErrorType> {
+  readonly name = "PeerError";
+}
+
 /** Represents the details of a peer error event. */
 export type PeerErrorDetails = {
   /** The unique identifier for a peer in the network. */
@@ -572,7 +604,27 @@ export type PeerErrorDetails = {
   /** The type of stream that the peer is connected to. */
   streamType: StreamType;
   /** The error that occurred during the peer-to-peer connection. */
-  error: Error;
+  error: PeerError;
+};
+
+/** Represents the types of warnings that can occur during a peer connection. */
+export type PeerWarningType = "timeout-strike";
+
+/** Represents a warning that occurred during a peer connection. */
+export class PeerWarning extends TypedError<PeerWarningType> {
+  readonly name = "PeerWarning";
+}
+
+/** Represents the details of a peer warning event. */
+export type PeerWarningDetails = {
+  /** The unique identifier for a peer in the network. */
+  peerId: string;
+  /** The info hash of the swarm that the peer is part of. */
+  infoHash: string;
+  /** The type of stream that the peer is connected to. */
+  streamType: StreamType;
+  /** The warning that occurred during the peer-to-peer connection. */
+  warning: PeerWarning;
 };
 
 /** Represents the details of a tracker error event. */
@@ -584,7 +636,7 @@ export type TrackerErrorDetails = {
   /** The type of stream that the tracker is for. */
   streamType: StreamType;
   /** The error that occurred during the tracker request. */
-  error: unknown;
+  error: TrackerError;
 };
 
 export type TrackerWarningDetails = {
@@ -595,8 +647,36 @@ export type TrackerWarningDetails = {
   /** The type of stream that the tracker is for. */
   streamType: StreamType;
   /** The warning that occurred during the tracker request. */
-  warning: unknown;
+  warning: TrackerWarning;
 };
+
+/** Represents the types of errors that can occur during the tracker request process. */
+export type TrackerErrorType =
+  | "announce-failed"
+  | "parse-error"
+  | "tracker-response"
+  | "signaling-failed";
+
+/** Represents an error that occurred during a tracker request. */
+export class TrackerError extends TypedError<TrackerErrorType> {
+  readonly name = "TrackerError";
+}
+
+/** Represents the types of warnings that can occur during the tracker request process. */
+export type TrackerWarningType = "tracker-response" | "offer-failed";
+
+/** Represents a warning that occurred during a tracker request. */
+export class TrackerWarning extends TypedError<TrackerWarningType> {
+  readonly name = "TrackerWarning";
+}
+
+/** Represents the types of errors that can occur during the peer connection process. */
+export type PeerConnectErrorType = "connection-failed";
+
+/** Represents an error that occurred while establishing a peer connection. */
+export class PeerConnectError extends TypedError<PeerConnectErrorType> {
+  readonly name = "PeerConnectError";
+}
 
 /** Represents the details of a peer connection error event. */
 export type PeerConnectErrorDetails = {
@@ -609,7 +689,7 @@ export type PeerConnectErrorDetails = {
   /** The tracker URL that the peer was discovered from. */
   trackerUrl: string;
   /** The error that occurred during the peer-to-peer connection. */
-  error: Error;
+  error: PeerConnectError;
 };
 
 /**
@@ -673,6 +753,13 @@ export type CoreEventMap = {
    */
   onPeerError: (params: PeerErrorDetails) => void;
 
+  /**
+   * Called when a warning occurs during a peer-to-peer connection.
+   *
+   * @param params - Contains information about the peer warning.
+   */
+  onPeerWarning: (params: PeerWarningDetails) => void;
+
   // Positional parameters instead of an object to avoid allocation on every
   // chunk — this is a high-frequency event and allocations increase GC pressure.
   /**
@@ -735,12 +822,7 @@ export type HttpRequestErrorType =
   | "http-segment-validation-failed";
 
 /** Defines the types of errors specific to peer-to-peer requests. */
-export type PeerRequestErrorType =
-  | "peer-response-bytes-length-mismatch"
-  | "peer-protocol-violation"
-  | "peer-segment-absent"
-  | "peer-closed"
-  | "p2p-segment-validation-failed";
+export type PeerRequestErrorType = "peer-segment-absent" | "peer-closed";
 
 /** Enumerates all possible request error types, including HTTP and peer-related errors. */
 export type RequestErrorType =
@@ -754,7 +836,9 @@ export type RequestErrorType =
  */
 export class RequestError<
   T extends RequestErrorType = RequestErrorType,
-> extends Error {
+> extends TypedError<T> {
+  readonly name = "RequestError";
+
   /** Error timestamp. */
   readonly timestamp: number;
 
@@ -762,12 +846,10 @@ export class RequestError<
    * Constructs a new RequestError.
    * @param type - The specific error type.
    * @param message - Optional message describing the error.
+   * @param cause - Optional underlying cause of the error.
    */
-  constructor(
-    readonly type: T,
-    message?: string,
-  ) {
-    super(message);
+  constructor(type: T, message?: string, cause?: unknown) {
+    super(type, message, cause);
     this.timestamp = performance.now();
   }
 }
@@ -782,14 +864,8 @@ export type SegmentResponse = {
 };
 
 /** Custom error class for errors that occur during core network requests. */
-export class CoreRequestError extends Error {
-  /**
-   * Constructs a new CoreRequestError.
-   * @param type - The type of the error, either 'failed' or 'aborted'.
-   */
-  constructor(readonly type: "failed" | "aborted") {
-    super();
-  }
+export class CoreRequestError extends TypedError<"failed" | "aborted"> {
+  readonly name = "CoreRequestError";
 }
 
 /** Callbacks for handling the success or failure of an engine operation. */

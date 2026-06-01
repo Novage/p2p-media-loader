@@ -36,7 +36,7 @@ export type RequestControls = Readonly<{
   firstBytesReceived: Request["firstBytesReceived"];
   addLoadedChunk: Request["addLoadedChunk"];
   completeOnSuccess: Request["completeOnSuccess"];
-  abortOnError: Request["abortOnError"];
+  failWithError: Request["failWithError"];
 }>;
 
 type OmitEncapsulated<T extends RequestAttempt> = Omit<
@@ -75,7 +75,7 @@ export class Request {
   private _status: RequestStatus = "not-started";
   private progress?: LoadProgress;
   private notReceivingBytesTimeout: Timeout;
-  private _abortRequestCallback?: (
+  private _onAbortCallback?: (
     error: RequestError<RequestAbortErrorType>,
   ) => void;
   private notReceivingBytesTimeoutMs?: number;
@@ -182,7 +182,7 @@ export class Request {
     requestData: StartRequestParameters,
     controls: {
       notReceivingBytesTimeoutMs?: number;
-      abort: (errorType: RequestError<RequestAbortErrorType>) => void;
+      onAbort: (errorType: RequestError<RequestAbortErrorType>) => void;
     },
     validate:
       | ((
@@ -266,7 +266,7 @@ export class Request {
         `${downloadSource} ${this.segment.externalId} validation failed for already-loaded bytes, clearing`,
       );
       this.clearLoadedBytes();
-      requestControls.abortOnError(new RequestError(validationErrorType));
+      requestControls.failWithError(new RequestError(validationErrorType));
       return;
     }
 
@@ -280,7 +280,7 @@ export class Request {
     requestData: StartRequestParameters,
     controls: {
       notReceivingBytesTimeoutMs?: number;
-      abort: (errorType: RequestError<RequestAbortErrorType>) => void;
+      onAbort: (errorType: RequestError<RequestAbortErrorType>) => void;
     },
   ): RequestControls {
     if (this._status === "succeed") {
@@ -303,8 +303,8 @@ export class Request {
     };
     this.manageBandwidthCalculatorsState("start");
 
-    const { notReceivingBytesTimeoutMs, abort } = controls;
-    this._abortRequestCallback = abort;
+    const { notReceivingBytesTimeoutMs } = controls;
+    this._onAbortCallback = controls.onAbort;
     this.notReceivingBytesTimeoutMs = notReceivingBytesTimeoutMs;
 
     if (notReceivingBytesTimeoutMs !== undefined) {
@@ -328,17 +328,17 @@ export class Request {
       firstBytesReceived: this.firstBytesReceived,
       addLoadedChunk: this.addLoadedChunk,
       completeOnSuccess: this.completeOnSuccess,
-      abortOnError: this.abortOnError,
+      failWithError: this.failWithError,
     };
   }
 
-  abortFromProcessQueue() {
+  cancel() {
     this.throwErrorIfNotLoadingStatus();
     this.setStatus("aborted");
     this.logger(
       `${this.currentAttempt?.downloadSource} ${this.segment.externalId} aborted`,
     );
-    this._abortRequestCallback?.(new RequestError("abort"));
+    this._onAbortCallback?.(new RequestError("abort"));
     this.onSegmentAbort({
       segment: mapSegmentWithStreamToSegment(this.segment),
       downloadSource: this.currentAttempt?.downloadSource,
@@ -349,31 +349,40 @@ export class Request {
       infoHash: this.infoHash,
       streamType: this.segment.stream.type,
     });
-    this._abortRequestCallback = undefined;
+    this._onAbortCallback = undefined;
     this.manageBandwidthCalculatorsState("stop");
     this.notReceivingBytesTimeout.clear();
   }
 
   private abortOnTimeout = () => {
     this.throwErrorIfNotLoadingStatus();
-    if (!this.currentAttempt || !this.progress || this.notReceivingBytesTimeoutMs === undefined) return;
+    if (
+      !this.currentAttempt ||
+      !this.progress ||
+      this.notReceivingBytesTimeoutMs === undefined
+    ) {
+      return;
+    }
 
     const now = performance.now();
-    const lastActive = this.progress.lastLoadedChunkTimestamp ?? this.progress.startTimestamp;
+    const lastActive =
+      this.progress.lastLoadedChunkTimestamp ?? this.progress.startTimestamp;
     const msSinceLastActive = now - lastActive;
 
     if (msSinceLastActive < this.notReceivingBytesTimeoutMs) {
       // False alarm! The stream is still downloading. Reschedule the timer.
-      this.notReceivingBytesTimeout.restart(this.notReceivingBytesTimeoutMs - msSinceLastActive);
+      this.notReceivingBytesTimeout.restart(
+        this.notReceivingBytesTimeoutMs - msSinceLastActive,
+      );
       return;
     }
 
     const error = new RequestError("bytes-receiving-timeout");
-    this._abortRequestCallback?.(error);
+    this._onAbortCallback?.(error);
     this.handleFailure(error);
   };
 
-  private abortOnError = (error: RequestError) => {
+  private failWithError = (error: RequestError) => {
     this.throwErrorIfNotLoadingStatus();
     if (!this.currentAttempt) return;
 

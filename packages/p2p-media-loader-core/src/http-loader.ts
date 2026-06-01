@@ -43,7 +43,7 @@ export class HttpRequestExecutor {
 
   execute() {
     const startControls = {
-      abort: () => this.abortController.abort(),
+      onAbort: () => this.abortController.abort(),
       notReceivingBytesTimeoutMs:
         this.httpConfig.httpNotReceivingBytesTimeoutMs,
     };
@@ -299,7 +299,7 @@ export class HttpRequestExecutor {
 
   private handleError(error: unknown, requestControls: RequestControls) {
     // Abort-initiated errors: the Request already transitioned its own
-    // status via abortFromProcessQueue/abortOnTimeout, nothing to do here.
+    // status via cancel/abortOnTimeout, nothing to do here.
     if (this.isAborted()) return;
 
     if (error instanceof Error) {
@@ -308,7 +308,7 @@ export class HttpRequestExecutor {
           ? (error as RequestError<HttpRequestErrorType>)
           : new RequestError("http-error", error.message);
 
-      requestControls.abortOnError(httpLoaderError);
+      requestControls.failWithError(httpLoaderError);
     }
   }
 }

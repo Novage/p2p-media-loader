@@ -44,11 +44,11 @@ interface WebTorrentManagerConfig {
 
 The Manager aggregates events from all child clients and forwards/handles them.
 
-- `peerConnected` (payload: `{ peerId: string, connection: RTCPeerConnection, channel: RTCDataChannel, trackerUrl: string, close: (error?: string) => void }`): Fired when a peer finishes WebRTC signaling on _any_ tracker and its Data Channel is successfully opened.
-- `peerDisconnected` (payload: `{ peerId: string, trackerUrl: string, reason: string, isError: boolean }`): Fired when a fully connected peer is closed, either due to an unexpected disconnect (e.g., network loss), manager destruction, or a manual call to the peer's `close` callback.
-- `peerConnectFailed` (payload: `{ peerId: string, trackerUrl: string, error: string }`): Fired if a signaled peer fails to connect or its data channel fails to open.
-- `warning` (payload: `{ trackerUrl: string, warning: string }`): Aggregated tracker warnings.
-- `error` (payload: `{ trackerUrl: string, error: string }`): Aggregated tracker errors (both WebSocket level and WebTorrent level).
+- `peerConnected` (payload: `{ peerId: string, connection: RTCPeerConnection, channel: RTCDataChannel, trackerUrl: string, close: (error?: PeerError) => void }`): Fired when a peer finishes WebRTC signaling on _any_ tracker and its Data Channel is successfully opened.
+- `peerDisconnected` (payload: `{ peerId: string, trackerUrl: string } & ({ error: PeerError } | { disconnectReason: string })`): Fired when a fully connected peer is closed, either due to an unexpected disconnect (e.g., network loss), manager destruction, or a manual call to the peer's `close` callback. The payload strictly separates expected closures (`disconnectReason`) from faults (`error`).
+- `peerConnectFailed` (payload: `{ peerId: string, trackerUrl: string, error: PeerConnectError }`): Fired if a signaled peer fails to connect or its data channel fails to open.
+- `warning` (payload: `{ trackerUrl: string, warning: TrackerWarning }`): Aggregated tracker warnings.
+- `error` (payload: `{ trackerUrl: string, error: TrackerError }`): Aggregated tracker errors (both WebSocket level and WebTorrent level).
 
 ---
 
@@ -97,14 +97,14 @@ Once connected, the Manager continues to monitor the peer for connection drops o
 
 1. Synchronously extracts the peer from the `#connectedPeers` map.
 2. Closes the connection and performs necessary cleanup.
-3. Dispatches a `peerDisconnected` event detailing the `reason` and whether `isError` is true.
+3. Dispatches a `peerDisconnected` event carrying either a `disconnectReason` (for expected disconnects) or an `error: PeerError` (for unexpected faults/failures).
 
 #### Intentional Disconnection
 
-To intentionally close a connection, the upper layer **must invoke the `close(error?: string)` callback** provided in the `peerConnected` event payload.
+To intentionally close a connection, the upper layer **must invoke the `close(error?: PeerError)` callback** provided in the `peerConnected` event payload.
 
-- Calling `close()` without arguments results in a standard disconnection with `reason: "Closed by consumer"` and `isError: false`.
-- Calling `close(errorMessage)` results in a disconnection with `reason` set to the provided message and `isError: true`.
+- Calling `close()` without arguments results in a standard disconnection with `disconnectReason: "Closed by consumer"`.
+- Calling `close(error)` results in a disconnection with the provided `error: PeerError`.
 
 This follows the exact same cleanup flow: it synchronously extracts and deletes the peer from the `#connectedPeers` map, closes the connection, and dispatches a `peerDisconnected` event.
 

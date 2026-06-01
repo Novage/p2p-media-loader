@@ -1,6 +1,7 @@
 import { Peer } from "./peer.js";
 import {
   CoreEventMap,
+  PeerError,
   SegmentWithStream,
   StreamConfig,
   StreamWithSegments,
@@ -40,6 +41,7 @@ export class P2PLoader {
   readonly #onPeerConnectError: CoreEventMap["onPeerConnectError"];
   readonly #onPeerClose: CoreEventMap["onPeerClose"];
   readonly #onPeerError: CoreEventMap["onPeerError"];
+  readonly #onPeerWarning: CoreEventMap["onPeerWarning"];
   readonly #onTrackerWarning: CoreEventMap["onTrackerWarning"];
   readonly #onTrackerError: CoreEventMap["onTrackerError"];
 
@@ -64,9 +66,11 @@ export class P2PLoader {
     this.#onSegmentAnnouncement = onSegmentAnnouncement;
 
     this.#onPeerConnect = eventTarget.getEventDispatcher("onPeerConnect");
-    this.#onPeerConnectError = eventTarget.getEventDispatcher("onPeerConnectError");
+    this.#onPeerConnectError =
+      eventTarget.getEventDispatcher("onPeerConnectError");
     this.#onPeerClose = eventTarget.getEventDispatcher("onPeerClose");
     this.#onPeerError = eventTarget.getEventDispatcher("onPeerError");
+    this.#onPeerWarning = eventTarget.getEventDispatcher("onPeerWarning");
     this.#onTrackerWarning = eventTarget.getEventDispatcher("onTrackerWarning");
     this.#onTrackerError = eventTarget.getEventDispatcher("onTrackerError");
 
@@ -107,7 +111,7 @@ export class P2PLoader {
         infoHash: this.#infoHash,
         streamType: this.#stream.type,
         trackerUrl: event.trackerUrl,
-        error: new Error(event.error),
+        error: event.error,
       });
     });
 
@@ -120,7 +124,7 @@ export class P2PLoader {
         trackerUrl: event.trackerUrl,
         infoHash: this.#infoHash,
         streamType: this.#stream.type,
-        warning: new Error(event.warning),
+        warning: event.warning,
       });
     });
 
@@ -133,7 +137,7 @@ export class P2PLoader {
         trackerUrl: event.trackerUrl,
         infoHash: this.#infoHash,
         streamType: this.#stream.type,
-        error: new Error(event.error),
+        error: event.error,
       });
     });
 
@@ -165,7 +169,7 @@ export class P2PLoader {
     } else {
       let maxSpeed = 0;
       for (const peer of peersWithSegment) {
-        const speed = peer.downloadBandwidth;
+        const speed = peer.getDownloadBandwidth();
         if (speed > maxSpeed) maxSpeed = speed;
       }
 
@@ -175,10 +179,10 @@ export class P2PLoader {
         let provenPeersWeight = 0;
 
         for (const peer of peersWithSegment) {
-          if (peer.downloadBandwidth <= baseSpeed) {
+          if (peer.getDownloadBandwidth() <= baseSpeed) {
             unprovenPeersCount++;
           } else {
-            provenPeersWeight += peer.downloadBandwidth;
+            provenPeersWeight += peer.getDownloadBandwidth();
           }
         }
 
@@ -192,7 +196,7 @@ export class P2PLoader {
         }
 
         selectedPeer = Utils.getWeightedRandomItem(peersWithSegment, (peer) =>
-          Math.max(peer.downloadBandwidth, adjustedBaseSpeed),
+          Math.max(peer.getDownloadBandwidth(), adjustedBaseSpeed),
         );
       } else {
         selectedPeer = Utils.getRandomItem(peersWithSegment);
@@ -246,7 +250,7 @@ export class P2PLoader {
   #onPeerConnectedWebTorrent = (event: {
     peerId: string;
     channel: RTCDataChannel;
-    close: (error?: string) => void;
+    close: (error?: PeerError) => void;
   }) => {
     this.#webtorrentManagerLogger(`peerConnected: peerId=${event.peerId}`);
     if (this.#peersMap.has(event.peerId)) {
@@ -273,9 +277,18 @@ export class P2PLoader {
           });
         },
         onSegmentsAnnouncement: this.#onSegmentAnnouncement,
+        onWarning: (warning) => {
+          this.#onPeerWarning({
+            peerId: peer.id,
+            infoHash: this.#infoHash,
+            streamType: this.#stream.type,
+            warning,
+          });
+        },
       },
       {
-        p2pNotReceivingBytesTimeoutMs: this.#config.p2pNotReceivingBytesTimeoutMs,
+        p2pNotReceivingBytesTimeoutMs:
+          this.#config.p2pNotReceivingBytesTimeoutMs,
         webRtcMaxMessageSize: this.#config.webRtcMaxMessageSize,
         p2pErrorRetries: this.#config.p2pErrorRetries,
         validateP2PSegment: this.#config.validateP2PSegment,
@@ -298,13 +311,19 @@ export class P2PLoader {
     peer.sendSegmentsAnnouncementCommand(loaded, httpLoading);
   };
 
-  #onPeerDisconnectedWebTorrent = (event: {
-    peerId: string;
-    reason: string;
-    isError: boolean;
-  }) => {
+  #onPeerDisconnectedWebTorrent = (
+    event: {
+      peerId: string;
+    } & (
+      | { error: PeerError; disconnectReason?: never }
+      | { error?: never; disconnectReason: string }
+    ),
+  ) => {
     this.#webtorrentManagerLogger(
-      `peerDisconnected: peerId=${event.peerId} reason=${event.reason} isError=${event.isError}`,
+      "peerDisconnected: peerId=%s error=%s reason=%s",
+      event.peerId,
+      event.error?.message,
+      event.disconnectReason,
     );
 
     const peer = this.#peersMap.get(event.peerId);
@@ -313,12 +332,12 @@ export class P2PLoader {
     this.#peersMap.delete(event.peerId);
     peer.destroy(true);
 
-    if (event.isError) {
+    if (event.error) {
       this.#onPeerError({
         peerId: event.peerId,
         infoHash: this.#infoHash,
         streamType: this.#stream.type,
-        error: new Error(event.reason),
+        error: event.error,
       });
     }
 

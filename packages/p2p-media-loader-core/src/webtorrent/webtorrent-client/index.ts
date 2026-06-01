@@ -2,6 +2,7 @@ import { EventTarget } from "../../utils/event-target.js";
 import { getPromiseWithResolvers } from "../../utils/utils.js";
 import { isTerminalConnectionState } from "../utils.js";
 import { WebSocketClient } from "../websocket-client/index.js";
+import { TrackerError, TrackerWarning, PeerConnectError } from "../../types.js";
 import { SafeAbortController } from "../../utils/abort-controller.js";
 
 import {
@@ -19,9 +20,12 @@ export type WebTorrentClientEventMap = {
     connection: RTCPeerConnection;
     channel: RTCDataChannel;
   }) => void;
-  peerConnectFailed: (event: { peerId: string; error: string }) => void;
-  warning: (warning: string) => void;
-  error: (error: string) => void;
+  peerConnectFailed: (event: {
+    peerId: string;
+    error: PeerConnectError;
+  }) => void;
+  warning: (warning: TrackerWarning) => void;
+  error: (error: TrackerError) => void;
 };
 
 const WEBTORRENT_DEFAULT_OFFER_TIMEOUT = 50000;
@@ -196,7 +200,11 @@ export class WebTorrentClient {
 
       this.#eventTarget.dispatchEvent(
         "error",
-        `Initial announce failed: ${String(err)}`,
+        new TrackerError(
+          "announce-failed",
+          `Initial announce failed: ${err instanceof Error ? err.message : String(err)}`,
+          err,
+        ),
       );
     });
   };
@@ -218,7 +226,11 @@ export class WebTorrentClient {
     } catch (err: unknown) {
       this.#eventTarget.dispatchEvent(
         "error",
-        `Failed to parse tracker message: ${String(err)}`,
+        new TrackerError(
+          "parse-error",
+          `Failed to parse tracker message: ${err instanceof Error ? err.message : String(err)}`,
+          err,
+        ),
       );
       return;
     }
@@ -234,12 +246,18 @@ export class WebTorrentClient {
 
     const warningMessage = dataObject["warning message"];
     if (typeof warningMessage === "string") {
-      this.#eventTarget.dispatchEvent("warning", warningMessage);
+      this.#eventTarget.dispatchEvent(
+        "warning",
+        new TrackerWarning("tracker-response", warningMessage),
+      );
     }
 
     const failureReason = dataObject["failure reason"];
     if (typeof failureReason === "string") {
-      this.#eventTarget.dispatchEvent("error", failureReason);
+      this.#eventTarget.dispatchEvent(
+        "error",
+        new TrackerError("tracker-response", failureReason),
+      );
       return;
     }
 
@@ -282,7 +300,11 @@ export class WebTorrentClient {
         if (this.#isDestroyed()) return;
         this.#eventTarget.dispatchEvent(
           "error",
-          `Failed to handle offer: ${String(err)}`,
+          new TrackerError(
+            "signaling-failed",
+            `Failed to handle offer: ${err instanceof Error ? err.message : String(err)}`,
+            err,
+          ),
         );
       });
     } else if (isSessionDescriptionInit(dataObject.answer)) {
@@ -294,7 +316,11 @@ export class WebTorrentClient {
         if (this.#isDestroyed()) return;
         this.#eventTarget.dispatchEvent(
           "error",
-          `Failed to handle answer: ${String(err)}`,
+          new TrackerError(
+            "signaling-failed",
+            `Failed to handle answer: ${err instanceof Error ? err.message : String(err)}`,
+            err,
+          ),
         );
       });
     }
@@ -313,7 +339,11 @@ export class WebTorrentClient {
         if (this.#isDestroyed()) return;
         this.#eventTarget.dispatchEvent(
           "error",
-          `Announce failed: ${String(err)}`,
+          new TrackerError(
+            "announce-failed",
+            `Announce failed: ${err instanceof Error ? err.message : String(err)}`,
+            err,
+          ),
         );
       }
 
@@ -472,7 +502,11 @@ export class WebTorrentClient {
       if (!this.#isDestroyed()) {
         this.#eventTarget.dispatchEvent(
           "warning",
-          `Failed to create offer: ${err instanceof Error ? err.message : String(err)}`,
+          new TrackerWarning(
+            "offer-failed",
+            `Failed to create offer: ${err instanceof Error ? err.message : String(err)}`,
+            err,
+          ),
         );
       }
     } finally {
@@ -589,7 +623,11 @@ export class WebTorrentClient {
       // already cleared, making the dispatch a no-op.
       this.#eventTarget.dispatchEvent("peerConnectFailed", {
         peerId: remotePeerId,
-        error: err instanceof Error ? err.message : String(err),
+        error: new PeerConnectError(
+          "connection-failed",
+          err instanceof Error ? err.message : String(err),
+          err,
+        ),
       });
     } finally {
       if (pc) this.#negotiatingConnections.delete(pc);
@@ -642,7 +680,11 @@ export class WebTorrentClient {
       // already cleared, making the dispatch a no-op.
       this.#eventTarget.dispatchEvent("peerConnectFailed", {
         peerId: remotePeerId,
-        error: err instanceof Error ? err.message : String(err),
+        error: new PeerConnectError(
+          "connection-failed",
+          err instanceof Error ? err.message : String(err),
+          err,
+        ),
       });
     } finally {
       this.#negotiatingConnections.delete(pending.connection);
