@@ -91,7 +91,7 @@ export function serializeSimilarIntArray(numbers: bigint[]) {
   result.push([SerializedItem.SimilarIntArray << 4, commonPartNumbersMap.size]);
 
   for (const [commonPart, binaryArray] of commonPartNumbersMap) {
-    const { length } = binaryArray.getBytesChunks();
+    const { length } = binaryArray;
     const commonPartWithLength = commonPart | (BigInt(length) & 0xffn);
     binaryArray.unshift(serializeInt(commonPartWithLength));
     result.push(binaryArray.getBuffer());
@@ -117,9 +117,10 @@ export function deserializeSimilarIntArray(bytes: Uint8Array) {
     );
     offset += byteLength;
     const arrayLength = commonPartWithLength & 0xffn;
+    const actualLength = arrayLength === 0n ? 256 : Number(arrayLength);
     const commonPart = commonPartWithLength & ~0xffn;
 
-    for (let j = 0; j < arrayLength; j++) {
+    for (let j = 0; j < actualLength; j++) {
       const diffPart = BigInt(bytes[offset]);
       originalIntArr.push(commonPart | diffPart);
       offset++;
