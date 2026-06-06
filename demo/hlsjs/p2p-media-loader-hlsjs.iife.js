@@ -1,4 +1,3 @@
-"use strict";
 this.p2pml = this.p2pml || {};
 this.p2pml.hlsjs = (function(exports) {
 	Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
@@ -46,7 +45,7 @@ this.p2pml.hlsjs = (function(exports) {
 		};
 	}
 	//#endregion
-	//#region \0@oxc-project+runtime@0.129.0/helpers/typeof.js
+	//#region \0@oxc-project+runtime@0.133.0/helpers/esm/typeof.js
 	function _typeof(o) {
 		"@babel/helpers - typeof";
 		return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function(o) {
@@ -56,7 +55,7 @@ this.p2pml.hlsjs = (function(exports) {
 		}, _typeof(o);
 	}
 	//#endregion
-	//#region \0@oxc-project+runtime@0.129.0/helpers/toPrimitive.js
+	//#region \0@oxc-project+runtime@0.133.0/helpers/esm/toPrimitive.js
 	function toPrimitive(t, r) {
 		if ("object" != _typeof(t) || !t) return t;
 		var e = t[Symbol.toPrimitive];
@@ -68,13 +67,13 @@ this.p2pml.hlsjs = (function(exports) {
 		return ("string" === r ? String : Number)(t);
 	}
 	//#endregion
-	//#region \0@oxc-project+runtime@0.129.0/helpers/toPropertyKey.js
+	//#region \0@oxc-project+runtime@0.133.0/helpers/esm/toPropertyKey.js
 	function toPropertyKey(t) {
 		var i = toPrimitive(t, "string");
 		return "symbol" == _typeof(i) ? i : i + "";
 	}
 	//#endregion
-	//#region \0@oxc-project+runtime@0.129.0/helpers/defineProperty.js
+	//#region \0@oxc-project+runtime@0.133.0/helpers/esm/defineProperty.js
 	function _defineProperty(e, r, t) {
 		return (r = toPropertyKey(r)) in e ? Object.defineProperty(e, r, {
 			value: t,
@@ -86,58 +85,101 @@ this.p2pml.hlsjs = (function(exports) {
 	//#endregion
 	//#region ../p2p-media-loader-core/src/types.ts
 	/**
+	* Base class for domain-specific errors carrying a machine-readable type discriminator.
+	* @internal
+	*/
+	var TypedError = class extends Error {
+		constructor(type, message, cause) {
+			super(message);
+			_defineProperty(this, "type", void 0);
+			_defineProperty(this, "cause", void 0);
+			this.type = type;
+			this.cause = cause;
+		}
+	};
+	/** Represents an error that occurred during a peer connection. */
+	var PeerError = class extends TypedError {
+		constructor(..._args) {
+			super(..._args);
+			_defineProperty(this, "name", "PeerError");
+		}
+	};
+	/** Represents a warning that occurred during a peer connection. */
+	var PeerWarning = class extends TypedError {
+		constructor(..._args2) {
+			super(..._args2);
+			_defineProperty(this, "name", "PeerWarning");
+		}
+	};
+	/** Represents an error that occurred during a tracker request. */
+	var TrackerError = class extends TypedError {
+		constructor(..._args3) {
+			super(..._args3);
+			_defineProperty(this, "name", "TrackerError");
+		}
+	};
+	/** Represents a warning that occurred during a tracker request. */
+	var TrackerWarning = class extends TypedError {
+		constructor(..._args4) {
+			super(..._args4);
+			_defineProperty(this, "name", "TrackerWarning");
+		}
+	};
+	/** Represents an error that occurred while establishing a peer connection. */
+	var PeerConnectError = class extends TypedError {
+		constructor(..._args5) {
+			super(..._args5);
+			_defineProperty(this, "name", "PeerConnectError");
+		}
+	};
+	/**
 	* Represents an error that can occur during the request process, with a timestamp for when the error occurred.
 	* @template T - The specific type of request error.
 	*/
-	var RequestError = class extends Error {
+	var RequestError = class extends TypedError {
 		/**
 		* Constructs a new RequestError.
 		* @param type - The specific error type.
 		* @param message - Optional message describing the error.
+		* @param cause - Optional underlying cause of the error.
 		*/
-		constructor(type, message) {
-			super(message);
-			_defineProperty(this, "type", void 0);
+		constructor(type, message, cause) {
+			super(type, message, cause);
+			_defineProperty(this, "name", "RequestError");
 			_defineProperty(
 				this,
 				/** Error timestamp. */
 				"timestamp",
 				void 0
 			);
-			this.type = type;
 			this.timestamp = performance.now();
 		}
 	};
 	/** Custom error class for errors that occur during core network requests. */
-	var CoreRequestError = class extends Error {
-		/**
-		* Constructs a new CoreRequestError.
-		* @param type - The type of the error, either 'failed' or 'aborted'.
-		*/
-		constructor(type) {
-			super();
-			_defineProperty(this, "type", void 0);
-			this.type = type;
+	var CoreRequestError = class extends TypedError {
+		constructor(..._args6) {
+			super(..._args6);
+			_defineProperty(this, "name", "CoreRequestError");
 		}
 	};
 	//#endregion
-	//#region \0@oxc-project+runtime@0.129.0/helpers/checkPrivateRedeclaration.js
+	//#region \0@oxc-project+runtime@0.133.0/helpers/esm/checkPrivateRedeclaration.js
 	function _checkPrivateRedeclaration(e, t) {
 		if (t.has(e)) throw new TypeError("Cannot initialize the same private elements twice on an object");
 	}
 	//#endregion
-	//#region \0@oxc-project+runtime@0.129.0/helpers/classPrivateFieldInitSpec.js
+	//#region \0@oxc-project+runtime@0.133.0/helpers/esm/classPrivateFieldInitSpec.js
 	function _classPrivateFieldInitSpec(e, t, a) {
 		_checkPrivateRedeclaration(e, t), t.set(e, a);
 	}
 	//#endregion
-	//#region \0@oxc-project+runtime@0.129.0/helpers/assertClassBrand.js
+	//#region \0@oxc-project+runtime@0.133.0/helpers/esm/assertClassBrand.js
 	function _assertClassBrand(e, t, n) {
 		if ("function" == typeof e ? e === t : e.has(t)) return arguments.length < 3 ? t : n;
 		throw new TypeError("Private element is not present on this object");
 	}
 	//#endregion
-	//#region \0@oxc-project+runtime@0.129.0/helpers/classPrivateFieldGet2.js
+	//#region \0@oxc-project+runtime@0.133.0/helpers/esm/classPrivateFieldGet2.js
 	function _classPrivateFieldGet2(s, a) {
 		return s.get(_assertClassBrand(s, a));
 	}
@@ -174,7 +216,7 @@ this.p2pml.hlsjs = (function(exports) {
 	var isAbortControllerSupported = typeof AbortController !== "undefined";
 	var SafeAbortController = isAbortControllerSupported ? AbortController : AbortControllerPolyfill;
 	//#endregion
-	//#region \0@oxc-project+runtime@0.129.0/helpers/objectSpread2.js
+	//#region \0@oxc-project+runtime@0.133.0/helpers/esm/objectSpread2.js
 	function ownKeys(e, r) {
 		var t = Object.keys(e);
 		if (Object.getOwnPropertySymbols) {
@@ -197,7 +239,7 @@ this.p2pml.hlsjs = (function(exports) {
 		return e;
 	}
 	//#endregion
-	//#region \0@oxc-project+runtime@0.129.0/helpers/asyncToGenerator.js
+	//#region \0@oxc-project+runtime@0.133.0/helpers/esm/asyncToGenerator.js
 	function asyncGeneratorStep(n, t, e, r, o, a, c) {
 		try {
 			var i = n[a](c), u = i.value;
@@ -243,7 +285,7 @@ this.p2pml.hlsjs = (function(exports) {
 		}
 		execute() {
 			const startControls = {
-				abort: () => this.abortController.abort(),
+				onAbort: () => this.abortController.abort(),
 				notReceivingBytesTimeoutMs: this.httpConfig.httpNotReceivingBytesTimeoutMs
 			};
 			if (this.request.tryCompleteByLoadedBytes({ downloadSource: "http" }, startControls, this.httpConfig.validateHTTPSegment, "http-segment-validation-failed")) return;
@@ -293,7 +335,7 @@ this.p2pml.hlsjs = (function(exports) {
 						if (_this.isAborted()) throw new DOMException("Request aborted", "AbortError");
 						const value = new Uint8Array(arrayBuffer);
 						requestControls.addLoadedChunk(value);
-						_this.onChunkDownloaded(value.byteLength, "http");
+						_this.onChunkDownloaded(value.byteLength, "http", void 0, segment.stream.type, _this.request.infoHash);
 					} else {
 						const reader = response.body.getReader();
 						activeReader = reader;
@@ -303,7 +345,7 @@ this.p2pml.hlsjs = (function(exports) {
 							if (done) break;
 							if (_this.isAborted()) throw new DOMException("Request aborted", "AbortError");
 							requestControls.addLoadedChunk(value);
-							_this.onChunkDownloaded(value.byteLength, "http");
+							_this.onChunkDownloaded(value.byteLength, "http", void 0, segment.stream.type, _this.request.infoHash);
 						}
 					}
 					if (_this.isAborted()) throw new DOMException("Request aborted", "AbortError");
@@ -357,7 +399,7 @@ this.p2pml.hlsjs = (function(exports) {
 			if (this.isAborted()) return;
 			if (error instanceof Error) {
 				const httpLoaderError = error instanceof RequestError ? error : new RequestError("http-error", error.message);
-				requestControls.abortOnError(httpLoaderError);
+				requestControls.failWithError(httpLoaderError);
 			}
 		}
 	};
@@ -1009,12 +1051,12 @@ this.p2pml.hlsjs = (function(exports) {
 		return filteredConfig;
 	}
 	//#endregion
-	//#region \0@oxc-project+runtime@0.129.0/helpers/classPrivateMethodInitSpec.js
+	//#region \0@oxc-project+runtime@0.133.0/helpers/esm/classPrivateMethodInitSpec.js
 	function _classPrivateMethodInitSpec(e, a) {
 		_checkPrivateRedeclaration(e, a), a.add(e);
 	}
 	//#endregion
-	//#region \0@oxc-project+runtime@0.129.0/helpers/classPrivateFieldSet2.js
+	//#region \0@oxc-project+runtime@0.133.0/helpers/esm/classPrivateFieldSet2.js
 	function _classPrivateFieldSet2(s, a, r) {
 		return s.set(_assertClassBrand(s, a), r), r;
 	}
@@ -1024,10 +1066,10 @@ this.p2pml.hlsjs = (function(exports) {
 	var textDecoder = new TextDecoder("utf8");
 	var SerializedItem = /* @__PURE__ */ function(SerializedItem) {
 		SerializedItem[SerializedItem["Min"] = -1] = "Min";
-		SerializedItem[SerializedItem["Int"] = 1 + SerializedItem["Min"]] = "Int";
-		SerializedItem[SerializedItem["SimilarIntArray"] = 1 + SerializedItem["Int"]] = "SimilarIntArray";
-		SerializedItem[SerializedItem["String"] = 1 + SerializedItem["SimilarIntArray"]] = "String";
-		SerializedItem[SerializedItem["Max"] = 1 + SerializedItem["String"]] = "Max";
+		SerializedItem[SerializedItem["Int"] = 0] = "Int";
+		SerializedItem[SerializedItem["SimilarIntArray"] = 1] = "SimilarIntArray";
+		SerializedItem[SerializedItem["String"] = 2] = "String";
+		SerializedItem[SerializedItem["Max"] = 3] = "Max";
 		return SerializedItem;
 	}({});
 	function getRequiredBytesForInt(num) {
@@ -1060,13 +1102,13 @@ this.p2pml.hlsjs = (function(exports) {
 	}
 	function serializeInt(num) {
 		const numBytes = intToBytes(num);
-		const numberMetadata = SerializedItem.Int << 4 | numBytes.length;
+		const numberMetadata = 0 | numBytes.length;
 		return new Uint8Array([numberMetadata, ...numBytes]);
 	}
 	function deserializeInt(bytes) {
 		if (bytes.length === 0) throw new Error("Buffer is too short");
 		const metadata = bytes[0];
-		if (metadata >> 4 !== SerializedItem.Int) throw new Error("Trying to deserialize integer with invalid serialized item code");
+		if (metadata >> 4 !== 0) throw new Error("Trying to deserialize integer with invalid serialized item code");
 		const numberBytesLength = metadata & 15;
 		const start = 1;
 		const end = start + numberBytesLength;
@@ -1075,7 +1117,7 @@ this.p2pml.hlsjs = (function(exports) {
 			byteLength: numberBytesLength + 1
 		};
 	}
-	function serializeSimilarIntArray(numbers) {
+	function serializeUniqueSimilarIntArray(numbers) {
 		const commonPartNumbersMap = /* @__PURE__ */ new Map();
 		for (const number of numbers) {
 			var _commonPartNumbersMap;
@@ -1086,27 +1128,28 @@ this.p2pml.hlsjs = (function(exports) {
 			bytes.push(diffByte);
 		}
 		const result = new ResizableUint8Array();
-		result.push([SerializedItem.SimilarIntArray << 4, commonPartNumbersMap.size]);
+		result.push([16, commonPartNumbersMap.size]);
 		for (const [commonPart, binaryArray] of commonPartNumbersMap) {
-			const { length } = binaryArray.getBytesChunks();
+			const { length } = binaryArray;
 			const commonPartWithLength = commonPart + (length & 255);
 			binaryArray.unshift(serializeInt(commonPartWithLength));
 			result.push(binaryArray.getBuffer());
 		}
 		return result.getBuffer();
 	}
-	function deserializeSimilarIntArray(bytes) {
+	function deserializeUniqueSimilarIntArray(bytes) {
 		if (bytes.length < 2) throw new Error("Buffer is too short");
 		const [codeByte, commonPartArraysAmount] = bytes;
-		if (codeByte >> 4 !== SerializedItem.SimilarIntArray) throw new Error("Trying to deserialize similar int array with invalid serialized item code");
+		if (codeByte >> 4 !== 1) throw new Error("Trying to deserialize similar int array with invalid serialized item code");
 		let offset = 2;
 		const originalIntArr = [];
 		for (let i = 0; i < commonPartArraysAmount; i++) {
 			const { number: commonPartWithLength, byteLength } = deserializeInt(bytes.subarray(offset));
 			offset += byteLength;
 			const arrayLength = commonPartWithLength & 255;
+			const actualLength = arrayLength === 0 ? 256 : arrayLength;
 			const commonPart = commonPartWithLength - arrayLength;
-			for (let j = 0; j < arrayLength; j++) {
+			for (let j = 0; j < actualLength; j++) {
 				const diffPart = bytes[offset];
 				originalIntArr.push(commonPart + diffPart);
 				offset++;
@@ -1122,15 +1165,16 @@ this.p2pml.hlsjs = (function(exports) {
 		const { length } = encoded;
 		if (length > 4095) throw new Error("String exceeds maximum length of 4095 bytes");
 		const bytes = new ResizableUint8Array();
-		bytes.push([SerializedItem.String << 4 | length >> 8 & 15, length & 255]);
+		bytes.push([32 | length >> 8 & 15, length & 255]);
 		bytes.push(encoded);
 		return bytes.getBuffer();
 	}
 	function deserializeString(bytes) {
 		if (bytes.length < 2) throw new Error("Buffer is too short");
 		const [codeByte, lengthByte] = bytes;
-		if (codeByte >> 4 !== SerializedItem.String) throw new Error("Trying to deserialize bytes (sting) with invalid serialized item code.");
+		if (codeByte >> 4 !== 2) throw new Error("Trying to deserialize bytes (sting) with invalid serialized item code.");
 		const length = (codeByte & 15) << 8 | lengthByte;
+		if (bytes.length < length + 2) throw new Error("Malformed string: buffer too short");
 		const stringBytes = bytes.subarray(2, length + 2);
 		return {
 			string: textDecoder.decode(stringBytes),
@@ -1192,7 +1236,7 @@ this.p2pml.hlsjs = (function(exports) {
 	}
 	function isLastCommandChunk(buffer) {
 		if (buffer.length < commandFramesLength) return false;
-		return areBuffersEqual(buffer.subarray(-FRAME_PART_LENGTH), commandFrameEnd, FRAME_PART_LENGTH);
+		return areBuffersEqual(buffer.subarray(-4), commandFrameEnd, FRAME_PART_LENGTH);
 	}
 	var BinaryCommandJoiningError = class extends Error {
 		constructor(type) {
@@ -1246,9 +1290,9 @@ this.p2pml.hlsjs = (function(exports) {
 			const bytes = serializeInt(value);
 			_classPrivateFieldGet2(_bytes, this).push(bytes);
 		}
-		addSimilarIntArr(name, arr) {
+		addUniqueSimilarIntArr(name, arr) {
 			_classPrivateFieldGet2(_bytes, this).push(name.charCodeAt(0));
-			const bytes = serializeSimilarIntArray(arr);
+			const bytes = serializeUniqueSimilarIntArray(arr);
 			_classPrivateFieldGet2(_bytes, this).push(bytes);
 		}
 		addString(name, string) {
@@ -1281,6 +1325,7 @@ this.p2pml.hlsjs = (function(exports) {
 		const deserializedCommand = { c: commandCode };
 		let offset = 1;
 		while (offset < bytes.length) {
+			if (offset + 1 >= bytes.length) throw new Error("Malformed command buffer: truncated name/type header");
 			const name = String.fromCharCode(bytes[offset]);
 			offset++;
 			switch (getDataTypeFromByte(bytes[offset])) {
@@ -1293,7 +1338,7 @@ this.p2pml.hlsjs = (function(exports) {
 					break;
 				case SerializedItem.SimilarIntArray:
 					{
-						const { numbers, byteLength } = deserializeSimilarIntArray(bytes.subarray(offset));
+						const { numbers, byteLength } = deserializeUniqueSimilarIntArray(bytes.subarray(offset));
 						deserializedCommand[name] = numbers;
 						offset += byteLength;
 					}
@@ -1360,8 +1405,8 @@ this.p2pml.hlsjs = (function(exports) {
 	function serializeSegmentAnnouncementCommand(command, maxChunkSize) {
 		const { c: commandCode, p: loadingByHttp, l: loaded } = command;
 		const creator = new BinaryCommandCreator(commandCode, maxChunkSize);
-		if (loaded === null || loaded === void 0 ? void 0 : loaded.length) creator.addSimilarIntArr("l", loaded);
-		if (loadingByHttp === null || loadingByHttp === void 0 ? void 0 : loadingByHttp.length) creator.addSimilarIntArr("p", loadingByHttp);
+		if (loaded === null || loaded === void 0 ? void 0 : loaded.length) creator.addUniqueSimilarIntArr("l", loaded);
+		if (loadingByHttp === null || loadingByHttp === void 0 ? void 0 : loadingByHttp.length) creator.addUniqueSimilarIntArr("p", loadingByHttp);
 		creator.complete();
 		return creator.getResultBuffers();
 	}
@@ -1498,8 +1543,8 @@ this.p2pml.hlsjs = (function(exports) {
 			})();
 		}
 		cancel() {
-			var _classPrivateFieldGet2$4;
-			(_classPrivateFieldGet2$4 = _classPrivateFieldGet2(_currentSendContext, this)) === null || _classPrivateFieldGet2$4 === void 0 || _classPrivateFieldGet2$4.cancel();
+			var _classPrivateFieldGet2$5;
+			(_classPrivateFieldGet2$5 = _classPrivateFieldGet2(_currentSendContext, this)) === null || _classPrivateFieldGet2$5 === void 0 || _classPrivateFieldGet2$5.cancel();
 		}
 	};
 	//#endregion
@@ -1513,7 +1558,7 @@ this.p2pml.hlsjs = (function(exports) {
 	var _channel = /* @__PURE__ */ new WeakMap();
 	var _peerConfig$1 = /* @__PURE__ */ new WeakMap();
 	var _eventHandlers$1 = /* @__PURE__ */ new WeakMap();
-	var _peerId = /* @__PURE__ */ new WeakMap();
+	var _peerId$1 = /* @__PURE__ */ new WeakMap();
 	var _onMessageReceived = /* @__PURE__ */ new WeakMap();
 	var _PeerProtocol_brand = /* @__PURE__ */ new WeakSet();
 	var PeerProtocol = class {
@@ -1527,19 +1572,24 @@ this.p2pml.hlsjs = (function(exports) {
 			_classPrivateFieldInitSpec(this, _channel, void 0);
 			_classPrivateFieldInitSpec(this, _peerConfig$1, void 0);
 			_classPrivateFieldInitSpec(this, _eventHandlers$1, void 0);
-			_classPrivateFieldInitSpec(this, _peerId, void 0);
+			_classPrivateFieldInitSpec(this, _peerId$1, void 0);
 			_classPrivateFieldInitSpec(this, _onMessageReceived, (event) => {
-				const data = new Uint8Array(event.data);
-				if (isCommandChunk(data)) _assertClassBrand(_PeerProtocol_brand, this, _receivingCommandBytes).call(this, data);
-				else {
-					_classPrivateFieldGet2(_eventHandlers$1, this).onSegmentChunkReceived(data);
-					_classPrivateFieldGet2(_onChunkDownloaded, this).call(this, data.byteLength, "p2p", _classPrivateFieldGet2(_peerId, this));
+				try {
+					const data = new Uint8Array(event.data);
+					if (isCommandChunk(data)) _assertClassBrand(_PeerProtocol_brand, this, _receivingCommandBytes).call(this, data);
+					else {
+						_classPrivateFieldGet2(_eventHandlers$1, this).onSegmentChunkReceived(data);
+						_classPrivateFieldGet2(_onChunkDownloaded, this).call(this, data.byteLength, "p2p", _classPrivateFieldGet2(_peerId$1, this), _classPrivateFieldGet2(_peerConfig$1, this).streamType, _classPrivateFieldGet2(_peerConfig$1, this).infoHash);
+					}
+				} catch (err) {
+					logger("error handling data channel message: %O", err);
+					_classPrivateFieldGet2(_eventHandlers$1, this).onProtocolError(err);
 				}
 			});
 			_classPrivateFieldSet2(_channel, this, channel);
 			_classPrivateFieldSet2(_peerConfig$1, this, peerConfig);
 			_classPrivateFieldSet2(_eventHandlers$1, this, eventHandlers);
-			_classPrivateFieldSet2(_peerId, this, peerId);
+			_classPrivateFieldSet2(_peerId$1, this, peerId);
 			_classPrivateFieldSet2(_dataChannelSender, this, new DataChannelSender(channel, peerConfig.webRtcMaxMessageSize));
 			_classPrivateFieldSet2(_onChunkDownloaded, this, eventTarget.getEventDispatcher("onChunkDownloaded"));
 			_classPrivateFieldSet2(_onChunkUploaded, this, eventTarget.getEventDispatcher("onChunkUploaded"));
@@ -1547,16 +1597,9 @@ this.p2pml.hlsjs = (function(exports) {
 			channel.addEventListener("message", _classPrivateFieldGet2(_onMessageReceived, this));
 		}
 		sendCommand(command) {
-			if (_classPrivateFieldGet2(_channel, this).readyState !== "open") {
-				logger("dropping command %d (channel state: %s)", command.c, _classPrivateFieldGet2(_channel, this).readyState);
-				return;
-			}
+			if (_classPrivateFieldGet2(_channel, this).readyState !== "open") throw new Error(`cannot send command ${command.c} (channel state: ${_classPrivateFieldGet2(_channel, this).readyState})`);
 			const binaryCommandBuffers = serializePeerCommand(command, _classPrivateFieldGet2(_peerConfig$1, this).webRtcMaxMessageSize);
-			try {
-				for (const buffer of binaryCommandBuffers) _classPrivateFieldGet2(_channel, this).send(buffer);
-			} catch (err) {
-				logger("error sending command: %O", err);
-			}
+			for (const buffer of binaryCommandBuffers) _classPrivateFieldGet2(_channel, this).send(buffer);
 		}
 		stopUploadingSegmentData() {
 			_classPrivateFieldGet2(_dataChannelSender, this).cancel();
@@ -1572,7 +1615,7 @@ this.p2pml.hlsjs = (function(exports) {
 				_classPrivateFieldSet2(_uploadingRequestId, _this, requestId);
 				try {
 					yield _classPrivateFieldGet2(_dataChannelSender, _this).sendData(data, (chunkSize) => {
-						_classPrivateFieldGet2(_onChunkUploaded, _this).call(_this, chunkSize, _classPrivateFieldGet2(_peerId, _this));
+						_classPrivateFieldGet2(_onChunkUploaded, _this).call(_this, chunkSize, _classPrivateFieldGet2(_peerId$1, _this), _classPrivateFieldGet2(_peerConfig$1, _this).streamType, _classPrivateFieldGet2(_peerConfig$1, _this).infoHash);
 					});
 				} finally {
 					if (_classPrivateFieldGet2(_uploadingRequestId, _this) === requestId) _classPrivateFieldSet2(_uploadingRequestId, _this, void 0);
@@ -1587,21 +1630,25 @@ this.p2pml.hlsjs = (function(exports) {
 		}
 	};
 	function _receivingCommandBytes(buffer) {
-		var _classPrivateFieldGet2$3;
-		(_classPrivateFieldGet2$3 = _classPrivateFieldGet2(_commandChunks, this)) !== null && _classPrivateFieldGet2$3 !== void 0 || _classPrivateFieldSet2(_commandChunks, this, new BinaryCommandChunksJoiner((commandBuffer) => {
+		var _classPrivateFieldGet2$4;
+		(_classPrivateFieldGet2$4 = _classPrivateFieldGet2(_commandChunks, this)) !== null && _classPrivateFieldGet2$4 !== void 0 || _classPrivateFieldSet2(_commandChunks, this, new BinaryCommandChunksJoiner((commandBuffer) => {
 			_classPrivateFieldSet2(_commandChunks, this, void 0);
+			let command;
 			try {
-				const command = deserializeCommand(commandBuffer);
-				_classPrivateFieldGet2(_eventHandlers$1, this).onCommandReceived(command);
+				command = deserializeCommand(commandBuffer);
 			} catch (err) {
-				logger("error processing command: %O", err);
+				logger("error deserializing command: %O", err);
+				_classPrivateFieldGet2(_eventHandlers$1, this).onProtocolError(err);
+				return;
 			}
+			_classPrivateFieldGet2(_eventHandlers$1, this).onCommandReceived(command);
 		}));
 		try {
 			_classPrivateFieldGet2(_commandChunks, this).addCommandChunk(buffer);
 		} catch (err) {
 			logger("error receiving command chunks: %O", err);
 			_classPrivateFieldSet2(_commandChunks, this, void 0);
+			_classPrivateFieldGet2(_eventHandlers$1, this).onProtocolError(err);
 		}
 	}
 	//#endregion
@@ -1692,18 +1739,23 @@ this.p2pml.hlsjs = (function(exports) {
 	var _downloadingContext = /* @__PURE__ */ new WeakMap();
 	var _loadedSegments = /* @__PURE__ */ new WeakMap();
 	var _httpLoadingSegments = /* @__PURE__ */ new WeakMap();
-	var _downloadingErrors = /* @__PURE__ */ new WeakMap();
+	var _consecutiveTimeouts = /* @__PURE__ */ new WeakMap();
 	var _bandwidthCalculator = /* @__PURE__ */ new WeakMap();
 	var _cachedDownloadBandwidth = /* @__PURE__ */ new WeakMap();
 	var _logger$1 = /* @__PURE__ */ new WeakMap();
 	var _nextRequestId = /* @__PURE__ */ new WeakMap();
+	var _latestRequestedUploadRequestId = /* @__PURE__ */ new WeakMap();
 	var _isDestroyed$1 = /* @__PURE__ */ new WeakMap();
 	var _closeConnection = /* @__PURE__ */ new WeakMap();
 	var _eventHandlers = /* @__PURE__ */ new WeakMap();
 	var _peerConfig = /* @__PURE__ */ new WeakMap();
-	var _Peer_brand = /* @__PURE__ */ new WeakSet();
 	var _onCommandReceived = /* @__PURE__ */ new WeakMap();
+	var _onSegmentChunkReceived = /* @__PURE__ */ new WeakMap();
+	var _Peer_brand = /* @__PURE__ */ new WeakSet();
 	var Peer = class {
+		get isDestroyed() {
+			return _classPrivateFieldGet2(_isDestroyed$1, this);
+		}
 		constructor(id, channel, closeConnection, eventHandlers, peerConfig, eventTarget) {
 			var _this = this;
 			_classPrivateMethodInitSpec(this, _Peer_brand);
@@ -1714,7 +1766,7 @@ this.p2pml.hlsjs = (function(exports) {
 			_classPrivateFieldInitSpec(this, _downloadingContext, void 0);
 			_classPrivateFieldInitSpec(this, _loadedSegments, /* @__PURE__ */ new Set());
 			_classPrivateFieldInitSpec(this, _httpLoadingSegments, /* @__PURE__ */ new Set());
-			_classPrivateFieldInitSpec(this, _downloadingErrors, []);
+			_classPrivateFieldInitSpec(this, _consecutiveTimeouts, 0);
 			_classPrivateFieldInitSpec(this, _bandwidthCalculator, new BandwidthCalculator());
 			_classPrivateFieldInitSpec(this, _cachedDownloadBandwidth, {
 				value: 0,
@@ -1722,7 +1774,9 @@ this.p2pml.hlsjs = (function(exports) {
 			});
 			_classPrivateFieldInitSpec(this, _logger$1, (0, import_browser.default)("p2pml-core:peer"));
 			_classPrivateFieldInitSpec(this, _nextRequestId, 0);
+			_classPrivateFieldInitSpec(this, _latestRequestedUploadRequestId, void 0);
 			_classPrivateFieldInitSpec(this, _isDestroyed$1, false);
+			_defineProperty(this, "connectedAt", performance.now());
 			_classPrivateFieldInitSpec(this, _closeConnection, void 0);
 			_classPrivateFieldInitSpec(this, _eventHandlers, void 0);
 			_classPrivateFieldInitSpec(this, _peerConfig, void 0);
@@ -1735,6 +1789,7 @@ this.p2pml.hlsjs = (function(exports) {
 							_classPrivateFieldGet2(_eventHandlers, _this).onSegmentsAnnouncement();
 							break;
 						case PeerCommandType.SegmentRequest:
+							_classPrivateFieldSet2(_latestRequestedUploadRequestId, _this, command.r);
 							_classPrivateFieldGet2(_peerProtocol, _this).stopUploadingSegmentData();
 							_classPrivateFieldGet2(_eventHandlers, _this).onSegmentRequested(_this, command.i, command.r, command.b);
 							break;
@@ -1746,54 +1801,42 @@ this.p2pml.hlsjs = (function(exports) {
 								if (request.segment.externalId !== command.i || requestId !== command.r) break;
 								_classPrivateFieldGet2(_downloadingContext, _this).isSegmentDataCommandReceived = true;
 								controls.firstBytesReceived();
-								if (request.totalBytes === void 0) request.setTotalBytes(command.s);
-								else if (request.totalBytes - request.loadedBytes !== command.s) {
-									request.clearLoadedBytes();
-									_assertClassBrand(_Peer_brand, _this, _sendCancelSegmentRequestCommand).call(_this, request.segment, requestId);
-									_assertClassBrand(_Peer_brand, _this, _cancelSegmentDownloading).call(_this, "peer-response-bytes-length-mismatch");
-									_this.destroy(false, "Peer response bytes length mismatch");
-								}
+								if (request.totalBytes === void 0) request.setTotalBytes(request.loadedBytes + command.s);
+								else if (request.totalBytes - request.loadedBytes !== command.s) _assertClassBrand(_Peer_brand, _this, _destroyOnPeerError).call(_this, "bytes-length-mismatch", "Peer response bytes length mismatch");
 							}
 							break;
 						case PeerCommandType.SegmentDataSendingCompleted: {
 							const downloadingContext = _classPrivateFieldGet2(_downloadingContext, _this);
 							if (!(downloadingContext === null || downloadingContext === void 0 ? void 0 : downloadingContext.isSegmentDataCommandReceived)) return;
-							const { request, controls } = downloadingContext;
-							if (downloadingContext.request.segment.externalId !== command.i || downloadingContext.requestId !== command.r) {
-								request.clearLoadedBytes();
-								_assertClassBrand(_Peer_brand, _this, _cancelSegmentDownloading).call(_this, "peer-protocol-violation");
-								_this.destroy(false, "Peer protocol violation");
+							const { request, controls, requestId } = downloadingContext;
+							if (request.segment.externalId !== command.i || requestId !== command.r) {
+								_assertClassBrand(_Peer_brand, _this, _destroyOnPeerError).call(_this, "protocol-violation", "Peer protocol violation");
 								return;
 							}
 							if (request.loadedBytes !== request.totalBytes) {
-								request.clearLoadedBytes();
-								_assertClassBrand(_Peer_brand, _this, _cancelSegmentDownloading).call(_this, "peer-response-bytes-length-mismatch");
-								_this.destroy(false, "Peer response bytes length mismatch");
+								_assertClassBrand(_Peer_brand, _this, _destroyOnPeerError).call(_this, "bytes-length-mismatch", "Peer response bytes length mismatch");
 								return;
 							}
 							const isValid = yield request.validateData(_classPrivateFieldGet2(_peerConfig, _this).validateP2PSegment);
 							if (_classPrivateFieldGet2(_isDestroyed$1, _this)) return;
 							if (_classPrivateFieldGet2(_downloadingContext, _this) !== downloadingContext) return;
 							if (!isValid) {
-								request.clearLoadedBytes();
-								_assertClassBrand(_Peer_brand, _this, _cancelSegmentDownloading).call(_this, "p2p-segment-validation-failed");
-								_this.destroy(false, "P2P segment validation failed");
+								_assertClassBrand(_Peer_brand, _this, _destroyOnPeerError).call(_this, "validation-failed", "P2P segment validation failed");
 								return;
 							}
-							_classPrivateFieldSet2(_downloadingErrors, _this, []);
+							_classPrivateFieldSet2(_consecutiveTimeouts, _this, 0);
 							controls.completeOnSuccess();
 							_classPrivateFieldGet2(_bandwidthCalculator, _this).stopLoading();
 							_classPrivateFieldSet2(_downloadingContext, _this, void 0);
 							break;
 						}
 						case PeerCommandType.SegmentAbsent:
-							var _classPrivateFieldGet2$2;
-							if (((_classPrivateFieldGet2$2 = _classPrivateFieldGet2(_downloadingContext, _this)) === null || _classPrivateFieldGet2$2 === void 0 ? void 0 : _classPrivateFieldGet2$2.request.segment.externalId) === command.i && _classPrivateFieldGet2(_downloadingContext, _this).requestId === command.r) {
-								_assertClassBrand(_Peer_brand, _this, _cancelSegmentDownloading).call(_this, "peer-segment-absent");
-								_classPrivateFieldGet2(_loadedSegments, _this).delete(command.i);
-							}
+							var _classPrivateFieldGet2$3;
+							_classPrivateFieldGet2(_loadedSegments, _this).delete(command.i);
+							if (((_classPrivateFieldGet2$3 = _classPrivateFieldGet2(_downloadingContext, _this)) === null || _classPrivateFieldGet2$3 === void 0 ? void 0 : _classPrivateFieldGet2$3.request.segment.externalId) === command.i && _classPrivateFieldGet2(_downloadingContext, _this).requestId === command.r) _assertClassBrand(_Peer_brand, _this, _cancelSegmentDownloading).call(_this, "peer-segment-absent");
 							break;
 						case PeerCommandType.CancelSegmentRequest:
+							if (_classPrivateFieldGet2(_latestRequestedUploadRequestId, _this) === command.r) _classPrivateFieldSet2(_latestRequestedUploadRequestId, _this, void 0);
 							if (_classPrivateFieldGet2(_peerProtocol, _this).getUploadingRequestId() !== command.r) break;
 							_classPrivateFieldGet2(_peerProtocol, _this).stopUploadingSegmentData();
 							break;
@@ -1803,27 +1846,17 @@ this.p2pml.hlsjs = (function(exports) {
 					return _ref.apply(this, arguments);
 				};
 			}());
-			_defineProperty(this, "onSegmentChunkReceived", (chunk) => {
+			_classPrivateFieldInitSpec(this, _onSegmentChunkReceived, (chunk) => {
 				var _classPrivateFieldGet3;
 				if (!((_classPrivateFieldGet3 = _classPrivateFieldGet2(_downloadingContext, this)) === null || _classPrivateFieldGet3 === void 0 ? void 0 : _classPrivateFieldGet3.isSegmentDataCommandReceived)) return;
 				const { request, controls } = _classPrivateFieldGet2(_downloadingContext, this);
 				if (request.totalBytes !== void 0 && request.loadedBytes + chunk.byteLength > request.totalBytes) {
-					request.clearLoadedBytes();
-					_assertClassBrand(_Peer_brand, this, _cancelSegmentDownloading).call(this, "peer-response-bytes-length-mismatch");
-					this.destroy(false, "Peer response bytes length mismatch");
+					_assertClassBrand(_Peer_brand, this, _destroyOnPeerError).call(this, "bytes-length-mismatch", "Peer response bytes length mismatch");
 					return;
 				}
 				_classPrivateFieldGet2(_bandwidthCalculator, this).addBytes(chunk.byteLength);
 				_classPrivateFieldGet2(_cachedDownloadBandwidth, this).timestamp = 0;
 				controls.addLoadedChunk(chunk);
-			});
-			_defineProperty(this, "destroy", (isConnectionClosed = false, error) => {
-				if (_classPrivateFieldGet2(_isDestroyed$1, this)) return;
-				_classPrivateFieldSet2(_isDestroyed$1, this, true);
-				_assertClassBrand(_Peer_brand, this, _cancelSegmentDownloading).call(this, "peer-closed");
-				_classPrivateFieldGet2(_peerProtocol, this).destroy();
-				if (!isConnectionClosed) _classPrivateFieldGet2(_closeConnection, this).call(this, error);
-				_classPrivateFieldGet2(_logger$1, this).call(this, `peer closed ${this.id}`);
 			});
 			this.id = id;
 			this.channel = channel;
@@ -1832,17 +1865,24 @@ this.p2pml.hlsjs = (function(exports) {
 			_classPrivateFieldSet2(_eventHandlers, this, eventHandlers);
 			_classPrivateFieldSet2(_peerConfig, this, peerConfig);
 			_classPrivateFieldSet2(_peerProtocol, this, new PeerProtocol(channel, peerConfig, {
-				onSegmentChunkReceived: this.onSegmentChunkReceived,
+				onSegmentChunkReceived: _classPrivateFieldGet2(_onSegmentChunkReceived, this),
 				onCommandReceived: (command) => void _classPrivateFieldGet2(_onCommandReceived, this).call(this, command).catch((error) => {
 					_classPrivateFieldGet2(_logger$1, this).call(this, "error processing command %O: %O", command, error);
-				})
+					this.destroy(false, new PeerError("protocol-violation", error instanceof Error ? error.message : "Error processing command", error));
+				}),
+				onProtocolError: (error) => {
+					this.destroy(false, new PeerError("protocol-violation", error instanceof Error ? error.message : "Protocol error", error));
+				}
 			}, eventTarget, id));
 		}
 		get downloadingSegment() {
 			var _classPrivateFieldGet4;
 			return (_classPrivateFieldGet4 = _classPrivateFieldGet2(_downloadingContext, this)) === null || _classPrivateFieldGet4 === void 0 ? void 0 : _classPrivateFieldGet4.request.segment;
 		}
-		get downloadBandwidth() {
+		get isUploadingSegment() {
+			return _classPrivateFieldGet2(_peerProtocol, this).getUploadingRequestId() !== void 0;
+		}
+		getDownloadBandwidth() {
 			const now = performance.now();
 			if (now - _classPrivateFieldGet2(_cachedDownloadBandwidth, this).timestamp > 1e3) {
 				_classPrivateFieldGet2(_cachedDownloadBandwidth, this).value = _classPrivateFieldGet2(_bandwidthCalculator, this).getBandwidthLoadingOnly(15);
@@ -1863,23 +1903,23 @@ this.p2pml.hlsjs = (function(exports) {
 				peerId: this.id
 			}, {
 				notReceivingBytesTimeoutMs: _classPrivateFieldGet2(_peerConfig, this).p2pNotReceivingBytesTimeoutMs,
-				abort: () => void 0
+				onAbort: () => void 0
 			}, _classPrivateFieldGet2(_peerConfig, this).validateP2PSegment, "p2p-segment-validation-failed")) return;
 			_classPrivateFieldGet2(_bandwidthCalculator, this).startLoading();
+			_classPrivateFieldSet2(_nextRequestId, this, (_classPrivateFieldGet2(_nextRequestId, this) + 1) % 1e9);
 			_classPrivateFieldSet2(_downloadingContext, this, {
 				request: segmentRequest,
-				requestId: _classPrivateFieldSet2(_nextRequestId, this, (_classPrivateFieldGet2(_nextRequestId, this) + 1) % 1e3),
+				requestId: _classPrivateFieldGet2(_nextRequestId, this),
 				isSegmentDataCommandReceived: false,
 				controls: segmentRequest.start({
 					downloadSource: "p2p",
 					peerId: this.id
 				}, {
 					notReceivingBytesTimeoutMs: _classPrivateFieldGet2(_peerConfig, this).p2pNotReceivingBytesTimeoutMs,
-					abort: (error) => {
-						if (!_classPrivateFieldGet2(_downloadingContext, this)) return;
+					onAbort: (error) => {
+						if (!_classPrivateFieldGet2(_downloadingContext, this) || _classPrivateFieldGet2(_downloadingContext, this).request !== segmentRequest) return;
 						const { request, requestId } = _classPrivateFieldGet2(_downloadingContext, this);
 						_assertClassBrand(_Peer_brand, this, _sendCancelSegmentRequestCommand).call(this, request.segment, requestId);
-						_classPrivateFieldGet2(_downloadingErrors, this).push(error);
 						_classPrivateFieldGet2(_bandwidthCalculator, this).stopLoading();
 						if (error.type !== "abort") {
 							_classPrivateFieldGet2(_bandwidthCalculator, this).clear();
@@ -1887,7 +1927,12 @@ this.p2pml.hlsjs = (function(exports) {
 							_classPrivateFieldGet2(_logger$1, this).call(this, `cleared bandwidth history due to ${error.type}`);
 						}
 						_classPrivateFieldSet2(_downloadingContext, this, void 0);
-						if (_classPrivateFieldGet2(_downloadingErrors, this).filter((error) => error.type === "bytes-receiving-timeout").length >= _classPrivateFieldGet2(_peerConfig, this).p2pErrorRetries) this.destroy(false, "Too many timeout errors");
+						if (error.type === "bytes-receiving-timeout") {
+							var _this$consecutiveTime;
+							_classPrivateFieldSet2(_consecutiveTimeouts, this, (_this$consecutiveTime = _classPrivateFieldGet2(_consecutiveTimeouts, this), _this$consecutiveTime++, _this$consecutiveTime));
+						}
+						if (_classPrivateFieldGet2(_consecutiveTimeouts, this) >= _classPrivateFieldGet2(_peerConfig, this).p2pErrorRetries) this.destroy(false, new PeerError("timeout", "Too many timeout errors"));
+						else if (error.type === "bytes-receiving-timeout") _classPrivateFieldGet2(_eventHandlers, this).onWarning(new PeerWarning("timeout-strike", `Timeout strike ${_classPrivateFieldGet2(_consecutiveTimeouts, this)}/${_classPrivateFieldGet2(_peerConfig, this).p2pErrorRetries}`));
 					}
 				})
 			});
@@ -1897,12 +1942,16 @@ this.p2pml.hlsjs = (function(exports) {
 				i: segmentRequest.segment.externalId
 			};
 			if (segmentRequest.loadedBytes) command.b = segmentRequest.loadedBytes;
-			_classPrivateFieldGet2(_peerProtocol, this).sendCommand(command);
+			if (!_assertClassBrand(_Peer_brand, this, _sendCommand).call(this, command)) _assertClassBrand(_Peer_brand, this, _cancelSegmentDownloading).call(this, "peer-closed");
 		}
 		uploadSegmentData(segment, requestId, data) {
 			var _this2 = this;
 			return _asyncToGenerator(function* () {
 				if (_classPrivateFieldGet2(_isDestroyed$1, _this2)) return;
+				if (requestId !== _classPrivateFieldGet2(_latestRequestedUploadRequestId, _this2)) {
+					_classPrivateFieldGet2(_logger$1, _this2).call(_this2, `discarding obsolete upload request ${requestId} for segment ${segment.externalId}`);
+					return;
+				}
 				const { externalId } = segment;
 				_classPrivateFieldGet2(_logger$1, _this2).call(_this2, `send segment ${segment.externalId} to ${_this2.id} (byteLength: ${data.byteLength})`);
 				const command = {
@@ -1911,14 +1960,14 @@ this.p2pml.hlsjs = (function(exports) {
 					r: requestId,
 					s: data.byteLength
 				};
-				_classPrivateFieldGet2(_peerProtocol, _this2).sendCommand(command);
+				if (!_assertClassBrand(_Peer_brand, _this2, _sendCommand).call(_this2, command)) return;
 				try {
 					yield _classPrivateFieldGet2(_peerProtocol, _this2).splitSegmentDataToChunksAndUploadAsync(data, requestId);
-					if (_assertClassBrand(_Peer_brand, _this2, _checkIsDestroyed).call(_this2)) return;
+					if (_this2.isDestroyed || requestId !== _classPrivateFieldGet2(_latestRequestedUploadRequestId, _this2)) return;
 					_assertClassBrand(_Peer_brand, _this2, _sendSegmentDataSendingCompletedCommand).call(_this2, segment, requestId);
 					_classPrivateFieldGet2(_logger$1, _this2).call(_this2, `segment ${externalId} has been sent to ${_this2.id}`);
-				} catch (_unused) {
-					_classPrivateFieldGet2(_logger$1, _this2).call(_this2, `cancel segment uploading ${externalId}`);
+				} catch (error) {
+					_classPrivateFieldGet2(_logger$1, _this2).call(_this2, `cancel segment uploading ${externalId}: %O`, error);
 				}
 			})();
 		}
@@ -1928,46 +1977,69 @@ this.p2pml.hlsjs = (function(exports) {
 				p: httpLoadingSegmentsIds,
 				l: loadedSegmentsIds
 			};
-			_classPrivateFieldGet2(_peerProtocol, this).sendCommand(command);
+			_assertClassBrand(_Peer_brand, this, _sendCommand).call(this, command);
 		}
 		sendSegmentAbsentCommand(segmentExternalId, requestId) {
-			_classPrivateFieldGet2(_peerProtocol, this).sendCommand({
+			_assertClassBrand(_Peer_brand, this, _sendCommand).call(this, {
 				c: PeerCommandType.SegmentAbsent,
 				i: segmentExternalId,
 				r: requestId
 			});
 		}
+		destroy(isConnectionClosed = false, error) {
+			if (_classPrivateFieldGet2(_isDestroyed$1, this)) return;
+			_classPrivateFieldSet2(_isDestroyed$1, this, true);
+			_assertClassBrand(_Peer_brand, this, _cancelSegmentDownloading).call(this, "peer-closed", error);
+			_classPrivateFieldGet2(_peerProtocol, this).destroy();
+			if (!isConnectionClosed) _classPrivateFieldGet2(_closeConnection, this).call(this, error);
+			_classPrivateFieldGet2(_logger$1, this).call(this, `peer closed ${this.id}`);
+		}
 	};
-	function _checkIsDestroyed() {
-		return _classPrivateFieldGet2(_isDestroyed$1, this);
+	function _destroyOnPeerError(type, message) {
+		var _classPrivateFieldGet5;
+		(_classPrivateFieldGet5 = _classPrivateFieldGet2(_downloadingContext, this)) === null || _classPrivateFieldGet5 === void 0 || _classPrivateFieldGet5.request.clearLoadedBytes();
+		const error = new PeerError(type, message);
+		_assertClassBrand(_Peer_brand, this, _cancelSegmentDownloading).call(this, "peer-closed", error);
+		this.destroy(false, error);
 	}
-	function _cancelSegmentDownloading(type) {
+	function _cancelSegmentDownloading(type, cause) {
 		if (!_classPrivateFieldGet2(_downloadingContext, this)) return;
 		const { request, controls } = _classPrivateFieldGet2(_downloadingContext, this);
 		const { segment } = request;
 		_classPrivateFieldGet2(_logger$1, this).call(this, `cancel segment request ${segment.externalId} (${type})`);
-		const error = new RequestError(type);
-		controls.abortOnError(error);
+		const error = new RequestError(type, void 0, cause);
+		controls.failWithError(error);
 		_classPrivateFieldGet2(_bandwidthCalculator, this).stopLoading();
-		_classPrivateFieldGet2(_bandwidthCalculator, this).clear();
-		_classPrivateFieldGet2(_cachedDownloadBandwidth, this).timestamp = 0;
-		_classPrivateFieldGet2(_logger$1, this).call(this, `cleared bandwidth history due to ${error.type}`);
+		if (type !== "peer-segment-absent") {
+			_classPrivateFieldGet2(_bandwidthCalculator, this).clear();
+			_classPrivateFieldGet2(_cachedDownloadBandwidth, this).timestamp = 0;
+			_classPrivateFieldGet2(_logger$1, this).call(this, `cleared bandwidth history due to ${error.type}`);
+		}
 		_classPrivateFieldSet2(_downloadingContext, this, void 0);
-		_classPrivateFieldGet2(_downloadingErrors, this).push(error);
 	}
 	function _sendCancelSegmentRequestCommand(segment, requestId) {
-		_classPrivateFieldGet2(_peerProtocol, this).sendCommand({
+		_assertClassBrand(_Peer_brand, this, _sendCommand).call(this, {
 			c: PeerCommandType.CancelSegmentRequest,
 			i: segment.externalId,
 			r: requestId
 		});
 	}
 	function _sendSegmentDataSendingCompletedCommand(segment, requestId) {
-		_classPrivateFieldGet2(_peerProtocol, this).sendCommand({
+		_assertClassBrand(_Peer_brand, this, _sendCommand).call(this, {
 			c: PeerCommandType.SegmentDataSendingCompleted,
 			r: requestId,
 			i: segment.externalId
 		});
+	}
+	function _sendCommand(command) {
+		if (_classPrivateFieldGet2(_isDestroyed$1, this)) return false;
+		try {
+			_classPrivateFieldGet2(_peerProtocol, this).sendCommand(command);
+			return true;
+		} catch (error) {
+			_classPrivateFieldGet2(_logger$1, this).call(this, "error sending command %d: %O", command.c, error);
+			return false;
+		}
 	}
 	//#endregion
 	//#region ../p2p-media-loader-core/src/utils/event-target.ts
@@ -1975,48 +2047,50 @@ this.p2pml.hlsjs = (function(exports) {
 		constructor() {
 			_defineProperty(this, "events", /* @__PURE__ */ new Map());
 		}
-		dispatchEvent(eventName, ...args) {
+		dispatchEvent(eventName, a1, a2, a3, a4, a5) {
 			const listeners = this.events.get(eventName);
 			if (!listeners) return;
 			for (const listener of listeners) try {
-				listener(...args);
+				listener(a1, a2, a3, a4, a5);
 			} catch (_unused) {}
 		}
 		getEventDispatcher(eventName) {
-			let listeners = this.events.get(eventName);
-			if (!listeners) {
-				listeners = [];
-				this.events.set(eventName, listeners);
-			}
-			const definedListeners = listeners;
-			return (...args) => {
-				for (const listener of definedListeners) try {
-					listener(...args);
+			return (a1, a2, a3, a4, a5) => {
+				const listeners = this.events.get(eventName);
+				if (!listeners) return;
+				for (const listener of listeners) try {
+					listener(a1, a2, a3, a4, a5);
 				} catch (_unused2) {}
 			};
 		}
 		addEventListener(eventName, listener) {
 			const listeners = this.events.get(eventName);
 			if (!listeners) this.events.set(eventName, [listener]);
-			else listeners.push(listener);
+			else this.events.set(eventName, [...listeners, listener]);
 		}
 		removeEventListener(eventName, listener) {
 			const listeners = this.events.get(eventName);
-			if (listeners) {
-				const index = listeners.indexOf(listener);
-				if (index !== -1) listeners.splice(index, 1);
+			if (!listeners) return;
+			const index = listeners.indexOf(listener);
+			if (index === -1) return;
+			if (listeners.length === 1) {
+				this.events.delete(eventName);
+				return;
 			}
+			const newListeners = listeners.slice();
+			newListeners.splice(index, 1);
+			this.events.set(eventName, newListeners);
 		}
 		clear() {
 			this.events.clear();
 		}
 	};
 	//#endregion
-	//#region ../p2p-media-loader-core/src/webtorrent/webtorrent-client/index.ts
-	var _ref, _globalObject$RTCPeer, _ref2, _globalObject$RTCSess;
-	var globalObject = typeof window !== "undefined" ? window : void 0;
-	var PeerConnection = (_ref = (_globalObject$RTCPeer = globalObject === null || globalObject === void 0 ? void 0 : globalObject.RTCPeerConnection) !== null && _globalObject$RTCPeer !== void 0 ? _globalObject$RTCPeer : globalObject === null || globalObject === void 0 ? void 0 : globalObject.webkitRTCPeerConnection) !== null && _ref !== void 0 ? _ref : globalObject === null || globalObject === void 0 ? void 0 : globalObject.mozRTCPeerConnection;
-	var SessionDescription = (_ref2 = (_globalObject$RTCSess = globalObject === null || globalObject === void 0 ? void 0 : globalObject.RTCSessionDescription) !== null && _globalObject$RTCSess !== void 0 ? _globalObject$RTCSess : globalObject === null || globalObject === void 0 ? void 0 : globalObject.webkitRTCSessionDescription) !== null && _ref2 !== void 0 ? _ref2 : globalObject === null || globalObject === void 0 ? void 0 : globalObject.mozRTCSessionDescription;
+	//#region ../p2p-media-loader-core/src/webtorrent/webtorrent-client/webrtc-utils.ts
+	var _ref, _win$RTCPeerConnectio, _ref2, _win$RTCSessionDescri;
+	var win = typeof window !== "undefined" ? window : {};
+	var PeerConnection = (_ref = (_win$RTCPeerConnectio = win.RTCPeerConnection) !== null && _win$RTCPeerConnectio !== void 0 ? _win$RTCPeerConnectio : win.webkitRTCPeerConnection) !== null && _ref !== void 0 ? _ref : win.mozRTCPeerConnection;
+	var SessionDescription = (_ref2 = (_win$RTCSessionDescri = win.RTCSessionDescription) !== null && _win$RTCSessionDescri !== void 0 ? _win$RTCSessionDescri : win.webkitRTCSessionDescription) !== null && _ref2 !== void 0 ? _ref2 : win.mozRTCSessionDescription;
 	/**
 	* Detects whether the current browser environment natively supports Promise-based WebRTC APIs
 	* (specifically pc.createOffer and pc.createAnswer).
@@ -2030,15 +2104,20 @@ this.p2pml.hlsjs = (function(exports) {
 	* during runtime connection negotiations, avoiding unnecessary exception-handling overhead.
 	*/
 	var supportsPromiseWebRTC = (() => {
+		if (!win.RTCPeerConnection && !win.webkitRTCPeerConnection && !win.mozRTCPeerConnection) return false;
+		let pc;
 		try {
-			const pc = new PeerConnection();
+			pc = new PeerConnection();
 			const p = pc.createOffer();
 			if (typeof (p === null || p === void 0 ? void 0 : p.then) === "function") {
-				pc.close();
+				p.catch(() => {});
 				return true;
 			}
-			pc.close();
-		} catch (_unused) {}
+		} catch (_unused) {} finally {
+			try {
+				pc === null || pc === void 0 || pc.close();
+			} catch (_unused2) {}
+		}
 		return false;
 	})();
 	/**
@@ -2051,7 +2130,7 @@ this.p2pml.hlsjs = (function(exports) {
 		if (supportsPromiseWebRTC) return pc.createOffer(options);
 		return new Promise((resolve, reject) => {
 			try {
-				pc.createOffer((offer) => resolve(offer), (err) => reject(err), options);
+				pc.createOffer(resolve, reject, options);
 			} catch (err) {
 				reject(err);
 			}
@@ -2067,7 +2146,7 @@ this.p2pml.hlsjs = (function(exports) {
 		if (supportsPromiseWebRTC) return pc.createAnswer(options);
 		return new Promise((resolve, reject) => {
 			try {
-				pc.createAnswer((answer) => resolve(answer), (err) => reject(err), options);
+				pc.createAnswer(resolve, reject, options);
 			} catch (err) {
 				reject(err);
 			}
@@ -2083,7 +2162,7 @@ this.p2pml.hlsjs = (function(exports) {
 		if (supportsPromiseWebRTC) return pc.setLocalDescription(description);
 		return new Promise((resolve, reject) => {
 			try {
-				pc.setLocalDescription(description, () => resolve(), (err) => reject(err));
+				pc.setLocalDescription(description, resolve, reject);
 			} catch (err) {
 				reject(err);
 			}
@@ -2099,25 +2178,34 @@ this.p2pml.hlsjs = (function(exports) {
 		if (supportsPromiseWebRTC) return pc.setRemoteDescription(description);
 		return new Promise((resolve, reject) => {
 			try {
-				pc.setRemoteDescription(description, () => resolve(), (err) => reject(err));
+				pc.setRemoteDescription(description, resolve, reject);
 			} catch (err) {
 				reject(err);
 			}
 		});
 	}
+	//#endregion
+	//#region ../p2p-media-loader-core/src/webtorrent/webtorrent-client/index.ts
 	var WEBTORRENT_DEFAULT_OFFER_TIMEOUT = 5e4;
 	var WEBTORRENT_DEFAULT_CONNECTION_TIMEOUT = 15e3;
 	var WEBTORRENT_DEFAULT_OFFERS_COUNT = 5;
+	var WEBTORRENT_DEFAULT_ICE_GATHERING_TIMEOUT = 5e3;
 	function generateOfferId() {
 		let id = "";
 		const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 		for (let i = 0; i < 20; i++) id += chars.charAt(Math.floor(Math.random() * 62));
 		return id;
 	}
+	var VALID_SDP_TYPES = new Set([
+		"offer",
+		"answer",
+		"pranswer",
+		"rollback"
+	]);
 	function isSessionDescriptionInit(value) {
 		if (typeof value !== "object" || value === null) return false;
 		const obj = value;
-		return typeof obj.type === "string" && typeof obj.sdp === "string";
+		return typeof obj.type === "string" && VALID_SDP_TYPES.has(obj.type) && typeof obj.sdp === "string";
 	}
 	var _config$4 = /* @__PURE__ */ new WeakMap();
 	var _wsClient = /* @__PURE__ */ new WeakMap();
@@ -2127,7 +2215,9 @@ this.p2pml.hlsjs = (function(exports) {
 	var _destroyAbortController = /* @__PURE__ */ new WeakMap();
 	var _announceTimeoutId = /* @__PURE__ */ new WeakMap();
 	var _announceIntervalSeconds = /* @__PURE__ */ new WeakMap();
-	var _announceRunId = /* @__PURE__ */ new WeakMap();
+	var _scheduleAnnounceRunId = /* @__PURE__ */ new WeakMap();
+	var _activeAnnouncePromise = /* @__PURE__ */ new WeakMap();
+	var _nextAnnounceEvent = /* @__PURE__ */ new WeakMap();
 	var _trackerId = /* @__PURE__ */ new WeakMap();
 	var _started$1 = /* @__PURE__ */ new WeakMap();
 	var _WebTorrentClient_brand = /* @__PURE__ */ new WeakSet();
@@ -2136,7 +2226,7 @@ this.p2pml.hlsjs = (function(exports) {
 	var _onWsMessage = /* @__PURE__ */ new WeakMap();
 	var WebTorrentClient = class {
 		constructor(config) {
-			var _config$offerTimeout, _config$offersCount, _config$connectionTim, _config$claimPeer, _config$shouldGenerat;
+			var _config$offerTimeout, _config$offersCount, _config$iceGatheringT, _config$connectionTim, _config$claimPeer, _config$shouldGenerat;
 			_classPrivateMethodInitSpec(this, _WebTorrentClient_brand);
 			_classPrivateFieldInitSpec(this, _config$4, void 0);
 			_classPrivateFieldInitSpec(this, _wsClient, void 0);
@@ -2146,14 +2236,16 @@ this.p2pml.hlsjs = (function(exports) {
 			_classPrivateFieldInitSpec(this, _destroyAbortController, new SafeAbortController());
 			_classPrivateFieldInitSpec(this, _announceTimeoutId, null);
 			_classPrivateFieldInitSpec(this, _announceIntervalSeconds, null);
-			_classPrivateFieldInitSpec(this, _announceRunId, 0);
+			_classPrivateFieldInitSpec(this, _scheduleAnnounceRunId, 0);
+			_classPrivateFieldInitSpec(this, _activeAnnouncePromise, null);
+			_classPrivateFieldInitSpec(this, _nextAnnounceEvent, void 0);
 			_classPrivateFieldInitSpec(this, _trackerId, null);
 			_classPrivateFieldInitSpec(this, _started$1, false);
 			_classPrivateFieldInitSpec(this, _onWsConnected, () => {
 				_assertClassBrand(_WebTorrentClient_brand, this, _scheduleAnnounce).call(this, _DEFAULT_ANNOUNCE_INTERVAL_SECONDS._);
 				_assertClassBrand(_WebTorrentClient_brand, this, _announce).call(this, "started").catch((err) => {
 					if (_assertClassBrand(_WebTorrentClient_brand, this, _isDestroyed).call(this)) return;
-					_classPrivateFieldGet2(_eventTarget$5, this).dispatchEvent("error", `Initial announce failed: ${String(err)}`);
+					_classPrivateFieldGet2(_eventTarget$5, this).dispatchEvent("error", new TrackerError("announce-failed", `Initial announce failed: ${err instanceof Error ? err.message : String(err)}`, err));
 				});
 			});
 			_classPrivateFieldInitSpec(this, _onWsDisconnected, () => {
@@ -2167,26 +2259,27 @@ this.p2pml.hlsjs = (function(exports) {
 					const text = typeof data === "string" ? data : new TextDecoder().decode(data);
 					msg = JSON.parse(text);
 				} catch (err) {
-					_classPrivateFieldGet2(_eventTarget$5, this).dispatchEvent("error", `Failed to parse tracker message: ${String(err)}`);
+					_classPrivateFieldGet2(_eventTarget$5, this).dispatchEvent("error", new TrackerError("parse-error", `Failed to parse tracker message: ${err instanceof Error ? err.message : String(err)}`, err));
 					return;
 				}
 				if (typeof msg !== "object" || msg === null || Array.isArray(msg)) return;
 				const dataObject = msg;
+				const infoHash = dataObject.info_hash;
+				if (typeof infoHash === "string" && infoHash !== _classPrivateFieldGet2(_config$4, this).infoHash) return;
 				const warningMessage = dataObject["warning message"];
-				if (typeof warningMessage === "string") _classPrivateFieldGet2(_eventTarget$5, this).dispatchEvent("warning", warningMessage);
+				if (typeof warningMessage === "string") _classPrivateFieldGet2(_eventTarget$5, this).dispatchEvent("warning", new TrackerWarning("tracker-response", warningMessage));
 				const failureReason = dataObject["failure reason"];
 				if (typeof failureReason === "string") {
-					_classPrivateFieldGet2(_eventTarget$5, this).dispatchEvent("error", failureReason);
+					_classPrivateFieldGet2(_eventTarget$5, this).dispatchEvent("error", new TrackerError("tracker-response", failureReason));
 					return;
 				}
 				const { interval } = dataObject;
 				if (typeof interval === "number" && interval > 0) {
-					if (_classPrivateFieldGet2(_announceIntervalSeconds, this) !== interval) _assertClassBrand(_WebTorrentClient_brand, this, _scheduleAnnounce).call(this, interval);
+					const safeInterval = Math.max(_MIN_ANNOUNCE_INTERVAL_SECONDS._, interval);
+					if (_classPrivateFieldGet2(_announceIntervalSeconds, this) !== safeInterval) _assertClassBrand(_WebTorrentClient_brand, this, _scheduleAnnounce).call(this, safeInterval);
 				}
 				const trackerId = dataObject["tracker id"];
 				if (typeof trackerId === "string") _classPrivateFieldSet2(_trackerId, this, trackerId);
-				const infoHash = dataObject.info_hash;
-				if (typeof infoHash === "string" && infoHash !== _classPrivateFieldGet2(_config$4, this).infoHash) return;
 				const peerId = dataObject.peer_id;
 				if (typeof peerId === "string" && peerId === _classPrivateFieldGet2(_config$4, this).peerId) return;
 				const offerId = dataObject.offer_id;
@@ -2197,7 +2290,7 @@ this.p2pml.hlsjs = (function(exports) {
 					offerId
 				}).catch((err) => {
 					if (_assertClassBrand(_WebTorrentClient_brand, this, _isDestroyed).call(this)) return;
-					_classPrivateFieldGet2(_eventTarget$5, this).dispatchEvent("error", `Failed to handle offer: ${String(err)}`);
+					_classPrivateFieldGet2(_eventTarget$5, this).dispatchEvent("error", new TrackerError("signaling-failed", `Failed to handle offer: ${err instanceof Error ? err.message : String(err)}`, err));
 				});
 				else if (isSessionDescriptionInit(dataObject.answer)) _assertClassBrand(_WebTorrentClient_brand, this, _handleIncomingAnswer).call(this, {
 					sdp: dataObject.answer,
@@ -2205,7 +2298,7 @@ this.p2pml.hlsjs = (function(exports) {
 					offerId
 				}).catch((err) => {
 					if (_assertClassBrand(_WebTorrentClient_brand, this, _isDestroyed).call(this)) return;
-					_classPrivateFieldGet2(_eventTarget$5, this).dispatchEvent("error", `Failed to handle answer: ${String(err)}`);
+					_classPrivateFieldGet2(_eventTarget$5, this).dispatchEvent("error", new TrackerError("signaling-failed", `Failed to handle answer: ${err instanceof Error ? err.message : String(err)}`, err));
 				});
 			});
 			_classPrivateFieldSet2(_config$4, this, {
@@ -2213,9 +2306,10 @@ this.p2pml.hlsjs = (function(exports) {
 				peerId: config.peerId,
 				rtcConfig: config.rtcConfig,
 				channelConfig: config.channelConfig,
-				offerTimeout: (_config$offerTimeout = config.offerTimeout) !== null && _config$offerTimeout !== void 0 ? _config$offerTimeout : WEBTORRENT_DEFAULT_OFFER_TIMEOUT,
-				offersCount: (_config$offersCount = config.offersCount) !== null && _config$offersCount !== void 0 ? _config$offersCount : WEBTORRENT_DEFAULT_OFFERS_COUNT,
-				connectionTimeout: (_config$connectionTim = config.connectionTimeout) !== null && _config$connectionTim !== void 0 ? _config$connectionTim : WEBTORRENT_DEFAULT_CONNECTION_TIMEOUT,
+				offerTimeout: (_config$offerTimeout = config.offerTimeout) !== null && _config$offerTimeout !== void 0 ? _config$offerTimeout : (() => WEBTORRENT_DEFAULT_OFFER_TIMEOUT),
+				offersCount: (_config$offersCount = config.offersCount) !== null && _config$offersCount !== void 0 ? _config$offersCount : (() => WEBTORRENT_DEFAULT_OFFERS_COUNT),
+				iceGatheringTimeout: (_config$iceGatheringT = config.iceGatheringTimeout) !== null && _config$iceGatheringT !== void 0 ? _config$iceGatheringT : (() => WEBTORRENT_DEFAULT_ICE_GATHERING_TIMEOUT),
+				connectionTimeout: (_config$connectionTim = config.connectionTimeout) !== null && _config$connectionTim !== void 0 ? _config$connectionTim : (() => WEBTORRENT_DEFAULT_CONNECTION_TIMEOUT),
 				claimPeer: (_config$claimPeer = config.claimPeer) !== null && _config$claimPeer !== void 0 ? _config$claimPeer : (() => true),
 				shouldGenerateOffers: (_config$shouldGenerat = config.shouldGenerateOffers) !== null && _config$shouldGenerat !== void 0 ? _config$shouldGenerat : (() => true)
 			});
@@ -2258,22 +2352,22 @@ this.p2pml.hlsjs = (function(exports) {
 	}
 	function _scheduleAnnounce(intervalSeconds) {
 		var _this = this;
-		var _this$announceRunId;
+		var _this$scheduleAnnounc;
 		_assertClassBrand(_WebTorrentClient_brand, this, _clearAnnounceTimeout).call(this);
 		_classPrivateFieldSet2(_announceIntervalSeconds, this, intervalSeconds);
-		const runId = _classPrivateFieldSet2(_announceRunId, this, (_this$announceRunId = _classPrivateFieldGet2(_announceRunId, this), ++_this$announceRunId));
+		const runId = _classPrivateFieldSet2(_scheduleAnnounceRunId, this, (_this$scheduleAnnounc = _classPrivateFieldGet2(_scheduleAnnounceRunId, this), ++_this$scheduleAnnounc));
 		const run = function() {
-			var _ref3 = _asyncToGenerator(function* () {
+			var _ref = _asyncToGenerator(function* () {
 				try {
 					yield _assertClassBrand(_WebTorrentClient_brand, _this, _announce).call(_this);
 				} catch (err) {
 					if (_assertClassBrand(_WebTorrentClient_brand, _this, _isDestroyed).call(_this)) return;
-					_classPrivateFieldGet2(_eventTarget$5, _this).dispatchEvent("error", `Announce failed: ${String(err)}`);
+					_classPrivateFieldGet2(_eventTarget$5, _this).dispatchEvent("error", new TrackerError("announce-failed", `Announce failed: ${err instanceof Error ? err.message : String(err)}`, err));
 				}
-				if (!_assertClassBrand(_WebTorrentClient_brand, _this, _isDestroyed).call(_this) && _classPrivateFieldGet2(_announceIntervalSeconds, _this) !== null && _classPrivateFieldGet2(_announceRunId, _this) === runId) _classPrivateFieldSet2(_announceTimeoutId, _this, setTimeout(run, _classPrivateFieldGet2(_announceIntervalSeconds, _this) * 1e3));
+				if (!_assertClassBrand(_WebTorrentClient_brand, _this, _isDestroyed).call(_this) && _classPrivateFieldGet2(_announceIntervalSeconds, _this) !== null && _classPrivateFieldGet2(_scheduleAnnounceRunId, _this) === runId) _classPrivateFieldSet2(_announceTimeoutId, _this, setTimeout(run, _classPrivateFieldGet2(_announceIntervalSeconds, _this) * 1e3));
 			});
 			return function run() {
-				return _ref3.apply(this, arguments);
+				return _ref.apply(this, arguments);
 			};
 		}();
 		_classPrivateFieldSet2(_announceTimeoutId, this, setTimeout(run, intervalSeconds * 1e3));
@@ -2288,24 +2382,40 @@ this.p2pml.hlsjs = (function(exports) {
 		var _this2 = this;
 		return _asyncToGenerator(function* () {
 			if (_assertClassBrand(_WebTorrentClient_brand, _this2, _isDestroyed).call(_this2) || _classPrivateFieldGet2(_wsClient, _this2).state !== "connected") return;
-			const offersCount = _classPrivateFieldGet2(_config$4, _this2).shouldGenerateOffers() ? _classPrivateFieldGet2(_config$4, _this2).offersCount : 0;
-			const results = yield Promise.all(Array.from({ length: offersCount }, () => _assertClassBrand(_WebTorrentClient_brand, _this2, _createOffer).call(_this2).then((value) => value, () => void 0)));
-			if (_assertClassBrand(_WebTorrentClient_brand, _this2, _isDestroyed).call(_this2)) {
-				for (const result of results) if (result) _assertClassBrand(_WebTorrentClient_brand, _this2, _cleanupPendingOffer).call(_this2, result.offer_id);
-				return;
-			}
-			const offers = [];
-			for (const result of results) if (result) offers.push(result);
-			const payload = _assertClassBrand(_WebTorrentClient_brand, _this2, _buildAnnouncePayload).call(_this2, {
-				numwant: offers.length,
-				offers,
-				event
-			});
+			if (event) _classPrivateFieldSet2(_nextAnnounceEvent, _this2, event);
+			if (_classPrivateFieldGet2(_activeAnnouncePromise, _this2)) return _classPrivateFieldGet2(_activeAnnouncePromise, _this2);
+			const promise = _asyncToGenerator(function* () {
+				const offersCount = _classPrivateFieldGet2(_config$4, _this2).shouldGenerateOffers() ? _classPrivateFieldGet2(_config$4, _this2).offersCount() : 0;
+				const results = yield Promise.all(Array.from({ length: offersCount }, () => _assertClassBrand(_WebTorrentClient_brand, _this2, _createOffer).call(_this2)));
+				if (_assertClassBrand(_WebTorrentClient_brand, _this2, _isDestroyed).call(_this2)) {
+					for (const result of results) if (result) _assertClassBrand(_WebTorrentClient_brand, _this2, _cleanupPendingOffer).call(_this2, result.offer_id);
+					return;
+				}
+				const offers = [];
+				for (const result of results) if (result) offers.push(result);
+				const currentEvent = _classPrivateFieldGet2(_nextAnnounceEvent, _this2);
+				_classPrivateFieldSet2(_nextAnnounceEvent, _this2, void 0);
+				const payload = _assertClassBrand(_WebTorrentClient_brand, _this2, _buildAnnouncePayload).call(_this2, {
+					numwant: offers.length,
+					offers,
+					event: currentEvent
+				});
+				if (_classPrivateFieldGet2(_wsClient, _this2).state !== "connected") {
+					for (const offer of offers) _assertClassBrand(_WebTorrentClient_brand, _this2, _cleanupPendingOffer).call(_this2, offer.offer_id);
+					return;
+				}
+				try {
+					_classPrivateFieldGet2(_wsClient, _this2).send(JSON.stringify(payload));
+				} catch (err) {
+					for (const offer of offers) _assertClassBrand(_WebTorrentClient_brand, _this2, _cleanupPendingOffer).call(_this2, offer.offer_id);
+					throw err;
+				}
+			})();
+			_classPrivateFieldSet2(_activeAnnouncePromise, _this2, promise);
 			try {
-				_classPrivateFieldGet2(_wsClient, _this2).send(JSON.stringify(payload));
-			} catch (err) {
-				for (const offer of offers) _assertClassBrand(_WebTorrentClient_brand, _this2, _cleanupPendingOffer).call(_this2, offer.offer_id);
-				throw err;
+				yield promise;
+			} finally {
+				if (_classPrivateFieldGet2(_activeAnnouncePromise, _this2) === promise) _classPrivateFieldSet2(_activeAnnouncePromise, _this2, null);
 			}
 		})();
 	}
@@ -2315,7 +2425,8 @@ this.p2pml.hlsjs = (function(exports) {
 			if (_assertClassBrand(_WebTorrentClient_brand, _this3, _isDestroyed).call(_this3)) return void 0;
 			let pc;
 			try {
-				pc = new PeerConnection(_classPrivateFieldGet2(_config$4, _this3).rtcConfig);
+				var _classPrivateFieldGet2$2, _classPrivateFieldGet3;
+				pc = new PeerConnection((_classPrivateFieldGet2$2 = (_classPrivateFieldGet3 = _classPrivateFieldGet2(_config$4, _this3)).rtcConfig) === null || _classPrivateFieldGet2$2 === void 0 ? void 0 : _classPrivateFieldGet2$2.call(_classPrivateFieldGet3));
 				_classPrivateFieldGet2(_negotiatingConnections, _this3).add(pc);
 				const channel = pc.createDataChannel("webtorrent", _classPrivateFieldGet2(_config$4, _this3).channelConfig);
 				const offer = yield safeCreateOffer(pc);
@@ -2335,7 +2446,7 @@ this.p2pml.hlsjs = (function(exports) {
 					channel,
 					timeoutId: setTimeout(() => {
 						_assertClassBrand(_WebTorrentClient_brand, _this3, _cleanupPendingOffer).call(_this3, offerId);
-					}, _classPrivateFieldGet2(_config$4, _this3).offerTimeout)
+					}, _classPrivateFieldGet2(_config$4, _this3).offerTimeout())
 				});
 				return {
 					offer: {
@@ -2346,8 +2457,7 @@ this.p2pml.hlsjs = (function(exports) {
 				};
 			} catch (err) {
 				pc === null || pc === void 0 || pc.close();
-				if (!_assertClassBrand(_WebTorrentClient_brand, _this3, _isDestroyed).call(_this3)) _classPrivateFieldGet2(_eventTarget$5, _this3).dispatchEvent("warning", `Failed to create offer: ${err instanceof Error ? err.message : String(err)}`);
-				return;
+				if (!_assertClassBrand(_WebTorrentClient_brand, _this3, _isDestroyed).call(_this3)) _classPrivateFieldGet2(_eventTarget$5, _this3).dispatchEvent("warning", new TrackerWarning("offer-failed", `Failed to create offer: ${err instanceof Error ? err.message : String(err)}`, err));
 			} finally {
 				if (pc) _classPrivateFieldGet2(_negotiatingConnections, _this3).delete(pc);
 			}
@@ -2362,7 +2472,7 @@ this.p2pml.hlsjs = (function(exports) {
 		});
 		try {
 			_classPrivateFieldGet2(_wsClient, this).send(JSON.stringify(payload));
-		} catch (_unused2) {}
+		} catch (_unused) {}
 	}
 	function _buildAnnouncePayload({ numwant, offers, event }) {
 		const payload = {
@@ -2385,7 +2495,8 @@ this.p2pml.hlsjs = (function(exports) {
 			if (!_classPrivateFieldGet2(_config$4, _this4).claimPeer(remotePeerId)) return;
 			let pc;
 			try {
-				pc = new PeerConnection(_classPrivateFieldGet2(_config$4, _this4).rtcConfig);
+				var _classPrivateFieldGet4, _classPrivateFieldGet5;
+				pc = new PeerConnection((_classPrivateFieldGet4 = (_classPrivateFieldGet5 = _classPrivateFieldGet2(_config$4, _this4)).rtcConfig) === null || _classPrivateFieldGet4 === void 0 ? void 0 : _classPrivateFieldGet4.call(_classPrivateFieldGet5));
 				_classPrivateFieldGet2(_negotiatingConnections, _this4).add(pc);
 				yield safeSetRemoteDescription(pc, new SessionDescription(offerSdp));
 				_assertClassBrand(_WebTorrentClient_brand, _this4, _throwIfDestroyed).call(_this4);
@@ -2418,9 +2529,9 @@ this.p2pml.hlsjs = (function(exports) {
 				});
 			} catch (err) {
 				pc === null || pc === void 0 || pc.close();
-				if (!_assertClassBrand(_WebTorrentClient_brand, _this4, _isDestroyed).call(_this4)) _classPrivateFieldGet2(_eventTarget$5, _this4).dispatchEvent("peerConnectFailed", {
+				_classPrivateFieldGet2(_eventTarget$5, _this4).dispatchEvent("peerConnectFailed", {
 					peerId: remotePeerId,
-					error: err instanceof Error ? err.message : String(err)
+					error: new PeerConnectError("connection-failed", err instanceof Error ? err.message : String(err), err)
 				});
 			} finally {
 				if (pc) _classPrivateFieldGet2(_negotiatingConnections, _this4).delete(pc);
@@ -2452,9 +2563,9 @@ this.p2pml.hlsjs = (function(exports) {
 				});
 			} catch (err) {
 				pending.connection.close();
-				if (!_assertClassBrand(_WebTorrentClient_brand, _this5, _isDestroyed).call(_this5)) _classPrivateFieldGet2(_eventTarget$5, _this5).dispatchEvent("peerConnectFailed", {
+				_classPrivateFieldGet2(_eventTarget$5, _this5).dispatchEvent("peerConnectFailed", {
 					peerId: remotePeerId,
-					error: err instanceof Error ? err.message : String(err)
+					error: new PeerConnectError("connection-failed", err instanceof Error ? err.message : String(err), err)
 				});
 			} finally {
 				_classPrivateFieldGet2(_negotiatingConnections, _this5).delete(pending.connection);
@@ -2508,7 +2619,7 @@ this.p2pml.hlsjs = (function(exports) {
 			timeoutId = setTimeout(() => {
 				cleanup();
 				resolve();
-			}, _ICE_GATHERING_TIMEOUT._);
+			}, _classPrivateFieldGet2(_config$4, this).iceGatheringTimeout());
 			pc.addEventListener("icegatheringstatechange", onGatheringChange);
 			pc.addEventListener("icecandidate", onIceCandidate);
 			pc.addEventListener("signalingstatechange", onSignalingChange);
@@ -2578,7 +2689,7 @@ this.p2pml.hlsjs = (function(exports) {
 		timeoutId = setTimeout(() => {
 			cleanup();
 			reject(/* @__PURE__ */ new Error("Data channel open timeout"));
-		}, _classPrivateFieldGet2(_config$4, this).connectionTimeout);
+		}, _classPrivateFieldGet2(_config$4, this).connectionTimeout());
 		pc.addEventListener("iceconnectionstatechange", rejectIfTerminalState);
 		_classPrivateFieldGet2(_destroyAbortController, this).signal.addEventListener("abort", onAbort);
 		if (boundChannel) bindDataChannel(boundChannel);
@@ -2601,9 +2712,11 @@ this.p2pml.hlsjs = (function(exports) {
 		_classPrivateFieldGet2(_negotiatingConnections, this).clear();
 	}
 	var _DEFAULT_ANNOUNCE_INTERVAL_SECONDS = { _: 120 };
-	var _ICE_GATHERING_TIMEOUT = { _: 5e3 };
+	var _MIN_ANNOUNCE_INTERVAL_SECONDS = { _: 20 };
 	//#endregion
 	//#region ../p2p-media-loader-core/src/webtorrent/webtorrent-manager/index.ts
+	var WEBTORRENT_DEFAULT_MAX_PEERS = 50;
+	var WEBTORRENT_DEFAULT_MAX_PEERS_MULTIPLIER = 1.5;
 	var _config$3 = /* @__PURE__ */ new WeakMap();
 	var _eventTarget$4 = /* @__PURE__ */ new WeakMap();
 	var _connectingPeers = /* @__PURE__ */ new WeakMap();
@@ -2615,6 +2728,7 @@ this.p2pml.hlsjs = (function(exports) {
 	var _WebTorrentManager_brand = /* @__PURE__ */ new WeakSet();
 	var WebTorrentManager = class {
 		constructor(config) {
+			var _config$maxPeers, _config$maxPeersMulti;
 			_classPrivateMethodInitSpec(this, _WebTorrentManager_brand);
 			_classPrivateFieldInitSpec(this, _config$3, void 0);
 			_classPrivateFieldInitSpec(this, _eventTarget$4, new EventTarget());
@@ -2626,10 +2740,15 @@ this.p2pml.hlsjs = (function(exports) {
 			_classPrivateFieldInitSpec(this, _claimPeer, (remotePeerId) => {
 				if (_classPrivateFieldGet2(_destroyed, this)) return false;
 				if (_classPrivateFieldGet2(_connectingPeers, this).has(remotePeerId) || _classPrivateFieldGet2(_connectedPeers, this).has(remotePeerId)) return false;
+				const hardLimit = Math.floor(_classPrivateFieldGet2(_config$3, this).maxPeers() * Math.max(1, _classPrivateFieldGet2(_config$3, this).maxPeersMultiplier()));
+				if (_classPrivateFieldGet2(_connectingPeers, this).size + _classPrivateFieldGet2(_connectedPeers, this).size >= hardLimit) return false;
 				_classPrivateFieldGet2(_connectingPeers, this).add(remotePeerId);
 				return true;
 			});
-			_classPrivateFieldSet2(_config$3, this, config);
+			_classPrivateFieldSet2(_config$3, this, _objectSpread2(_objectSpread2({}, config), {}, {
+				maxPeers: (_config$maxPeers = config.maxPeers) !== null && _config$maxPeers !== void 0 ? _config$maxPeers : (() => WEBTORRENT_DEFAULT_MAX_PEERS),
+				maxPeersMultiplier: (_config$maxPeersMulti = config.maxPeersMultiplier) !== null && _config$maxPeersMulti !== void 0 ? _config$maxPeersMulti : (() => WEBTORRENT_DEFAULT_MAX_PEERS_MULTIPLIER)
+			}));
 		}
 		addEventListener(eventName, listener) {
 			_classPrivateFieldGet2(_eventTarget$4, this).addEventListener(eventName, listener);
@@ -2643,62 +2762,68 @@ this.p2pml.hlsjs = (function(exports) {
 			try {
 				for (const url of _classPrivateFieldGet2(_config$3, this).trackerUrls) {
 					const { client: wsClient, release } = _classPrivateFieldGet2(_config$3, this).socketPool.acquire(url);
-					let client;
+					let addedToClients = false;
 					try {
-						client = new WebTorrentClient({
+						const client = new WebTorrentClient({
 							infoHash: _classPrivateFieldGet2(_config$3, this).infoHash,
 							peerId: _classPrivateFieldGet2(_config$3, this).peerId,
 							wsClient,
 							rtcConfig: _classPrivateFieldGet2(_config$3, this).rtcConfig,
 							channelConfig: _classPrivateFieldGet2(_config$3, this).channelConfig,
-							claimPeer: _classPrivateFieldGet2(_claimPeer, this)
+							claimPeer: _classPrivateFieldGet2(_claimPeer, this),
+							offersCount: _classPrivateFieldGet2(_config$3, this).offersCount,
+							offerTimeout: _classPrivateFieldGet2(_config$3, this).offerTimeout,
+							iceGatheringTimeout: _classPrivateFieldGet2(_config$3, this).iceGatheringTimeout,
+							connectionTimeout: _classPrivateFieldGet2(_config$3, this).connectionTimeout,
+							shouldGenerateOffers: () => _classPrivateFieldGet2(_connectingPeers, this).size + _classPrivateFieldGet2(_connectedPeers, this).size < _classPrivateFieldGet2(_config$3, this).maxPeers()
 						});
+						const onPeerConnected = (event) => {
+							_classPrivateFieldGet2(_connectingPeers, this).delete(event.peerId);
+							_assertClassBrand(_WebTorrentManager_brand, this, _addConnectedPeer).call(this, event.peerId, event.connection, event.channel, url);
+						};
+						const onPeerConnectFailed = (event) => {
+							if (_classPrivateFieldGet2(_connectingPeers, this).has(event.peerId)) {
+								_classPrivateFieldGet2(_connectingPeers, this).delete(event.peerId);
+								_classPrivateFieldGet2(_eventTarget$4, this).dispatchEvent("peerConnectFailed", {
+									peerId: event.peerId,
+									trackerUrl: url,
+									error: event.error
+								});
+							}
+						};
+						const onWarning = (warning) => {
+							_classPrivateFieldGet2(_eventTarget$4, this).dispatchEvent("warning", {
+								trackerUrl: url,
+								warning
+							});
+						};
+						const onError = (error) => {
+							_classPrivateFieldGet2(_eventTarget$4, this).dispatchEvent("error", {
+								trackerUrl: url,
+								error
+							});
+						};
+						client.addEventListener("peerConnected", onPeerConnected);
+						client.addEventListener("peerConnectFailed", onPeerConnectFailed);
+						client.addEventListener("warning", onWarning);
+						client.addEventListener("error", onError);
+						const cleanupListeners = () => {
+							client.removeEventListener("peerConnected", onPeerConnected);
+							client.removeEventListener("peerConnectFailed", onPeerConnectFailed);
+							client.removeEventListener("warning", onWarning);
+							client.removeEventListener("error", onError);
+						};
+						_classPrivateFieldGet2(_clients, this).add({
+							client,
+							releaseSocket: release,
+							cleanupListeners
+						});
+						addedToClients = true;
+						client.start();
 					} catch (error) {
-						release();
+						if (!addedToClients) release();
 						throw error;
 					}
-					const onPeerConnected = (event) => {
-						_classPrivateFieldGet2(_connectingPeers, this).delete(event.peerId);
-						_assertClassBrand(_WebTorrentManager_brand, this, _addConnectedPeer).call(this, event.peerId, event.connection, event.channel, url);
-					};
-					const onPeerConnectFailed = (event) => {
-						if (_classPrivateFieldGet2(_connectingPeers, this).has(event.peerId)) {
-							_classPrivateFieldGet2(_connectingPeers, this).delete(event.peerId);
-							_classPrivateFieldGet2(_eventTarget$4, this).dispatchEvent("peerConnectFailed", {
-								peerId: event.peerId,
-								trackerUrl: url,
-								error: `Connection failed: ${event.error}`
-							});
-						}
-					};
-					const onWarning = (warning) => {
-						_classPrivateFieldGet2(_eventTarget$4, this).dispatchEvent("warning", {
-							trackerUrl: url,
-							warning
-						});
-					};
-					const onError = (error) => {
-						_classPrivateFieldGet2(_eventTarget$4, this).dispatchEvent("error", {
-							trackerUrl: url,
-							error
-						});
-					};
-					client.addEventListener("peerConnected", onPeerConnected);
-					client.addEventListener("peerConnectFailed", onPeerConnectFailed);
-					client.addEventListener("warning", onWarning);
-					client.addEventListener("error", onError);
-					const cleanupListeners = () => {
-						client.removeEventListener("peerConnected", onPeerConnected);
-						client.removeEventListener("peerConnectFailed", onPeerConnectFailed);
-						client.removeEventListener("warning", onWarning);
-						client.removeEventListener("error", onError);
-					};
-					_classPrivateFieldGet2(_clients, this).add({
-						client,
-						releaseSocket: release,
-						cleanupListeners
-					});
-					client.start();
 				}
 			} catch (error) {
 				this.destroy();
@@ -2719,52 +2844,60 @@ this.p2pml.hlsjs = (function(exports) {
 			_classPrivateFieldGet2(_connectedPeers, this).clear();
 			for (const [peerId, peer] of connectedSnapshot) {
 				peer.cleanup();
-				peer.connection.close();
+				try {
+					peer.channel.close();
+				} catch (_unused) {}
+				try {
+					peer.connection.close();
+				} catch (_unused2) {}
 				_classPrivateFieldGet2(_eventTarget$4, this).dispatchEvent("peerDisconnected", {
 					peerId,
 					trackerUrl: peer.trackerUrl,
-					reason: "Manager destroyed",
-					isError: false
+					disconnectReason: "Manager destroyed"
 				});
 			}
 			_classPrivateFieldGet2(_eventTarget$4, this).clear();
 		}
 	};
-	function _closePeer(peerId, reason, isError) {
+	function _closePeer(peerId, cause) {
 		if (_classPrivateFieldGet2(_destroyed, this)) return;
 		const connected = _classPrivateFieldGet2(_connectedPeers, this).get(peerId);
-		if (connected) {
-			connected.cleanup();
+		if (!connected) return;
+		_classPrivateFieldGet2(_connectedPeers, this).delete(peerId);
+		connected.cleanup();
+		try {
+			connected.channel.close();
+		} catch (_unused3) {}
+		try {
 			connected.connection.close();
-			_classPrivateFieldGet2(_connectedPeers, this).delete(peerId);
-			_classPrivateFieldGet2(_eventTarget$4, this).dispatchEvent("peerDisconnected", {
-				peerId,
-				trackerUrl: connected.trackerUrl,
-				reason,
-				isError
-			});
-		}
+		} catch (_unused4) {}
+		_classPrivateFieldGet2(_eventTarget$4, this).dispatchEvent("peerDisconnected", _objectSpread2({
+			peerId,
+			trackerUrl: connected.trackerUrl
+		}, cause));
 	}
 	function _addConnectedPeer(peerId, connection, channel, trackerUrl) {
 		if (isTerminalConnectionState(connection.iceConnectionState)) {
-			connection.close();
+			try {
+				connection.close();
+			} catch (_unused5) {}
 			_classPrivateFieldGet2(_eventTarget$4, this).dispatchEvent("peerConnectFailed", {
 				peerId,
 				trackerUrl,
-				error: "Connection failed during promotion"
+				error: new PeerConnectError("connection-failed", "Connection failed during promotion")
 			});
 			return;
 		}
-		const onDisconnect = (reason, isError) => _assertClassBrand(_WebTorrentManager_brand, this, _closePeer).call(this, peerId, reason, isError);
+		const onDisconnect = (cause) => _assertClassBrand(_WebTorrentManager_brand, this, _closePeer).call(this, peerId, cause);
 		const onIceConnectionStateChange = () => {
-			if (isTerminalConnectionState(connection.iceConnectionState)) onDisconnect(`ICE connection state became ${connection.iceConnectionState}`, true);
+			if (isTerminalConnectionState(connection.iceConnectionState)) onDisconnect({ error: new PeerError("connection-lost", `ICE connection state became ${connection.iceConnectionState}`) });
 		};
-		const onChannelClose = () => onDisconnect("Data channel closed", false);
-		const onChannelClosing = () => onDisconnect("Data channel closing", false);
+		const onChannelClose = () => onDisconnect({ disconnectReason: "Data channel closed" });
+		const onChannelClosing = () => onDisconnect({ disconnectReason: "Data channel closing" });
 		const onChannelError = (event) => {
-			onDisconnect(`Data channel error: ${getRTCErrorMessage(event, "Data channel error")}`, true);
+			onDisconnect({ error: new PeerError("transport-error", `Data channel error: ${getRTCErrorMessage(event, "Data channel error")}`) });
 		};
-		let closeRef = (error) => _assertClassBrand(_WebTorrentManager_brand, this, _closePeer).call(this, peerId, error !== null && error !== void 0 ? error : "Closed by consumer", !!error);
+		let closeRef = (error) => _assertClassBrand(_WebTorrentManager_brand, this, _closePeer).call(this, peerId, error ? { error } : { disconnectReason: "Closed by consumer" });
 		const cleanup = () => {
 			closeRef = null;
 			connection.removeEventListener("iceconnectionstatechange", onIceConnectionStateChange);
@@ -2947,12 +3080,15 @@ this.p2pml.hlsjs = (function(exports) {
 	}
 	//#endregion
 	//#region ../p2p-media-loader-core/src/p2p/loader.ts
+	var MIN_CHURN_CLEANUP_INTERVAL_MS = 1e3;
 	var _webtorrentManager = /* @__PURE__ */ new WeakMap();
 	var _peersMap = /* @__PURE__ */ new WeakMap();
 	var _swarmId = /* @__PURE__ */ new WeakMap();
 	var _streamSwarmId = /* @__PURE__ */ new WeakMap();
 	var _isAnnounceMicrotaskCreated = /* @__PURE__ */ new WeakMap();
 	var _webtorrentManagerLogger = /* @__PURE__ */ new WeakMap();
+	var _churnLogger = /* @__PURE__ */ new WeakMap();
+	var _infoHash = /* @__PURE__ */ new WeakMap();
 	var _streamManifestUrl$1 = /* @__PURE__ */ new WeakMap();
 	var _stream = /* @__PURE__ */ new WeakMap();
 	var _requests$1 = /* @__PURE__ */ new WeakMap();
@@ -2961,13 +3097,22 @@ this.p2pml.hlsjs = (function(exports) {
 	var _webTorrentSocketPool$1 = /* @__PURE__ */ new WeakMap();
 	var _eventTarget$3 = /* @__PURE__ */ new WeakMap();
 	var _onSegmentAnnouncement$1 = /* @__PURE__ */ new WeakMap();
+	var _churnCleanupTimeoutId = /* @__PURE__ */ new WeakMap();
+	var _onPeerConnect = /* @__PURE__ */ new WeakMap();
+	var _onPeerConnectError = /* @__PURE__ */ new WeakMap();
+	var _onPeerClose = /* @__PURE__ */ new WeakMap();
+	var _onPeerError = /* @__PURE__ */ new WeakMap();
+	var _onPeerWarning = /* @__PURE__ */ new WeakMap();
+	var _onTrackerWarning = /* @__PURE__ */ new WeakMap();
+	var _onTrackerError = /* @__PURE__ */ new WeakMap();
+	var _churnCleanup = /* @__PURE__ */ new WeakMap();
 	var _P2PLoader_brand = /* @__PURE__ */ new WeakSet();
 	var _onPeerConnectedWebTorrent = /* @__PURE__ */ new WeakMap();
 	var _onPeerDisconnectedWebTorrent = /* @__PURE__ */ new WeakMap();
 	var _sendSegmentsAnnouncement = /* @__PURE__ */ new WeakMap();
 	var _onSegmentRequested = /* @__PURE__ */ new WeakMap();
 	var P2PLoader = class {
-		constructor(streamManifestUrl, stream, requests, segmentStorage, config, webTorrentSocketPool, eventTarget, onSegmentAnnouncement) {
+		constructor(streamManifestUrl, stream, requests, segmentStorage, config, webTorrentSocketPool, eventTarget, peerId, onSegmentAnnouncement) {
 			var _this = this;
 			var _this$config$swarmId;
 			_classPrivateMethodInitSpec(this, _P2PLoader_brand);
@@ -2977,6 +3122,8 @@ this.p2pml.hlsjs = (function(exports) {
 			_classPrivateFieldInitSpec(this, _streamSwarmId, void 0);
 			_classPrivateFieldInitSpec(this, _isAnnounceMicrotaskCreated, false);
 			_classPrivateFieldInitSpec(this, _webtorrentManagerLogger, (0, import_browser.default)("p2pml-core:webtorrent-manager"));
+			_classPrivateFieldInitSpec(this, _churnLogger, (0, import_browser.default)("p2pml-core:churn-cleanup"));
+			_classPrivateFieldInitSpec(this, _infoHash, void 0);
 			_classPrivateFieldInitSpec(this, _streamManifestUrl$1, void 0);
 			_classPrivateFieldInitSpec(this, _stream, void 0);
 			_classPrivateFieldInitSpec(this, _requests$1, void 0);
@@ -2985,6 +3132,36 @@ this.p2pml.hlsjs = (function(exports) {
 			_classPrivateFieldInitSpec(this, _webTorrentSocketPool$1, void 0);
 			_classPrivateFieldInitSpec(this, _eventTarget$3, void 0);
 			_classPrivateFieldInitSpec(this, _onSegmentAnnouncement$1, void 0);
+			_classPrivateFieldInitSpec(this, _churnCleanupTimeoutId, void 0);
+			_classPrivateFieldInitSpec(this, _onPeerConnect, void 0);
+			_classPrivateFieldInitSpec(this, _onPeerConnectError, void 0);
+			_classPrivateFieldInitSpec(this, _onPeerClose, void 0);
+			_classPrivateFieldInitSpec(this, _onPeerError, void 0);
+			_classPrivateFieldInitSpec(this, _onPeerWarning, void 0);
+			_classPrivateFieldInitSpec(this, _onTrackerWarning, void 0);
+			_classPrivateFieldInitSpec(this, _onTrackerError, void 0);
+			_classPrivateFieldInitSpec(this, _churnCleanup, () => {
+				_classPrivateFieldSet2(_churnCleanupTimeoutId, this, setTimeout(_classPrivateFieldGet2(_churnCleanup, this), Math.max(MIN_CHURN_CLEANUP_INTERVAL_MS, _classPrivateFieldGet2(_config$2, this).p2pChurnCleanupIntervalMs)));
+				const excessPeersCount = _classPrivateFieldGet2(_peersMap, this).size - _classPrivateFieldGet2(_config$2, this).p2pMaxPeers;
+				if (excessPeersCount <= 0) return;
+				const eligiblePeers = [];
+				const now = performance.now();
+				for (const peer of _classPrivateFieldGet2(_peersMap, this).values()) {
+					if (peer.downloadingSegment || peer.isUploadingSegment) continue;
+					if (now - peer.connectedAt < _classPrivateFieldGet2(_config$2, this).p2pChurnGracePeriodMs) continue;
+					eligiblePeers.push(peer);
+				}
+				if (eligiblePeers.length === 0) return;
+				eligiblePeers.sort((a, b) => {
+					return a.getDownloadBandwidth() - b.getDownloadBandwidth() || a.connectedAt - b.connectedAt;
+				});
+				const peersToDrop = eligiblePeers.slice(0, excessPeersCount);
+				_classPrivateFieldGet2(_churnLogger, this).call(this, `Background churn cleanup: dropping ${peersToDrop.length} excess peers (total: ${_classPrivateFieldGet2(_peersMap, this).size}, target: ${_classPrivateFieldGet2(_config$2, this).p2pMaxPeers}, eligible: ${eligiblePeers.length})`);
+				for (const peer of peersToDrop) {
+					_classPrivateFieldGet2(_churnLogger, this).call(this, `dropping excess peer ${peer.id} with bandwidth ${peer.getDownloadBandwidth()}`);
+					peer.destroy();
+				}
+			});
 			_classPrivateFieldInitSpec(this, _onPeerConnectedWebTorrent, (event) => {
 				_classPrivateFieldGet2(_webtorrentManagerLogger, this).call(this, `peerConnected: peerId=${event.peerId}`);
 				if (_classPrivateFieldGet2(_peersMap, this).has(event.peerId)) {
@@ -2997,11 +3174,27 @@ this.p2pml.hlsjs = (function(exports) {
 							_classPrivateFieldGet2(_webtorrentManagerLogger, this).call(this, `Error in onSegmentRequested ${segmentExternalId} for peer ${peer.id}:`, error);
 						});
 					},
-					onSegmentsAnnouncement: _classPrivateFieldGet2(_onSegmentAnnouncement$1, this)
-				}, _classPrivateFieldGet2(_config$2, this), _classPrivateFieldGet2(_eventTarget$3, this));
+					onSegmentsAnnouncement: _classPrivateFieldGet2(_onSegmentAnnouncement$1, this),
+					onWarning: (warning) => {
+						_classPrivateFieldGet2(_onPeerWarning, this).call(this, {
+							peerId: peer.id,
+							infoHash: _classPrivateFieldGet2(_infoHash, this),
+							streamType: _classPrivateFieldGet2(_stream, this).type,
+							warning
+						});
+					}
+				}, {
+					p2pNotReceivingBytesTimeoutMs: _classPrivateFieldGet2(_config$2, this).p2pNotReceivingBytesTimeoutMs,
+					webRtcMaxMessageSize: _classPrivateFieldGet2(_config$2, this).webRtcMaxMessageSize,
+					p2pErrorRetries: _classPrivateFieldGet2(_config$2, this).p2pErrorRetries,
+					validateP2PSegment: _classPrivateFieldGet2(_config$2, this).validateP2PSegment,
+					streamType: _classPrivateFieldGet2(_stream, this).type,
+					infoHash: _classPrivateFieldGet2(_infoHash, this)
+				}, _classPrivateFieldGet2(_eventTarget$3, this));
 				_classPrivateFieldGet2(_peersMap, this).set(event.peerId, peer);
-				_classPrivateFieldGet2(_eventTarget$3, this).getEventDispatcher("onPeerConnect")({
+				_classPrivateFieldGet2(_onPeerConnect, this).call(this, {
 					peerId: event.peerId,
+					infoHash: _classPrivateFieldGet2(_infoHash, this),
 					streamType: _classPrivateFieldGet2(_stream, this).type
 				});
 				if (_classPrivateFieldGet2(_config$2, this).isP2PUploadDisabled) return;
@@ -3009,18 +3202,21 @@ this.p2pml.hlsjs = (function(exports) {
 				peer.sendSegmentsAnnouncementCommand(loaded, httpLoading);
 			});
 			_classPrivateFieldInitSpec(this, _onPeerDisconnectedWebTorrent, (event) => {
-				_classPrivateFieldGet2(_webtorrentManagerLogger, this).call(this, `peerDisconnected: peerId=${event.peerId} reason=${event.reason} isError=${event.isError}`);
+				var _event$error;
+				_classPrivateFieldGet2(_webtorrentManagerLogger, this).call(this, "peerDisconnected: peerId=%s error=%s reason=%s", event.peerId, (_event$error = event.error) === null || _event$error === void 0 ? void 0 : _event$error.message, event.disconnectReason);
 				const peer = _classPrivateFieldGet2(_peersMap, this).get(event.peerId);
 				if (!peer) return;
 				_classPrivateFieldGet2(_peersMap, this).delete(event.peerId);
 				peer.destroy(true);
-				if (event.isError) _classPrivateFieldGet2(_eventTarget$3, this).getEventDispatcher("onPeerError")({
+				if (event.error) _classPrivateFieldGet2(_onPeerError, this).call(this, {
 					peerId: event.peerId,
+					infoHash: _classPrivateFieldGet2(_infoHash, this),
 					streamType: _classPrivateFieldGet2(_stream, this).type,
-					error: new Error(event.reason)
+					error: event.error
 				});
-				_classPrivateFieldGet2(_eventTarget$3, this).getEventDispatcher("onPeerClose")({
+				_classPrivateFieldGet2(_onPeerClose, this).call(this, {
 					peerId: peer.id,
+					infoHash: _classPrivateFieldGet2(_infoHash, this),
 					streamType: _classPrivateFieldGet2(_stream, this).type
 				});
 			});
@@ -3073,71 +3269,69 @@ this.p2pml.hlsjs = (function(exports) {
 			_classPrivateFieldSet2(_webTorrentSocketPool$1, this, webTorrentSocketPool);
 			_classPrivateFieldSet2(_eventTarget$3, this, eventTarget);
 			_classPrivateFieldSet2(_onSegmentAnnouncement$1, this, onSegmentAnnouncement);
+			_classPrivateFieldSet2(_onPeerConnect, this, eventTarget.getEventDispatcher("onPeerConnect"));
+			_classPrivateFieldSet2(_onPeerConnectError, this, eventTarget.getEventDispatcher("onPeerConnectError"));
+			_classPrivateFieldSet2(_onPeerClose, this, eventTarget.getEventDispatcher("onPeerClose"));
+			_classPrivateFieldSet2(_onPeerError, this, eventTarget.getEventDispatcher("onPeerError"));
+			_classPrivateFieldSet2(_onPeerWarning, this, eventTarget.getEventDispatcher("onPeerWarning"));
+			_classPrivateFieldSet2(_onTrackerWarning, this, eventTarget.getEventDispatcher("onTrackerWarning"));
+			_classPrivateFieldSet2(_onTrackerError, this, eventTarget.getEventDispatcher("onTrackerError"));
 			_classPrivateFieldSet2(_swarmId, this, (_this$config$swarmId = _classPrivateFieldGet2(_config$2, this).swarmId) !== null && _this$config$swarmId !== void 0 ? _this$config$swarmId : _classPrivateFieldGet2(_streamManifestUrl$1, this));
 			_classPrivateFieldSet2(_streamSwarmId, this, getStreamSwarmId(_classPrivateFieldGet2(_swarmId, this), _classPrivateFieldGet2(_stream, this)));
 			const streamHash = getStreamHash(_classPrivateFieldGet2(_streamSwarmId, this));
-			let peerId = _PEER_ID_BY_INFO_HASH._.get(streamHash);
-			if (!peerId) {
-				peerId = generatePeerId(_classPrivateFieldGet2(_config$2, this).trackerClientVersionPrefix);
-				_PEER_ID_BY_INFO_HASH._.set(streamHash, peerId);
-			}
+			_classPrivateFieldSet2(_infoHash, this, streamHash);
 			_classPrivateFieldSet2(_webtorrentManager, this, new WebTorrentManager({
 				infoHash: streamHash,
 				peerId,
 				trackerUrls: _classPrivateFieldGet2(_config$2, this).announceTrackers,
-				rtcConfig: _classPrivateFieldGet2(_config$2, this).rtcConfig,
-				socketPool: _classPrivateFieldGet2(_webTorrentSocketPool$1, this)
+				rtcConfig: () => _classPrivateFieldGet2(_config$2, this).rtcConfig,
+				socketPool: _classPrivateFieldGet2(_webTorrentSocketPool$1, this),
+				maxPeers: () => _classPrivateFieldGet2(_config$2, this).p2pMaxPeers,
+				maxPeersMultiplier: () => _classPrivateFieldGet2(_config$2, this).p2pChurnMaxPeersMultiplier,
+				offersCount: () => _classPrivateFieldGet2(_config$2, this).webRtcOffersCount,
+				offerTimeout: () => _classPrivateFieldGet2(_config$2, this).webRtcOfferTimeoutMs,
+				iceGatheringTimeout: () => _classPrivateFieldGet2(_config$2, this).webRtcIceGatheringTimeoutMs,
+				connectionTimeout: () => _classPrivateFieldGet2(_config$2, this).webRtcConnectionTimeoutMs
 			}));
 			_classPrivateFieldGet2(_webtorrentManager, this).addEventListener("peerConnected", _classPrivateFieldGet2(_onPeerConnectedWebTorrent, this));
 			_classPrivateFieldGet2(_webtorrentManager, this).addEventListener("peerDisconnected", _classPrivateFieldGet2(_onPeerDisconnectedWebTorrent, this));
 			_classPrivateFieldGet2(_webtorrentManager, this).addEventListener("peerConnectFailed", (event) => {
 				_classPrivateFieldGet2(_webtorrentManagerLogger, this).call(this, `Peer connection failed (${event.peerId}) from tracker ${event.trackerUrl}:`, event.error);
-				_classPrivateFieldGet2(_eventTarget$3, this).getEventDispatcher("onPeerError")({
+				_classPrivateFieldGet2(_onPeerConnectError, this).call(this, {
 					peerId: event.peerId,
+					infoHash: _classPrivateFieldGet2(_infoHash, this),
 					streamType: _classPrivateFieldGet2(_stream, this).type,
-					error: new Error(event.error)
+					trackerUrl: event.trackerUrl,
+					error: event.error
 				});
 			});
 			_classPrivateFieldGet2(_webtorrentManager, this).addEventListener("warning", (event) => {
 				_classPrivateFieldGet2(_webtorrentManagerLogger, this).call(this, `Tracker warning (${event.trackerUrl}):`, event.warning);
-				_classPrivateFieldGet2(_eventTarget$3, this).getEventDispatcher("onTrackerWarning")({
+				_classPrivateFieldGet2(_onTrackerWarning, this).call(this, {
+					trackerUrl: event.trackerUrl,
+					infoHash: _classPrivateFieldGet2(_infoHash, this),
 					streamType: _classPrivateFieldGet2(_stream, this).type,
-					warning: new Error(event.warning)
+					warning: event.warning
 				});
 			});
 			_classPrivateFieldGet2(_webtorrentManager, this).addEventListener("error", (event) => {
 				_classPrivateFieldGet2(_webtorrentManagerLogger, this).call(this, `Tracker error (${event.trackerUrl}):`, event.error);
-				_classPrivateFieldGet2(_eventTarget$3, this).getEventDispatcher("onTrackerError")({
+				_classPrivateFieldGet2(_onTrackerError, this).call(this, {
+					trackerUrl: event.trackerUrl,
+					infoHash: _classPrivateFieldGet2(_infoHash, this),
 					streamType: _classPrivateFieldGet2(_stream, this).type,
-					error: new Error(event.error)
+					error: event.error
 				});
 			});
 			_classPrivateFieldGet2(_eventTarget$3, this).addEventListener(`onStorageUpdated-${_classPrivateFieldGet2(_streamSwarmId, this)}`, this.broadcastAnnouncement);
 			_classPrivateFieldGet2(_webtorrentManager, this).start();
+			_classPrivateFieldSet2(_churnCleanupTimeoutId, this, setTimeout(_classPrivateFieldGet2(_churnCleanup, this), Math.max(MIN_CHURN_CLEANUP_INTERVAL_MS, _classPrivateFieldGet2(_config$2, this).p2pChurnCleanupIntervalMs)));
 		}
 		downloadSegment(segment) {
 			const peersWithSegment = [];
 			for (const peer of _classPrivateFieldGet2(_peersMap, this).values()) if (!peer.downloadingSegment && peer.getSegmentStatus(segment) === "loaded") peersWithSegment.push(peer);
 			if (peersWithSegment.length === 0) return;
-			let selectedPeer;
-			if (peersWithSegment.length === 1) selectedPeer = peersWithSegment[0];
-			else {
-				let maxSpeed = 0;
-				for (const peer of peersWithSegment) {
-					const speed = peer.downloadBandwidth;
-					if (speed > maxSpeed) maxSpeed = speed;
-				}
-				if (maxSpeed > 0) {
-					const baseSpeed = Math.max(1, maxSpeed * .1);
-					let unprovenPeersCount = 0;
-					let provenPeersWeight = 0;
-					for (const peer of peersWithSegment) if (peer.downloadBandwidth <= baseSpeed) unprovenPeersCount++;
-					else provenPeersWeight += peer.downloadBandwidth;
-					let adjustedBaseSpeed = baseSpeed;
-					if (unprovenPeersCount > 0 && provenPeersWeight > 0 && unprovenPeersCount * baseSpeed > provenPeersWeight) adjustedBaseSpeed = provenPeersWeight / unprovenPeersCount;
-					selectedPeer = getWeightedRandomItem(peersWithSegment, (peer) => Math.max(peer.downloadBandwidth, adjustedBaseSpeed));
-				} else selectedPeer = getRandomItem(peersWithSegment);
-			}
+			const selectedPeer = selectPeerForDownload(peersWithSegment);
 			const request = _classPrivateFieldGet2(_requests$1, this).getOrCreateRequest(segment);
 			selectedPeer.downloadSegment(request);
 		}
@@ -3156,10 +3350,12 @@ this.p2pml.hlsjs = (function(exports) {
 			for (const peer of _classPrivateFieldGet2(_peersMap, this).values()) yield peer;
 		}
 		destroy() {
+			clearTimeout(_classPrivateFieldGet2(_churnCleanupTimeoutId, this));
+			_classPrivateFieldSet2(_churnCleanupTimeoutId, this, void 0);
 			_classPrivateFieldGet2(_eventTarget$3, this).removeEventListener(`onStorageUpdated-${_classPrivateFieldGet2(_streamSwarmId, this)}`, this.broadcastAnnouncement);
+			_classPrivateFieldGet2(_webtorrentManager, this).destroy();
 			for (const peer of _classPrivateFieldGet2(_peersMap, this).values()) peer.destroy();
 			_classPrivateFieldGet2(_peersMap, this).clear();
-			_classPrivateFieldGet2(_webtorrentManager, this).destroy();
 		}
 	};
 	function _getSegmentsAnnouncement() {
@@ -3175,7 +3371,24 @@ this.p2pml.hlsjs = (function(exports) {
 			httpLoading
 		};
 	}
-	var _PEER_ID_BY_INFO_HASH = { _: /* @__PURE__ */ new Map() };
+	function selectPeerForDownload(peersWithSegment) {
+		if (peersWithSegment.length === 1) return peersWithSegment[0];
+		let maxSpeed = 0;
+		for (const peer of peersWithSegment) {
+			const speed = peer.getDownloadBandwidth();
+			if (speed > maxSpeed) maxSpeed = speed;
+		}
+		if (maxSpeed > 0) {
+			const baseSpeed = Math.max(1, maxSpeed * .1);
+			let unprovenPeersCount = 0;
+			let provenPeersWeight = 0;
+			for (const peer of peersWithSegment) if (peer.getDownloadBandwidth() <= baseSpeed) unprovenPeersCount++;
+			else provenPeersWeight += peer.getDownloadBandwidth();
+			let adjustedBaseSpeed = baseSpeed;
+			if (unprovenPeersCount > 0 && provenPeersWeight > 0 && unprovenPeersCount * baseSpeed > provenPeersWeight) adjustedBaseSpeed = provenPeersWeight / unprovenPeersCount;
+			return getWeightedRandomItem(peersWithSegment, (peer) => Math.max(peer.getDownloadBandwidth(), adjustedBaseSpeed));
+		} else return getRandomItem(peersWithSegment);
+	}
 	//#endregion
 	//#region ../p2p-media-loader-core/src/utils/logger.ts
 	function getStreamString(stream) {
@@ -3196,10 +3409,11 @@ this.p2pml.hlsjs = (function(exports) {
 	var _config$1 = /* @__PURE__ */ new WeakMap();
 	var _webTorrentSocketPool = /* @__PURE__ */ new WeakMap();
 	var _eventTarget$2 = /* @__PURE__ */ new WeakMap();
+	var _peerId = /* @__PURE__ */ new WeakMap();
 	var _onSegmentAnnouncement = /* @__PURE__ */ new WeakMap();
 	var _P2PLoadersContainer_brand = /* @__PURE__ */ new WeakSet();
 	var P2PLoadersContainer = class {
-		constructor(streamManifestUrl, stream, requests, segmentStorage, config, webTorrentSocketPool, eventTarget, onSegmentAnnouncement) {
+		constructor(streamManifestUrl, stream, requests, segmentStorage, config, webTorrentSocketPool, eventTarget, peerId, onSegmentAnnouncement) {
 			_classPrivateMethodInitSpec(this, _P2PLoadersContainer_brand);
 			_classPrivateFieldInitSpec(this, _loaders, /* @__PURE__ */ new Map());
 			_classPrivateFieldInitSpec(this, _currentLoaderItem, void 0);
@@ -3210,6 +3424,7 @@ this.p2pml.hlsjs = (function(exports) {
 			_classPrivateFieldInitSpec(this, _config$1, void 0);
 			_classPrivateFieldInitSpec(this, _webTorrentSocketPool, void 0);
 			_classPrivateFieldInitSpec(this, _eventTarget$2, void 0);
+			_classPrivateFieldInitSpec(this, _peerId, void 0);
 			_classPrivateFieldInitSpec(this, _onSegmentAnnouncement, void 0);
 			_classPrivateFieldSet2(_streamManifestUrl, this, streamManifestUrl);
 			_classPrivateFieldSet2(_requests, this, requests);
@@ -3217,6 +3432,7 @@ this.p2pml.hlsjs = (function(exports) {
 			_classPrivateFieldSet2(_config$1, this, config);
 			_classPrivateFieldSet2(_webTorrentSocketPool, this, webTorrentSocketPool);
 			_classPrivateFieldSet2(_eventTarget$2, this, eventTarget);
+			_classPrivateFieldSet2(_peerId, this, peerId);
 			_classPrivateFieldSet2(_onSegmentAnnouncement, this, onSegmentAnnouncement);
 			_classPrivateFieldSet2(_currentLoaderItem, this, _assertClassBrand(_P2PLoadersContainer_brand, this, _findOrCreateLoaderForStream).call(this, stream));
 			_classPrivateFieldGet2(_logger, this).call(this, `set current p2p loader: ${getStreamString(stream)}`);
@@ -3243,7 +3459,7 @@ this.p2pml.hlsjs = (function(exports) {
 	};
 	function _createLoader(stream) {
 		if (_classPrivateFieldGet2(_loaders, this).has(stream.runtimeId)) throw new Error("Loader for this stream already exists");
-		const loader = new P2PLoader(_classPrivateFieldGet2(_streamManifestUrl, this), stream, _classPrivateFieldGet2(_requests, this), _classPrivateFieldGet2(_segmentStorage, this), _classPrivateFieldGet2(_config$1, this), _classPrivateFieldGet2(_webTorrentSocketPool, this), _classPrivateFieldGet2(_eventTarget$2, this), () => {
+		const loader = new P2PLoader(_classPrivateFieldGet2(_streamManifestUrl, this), stream, _classPrivateFieldGet2(_requests, this), _classPrivateFieldGet2(_segmentStorage, this), _classPrivateFieldGet2(_config$1, this), _classPrivateFieldGet2(_webTorrentSocketPool, this), _classPrivateFieldGet2(_eventTarget$2, this), _classPrivateFieldGet2(_peerId, this), () => {
 			if (_classPrivateFieldGet2(_currentLoaderItem, this).loader === loader) _classPrivateFieldGet2(_onSegmentAnnouncement, this).call(this);
 		});
 		const loggerInfo = getStreamString(stream);
@@ -3251,7 +3467,7 @@ this.p2pml.hlsjs = (function(exports) {
 		return {
 			loader,
 			stream,
-			loggerInfo: getStreamString(stream)
+			loggerInfo
 		};
 	}
 	function _findOrCreateLoaderForStream(stream) {
@@ -3287,12 +3503,13 @@ this.p2pml.hlsjs = (function(exports) {
 		};
 	}
 	var Request$1 = class {
-		constructor(segment, requestProcessQueueCallback, bandwidthCalculators, playback, playbackConfig, eventTarget) {
+		constructor(segment, requestProcessQueueCallback, bandwidthCalculators, playback, playbackConfig, eventTarget, infoHash) {
 			_defineProperty(this, "segment", void 0);
 			_defineProperty(this, "requestProcessQueueCallback", void 0);
 			_defineProperty(this, "bandwidthCalculators", void 0);
 			_defineProperty(this, "playback", void 0);
 			_defineProperty(this, "playbackConfig", void 0);
+			_defineProperty(this, "infoHash", void 0);
 			_defineProperty(this, "currentAttempt", void 0);
 			_defineProperty(this, "_failedAttempts", new FailedRequestAttempts());
 			_defineProperty(this, "finalData", void 0);
@@ -3302,7 +3519,8 @@ this.p2pml.hlsjs = (function(exports) {
 			_defineProperty(this, "_status", "not-started");
 			_defineProperty(this, "progress", void 0);
 			_defineProperty(this, "notReceivingBytesTimeout", void 0);
-			_defineProperty(this, "_abortRequestCallback", void 0);
+			_defineProperty(this, "_onAbortCallback", void 0);
+			_defineProperty(this, "notReceivingBytesTimeoutMs", void 0);
 			_defineProperty(this, "_logger", void 0);
 			_defineProperty(this, "_isHandledByProcessQueue", false);
 			_defineProperty(this, "onSegmentError", void 0);
@@ -3310,14 +3528,19 @@ this.p2pml.hlsjs = (function(exports) {
 			_defineProperty(this, "onSegmentStart", void 0);
 			_defineProperty(this, "onSegmentLoaded", void 0);
 			_defineProperty(this, "abortOnTimeout", () => {
-				var _this$_abortRequestCa;
+				var _this$progress$lastLo, _this$_onAbortCallbac;
 				this.throwErrorIfNotLoadingStatus();
-				if (!this.currentAttempt) return;
+				if (!this.currentAttempt || !this.progress || this.notReceivingBytesTimeoutMs === void 0) return;
+				const msSinceLastActive = performance.now() - ((_this$progress$lastLo = this.progress.lastLoadedChunkTimestamp) !== null && _this$progress$lastLo !== void 0 ? _this$progress$lastLo : this.progress.startTimestamp);
+				if (msSinceLastActive < this.notReceivingBytesTimeoutMs) {
+					this.notReceivingBytesTimeout.restart(this.notReceivingBytesTimeoutMs - msSinceLastActive);
+					return;
+				}
 				const error = new RequestError("bytes-receiving-timeout");
-				(_this$_abortRequestCa = this._abortRequestCallback) === null || _this$_abortRequestCa === void 0 || _this$_abortRequestCa.call(this, error);
+				(_this$_onAbortCallbac = this._onAbortCallback) === null || _this$_onAbortCallbac === void 0 || _this$_onAbortCallbac.call(this, error);
 				this.handleFailure(error);
 			});
-			_defineProperty(this, "abortOnError", (error) => {
+			_defineProperty(this, "failWithError", (error) => {
 				this.throwErrorIfNotLoadingStatus();
 				if (!this.currentAttempt) return;
 				this.handleFailure(error);
@@ -3332,6 +3555,7 @@ this.p2pml.hlsjs = (function(exports) {
 					error,
 					downloadSource: this.currentAttempt.downloadSource,
 					peerId: this.currentAttempt.downloadSource === "p2p" ? this.currentAttempt.peerId : void 0,
+					infoHash: this.infoHash,
 					streamType: this.segment.stream.type
 				});
 				this.notReceivingBytesTimeout.clear();
@@ -3347,9 +3571,11 @@ this.p2pml.hlsjs = (function(exports) {
 				this._totalBytes = this._loadedBytes;
 				this.onSegmentLoaded({
 					segmentUrl: this.segment.url,
+					segment: mapSegmentWithStreamToSegment(this.segment),
 					bytesLength: this.data.byteLength,
 					downloadSource: this.currentAttempt.downloadSource,
 					peerId: this.currentAttempt.downloadSource === "p2p" ? this.currentAttempt.peerId : void 0,
+					infoHash: this.infoHash,
 					streamType: this.segment.stream.type
 				});
 				this.logger(`${this.currentAttempt.downloadSource} ${this.segment.externalId} succeed`);
@@ -3358,7 +3584,6 @@ this.p2pml.hlsjs = (function(exports) {
 			_defineProperty(this, "addLoadedChunk", (chunk) => {
 				this.throwErrorIfNotLoadingStatus();
 				if (!this.currentAttempt || !this.progress) return;
-				this.notReceivingBytesTimeout.restart();
 				const { byteLength } = chunk;
 				const { all: allBC, http: httpBC } = this.bandwidthCalculators;
 				allBC.addBytes(byteLength);
@@ -3370,13 +3595,13 @@ this.p2pml.hlsjs = (function(exports) {
 			});
 			_defineProperty(this, "firstBytesReceived", () => {
 				this.throwErrorIfNotLoadingStatus();
-				this.notReceivingBytesTimeout.restart();
 			});
 			this.segment = segment;
 			this.requestProcessQueueCallback = requestProcessQueueCallback;
 			this.bandwidthCalculators = bandwidthCalculators;
 			this.playback = playback;
 			this.playbackConfig = playbackConfig;
+			this.infoHash = infoHash;
 			this.onSegmentError = eventTarget.getEventDispatcher("onSegmentError");
 			this.onSegmentAbort = eventTarget.getEventDispatcher("onSegmentAbort");
 			this.onSegmentStart = eventTarget.getEventDispatcher("onSegmentStart");
@@ -3480,7 +3705,7 @@ this.p2pml.hlsjs = (function(exports) {
 				if (!isValid) {
 					_this2.logger(`${downloadSource} ${_this2.segment.externalId} validation failed for already-loaded bytes, clearing`);
 					_this2.clearLoadedBytes();
-					requestControls.abortOnError(new RequestError(validationErrorType));
+					requestControls.failWithError(new RequestError(validationErrorType));
 					return;
 				}
 				_this2.logger(`${downloadSource} ${_this2.segment.externalId} validation passed for already-loaded bytes`);
@@ -3498,35 +3723,39 @@ this.p2pml.hlsjs = (function(exports) {
 				startTimestamp: performance.now()
 			};
 			this.manageBandwidthCalculatorsState("start");
-			const { notReceivingBytesTimeoutMs, abort } = controls;
-			this._abortRequestCallback = abort;
+			const { notReceivingBytesTimeoutMs } = controls;
+			this._onAbortCallback = controls.onAbort;
+			this.notReceivingBytesTimeoutMs = notReceivingBytesTimeoutMs;
 			if (notReceivingBytesTimeoutMs !== void 0) this.notReceivingBytesTimeout.start(notReceivingBytesTimeoutMs);
 			this.logger(`${requestData.downloadSource} ${this.segment.externalId} started`);
 			this.onSegmentStart({
 				segment: mapSegmentWithStreamToSegment(this.segment),
 				downloadSource: requestData.downloadSource,
-				peerId: requestData.downloadSource === "p2p" ? requestData.peerId : void 0
+				peerId: requestData.downloadSource === "p2p" ? requestData.peerId : void 0,
+				infoHash: this.infoHash,
+				streamType: this.segment.stream.type
 			});
 			return {
 				firstBytesReceived: this.firstBytesReceived,
 				addLoadedChunk: this.addLoadedChunk,
 				completeOnSuccess: this.completeOnSuccess,
-				abortOnError: this.abortOnError
+				failWithError: this.failWithError
 			};
 		}
-		abortFromProcessQueue() {
-			var _this$currentAttempt2, _this$_abortRequestCa2, _this$currentAttempt3, _this$currentAttempt4;
+		cancel() {
+			var _this$currentAttempt2, _this$_onAbortCallbac2, _this$currentAttempt3, _this$currentAttempt4;
 			this.throwErrorIfNotLoadingStatus();
 			this.setStatus("aborted");
 			this.logger(`${(_this$currentAttempt2 = this.currentAttempt) === null || _this$currentAttempt2 === void 0 ? void 0 : _this$currentAttempt2.downloadSource} ${this.segment.externalId} aborted`);
-			(_this$_abortRequestCa2 = this._abortRequestCallback) === null || _this$_abortRequestCa2 === void 0 || _this$_abortRequestCa2.call(this, new RequestError("abort"));
+			(_this$_onAbortCallbac2 = this._onAbortCallback) === null || _this$_onAbortCallbac2 === void 0 || _this$_onAbortCallbac2.call(this, new RequestError("abort"));
 			this.onSegmentAbort({
 				segment: mapSegmentWithStreamToSegment(this.segment),
 				downloadSource: (_this$currentAttempt3 = this.currentAttempt) === null || _this$currentAttempt3 === void 0 ? void 0 : _this$currentAttempt3.downloadSource,
 				peerId: ((_this$currentAttempt4 = this.currentAttempt) === null || _this$currentAttempt4 === void 0 ? void 0 : _this$currentAttempt4.downloadSource) === "p2p" ? this.currentAttempt.peerId : void 0,
+				infoHash: this.infoHash,
 				streamType: this.segment.stream.type
 			});
-			this._abortRequestCallback = void 0;
+			this._onAbortCallback = void 0;
 			this.manageBandwidthCalculatorsState("stop");
 			this.notReceivingBytesTimeout.clear();
 		}
@@ -3580,9 +3809,9 @@ this.p2pml.hlsjs = (function(exports) {
 			this.timeoutId = window.setTimeout(this.action, this.ms);
 		}
 		restart(ms) {
-			if (this.timeoutId) clearTimeout(this.timeoutId);
-			if (ms) this.ms = ms;
-			if (!this.ms) return;
+			this.clear();
+			if (ms !== void 0) this.ms = ms;
+			if (this.ms === void 0) return;
 			this.timeoutId = window.setTimeout(this.action, this.ms);
 		}
 		clear() {
@@ -3593,18 +3822,20 @@ this.p2pml.hlsjs = (function(exports) {
 	//#endregion
 	//#region ../p2p-media-loader-core/src/requests/request-container.ts
 	var RequestsContainer = class {
-		constructor(requestProcessQueueCallback, bandwidthCalculators, playback, config, eventTarget) {
+		constructor(requestProcessQueueCallback, bandwidthCalculators, playback, config, eventTarget, swarmId) {
 			_defineProperty(this, "requestProcessQueueCallback", void 0);
 			_defineProperty(this, "bandwidthCalculators", void 0);
 			_defineProperty(this, "playback", void 0);
 			_defineProperty(this, "config", void 0);
 			_defineProperty(this, "eventTarget", void 0);
+			_defineProperty(this, "swarmId", void 0);
 			_defineProperty(this, "requests", /* @__PURE__ */ new Map());
 			this.requestProcessQueueCallback = requestProcessQueueCallback;
 			this.bandwidthCalculators = bandwidthCalculators;
 			this.playback = playback;
 			this.config = config;
 			this.eventTarget = eventTarget;
+			this.swarmId = swarmId;
 		}
 		get executingHttpCount() {
 			let count = 0;
@@ -3622,7 +3853,8 @@ this.p2pml.hlsjs = (function(exports) {
 		getOrCreateRequest(segment) {
 			let request = this.requests.get(segment);
 			if (!request) {
-				request = new Request$1(segment, this.requestProcessQueueCallback, this.bandwidthCalculators, this.playback, this.config, this.eventTarget);
+				const infoHash = getStreamHash(getStreamSwarmId(this.swarmId, segment.stream));
+				request = new Request$1(segment, this.requestProcessQueueCallback, this.bandwidthCalculators, this.playback, this.config, this.eventTarget, infoHash);
 				this.requests.set(segment, request);
 			}
 			return request;
@@ -3642,7 +3874,7 @@ this.p2pml.hlsjs = (function(exports) {
 		destroy() {
 			for (const request of this.requests.values()) {
 				if (request.status !== "loading") continue;
-				request.abortFromProcessQueue();
+				request.cancel();
 			}
 			this.requests.clear();
 		}
@@ -3737,7 +3969,7 @@ this.p2pml.hlsjs = (function(exports) {
 	var FAILED_ATTEMPTS_CLEAR_INTERVAL = 6e4;
 	var PEER_UPDATE_LATENCY = 1e3;
 	var HybridLoader = class {
-		constructor(streamManifestUrl, lastRequestedSegment, streamDetails, config, bandwidthCalculators, segmentStorage, webTorrentSocketPool, eventTarget) {
+		constructor(streamManifestUrl, lastRequestedSegment, streamDetails, config, bandwidthCalculators, segmentStorage, webTorrentSocketPool, eventTarget, peerId) {
 			var _this$config$swarmId;
 			_defineProperty(this, "streamManifestUrl", void 0);
 			_defineProperty(this, "lastRequestedSegment", void 0);
@@ -3747,6 +3979,7 @@ this.p2pml.hlsjs = (function(exports) {
 			_defineProperty(this, "segmentStorage", void 0);
 			_defineProperty(this, "webTorrentSocketPool", void 0);
 			_defineProperty(this, "eventTarget", void 0);
+			_defineProperty(this, "peerId", void 0);
 			_defineProperty(this, "requests", void 0);
 			_defineProperty(this, "engineRequest", void 0);
 			_defineProperty(this, "p2pLoaders", void 0);
@@ -3781,6 +4014,7 @@ this.p2pml.hlsjs = (function(exports) {
 			this.segmentStorage = segmentStorage;
 			this.webTorrentSocketPool = webTorrentSocketPool;
 			this.eventTarget = eventTarget;
+			this.peerId = peerId;
 			const activeStream = this.lastRequestedSegment.stream;
 			this.swarmId = (_this$config$swarmId = this.config.swarmId) !== null && _this$config$swarmId !== void 0 ? _this$config$swarmId : this.streamManifestUrl;
 			this.playback = {
@@ -3788,8 +4022,8 @@ this.p2pml.hlsjs = (function(exports) {
 				rate: 1
 			};
 			this.segmentAvgDuration = getSegmentAvgDuration(activeStream);
-			this.requests = new RequestsContainer(this.requestProcessQueueMicrotask, this.bandwidthCalculators, this.playback, this.config, this.eventTarget);
-			this.p2pLoaders = new P2PLoadersContainer(this.streamManifestUrl, this.lastRequestedSegment.stream, this.requests, this.segmentStorage, this.config, this.webTorrentSocketPool, this.eventTarget, this.requestProcessQueueMicrotask);
+			this.requests = new RequestsContainer(this.requestProcessQueueMicrotask, this.bandwidthCalculators, this.playback, this.config, this.eventTarget, this.swarmId);
+			this.p2pLoaders = new P2PLoadersContainer(this.streamManifestUrl, this.lastRequestedSegment.stream, this.requests, this.segmentStorage, this.config, this.webTorrentSocketPool, this.eventTarget, this.peerId, this.requestProcessQueueMicrotask);
 			this.logger = (0, import_browser.default)(`p2pml-core:hybrid-loader-${activeStream.type}`);
 			this.logger.color = "coral";
 			this.setIntervalLoading();
@@ -3848,7 +4082,7 @@ this.p2pml.hlsjs = (function(exports) {
 				switch (status) {
 					case "loading":
 						if (!queueSegmentIds.has(segment.runtimeId) && !engineRequest) {
-							request.abortFromProcessQueue();
+							request.cancel();
 							this.requests.remove(request);
 						}
 						break;
@@ -3917,7 +4151,7 @@ this.p2pml.hlsjs = (function(exports) {
 					const canLoadThroughHttp = !isInitialHttpWait && ((_request$failedAttemp2 = request === null || request === void 0 ? void 0 : request.failedAttempts.httpAttemptsCount) !== null && _request$failedAttemp2 !== void 0 ? _request$failedAttemp2 : 0) < httpErrorRetries;
 					if ((request === null || request === void 0 ? void 0 : request.status) === "loading") {
 						if (canLoadThroughHttp && request.downloadSource === "p2p" && (this.requests.executingHttpCount < simultaneousHttpDownloads || this.abortLastHttpLoadingInQueueAfterItem(queue, segment))) {
-							request.abortFromProcessQueue();
+							request.cancel();
 							this.loadThroughHttp(segment);
 						}
 						continue;
@@ -3982,7 +4216,7 @@ this.p2pml.hlsjs = (function(exports) {
 				if (itemSegment === segment) break;
 				const request = this.requests.get(itemSegment);
 				if ((request === null || request === void 0 ? void 0 : request.downloadSource) === "http" && request.status === "loading") {
-					request.abortFromProcessQueue();
+					request.cancel();
 					return true;
 				}
 			}
@@ -3993,7 +4227,7 @@ this.p2pml.hlsjs = (function(exports) {
 				if (itemSegment === segment) break;
 				const request = this.requests.get(itemSegment);
 				if ((request === null || request === void 0 ? void 0 : request.downloadSource) === "p2p" && request.status === "loading") {
-					request.abortFromProcessQueue();
+					request.cancel();
 					return true;
 				}
 			}
@@ -4405,13 +4639,11 @@ this.p2pml.hlsjs = (function(exports) {
 				release: () => {
 					if (isReleased) return;
 					isReleased = true;
-					const currentEntry = _classPrivateFieldGet2(_sockets, this).get(url);
-					if (!currentEntry) return;
-					currentEntry.refCount--;
-					if (currentEntry.refCount <= 0) {
-						if (currentEntry.refCount < 0) console.error(`[WebTorrentSocketPool] Negative refCount detected for ${url}`);
-						_classPrivateFieldGet2(_sockets, this).delete(url);
-						currentEntry.client.dispose();
+					entry.refCount--;
+					if (entry.refCount <= 0) {
+						if (entry.refCount < 0) console.error(`[WebTorrentSocketPool] Negative refCount detected for ${url}`);
+						if (_classPrivateFieldGet2(_sockets, this).get(url) === entry) _classPrivateFieldGet2(_sockets, this).delete(url);
+						entry.client.dispose();
 					}
 				}
 			};
@@ -4463,6 +4695,7 @@ this.p2pml.hlsjs = (function(exports) {
 			_defineProperty(this, "segmentStorage", void 0);
 			_defineProperty(this, "webTorrentSocketPool", new WebTorrentSocketPool());
 			_defineProperty(this, "socketPoolLogger", (0, import_browser.default)("p2pml-core:webtorrent-socket-pool"));
+			_defineProperty(this, "peerId", void 0);
 			_defineProperty(this, "mainStreamLoader", void 0);
 			_defineProperty(this, "secondaryStreamLoader", void 0);
 			_defineProperty(this, "streamDetails", {
@@ -4484,6 +4717,7 @@ this.p2pml.hlsjs = (function(exports) {
 				baseConfig: filteredConfig,
 				specificStreamConfig: filteredConfig.secondaryStream
 			});
+			this.peerId = generatePeerId(this.commonCoreConfig.trackerClientVersionPrefix);
 			this.webTorrentSocketPool.addEventListener("error", (error, url) => {
 				this.socketPoolLogger(`WebSocket error for tracker url ${url}:`, error);
 			});
@@ -4758,12 +4992,13 @@ this.p2pml.hlsjs = (function(exports) {
 			if (!this.manifestResponseUrl) throw new Error("Manifest response url is not defined");
 			if (!this.segmentStorage) throw new Error("Segment storage is not initialized");
 			const streamConfig = segment.stream.type === "main" ? this.mainStreamConfig : this.secondaryStreamConfig;
-			return new HybridLoader(this.manifestResponseUrl, segment, this.streamDetails, streamConfig, this.bandwidthCalculators, this.segmentStorage, this.webTorrentSocketPool, this.eventTarget);
+			return new HybridLoader(this.manifestResponseUrl, segment, this.streamDetails, streamConfig, this.bandwidthCalculators, this.segmentStorage, this.webTorrentSocketPool, this.eventTarget, this.peerId);
 		}
 	};
 	_defineProperty(Core, "DEFAULT_COMMON_CORE_CONFIG", {
 		segmentMemoryStorageLimit: void 0,
-		customSegmentStorageFactory: void 0
+		customSegmentStorageFactory: void 0,
+		trackerClientVersionPrefix: TRACKER_CLIENT_VERSION_PREFIX
 	});
 	_defineProperty(Core, "DEFAULT_STREAM_CONFIG", {
 		isP2PUploadDisabled: false,
@@ -4780,13 +5015,20 @@ this.p2pml.hlsjs = (function(exports) {
 		httpNotReceivingBytesTimeoutMs: 3e3,
 		httpErrorRetries: 3,
 		p2pErrorRetries: 3,
-		trackerClientVersionPrefix: TRACKER_CLIENT_VERSION_PREFIX,
 		announceTrackers: ["wss://tracker.novage.com.ua", "wss://tracker.openwebtorrent.com"],
 		rtcConfig: { iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:global.stun.twilio.com:3478" }] },
 		validateP2PSegment: void 0,
 		validateHTTPSegment: void 0,
 		httpRequestSetup: void 0,
-		swarmId: void 0
+		swarmId: void 0,
+		p2pMaxPeers: 50,
+		p2pChurnMaxPeersMultiplier: 1.5,
+		p2pChurnCleanupIntervalMs: 3e4,
+		p2pChurnGracePeriodMs: 15e3,
+		webRtcOffersCount: 5,
+		webRtcOfferTimeoutMs: 5e4,
+		webRtcIceGatheringTimeoutMs: 5e3,
+		webRtcConnectionTimeoutMs: 15e3
 	});
 	//#endregion
 	//#region src/fragment-loader.ts
@@ -5008,7 +5250,7 @@ this.p2pml.hlsjs = (function(exports) {
 		}
 	};
 	//#endregion
-	//#region \0@oxc-project+runtime@0.129.0/helpers/objectWithoutPropertiesLoose.js
+	//#region \0@oxc-project+runtime@0.133.0/helpers/esm/objectWithoutPropertiesLoose.js
 	function _objectWithoutPropertiesLoose(r, e) {
 		if (null == r) return {};
 		var t = {};
@@ -5019,7 +5261,7 @@ this.p2pml.hlsjs = (function(exports) {
 		return t;
 	}
 	//#endregion
-	//#region \0@oxc-project+runtime@0.129.0/helpers/objectWithoutProperties.js
+	//#region \0@oxc-project+runtime@0.133.0/helpers/esm/objectWithoutProperties.js
 	function _objectWithoutProperties(e, t) {
 		if (null == e) return {};
 		var o, r, i = _objectWithoutPropertiesLoose(e, t);
@@ -5055,9 +5297,9 @@ this.p2pml.hlsjs = (function(exports) {
 	//#region src/engine.ts
 	var MAX_LIVE_SYNC_DURATION = 120;
 	/**
-	* Represents a P2P (peer-to-peer) engine for HLS (HTTP Live Streaming) to enhance media streaming efficiency.
-	* This class integrates P2P technologies into HLS.js, enabling the distribution of media segments via a peer network
-	* alongside traditional HTTP fetching. It reduces server bandwidth costs and improves scalability by sharing the load
+	* Represents a Peer-to-Peer (P2P) engine for HLS (HTTP Live Streaming) to enhance media streaming efficiency.
+	* This class integrates P2P technologies into Hls.js, enabling the distribution of media segments via a peer network
+	* alongside traditional HTTP fetching. This reduces server bandwidth costs and improves scalability by sharing the load
 	* across multiple clients.
 	*
 	* The engine manages core functionalities such as segment fetching, segment management, peer connection management,
@@ -5086,9 +5328,9 @@ this.p2pml.hlsjs = (function(exports) {
 	*/
 	var HlsJsP2PEngine = class {
 		/**
-		* Enhances a given Hls.js class by injecting additional P2P (peer-to-peer) functionalities.
+		* Enhances a given `Hls.js` class by injecting additional Peer-to-Peer (P2P) functionalities.
 		*
-		* @returns {HlsWithP2PInstance} - The enhanced Hls.js class with P2P functionalities.
+		* @returns The enhanced `Hls.js` class with P2P functionalities.
 		*
 		* @example
 		* const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
@@ -5110,8 +5352,8 @@ this.p2pml.hlsjs = (function(exports) {
 			return injectMixin(hls);
 		}
 		/**
-		* Constructs an instance of HlsJsP2PEngine.
-		* @param config Optional configuration for P2P engine setup.
+		* Constructs an instance of `HlsJsP2PEngine`.
+		* @param config An optional configuration for the P2P engine setup.
 		*/
 		constructor(config) {
 			_defineProperty(this, "core", void 0);
@@ -5158,7 +5400,7 @@ this.p2pml.hlsjs = (function(exports) {
 			_defineProperty(this, "destroyCore", () => this.core.destroy());
 			_defineProperty(
 				this,
-				/** Clean up and release all resources. Unregister all event handlers. */
+				/** Cleans up and releases all resources, and unregisters all event handlers. */
 				"destroy",
 				() => {
 					this.destroyCore();
@@ -5205,8 +5447,8 @@ this.p2pml.hlsjs = (function(exports) {
 			this.core.removeEventListener(eventName, listener);
 		}
 		/**
-		* provides the Hls.js P2P specific configuration for Hls.js loaders.
-		* @returns An object with fragment loader (fLoader) and playlist loader (pLoader).
+		* Provides the Hls.js P2P specific configuration for Hls.js loaders.
+		* @returns An object containing the fragment loader (`fLoader`) and playlist loader (`pLoader`).
 		*/
 		getConfigForHlsJs() {
 			return {
@@ -5215,15 +5457,15 @@ this.p2pml.hlsjs = (function(exports) {
 			};
 		}
 		/**
-		* Returns the configuration of the HLS.js P2P engine.
-		* @returns A readonly version of the HlsJsP2PEngineConfig.
+		* Retrieves the current configuration of the Hls.js P2P engine.
+		* @returns A readonly version of the `HlsJsP2PEngineConfig`.
 		*/
 		getConfig() {
 			return { core: this.core.getConfig() };
 		}
 		/**
 		* Applies dynamic configuration updates to the P2P engine.
-		* @param dynamicConfig Configuration changes to apply.
+		* @param dynamicConfig The configuration changes to apply.
 		*
 		* @example
 		* // Assuming `hlsP2PEngine` is an instance of HlsJsP2PEngine
@@ -5232,10 +5474,11 @@ this.p2pml.hlsjs = (function(exports) {
 		*   core: {
 		*     // Increase the number of cached segments to 1000
 		*     cachedSegmentsCount: 1000,
-		*     // 50 minutes of segments will be downloaded further through HTTP connections if P2P fails
+		*     // 50 minutes of segments will be preemptively downloaded via HTTP connections
 		*     httpDownloadTimeWindow: 3000,
-		*     // 100 minutes of segments will be downloaded further through P2P connections
+		*     // 100 minutes of segments will be preemptively downloaded via P2P connections
 		*     p2pDownloadTimeWindow: 6000,
+		*   }
 		* };
 		*
 		* hlsP2PEngine.applyDynamicConfig(newDynamicConfig);
@@ -5244,8 +5487,8 @@ this.p2pml.hlsjs = (function(exports) {
 			if (dynamicConfig.core) this.core.applyDynamicConfig(dynamicConfig.core);
 		}
 		/**
-		* Sets the HLS instance for handling media.
-		* @param hls The HLS instance or a function that returns an HLS instance.
+		* Sets the HLS instance used for handling media.
+		* @param hls The HLS instance, or a function that returns an HLS instance.
 		*/
 		bindHls(hls) {
 			this.hlsInstanceGetter = typeof hls === "function" ? hls : () => hls;
