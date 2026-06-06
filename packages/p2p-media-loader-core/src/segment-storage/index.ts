@@ -1,11 +1,11 @@
 import { CommonCoreConfig, StreamConfig, StreamType } from "../types.js";
-/** Segments storage interface */
+/** The interface for segment storage. */
 export interface SegmentStorage {
   /**
-   * Initializes storage
-   * @param coreConfig - Core configuration with storage options
-   * @param mainStreamConfig - Main stream configuration
-   * @param secondaryStreamConfig - Secondary stream configuration
+   * Initializes the storage.
+   * @param coreConfig The core configuration containing storage options.
+   * @param mainStreamConfig The configuration for the main stream.
+   * @param secondaryStreamConfig The configuration for the secondary stream.
    */
   initialize(
     coreConfig: CommonCoreConfig,
@@ -14,21 +14,21 @@ export interface SegmentStorage {
   ): Promise<void>;
 
   /**
-   * Provides playback position from player
-   * @param position - Playback position
-   * @param rate - Playback rate
+   * Updates the storage with the current playback position from the player.
+   * @param position The current playback position.
+   * @param rate The current playback rate.
    */
   onPlaybackUpdated(position: number, rate: number): void;
 
   /**
-   * Provides segment request information from player
-   * @param swarmId - Swarm identifier
-   * @param streamId - Stream identifier
-   * @param segmentId - Segment identifier
-   * @param startTime - Segment start time
-   * @param endTime - Segment end time
-   * @param streamType - Stream type
-   * @param isLiveStream - Is live stream
+   * Provides the storage with information about a segment requested by the player.
+   * @param swarmId The swarm identifier.
+   * @param streamId The stream identifier.
+   * @param segmentId The segment identifier.
+   * @param startTime The start time of the segment.
+   * @param endTime The end time of the segment.
+   * @param streamType The type of the stream.
+   * @param isLiveStream Indicates whether the stream is live.
    */
   onSegmentRequested(
     swarmId: string,
@@ -41,15 +41,15 @@ export interface SegmentStorage {
   ): void;
 
   /**
-   * Stores segment data
-   * @param swarmId - Swarm identifier
-   * @param streamId - Stream identifier
-   * @param segmentId - Segment identifier
-   * @param data - Segment data
-   * @param startTime - Segment start time
-   * @param endTime - Segment end time
-   * @param streamType - Stream type
-   * @param isLiveStream - Is live stream
+   * Stores the data for a specific segment.
+   * @param swarmId The swarm identifier.
+   * @param streamId The stream identifier.
+   * @param segmentId The segment identifier.
+   * @param data The segment data to store.
+   * @param startTime The start time of the segment.
+   * @param endTime The end time of the segment.
+   * @param streamType The type of the stream.
+   * @param isLiveStream Indicates whether the stream is live.
    */
   storeSegment(
     swarmId: string,
@@ -63,10 +63,10 @@ export interface SegmentStorage {
   ): Promise<void>;
 
   /**
-   * Returns segment data
-   * @param swarmId - Swarm identifier
-   * @param streamId - Stream identifier
-   * @param segmentId - Segment identifier
+   * Retrieves the data for a specific segment.
+   * @param swarmId The swarm identifier.
+   * @param streamId The stream identifier.
+   * @param segmentId The segment identifier.
    */
   getSegmentData(
     swarmId: string,
@@ -75,7 +75,7 @@ export interface SegmentStorage {
   ): Promise<ArrayBuffer | undefined>;
 
   /**
-   * Returns used memory information in the storage
+   * Retrieves information about the current memory usage of the storage.
    */
   getUsage(): {
     totalCapacity: number;
@@ -83,30 +83,31 @@ export interface SegmentStorage {
   };
 
   /**
-   * Returns true if segment is in storage
-   * @param swarmId - Swarm identifier
-   * @param streamId - Stream identifier
-   * @param segmentId - Segment identifier
+   * Checks if a specific segment is present in the storage.
+   * @param swarmId The swarm identifier.
+   * @param streamId The stream identifier.
+   * @param segmentId The segment identifier.
+   * @returns `true` if the segment is in the storage, otherwise `false`.
    */
   hasSegment(swarmId: string, streamId: string, segmentId: number): boolean;
 
   /**
-   * Returns segment IDs of a stream that are stored in the storage
-   * @param swarmId - Swarm identifier
-   * @param streamId - Stream identifier
+   * Retrieves the IDs of all segments for a specific stream currently stored in the storage.
+   * @param swarmId The swarm identifier.
+   * @param streamId The stream identifier.
    */
   getStoredSegmentIds(swarmId: string, streamId: string): number[];
 
   /**
-   * Sets segment change callback function
-   * @param callback - Callback function that has to be called when segments appear or disappear in the storage
+   * Sets the callback function to be invoked when segments are added to or removed from the storage.
+   * @param callback The callback function, which receives the `streamId` of the affected stream.
    */
   setSegmentChangeCallback(
     callback: ((streamId: string) => void) | undefined,
   ): void;
 
   /**
-   * Function to destroy storage
+   * Destroys the storage and releases all associated resources.
    */
   destroy(): void;
 }

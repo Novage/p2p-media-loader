@@ -87,8 +87,13 @@ export class P2PLoader {
       infoHash: streamHash,
       peerId,
       trackerUrls: this.#config.announceTrackers,
-      rtcConfig: this.#config.rtcConfig,
+      rtcConfig: () => this.#config.rtcConfig,
       socketPool: this.#webTorrentSocketPool,
+      maxPeers: () => this.#config.p2pMaxPeers,
+      offersCount: () => this.#config.webRtcOffersCount,
+      offerTimeout: () => this.#config.webRtcOfferTimeoutMs,
+      iceGatheringTimeout: () => this.#config.webRtcIceGatheringTimeoutMs,
+      connectionTimeout: () => this.#config.webRtcConnectionTimeoutMs,
     });
 
     this.#webtorrentManager.addEventListener(

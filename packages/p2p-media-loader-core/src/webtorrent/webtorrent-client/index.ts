@@ -31,16 +31,18 @@ export type WebTorrentClientEventMap = {
 const WEBTORRENT_DEFAULT_OFFER_TIMEOUT = 50000;
 const WEBTORRENT_DEFAULT_CONNECTION_TIMEOUT = 15000;
 const WEBTORRENT_DEFAULT_OFFERS_COUNT = 5;
+const WEBTORRENT_DEFAULT_ICE_GATHERING_TIMEOUT = 5000;
 
 export interface WebTorrentClientConfig {
   wsClient: WebSocketClient;
   infoHash: string;
   peerId: string;
-  rtcConfig?: RTCConfiguration;
+  rtcConfig?: () => RTCConfiguration | undefined;
   channelConfig?: RTCDataChannelInit;
-  offerTimeout?: number;
-  offersCount?: number;
-  connectionTimeout?: number;
+  offerTimeout?: () => number;
+  offersCount?: () => number;
+  iceGatheringTimeout?: () => number;
+  connectionTimeout?: () => number;
   claimPeer?: (peerId: string) => boolean;
   shouldGenerateOffers?: () => boolean;
 }
@@ -91,12 +93,11 @@ function isSessionDescriptionInit(
 export class WebTorrentClient {
   static readonly #DEFAULT_ANNOUNCE_INTERVAL_SECONDS = 120;
   static readonly #MIN_ANNOUNCE_INTERVAL_SECONDS = 20;
-  static readonly #ICE_GATHERING_TIMEOUT = 5_000;
 
   readonly #config: Required<
     Omit<WebTorrentClientConfig, "rtcConfig" | "channelConfig" | "wsClient">
   > & {
-    rtcConfig?: RTCConfiguration;
+    rtcConfig?: () => RTCConfiguration | undefined;
     channelConfig?: RTCDataChannelInit;
   };
 
@@ -130,10 +131,14 @@ export class WebTorrentClient {
       peerId: config.peerId,
       rtcConfig: config.rtcConfig,
       channelConfig: config.channelConfig,
-      offerTimeout: config.offerTimeout ?? WEBTORRENT_DEFAULT_OFFER_TIMEOUT,
-      offersCount: config.offersCount ?? WEBTORRENT_DEFAULT_OFFERS_COUNT,
+      offerTimeout:
+        config.offerTimeout ?? (() => WEBTORRENT_DEFAULT_OFFER_TIMEOUT),
+      offersCount:
+        config.offersCount ?? (() => WEBTORRENT_DEFAULT_OFFERS_COUNT),
+      iceGatheringTimeout:
+        config.iceGatheringTimeout ?? (() => WEBTORRENT_DEFAULT_ICE_GATHERING_TIMEOUT),
       connectionTimeout:
-        config.connectionTimeout ?? WEBTORRENT_DEFAULT_CONNECTION_TIMEOUT,
+        config.connectionTimeout ?? (() => WEBTORRENT_DEFAULT_CONNECTION_TIMEOUT),
       claimPeer: config.claimPeer ?? (() => true),
       shouldGenerateOffers: config.shouldGenerateOffers ?? (() => true),
     };
@@ -382,7 +387,7 @@ export class WebTorrentClient {
 
     const promise = (async () => {
       const shouldGenerateOffers = this.#config.shouldGenerateOffers();
-      const offersCount = shouldGenerateOffers ? this.#config.offersCount : 0;
+      const offersCount = shouldGenerateOffers ? this.#config.offersCount() : 0;
 
       // Generate offers in parallel to avoid sequential ICE gathering latency.
       // Each #createOffer() internally catches its own errors and returns
@@ -460,7 +465,7 @@ export class WebTorrentClient {
 
     let pc: RTCPeerConnection | undefined;
     try {
-      pc = new PeerConnection(this.#config.rtcConfig);
+      pc = new PeerConnection(this.#config.rtcConfig?.());
       this.#negotiatingConnections.add(pc);
 
       const channel = pc.createDataChannel(
@@ -490,7 +495,7 @@ export class WebTorrentClient {
         channel,
         timeoutId: setTimeout(() => {
           this.#cleanupPendingOffer(offerId);
-        }, this.#config.offerTimeout),
+        }, this.#config.offerTimeout()),
       });
 
       return {
@@ -577,7 +582,7 @@ export class WebTorrentClient {
 
     let pc: RTCPeerConnection | undefined;
     try {
-      pc = new PeerConnection(this.#config.rtcConfig);
+      pc = new PeerConnection(this.#config.rtcConfig?.());
       this.#negotiatingConnections.add(pc);
 
       await safeSetRemoteDescription(pc, new SessionDescription(offerSdp));
@@ -751,7 +756,7 @@ export class WebTorrentClient {
       timeoutId = setTimeout(() => {
         cleanup();
         resolve(); // Use whatever candidates we have gathered so far
-      }, WebTorrentClient.#ICE_GATHERING_TIMEOUT);
+      }, this.#config.iceGatheringTimeout());
 
       pc.addEventListener("icegatheringstatechange", onGatheringChange);
       pc.addEventListener("icecandidate", onIceCandidate);
@@ -847,7 +852,7 @@ export class WebTorrentClient {
     timeoutId = setTimeout(() => {
       cleanup();
       reject(new Error("Data channel open timeout"));
-    }, this.#config.connectionTimeout);
+    }, this.#config.connectionTimeout());
 
     pc.addEventListener("iceconnectionstatechange", rejectIfTerminalState);
     this.#destroyAbortController.signal.addEventListener("abort", onAbort);

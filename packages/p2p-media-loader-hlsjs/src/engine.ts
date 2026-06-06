@@ -21,13 +21,13 @@ import {
 } from "p2p-media-loader-core";
 import { injectMixin } from "./engine-static.js";
 
-/** Represents the complete configuration for HlsJsP2PEngine. */
+/** Represents the complete configuration for the `HlsJsP2PEngine`. */
 export type HlsJsP2PEngineConfig = {
   /** Complete core configuration settings. */
   core: DefinedCoreConfig;
 };
 
-/** Allows for partial configuration of HlsJsP2PEngine, useful for providing overrides or partial updates. */
+/** Allows for partial configuration of the `HlsJsP2PEngine`, useful for providing overrides or partial updates. */
 export type PartialHlsJsP2PEngineConfig = Partial<
   Omit<HlsJsP2PEngineConfig, "core">
 > & {
@@ -35,7 +35,7 @@ export type PartialHlsJsP2PEngineConfig = Partial<
   core?: Partial<CoreConfig>;
 };
 
-/** Type for specifying dynamic configuration options that can be changed at runtime for the P2P engine's core. */
+/** A type for specifying dynamic configuration options that can be changed at runtime for the P2P engine's core. */
 export type DynamicHlsJsP2PEngineConfig = {
   /** Dynamic core config */
   core?: DynamicCoreConfig;
@@ -64,9 +64,9 @@ export type HlsWithP2PConfig<HlsType extends abstract new () => unknown> =
 const MAX_LIVE_SYNC_DURATION = 120;
 
 /**
- * Represents a P2P (peer-to-peer) engine for HLS (HTTP Live Streaming) to enhance media streaming efficiency.
- * This class integrates P2P technologies into HLS.js, enabling the distribution of media segments via a peer network
- * alongside traditional HTTP fetching. It reduces server bandwidth costs and improves scalability by sharing the load
+ * Represents a Peer-to-Peer (P2P) engine for HLS (HTTP Live Streaming) to enhance media streaming efficiency.
+ * This class integrates P2P technologies into Hls.js, enabling the distribution of media segments via a peer network
+ * alongside traditional HTTP fetching. This reduces server bandwidth costs and improves scalability by sharing the load
  * across multiple clients.
  *
  * The engine manages core functionalities such as segment fetching, segment management, peer connection management,
@@ -101,9 +101,9 @@ export class HlsJsP2PEngine {
   private readonly debug = debug("p2pml-hlsjs:engine");
 
   /**
-   * Enhances a given Hls.js class by injecting additional P2P (peer-to-peer) functionalities.
+   * Enhances a given `Hls.js` class by injecting additional Peer-to-Peer (P2P) functionalities.
    *
-   * @returns {HlsWithP2PInstance} - The enhanced Hls.js class with P2P functionalities.
+   * @returns The enhanced `Hls.js` class with P2P functionalities.
    *
    * @example
    * const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
@@ -126,8 +126,8 @@ export class HlsJsP2PEngine {
   }
 
   /**
-   * Constructs an instance of HlsJsP2PEngine.
-   * @param config Optional configuration for P2P engine setup.
+   * Constructs an instance of `HlsJsP2PEngine`.
+   * @param config An optional configuration for the P2P engine setup.
    */
   constructor(config?: PartialHlsJsP2PEngineConfig) {
     this.core = new Core(config?.core);
@@ -177,8 +177,8 @@ export class HlsJsP2PEngine {
   }
 
   /**
-   * provides the Hls.js P2P specific configuration for Hls.js loaders.
-   * @returns An object with fragment loader (fLoader) and playlist loader (pLoader).
+   * Provides the Hls.js P2P specific configuration for Hls.js loaders.
+   * @returns An object containing the fragment loader (`fLoader`) and playlist loader (`pLoader`).
    */
   getConfigForHlsJs(): { fLoader: unknown; pLoader: unknown } {
     return {
@@ -188,8 +188,8 @@ export class HlsJsP2PEngine {
   }
 
   /**
-   * Returns the configuration of the HLS.js P2P engine.
-   * @returns A readonly version of the HlsJsP2PEngineConfig.
+   * Retrieves the current configuration of the Hls.js P2P engine.
+   * @returns A readonly version of the `HlsJsP2PEngineConfig`.
    */
   getConfig(): HlsJsP2PEngineConfig {
     return { core: this.core.getConfig() };
@@ -197,7 +197,7 @@ export class HlsJsP2PEngine {
 
   /**
    * Applies dynamic configuration updates to the P2P engine.
-   * @param dynamicConfig Configuration changes to apply.
+   * @param dynamicConfig The configuration changes to apply.
    *
    * @example
    * // Assuming `hlsP2PEngine` is an instance of HlsJsP2PEngine
@@ -206,10 +206,11 @@ export class HlsJsP2PEngine {
    *   core: {
    *     // Increase the number of cached segments to 1000
    *     cachedSegmentsCount: 1000,
-   *     // 50 minutes of segments will be downloaded further through HTTP connections if P2P fails
+   *     // 50 minutes of segments will be preemptively downloaded via HTTP connections
    *     httpDownloadTimeWindow: 3000,
-   *     // 100 minutes of segments will be downloaded further through P2P connections
+   *     // 100 minutes of segments will be preemptively downloaded via P2P connections
    *     p2pDownloadTimeWindow: 6000,
+   *   }
    * };
    *
    * hlsP2PEngine.applyDynamicConfig(newDynamicConfig);
@@ -219,8 +220,8 @@ export class HlsJsP2PEngine {
   }
 
   /**
-   * Sets the HLS instance for handling media.
-   * @param hls The HLS instance or a function that returns an HLS instance.
+   * Sets the HLS instance used for handling media.
+   * @param hls The HLS instance, or a function that returns an HLS instance.
    */
   bindHls<T = unknown>(hls: T | (() => T)) {
     this.hlsInstanceGetter =
@@ -406,7 +407,7 @@ export class HlsJsP2PEngine {
 
   private destroyCore = () => this.core.destroy();
 
-  /** Clean up and release all resources. Unregister all event handlers. */
+  /** Cleans up and releases all resources, and unregisters all event handlers. */
   destroy = () => {
     this.destroyCore();
     this.updateHlsEventsHandlers("unregister");

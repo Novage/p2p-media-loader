@@ -13,12 +13,14 @@ export interface WebTorrentManagerConfig {
   infoHash: string;
   peerId: string;
   trackerUrls: string[];
-  rtcConfig?: RTCConfiguration;
+  rtcConfig?: () => RTCConfiguration | undefined;
   channelConfig?: RTCDataChannelInit;
   socketPool: WebTorrentSocketPool;
-  offersCount?: number;
-  offerTimeout?: number;
-  connectionTimeout?: number;
+  offersCount?: () => number;
+  offerTimeout?: () => number;
+  iceGatheringTimeout?: () => number;
+  connectionTimeout?: () => number;
+  maxPeers?: () => number;
 }
 
 export type WebTorrentManagerEventMap = {
@@ -54,8 +56,10 @@ type ConnectedPeer = {
   cleanup: () => void;
 };
 
+const WEBTORRENT_DEFAULT_MAX_PEERS = 50;
+
 export class WebTorrentManager {
-  readonly #config: WebTorrentManagerConfig;
+  readonly #config: WebTorrentManagerConfig & { maxPeers: () => number };
   readonly #eventTarget = new EventTarget<WebTorrentManagerEventMap>();
 
   readonly #connectingPeers = new Set<string>();
@@ -80,12 +84,19 @@ export class WebTorrentManager {
       return false;
     }
 
+    if (this.#connectingPeers.size + this.#connectedPeers.size >= this.#config.maxPeers()) {
+      return false;
+    }
+
     this.#connectingPeers.add(remotePeerId);
     return true;
   };
 
   constructor(config: WebTorrentManagerConfig) {
-    this.#config = config;
+    this.#config = {
+      ...config,
+      maxPeers: config.maxPeers ?? (() => WEBTORRENT_DEFAULT_MAX_PEERS),
+    };
   }
 
   public addEventListener<K extends keyof WebTorrentManagerEventMap>(
@@ -122,7 +133,10 @@ export class WebTorrentManager {
             claimPeer: this.#claimPeer,
             offersCount: this.#config.offersCount,
             offerTimeout: this.#config.offerTimeout,
+            iceGatheringTimeout: this.#config.iceGatheringTimeout,
             connectionTimeout: this.#config.connectionTimeout,
+            shouldGenerateOffers: () =>
+              this.#connectingPeers.size + this.#connectedPeers.size < this.#config.maxPeers(),
           });
 
           const onPeerConnected = (event: {

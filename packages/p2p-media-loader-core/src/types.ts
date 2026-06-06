@@ -16,7 +16,7 @@ export type Segment = {
   /** A runtime identifier for the segment that includes URL and byte range from its manifest. */
   readonly runtimeId: string;
 
-  /** An unique identifier of the segment in its stream used for P2P communications: sequence number for HLS or playtime for MPEG-DASH. */
+  /** A unique identifier for the segment in its stream, used for P2P communications: sequence number for HLS or playtime for MPEG-DASH. */
   readonly externalId: number;
 
   /** The URL from which the segment can be downloaded. */
@@ -80,9 +80,16 @@ export type DynamicStreamProperties =
   | "httpErrorRetries"
   | "p2pErrorRetries"
   | "validateP2PSegment"
+  | "validateHTTPSegment"
   | "httpRequestSetup"
   | "isP2PDisabled"
-  | "isP2PUploadDisabled";
+  | "isP2PUploadDisabled"
+  | "p2pMaxPeers"
+  | "webRtcOffersCount"
+  | "webRtcOfferTimeoutMs"
+  | "webRtcIceGatheringTimeoutMs"
+  | "webRtcConnectionTimeoutMs"
+  | "rtcConfig";
 
 /**
  * Represents a dynamically modifiable configuration, allowing updates to selected CoreConfig properties at runtime.
@@ -122,7 +129,7 @@ export type DynamicStreamConfig = Partial<
 /** Represents the configuration for the Core functionality that is common to all streams. */
 export type CommonCoreConfig = {
   /**
-   * Defines the memory storage limit for media segments, in MiB.
+   * Defines the memory storage limit for media segments (in MiB).
    *
    * @default
    * ```typescript
@@ -140,7 +147,7 @@ export type CommonCoreConfig = {
   segmentMemoryStorageLimit: number | undefined;
 
   /**
-   * Optional custom storage factory for the segments storage.
+   * An optional custom storage factory for the segment storage.
    *
    * @default
    * ```typescript
@@ -150,7 +157,7 @@ export type CommonCoreConfig = {
   customSegmentStorageFactory?: (isLive: boolean) => SegmentStorage;
 
   /**
-   * Prefix to use for the WebTorrent client version in tracker communications.
+   * The prefix to use for the WebTorrent client version during tracker communications.
    *
    * @default
    * ```typescript
@@ -204,8 +211,8 @@ export type CoreConfig = Partial<StreamConfig> &
 /** Configuration options for the Core functionality, including network and processing parameters. */
 export type StreamConfig = {
   /**
-   * Controls if peer-to-peer upload is disabled for the stream.
-   * If `true`, the stream only downloads segments without uploading to peers.
+   * Controls whether peer-to-peer uploading is disabled for the stream.
+   * If `true`, the stream will only download segments and will not upload to other peers.
    *
    * @default
    * ```typescript
@@ -214,7 +221,7 @@ export type StreamConfig = {
    */
   isP2PUploadDisabled: boolean;
   /**
-   * Controls whether peer-to-peer functionality is disabled for the stream.
+   * Controls whether all peer-to-peer functionality is disabled for the stream.
    *
    * @default
    * ```typescript
@@ -223,8 +230,8 @@ export type StreamConfig = {
    */
   isP2PDisabled: boolean;
   /**
-   * Defines the duration of the time window, in seconds, during which segments are pre-loaded to ensure smooth playback.
-   * This window helps prioritize the fetching of media segments that are imminent to playback.
+   * Defines the duration of the time window (in seconds) during which segments are preemptively loaded to ensure smooth playback.
+   * This window prioritizes the fetching of media segments that will be played imminently.
    *
    * @default
    * ```typescript
@@ -234,12 +241,12 @@ export type StreamConfig = {
   highDemandTimeWindow: number;
 
   /**
-   * Defines the time window, in seconds, for HTTP segment downloads. This property specifies the duration
-   * over which media segments are pre-fetched using HTTP requests.
+   * Defines the time window (in seconds) for HTTP segment downloads. This property specifies the duration
+   * over which media segments are preemptively fetched using HTTP requests.
    *
-   * For a better P2P ratio, it is recommended to set this `httpDownloadTimeWindow` to be lower than `p2pDownloadTimeWindow`.
+   * To achieve a higher P2P ratio, it is recommended to set `httpDownloadTimeWindow` lower than `p2pDownloadTimeWindow`.
    *
-   * NOTE: This setting only takes effect if there is at least one peer connection and the connected peer
+   * NOTE: This setting only takes effect if there is at least one peer connection, and the connected peer
    * does not have the requested segments available to share via P2P.
    *
    * @default
@@ -250,11 +257,11 @@ export type StreamConfig = {
   httpDownloadTimeWindow: number;
 
   /**
-   * Time in milliseconds to delay the HTTP fallback for the very first segments.
-   * This gives the tracker time to discover peers when playback just started.
-   * A higher value gives a better chance to download the initial segments via P2P, thus improving the overall P2P ratio.
-   * However, setting this value too high can increase the playback startup time or even stall the playback if peers are not immediately available.
-   * If `0`, HTTP fallback happens immediately.
+   * The delay (in milliseconds) before falling back to HTTP for the very first segments.
+   * This allows the tracker time to discover peers when playback first begins.
+   * A higher value provides a better opportunity to download initial segments via P2P, thereby improving the overall P2P ratio.
+   * However, setting this value too high can increase playback startup time or stall playback if peers are not immediately available.
+   * If set to `0`, the HTTP fallback will occur immediately.
    *
    * @default
    * ```typescript
@@ -264,10 +271,10 @@ export type StreamConfig = {
   httpDownloadInitialTimeoutMs: number;
 
   /**
-   * Defines the time window, in seconds, dedicated to pre-fetching media segments via Peer-to-Peer (P2P) downloads.
-   * This duration determines how much content is downloaded in advance using P2P connections to ensure smooth playback and reduce reliance on HTTP downloads.
+   * Defines the time window (in seconds) dedicated to preemptively fetching media segments via Peer-to-Peer (P2P) downloads.
+   * This duration determines how much content is downloaded in advance via P2P connections to ensure smooth playback and reduce reliance on HTTP downloads.
    *
-   * For a better P2P ratio, it is recommended to set this time window to be greater than `httpDownloadTimeWindow` to maximize P2P usage.
+   * To achieve a higher P2P ratio, it is recommended to set this time window higher than `httpDownloadTimeWindow` to maximize P2P usage.
    *
    * @default
    * ```typescript
@@ -277,7 +284,7 @@ export type StreamConfig = {
   p2pDownloadTimeWindow: number;
 
   /**
-   * Maximum number of simultaneous HTTP downloads allowed.
+   * The maximum number of simultaneous HTTP downloads allowed.
    *
    * @default
    * ```typescript
@@ -287,7 +294,7 @@ export type StreamConfig = {
   simultaneousHttpDownloads: number;
 
   /**
-   * Maximum number of simultaneous P2P downloads allowed.
+   * The maximum number of simultaneous P2P downloads allowed.
    *
    * @default
    * ```typescript
@@ -297,7 +304,7 @@ export type StreamConfig = {
   simultaneousP2PDownloads: number;
 
   /**
-   * Maximum message size for WebRTC communications, in bytes.
+   * The maximum message size for WebRTC communications, in bytes.
    *
    * @default
    * ```typescript
@@ -307,7 +314,7 @@ export type StreamConfig = {
   webRtcMaxMessageSize: number;
 
   /**
-   * Timeout for not receiving bytes from P2P, in milliseconds.
+   * The timeout duration (in milliseconds) for not receiving bytes from a P2P connection.
    *
    * @default
    * ```typescript
@@ -317,7 +324,7 @@ export type StreamConfig = {
   p2pNotReceivingBytesTimeoutMs: number;
 
   /**
-   * Timeout for destroying the P2P loader if inactive, in milliseconds.
+   * The timeout duration (in milliseconds) before destroying the P2P loader if it remains inactive.
    *
    * @default
    * ```typescript
@@ -327,7 +334,7 @@ export type StreamConfig = {
   p2pInactiveLoaderDestroyTimeoutMs: number;
 
   /**
-   * Timeout for not receiving bytes from HTTP downloads, in milliseconds.
+   * The timeout duration (in milliseconds) for not receiving bytes from an HTTP download.
    *
    * @default
    * ```typescript
@@ -337,7 +344,7 @@ export type StreamConfig = {
   httpNotReceivingBytesTimeoutMs: number;
 
   /**
-   * Number of retries allowed after an HTTP error.
+   * The number of retries allowed following an HTTP error.
    *
    * @default
    * ```typescript
@@ -347,7 +354,7 @@ export type StreamConfig = {
   httpErrorRetries: number;
 
   /**
-   * Number of retries allowed after a P2P error.
+   * The number of retries allowed following a P2P error.
    *
    * @default
    * ```typescript
@@ -357,10 +364,10 @@ export type StreamConfig = {
   p2pErrorRetries: number;
 
   /**
-   * List of URLs to the WebTorrent trackers used for announcing and discovering peers (i.e. WebRTC signaling).
+   * A list of URLs to the WebTorrent trackers used for announcing and discovering peers (i.e., WebRTC signaling).
    *
-   * WARNING: In the Safari browser, only the first tracker will be used. Safari has issues with multiple trackers,
-   * leading to problems with sending SDP messages for WebRTC signaling.
+   * WARNING: In the Safari browser, only the first tracker will be utilized. Safari has known issues with multiple trackers,
+   * which can lead to problems sending SDP messages during WebRTC signaling.
    *
    * @default
    * The default trackers used are:
@@ -374,7 +381,7 @@ export type StreamConfig = {
   announceTrackers: string[];
 
   /**
-   * Configuration for the RTC layer, used in WebRTC communication.
+   * The configuration for the RTC layer, utilized during WebRTC communication.
    * This configuration specifies the STUN/TURN servers used by WebRTC to establish connections through NATs and firewalls.
    *
    * @see https://developer.mozilla.org/en-US/docs/Web/API/RTCConfiguration
@@ -394,8 +401,8 @@ export type StreamConfig = {
   rtcConfig: RTCConfiguration;
 
   /**
-   * Optional unique identifier for the swarm, used to isolate peer pools by media stream.
-   * If undefined, the URL of the manifest is used as the swarm ID.
+   * An optional unique identifier for the swarm, used to isolate peer pools by media stream.
+   * If left undefined, the manifest URL will be used as the swarm ID.
    * @default
    * ```typescript
    * swarmId: undefined
@@ -404,11 +411,11 @@ export type StreamConfig = {
   swarmId?: string;
 
   /**
-   * Optional function to validate a P2P segment before fully integrating it into the playback buffer.
-   * @param url URL of the segment to validate.
-   * @param byteRange Optional byte range of the segment.
-   * @param data Downloaded segment data.
-   * @returns A promise that resolves with a boolean indicating if the segment is valid.
+   * An optional function to validate a P2P segment before fully integrating it into the playback buffer.
+   * @param url The URL of the segment to validate.
+   * @param byteRange The optional byte range of the segment.
+   * @param data The downloaded segment data.
+   * @returns A promise that resolves to a boolean indicating whether the segment is valid.
    *
    * @default
    * ```typescript
@@ -422,11 +429,11 @@ export type StreamConfig = {
   ) => Promise<boolean>;
 
   /**
-   * Optional function to validate a HTTP segment before fully integrating it into the playback buffer.
-   * @param url URL of the segment to validate.
-   * @param byteRange Optional byte range of the segment.
-   * @param data Downloaded segment data.
-   * @returns A promise that resolves with a boolean indicating if the segment is valid.
+   * An optional function to validate an HTTP segment before fully integrating it into the playback buffer.
+   * @param url The URL of the segment to validate.
+   * @param byteRange The optional byte range of the segment.
+   * @param data The downloaded segment data.
+   * @returns A promise that resolves to a boolean indicating whether the segment is valid.
    *
    * @default
    * ```typescript
@@ -440,12 +447,12 @@ export type StreamConfig = {
   ) => Promise<boolean>;
 
   /**
-   * Optional function to customize the setup of HTTP requests for segment downloads.
-   * @param segmentUrl URL of the segment.
+   * An optional function to customize the setup of HTTP requests for segment downloads.
+   * @param segmentUrl The URL of the segment.
    * @param segmentByteRange The range of bytes requested for the segment.
-   * @param requestAbortSignal An abort signal to cancel the request if needed (undefined if AbortController is not supported by the browser).
-   * @param requestByteRange Additional byte range for partial requests, if required.
-   * @returns A promise that resolves with the configured request, or undefined if no customization should be made.
+   * @param requestAbortSignal An abort signal to cancel the request if needed (will be `undefined` if `AbortController` is not supported by the browser).
+   * @param requestByteRange An additional byte range for partial requests, if required.
+   * @returns A promise that resolves to the configured request, or `undefined` if no customization is necessary.
    *
    * @default
    * ```typescript
@@ -458,6 +465,59 @@ export type StreamConfig = {
     requestAbortSignal: AbortSignal | undefined,
     requestByteRange: { start: number; end?: number } | undefined,
   ) => Promise<Request | undefined | null>;
+
+  /**
+   * The maximum number of active peer-to-peer connections for the stream.
+   * If this limit is reached, the client will stop accepting new incoming offers
+   * and cease requesting new peers from the tracker until the connection count drops.
+   *
+   * @default
+   * ```typescript
+   * p2pMaxPeers: 50
+   * ```
+   */
+  p2pMaxPeers: number;
+
+  /**
+   * The number of WebRTC offers to generate and send to the tracker per announce request.
+   * This controls how aggressively the client attempts to discover new peers.
+   *
+   * @default
+   * ```typescript
+   * webRtcOffersCount: 5
+   * ```
+   */
+  webRtcOffersCount: number;
+
+  /**
+   * The duration (in milliseconds) to keep a pending WebRTC offer alive while waiting for an answer from a remote peer.
+   *
+   * @default
+   * ```typescript
+   * webRtcOfferTimeoutMs: 50000
+   * ```
+   */
+  webRtcOfferTimeoutMs: number;
+
+  /**
+   * The maximum duration (in milliseconds) to wait for ICE candidates to gather before sending an offer.
+   *
+   * @default
+   * ```typescript
+   * webRtcIceGatheringTimeoutMs: 5000
+   * ```
+   */
+  webRtcIceGatheringTimeoutMs: number;
+
+  /**
+   * The maximum duration (in milliseconds) to wait for the actual RTCDataChannel to open after signaling has completed.
+   *
+   * @default
+   * ```typescript
+   * webRtcConnectionTimeoutMs: 15000
+   * ```
+   */
+  webRtcConnectionTimeoutMs: number;
 };
 
 /**

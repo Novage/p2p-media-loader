@@ -69,6 +69,11 @@ export class Core<TStream extends Stream = Stream> {
     validateHTTPSegment: undefined,
     httpRequestSetup: undefined,
     swarmId: undefined,
+    p2pMaxPeers: 50,
+    webRtcOffersCount: 5,
+    webRtcOfferTimeoutMs: 50000,
+    webRtcIceGatheringTimeoutMs: 5000,
+    webRtcConnectionTimeoutMs: 15000,
   };
 
   private readonly eventTarget = new EventTarget<CoreEventMap>();

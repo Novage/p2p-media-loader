@@ -4,16 +4,16 @@
   - [Hls.js integration](https://npmjs.com/package/p2p-media-loader-hlsjs)
   - [Shaka Player integration](https://npmjs.com/package/p2p-media-loader-shaka)
 
-**P2P Media Loader** is an open-source JavaScript library that leverages modern web browser features, such as HTML5 video and WebRTC, to enable media delivery over peer-to-peer (P2P) networks. It integrates smoothly with many popular HTML5 video players and works entirely without browser plugins or add-ons. Experience it in action with the [demo](http://novage.com.ua/p2p-media-loader/demo.html).
+**P2P Media Loader** is an open-source JavaScript library that leverages modern web browser features, such as HTML5 video and WebRTC, to enable media delivery over peer-to-peer (P2P) networks. It integrates smoothly with many popular HTML5 video players and works entirely without browser plugins or add-ons. Experience it in action with our [demo](http://novage.com.ua/p2p-media-loader/demo.html).
 
-**P2P Media Loader** can be bundled in your project as an npm package or used through a CDN. Below are examples of both methods.
+**P2P Media Loader** can be bundled into your project via an npm package or loaded directly from a CDN. Below are examples of both methods.
 
 ## Using P2P Media Loader with npm
 
 To include **P2P Media Loader** in your project using npm, follow these steps:
 
 1. Install the package via npm:
-   - For HLS.js integration:
+   - For Hls.js integration:
 
      ```bash
      npm install p2p-media-loader-hlsjs
@@ -25,7 +25,7 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
      ```
 
 1. Import and use it in your project:
-   - HLS.js integration:
+   - Hls.js integration:
 
      ```typescript
      import Hls from "hls.js";
@@ -43,11 +43,11 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
      ShakaP2PEngine.registerPlugins(shaka);
      ```
 
-For more examples with npm packages, you may check our [React demo](https://github.com/Novage/p2p-media-loader/tree/main/packages/p2p-media-loader-demo/src/components/players)
+For additional examples using npm packages, please refer to our [React demo](https://github.com/Novage/p2p-media-loader/tree/main/packages/p2p-media-loader-demo/src/components/players).
 
-## Using P2P Media Loader with CDN via JavaScript Modules
+## Using P2P Media Loader from a CDN via JavaScript Modules
 
-**P2P Media Loader** supports many players that use Hls.js as media engine. Lets pick [Vidstack](https://www.vidstack.io/) player for extended hlsjs example:
+**P2P Media Loader** supports a wide variety of players that use Hls.js as their underlying media engine. Let's use the [Vidstack](https://www.vidstack.io/) player for a comprehensive Hls.js example:
 
 ### Integrating P2P with Vidstack and Hls.js
 
@@ -55,10 +55,10 @@ For more examples with npm packages, you may check our [React demo](https://gith
 <!doctype html>
 <html>
   <head>
-    <!-- Include Hls.js library from CDN -->
+    <!-- Include the Hls.js library from a CDN -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@~1/dist/hls.min.js"></script>
 
-    <!-- Import map for P2P Media Loader modules -->
+    <!-- Import map for the P2P Media Loader modules -->
     <script type="importmap">
       {
         "imports": {
@@ -72,10 +72,10 @@ For more examples with npm packages, you may check our [React demo](https://gith
     <link rel="stylesheet" href="https://cdn.vidstack.io/player/theme.css" />
     <link rel="stylesheet" href="https://cdn.vidstack.io/player/video.css" />
 
-    <!-- Include Vidstack player library from CDN -->
+    <!-- Include the Vidstack player library from a CDN -->
     <script src="https://cdn.vidstack.io/player" type="module"></script>
 
-    <!-- Module script to initialize Vidstack player with P2P Media Loader -->
+    <!-- Module script to initialize the Vidstack player with P2P Media Loader -->
     <script type="module">
       import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 
@@ -94,7 +94,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
             p2p: {
               core: {
                 swarmId: "Optional custom swarm ID for stream",
-                // other P2P engine config parameters go here
+                // other P2P engine configuration parameters go here
               },
               onHlsJsCreated: (hls) => {
                 hls.p2pEngine.addEventListener("onPeerConnect", (params) => {
@@ -111,7 +111,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
 
   <body>
     <div style="width: 800px">
-      <!-- Vidstack media player with HLS stream -->
+      <!-- Vidstack media player with an HLS stream -->
       <media-player src="streamUrl">
         <media-provider></media-provider>
         <media-video-layout></media-video-layout>
@@ -121,7 +121,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
 </html>
 ```
 
-### **Integrating P2P with raw Hls.js player**
+### **Integrating P2P with a standalone Hls.js player**
 
 ```html
 <script type="module">
@@ -135,7 +135,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
     p2p: {
       core: {
         swarmId: "Optional custom swarm ID for stream",
-        // Other P2P engine config parameters go here
+        // Other P2P engine configuration parameters go here
       },
       onHlsJsCreated(hls) {
         hls.p2pEngine.addEventListener("onPeerConnect", (params) => {
@@ -165,7 +165,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
       p2p: {
         core: {
           swarmId: "Optional custom swarm ID for stream",
-          // Other P2P engine config parameters go here
+          // Other P2P engine configuration parameters go here
         },
         onHlsJsCreated: (hls) => {
           // Subscribe to P2P engine and Hls.js events here
@@ -200,7 +200,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
             p2p: {
               core: {
                 swarmId: "Optional custom swarm ID for stream",
-                // Other P2P engine config parameters go here
+                // Other P2P engine configuration parameters go here
               },
             },
           });
@@ -225,7 +225,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
   const engine = new HlsJsP2PEngine({
     core: {
       swarmId: "Optional custom swarm ID for stream",
-      // Other P2P engine config parameters go here
+      // Other P2P engine configuration parameters go here
     },
   });
 
@@ -262,7 +262,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
       p2p: {
         core: {
           swarmId: "Optional custom swarm ID for stream",
-          // Other P2P engine config parameters go here
+          // Other P2P engine configuration parameters go here
         },
         onHlsJsCreated: (hls) => {
           // Subscribe to P2P engine and Hls.js events here
@@ -290,7 +290,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
     p2p: {
       core: {
         swarmId: "Optional custom swarm ID for stream",
-        // Other P2P engine config parameters go here
+        // Other P2P engine configuration parameters go here
       },
       onHlsJsCreated(hls) {
         // Subscribe to P2P engine and Hls.js events here
@@ -340,7 +340,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
       p2p: {
         core: {
           swarmId: "Optional custom swarm ID for stream",
-          // Other P2P engine config parameters go here
+          // Other P2P engine configuration parameters go here
         },
         onHlsJsCreated: (hls) => {
           // Subscribe to P2P engine and Hls.js events here
@@ -369,7 +369,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
 
 ### Integrating P2P with Shaka Player
 
-[Shaka](https://shaka-player-demo.appspot.com/demo/) player is used for an extended example:
+[Shaka Player](https://shaka-player-demo.appspot.com/demo/) is used below for an extended example:
 
 ```html
 <!doctype html>
@@ -385,7 +385,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
     <!-- Link to Shaka Player's compiled UI script -->
     <script src="https://unpkg.com/shaka-player/dist/shaka-player.ui.js"></script>
 
-    <!-- Import map for P2P Media Loader modules -->
+    <!-- Import map for the P2P Media Loader modules -->
     <script type="importmap">
       {
         "imports": {
@@ -411,15 +411,15 @@ For more examples with npm packages, you may check our [React demo](https://gith
         const controls = ui.getControls();
         const player = controls.getPlayer();
 
-        // Initialize P2P Media Loader with custom config
+        // Initialize P2P Media Loader with a custom config
         const shakaP2PEngine = new ShakaP2PEngine({
           core: {
             swarmId: "Optional custom swarm ID for stream",
-            // Other P2P engine config parameters go here
+            // Other P2P engine configuration parameters go here
           },
         });
 
-        //Subscribe to P2P engine events here
+        // Subscribe to P2P engine events here
         shakaP2PEngine.addEventListener("onPeerConnect", (params) => {
           console.log("Peer connected:", params.peerId);
         });
@@ -431,7 +431,7 @@ For more examples with npm packages, you may check our [React demo](https://gith
         player.load(streamUrl);
       }
 
-      // Add event listener for Shaka UI loaded event to trigger initialization
+      // Add event listener for the Shaka UI loaded event to trigger initialization
       document.addEventListener("shaka-ui-loaded", init);
     </script>
   </head>
@@ -554,13 +554,13 @@ For more examples with npm packages, you may check our [React demo](https://gith
 </script>
 ```
 
-## Using P2P Media Loader for older browsers and Smart TVs (IIFE)
+## Using P2P Media Loader in older browsers and Smart TVs (IIFE)
 
-For older environments that do not support ES modules (such as older Smart TVs and legacy browsers), you can use the IIFE builds. When using IIFE builds, the library components are exposed through global variables instead of ES module imports.
+For legacy environments that lack ES module support (such as older Smart TVs and deprecated browsers), you can utilize our IIFE builds. In these builds, the library components are exposed via global variables instead of ES module imports.
 
-The global variables are `window.p2pml.hlsjs` and `window.p2pml.shaka`.
+The global namespaces are `window.p2pml.hlsjs` and `window.p2pml.shaka`.
 
-### Integrating P2P with raw Hls.js player (IIFE)
+### Integrating P2P with a standalone Hls.js player (IIFE)
 
 ```html
 <script src="https://cdn.jsdelivr.net/npm/hls.js@~1/dist/hls.min.js"></script>
@@ -581,7 +581,7 @@ The global variables are `window.p2pml.hlsjs` and `window.p2pml.shaka`.
         p2p: {
           core: {
             swarmId: "Optional custom swarm ID for stream",
-            // Other P2P engine config parameters go here
+            // Other P2P engine configuration parameters go here
           },
         },
       });
@@ -614,7 +614,7 @@ The global variables are `window.p2pml.hlsjs` and `window.p2pml.shaka`.
         p2p: {
           core: {
             swarmId: "Optional custom swarm ID for stream",
-            // Other P2P engine config parameters go here
+            // Other P2P engine configuration parameters go here
           },
         },
       });
