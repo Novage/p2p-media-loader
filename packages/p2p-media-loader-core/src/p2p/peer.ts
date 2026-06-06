@@ -42,6 +42,7 @@ export class Peer {
   #nextRequestId = 0;
   #latestRequestedUploadRequestId?: number;
   #isDestroyed = false;
+  readonly connectedAt = performance.now();
 
   readonly #closeConnection: (error?: PeerError) => void;
   readonly #eventHandlers: PeerEventHandlers;
@@ -100,6 +101,10 @@ export class Peer {
 
   get downloadingSegment(): SegmentWithStream | undefined {
     return this.#downloadingContext?.request.segment;
+  }
+
+  get isUploadingSegment(): boolean {
+    return this.#peerProtocol.getUploadingRequestId() !== undefined;
   }
 
   getDownloadBandwidth(): number {

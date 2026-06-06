@@ -19,6 +19,8 @@ import debug from "debug";
 export type EventTargetMap = Record<`onStorageUpdated-${string}`, () => void> &
   CoreEventMap;
 
+const MIN_CHURN_CLEANUP_INTERVAL_MS = 1000;
+
 export class P2PLoader {
   readonly #webtorrentManager: WebTorrentManager;
   readonly #peersMap = new Map<string, Peer>();
@@ -26,6 +28,7 @@ export class P2PLoader {
   readonly #streamSwarmId: string;
   #isAnnounceMicrotaskCreated = false;
   readonly #webtorrentManagerLogger = debug("p2pml-core:webtorrent-manager");
+  readonly #churnLogger = debug("p2pml-core:churn-cleanup");
 
   readonly #infoHash: string;
   #streamManifestUrl: string;
@@ -36,6 +39,7 @@ export class P2PLoader {
   readonly #webTorrentSocketPool: WebTorrentSocketPool;
   readonly #eventTarget: EventTarget<EventTargetMap>;
   readonly #onSegmentAnnouncement: () => void;
+  #churnCleanupTimeoutId?: ReturnType<typeof setTimeout>;
 
   readonly #onPeerConnect: CoreEventMap["onPeerConnect"];
   readonly #onPeerConnectError: CoreEventMap["onPeerConnectError"];
@@ -90,6 +94,7 @@ export class P2PLoader {
       rtcConfig: () => this.#config.rtcConfig,
       socketPool: this.#webTorrentSocketPool,
       maxPeers: () => this.#config.p2pMaxPeers,
+      maxPeersMultiplier: () => this.#config.p2pChurnMaxPeersMultiplier,
       offersCount: () => this.#config.webRtcOffersCount,
       offerTimeout: () => this.#config.webRtcOfferTimeoutMs,
       iceGatheringTimeout: () => this.#config.webRtcIceGatheringTimeoutMs,
@@ -152,7 +157,67 @@ export class P2PLoader {
     );
 
     this.#webtorrentManager.start();
+
+    this.#churnCleanupTimeoutId = setTimeout(
+      this.#churnCleanup,
+      Math.max(
+        MIN_CHURN_CLEANUP_INTERVAL_MS,
+        this.#config.p2pChurnCleanupIntervalMs,
+      ),
+    );
   }
+
+  #churnCleanup = () => {
+    // Schedule the next run dynamically based on the current config value, enforcing a minimum safe interval
+    this.#churnCleanupTimeoutId = setTimeout(
+      this.#churnCleanup,
+      Math.max(
+        MIN_CHURN_CLEANUP_INTERVAL_MS,
+        this.#config.p2pChurnCleanupIntervalMs,
+      ),
+    );
+
+    const excessPeersCount = this.#peersMap.size - this.#config.p2pMaxPeers;
+    if (excessPeersCount <= 0) return;
+
+    const eligiblePeers: Peer[] = [];
+    const now = performance.now();
+
+    for (const peer of this.#peersMap.values()) {
+      // Don't drop peers that are actively downloading or uploading to avoid interrupting streams
+      if (peer.downloadingSegment || peer.isUploadingSegment) continue;
+
+      // Give new peers a grace period to establish connections and prove their bandwidth
+      if (now - peer.connectedAt < this.#config.p2pChurnGracePeriodMs) {
+        continue;
+      }
+
+      eligiblePeers.push(peer);
+    }
+
+    if (eligiblePeers.length === 0) return;
+
+    eligiblePeers.sort((a, b) => {
+      return (
+        a.getDownloadBandwidth() - b.getDownloadBandwidth() ||
+        a.connectedAt - b.connectedAt
+      );
+    });
+
+    const peersToDrop = eligiblePeers.slice(0, excessPeersCount);
+
+    this.#churnLogger(
+      `Background churn cleanup: dropping ${peersToDrop.length} excess peers ` +
+        `(total: ${this.#peersMap.size}, target: ${this.#config.p2pMaxPeers}, eligible: ${eligiblePeers.length})`,
+    );
+
+    for (const peer of peersToDrop) {
+      this.#churnLogger(
+        `dropping excess peer ${peer.id} with bandwidth ${peer.getDownloadBandwidth()}`,
+      );
+      peer.destroy();
+    }
+  };
 
   downloadSegment(segment: SegmentWithStream) {
     const peersWithSegment: Peer[] = [];
@@ -389,6 +454,9 @@ export class P2PLoader {
   };
 
   destroy() {
+    clearTimeout(this.#churnCleanupTimeoutId);
+    this.#churnCleanupTimeoutId = undefined;
+
     this.#eventTarget.removeEventListener(
       `onStorageUpdated-${this.#streamSwarmId}`,
       this.broadcastAnnouncement,

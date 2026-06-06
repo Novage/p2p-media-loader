@@ -21,6 +21,7 @@ export interface WebTorrentManagerConfig {
   iceGatheringTimeout?: () => number;
   connectionTimeout?: () => number;
   maxPeers?: () => number;
+  maxPeersMultiplier?: () => number;
 }
 
 export type WebTorrentManagerEventMap = {
@@ -57,9 +58,15 @@ type ConnectedPeer = {
 };
 
 const WEBTORRENT_DEFAULT_MAX_PEERS = 50;
+const WEBTORRENT_DEFAULT_MAX_PEERS_MULTIPLIER = 1.5;
+
+type ResolvedConfig = Required<
+  Pick<WebTorrentManagerConfig, "maxPeers" | "maxPeersMultiplier">
+> &
+  WebTorrentManagerConfig;
 
 export class WebTorrentManager {
-  readonly #config: WebTorrentManagerConfig & { maxPeers: () => number };
+  readonly #config: ResolvedConfig;
   readonly #eventTarget = new EventTarget<WebTorrentManagerEventMap>();
 
   readonly #connectingPeers = new Set<string>();
@@ -84,7 +91,13 @@ export class WebTorrentManager {
       return false;
     }
 
-    if (this.#connectingPeers.size + this.#connectedPeers.size >= this.#config.maxPeers()) {
+    // claimPeer is used to passively ACCEPT incoming connections.
+    // We accept peers up to the hard limit (maxPeers * multiplier) to allow new
+    // peers to join the swarm and be evaluated by the background peer churning process.
+    const hardLimit = Math.floor(
+      this.#config.maxPeers() * Math.max(1.0, this.#config.maxPeersMultiplier()),
+    );
+    if (this.#connectingPeers.size + this.#connectedPeers.size >= hardLimit) {
       return false;
     }
 
@@ -96,6 +109,9 @@ export class WebTorrentManager {
     this.#config = {
       ...config,
       maxPeers: config.maxPeers ?? (() => WEBTORRENT_DEFAULT_MAX_PEERS),
+      maxPeersMultiplier:
+        config.maxPeersMultiplier ??
+        (() => WEBTORRENT_DEFAULT_MAX_PEERS_MULTIPLIER),
     };
   }
 
@@ -135,8 +151,13 @@ export class WebTorrentManager {
             offerTimeout: this.#config.offerTimeout,
             iceGatheringTimeout: this.#config.iceGatheringTimeout,
             connectionTimeout: this.#config.connectionTimeout,
+            // shouldGenerateOffers is used to proactively INITIATE connections.
+            // We stop actively hunting for peers once we hit the soft limit (maxPeers).
+            // This prevents artificial hyper-churn where a stable swarm constantly 
+            // cycles connections to reach the hard limit unnecessarily.
             shouldGenerateOffers: () =>
-              this.#connectingPeers.size + this.#connectedPeers.size < this.#config.maxPeers(),
+              this.#connectingPeers.size + this.#connectedPeers.size <
+              this.#config.maxPeers(),
           });
 
           const onPeerConnected = (event: {

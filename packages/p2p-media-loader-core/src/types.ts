@@ -85,6 +85,9 @@ export type DynamicStreamProperties =
   | "isP2PDisabled"
   | "isP2PUploadDisabled"
   | "p2pMaxPeers"
+  | "p2pChurnMaxPeersMultiplier"
+  | "p2pChurnCleanupIntervalMs"
+  | "p2pChurnGracePeriodMs"
   | "webRtcOffersCount"
   | "webRtcOfferTimeoutMs"
   | "webRtcIceGatheringTimeoutMs"
@@ -477,6 +480,41 @@ export type StreamConfig = {
    * ```
    */
   p2pMaxPeers: number;
+
+  /**
+   * The multiplier applied to `p2pMaxPeers` to determine the hard limit for accepting incoming connections.
+   * To keep the P2P swarm healthy and well-mixed, incoming connection offers are accepted up to this hard limit,
+   * and a background cleanup process will periodically prune the worst-performing peers if the total count exceeds `p2pMaxPeers`.
+   *
+   * @default
+   * ```typescript
+   * p2pChurnMaxPeersMultiplier: 1.5
+   * ```
+   */
+  p2pChurnMaxPeersMultiplier: number;
+
+  /**
+   * The interval (in milliseconds) at which the background churning process evaluates and prunes the worst-performing
+   * peers if the total connection count exceeds `p2pMaxPeers`.
+   *
+   * @default
+   * ```typescript
+   * p2pChurnCleanupIntervalMs: 30000
+   * ```
+   */
+  p2pChurnCleanupIntervalMs: number;
+
+  /**
+   * The duration (in milliseconds) of the grace period granted to new peers.
+   * During this time, newly connected peers are protected from being dropped by the churning logic,
+   * allowing them time to establish connections and prove their bandwidth.
+   *
+   * @default
+   * ```typescript
+   * p2pChurnGracePeriodMs: 15000
+   * ```
+   */
+  p2pChurnGracePeriodMs: number;
 
   /**
    * The number of WebRTC offers to generate and send to the tracker per announce request.
