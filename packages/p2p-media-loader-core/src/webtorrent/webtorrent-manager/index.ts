@@ -95,7 +95,8 @@ export class WebTorrentManager {
     // We accept peers up to the hard limit (maxPeers * multiplier) to allow new
     // peers to join the swarm and be evaluated by the background peer churning process.
     const hardLimit = Math.floor(
-      this.#config.maxPeers() * Math.max(1.0, this.#config.maxPeersMultiplier()),
+      this.#config.maxPeers() *
+        Math.max(1.0, this.#config.maxPeersMultiplier()),
     );
     if (this.#connectingPeers.size + this.#connectedPeers.size >= hardLimit) {
       return false;
@@ -153,7 +154,7 @@ export class WebTorrentManager {
             connectionTimeout: this.#config.connectionTimeout,
             // shouldGenerateOffers is used to proactively INITIATE connections.
             // We stop actively hunting for peers once we hit the soft limit (maxPeers).
-            // This prevents artificial hyper-churn where a stable swarm constantly 
+            // This prevents artificial hyper-churn where a stable swarm constantly
             // cycles connections to reach the hard limit unnecessarily.
             shouldGenerateOffers: () =>
               this.#connectingPeers.size + this.#connectedPeers.size <

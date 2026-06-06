@@ -303,7 +303,12 @@ export class Peer {
             // Note: This callback is exclusively triggered by Engine-initiated
             // cancellations (e.g., user seeks) or timeouts. It is mutually exclusive
             // from peer-initiated failures, which are handled by #cancelSegmentDownloading.
-            if (!this.#downloadingContext || this.#downloadingContext.request !== segmentRequest) return;
+            if (
+              !this.#downloadingContext ||
+              this.#downloadingContext.request !== segmentRequest
+            ) {
+              return;
+            }
             const { request, requestId } = this.#downloadingContext;
             this.#sendCancelSegmentRequestCommand(request.segment, requestId);
             this.#bandwidthCalculator.stopLoading();
@@ -377,7 +382,12 @@ export class Peer {
         data,
         requestId,
       );
-      if (this.isDestroyed || requestId !== this.#latestRequestedUploadRequestId) return;
+      if (
+        this.isDestroyed ||
+        requestId !== this.#latestRequestedUploadRequestId
+      ) {
+        return;
+      }
       this.#sendSegmentDataSendingCompletedCommand(segment, requestId);
       this.#logger(`segment ${externalId} has been sent to ${this.id}`);
     } catch (error) {

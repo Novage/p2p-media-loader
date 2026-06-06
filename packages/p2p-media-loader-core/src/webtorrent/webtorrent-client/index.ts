@@ -136,9 +136,11 @@ export class WebTorrentClient {
       offersCount:
         config.offersCount ?? (() => WEBTORRENT_DEFAULT_OFFERS_COUNT),
       iceGatheringTimeout:
-        config.iceGatheringTimeout ?? (() => WEBTORRENT_DEFAULT_ICE_GATHERING_TIMEOUT),
+        config.iceGatheringTimeout ??
+        (() => WEBTORRENT_DEFAULT_ICE_GATHERING_TIMEOUT),
       connectionTimeout:
-        config.connectionTimeout ?? (() => WEBTORRENT_DEFAULT_CONNECTION_TIMEOUT),
+        config.connectionTimeout ??
+        (() => WEBTORRENT_DEFAULT_CONNECTION_TIMEOUT),
       claimPeer: config.claimPeer ?? (() => true),
       shouldGenerateOffers: config.shouldGenerateOffers ?? (() => true),
     };

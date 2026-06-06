@@ -193,7 +193,9 @@ export function deserializeCommand(bytes: Uint8Array): PeerCommand {
       case Serialization.SerializedItem.SimilarIntArray:
         {
           const { numbers, byteLength } =
-            Serialization.deserializeUniqueSimilarIntArray(bytes.subarray(offset));
+            Serialization.deserializeUniqueSimilarIntArray(
+              bytes.subarray(offset),
+            );
           deserializedCommand[name] = numbers;
           offset += byteLength;
         }

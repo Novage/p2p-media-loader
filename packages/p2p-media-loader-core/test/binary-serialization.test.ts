@@ -95,7 +95,9 @@ describe("binary-serialization", () => {
       // codeByte = SerializedItem.String << 4 = 2 << 4 = 32
       // lengthByte = 5
       const bytes = new Uint8Array([32, 5, 97, 98, 99]); // only 3 chars, expected 5
-      expect(() => deserializeString(bytes)).toThrow("Malformed string: buffer too short");
+      expect(() => deserializeString(bytes)).toThrow(
+        "Malformed string: buffer too short",
+      );
     });
   });
 
@@ -106,16 +108,19 @@ describe("binary-serialization", () => {
       creator.addInteger("r", 50);
       creator.complete();
       const buffers = creator.getResultBuffers();
-      
+
       let unframed!: Uint8Array;
-      const joiner = new BinaryCommandChunksJoiner((buf) => { unframed = buf; });
+      const joiner = new BinaryCommandChunksJoiner((buf) => {
+        unframed = buf;
+      });
       for (const buf of buffers) {
         joiner.addCommandChunk(new Uint8Array(buf));
       }
-      
+
       const deserialized = deserializeCommand(unframed);
       expect(deserialized.c).toBe(1);
-      if (deserialized.c === 1) { // PeerCommandType.SegmentRequest
+      if (deserialized.c === 1) {
+        // PeerCommandType.SegmentRequest
         expect(deserialized.i).toBe(100);
         expect(deserialized.r).toBe(50);
       }
@@ -123,8 +128,9 @@ describe("binary-serialization", () => {
 
     it("deserializeCommand should throw error on truncated name/type header", async () => {
       const bytes = new Uint8Array([1, 105]); // commandCode, then name 'i', but no type byte
-      expect(() => deserializeCommand(bytes)).toThrow("Malformed command buffer: truncated name/type header");
+      expect(() => deserializeCommand(bytes)).toThrow(
+        "Malformed command buffer: truncated name/type header",
+      );
     });
   });
 });
-
