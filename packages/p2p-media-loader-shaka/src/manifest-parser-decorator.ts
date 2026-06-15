@@ -1,18 +1,30 @@
-import type shaka from "shaka-player/dist/shaka-player.compiled.d.ts";
-import { SegmentManager } from "./segment-manager.js";
-import {
-  HookedStream,
-  Shaka,
-  HookedNetworkingEngine,
-  P2PMLShakaData,
-} from "./types.js";
 import {
   StreamType,
   debug,
   generateStreamShortId,
-} from "p2p-media-loader-core";
+} from "p2p-media-loader-core"
+import type shaka from "shaka-player/dist/shaka-player.compiled.d.ts"
+import { SegmentManager } from "./segment-manager.js"
+import {
+  HookedNetworkingEngine,
+  HookedStream,
+  P2PMLShakaData,
+  Shaka,
+} from "./types.js"
 
 const AUDIO_CODECS = ["mp4a", "ac-3", "ec-3", "ec+3", "opus", "vorb", "flac"];
+
+type StreamToProcess = {
+  stream: shaka.extern.Stream;
+  sortKey: string;
+};
+
+function compareBySortKey(a: StreamToProcess, b: StreamToProcess) {
+  if (a.sortKey < b.sortKey) return -1;
+  if (a.sortKey > b.sortKey) return 1;
+
+  return 0;
+}
 
 export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   private readonly debug = debug("p2pml-shaka:manifest-parser");
@@ -89,7 +101,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     const { segmentManager } = this;
     if (!segmentManager) return;
 
-    const processedStreams = new Set<number>();
+    const collectedStreams = new Set<number>();
     const processStream = (
       stream: shaka.extern.Stream,
       type: StreamType,
@@ -97,14 +109,17 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     ) => {
       this.hookSegmentIndex(stream);
       segmentManager.setStream(stream, type, index);
-      processedStreams.add(stream.id);
       return true;
     };
+
+    const mainStreams: StreamToProcess[] = [];
+    const secondaryStreams: StreamToProcess[] = [];
 
     for (const variant of variants) {
       const { video, audio } = variant;
 
-      if (video && !processedStreams.has(video.id)) {
+      if (video && !collectedStreams.has(video.id)) {
+        collectedStreams.add(video.id);
         const isMissingMetadata = variant.bandwidth === 0;
         // In muxed streams, Shaka natively includes audio codecs in the video codec array.
         // We strip standard audio prefixes here to strictly match HLS.js's cleanly separated
@@ -120,7 +135,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
 
         const { frameRate, hdr: videoRange } = video;
 
-        const index = generateStreamShortId({
+        const sortKey = generateStreamShortId({
           bitrate: variant.bandwidth,
           codecs: isMissingMetadata ? undefined : videoCodecs,
           width: isMissingMetadata ? undefined : video.width,
@@ -128,22 +143,49 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
           frameRate: isMissingMetadata ? undefined : frameRate,
           videoRange: isMissingMetadata ? undefined : videoRange,
         });
-        processStream(video, "main", index);
+
+        mainStreams.push({
+          stream: video,
+          sortKey,
+        });
       }
-      if (audio && !processedStreams.has(audio.id)) {
+
+      if (audio && !collectedStreams.has(audio.id)) {
+        collectedStreams.add(audio.id);
         const isMain = !video; // audio-only master playlist variants
         const name = audio.label ?? audio.originalId ?? undefined;
 
-        const index = generateStreamShortId({
+        const sortKey = generateStreamShortId({
           bitrate: isMain ? variant.bandwidth : 0,
           codecs: isMain ? undefined : audio.codecs,
           language: isMain ? undefined : audio.language,
           channels: isMain ? undefined : audio.channelsCount,
           name: isMain ? undefined : name,
         });
-        processStream(audio, isMain ? "main" : "secondary", index);
+
+        if (isMain) {
+          mainStreams.push({
+            stream: audio,
+            sortKey,
+          });
+        } else {
+          secondaryStreams.push({
+            stream: audio,
+            sortKey,
+          });
+        }
       }
     }
+
+    mainStreams.sort(compareBySortKey);
+    mainStreams.forEach((item, index) => {
+      processStream(item.stream, "main", index.toString());
+    });
+
+    secondaryStreams.sort(compareBySortKey);
+    secondaryStreams.forEach((item, index) => {
+      processStream(item.stream, "secondary", index.toString());
+    });
   }
 
   private hookSegmentIndex(stream: HookedStream): void {
@@ -261,7 +303,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     }
 
     // For version 4.2; Retrieving mediaSequence map for each HLS playlist
-    const manifestVariantsMap = maps.find((map: Map<unknown, unknown>) => {
+    const manifestVariantsMap = maps.find((map) => {
       const item = map.values().next().value;
 
       return (
@@ -280,7 +322,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
 
       const mediaSequenceTimeMap = getMapPropertiesFromObject(
         variant as Record<string, unknown>,
-      ).find((map: Map<unknown, unknown>) => {
+      ).find((map) => {
         const [key, value] = map.entries().next().value ?? [];
         return typeof key === "number" && typeof value === "number";
       });

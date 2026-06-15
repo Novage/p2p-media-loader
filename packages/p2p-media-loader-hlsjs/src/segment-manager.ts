@@ -1,11 +1,23 @@
-import * as Utils from "./utils.js";
 import type {
-  ManifestLoadedData,
-  LevelUpdatedData,
   AudioTrackLoadedData,
   LevelParsed,
-} from "hls.js";
-import { Core, Segment, generateStreamShortId } from "p2p-media-loader-core";
+  LevelUpdatedData,
+  ManifestLoadedData,
+} from "hls.js"
+import { Core, Segment, generateStreamShortId } from "p2p-media-loader-core"
+import * as Utils from "./utils.js"
+
+type StreamToRegister = {
+  runtimeId: string;
+  sortKey: string;
+};
+
+function compareBySortKey(a: StreamToRegister, b: StreamToRegister) {
+  if (a.sortKey < b.sortKey) return -1;
+  if (a.sortKey > b.sortKey) return 1;
+
+  return 0;
+}
 
 export class SegmentManager {
   core: Core;
@@ -18,6 +30,8 @@ export class SegmentManager {
     const { levels, audioTracks } = data;
     // in the case of audio only stream it is stored in levels
 
+    const mainStreams: StreamToRegister[] = [];
+
     for (const level of levels) {
       const { url, bitrate, maxBitrate, videoCodec, width, height } =
         level as LevelParsed & { maxBitrate?: number };
@@ -28,7 +42,7 @@ export class SegmentManager {
       const frameRate = level.attrs["FRAME-RATE"];
       const videoRange = level.attrs["VIDEO-RANGE"];
 
-      const index = generateStreamShortId({
+      const sortKey = generateStreamShortId({
         bitrate: b,
         codecs: isMissingMetadata ? undefined : videoCodec,
         width: isMissingMetadata ? undefined : width,
@@ -36,29 +50,49 @@ export class SegmentManager {
         frameRate: isMissingMetadata ? undefined : frameRate,
         videoRange: isMissingMetadata ? undefined : videoRange,
       });
-      this.core.addStreamIfNoneExists({
+
+      mainStreams.push({
         runtimeId: Array.isArray(url) ? (url as string[])[0] : url,
-        type: "main",
-        index,
+        sortKey,
       });
     }
+
+    mainStreams.sort(compareBySortKey);
+    mainStreams.forEach((stream, index) => {
+      this.core.addStreamIfNoneExists({
+        runtimeId: stream.runtimeId,
+        type: "main",
+        index: index.toString(),
+      });
+    });
+
+    const secondaryStreams: StreamToRegister[] = [];
 
     for (const track of audioTracks) {
       // Object properties vary across hls.js versions so we cast to any:
       const { url, audioCodec, lang, channels, name } = track;
-      const index = generateStreamShortId({
+      const sortKey = generateStreamShortId({
         bitrate: 0, // Match Shaka behavior for audio stream without variant
         codecs: audioCodec,
         language: lang,
         channels,
         name,
       });
-      this.core.addStreamIfNoneExists({
+
+      secondaryStreams.push({
         runtimeId: Array.isArray(url) ? (url as string[])[0] : url,
-        type: "secondary",
-        index,
+        sortKey,
       });
     }
+
+    secondaryStreams.sort(compareBySortKey);
+    secondaryStreams.forEach((stream, index) => {
+      this.core.addStreamIfNoneExists({
+        runtimeId: stream.runtimeId,
+        type: "secondary",
+        index: index.toString(),
+      });
+    });
   }
 
   updatePlaylist(data: LevelUpdatedData | AudioTrackLoadedData) {
