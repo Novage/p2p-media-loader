@@ -211,6 +211,22 @@ export type CoreConfig = Partial<StreamConfig> &
     secondaryStream?: Partial<StreamConfig>;
   };
 
+/**
+ * Defines the properties used to generate a short, stable stream identifier.
+ * These are typically derived from the manifest's variant or rendition metadata.
+ */
+export type GenerateStreamShortIdProps = {
+  bitrate?: number | null;
+  codecs?: string | null;
+  width?: number | null;
+  height?: number | null;
+  language?: string | null;
+  channels?: string | number | null;
+  name?: string | null;
+  frameRate?: number | string | null;
+  videoRange?: string | null;
+};
+
 /** Configuration options for the Core functionality, including network and processing parameters. */
 export type StreamConfig = {
   /**
@@ -556,6 +572,48 @@ export type StreamConfig = {
    * ```
    */
   webRtcConnectionTimeoutMs: number;
+
+  /**
+   * An optional function to build the infohash from stream identity data.
+   * If not provided, the default implementation builds the hash using SHA-1
+   * from the stream swarm ID (derived from swarm ID, stream identity, and protocol version).
+   *
+   * @param options.swarmId - The swarm ID for the stream (either the configured `swarmId` or the manifest URL).
+   * @param options.stream - The stream object for which the infohash is being built.
+   * @param options.peerProtocolVersion - The peer protocol version used in the swarm ID derivation.
+   * @returns The infohash string to use for this stream's P2P swarm.
+   *
+   * NOTE: This property is intentionally excluded from `DynamicStreamProperties` and cannot be
+   * changed at runtime. Modifying it after initialization would silently break P2P connectivity
+   * by causing the client to announce to a different swarm without reconnecting.
+   *
+   * @default
+   * ```typescript
+   * infoHashBuilder: undefined
+   * ```
+   */
+  infoHashBuilder?: (options: {
+    swarmId: string,
+    stream: Readonly<Stream>,
+    peerProtocolVersion: string,
+  }) => string;
+
+  /**
+   * An optional function to build the stream identifier from stream properties.
+   *
+   * @param props - The stream properties used to derive the identifier.
+   * @returns The short ID string used as the stream index.
+   *
+   * NOTE: This property is intentionally excluded from `DynamicStreamProperties` and cannot be
+   * changed at runtime. Modifying it after initialization would cause inconsistent stream indices
+   * and break P2P segment sharing between peers.
+   *
+   * @default
+   * ```typescript
+   * streamIdBuilder: undefined
+   * ```
+   */
+  streamIdBuilder?: (props: GenerateStreamShortIdProps) => string;
 };
 
 /**

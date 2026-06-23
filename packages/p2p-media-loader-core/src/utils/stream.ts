@@ -1,4 +1,5 @@
 import {
+  GenerateStreamShortIdProps,
   SegmentWithStream,
   Stream,
   StreamConfig,
@@ -19,19 +20,7 @@ export type PlaybackTimeWindowsConfig = Pick<
   "highDemandTimeWindow" | "httpDownloadTimeWindow" | "p2pDownloadTimeWindow"
 >;
 
-const PEER_PROTOCOL_VERSION = "v2";
-
-export type GenerateStreamShortIdProps = {
-  bitrate?: number | null;
-  codecs?: string | null;
-  width?: number | null;
-  height?: number | null;
-  language?: string | null;
-  channels?: string | number | null;
-  name?: string | null;
-  frameRate?: number | string | null;
-  videoRange?: string | null;
-};
+export const PEER_PROTOCOL_VERSION = "v2";
 
 /**
  * Generates a stable, unique string ID for a stream based on its properties.

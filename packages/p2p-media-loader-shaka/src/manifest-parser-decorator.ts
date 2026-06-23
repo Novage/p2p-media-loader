@@ -5,8 +5,10 @@ import {
   Shaka,
   HookedNetworkingEngine,
   P2PMLShakaData,
+  Stream,
 } from "./types.js";
 import {
+  Core,
   StreamType,
   debug,
   generateStreamShortId,
@@ -19,6 +21,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
   private readonly isHls: boolean;
   private segmentManager?: SegmentManager;
   private player?: shaka.Player;
+  private core?: Core<Stream>;
 
   constructor(
     private readonly shaka: Readonly<Shaka>,
@@ -43,6 +46,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     if (!p2pml) return;
     this.segmentManager = p2pml.segmentManager;
     this.player = p2pml.player;
+    this.core = p2pml.core;
     p2pml.streamInfo.protocol = this.isHls ? "hls" : "dash";
   }
 
@@ -89,6 +93,10 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
     const { segmentManager } = this;
     if (!segmentManager) return;
 
+    const coreConfig = this.core?.getConfig();
+    const mainBuildId = coreConfig?.mainStream.streamIdBuilder ?? generateStreamShortId;
+    const secondaryBuildId = coreConfig?.secondaryStream.streamIdBuilder ?? generateStreamShortId;
+
     const processedStreams = new Set<number>();
     const processStream = (
       stream: shaka.extern.Stream,
@@ -120,7 +128,7 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
 
         const { frameRate, hdr: videoRange } = video;
 
-        const index = generateStreamShortId({
+        const index = mainBuildId({
           bitrate: variant.bandwidth,
           codecs: isMissingMetadata ? undefined : videoCodecs,
           width: isMissingMetadata ? undefined : video.width,
@@ -133,8 +141,9 @@ export class ManifestParserDecorator implements shaka.extern.ManifestParser {
       if (audio && !processedStreams.has(audio.id)) {
         const isMain = !video; // audio-only master playlist variants
         const name = audio.label ?? audio.originalId ?? undefined;
+        const buildId = isMain ? mainBuildId : secondaryBuildId;
 
-        const index = generateStreamShortId({
+        const index = buildId({
           bitrate: isMain ? variant.bandwidth : 0,
           codecs: isMain ? undefined : audio.codecs,
           language: isMain ? undefined : audio.language,

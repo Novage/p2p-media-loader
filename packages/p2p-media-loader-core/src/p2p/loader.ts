@@ -15,6 +15,7 @@ import * as PeerUtil from "../utils/peer.js";
 import { EventTarget } from "../utils/event-target.js";
 import { SegmentStorage } from "../segment-storage/index.js";
 import debug from "debug";
+import { PEER_PROTOCOL_VERSION } from '../utils/stream.js';
 
 export type EventTargetMap = Record<`onStorageUpdated-${string}`, () => void> &
   CoreEventMap;
@@ -84,7 +85,13 @@ export class P2PLoader {
       this.#stream,
     );
 
-    const streamHash = PeerUtil.getStreamHash(this.#streamSwarmId);
+    const streamHash = this.#config.infoHashBuilder
+      ? this.#config.infoHashBuilder({
+          swarmId: this.#swarmId,
+          stream: this.#stream,
+          peerProtocolVersion: PEER_PROTOCOL_VERSION,
+        })
+      : PeerUtil.getStreamHash(this.#streamSwarmId);
     this.#infoHash = streamHash;
 
     this.#webtorrentManager = new WebTorrentManager({

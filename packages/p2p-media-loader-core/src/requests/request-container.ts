@@ -4,6 +4,7 @@ import { EventTarget } from "../utils/event-target.js";
 import { Request } from "./request.js";
 import * as StreamUtils from "../utils/stream.js";
 import * as PeerUtil from "../utils/peer.js";
+import { PEER_PROTOCOL_VERSION } from '../utils/stream.js'
 
 export class RequestsContainer {
   private readonly requests = new Map<SegmentWithStream, Request>();
@@ -40,11 +41,22 @@ export class RequestsContainer {
   getOrCreateRequest(segment: SegmentWithStream) {
     let request = this.requests.get(segment);
     if (!request) {
-      const streamSwarmId = StreamUtils.getStreamSwarmId(
-        this.swarmId,
-        segment.stream,
-      );
-      const infoHash = PeerUtil.getStreamHash(streamSwarmId);
+      let infoHash: string;
+
+      if (this.config.infoHashBuilder) {
+        infoHash = this.config.infoHashBuilder({
+          swarmId: this.swarmId,
+          stream: segment.stream,
+          peerProtocolVersion: PEER_PROTOCOL_VERSION,
+        });
+      } else {
+        const streamSwarmId = StreamUtils.getStreamSwarmId(
+          this.swarmId,
+          segment.stream,
+        );
+        infoHash = PeerUtil.getStreamHash(streamSwarmId);
+      }
+
       request = new Request(
         segment,
         this.requestProcessQueueCallback,

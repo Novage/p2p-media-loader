@@ -17,6 +17,7 @@ export class SegmentManager {
   processMainManifest(data: ManifestLoadedData) {
     const { levels, audioTracks } = data;
     // in the case of audio only stream it is stored in levels
+    const config = this.core.getConfig();
 
     for (const level of levels) {
       const { url, bitrate, maxBitrate, videoCodec, width, height } =
@@ -28,7 +29,8 @@ export class SegmentManager {
       const frameRate = level.attrs["FRAME-RATE"];
       const videoRange = level.attrs["VIDEO-RANGE"];
 
-      const index = generateStreamShortId({
+      const buildId = config.mainStream.streamIdBuilder ?? generateStreamShortId;
+      const index = buildId({
         bitrate: b,
         codecs: isMissingMetadata ? undefined : videoCodec,
         width: isMissingMetadata ? undefined : width,
@@ -46,7 +48,8 @@ export class SegmentManager {
     for (const track of audioTracks) {
       // Object properties vary across hls.js versions so we cast to any:
       const { url, audioCodec, lang, channels, name } = track;
-      const index = generateStreamShortId({
+      const buildId = config.secondaryStream.streamIdBuilder ?? generateStreamShortId;
+      const index = buildId({
         bitrate: 0, // Match Shaka behavior for audio stream without variant
         codecs: audioCodec,
         language: lang,
