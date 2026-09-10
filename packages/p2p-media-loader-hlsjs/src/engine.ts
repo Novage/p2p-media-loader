@@ -28,9 +28,7 @@ export type HlsJsP2PEngineConfig = {
 };
 
 /** Allows for partial configuration of the `HlsJsP2PEngine`, useful for providing overrides or partial updates. */
-export type PartialHlsJsP2PEngineConfig = Partial<
-  Omit<HlsJsP2PEngineConfig, "core">
-> & {
+export type PartialHlsJsP2PEngineConfig = {
   /** Partial core config */
   core?: Partial<CoreConfig>;
 };

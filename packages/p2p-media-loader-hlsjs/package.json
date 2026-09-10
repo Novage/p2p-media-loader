@@ -50,13 +50,14 @@
     "lint": "eslint src --report-unused-disable-directives --max-warnings 0 --flag unstable_native_nodejs_ts_config",
     "clean:build": "rimraf lib dist build p2p-media-loader-hlsjs-*.tgz",
     "type-check": "npx tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest",
+    "test:ci": "vitest run"
   },
   "dependencies": {
     "p2p-media-loader-core": "workspace:*"
   },
   "devDependencies": {
-    "hls.js": "^1.7.0",
-    "vitest": "^4.1.10"
+    "hls.js": "^1.7.2",
+    "vitest": "^5.0.0"
   }
 }
