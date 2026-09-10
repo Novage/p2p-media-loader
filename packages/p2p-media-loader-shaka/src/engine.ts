@@ -34,9 +34,7 @@ export type ShakaP2PEngineConfig = {
 };
 
 /** Allows for partial configuration settings for the `ShakaP2PEngine`. */
-export type PartialShakaP2PEngineConfig = Partial<
-  Omit<ShakaP2PEngineConfig, "core">
-> & {
+export type PartialShakaP2PEngineConfig = {
   /** Partial core config */
   core?: Partial<CoreConfig>;
 };

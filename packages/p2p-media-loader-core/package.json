@@ -63,13 +63,14 @@
     "lint": "eslint src --report-unused-disable-directives --max-warnings 0 --flag unstable_native_nodejs_ts_config",
     "clean:build": "rimraf lib dist build p2p-media-loader-core-*.tgz",
     "type-check": "npx tsc --noEmit",
-    "test": "vitest"
+    "test": "vitest",
+    "test:ci": "vitest run"
   },
   "dependencies": {
     "@types/debug": "^4.1.13",
     "debug": "^4.4.3"
   },
   "devDependencies": {
-    "vitest": "^4.1.10"
+    "vitest": "^5.0.0"
   }
 }

@@ -3,7 +3,7 @@ packages:
   - "demo"
 
 allowBuilds:
-  bufferutil: true
   core-js: true
-  node-datachannel: true
-  utf-8-validate: true
+
+minimumReleaseAgeExclude:
+  - '@rolldown/binding-openharmony-arm64@1.2.8'

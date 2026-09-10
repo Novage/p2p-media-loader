@@ -49,23 +49,23 @@
     "@vidstack/react": "^1.15.6",
     "d3": "^7.9.0",
     "dplayer": "^1.27.1",
-    "hls.js": "^1.7.0",
+    "hls.js": "^1.7.2",
     "mediaelement": "^7.1.0",
     "openplayerjs": "^2.14.12",
     "p2p-media-loader-core": "workspace:*",
     "p2p-media-loader-hlsjs": "workspace:*",
     "p2p-media-loader-shaka": "workspace:*",
     "plyr": "^3.8.4",
-    "shaka-player": "^5.2.6"
+    "shaka-player": "^5.2.9"
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",
     "@types/dplayer": "^1.25.6",
     "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.4",
+    "@types/react-dom": "^19.2.7",
     "cpy-cli": "^7.0.0",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.4",
+    "eslint-plugin-react-refresh": "^0.5.6",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
