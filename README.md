@@ -70,6 +70,10 @@ This library makes it possible to build large-scale P2P mesh networks — often 
   - Engines: Hls.js, Shaka Player
   - Video players: [Vidstack](https://www.vidstack.io/), [Clappr](http://clappr.io/), [MediaElement](https://www.mediaelementjs.com/), [Plyr](https://plyr.io/), [DPlayer](https://dplayer.diygod.dev/), [OpenPlayerJS](https://www.openplayerjs.com/), [PlayerJS](https://playerjs.com/) , and others that support Hls.js or Shaka video engines. These players can be integrated via custom integration with the library API.
 - Supports adaptive bitrate streaming of HLS and MPEG-DASH protocols
+- Supports DRM-protected and encrypted streams, including Widevine, PlayReady, FairPlay, and HLS AES-128:
+  - Peers exchange segments exactly as the CDN delivers them, still encrypted. Decryption stays in the video player; the library never decrypts media and never stores or shares decrypted data
+  - Key and license requests are never intercepted and never travel between peers — they always go directly to your license server
+  - Not applicable to per-session encryption or forensic watermarking, where every viewer receives different bytes for the same segment. P2P must be disabled for such content
 - There is no need for server-side software for simple use cases. By default **P2P Media Loader** uses publicly available servers:
   - WebTorrent trackers - [wss://tracker.novage.com.ua](https://novage.com.ua/), [wss://tracker.webtorrent.dev](https://webtorrent.dev/), [wss://tracker.openwebtorrent.com](https://openwebtorrent.com/)
   - STUN servers - [Public STUN server list](https://gist.github.com/mondain/b0ec1cf5f60ae726202e)
