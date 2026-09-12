@@ -92,6 +92,14 @@ the registry and fall through to the player's own loader, so the stream plays
 normally without P2P. This is the same degradation as any other registry miss —
 never an error, never wrong bytes.
 
+> **This is a regression, not a gap.** Shaka Player resolves `SegmentBase`
+> indexes itself, and the previous design read segments back out of Shaka's
+> index, so Shaka + DASH `SegmentBase` streams share over P2P today. Deriving
+> the registry from the manifest gives that up until an external index can be
+> resolved. Resolving it is therefore a prerequisite for moving the Shaka
+> adapter over, not an optional enhancement — or an accepted, deliberate loss
+> of capability.
+
 ### Resolving an external index
 
 Support for `sidx`-indexed streams is added by resolving `external` sources into
@@ -237,9 +245,9 @@ next refresh. That is correct: it is no longer live.
   and deliberately passed through. See below.
 - **Segments behind an unresolved external index** (DASH `SegmentBase`) — the
   stream is registered, its segments are not, until the index is resolved. See
-  [Where segment lists come from](#where-segment-lists-come-from). This is a
-  capability that is not yet built, unlike the entries above, which are
-  deliberate exclusions.
+  [Where segment lists come from](#where-segment-lists-come-from). Unlike the
+  entries above, which are deliberate exclusions, this one is capability the
+  previous design had.
 
 ### Initialization segments
 

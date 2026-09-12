@@ -114,8 +114,9 @@ meaningfully before anyone else. Core parses these tags only in order to ignore
 them: partial segments and preload hints are never registered, so they are never
 announced to peers.
 
-This is a permanent exclusion, distinct from a capability that is merely absent.
-DASH `SegmentBase` streams also carry no P2P today, but because their segment
-index has not yet been implemented rather than because sharing them is
-pointless; the design reserves a place for it. See
+This is a permanent exclusion, and the only one. DASH `SegmentBase` streams also
+carry no P2P under this design, but for an entirely different reason: their
+segment index has not yet been implemented. Those streams do share under the
+previous design, where Shaka resolved the index and the registry was read back
+out of it, so this is capability given up rather than capability never had. See
 [manifest-registry.md](manifest-registry.md).
