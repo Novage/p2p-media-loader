@@ -19,6 +19,8 @@ import {
   CoreEventMap,
   DynamicCoreConfig,
   DefinedCoreConfig,
+  debug,
+  getPlaybackStateFromMediaElement,
 } from "p2p-media-loader-core";
 
 /** A type for specifying dynamic configuration options that can be changed at runtime for the P2P engine's core. */
@@ -40,6 +42,19 @@ export type PartialShakaP2PEngineConfig = {
 };
 
 const LIVE_EDGE_DELAY = 25;
+
+// Every event after which the buffer ahead of the playhead or the rate may
+// have changed. `progress` covers buffer growth without playhead movement.
+const PLAYBACK_EVENTS = [
+  "timeupdate",
+  "progress",
+  "seeking",
+  "seeked",
+  "ratechange",
+  "play",
+  "pause",
+  "waiting",
+] as const;
 
 /**
  * Represents a Peer-to-Peer (P2P) engine designed to enhance media streaming efficiency.
@@ -77,6 +92,9 @@ export class ShakaP2PEngine {
   private readonly core: Core<Stream>;
   private readonly segmentManager: SegmentManager;
   private requestFilter?: shaka.extern.RequestFilter;
+  // See HybridLoader.oracleLogger: logs media.currentTime beside the core's
+  // estimate so the two can be compared while the playback contract beds in.
+  private readonly oracle = debug("p2pml:playback-oracle");
 
   /**
    * Constructs an instance of `ShakaP2PEngine`.
@@ -265,14 +283,17 @@ export class ShakaP2PEngine {
     if (!media) return;
     const method =
       type === "register" ? "addEventListener" : "removeEventListener";
-    media[method]("timeupdate", this.handlePlaybackUpdate);
-    media[method]("ratechange", this.handlePlaybackUpdate);
-    media[method]("seeking", this.handlePlaybackUpdate);
+    for (const event of PLAYBACK_EVENTS) {
+      media[method](event, this.handlePlaybackUpdate);
+    }
   };
 
   private handlePlaybackUpdate = (event: Event) => {
     const media = event.target as HTMLVideoElement;
-    this.core.updatePlayback(media.currentTime, media.playbackRate);
+    if (this.oracle.enabled) {
+      this.oracle(`media.currentTime=${media.currentTime.toFixed(3)}`);
+    }
+    this.core.updatePlayback(getPlaybackStateFromMediaElement(media));
   };
 
   /** Cleans up and releases all resources, and unregisters all event handlers. */

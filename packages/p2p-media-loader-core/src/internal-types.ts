@@ -1,9 +1,21 @@
 import { BandwidthCalculator } from "./bandwidth-calculator.js";
 import { Segment, Stream } from "./types.js";
+import type { PlaybackStateSource } from "./playback.js";
 
+/**
+ * The playhead as the request queue sees it. No absolute position: every
+ * scheduling decision is a distance from the playhead, computed as
+ * `segment.startTime - bufferEdge + bufferAhead`, so the manifest timeline and
+ * the player's clock are never compared. See specs/playback-contract.md.
+ */
 export type Playback = {
-  position: number;
+  /** Manifest time at which the player's buffer currently ends. */
+  bufferEdge: number;
+  /** Seconds buffered ahead of the playhead, on the player's own clock. */
+  bufferAhead: number;
+  /** Rate used for window sizing; see HybridLoader.syncPlayback for pauses. */
   rate: number;
+  source: PlaybackStateSource;
 };
 
 /** Extends a Segment with a reference to its associated stream. */

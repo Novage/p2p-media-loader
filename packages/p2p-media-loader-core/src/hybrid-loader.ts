@@ -12,13 +12,14 @@ import { RequestsContainer } from "./requests/request-container.js";
 import { EngineRequest } from "./requests/engine-request.js";
 import * as QueueUtils from "./utils/queue.js";
 import * as LoggerUtils from "./utils/logger.js";
-import * as StreamUtils from "./utils/stream.js";
 import * as Utils from "./utils/utils.js";
 import debug from "debug";
 import { QueueItem } from "./utils/queue.js";
 import { EventTarget } from "./utils/event-target.js";
 import { SegmentStorage } from "./segment-storage/index.js";
 import { WebTorrentSocketPool } from "./webtorrent/webtorrent-socket-pool/index.js";
+import { PlaybackTracker } from "./playback-tracker.js";
+import type { PlaybackState } from "./playback.js";
 
 const FAILED_ATTEMPTS_CLEAR_INTERVAL = 60000;
 const PEER_UPDATE_LATENCY = 1000;
@@ -28,8 +29,12 @@ export class HybridLoader {
   private engineRequest?: EngineRequest;
   private readonly p2pLoaders: P2PLoadersContainer;
   private readonly playback: Playback;
-  private readonly segmentAvgDuration: number;
+  private readonly playbackTracker: PlaybackTracker;
   private readonly logger: debug.Debugger;
+  // Diagnostic only. While segment times still come from the player, the
+  // estimate below must match media.currentTime; the engines log that value in
+  // the same namespace. Enable with localStorage.debug = "p2pml:playback-oracle".
+  private readonly oracleLogger = debug("p2pml:playback-oracle");
   private levelChangedTimestamp?: number;
   private lastQueueProcessingTimeStamp?: number;
   private randomHttpDownloadTimeout?: number;
@@ -48,8 +53,10 @@ export class HybridLoader {
     private readonly peerId: string,
   ) {
     const activeStream = this.lastRequestedSegment.stream;
-    this.playback = { position: this.lastRequestedSegment.startTime, rate: 1 };
-    this.segmentAvgDuration = StreamUtils.getSegmentAvgDuration(activeStream);
+    this.playbackTracker = new PlaybackTracker(this.lastRequestedSegment);
+    // Shared by reference with the requests container; kept current by
+    // syncPlayback() rather than replaced.
+    this.playback = this.playbackTracker.getPlayback();
     this.requests = new RequestsContainer(
       this.requestProcessQueueMicrotask,
       this.bandwidthCalculators,
@@ -97,6 +104,9 @@ export class HybridLoader {
       this.p2pLoaders.changeCurrentLoader(stream);
     }
     this.lastRequestedSegment = segment;
+    const isSeek = this.playbackTracker.onSegmentRequested(segment);
+    this.syncPlayback();
+    if (isSeek) this.logger("seek detected: buffer edge re-anchored");
 
     this.segmentStorage.onSegmentRequested(
       stream.swarmId,
@@ -108,6 +118,9 @@ export class HybridLoader {
       this.streamDetails.isLive,
     );
     const engineRequest = new EngineRequest(segment, callbacks);
+    // After a seek the player has nothing buffered at the new position; do not
+    // wait for peers before starting this request.
+    if (isSeek) engineRequest.markAsShouldBeStartedImmediately();
 
     try {
       const hasSegment = this.segmentStorage.hasSegment(
@@ -125,6 +138,8 @@ export class HybridLoader {
         if (data) {
           const { queueDownloadRatio } = this.generateQueue();
           engineRequest.resolve(data, this.getBandwidth(queueDownloadRatio));
+          this.playbackTracker.onSegmentDelivered(segment);
+          this.syncPlayback();
           return;
         }
       }
@@ -209,6 +224,11 @@ export class HybridLoader {
               this.getBandwidth(queueDownloadRatio),
             );
             this.engineRequest = undefined;
+            // The buffer edge tracks what the player holds. Only an engine
+            // request delivers to the player; a background prefetch fills the
+            // store and leaves the player's buffer where it was.
+            this.playbackTracker.onSegmentDelivered(segment);
+            this.syncPlayback();
           }
           this.requests.remove(request);
 
@@ -439,6 +459,7 @@ export class HybridLoader {
       return;
     }
 
+    this.syncPlayback();
     const segmentsToLoad: SegmentWithStream[] = [];
     for (const { segment, statuses } of QueueUtils.generateQueue(
       this.lastRequestedSegment,
@@ -540,6 +561,7 @@ export class HybridLoader {
   }
 
   private generateQueue() {
+    this.syncPlayback();
     const queue: QueueItem[] = [];
     const queueSegmentIds = new Set<string>();
     let maxPossibleLength = 0;
@@ -622,24 +644,46 @@ export class HybridLoader {
     );
   }
 
-  updatePlayback(position: number, rate: number) {
-    const isRateChanged = this.playback.rate !== rate;
-    const isPositionChanged = this.playback.position !== position;
+  updatePlayback(state: PlaybackState) {
+    this.playbackTracker.report(state);
+    const changed = this.syncPlayback();
+    if (!changed) return;
 
-    if (!isRateChanged && !isPositionChanged) return;
-
-    const isPositionSignificantlyChanged =
-      Math.abs(position - this.playback.position) / this.segmentAvgDuration >
-      0.5;
-
-    if (isPositionChanged) this.playback.position = position;
-    if (isRateChanged && rate !== 0) this.playback.rate = rate;
-    if (isPositionSignificantlyChanged) {
-      this.logger("position significantly changed");
-      this.engineRequest?.markAsShouldBeStartedImmediately();
+    if (this.oracleLogger.enabled) {
+      const { bufferEdge, bufferAhead, source } = this.playback;
+      this.oracleLogger(
+        `${this.lastRequestedSegment.stream.type} playhead≈${(bufferEdge - bufferAhead).toFixed(3)} (${source})`,
+      );
     }
-    this.segmentStorage.onPlaybackUpdated(position, rate);
-    this.requestProcessQueueMicrotask(isPositionSignificantlyChanged);
+
+    // The store compares this position against the segment times it was given,
+    // which are manifest time — so the position must be manifest time too.
+    const { bufferEdge, bufferAhead, rate } = this.playback;
+    this.segmentStorage.onPlaybackUpdated(bufferEdge - bufferAhead, rate);
+    this.requestProcessQueueMicrotask(false);
+  }
+
+  /**
+   * Copies the tracker's current view into the shared `playback` object.
+   * Returns whether anything changed.
+   *
+   * A paused player reports rate 0. Window sizing keeps the last non-zero
+   * rate instead, so prefetching continues while paused and the buffer is
+   * ready on resume — the behaviour the absolute-position code had.
+   */
+  private syncPlayback(): boolean {
+    const next = this.playbackTracker.getPlayback();
+    const rate = next.rate === 0 ? this.playback.rate : next.rate;
+    const changed =
+      this.playback.bufferEdge !== next.bufferEdge ||
+      this.playback.bufferAhead !== next.bufferAhead ||
+      this.playback.rate !== rate ||
+      this.playback.source !== next.source;
+    this.playback.bufferEdge = next.bufferEdge;
+    this.playback.bufferAhead = next.bufferAhead;
+    this.playback.rate = rate;
+    this.playback.source = next.source;
+    return changed;
   }
 
   updateStream(stream: StreamWithSegments) {

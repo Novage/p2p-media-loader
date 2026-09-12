@@ -1,4 +1,5 @@
 import { HybridLoader } from "./hybrid-loader.js";
+import type { PlaybackState } from "./playback.js";
 import debug from "debug";
 import {
   Stream,
@@ -538,14 +539,17 @@ export class Core<TStream extends Stream = Stream> {
   }
 
   /**
-   * Updates the playback parameters while play head moves, specifically position and playback rate, for stream loaders.
+   * Reports the player's playback state to the stream loaders.
    *
-   * @param position - The new position in the stream, in seconds.
-   * @param rate - The new playback rate.
+   * Only the buffer ahead of the playhead and the rate are needed — never the
+   * absolute position. See `getPlaybackStateFromMediaElement` for the browser
+   * case, and specs/playback-contract.md for why.
+   *
+   * @param state - The current playback state.
    */
-  updatePlayback(position: number, rate: number): void {
-    this.mainStreamLoader?.updatePlayback(position, rate);
-    this.secondaryStreamLoader?.updatePlayback(position, rate);
+  updatePlayback(state: PlaybackState): void {
+    this.mainStreamLoader?.updatePlayback(state);
+    this.secondaryStreamLoader?.updatePlayback(state);
   }
 
   /**

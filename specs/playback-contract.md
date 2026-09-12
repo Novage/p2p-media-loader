@@ -83,6 +83,15 @@ segment removes a silent one-segment-duration error: the correct origin depends
 on whether that segment has been delivered yet, which differs between the
 request path and everything else that reads playback state.
 
+"Delivered" means handed to the player, not appended to its media buffer. The
+edge advances only when bytes reach the player through its own request — a
+background prefetch fills the core's store and leaves the player's buffer where
+it was, so it must not move the edge. Because the player appends a delivered
+segment a moment after receiving it, the estimate overstates the playhead by at
+most one segment in that interval and the next reported state corrects it. The
+same bound applies at startup, when a player issues several requests at once
+before any has been appended. Neither transient accumulates.
+
 ## Distance from the playhead
 
 The buffer edge sits exactly `bufferAhead` in front of the playhead, so:

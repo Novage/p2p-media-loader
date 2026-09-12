@@ -18,6 +18,7 @@ import {
   DynamicCoreConfig,
   debug,
   DefinedCoreConfig,
+  getPlaybackStateFromMediaElement,
 } from "p2p-media-loader-core";
 import { injectMixin } from "./engine-static.js";
 
@@ -61,6 +62,19 @@ export type HlsWithP2PConfig<HlsType extends abstract new () => unknown> =
 
 const MAX_LIVE_SYNC_DURATION = 120;
 
+// Every event after which the buffer ahead of the playhead or the rate may
+// have changed. `progress` covers buffer growth without playhead movement.
+const PLAYBACK_EVENTS = [
+  "timeupdate",
+  "progress",
+  "seeking",
+  "seeked",
+  "ratechange",
+  "play",
+  "pause",
+  "waiting",
+] as const;
+
 /**
  * Represents a Peer-to-Peer (P2P) engine for HLS (HTTP Live Streaming) to enhance media streaming efficiency.
  * This class integrates P2P technologies into Hls.js, enabling the distribution of media segments via a peer network
@@ -97,6 +111,9 @@ export class HlsJsP2PEngine {
   private hlsInstanceGetter?: () => Hls;
   private currentHlsInstance?: Hls;
   private readonly debug = debug("p2pml-hlsjs:engine");
+  // See HybridLoader.oracleLogger: logs media.currentTime beside the core's
+  // estimate so the two can be compared while the playback contract beds in.
+  private readonly oracle = debug("p2pml:playback-oracle");
 
   /**
    * Enhances a given `Hls.js` class by injecting additional Peer-to-Peer (P2P) functionalities.
@@ -282,9 +299,9 @@ export class HlsJsP2PEngine {
     if (!media) return;
     const method =
       type === "register" ? "addEventListener" : "removeEventListener";
-    media[method]("timeupdate", this.handlePlaybackUpdate);
-    media[method]("seeking", this.handlePlaybackUpdate);
-    media[method]("ratechange", this.handlePlaybackUpdate);
+    for (const event of PLAYBACK_EVENTS) {
+      media[method](event, this.handlePlaybackUpdate);
+    }
   };
 
   private handleManifestLoaded = (event: string, data: ManifestLoadedData) => {
@@ -402,7 +419,10 @@ export class HlsJsP2PEngine {
 
   private handlePlaybackUpdate = (event: Event) => {
     const media = event.target as HTMLMediaElement;
-    this.core.updatePlayback(media.currentTime, media.playbackRate);
+    if (this.oracle.enabled) {
+      this.oracle(`media.currentTime=${media.currentTime.toFixed(3)}`);
+    }
+    this.core.updatePlayback(getPlaybackStateFromMediaElement(media));
   };
 
   private destroyCore = () => this.core.destroy();
