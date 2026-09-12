@@ -17,6 +17,12 @@ Hook the player's manifest/playlist loading and pass every response body to
 Do not fetch manifests separately — see the rationale in
 [architecture.md](architecture.md).
 
+The same applies to a stream's segment index when it lives outside the manifest
+(DASH `SegmentBase`). The player fetches it before any media; the adapter
+recognises that request and hands the bytes to core. It is not a media segment
+and will not resolve against the registry, so it needs recognising, not
+looking up. See [manifest-registry.md](manifest-registry.md).
+
 ## 2. Serve segment requests through core
 
 Hook the player's segment loader. For each request:
@@ -33,6 +39,12 @@ if (core.isSegmentLoadable(url, byteRange)) {
 
 Falling back on an unrecognised URL is normal operation, not an error path. It
 is what makes a disagreement between core's parse and the player's harmless.
+
+**Handle manifest and segment requests only, and pass every other type through
+untouched.** Licence, key, certificate, timing and steering requests belong to
+the player. This is a whitelist by design — the set of request types a player
+emits grows over time, and an exclusion list is wrong after the next release.
+See [encryption.md](encryption.md).
 
 Two details adapters routinely get wrong:
 
@@ -103,7 +115,9 @@ Each responsibility has a known home:
 - Manifest and segments: `player.extend("XHRLoader", …)`. The override resolves
   through dash.js's `FactoryMaker` at instantiation, so it applies even though
   `HTTPLoader` imports the loader module directly. Manifest and segment requests
-  both arrive there, distinguished by `request.type`.
+  both arrive there, distinguished by `request.type` — as do `SegmentBase` index
+  fetches, under their own `INDEX_SEGMENT_TYPE`, which the adapter observes and
+  forwards rather than serves.
 - Playback: the media element.
 - Parsers: DASH only.
 

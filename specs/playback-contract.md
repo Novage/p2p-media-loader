@@ -45,6 +45,26 @@ The contract is also the intersection of what every target player can answer,
 which is why it is expressed this way rather than in any player's own terms.
 See [player-adapters.md](player-adapters.md).
 
+## Sources, in order of preference
+
+| Source     | Accuracy                          | Available when                      |
+| ---------- | --------------------------------- | ----------------------------------- |
+| `reported` | exact                             | the integration can read the player |
+| `cmcd`     | exact, `bufferAhead` only         | the player emits CMCD               |
+| `inferred` | approximate, blind to quiet seeks | always                              |
+
+A directly readable player always wins. In a browser the media element is free,
+continuous and unconditional, so neither fallback is ever preferred there.
+
+### Staleness
+
+A `reported` or `cmcd` state describes one instant. Core keeps the most recent
+one and treats it as current for a bounded window (on the order of a couple of
+seconds); past that, it falls to the next source down rather than trusting a
+value the player may have long moved on from. A browser adapter reporting on
+media events never approaches the window; a proxy fed one CMCD sample per
+segment routinely does, which is why inference has to be sound on its own.
+
 ## The buffer edge
 
 Core tracks `bufferEdge`: the point on the **manifest timeline** where the
@@ -126,29 +146,20 @@ The third row is the one that motivates the design. Both terms are anchored to
 the same buffer edge, so seeking within a buffered range needs no new
 information from the player and produces no error.
 
-## Sources, in order of preference
-
-| Source     | Accuracy                          | Available when                      |
-| ---------- | --------------------------------- | ----------------------------------- |
-| `reported` | exact                             | the integration can read the player |
-| `cmcd`     | exact, `bufferAhead` only         | the player emits CMCD               |
-| `inferred` | approximate, blind to quiet seeks | always                              |
-
-A directly readable player always wins. In a browser the media element is free,
-continuous and unconditional, so neither fallback is ever preferred there.
-
 ## Reading playback state from CMCD
 
 Where core intercepts requests but cannot read the player — the proxy
 architecture — a player that emits CMCD (CTA-5004) is describing its own buffer
 in the request core is already handling. That is worth using, with two limits.
 
-**It supplies `bufferAhead` only.** The `pr` key nominally carries playback rate
-and the specification defines `0` as "not playing", but implementations report
-the media element's `playbackRate` property, which stays at 1 while paused. More
+**It supplies `bufferAhead`; it cannot tell core about a pause.** `rate` is
+taken from the `pr` key when present and defaults to 1 when absent, as the
+specification directs. But paused is undetectable: the specification defines
+`pr=0` as "not playing", yet implementations report the media element's
+`playbackRate` property, which stays at 1 while paused — and more
 fundamentally, CMCD is request-triggered and a pause is the _absence_ of
-requests, so no implementation could report it. A CMCD source therefore assumes
-`rate` is 1, for the same reason and with the same consequence as inference.
+requests, so no implementation could report it. A paused player therefore looks
+like a playing one, with the same consequence as under inference.
 
 **It is a sample, not a stream.** The value is written when a request is issued,
 so in steady state it arrives once per segment duration and is stale between
@@ -156,10 +167,11 @@ times. The same staleness rules apply as to a reported state.
 
 Two details decide correctness:
 
-- `dl` is `bl` divided by playback rate, and is preferred when the rate is known
-  and non-zero. While paused the division is degenerate: scaling `dl` back would
-  report a fully buffered player as having nothing buffered. `bl` is
-  authoritative whenever the rate is zero.
+- `dl` is `bl` divided by playback rate, and is preferred when `pr` is present
+  and non-zero, since it is the quantity the player itself derived. Should a
+  conforming implementation ever send `pr=0`, the division is degenerate —
+  scaling `dl` back would report a fully buffered player as having nothing
+  buffered — so `bl` is authoritative whenever `pr` is zero.
 - `bl` may be measured per media track rather than across the presentation —
   hls.js reports the requested track's forward buffer, Media3 reports the
   overall buffered duration from the playhead. The two are not interchangeable

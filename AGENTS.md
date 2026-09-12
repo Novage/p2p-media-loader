@@ -8,7 +8,10 @@ tool-specific file point here; this is the source of truth.
 
 `specs/` documents the system as designed — the shape the code is meant to have
 and the reasoning behind it. It is design documentation, not a roadmap: it
-describes the end state, never development phases or history.
+describes the end state, never development phases or a narrative of how the code
+got here. Contrasting a decision with the design it replaced is welcome when it
+explains _why_ — that is reasoning, not history — and must not be stripped as
+such.
 
 **Read before changing.** Before modifying anything that crosses a package
 boundary, changes identity derivation, alters the peer protocol, or adds a
@@ -36,7 +39,8 @@ issue tracker.
 
 - **Package manager: pnpm.** The workspace is `packages/*` and `demo`. Never run
   `npm install` in a workspace package.
-- **Verify before reporting done:** `pnpm type-check`, `pnpm lint`, `pnpm test`.
+- **Verify before reporting done:** `pnpm type-check`, `pnpm lint`, `pnpm test`,
+  and `npx prettier --check specs/*.md AGENTS.md` when specs changed.
 - Match the surrounding code's style, comment density and naming. The codebase
   favours comments that explain _why_ over comments that restate the code.
 
@@ -61,4 +65,9 @@ the old ones. See [`specs/segment-identity.md`](specs/segment-identity.md).
   [`specs/playback-contract.md`](specs/playback-contract.md).
 - **Adapters do not describe streams to core.** Three responsibilities only; see
   [`specs/player-adapters.md`](specs/player-adapters.md).
-- **Low-latency HLS tags are parsed in order to be ignored.**
+- **Adapters whitelist manifest and segment requests and pass every other type
+  through.** Never an exclusion list. See [`specs/encryption.md`](specs/encryption.md).
+- **Core handles ciphertext only.** It never decrypts, and never stores or seeds
+  decrypted media.
+- **Low-latency extensions are parsed in order to be ignored** — LL-HLS parts
+  and hints, LL-DASH chunked segments. Nothing at the live edge is shareable.

@@ -83,6 +83,14 @@ period boundary.
 `PEER_PROTOCOL_VERSION` is part of every stream swarm ID, so peers with
 incompatible derivations never meet in the same swarm.
 
+**This design is itself a protocol version.** Both derivations above differ from
+the previous version's — HLS moved from a per-player sequence number or index to
+the manifest's media sequence, DASH from a half-second time bucket to
+millisecond presentation time — so the manifest-driven core carries its own
+`PEER_PROTOCOL_VERSION`, and peers running the previous version form separate
+swarms from it. That is the intended outcome, not a defect: the two derive
+identity differently and must not be allowed to meet.
+
 **Any change to how `identityHash` or `externalId` is derived requires bumping
 it.** This includes changes that look cosmetic: a different normalization of a
 codec string, a different rounding of a frame rate, a different base for a
@@ -94,6 +102,14 @@ vectors are not expectations to be updated when the code changes; they are the
 wire format. A change that breaks them is a protocol change, and the correct
 response is to bump the version and add a new set, keeping the old ones as a
 record of what the previous version produced.
+
+Because DASH identity is computed by the manifest parser — presentation time is
+`mpd-parser`'s output — **the parser is part of the wire format.** A parser
+upgrade that computes presentation time differently is a protocol change even
+though no line in this repository changed. The golden vectors therefore include
+real manifests with the `externalId` each segment must receive, not only
+property-to-hash fixtures, so that a dependency update is caught the same way a
+code change is.
 
 ## Runtime identifiers
 

@@ -1,8 +1,8 @@
 # Encrypted content
 
 Encrypted streams are shared like any other. Nothing about encryption changes
-identity, the registry, or scheduling — but three rules are absolute, and one
-class of content must never be shared at all.
+identity, the registry, or scheduling. What follows are the rules that keep that
+true, and the one class of content to which none of it applies.
 
 ## Core handles ciphertext only
 
@@ -21,9 +21,9 @@ stored or seeded.
 
 ## Key and licence requests are never registered
 
-`EXT-X-KEY` URIs, DASH licence server requests, and FairPlay or Widevine
-acquisition are not segments and are never entered into the registry. They
-travel the player's own path, untouched.
+`EXT-X-KEY` and `EXT-X-SESSION-KEY` URIs, DASH licence server requests, and
+licence acquisition for FairPlay, Widevine or PlayReady are not segments and are
+never entered into the registry. They travel the player's own path, untouched.
 
 These requests are bound to a viewer's entitlement rather than to the content.
 Serving one from a peer would both break the licence model and hand a key to a

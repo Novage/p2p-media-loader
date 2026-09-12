@@ -32,10 +32,12 @@ different players could not reliably recognise the same segment.
 An adapter does exactly three things ([player-adapters.md](player-adapters.md)):
 
 1. **Feeds manifest bytes to core** — from the responses the player already
-   fetches, not from separate requests.
+   fetches, not from separate requests. Where a stream's segment index lives
+   outside the manifest, the index bytes are fed the same way.
 2. **Serves segment requests through core** — the player's loader hook asks
    core for the bytes, falling back to its own loader when core does not
-   recognise the URL.
+   recognise the URL. Every other request type — licences, keys, timing,
+   steering — passes through untouched ([encryption.md](encryption.md)).
 3. **Reports playback state** — buffer ahead of the playhead, and rate.
 
 Nothing else. An adapter does not enumerate streams, compute segment IDs,
@@ -108,15 +110,20 @@ never the default.
 
 ## What is explicitly out of scope
 
-**Low-latency HLS.** Partial segments (`EXT-X-PART`) and preload hints exist at
-the live edge, where there is nothing to share — no peer has the data
-meaningfully before anyone else. Core parses these tags only in order to ignore
-them: partial segments and preload hints are never registered, so they are never
-announced to peers.
+**Low-latency streaming.** At the live edge there is nothing to share — no peer
+has the data meaningfully before anyone else — so the low-latency extensions of
+both protocols are outside P2P:
 
-This is a permanent exclusion, and the only one. DASH `SegmentBase` streams also
-carry no P2P under this design, but for an entirely different reason: their
+- **LL-HLS** partial segments (`EXT-X-PART`) and preload hints
+  (`EXT-X-PRELOAD-HINT`). Core parses these tags only in order to ignore them:
+  they are never registered, so they are never announced to peers.
+- **LL-DASH** chunked segments, which a player fetches while they are still
+  being produced (`availabilityTimeComplete="false"`). These requests are left
+  to the player's own streaming loader; core serves whole segments only.
+
+This is a permanent exclusion. It is a different matter from DASH `SegmentBase`
+streams, which also carry no P2P under this design but only because their
 segment index has not yet been implemented. Those streams do share under the
 previous design, where Shaka resolved the index and the registry was read back
-out of it, so this is capability given up rather than capability never had. See
+out of it, so that is capability given up rather than capability never had. See
 [manifest-registry.md](manifest-registry.md).

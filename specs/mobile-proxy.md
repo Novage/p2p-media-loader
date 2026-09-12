@@ -38,10 +38,16 @@ player. See [segment-identity.md](segment-identity.md).
 
 ## Mapping the three responsibilities
 
-**Manifests.** The proxy must rewrite manifest URLs to point at itself, or the
-player fetches segments straight from the CDN and bypasses P2P. That rewrite
-requires parsing the manifest, which is the same parse that builds the registry
-— one pass serves both.
+**Manifests.** The proxy must rewrite the URLs _inside_ each manifest — media
+playlists, segments, initialization segments — to point at itself, or the player
+fetches them straight from the CDN and bypasses P2P. That rewrite requires
+parsing the manifest, which is the same parse that builds the registry — one
+pass serves both.
+
+Licence and key URLs are **not** rewritten and never traverse the proxy: DRM
+licence acquisition reaches the licence server directly, and on iOS FairPlay
+key exchange runs through `AVContentKeySession` outside HTTP loading entirely.
+See [encryption.md](encryption.md).
 
 **Segments.** The proxy resolves each request through core, exactly as a browser
 adapter's loader hook does. It must be a fully range-capable HTTP server:

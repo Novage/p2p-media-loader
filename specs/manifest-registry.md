@@ -26,15 +26,17 @@ A manifest whose protocol has no registered parser is ignored, and its segments
 therefore load without P2P. This is the same degradation as an unrecognised
 URL: never an error, never wrong bytes.
 
-The call is synchronous in effect and idempotent: re-processing an unchanged
-manifest produces no registry changes and no events.
+The call is idempotent: re-processing an unchanged manifest produces no
+registry changes and no events. A manifest that fails to parse leaves the
+registry exactly as it was — the previous segment list stays in force rather
+than being emptied by a transient bad response.
 
 ## Master versus media manifests
 
-A parsed HLS manifest with a non-empty `playlists` array is a master playlist;
-it declares variants and renditions and contains no segments. A parsed manifest
-with segments and no variants is a media playlist. A DASH MPD declares both in
-one document.
+An HLS master playlist declares variants and renditions and contains no
+segments; an HLS media playlist lists segments and declares no variants. The two
+are distinguished by content, not by URL. A DASH MPD declares both in one
+document.
 
 Core registers **streams** from the master manifest (or the MPD's
 `AdaptationSet`/`Representation` tree) and **segments** from each media
@@ -51,9 +53,10 @@ swarm
 
 Segments are keyed by the URL the player will request, including byte range
 where `EXT-X-BYTERANGE` or a DASH `mediaRange` applies. This key is what a
-segment request is resolved against. Relative URIs are resolved against the
-media playlist's own URL before being stored, because that is the form the
-player will request, and keys are normalized as described under
+segment request is resolved against. Relative URIs are resolved to absolute
+form before being stored — against the media playlist's URL for HLS, and
+through the `BaseURL` chain down from the MPD's URL for DASH — because that is
+the form the player will request. Keys are normalized as described under
 [URL normalization](#url-normalization).
 
 Each registered segment carries:
@@ -116,10 +119,29 @@ needs no version bump. See [segment-identity.md](segment-identity.md).
 request any media, and it fetches it through the same loader hook core already
 intercepts. Core therefore sees the `sidx` bytes without issuing a request of
 its own, consistent with observing manifests rather than polling them
-([architecture.md](architecture.md)).
+([architecture.md](architecture.md)). The index is a byte range of the media
+file itself, typically adjacent to the initialization segment and often fetched
+with it, so this is not an additional resource either.
 
-What is missing is only the parser: reading an MP4 `sidx` box into subsegment
-offsets and durations. Until that exists, `external` sources stay unresolved.
+Seeing the bytes is not the same as knowing what they are. An index request
+misses the registry by definition — its segments are exactly what is not yet
+known — so "pass through on a miss" cannot handle it. The adapter recognises the
+request as a stream's pending index and hands the response to core, exactly as
+it does for a manifest. That recognition is a distinct request type in some
+players (dash.js issues it as `INDEX_SEGMENT_TYPE`, not `MEDIA_SEGMENT_TYPE`),
+and an adapter that handles only manifest and media types will watch it go by.
+
+A player may fetch a range wider than the index alone — initialization and
+index together — so the `sidx` box is located by walking the MP4 box structure,
+never assumed to sit at the start of the response.
+
+Resolving an index therefore requires the `sidx` parser and this recognition
+path. Two limits then remain by design of the conversion, which is
+`mpd-parser`'s own: **hierarchical indexes** — references that point at further
+`sidx` boxes rather than at media — are dropped rather than followed, and 64-bit
+offsets or times beyond the safe integer range are rejected. Both are rare in
+practice; neither is silently wrong, since an unresolved index degrades to no
+P2P.
 
 ## URL normalization
 
@@ -177,11 +199,11 @@ unrecognised parameter.
 
 ## Live updates
 
-A media playlist refresh produces a diff against the registry: segments present
-in the new parse and absent from the registry are added; segments absent from
-the new parse are removed. Both operations are driven by the URL key, so a
-sliding window needs no positional reasoning and no assumptions about
-registration order.
+A manifest refresh — an HLS media playlist, or the whole MPD for DASH —
+produces a diff against the registry: segments present in the new parse and
+absent from the registry are added; segments absent from the new parse are
+removed. Both operations are driven by the URL key, so a sliding window needs
+no positional reasoning and no assumptions about registration order.
 
 A stream whose playlist stops being refreshed retains its segments until the
 stream itself is removed.
@@ -205,11 +227,14 @@ accumulating durations from the last tag, and backward for segments preceding
 the first tag. The resulting `programDateTime` is an absolute timeline that
 survives refreshes, and it is used directly.
 
-**HLS, without `EXT-X-PROGRAM-DATE-TIME`.** Core anchors on media sequence.
-The first parse records a base pair of `(mediaSequence, time)`; every later
-parse derives `startTime` by accumulating durations from that base. Media
-sequence numbers are monotonic across refreshes by specification, so the anchor
-holds for the life of the stream.
+**HLS, without `EXT-X-PROGRAM-DATE-TIME`.** Core anchors on media sequence,
+per stream. The first parse of a stream records its first media sequence number
+against an arbitrary base time (zero); every later parse derives `startTime` by
+accumulating durations from that base. Media sequence numbers are monotonic
+across refreshes by specification, so the anchor holds for the life of the
+stream. `EXT-X-DISCONTINUITY` does not disturb it: the manifest timeline is a
+running sum of durations, and a discontinuity only matters to a clock this
+timeline is never compared against.
 
 **DASH.** `mpd-parser` yields presentation time, which is already stable across
 refreshes. No anchoring is required.
