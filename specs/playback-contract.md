@@ -1,0 +1,208 @@
+# Playback contract
+
+Core needs two things from the player: **where it is** in the stream, and **how
+urgently** it needs the segment it just asked for. The first is already known —
+the last requested segment says it. This spec is mostly about the second, and
+about doing both without ever comparing a manifest time to a player time.
+
+## The problem
+
+Segment times come from the manifest. The playhead comes from the player. These
+are different timebases, separated by an offset that core cannot derive:
+
+- **HLS** — the player anchors its timeline on PTS after transmuxing; the media
+  need not begin at zero.
+- **DASH** — `presentationTimeOffset`, period start and `availabilityStartTime`
+  all shift it.
+- **Live** — the anchor depends on where in the sliding window the player
+  started.
+
+The offset also drifts, and changes at discontinuities. Measuring it is possible
+but fragile, and every consumer of the measurement inherits its error.
+
+## The contract
+
+```ts
+type PlaybackState = {
+  /**
+   * Seconds of contiguous media buffered ahead of the playhead.
+   * Zero when the playhead sits in a gap.
+   */
+  readonly bufferAhead: number;
+
+  /** Effective playback rate; 0 while paused. */
+  readonly rate: number;
+};
+```
+
+**There is no position field, and that is the point.** `bufferAhead` is a
+_duration_, so it is invariant under the offset. Combined with the last
+requested segment — which core already knows, in manifest time — it is
+sufficient. No calibration step exists because no absolute comparison is ever
+made.
+
+The contract is also the intersection of what every target player can answer,
+which is why it is expressed this way rather than in any player's own terms.
+See [player-adapters.md](player-adapters.md).
+
+## The buffer edge
+
+Core tracks `bufferEdge`: the point on the **manifest timeline** where the
+player's buffer currently ends.
+
+- When a segment is requested, the buffer ends where that segment begins — that
+  is precisely why the player is requesting it. `bufferEdge = segment.startTime`.
+- When the segment is delivered, the buffer extends through it.
+  `bufferEdge = max(bufferEdge, segment.endTime)`.
+
+The `max` guards against out-of-order completion of parallel requests dragging
+the edge backwards.
+
+Keeping the edge explicit rather than deriving it from the last requested
+segment removes a silent one-segment-duration error: the correct origin depends
+on whether that segment has been delivered yet, which differs between the
+request path and everything else that reads playback state.
+
+## Distance from the playhead
+
+The buffer edge sits exactly `bufferAhead` in front of the playhead, so:
+
+```
+distance(segment) = segment.startTime - bufferEdge + bufferAhead
+```
+
+Every term is a difference. `segment.startTime - bufferEdge` is a
+manifest-space delta and exact; `bufferAhead` is a player-space duration and
+offset-free. The offset between the two timebases cancels and never appears.
+
+All scheduling decisions are expressed on this axis:
+
+```ts
+function isSegmentInTimeWindow(segment, playback, timeWindowLength) {
+  const start = segment.startTime - playback.bufferEdge + playback.bufferAhead;
+  const end = segment.endTime - playback.bufferEdge + playback.bufferAhead;
+  return !(timeWindowLength * playback.rate < start || 0 > end);
+}
+```
+
+The same axis governs the high-demand, HTTP and P2P windows, and eviction from
+the segment store.
+
+## What the segment store receives
+
+`SegmentStorage` is public API — an integration may supply its own through
+`customSegmentStorageFactory` — so it is worth being explicit about what changes
+for one.
+
+The store is told the playhead through `onPlaybackUpdated(position, rate)`, and
+it compares that position against the `startTime` and `endTime` it was given
+when each segment was stored. **Both sides of that comparison are manifest
+time.** The position core passes is derived, not the player's clock:
+
+```
+position = bufferEdge - bufferAhead
+```
+
+The signature does not change and the comparison stays valid, because segment
+times moved to the same timeline. What changes is that the absolute values no
+longer coincide with `video.currentTime`.
+
+A custom store that only ever compares the position it is given against the
+segment times it was given is unaffected. A custom store that mixes in a
+player-sourced time — reading `currentTime` itself, or persisting positions
+across sessions against wall-clock — is comparing two timebases and will be
+wrong by the offset this design exists to avoid.
+
+## Behaviour under seeking
+
+| Situation                                         | Outcome                                                                                                                                                                                                                            |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Seek forward into unbuffered media                | Buffer discarded, player requests at the new position, `bufferAhead` is 0. Exact, and urgency correctly maxes out.                                                                                                                 |
+| Seek backward into unbuffered media               | Same. Exact.                                                                                                                                                                                                                       |
+| Seek backward **inside** the buffer               | No request is issued at all. The edge is unchanged and `bufferAhead` has grown by exactly the distance seeked, so the two cancel. Exact.                                                                                           |
+| Seek across a gap into an earlier buffered island | The edge describes a later island while `bufferAhead` is measured in an earlier one. Wrong until the player issues a request, which it does immediately to extend the range it is now playing. Self-correcting within one request. |
+
+The third row is the one that motivates the design. Both terms are anchored to
+the same buffer edge, so seeking within a buffered range needs no new
+information from the player and produces no error.
+
+## Sources, in order of preference
+
+| Source     | Accuracy                          | Available when                      |
+| ---------- | --------------------------------- | ----------------------------------- |
+| `reported` | exact                             | the integration can read the player |
+| `cmcd`     | exact, `bufferAhead` only         | the player emits CMCD               |
+| `inferred` | approximate, blind to quiet seeks | always                              |
+
+A directly readable player always wins. In a browser the media element is free,
+continuous and unconditional, so neither fallback is ever preferred there.
+
+## Reading playback state from CMCD
+
+Where core intercepts requests but cannot read the player — the proxy
+architecture — a player that emits CMCD (CTA-5004) is describing its own buffer
+in the request core is already handling. That is worth using, with two limits.
+
+**It supplies `bufferAhead` only.** The `pr` key nominally carries playback rate
+and the specification defines `0` as "not playing", but implementations report
+the media element's `playbackRate` property, which stays at 1 while paused. More
+fundamentally, CMCD is request-triggered and a pause is the _absence_ of
+requests, so no implementation could report it. A CMCD source therefore assumes
+`rate` is 1, for the same reason and with the same consequence as inference.
+
+**It is a sample, not a stream.** The value is written when a request is issued,
+so in steady state it arrives once per segment duration and is stale between
+times. The same staleness rules apply as to a reported state.
+
+Two details decide correctness:
+
+- `dl` is `bl` divided by playback rate, and is preferred when the rate is known
+  and non-zero. While paused the division is degenerate: scaling `dl` back would
+  report a fully buffered player as having nothing buffered. `bl` is
+  authoritative whenever the rate is zero.
+- `bl` may be measured per media track rather than across the presentation —
+  hls.js reports the requested track's forward buffer, Media3 reports the
+  overall buffered duration from the playhead. The two are not interchangeable
+  with each other or with a media element's intersected buffered ranges, so a
+  CMCD reading is used on its own, never blended with another source.
+
+CMCD is disabled by default in every player, so core never depends on it.
+
+## When the player reports nothing
+
+Some integrations cannot wrap the player — a proxy that a native application
+points at, with no SDK around its player. Core then infers `PlaybackState` from
+the request pattern it already observes. Inference is a fallback _inside_ core,
+not a second contract: an adapter's only job is to report if it can and stay
+silent if it cannot.
+
+Inference re-anchors on two reliable events and integrates between them:
+
+- **Seek** — a requested `externalId` that is not the successor of the previous
+  one means the player jumped, and a jump means its buffer was discarded.
+  `bufferAhead` resets to zero.
+- **Buffer full** — a sequential request arriving after an idle gap longer than
+  a fraction of a segment duration means the player was not fetching because it
+  had nowhere to put the data. `bufferAhead` is at the player's target, which is
+  itself learned as a moving average of the estimate at these moments.
+- **Between anchors** — delivered media time minus elapsed wall-clock time,
+  clamped to the learned target.
+
+Inferred estimates are scaled down by a safety factor before use.
+Underestimating the buffer costs P2P ratio; overestimating it stalls the viewer.
+The bias is deliberately toward the cheaper failure.
+
+Playback rate is ambiguous when inferring and is assumed to be 1. This is safe:
+assuming playback decays the estimate, which only ever makes core more willing
+to use HTTP, and core acts only when a request arrives, so a paused player costs
+nothing.
+
+### Limits of inference
+
+**A seek that issues no requests is invisible.** Seeking backward inside a
+buffered range produces no network activity, so inference cannot detect it and
+its estimate stays wrong until the player next requests something. Reported
+state handles this case exactly.
+
+Inference is a graceful degradation, not an equivalent. Any integration that can
+report playback state should.
