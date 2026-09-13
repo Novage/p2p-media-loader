@@ -121,9 +121,8 @@ both protocols are outside P2P:
   being produced (`availabilityTimeComplete="false"`). These requests are left
   to the player's own streaming loader; core serves whole segments only.
 
-This is a permanent exclusion. It is a different matter from DASH `SegmentBase`
-streams, which also carry no P2P under this design but only because their
-segment index has not yet been implemented. Those streams do share under the
-previous design, where Shaka resolved the index and the registry was read back
-out of it, so that is capability given up rather than capability never had. See
+This is a permanent exclusion. It is different in kind from a stream whose
+segment index lives outside the manifest (DASH `SegmentBase`): such streams are
+shared like any other once their index has arrived, which the player fetches
+before it can request any media. See
 [manifest-registry.md](manifest-registry.md).

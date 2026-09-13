@@ -21,6 +21,7 @@ import {
   getPlaybackStateFromMediaElement,
 } from "p2p-media-loader-core";
 import { injectMixin } from "./engine-static.js";
+import { hlsManifestParser } from "p2p-media-loader-core/hls";
 
 /** Represents the complete configuration for the `HlsJsP2PEngine`. */
 export type HlsJsP2PEngineConfig = {
@@ -145,7 +146,11 @@ export class HlsJsP2PEngine {
    * @param config An optional configuration for the P2P engine setup.
    */
   constructor(config?: PartialHlsJsP2PEngineConfig) {
-    this.core = new Core(config?.core);
+    this.core = new Core({
+      ...config?.core,
+      // hls.js plays HLS only; a bundle of this engine carries no DASH parser.
+      manifestParsers: config?.core?.manifestParsers ?? [hlsManifestParser],
+    });
     this.segmentManager = new SegmentManager(this.core);
   }
 
@@ -452,11 +457,12 @@ export class HlsJsP2PEngine {
   }
 
   private createPlaylistLoaderClass() {
+    const { core } = this;
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const engine = this;
     return class PlaylistLoader extends PlaylistLoaderBase {
       constructor(config: HlsConfig) {
-        super(config);
+        super(config, core);
         engine.initHlsEvents();
       }
     };

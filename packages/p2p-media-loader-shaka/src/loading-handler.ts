@@ -49,11 +49,14 @@ export class Loader {
   }
 
   private async handleManifestLoading(loadingPromise: Promise<Response>) {
+    const response = await loadingPromise;
     if (!this.streamInfo.manifestResponseUrl) {
       // loading main manifest either HLS or DASH
-      const response = await loadingPromise;
       this.setManifestResponseUrl(response.uri);
     }
+    // Every manifest Shaka fetches — master, media playlist, MPD refresh — is
+    // also handed to the core. Shaka's own parsing is untouched.
+    this.core.processManifest({ url: response.uri, data: response.data });
   }
 
   private loadSegment(

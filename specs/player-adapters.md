@@ -19,9 +19,9 @@ Do not fetch manifests separately — see the rationale in
 
 The same applies to a stream's segment index when it lives outside the manifest
 (DASH `SegmentBase`). The player fetches it before any media; the adapter
-recognises that request and hands the bytes to core. It is not a media segment
-and will not resolve against the registry, so it needs recognising, not
-looking up. See [manifest-registry.md](manifest-registry.md).
+recognises that request and hands the bytes to `core.processSegmentIndex`. It
+is not a media segment and will not resolve against the registry, so it needs
+recognising, not looking up. See [manifest-registry.md](manifest-registry.md).
 
 ## 2. Serve segment requests through core
 
@@ -126,9 +126,8 @@ Each responsibility has a known home:
 player's own loading — matching the low-latency exclusion in
 [architecture.md](architecture.md) at no cost.
 
-Note that DASH support is itself incomplete independently of any adapter:
-`SegmentBase` streams have no segment list in the manifest. See
-[manifest-registry.md](manifest-registry.md).
+`SegmentBase` streams carry no segment list in the MPD, so this adapter also
+forwards index responses, as described under responsibility 1.
 
 ### video.js
 

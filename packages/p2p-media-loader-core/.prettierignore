@@ -5,3 +5,7 @@ dist
 README.md
 LICENSE
 package-lock.json
+build
+# Manifest snapshots used as test fixtures; not source.
+test/fixtures/*.m3u8
+test/fixtures/*.mpd

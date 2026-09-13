@@ -1,5 +1,11 @@
 import { HybridLoader } from "./hybrid-loader.js";
 import type { PlaybackState } from "./playback.js";
+import type { ManifestParser, ManifestProtocol } from "./manifest/types.js";
+import { ManifestRegistry, type RegistryStream } from "./manifest/registry.js";
+import {
+  computeDivergence,
+  type ManifestDivergenceDetails,
+} from "./manifest/divergence.js";
 import debug from "debug";
 import {
   Stream,
@@ -117,6 +123,11 @@ export class Core<TStream extends Stream = Stream> {
     activeLevelBitrate: 0,
   };
   private storageInitPromise?: Promise<void>;
+  private readonly manifestParsers: readonly ManifestParser[];
+  private manifestRegistry = new ManifestRegistry();
+  private readonly manifestLogger = debug("p2pml-core:manifest");
+  private lastManifestUrl?: string;
+  private divergenceLogTimer?: ReturnType<typeof setTimeout>;
 
   /**
    * Constructs a new Core instance with optional initial configuration.
@@ -159,6 +170,10 @@ export class Core<TStream extends Stream = Stream> {
     this.peerId = generatePeerId(
       this.commonCoreConfig.trackerClientVersionPrefix,
     );
+
+    // Parsers are capabilities, not tunables: kept as given, outside the
+    // merged config, so they are never deep-copied or surfaced by getConfig().
+    this.manifestParsers = config?.manifestParsers ?? [];
 
     this.webTorrentSocketPool.addEventListener("error", (error, url) => {
       this.socketPoolLogger(`WebSocket error for tracker url ${url}:`, error);
@@ -293,6 +308,189 @@ export class Core<TStream extends Stream = Stream> {
    */
   setManifestResponseUrl(url: string): void {
     this.manifestResponseUrl = url.split("?")[0];
+  }
+
+  /**
+   * Parses a manifest the player has fetched and updates the manifest-derived
+   * registry. In shadow mode that registry drives nothing. See
+   * specs/manifest-registry.md.
+   *
+   * Never throws. A manifest with no matching parser is ignored, and a parse
+   * failure leaves the registry as it was — a transient bad response must not
+   * empty a working segment list.
+   */
+  processManifest(manifest: {
+    url: string;
+    /** Text, or the raw bytes a player's networking layer delivers. */
+    data: string | ArrayBuffer | ArrayBufferView;
+    protocol?: ManifestProtocol;
+  }): void {
+    const text =
+      typeof manifest.data === "string"
+        ? manifest.data
+        : new TextDecoder().decode(manifest.data);
+
+    const parser = manifest.protocol
+      ? this.manifestParsers.find((p) => p.protocol === manifest.protocol)
+      : this.manifestParsers.find((p) => p.canParse(text));
+    if (!parser) {
+      this.manifestLogger("no parser for manifest %s", manifest.url);
+      return;
+    }
+
+    try {
+      this.manifestRegistry.apply(parser.parse(text, manifest.url));
+    } catch (error) {
+      this.manifestLogger("failed to parse %s: %O", manifest.url, error);
+      return;
+    }
+
+    this.lastManifestUrl = manifest.url;
+    this.scheduleDivergenceLog();
+  }
+
+  /**
+   * The adapter hands the core a manifest before the player parses the same
+   * response, and the player reads segment indexes later still — for a VOD
+   * manifest, after the only refresh there will ever be. Comparing shortly
+   * after either side moves, and once per burst, measures disagreement rather
+   * than which side saw the data first.
+   */
+  private scheduleDivergenceLog(): void {
+    if (!this.manifestLogger.enabled || this.lastManifestUrl === undefined) {
+      return;
+    }
+    if (this.divergenceLogTimer !== undefined) return;
+    this.divergenceLogTimer = setTimeout(() => {
+      this.divergenceLogTimer = undefined;
+      if (this.lastManifestUrl !== undefined) {
+        this.logManifestDivergence(this.lastManifestUrl);
+      }
+    }, 250);
+  }
+
+  /**
+   * Snapshot of the manifest-derived registry. Shadow-phase diagnostic, not
+   * public API: stripped from the published typings and documentation.
+   * @internal
+   */
+  getManifestStreams(): readonly RegistryStream[] {
+    return this.manifestRegistry.getStreams();
+  }
+
+  /**
+   * How the manifest-derived registry differs from what the player
+   * integration registered. Shadow-phase diagnostic, not public API: stripped
+   * from the published typings and documentation.
+   * @internal
+   */
+  getManifestDivergence(manifestUrl: string): ManifestDivergenceDetails {
+    return computeDivergence(
+      this.manifestRegistry,
+      this.streams.values(),
+      manifestUrl,
+    );
+  }
+
+  /** `localStorage.debug = "p2pml-core:manifest"` judges the parse on a real stream. */
+  private logManifestDivergence(manifestUrl: string): void {
+    const divergence = this.getManifestDivergence(manifestUrl);
+    const players = Array.from(this.streams.values());
+    this.manifestLogger(
+      "%s — registry %d streams, player %d streams (%s)",
+      manifestUrl,
+      divergence.streams.length,
+      players.length,
+      players
+        .map((p) => `${p.type}#${p.runtimeId}:${p.segments.size}`)
+        .join(" ") || "none",
+    );
+    for (const stream of divergence.streams) {
+      const registryStream = this.manifestRegistry.getStream(stream.key);
+      if (registryStream?.indexSource.kind === "external") {
+        this.manifestLogger(
+          "%s %s external index %s|%d-%d (segments arrive with it)",
+          stream.type,
+          stream.key,
+          registryStream.indexSource.url,
+          registryStream.indexSource.byteRange.start,
+          registryStream.indexSource.byteRange.end,
+        );
+        continue;
+      }
+      if (
+        stream.segmentsCompared === 0 &&
+        stream.segmentsOnlyInManifest === 0 &&
+        stream.segmentsOnlyInPlayer === 0
+      ) {
+        continue; // a master-declared stream with no segments on either side yet
+      }
+      if (!stream.playerRuntimeId && registryStream) {
+        this.manifestLogger(
+          "  registry sample key: %s",
+          firstKey(registryStream.segments) ?? "(none)",
+        );
+      }
+      this.manifestLogger(
+        "%s %s matched=%s identity=%s compared=%d onlyManifest=%d onlyPlayer=%d idMismatch=%d offset=%.3f maxΔstart=%.3f maxΔend=%.3f",
+        stream.type,
+        stream.key,
+        stream.playerRuntimeId ? "yes" : "NO",
+        stream.identityHashMatches ?? "n/a",
+        stream.segmentsCompared,
+        stream.segmentsOnlyInManifest,
+        stream.segmentsOnlyInPlayer,
+        stream.externalIdMismatches,
+        stream.timelineOffset,
+        stream.maxStartTimeDelta,
+        stream.maxEndTimeDelta,
+      );
+      if (stream.identityInputs) {
+        this.manifestLogger(
+          "  identity differs — manifest %o vs player %o",
+          stream.identityInputs.manifest,
+          stream.identityInputs.player,
+        );
+      }
+      if (stream.manifestRange && stream.playerRange) {
+        this.manifestLogger(
+          "  starts — manifest [%.3f, %.3f] player [%.3f, %.3f]%s%s",
+          stream.manifestRange[0],
+          stream.manifestRange[1],
+          stream.playerRange[0],
+          stream.playerRange[1],
+          stream.onlyInManifestSample
+            ? ` onlyManifest e.g. ${stream.onlyInManifestSample}`
+            : "",
+          stream.onlyInPlayerSample
+            ? ` onlyPlayer e.g. ${stream.onlyInPlayerSample}`
+            : "",
+        );
+      }
+      if (stream.sample) {
+        this.manifestLogger(
+          "  externalId sample — player %d vs manifest %d at %s (Δstart %.3f)",
+          stream.sample.playerExternalId,
+          stream.sample.manifestExternalId,
+          stream.sample.key,
+          stream.sample.startTimeDelta,
+        );
+      }
+    }
+    for (const runtimeId of divergence.unmatchedPlayerStreams) {
+      const player = this.streams.get(runtimeId);
+      if (!player) continue;
+      const sample = firstKey(player.segments);
+      this.manifestLogger(
+        "player stream with no manifest match: %s#%s identity=%s segments=%d sample key: %s props=%o",
+        player.type,
+        runtimeId,
+        player.identityHash,
+        player.segments.size,
+        sample ?? "(none)",
+        player.properties,
+      );
+    }
   }
 
   /**
@@ -509,6 +707,7 @@ export class Core<TStream extends Stream = Stream> {
 
     this.mainStreamLoader?.updateStream(stream);
     this.secondaryStreamLoader?.updateStream(stream);
+    this.scheduleDivergenceLog();
   }
 
   /**
@@ -615,6 +814,11 @@ export class Core<TStream extends Stream = Stream> {
    * unsubscribe explicitly.
    */
   destroy(): void {
+    if (this.divergenceLogTimer !== undefined) {
+      clearTimeout(this.divergenceLogTimer);
+      this.divergenceLogTimer = undefined;
+    }
+    this.manifestRegistry = new ManifestRegistry();
     this.streams.clear();
     this.mainStreamLoader?.destroy();
     this.secondaryStreamLoader?.destroy();
@@ -784,4 +988,9 @@ export class Core<TStream extends Stream = Stream> {
       this.peerId,
     );
   }
+}
+
+function firstKey(map: ReadonlyMap<string, unknown>): string | undefined {
+  for (const key of map.keys()) return key;
+  return undefined;
 }

@@ -29,6 +29,24 @@ Because core parses the manifest itself, the properties feeding `identityHash`
 are read from the manifest rather than from a player's representation of it.
 Every peer hashes the same input.
 
+Two of those inputs need stating for DASH, because a player's own model gives
+different answers:
+
+- **`bitrate` is the Representation's own `@bandwidth`.** For a video stream
+  that is the video bit rate alone. A player that pairs video and audio into
+  variants reports their sum, which makes a video stream's identity depend on
+  which audio track the viewer chose — two viewers of the same video with
+  different audio would not share it. The manifest value is independent of that
+  choice. (HLS `BANDWIDTH` already covers the whole variant by specification, so
+  the two protocols differ here on purpose; they never share a swarm.)
+- **An audio rendition's `name` is its Representation `@id`**, the one stable,
+  manifest-given name it has. A `label` is optional, and a parser may synthesise
+  one from language and role. `channels` is read from
+  `AudioChannelConfiguration` under the MPEG scheme
+  (`urn:mpeg:dash:23003:3:audio_channel_configuration:2011`), whose value is a
+  plain count; vendor schemes encode channel masks and are left unset rather than
+  guessed.
+
 ## Segment identity
 
 `externalId` identifies a segment within its stream. It travels on the wire as

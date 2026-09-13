@@ -13,6 +13,8 @@ import {
   P2PMLShakaData,
 } from "./types.js";
 import { Loader } from "./loading-handler.js";
+import { hlsManifestParser } from "p2p-media-loader-core/hls";
+import { dashManifestParser } from "p2p-media-loader-core/dash";
 import {
   CoreConfig,
   Core,
@@ -106,7 +108,14 @@ export class ShakaP2PEngine {
     validateShaka(shaka);
 
     this.shaka = shaka;
-    this.core = new Core(config?.core);
+    this.core = new Core({
+      ...config?.core,
+      // Shaka plays both protocols, so its bundle carries both parsers.
+      manifestParsers: config?.core?.manifestParsers ?? [
+        hlsManifestParser,
+        dashManifestParser,
+      ],
+    });
     this.segmentManager = new SegmentManager(this.streamInfo, this.core);
   }
 

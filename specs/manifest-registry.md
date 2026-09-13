@@ -5,7 +5,11 @@
 Core receives manifest bytes from the adapter:
 
 ```ts
-core.processManifest({ url: string, data: ArrayBuffer | string }): void
+core.processManifest({
+  url: string; // the response URL, after redirects
+  data: string | ArrayBuffer | ArrayBufferView; // as the player's network layer delivered it
+  protocol?: "hls" | "dash"; // when the adapter already knows
+}): void;
 ```
 
 The protocol is detected from the payload — an HLS playlist begins with
@@ -90,58 +94,51 @@ type SegmentIndexSource =
 ```
 
 A stream whose index is `external` is registered with its identity, properties
-and swarm membership intact, but with **no segments**. Its segment requests miss
-the registry and fall through to the player's own loader, so the stream plays
-normally without P2P. This is the same degradation as any other registry miss —
-never an error, never wrong bytes.
-
-> **This is a regression, not a gap.** Shaka Player resolves `SegmentBase`
-> indexes itself, and the previous design read segments back out of Shaka's
-> index, so Shaka + DASH `SegmentBase` streams share over P2P today. Deriving
-> the registry from the manifest gives that up until an external index can be
-> resolved. Resolving it is therefore a prerequisite for moving the Shaka
-> adapter over, not an optional enhancement — or an accepted, deliberate loss
-> of capability.
+and swarm membership intact, and gains its segments when the index arrives.
+Until it does, the stream's segment requests miss the registry and fall through
+to the player's own loader — the same degradation as any other miss: never an
+error, never wrong bytes.
 
 ### Resolving an external index
 
-Support for `sidx`-indexed streams is added by resolving `external` sources into
-segments. Two properties of the design make that an additive change rather than
-a restructuring:
-
-**Identity already works.** A `sidx` box describes subsegments by duration, from
-which presentation times follow. DASH `externalId` is derived from presentation
-time precisely so that a segment identifies the same way whichever index
-produced it, so resolving an external index introduces no protocol change and
-needs no version bump. See [segment-identity.md](segment-identity.md).
-
-**The bytes arrive on their own.** A player must fetch the index before it can
-request any media, and it fetches it through the same loader hook core already
-intercepts. Core therefore sees the `sidx` bytes without issuing a request of
-its own, consistent with observing manifests rather than polling them
-([architecture.md](architecture.md)). The index is a byte range of the media
-file itself, typically adjacent to the initialization segment and often fetched
-with it, so this is not an additional resource either.
+A player must fetch the index before it can request any media, and it fetches
+it through the loader hook the adapter already intercepts, so core sees the
+bytes without issuing a request of its own — consistent with observing
+manifests rather than polling them ([architecture.md](architecture.md)). The
+index is a byte range of the media file itself, typically adjacent to the
+initialization segment and often fetched with it, so it is not an additional
+resource either.
 
 Seeing the bytes is not the same as knowing what they are. An index request
 misses the registry by definition — its segments are exactly what is not yet
 known — so "pass through on a miss" cannot handle it. The adapter recognises the
 request as a stream's pending index and hands the response to core, exactly as
-it does for a manifest. That recognition is a distinct request type in some
-players (dash.js issues it as `INDEX_SEGMENT_TYPE`, not `MEDIA_SEGMENT_TYPE`),
-and an adapter that handles only manifest and media types will watch it go by.
+it does for a manifest:
 
-A player may fetch a range wider than the index alone — initialization and
-index together — so the `sidx` box is located by walking the MP4 box structure,
-never assumed to sit at the start of the response.
+```ts
+core.processSegmentIndex({
+  url: string; // the media file the index was read from
+  byteRange: ByteRange; // the range that was fetched
+  data: ArrayBuffer | ArrayBufferView;
+}): void;
+```
 
-Resolving an index therefore requires the `sidx` parser and this recognition
-path. Two limits then remain by design of the conversion, which is
-`mpd-parser`'s own: **hierarchical indexes** — references that point at further
-`sidx` boxes rather than at media — are dropped rather than followed, and 64-bit
-offsets or times beyond the safe integer range are rejected. Both are rare in
-practice; neither is silently wrong, since an unresolved index degrades to no
-P2P.
+That recognition is a distinct request type in some players (dash.js issues it
+as `INDEX_SEGMENT_TYPE`, not `MEDIA_SEGMENT_TYPE`), and an adapter that handles
+only manifest and media types will watch it go by.
+
+Core locates the `sidx` box by walking the MP4 box structure — a player may
+fetch a range wider than the index alone, initialization and index together, so
+the box is never assumed to sit at the start of the response — reads its
+references, and lays the subsegments onto the timeline from their durations.
+Identity is presentation time, so a segment identifies the same way whichever
+index produced it; see [segment-identity.md](segment-identity.md).
+
+Two limits are by design: **hierarchical indexes** — references that point at
+further `sidx` boxes rather than at media — are not followed, and 64-bit offsets
+or times beyond the safe integer range are rejected. Both are rare, and neither
+is silently wrong: an index that cannot be resolved leaves its stream without
+P2P, as above.
 
 ## URL normalization
 
@@ -268,11 +265,11 @@ next refresh. That is correct: it is no longer live.
   worth swarm capacity.
 - **Initialization segments** (`EXT-X-MAP`, DASH `Initialization`) — recognised
   and deliberately passed through. See below.
-- **Segments behind an unresolved external index** (DASH `SegmentBase`) — the
-  stream is registered, its segments are not, until the index is resolved. See
-  [Where segment lists come from](#where-segment-lists-come-from). Unlike the
-  entries above, which are deliberate exclusions, this one is capability the
-  previous design had.
+- **Segments behind an external index that has not arrived** (DASH
+  `SegmentBase`) — the stream is registered when the MPD is parsed; its segments
+  are added when the player fetches the index, which it does before requesting
+  any media. See
+  [Where segment lists come from](#where-segment-lists-come-from).
 
 ### Initialization segments
 
@@ -311,3 +308,11 @@ falls back to its own loader, and the segment loads without P2P.
 
 Core emits a diagnostic event on a segment request that misses the registry, so
 divergence is observable in production rather than silent.
+
+One disagreement is expected and harmless: segment **boundaries**. A player
+corrects its fragment times to the presentation timestamps it finds after
+demuxing, so its timeline drifts from the manifest's by the encoder's timing
+slack — tens of milliseconds on real streams. The manifest timeline is not
+corrected, because nothing in the core compares it to the player's clock
+([playback-contract.md](playback-contract.md)), and scheduling windows are
+seconds wide. A boundary delta of that size is not a parse error.

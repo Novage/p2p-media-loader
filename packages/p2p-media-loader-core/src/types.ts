@@ -1,4 +1,5 @@
 import { SegmentStorage } from "./segment-storage/index.js";
+import type { ManifestParser } from "./manifest/types.js";
 
 /** Represents the types of streams available, either primary (main) or secondary. */
 export type StreamType = "main" | "secondary";
@@ -253,6 +254,19 @@ export type CoreConfig = Partial<StreamConfig> &
     mainStream?: Partial<StreamConfig>;
     /** Optional configuration for the secondary stream. */
     secondaryStream?: Partial<StreamConfig>;
+    /**
+     * Manifest parsers the core may use, selected statically by the
+     * integration so a bundle carries only the protocols it plays:
+     *
+     * ```ts
+     * import { hlsManifestParser } from "p2p-media-loader-core/hls";
+     * new Core({ manifestParsers: [hlsManifestParser] });
+     * ```
+     *
+     * Not part of the merged configuration returned by `getConfig()`.
+     * See specs/packaging.md.
+     */
+    manifestParsers?: readonly ManifestParser[];
   };
 
 /** Configuration options for the Core functionality, including network and processing parameters. */

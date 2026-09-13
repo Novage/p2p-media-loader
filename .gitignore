@@ -23,6 +23,8 @@ node_modules
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
+# Agent tooling; nothing in it is worth sharing, and configs are regenerated on demand
+.claude/
 .idea
 .DS_Store
 *.suo
