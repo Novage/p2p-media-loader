@@ -40,6 +40,12 @@ if (core.isSegmentLoadable(url, byteRange)) {
 Falling back on an unrecognised URL is normal operation, not an error path. It
 is what makes a disagreement between core's parse and the player's harmless.
 
+`isSegmentLoadable` is the one check to make: it answers `false` both for a URL
+the registry does not know and for a stream whose P2P is switched off, and it
+reports the former through the registry-miss diagnostic. Cancellation goes
+through the request's `signal`; an environment without `AbortController` calls
+`core.abortSegmentLoading(url, byteRange)` instead.
+
 **Handle manifest and segment requests only, and pass every other type through
 untouched.** Licence, key, certificate, timing and steering requests belong to
 the player. This is a whitelist by design — the set of request types a player

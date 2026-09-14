@@ -7,7 +7,7 @@ import { sha1 } from "./utils/hash.js";
  *
  * Changing the identity derivation in any way requires bumping this version.
  */
-export const PEER_PROTOCOL_VERSION = "v2";
+export const PEER_PROTOCOL_VERSION = "v3";
 
 /**
  * Computes a stable, unique identity hash for a stream based on its properties.

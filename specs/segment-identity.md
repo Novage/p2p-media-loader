@@ -56,7 +56,7 @@ protocol.
 | Protocol | `externalId`                                                                                               |
 | -------- | ---------------------------------------------------------------------------------------------------------- |
 | HLS      | Media sequence number: the playlist's `EXT-X-MEDIA-SEQUENCE` plus the segment's index within that playlist |
-| DASH     | Presentation time in milliseconds, rounded: `Math.round(presentationTime * 1000)`                          |
+| DASH     | Presentation time in 100 ms units, rounded: `Math.round(presentationTime * 10)`                            |
 
 Neither depends on when a peer joined, what its player buffered, or how far into
 the stream it started — two peers watching the same live stream from different
@@ -87,10 +87,23 @@ segment identifies the same way whether its index came from a `SegmentTemplate`,
 a `SegmentTimeline`, or a `sidx` box. That is what allows indexed-segment support
 to be added without a protocol change.
 
-Millisecond resolution is finer than any real segmentation, and presentation
-time is computed from integer `timescale` arithmetic in the manifest, so every
-peer parsing the same manifest arrives at the same value. Rounding absorbs the
-last bit of floating-point representation.
+Presentation time is computed from integer `timescale` arithmetic in the
+manifest, so every peer parsing the same manifest arrives at the same value,
+and rounding absorbs the last bit of floating-point representation.
+
+The unit is a trade between two pressures. It must be finer than any real
+segment, or two segments would share one identity — 100 ms is well under the
+shortest segments outside the low-latency profiles this design excludes. And
+it should be as coarse as that allows, because `externalId` is the bulk of the
+peer protocol's traffic: every stored-segment announcement lists them, packed by
+an encoding that groups ids sharing their high bytes and spends one byte per id
+within a group. Live presentation times run from 1970, so in milliseconds a
+current id needs seven bytes and consecutive two-second segments are 2000
+apart — every id its own group, and an announcement of thirty segments costs
+some 240 bytes to every peer on every change. In 100 ms units the same id fits
+six bytes, consecutive segments are 20 apart, a dozen share a group, and the
+announcement is a few dozen bytes. Finer units buy nothing and cost every peer
+upstream bandwidth on every announcement.
 
 Presentation time is measured on the presentation timeline, not relative to a
 period, so a multi-period presentation does not restart identities at each
@@ -103,8 +116,8 @@ incompatible derivations never meet in the same swarm.
 
 **This design is itself a protocol version.** Both derivations above differ from
 the previous version's — HLS moved from a per-player sequence number or index to
-the manifest's media sequence, DASH from a half-second time bucket to
-millisecond presentation time — so the manifest-driven core carries its own
+the manifest's media sequence, DASH from a truncated half-second bucket to
+rounded 100 ms presentation time — so the manifest-driven core carries its own
 `PEER_PROTOCOL_VERSION`, and peers running the previous version form separate
 swarms from it. That is the intended outcome, not a defect: the two derive
 identity differently and must not be allowed to meet.

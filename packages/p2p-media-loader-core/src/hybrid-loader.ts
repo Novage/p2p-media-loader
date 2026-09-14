@@ -1,8 +1,9 @@
 import { HttpRequestExecutor } from "./http-loader.js";
-import { CoreEventMap, EngineCallbacks, StreamConfig } from "./types.js";
+import { CoreEventMap, StreamConfig } from "./types.js";
 import {
   Playback,
   BandwidthCalculators,
+  EngineCallbacks,
   StreamDetails,
   SegmentWithStream,
   StreamWithSegments,
@@ -102,6 +103,9 @@ export class HybridLoader {
     if (stream !== this.lastRequestedSegment.stream) {
       this.logger(`stream changed to ${LoggerUtils.getStreamString(stream)}`);
       this.p2pLoaders.changeCurrentLoader(stream);
+      // The active rendition follows from the requested segment; bandwidth
+      // measured before the switch says nothing about the new one.
+      this.levelChangedTimestamp = performance.now();
     }
     this.lastRequestedSegment = segment;
     const isSeek = this.playbackTracker.onSegmentRequested(segment);
@@ -606,7 +610,8 @@ export class HybridLoader {
 
   private getBandwidth(queueDownloadRatio: number) {
     const { http, all } = this.bandwidthCalculators;
-    const { activeLevelBitrate } = this.streamDetails;
+    const activeLevelBitrate =
+      this.lastRequestedSegment.stream.properties.bitrate ?? 0;
     if (activeLevelBitrate === 0) {
       return all.getBandwidthLoadingOnly(3);
     }
@@ -632,10 +637,6 @@ export class HybridLoader {
     );
 
     return Math.max(bandwidth, httpRealBandwidth);
-  }
-
-  notifyLevelChanged() {
-    this.levelChangedTimestamp = performance.now();
   }
 
   sendBroadcastAnnouncement(sendEmptySegmentsAnnouncement = false) {

@@ -1,5 +1,5 @@
 import { BandwidthCalculator } from "./bandwidth-calculator.js";
-import { Segment, Stream } from "./types.js";
+import { CoreRequestError, Segment, SegmentResponse, Stream } from "./types.js";
 import type { PlaybackStateSource } from "./playback.js";
 
 /**
@@ -25,9 +25,7 @@ export type SegmentWithStream<TStream extends Stream = Stream> = Segment & {
 
 /**
  * A registered stream together with the core's live segment registry.
- * Internal: the public API exposes only the base stream (`Core.getStream`)
- * and a snapshot of the segment runtime IDs
- * (`Core.getStreamSegmentRuntimeIds`).
+ * Internal: the public API exposes only the base stream (`Core.getStream`).
  */
 export type StreamWithSegments<TStream extends Stream = Stream> = TStream & {
   readonly segments: Map<string, SegmentWithStream<TStream>>;
@@ -38,7 +36,13 @@ export type BandwidthCalculators = Readonly<{
   http: BandwidthCalculator;
 }>;
 
+/** Derived from the manifests, never reported by an adapter. */
 export type StreamDetails = {
   isLive: boolean;
-  activeLevelBitrate: number;
+};
+
+/** How a hybrid loader answers a segment request from `Core.loadSegment`. */
+export type EngineCallbacks = {
+  onSuccess: (response: SegmentResponse) => void;
+  onError: (reason: CoreRequestError) => void;
 };

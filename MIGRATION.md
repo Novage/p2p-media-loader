@@ -1,5 +1,106 @@
 # Migration Guide
 
+## v4 → v5
+
+v5 makes the core parse HLS and MPEG-DASH manifests itself. A player
+integration no longer describes streams or segments to the core: it hands the
+core every manifest the player fetches, routes segment requests through it, and
+reports playback state. Segment identity is derived from the manifest, so
+peers on different players share one swarm. The design is documented in
+`specs/`.
+
+**Wire compatibility:** none with v4. `externalId` is now the HLS media
+sequence number or the DASH presentation time in 100 ms units, so the peer
+protocol version is `v3` and v5 peers form separate swarms from v4 peers.
+Roll a deployment over in one step; mixed versions do not exchange segments,
+and every stream still plays over HTTP.
+
+### Bundled engines: nothing to do
+
+`p2p-media-loader-hlsjs` and `p2p-media-loader-shaka` keep their public API.
+`ShakaP2PEngine.registerPlugins` now registers only the networking schemes;
+Shaka's own manifest parsers are no longer replaced.
+
+DASH `SegmentBase` streams (an index inside the media file, `sidx`) play on
+Shaka without P2P in this version. Support for reading that index is tracked
+in the repository's issue tracker.
+
+### Custom integrations
+
+A custom integration must supply the manifest parsers for the protocols its
+player plays and hand every manifest response to the core:
+
+```typescript
+import { Core } from "p2p-media-loader-core";
+import { hlsManifestParser } from "p2p-media-loader-core/hls";
+import { dashManifestParser } from "p2p-media-loader-core/dash";
+
+const core = new Core({
+  manifestParsers: [hlsManifestParser, dashManifestParser],
+});
+
+// in the player's manifest loader, for every response:
+core.processManifest({ url: response.url, data: response.data });
+```
+
+Segment requests are resolved by URL and byte range rather than by a
+runtime identifier the integration composed:
+
+```typescript
+// v4
+const id = byteRange ? `${url}|${byteRange.start}-${byteRange.end}` : url;
+if (core.hasSegment(id) && core.isSegmentLoadable(id)) {
+  core.loadSegment(id, { onSuccess, onError });
+}
+
+// v5
+if (core.isSegmentLoadable(url, byteRange)) {
+  const { data, bandwidth } = await core.loadSegment(url, {
+    byteRange,
+    signal,
+  });
+}
+```
+
+Playback is reported as `{ bufferAhead, rate }` through
+`core.updatePlayback(getPlaybackStateFromMediaElement(media))` (see the v4.x
+notes below and `specs/playback-contract.md`).
+
+### Removed from `Core`
+
+| v4                                         | v5                                                      |
+| ------------------------------------------ | ------------------------------------------------------- |
+| `addStreamIfNoneExists(stream)`            | removed — streams come from `processManifest`           |
+| `updateStream(id, add, remove)`            | removed — segments come from `processManifest`          |
+| `getStreamSegmentRuntimeIds(id)`           | removed                                                 |
+| `setIsLive(isLive)`                        | removed — derived from the manifest                     |
+| `setActiveLevelBitrate(bitrate)`           | removed — follows from the requested segment            |
+| `hasSegment(runtimeId)`                    | `hasSegment(url, byteRange?)`                           |
+| `isSegmentLoadable(runtimeId)`             | `isSegmentLoadable(url, byteRange?)`                    |
+| `loadSegment(runtimeId, callbacks)`        | `loadSegment(url, { byteRange?, signal? })` → `Promise` |
+| `abortSegmentLoading(runtimeId)`           | `abortSegmentLoading(url, byteRange?)`                  |
+| `Core<TStream>` generic                    | `Core` — streams carry no integration-specific fields   |
+| `StreamRegistration`, `EngineCallbacks`    | removed                                                 |
+| `setManifestResponseUrl(url)` _(required)_ | optional — the first manifest names the swarm           |
+
+`Stream.runtimeId` is now the manifest-derived stream key: the media playlist
+URL for HLS, the Representation id for DASH. The `onStreamRegistrationError`
+event keeps its shape; it fires once per failing stream, only for
+`streamSwarmIdBuilder` failures.
+
+### New APIs
+
+- `CoreConfig.manifestParsers` and the `p2p-media-loader-core/hls` and
+  `p2p-media-loader-core/dash` subpaths.
+- `Core.processManifest({ url, data, protocol? })`.
+- `onSegmentRegistryMiss` core event — a segment request the registry did not
+  know, which the player then loaded itself. Initialization segments are
+  recognised and never reported.
+- `byteRangeFromRangeHeader(header)` — converts a `Range: bytes=a-b` header to
+  the inclusive `ByteRange` the lookup methods take.
+- Bundles: `p2p-media-loader-core.es.min.js` carries both parsers;
+  `-hls` and `-dash` variants carry one.
+
 ## v3 → v4
 
 v4 moves stream identity derivation from the player integrations into the core.
@@ -59,8 +160,8 @@ reported via the `onStreamRegistrationError` event.
 
 ### Renamed / removed exports
 
-| v3                                            | v4                                                          |
-| --------------------------------------------- | ----------------------------------------------------------- |
+| v3                                             | v4                                                          |
+| ---------------------------------------------- | ----------------------------------------------------------- |
 | `generateStreamShortId(props)`                 | `computeStreamIdentityHash(properties)`                     |
 | `GenerateStreamShortIdProps`                   | `StreamProperties`                                          |
 | `Stream.index`                                 | `Stream.identityHash`                                       |

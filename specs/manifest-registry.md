@@ -30,6 +30,12 @@ A manifest whose protocol has no registered parser is ignored, and its segments
 therefore load without P2P. This is the same degradation as an unrecognised
 URL: never an error, never wrong bytes.
 
+The first manifest processed also names the swarm: unless a `swarmId` is
+configured or the integration has set the manifest response URL explicitly,
+the swarm ID is that manifest's URL with its query string discarded
+([segment-identity.md](segment-identity.md)). Every viewer of a stream fetches
+the same master first, so this needs no coordination.
+
 The call is idempotent: re-processing an unchanged manifest produces no
 registry changes and no events. A manifest that fails to parse leaves the
 registry exactly as it was — the previous segment list stays in force rather

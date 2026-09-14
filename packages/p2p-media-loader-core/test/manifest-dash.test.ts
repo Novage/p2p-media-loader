@@ -176,21 +176,23 @@ describe("dashManifestParser: real manifests", () => {
       dashManifestParser.parse(readFixture("bbb_30fps.mpd"), BBB_MPD_URL),
     );
 
-    // Video: duration 120 @ timescale 30 → 4.000 s → 4000 per segment.
+    // Video: duration 120 @ timescale 30 → 4.000 s → 40 per segment.
     const video = Array.from(
       registry.getStream("bbb_30fps_1024x576_2500k")?.segments.values() ?? [],
     );
-    expect(video.map((s) => s.externalId).slice(0, 3)).toEqual([0, 4000, 8000]);
-    expect(video[158].externalId).toBe(632000);
+    expect(video.map((s) => s.externalId).slice(0, 3)).toEqual([0, 40, 80]);
+    expect(video[158].externalId).toBe(6320);
     expect(video[158].startTime).toBe(632);
     // The presentation is 634.566 s long; the last segment is clipped to it.
     expect(video[158].endTime).toBeCloseTo(634.566, 3);
 
-    // Audio: duration 192512 @ timescale 48000 → 4.01066… s, rounded to ms.
+    // Audio: duration 192512 @ timescale 48000 → 4.01066… s; 40.1066… per
+    // segment, rounded — so the ids drift off the video's by one every ~10.
     const audio = Array.from(
       registry.getStream("bbb_a64k")?.segments.values() ?? [],
     );
-    expect(audio.map((s) => s.externalId).slice(0, 3)).toEqual([0, 4011, 8021]);
-    expect(audio[158].externalId).toBe(633685);
+    expect(audio.map((s) => s.externalId).slice(0, 3)).toEqual([0, 40, 80]);
+    expect(audio[10].externalId).toBe(401);
+    expect(audio[158].externalId).toBe(6337);
   });
 });

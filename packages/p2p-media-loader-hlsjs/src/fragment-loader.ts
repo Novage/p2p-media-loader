@@ -7,8 +7,12 @@ import type {
   LoaderContext,
   LoaderStats,
 } from "hls.js";
-import * as Utils from "./utils.js";
-import { Core, SegmentResponse, CoreRequestError } from "p2p-media-loader-core";
+import {
+  Core,
+  SegmentResponse,
+  CoreRequestError,
+  ByteRange,
+} from "p2p-media-loader-core";
 
 const DEFAULT_DOWNLOAD_LATENCY = 10;
 
@@ -21,7 +25,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   #defaultLoader?: Loader<LoaderContext>;
   #core: Core;
   #response?: SegmentResponse;
-  #segmentId?: string;
+  #request?: { url: string; byteRange?: ByteRange };
 
   constructor(config: HlsConfig, core: Core) {
     this.#core = core;
@@ -51,21 +55,14 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     this.#callbacks = callbacks;
     const { stats } = this;
 
-    const { rangeStart: start, rangeEnd: end } = context;
-    const byteRange = Utils.getByteRange(
-      start,
-      end !== undefined ? end - 1 : undefined,
-    );
+    // hls.js carries a half-open [rangeStart, rangeEnd); the core keys
+    // segments by the inclusive range the playlist declared.
+    const byteRange = inclusiveByteRange(context.rangeStart, context.rangeEnd);
+    this.#request = { url: context.url, byteRange };
 
-    this.#segmentId = Utils.getSegmentRuntimeId(context.url, byteRange);
-    const isSegmentDownloadableByP2PCore = this.#core.isSegmentLoadable(
-      this.#segmentId,
-    );
-
-    if (
-      !this.#core.hasSegment(this.#segmentId) ||
-      !isSegmentDownloadableByP2PCore
-    ) {
+    // Whitelist by lookup: a fragment the core's registry does not know, or
+    // one whose stream has P2P disabled, loads through hls.js's own loader.
+    if (!this.#core.isSegmentLoadable(context.url, byteRange)) {
       this.#defaultLoader = this.#createDefaultLoader();
       this.#defaultLoader.stats = this.stats;
       this.#defaultLoader.load(context, config, callbacks);
@@ -112,7 +109,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       this.#handleError(error);
     };
 
-    void this.#core.loadSegment(this.#segmentId, { onSuccess, onError });
+    this.#core.loadSegment(context.url, { byteRange }).then(onSuccess, onError);
   }
 
   #handleError(thrownError: unknown) {
@@ -130,9 +127,12 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   }
 
   #abortInternal() {
-    if (!this.#response && this.#segmentId) {
+    if (!this.#response && this.#request) {
       this.stats.aborted = true;
-      this.#core.abortSegmentLoading(this.#segmentId);
+      this.#core.abortSegmentLoading(
+        this.#request.url,
+        this.#request.byteRange,
+      );
     }
   }
 
@@ -154,6 +154,15 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       this.config = null;
     }
   }
+}
+
+function inclusiveByteRange(
+  rangeStart: number | undefined,
+  rangeEnd: number | undefined,
+): ByteRange | undefined {
+  if (rangeStart === undefined || rangeEnd === undefined) return undefined;
+  if (rangeEnd <= rangeStart) return undefined;
+  return { start: rangeStart, end: rangeEnd - 1 };
 }
 
 function getLoadingStat(

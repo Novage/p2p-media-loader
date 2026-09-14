@@ -2,15 +2,12 @@ import type Hls from "hls.js";
 import type {
   AudioTrackLoadedData,
   LevelUpdatedData,
-  ManifestLoadedData,
-  LevelSwitchingData,
   PlaylistLevelType,
   HlsConfig,
   Events,
 } from "hls.js";
 import { FragmentLoaderBase } from "./fragment-loader.js";
 import { PlaylistLoaderBase } from "./playlist-loader.js";
-import { SegmentManager } from "./segment-manager.js";
 import {
   CoreConfig,
   Core,
@@ -82,8 +79,10 @@ const PLAYBACK_EVENTS = [
  * alongside traditional HTTP fetching. This reduces server bandwidth costs and improves scalability by sharing the load
  * across multiple clients.
  *
- * The engine manages core functionalities such as segment fetching, segment management, peer connection management,
- * and event handling related to the P2P and HLS processes.
+ * The engine has three responsibilities (see specs/player-adapters.md): it
+ * hands every playlist hls.js fetches to the core, routes fragment requests
+ * through the core, and reports playback state from the media element. The
+ * core parses the playlists itself; nothing here describes streams to it.
  *
  * @example
  * // Creating an instance of HlsJsP2PEngine with custom configuration
@@ -108,7 +107,6 @@ const PLAYBACK_EVENTS = [
  */
 export class HlsJsP2PEngine {
   private readonly core: Core;
-  private readonly segmentManager: SegmentManager;
   private hlsInstanceGetter?: () => Hls;
   private currentHlsInstance?: Hls;
   private readonly debug = debug("p2pml-hlsjs:engine");
@@ -151,7 +149,6 @@ export class HlsJsP2PEngine {
       // hls.js plays HLS only; a bundle of this engine carries no DASH parser.
       manifestParsers: config?.core?.manifestParsers ?? [hlsManifestParser],
     });
-    this.segmentManager = new SegmentManager(this.core);
   }
 
   /**
@@ -263,14 +260,6 @@ export class HlsJsP2PEngine {
     const method = type === "register" ? "on" : "off";
 
     hls[method](
-      "hlsManifestLoaded" as Events.MANIFEST_LOADED,
-      this.handleManifestLoaded,
-    );
-    hls[method](
-      "hlsLevelSwitching" as Events.LEVEL_SWITCHING,
-      this.handleLevelSwitching,
-    );
-    hls[method](
       "hlsLevelUpdated" as Events.LEVEL_UPDATED,
       this.handleLevelUpdated,
     );
@@ -309,23 +298,10 @@ export class HlsJsP2PEngine {
     }
   };
 
-  private handleManifestLoaded = (event: string, data: ManifestLoadedData) => {
-    // hls.js already resolves this URL for us (getResponseUrl): it is the
-    // loader-reported response URL — post-redirect for any loader that honors
-    // the `response.url` contract, including both default loaders — with a
-    // guarded fallback to the request URL (custom loaders that omit
-    // `response.url`, or legacy WebViews without `xhr.responseURL`). A custom
-    // loader that omits `response.url` on a redirecting manifest degrades to
-    // the pre-redirect URL: its peers still form a consistent swarm among
-    // themselves, but not with default-loader peers.
-    this.core.setManifestResponseUrl(data.url);
-    this.segmentManager.processMainManifest(data);
-  };
-
-  private handleLevelSwitching = (event: string, data: LevelSwitchingData) => {
-    if (data.bitrate) this.core.setActiveLevelBitrate(data.bitrate);
-  };
-
+  /**
+   * Buffer tuning only. Streams and segments reach the core through the
+   * playlist loader; live state is derived from the playlist by the core.
+   */
   private handleLevelUpdated = (
     event: string,
     data: LevelUpdatedData | AudioTrackLoadedData,
@@ -350,9 +326,6 @@ export class HlsJsP2PEngine {
         this.updateMaxBufferLength(data.details.targetduration);
       }
     }
-
-    this.core.setIsLive(data.details.live);
-    this.segmentManager.updatePlaylist(data);
   };
 
   private updateLiveSyncDurationCount(

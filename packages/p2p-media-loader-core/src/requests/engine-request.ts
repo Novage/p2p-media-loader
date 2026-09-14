@@ -1,5 +1,5 @@
-import { CoreRequestError, EngineCallbacks } from "../types.js";
-import { SegmentWithStream } from "../internal-types.js";
+import { CoreRequestError } from "../types.js";
+import { EngineCallbacks, SegmentWithStream } from "../internal-types.js";
 
 export class EngineRequest {
   private _status: "pending" | "succeed" | "failed" | "aborted" = "pending";

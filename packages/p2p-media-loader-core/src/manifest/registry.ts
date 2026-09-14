@@ -9,9 +9,8 @@ import { computeStreamIdentityHash } from "../stream-identity.js";
 import { normalizeUrl, segmentKey } from "./url-key.js";
 
 /**
- * The manifest-derived registry. In shadow mode it drives nothing; it exists
- * to be compared against what the player integration registered, so that the
- * parse can be trusted before it becomes authoritative. See
+ * The manifest-derived registry: every stream and segment the core knows,
+ * as read from the manifests the player fetched. See
  * specs/manifest-registry.md.
  *
  * Everything here is interpretation, and interpretation belongs to the core:
@@ -22,7 +21,7 @@ export type RegistrySegment = {
   readonly key: string;
   readonly url: string;
   readonly byteRange?: ByteRange;
-  /** Canonical identity: HLS media sequence; DASH presentation time in ms. */
+  /** Canonical identity: HLS media sequence; DASH presentation time in 100 ms units. */
   readonly externalId: number;
   readonly startTime: number;
   readonly endTime: number;
@@ -243,9 +242,10 @@ function externalIdOf(
 ): number {
   // See specs/segment-identity.md: HLS media sequence is canonical; a DASH
   // segment number is not available in every addressing mode, so DASH uses
-  // presentation time at millisecond resolution.
+  // presentation time in 100 ms units — fine enough to separate any real
+  // segments, coarse enough to keep peer announcements compact.
   return protocol === "dash"
-    ? Math.round((s.presentationTime ?? 0) * 1000)
+    ? Math.round((s.presentationTime ?? 0) * 10)
     : s.sequence;
 }
 

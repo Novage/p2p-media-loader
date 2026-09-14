@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ManifestRegistry } from "../src/manifest/registry.js";
 import { hlsManifestParser } from "../src/manifest/hls.js";
 import { dashManifestParser } from "../src/manifest/dash.js";
-import { Core, type Segment } from "../src/index.js";
+import { Core } from "../src/index.js";
 import {
   DASH_SEGMENT_TEMPLATE,
   HLS_LIVE_NO_PDT_REFRESH_1,
@@ -114,13 +114,13 @@ describe("ManifestRegistry: PDT and DASH timelines", () => {
     expect(first.startTime).toBeCloseTo(Date.parse(pdt!) / 1000, 3);
   });
 
-  it("uses presentation time in milliseconds as DASH externalId", () => {
+  it("uses presentation time in 100 ms units as DASH externalId", () => {
     const registry = new ManifestRegistry();
     registry.apply(dashManifestParser.parse(DASH_SEGMENT_TEMPLATE, MASTER));
     const video = registry.getStream("video-720p")!;
     const segments = [...video.segments.values()];
     expect(segments.map((s) => s.externalId)).toEqual([
-      0, 6000, 12000, 18000, 24000, 30000, 36000,
+      0, 60, 120, 180, 240, 300, 360,
     ]);
     expect(segments.map((s) => s.startTime)).toEqual([
       0, 6, 12, 18, 24, 30, 36,
@@ -130,94 +130,43 @@ describe("ManifestRegistry: PDT and DASH timelines", () => {
 
 describe("Core.processManifest", () => {
   const mediaText = readFixture("mux-720p-media.m3u8");
+  const firstSegmentUrl = hls(mediaText, MUX_720P_URL).streams[0].segments![0]
+    .url;
 
-  /** What the hls.js integration registers for the same stream today. */
-  function registerAsPlayer(core: Core, externalIdOffset = 0) {
-    core.setManifestResponseUrl(MUX_MASTER_URL);
-    const master = hls(readFixture("mux-master.m3u8"), MUX_MASTER_URL);
-    const declared = master.streams.find((s) => s.key === MUX_720P_URL)!;
-    core.addStreamIfNoneExists({
-      runtimeId: MUX_720P_URL,
-      type: "main",
-      properties: declared.properties,
-    });
-
-    const [media] = hls(mediaText, MUX_720P_URL).streams;
-    let start = 0;
-    const segments: Segment[] = (media.segments ?? []).map((s, i) => {
-      const segment = {
-        runtimeId: s.url,
-        externalId: i + externalIdOffset,
-        url: s.url,
-        startTime: start,
-        endTime: start + s.duration,
-      };
-      start += s.duration;
-      return segment;
-    });
-    core.updateStream(MUX_720P_URL, segments);
-  }
-
-  it("agrees with the hls.js registration for the mux VOD", () => {
+  it("registers the streams a master declares and the segments its media playlist lists", () => {
     const core = new Core({ manifestParsers: [hlsManifestParser] });
-    registerAsPlayer(core);
-
     core.processManifest({
       url: MUX_MASTER_URL,
       data: readFixture("mux-master.m3u8"),
     });
+    expect(core.getStreams().map((s) => s.runtimeId)).toContain(MUX_720P_URL);
+    expect(core.hasSegment(firstSegmentUrl)).toBe(false);
+
     core.processManifest({ url: MUX_720P_URL, data: mediaText });
-    const d = core.getManifestDivergence(MUX_720P_URL);
-
-    const stream = d.streams.find((s) => s.key === MUX_720P_URL)!;
-    expect(stream.playerRuntimeId).toBe(MUX_720P_URL);
-    expect(stream.identityHashMatches).toBe(true);
-    expect(stream.segmentsCompared).toBe(64);
-    expect(stream.segmentsOnlyInManifest).toBe(0);
-    expect(stream.segmentsOnlyInPlayer).toBe(0);
-    expect(stream.externalIdMismatches).toBe(0);
-    expect(stream.maxStartTimeDelta).toBeCloseTo(0, 6);
-    expect(stream.maxEndTimeDelta).toBeCloseTo(0, 6);
-  });
-
-  it("counts externalId disagreements and shows a sample", () => {
-    const core = new Core({ manifestParsers: [hlsManifestParser] });
-    registerAsPlayer(core, 1);
-
-    core.processManifest({
-      url: MUX_MASTER_URL,
-      data: readFixture("mux-master.m3u8"),
-    });
-    core.processManifest({ url: MUX_720P_URL, data: mediaText });
-    const d = core.getManifestDivergence(MUX_720P_URL);
-    const stream = d.streams.find((s) => s.key === MUX_720P_URL)!;
-    expect(stream.externalIdMismatches).toBe(64);
-    expect(stream.sample).toMatchObject({
-      playerExternalId: 1,
-      manifestExternalId: 0,
-    });
+    expect(core.hasSegment(firstSegmentUrl)).toBe(true);
+    expect(core.isSegmentLoadable(firstSegmentUrl)).toBe(true);
   });
 
   it("leaves the registry untouched when a manifest fails to parse", () => {
     const core = new Core({ manifestParsers: [hlsManifestParser] });
     core.processManifest({ url: MUX_720P_URL, data: mediaText });
-    const before = core.getManifestStreams()[0].segments.size;
+    expect(core.hasSegment(firstSegmentUrl)).toBe(true);
 
     const bad = `#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI="k",IV=0x1\n#EXTINF:6,\ns.ts\n`;
     core.processManifest({ url: MUX_720P_URL, data: bad });
-    expect(core.getManifestStreams()[0].segments.size).toBe(before);
+    expect(core.hasSegment(firstSegmentUrl)).toBe(true);
   });
 
   it("ignores a manifest no configured parser can read", () => {
     const core = new Core({ manifestParsers: [hlsManifestParser] });
     core.processManifest({ url: MASTER, data: DASH_SEGMENT_TEMPLATE });
-    expect(core.getManifestStreams()).toEqual([]);
+    expect(core.getStreams()).toEqual([]);
   });
 
   it("accepts ArrayBuffer payloads as Shaka delivers them", () => {
     const core = new Core({ manifestParsers: [hlsManifestParser] });
     const data = new TextEncoder().encode(mediaText).buffer;
     core.processManifest({ url: MUX_720P_URL, data });
-    expect(core.getManifestStreams()[0].segments.size).toBe(64);
+    expect(core.hasSegment(firstSegmentUrl)).toBe(true);
   });
 });

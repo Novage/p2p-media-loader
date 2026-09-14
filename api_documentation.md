@@ -644,9 +644,11 @@ import {
 // With the default client configuration:
 const infoHash = computeInfoHash(
   computeStreamSwarmId({
-    swarmId, // the configured swarmId or the manifest URL without query parameters
+    swarmId, // the configured swarmId, or the master manifest's URL without its query string
     streamType: "main",
-    properties: { bitrate, codecs, width, height },
+    // Exactly the properties the core reads from the manifest for this stream;
+    // see specs/segment-identity.md for what those are per protocol.
+    properties: { bitrate, codecs, width, height, frameRate, videoRange },
   }),
 );
 
@@ -670,6 +672,6 @@ const infoHash = computeInfoHash(
 );
 ```
 
-The stream swarm ID must be deterministic and identical across all peers of a swarm, and **every distinct stream must map to a distinct ID**. Include enough properties to guarantee that: resolution alone collides on ladders with several bitrates at the same resolution, so the example above adds `bitrate`. If your ladder can have several renditions sharing those fields (e.g. different codecs at the same resolution and bitrate), add the distinguishing property too, or incorporate the stream's `identityHash` (reproduce it server-side with `computeStreamIdentityHash(properties)`). Registering two different streams with the same ID throws. The builder cannot be changed at runtime. Clients can also observe each registered stream's computed identity through the `onStreamAdded` core event.
+The stream swarm ID must be deterministic and identical across all peers of a swarm, and **every distinct stream must map to a distinct ID**. Include enough properties to guarantee that: resolution alone collides on ladders with several bitrates at the same resolution, so the example above adds `bitrate`. If your ladder can have several renditions sharing those fields (e.g. different codecs at the same resolution and bitrate), add the distinguishing property too, or incorporate the stream's `identityHash` (reproduce it server-side with `computeStreamIdentityHash(properties)`). Two different streams resolving to the same ID fail to register (reported through the `onStreamRegistrationError` core event) and play without P2P. The builder cannot be changed at runtime. Clients can also observe each registered stream's computed identity through the `onStreamAdded` core event.
 
 The builder context also provides `defaultStreamSwarmId` — the ID the default derivation would produce — which is guaranteed unique per stream and convenient as a base for custom IDs (e.g. `` `${tenant}-${defaultStreamSwarmId}` ``; reproduce it server-side with `computeStreamSwarmId` or compose it with `buildStreamSwarmId(swarmId, streamType, identityHash)`).

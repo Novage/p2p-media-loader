@@ -14,10 +14,18 @@ export type ByteRange = {
 
 /** Describes a media segment with its unique identifiers, location, and timing information. */
 export type Segment = {
-  /** A runtime identifier for the segment that includes URL and byte range from its manifest. */
+  /**
+   * The registry key: the segment's absolute URL, with telemetry query
+   * parameters (`CMCD`) removed, followed by `|start-end` when a byte range
+   * applies. Local to this process, never on the wire.
+   */
   readonly runtimeId: string;
 
-  /** A unique identifier for the segment in its stream, used for P2P communications: sequence number for HLS or playtime for MPEG-DASH. */
+  /**
+   * The segment's identity within its stream, as sent to peers: the media
+   * sequence number for HLS, the presentation time in 100 ms units for
+   * MPEG-DASH. See specs/segment-identity.md.
+   */
   readonly externalId: number;
 
   /** The URL from which the segment can be downloaded. */
@@ -26,10 +34,20 @@ export type Segment = {
   /** An optional property specifying the range of bytes that represent the segment. */
   readonly byteRange?: ByteRange;
 
-  /** The start time of the segment in seconds, relative to the beginning of the stream. */
+  /**
+   * Start of the segment, in seconds, on the stream's manifest timeline.
+   *
+   * The timeline is whatever the manifest provides — wall-clock time from
+   * `EXT-X-PROGRAM-DATE-TIME`, presentation time for DASH (which counts from
+   * the MPD's availability start, often 1970 for live), or a zero-based
+   * anchor on the media sequence when HLS carries no date tags. Its zero
+   * point is arbitrary: only differences between values of the same stream
+   * carry meaning. Never compare it with the media element's `currentTime`.
+   * See specs/manifest-registry.md, "Timeline stability".
+   */
   readonly startTime: number;
 
-  /** The end time of the segment in seconds, relative to the beginning of the stream. */
+  /** End of the segment, in seconds, on the same timeline as `startTime`. */
   readonly endTime: number;
 };
 
@@ -52,18 +70,22 @@ export type StreamProperties = {
 
 /** Represents a media stream with various defining characteristics. */
 export type Stream = {
-  /** Runtime identifier of the stream from an engine. May differ from peer to peer. */
+  /**
+   * The manifest-derived stream key: the media playlist URL for HLS, the
+   * Representation id for DASH. Local to this process, never on the wire.
+   */
   readonly runtimeId: string;
 
   /** Stream type. */
   readonly type: StreamType;
 
-  /** Raw stream properties from the manifest, provided by the player integration. */
+  /** Raw stream properties as the core read them from the manifest. */
   readonly properties: Readonly<StreamProperties>;
 
   /**
    * The swarm ID the stream was registered with: the configured `swarmId`
-   * or, if not set, the manifest response URL. Resolved once at registration.
+   * or, if not set, the first manifest's response URL with its query string
+   * discarded. Resolved once at registration.
    */
   readonly swarmId: string;
 
@@ -87,16 +109,6 @@ export type Stream = {
    */
   readonly infoHash: string;
 };
-
-/**
- * The stream data a player integration passes to `Core.addStreamIfNoneExists`.
- * The identity fields (`swarmId`, `identityHash`, `streamSwarmId`, `infoHash`)
- * are computed by the Core at registration.
- */
-export type StreamRegistration<TStream extends Stream = Stream> = Omit<
-  TStream,
-  "swarmId" | "identityHash" | "streamSwarmId" | "infoHash"
->;
 
 /** Represents a defined Core configuration with specific settings for the main and secondary streams. */
 export type DefinedCoreConfig = CommonCoreConfig & {
@@ -194,7 +206,9 @@ export type CommonCoreConfig = {
   segmentMemoryStorageLimit: number | undefined;
 
   /**
-   * An optional custom storage factory for the segment storage.
+   * An optional custom storage factory for the segment storage. Called once,
+   * on the first segment request; `isLive` is derived from the manifests
+   * processed so far (see specs/manifest-registry.md, "Live detection").
    *
    * @default
    * ```typescript
@@ -464,7 +478,10 @@ export type StreamConfig = {
 
   /**
    * An optional unique identifier for the swarm, used to isolate peer pools by media stream.
-   * If left undefined, the manifest URL will be used as the swarm ID.
+   * If left undefined, the first manifest's response URL — after redirects,
+   * with its query string discarded — names the swarm. Set it when that URL
+   * differs between viewers of the same content, for example a redirect to a
+   * per-viewer edge host or a token in the path (see specs/segment-identity.md).
    *
    * This property cannot be changed at runtime: stream identity is derived
    * from it once, when a stream is registered.
@@ -670,10 +687,17 @@ export type StreamConfig = {
 
 /** The stream identity data passed to a custom `streamSwarmIdBuilder`. */
 export type StreamSwarmIdBuilderContext = {
-  /** The swarm ID of the stream: the configured `swarmId` or the manifest response URL. */
+  /**
+   * The swarm ID of the stream: the configured `swarmId` or, if unset, the
+   * first manifest's response URL with its query string discarded.
+   */
   swarmId: string;
 
-  /** Runtime identifier of the stream from the engine. May differ from peer to peer — avoid using it in the ID. */
+  /**
+   * The stream key (`Stream.runtimeId`): the media playlist URL for HLS, the
+   * Representation id for DASH. A playlist URL may differ from peer to peer
+   * (CDN host, signed path) — avoid using it in the ID.
+   */
   runtimeId: string;
 
   /** Stream type. */
@@ -867,13 +891,13 @@ export type PeerConnectErrorDetails = PeerDetails & {
 
 /** Represents the details of a stream registration failure. */
 export type StreamRegistrationErrorDetails = {
-  /** Runtime identifier of the stream that failed to register. */
+  /** Key of the stream that failed to register (see `Stream.runtimeId`). */
   runtimeId: string;
 
   /** Stream type. */
   streamType: StreamType;
 
-  /** Raw stream properties the integration passed for the stream. */
+  /** Raw stream properties the core read from the manifest. */
   properties: Readonly<StreamProperties>;
 
   /** The error that caused the registration to fail. */
@@ -881,7 +905,7 @@ export type StreamRegistrationErrorDetails = {
 };
 
 /** Represents the details about a registered stream. */
-export type StreamAddedDetails<TStream extends Stream = Stream> = {
+export type StreamAddedDetails = {
   /**
    * The registered stream with its computed identity.
    *
@@ -889,7 +913,19 @@ export type StreamAddedDetails<TStream extends Stream = Stream> = {
    * stream state. The identity fields never change after registration, so
    * the snapshot stays accurate for the stream's lifetime.
    */
-  stream: TStream;
+  stream: Stream;
+};
+
+/**
+ * A segment request the registry could not resolve. See
+ * specs/manifest-registry.md, "Divergence between core and the player".
+ */
+export type SegmentRegistryMissDetails = {
+  /** The URL the player requested. */
+  url: string;
+
+  /** The byte range the player requested, if any. */
+  byteRange?: ByteRange;
 };
 
 /**
@@ -902,20 +938,15 @@ export type CoreEventMap = {
    * The stream carries its computed identity, including the infohash
    * announced to trackers for its swarm.
    *
-   * The event map is not generic, so the stream is typed as the base
-   * `Stream`. Consumers of a `Core<TStream>` receive their extended stream
-   * at runtime and may narrow via `StreamAddedDetails<TStream>`.
-   *
    * @param params - Contains the registered stream.
    */
   onStreamAdded: (params: StreamAddedDetails) => void;
 
   /**
-   * Invoked when a stream fails to register in the Core: the swarm ID is
-   * unresolvable, or a custom `streamSwarmIdBuilder` returned an invalid or
-   * colliding stream swarm ID. The stream stays unknown to the core — its
-   * segments load through the player's default path without P2P; other
-   * streams are unaffected.
+   * Invoked when a stream fails to register in the Core: a custom
+   * `streamSwarmIdBuilder` returned an invalid or colliding stream swarm ID.
+   * The stream stays unknown to the core — its segments load through the
+   * player's default path without P2P; other streams are unaffected.
    *
    * Subscribe to surface `streamSwarmIdBuilder` misconfigurations: without a
    * listener the failure is only visible in debug logs.
@@ -923,6 +954,17 @@ export type CoreEventMap = {
    * @param params - Contains the failed registration and the error.
    */
   onStreamRegistrationError: (params: StreamRegistrationErrorDetails) => void;
+
+  /**
+   * Invoked when the player requests a segment the registry does not know.
+   * The request falls back to the player's own loader and plays without P2P;
+   * this event makes the disagreement between the core's manifest parse and
+   * the player's observable rather than silent. Initialization segments are
+   * recognised and never reported.
+   *
+   * @param params - The URL and byte range that missed.
+   */
+  onSegmentRegistryMiss: (params: SegmentRegistryMissDetails) => void;
 
   /**
    * Invoked when a segment is fully downloaded and available for use.
@@ -1099,18 +1141,3 @@ export type SegmentResponse = {
 export class CoreRequestError extends TypedError<"failed" | "aborted"> {
   readonly name = "CoreRequestError";
 }
-
-/** Callbacks for handling the success or failure of an engine operation. */
-export type EngineCallbacks = {
-  /**
-   * Called when the operation is successful.
-   * @param response - The response from the successful operation.
-   */
-  onSuccess: (response: SegmentResponse) => void;
-
-  /**
-   * Called when the operation encounters an error.
-   * @param reason - The error encountered during the operation.
-   */
-  onError: (reason: CoreRequestError) => void;
-};

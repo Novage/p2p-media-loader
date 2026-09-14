@@ -1,13 +1,6 @@
 import type shaka from "shaka-player/dist/shaka-player.compiled.d.ts";
 import {
-  HlsManifestParser,
-  DashManifestParser,
-} from "./manifest-parser-decorator.js";
-import { SegmentManager } from "./segment-manager.js";
-import {
-  StreamInfo,
   Shaka,
-  Stream,
   HookedNetworkingEngine,
   HookedRequest,
   P2PMLShakaData,
@@ -64,8 +57,10 @@ const PLAYBACK_EVENTS = [
  * alongside traditional HTTP fetching. This reduces server bandwidth costs and improves scalability by sharing the load
  * across multiple clients.
  *
- * The engine manages core functionalities such as segment fetching, segment management, peer connection management,
- * and event handling related to the P2P and HLS processes.
+ * The engine has three responsibilities (see specs/player-adapters.md): it
+ * hands every manifest Shaka fetches to the core, routes segment requests
+ * through the core, and reports playback state from the media element. Shaka's
+ * own manifest parsers run untouched; the core parses the same bytes itself.
  *
  * @example
  * // Initializing the ShakaP2PEngine with custom configuration
@@ -90,9 +85,7 @@ const PLAYBACK_EVENTS = [
 export class ShakaP2PEngine {
   private player?: shaka.Player;
   private readonly shaka: Shaka;
-  private readonly streamInfo: StreamInfo = {};
-  private readonly core: Core<Stream>;
-  private readonly segmentManager: SegmentManager;
+  private readonly core: Core;
   private requestFilter?: shaka.extern.RequestFilter;
   // See HybridLoader.oracleLogger: logs media.currentTime beside the core's
   // estimate so the two can be compared while the playback contract beds in.
@@ -116,7 +109,6 @@ export class ShakaP2PEngine {
         dashManifestParser,
       ],
     });
-    this.segmentManager = new SegmentManager(this.streamInfo, this.core);
   }
 
   /**
@@ -234,8 +226,6 @@ export class ShakaP2PEngine {
           player,
           shaka: this.shaka,
           core: this.core,
-          streamInfo: this.streamInfo,
-          segmentManager: this.segmentManager,
         };
         this.requestFilter = (requestType, request) => {
           (request as HookedRequest).p2pml = p2pml;
@@ -254,23 +244,9 @@ export class ShakaP2PEngine {
     player[method]("loaded", this.handlePlayerLoaded);
     player[method]("loading", this.destroyCurrentStreamContext);
     player[method]("unloading", this.handlePlayerUnloading);
-    player[method]("adaptation", this.onVariantChanged);
-    player[method]("variantchanged", this.onVariantChanged);
-  };
-
-  private onVariantChanged = () => {
-    if (!this.player) return;
-    const activeTrack = this.player
-      .getVariantTracks()
-      .find((track) => track.active);
-
-    if (!activeTrack) return;
-    this.core.setActiveLevelBitrate(activeTrack.bandwidth);
   };
 
   private handlePlayerLoaded = () => {
-    if (!this.player) return;
-    this.core.setIsLive(this.player.isLive());
     this.updateMediaElementEventHandlers("register");
   };
 
@@ -280,8 +256,6 @@ export class ShakaP2PEngine {
   };
 
   private destroyCurrentStreamContext = () => {
-    this.streamInfo.protocol = undefined;
-    this.streamInfo.manifestResponseUrl = undefined;
     this.core.destroy();
   };
 
@@ -313,28 +287,6 @@ export class ShakaP2PEngine {
     this.player = undefined;
   }
 
-  private static registerManifestParsers(shaka: Shaka) {
-    const hlsParserFactory = () => new HlsManifestParser(shaka);
-    const dashParserFactory = () => new DashManifestParser(shaka);
-
-    const Parser = shaka.media.ManifestParser;
-    Parser.registerParserByMime("application/dash+xml", dashParserFactory);
-    Parser.registerParserByMime("application/x-mpegurl", hlsParserFactory);
-    Parser.registerParserByMime(
-      "application/vnd.apple.mpegurl",
-      hlsParserFactory,
-    );
-  }
-
-  private static unregisterManifestParsers(shaka: Shaka) {
-    const Parser = shaka.media.ManifestParser;
-    Parser.unregisterParserByMime("mpd");
-    Parser.unregisterParserByMime("application/dash+xml");
-    Parser.unregisterParserByMime("m3u8");
-    Parser.unregisterParserByMime("application/x-mpegurl");
-    Parser.unregisterParserByMime("application/vnd.apple.mpegurl");
-  }
-
   private static registerNetworkingEngineSchemes(shaka: Shaka) {
     const { NetworkingEngine } = shaka.net;
 
@@ -347,7 +299,7 @@ export class ShakaP2PEngine {
         ) as shaka.extern.IAbortableOperation<shaka.extern.Response>;
       }
 
-      const loader = new Loader(p2pml.shaka, p2pml.core, p2pml.streamInfo);
+      const loader = new Loader(p2pml.shaka, p2pml.core);
       return loader.load(...args);
     };
     NetworkingEngine.registerScheme("http", handleLoading);
@@ -363,15 +315,15 @@ export class ShakaP2PEngine {
   }
 
   /**
-   * Registers plugins related to P2P functionality into the Shaka Player.
-   * Plugins must be registered before initializing the player to ensure proper integration.
+   * Registers the networking scheme plugins the P2P engine needs into Shaka
+   * Player. Plugins must be registered before initializing the player.
+   * Shaka's manifest parsers are left as they are.
    *
    * @param shaka The Shaka Player library. Defaults to the global Shaka Player instance if not provided.
    */
   static registerPlugins(shaka = window.shaka) {
     validateShaka(shaka);
 
-    ShakaP2PEngine.registerManifestParsers(shaka);
     ShakaP2PEngine.registerNetworkingEngineSchemes(shaka);
   }
 
@@ -383,7 +335,6 @@ export class ShakaP2PEngine {
   static unregisterPlugins(shaka = window.shaka) {
     validateShaka(shaka);
 
-    ShakaP2PEngine.unregisterManifestParsers(shaka);
     ShakaP2PEngine.unregisterNetworkingEngineSchemes(shaka);
   }
 }
