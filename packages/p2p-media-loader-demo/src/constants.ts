@@ -14,8 +14,10 @@ export const PLAYERS = {
   clappr_shaka: "Clappr (DASH only)",
   plyr_shaka: "Plyr",
 } as const;
+// The HLS live stream specs/verification.md lists; the previous default's
+// master playlist now references a variant that does not exist.
 export const DEFAULT_STREAM =
-  "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8";
+  "https://fcc3ddae59ed.us-west-2.playback.live-video.net/api/video/v1/us-west-2.893648527354.channel.DmumNckWFTqz.m3u8";
 export const COLORS = {
   yellow: "#faf21b",
   lightOrange: "#ff7f0e",

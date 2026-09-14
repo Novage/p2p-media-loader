@@ -19,11 +19,34 @@ request no longer splits a rendition's swarm. The peer protocol version is
 Roll a deployment over in one step; mixed versions do not exchange segments,
 and every stream still plays over HTTP.
 
-### Bundled engines: nothing to do
+### Bundled engines
 
 `p2p-media-loader-hlsjs` and `p2p-media-loader-shaka` keep their public API.
 `ShakaP2PEngine.registerPlugins` now registers only the networking schemes;
-Shaka's own manifest parsers are no longer replaced.
+Shaka's own manifest parsers are no longer replaced. npm and IIFE consumers
+have nothing to change. `p2p-media-loader-shaka` works with Shaka Player 4.3
+and later as well as 5 — the adapter uses only the networking plugin API,
+which both share — and, as before, declares no peer dependency on it.
+
+**ESM bundles from a CDN need two or three more import map entries.** The
+engine's `dist/*.es.js` imports the core _and_ its manifest parsers by bare
+specifier; map every one of them to the same core bundle, the one carrying the
+parsers the engine needs:
+
+```json
+{
+  "imports": {
+    "p2p-media-loader-core": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core-hls.es.min.js",
+    "p2p-media-loader-core/hls": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core-hls.es.min.js",
+    "p2p-media-loader-hlsjs": "https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@^5/dist/p2p-media-loader-hlsjs.es.min.js"
+  }
+}
+```
+
+For Shaka map `p2p-media-loader-core`, `p2p-media-loader-core/hls` and
+`p2p-media-loader-core/dash` to `p2p-media-loader-core.es.min.js`, which
+carries both parsers. A missing entry fails at module resolution rather than
+silently; see `specs/packaging.md`.
 
 DASH `SegmentBase` streams keep their segment list in a `sidx` box inside the
 media file; the core reads it from the response the player fetches, so these

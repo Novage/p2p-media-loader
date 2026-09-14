@@ -58,12 +58,15 @@ For additional examples using npm packages, please refer to our [React demo](htt
     <!-- Include the Hls.js library from a CDN -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@~1/dist/hls.min.js"></script>
 
-    <!-- Import map for the P2P Media Loader modules -->
+    <!-- Import map for the P2P Media Loader modules. The engine imports the
+         core and its HLS manifest parser by bare specifier; both must resolve
+         to the same core bundle, here the one carrying only the HLS parser. -->
     <script type="importmap">
       {
         "imports": {
-          "p2p-media-loader-core": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^4/dist/p2p-media-loader-core.es.min.js",
-          "p2p-media-loader-hlsjs": "https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@^4/dist/p2p-media-loader-hlsjs.es.min.js"
+          "p2p-media-loader-core": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core-hls.es.min.js",
+          "p2p-media-loader-core/hls": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core-hls.es.min.js",
+          "p2p-media-loader-hlsjs": "https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@^5/dist/p2p-media-loader-hlsjs.es.min.js"
         }
       }
     </script>
@@ -385,12 +388,16 @@ For additional examples using npm packages, please refer to our [React demo](htt
     <!-- Link to Shaka Player's compiled UI script -->
     <script src="https://unpkg.com/shaka-player/dist/shaka-player.ui.js"></script>
 
-    <!-- Import map for the P2P Media Loader modules -->
+    <!-- Import map for the P2P Media Loader modules. The engine imports the
+         core and both manifest parsers by bare specifier; all three must
+         resolve to the same core bundle, here the one carrying both parsers. -->
     <script type="importmap">
       {
         "imports": {
-          "p2p-media-loader-core": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^4/dist/p2p-media-loader-core.es.min.js",
-          "p2p-media-loader-shaka": "https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@^4/dist/p2p-media-loader-shaka.es.min.js"
+          "p2p-media-loader-core": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core.es.min.js",
+          "p2p-media-loader-core/hls": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core.es.min.js",
+          "p2p-media-loader-core/dash": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core.es.min.js",
+          "p2p-media-loader-shaka": "https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@^5/dist/p2p-media-loader-shaka.es.min.js"
         }
       }
     </script>
@@ -564,7 +571,7 @@ The global namespaces are `window.p2pml.hlsjs` and `window.p2pml.shaka`.
 
 ```html
 <script src="https://cdn.jsdelivr.net/npm/hls.js@~1/dist/hls.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/dist/p2p-media-loader-hlsjs.iife.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@^5/dist/p2p-media-loader-hlsjs.iife.min.js"></script>
 
 <script>
   // Wait for the DOM and scripts to load
@@ -597,7 +604,7 @@ The global namespaces are `window.p2pml.hlsjs` and `window.p2pml.shaka`.
 
 ```html
 <script src="https://unpkg.com/shaka-player/dist/shaka-player.compiled.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@latest/dist/p2p-media-loader-shaka.iife.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@^5/dist/p2p-media-loader-shaka.iife.min.js"></script>
 
 <script>
   // Wait for the DOM and scripts to load. The IIFE bundle targets ES2015 for

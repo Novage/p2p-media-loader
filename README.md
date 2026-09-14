@@ -34,7 +34,7 @@ This library makes it possible to build large-scale P2P mesh networks — often 
 ## Documentation and Important Links
 
 - Guides [for HTML pages and web apps](https://novage.com.ua/blog/setting-up-p2p-video-on-a-web-page-in-5-minutes-for-free) and [for native mobile apps](https://novage.com.ua/blog/integrate-p2p-video-streaming-into-mobile-application)
-- [API documentation](https://novage.github.io/p2p-media-loader/docs/v4.0/)
+- [API documentation](https://novage.github.io/p2p-media-loader/docs/v5.0/)
 - [v3 → v4 migration guide](https://github.com/Novage/p2p-media-loader/blob/main/MIGRATION.md)
 - [P2P development, support & consulting](https://novage.com.ua/)
 - [Demo](http://novage.com.ua/p2p-media-loader/demo.html)
@@ -47,12 +47,12 @@ This library makes it possible to build large-scale P2P mesh networks — often 
   - [Hls.js integration](https://npmjs.com/package/p2p-media-loader-hlsjs)
   - [Shaka Player integration](https://npmjs.com/package/p2p-media-loader-shaka)
 - ES modules CDN
-  - [Core](https://cdn.jsdelivr.net/npm/p2p-media-loader-core@latest/dist/) — three builds: `p2p-media-loader-core.es.min.js` with the HLS and MPEG-DASH manifest parsers, `p2p-media-loader-core-hls.es.min.js` and `p2p-media-loader-core-dash.es.min.js` with one. Load exactly one; each carries its own copy of the core
-  - [Hls.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/dist/)
-  - [Shaka Player integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@latest/dist/)
+  - [Core](https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/) — three builds: `p2p-media-loader-core.es.min.js` with the HLS and MPEG-DASH manifest parsers, `p2p-media-loader-core-hls.es.min.js` and `p2p-media-loader-core-dash.es.min.js` with one. Load exactly one; each carries its own copy of the core
+  - [Hls.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@^5/dist/)
+  - [Shaka Player integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@^5/dist/)
 - IIFE builds CDN (for older browsers and Smart TVs)
-  - [Hls.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/dist/p2p-media-loader-hlsjs.iife.min.js)
-  - [Shaka Player integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@latest/dist/p2p-media-loader-shaka.iife.min.js)
+  - [Hls.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@^5/dist/p2p-media-loader-hlsjs.iife.min.js)
+  - [Shaka Player integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@^5/dist/p2p-media-loader-shaka.iife.min.js)
 
 ## Web Browsers Support
 
