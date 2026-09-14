@@ -120,18 +120,23 @@ export class Loader {
           ),
         };
       } catch (error) {
-        // TODO: throw Shaka Errors
-        if (error instanceof CoreRequestError) {
-          const { Error: ShakaError } = this.shaka.util;
-          if (error.type === "aborted") {
-            throw new ShakaError(
-              ShakaError.Severity.RECOVERABLE,
-              ShakaError.Category.NETWORK,
-              this.shaka.util.Error.Code.OPERATION_ABORTED,
-            );
-          }
-        }
-        throw error;
+        // Shaka's networking engine retries and reports only its own error
+        // type, so a core failure is translated: an abort into the operation
+        // Shaka itself cancelled, anything else into a recoverable network
+        // error carrying the cause, which Shaka's retry parameters govern.
+        const { Error: ShakaError } = this.shaka.util;
+        const isAbort =
+          error instanceof CoreRequestError && error.type === "aborted";
+        throw new ShakaError(
+          ShakaError.Severity.RECOVERABLE,
+          ShakaError.Category.NETWORK,
+          isAbort
+            ? ShakaError.Code.OPERATION_ABORTED
+            : ShakaError.Code.HTTP_ERROR,
+          segmentUrl,
+          error,
+          this.shaka.net.NetworkingEngine.RequestType.SEGMENT,
+        );
       }
     };
 

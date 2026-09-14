@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Core } from "p2p-media-loader-core";
+import { CoreRequestError, type Core } from "p2p-media-loader-core";
 import { Loader } from "../src/loading-handler.js";
 import type { Shaka } from "../src/types.js";
 
@@ -18,13 +18,16 @@ class FakeAbortableOperation<T> {
 class FakeShakaError extends Error {
   static Severity = { RECOVERABLE: 1 };
   static Category = { NETWORK: 1 };
-  static Code = { OPERATION_ABORTED: 7001 };
+  static Code = { OPERATION_ABORTED: 7001, HTTP_ERROR: 1002 };
+  readonly data: unknown[];
   constructor(
     readonly severity: number,
     readonly category: number,
     readonly code: number,
+    ...data: unknown[]
   ) {
     super(`shaka error ${code}`);
+    this.data = data;
   }
 }
 
@@ -145,6 +148,19 @@ describe("Shaka loading handler", () => {
     core.loadSegment.mockResolvedValueOnce({ data: oneMiB, bandwidth: 0 });
     response = await loader.load(url, request(), RequestType.SEGMENT).promise;
     expect(response.timeMs).toBe(1);
+  });
+
+  it("translates a core failure into a recoverable Shaka network error carrying the cause", async () => {
+    const { loader, core } = setup();
+    const failure = new CoreRequestError("failed", "peer and http both failed");
+    core.loadSegment.mockRejectedValueOnce(failure);
+    const error = (await loader
+      .load(url, request(), RequestType.SEGMENT)
+      .promise.catch((e: unknown) => e)) as FakeShakaError;
+    expect(error).toBeInstanceOf(FakeShakaError);
+    expect(error.severity).toBe(FakeShakaError.Severity.RECOVERABLE);
+    expect(error.code).toBe(FakeShakaError.Code.HTTP_ERROR);
+    expect(error.data).toEqual([url, failure, RequestType.SEGMENT]);
   });
 
   it("falls back to Shaka's fetch for a segment the core does not serve", () => {

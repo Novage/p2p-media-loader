@@ -22,8 +22,15 @@ const getESMConfig = ({
         formats: ["es"],
         entry: "src/index.ts",
       },
+      // Core and the parsers stay bare imports for the page's import map to
+      // resolve — to one core bundle, which carries all three. Inlining the
+      // parsers here would ship them twice. See specs/packaging.md.
       rolldownOptions: {
-        external: ["p2p-media-loader-core"],
+        external: [
+          "p2p-media-loader-core",
+          "p2p-media-loader-core/hls",
+          "p2p-media-loader-core/dash",
+        ],
       },
     },
   };
