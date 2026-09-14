@@ -97,7 +97,9 @@ export const ShakaPlyr = ({
               shakaPlayerInit.configure({
                 abr: { enabled: false },
               });
-              shakaPlayerInit.selectVariantTrack(level, true);
+              // Keep the buffer: clearing it lands the player on the live
+              // edge with nothing ahead for peers to fill.
+              shakaPlayerInit.selectVariantTrack(level, false);
             }
           });
         },
@@ -120,7 +122,6 @@ export const ShakaPlyr = ({
     onPeerConnect,
     onPeerClose,
     streamUrl,
-    
   ]);
 
   return shaka.Player.isBrowserSupported() ? (

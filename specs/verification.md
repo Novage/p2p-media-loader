@@ -20,6 +20,30 @@ are run against this matrix in the demo before they are considered done.
 Every stream is played on every engine that supports its protocol: hls.js for
 HLS; Shaka Player for both.
 
+## Isolating a test swarm
+
+The default swarm ID is the manifest URL, so every demo instance playing one of
+these public streams — on any machine, on any branch that shares the peer
+protocol version — joins the same swarm through the public trackers. That is
+what the design intends for production, and the wrong thing for a measurement:
+a stranger's peer supplies segments, or takes them, and the result no longer
+says anything about the two peers under test. A stray peer on a different
+build of the same protocol version can also mask a real defect, or invent one.
+
+When the outcome depends on which peers are present — the cross-player check,
+anything measuring P2P share, anything that behaves differently with and
+without a peer — run every peer under test with a swarm ID nobody else uses.
+The demo takes it as a query parameter, and the same value must be given to
+each peer that should meet:
+
+```
+http://localhost:5173/?swarmId=my-test-2026-09-14&streamUrl=…
+```
+
+A configured `swarmId` replaces the manifest URL in every stream swarm ID
+([segment-identity.md](segment-identity.md)), so the peers still share exactly
+the streams they would share in production; only the audience changes.
+
 ## What is checked
 
 **Playback contract.** With `localStorage.debug = "p2pml:playback-oracle"`, the
