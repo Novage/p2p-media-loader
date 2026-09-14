@@ -6,6 +6,7 @@ import {
   P2PMLShakaData,
 } from "./types.js";
 import { Loader } from "./loading-handler.js";
+import { liveDelayFor } from "./live-delay.js";
 import { hlsManifestParser } from "p2p-media-loader-core/hls";
 import { dashManifestParser } from "p2p-media-loader-core/dash";
 import {
@@ -14,6 +15,7 @@ import {
   CoreEventMap,
   DynamicCoreConfig,
   DefinedCoreConfig,
+  ProcessedManifest,
   debug,
   getPlaybackStateFromMediaElement,
 } from "p2p-media-loader-core";
@@ -36,7 +38,14 @@ export type PartialShakaP2PEngineConfig = {
   core?: Partial<CoreConfig>;
 };
 
-const LIVE_EDGE_DELAY = 25;
+/**
+ * Presentation delay until the first live manifest says how wide the window
+ * is; from then on the delay follows the window (see live-delay.ts). Only
+ * applied when the integrator left Shaka's own default in place.
+ */
+const INITIAL_LIVE_EDGE_DELAY = 25;
+/** Shaka's default: "derive from the manifest", which places the player near the edge. */
+const SHAKA_DEFAULT_PRESENTATION_DELAY = 0;
 
 // Every event after which the buffer ahead of the playhead or the rate may
 // have changed. `progress` covers buffer growth without playhead movement.
@@ -87,6 +96,9 @@ export class ShakaP2PEngine {
   private readonly shaka: Shaka;
   private readonly core: Core;
   private requestFilter?: shaka.extern.RequestFilter;
+  /** False when the integrator configured a presentation delay themselves. */
+  private managesPresentationDelay = false;
+  private readonly debug = debug("p2pml-shaka:engine");
   // See HybridLoader.oracleLogger: logs media.currentTime beside the core's
   // estimate so the two can be compared while the playback contract beds in.
   private readonly oracle = debug("p2pml:playback-oracle");
@@ -121,11 +133,19 @@ export class ShakaP2PEngine {
     if (this.player) this.destroy();
 
     this.player = player;
-    this.player.configure("manifest.defaultPresentationDelay", LIVE_EDGE_DELAY);
-    this.player.configure(
-      "manifest.dash.ignoreSuggestedPresentationDelay",
-      true,
-    );
+    this.managesPresentationDelay =
+      player.getConfiguration().manifest.defaultPresentationDelay ===
+      SHAKA_DEFAULT_PRESENTATION_DELAY;
+    if (this.managesPresentationDelay) {
+      this.player.configure(
+        "manifest.defaultPresentationDelay",
+        INITIAL_LIVE_EDGE_DELAY,
+      );
+      this.player.configure(
+        "manifest.dash.ignoreSuggestedPresentationDelay",
+        true,
+      );
+    }
 
     const versionMatch = /\d+/.exec(this.shaka.Player.version);
     const versionMajor = parseInt(versionMatch ? versionMatch[0] : "0", 10);
@@ -226,6 +246,7 @@ export class ShakaP2PEngine {
           player,
           shaka: this.shaka,
           core: this.core,
+          onManifestProcessed: this.applyLiveDelay,
         };
         this.requestFilter = (requestType, request) => {
           (request as HookedRequest).p2pml = p2pml;
@@ -244,6 +265,26 @@ export class ShakaP2PEngine {
     player[method]("loaded", this.handlePlayerLoaded);
     player[method]("loading", this.destroyCurrentStreamContext);
     player[method]("unloading", this.handlePlayerUnloading);
+  };
+
+  /**
+   * Sizes the presentation delay from the window the core just parsed. The
+   * manifest reaches the core before Shaka's parser sees the same bytes, so
+   * the value is in place when Shaka builds its timeline. Re-applied only
+   * when the window changes by at least half a segment; fractional drift in
+   * the window length is not a change.
+   */
+  private applyLiveDelay = (manifest: ProcessedManifest) => {
+    if (!this.player || !this.managesPresentationDelay) return;
+    const target = liveDelayFor(manifest);
+    if (!target) return;
+
+    const current =
+      this.player.getConfiguration().manifest.defaultPresentationDelay;
+    if (Math.abs(current - target.delay) < target.segment / 2) return;
+
+    this.debug(`Setting defaultPresentationDelay to ${target.delay}`);
+    this.player.configure("manifest.defaultPresentationDelay", target.delay);
   };
 
   private handlePlayerLoaded = () => {
@@ -299,7 +340,11 @@ export class ShakaP2PEngine {
         ) as shaka.extern.IAbortableOperation<shaka.extern.Response>;
       }
 
-      const loader = new Loader(p2pml.shaka, p2pml.core);
+      const loader = new Loader(
+        p2pml.shaka,
+        p2pml.core,
+        p2pml.onManifestProcessed,
+      );
       return loader.load(...args);
     };
     NetworkingEngine.registerScheme("http", handleLoading);

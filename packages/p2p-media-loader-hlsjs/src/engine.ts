@@ -1,6 +1,7 @@
 import type Hls from "hls.js";
 import type {
   AudioTrackLoadedData,
+  LevelDetails,
   LevelUpdatedData,
   PlaylistLevelType,
   HlsConfig,
@@ -58,7 +59,27 @@ export type HlsWithP2PConfig<HlsType extends abstract new () => unknown> =
     };
   };
 
-const MAX_LIVE_SYNC_DURATION = 120;
+/**
+ * Where the player sits in a live window. See specs/player-adapters.md,
+ * "hls.js".
+ *
+ * Every segment between the player's buffer and the live edge is one peers
+ * can fetch for each other, so the player is placed as deep in the window as
+ * it can go: one segment inside the tail, and never more than
+ * MAX_LIVE_LATENCY seconds behind the edge. Its own forward buffer keeps the
+ * fetch positions inside the window even as the playhead drifts past the
+ * tail. The re-sync threshold sits two segments beyond the target, so a
+ * viewer who pauses or stalls is brought back to the target before the
+ * buffer starves.
+ */
+/**
+ * The most latency the adapter will ask a viewer to accept for the sake of the
+ * swarm. A minute leaves tens of segments ahead of the buffer on any stream
+ * whose window is that wide; wider windows buy nothing a viewer would notice.
+ */
+const MAX_LIVE_LATENCY = 60;
+const LIVE_TAIL_MARGIN_SEGMENTS = 1;
+const LIVE_RESYNC_MARGIN_SEGMENTS = 2;
 
 // Every event after which the buffer ahead of the playhead or the rate may
 // have changed. `progress` covers buffer growth without playhead movement.
@@ -195,6 +216,12 @@ export class HlsJsP2PEngine {
 
   /**
    * Provides the Hls.js P2P specific configuration for Hls.js loaders.
+   *
+   * An integration that constructs hls.js itself should also pass
+   * `lowLatencyMode: false` (the mixin does so unless the integrator sets it):
+   * in low-latency mode hls.js requests partial segments, which the core does
+   * not register, so those requests bypass P2P.
+   *
    * @returns An object containing the fragment loader (`fLoader`) and playlist loader (`pLoader`).
    */
   getConfigForHlsJs(): { fLoader: unknown; pLoader: unknown } {
@@ -311,13 +338,7 @@ export class HlsJsP2PEngine {
       data.details.fragments[0].type === ("main" as PlaylistLevelType) &&
       data.details.fragments.length > 4
     ) {
-      if (
-        data.details.live &&
-        !this.currentHlsInstance.userConfig.liveSyncDuration &&
-        !this.currentHlsInstance.userConfig.liveSyncDurationCount
-      ) {
-        this.updateLiveSyncDurationCount(data);
-      }
+      if (data.details.live) this.updateLiveSync(data.details);
 
       if (
         !this.currentHlsInstance.userConfig.maxBufferLength &&
@@ -328,29 +349,56 @@ export class HlsJsP2PEngine {
     }
   };
 
-  private updateLiveSyncDurationCount(
-    data: LevelUpdatedData | AudioTrackLoadedData,
-  ) {
-    const fragmentDuration = data.details.targetduration;
+  /**
+   * Places the player deep in the live window so that the segments between
+   * its buffer and the live edge — the ones peers exchange — are as many as
+   * the window allows. Applied through hls.js's own `targetLatency` API and
+   * only when the integrator has not configured the live sync settings
+   * themselves. Set once per value; hls.js then re-syncs to it on start, on a
+   * stall, and when the max latency is exceeded.
+   *
+   * Segment length is the playlist's average: `EXT-X-TARGETDURATION` is an
+   * upper bound and can be several times the real segment.
+   */
+  private updateLiveSync(details: LevelDetails) {
+    const hls = this.currentHlsInstance;
+    if (!hls) return;
 
-    const maxLiveSyncCount = Math.floor(
-      MAX_LIVE_SYNC_DURATION / fragmentDuration,
+    const segment = details.averagetargetduration ?? details.targetduration;
+    const window = details.totalduration;
+    if (!(segment > 0) || !(window > 0)) return;
+
+    const targetLatency = Math.max(
+      segment,
+      Math.min(window - LIVE_TAIL_MARGIN_SEGMENTS * segment, MAX_LIVE_LATENCY),
     );
-    const newLiveSyncDurationCount = Math.min(
-      data.details.fragments.length - 1,
-      maxLiveSyncCount,
-    );
+    const maxLatency = targetLatency + LIVE_RESYNC_MARGIN_SEGMENTS * segment;
+
+    // Segment durations are not exact multiples, so the window length drifts
+    // by fractions of a second between refreshes. Only a change of at least
+    // half a segment means the window itself changed; anything smaller is
+    // noise, and re-applying the target would reset hls.js's stall tracking.
+    const tolerance = segment / 2;
+    const differs = (current: number | undefined, next: number) =>
+      current === undefined || Math.abs(current - next) >= tolerance;
+
+    const { userConfig } = hls;
+    if (
+      userConfig.liveSyncDuration === undefined &&
+      userConfig.liveSyncDurationCount === undefined &&
+      differs(hls.config.liveSyncDuration, targetLatency)
+    ) {
+      this.debug(`Setting targetLatency to ${targetLatency}`);
+      hls.targetLatency = targetLatency;
+    }
 
     if (
-      this.currentHlsInstance &&
-      this.currentHlsInstance.config.liveSyncDurationCount !==
-        newLiveSyncDurationCount
+      userConfig.liveMaxLatencyDuration === undefined &&
+      userConfig.liveMaxLatencyDurationCount === undefined &&
+      differs(hls.config.liveMaxLatencyDuration, maxLatency)
     ) {
-      this.debug(
-        `Setting liveSyncDurationCount to ${newLiveSyncDurationCount}`,
-      );
-      this.currentHlsInstance.config.liveSyncDurationCount =
-        newLiveSyncDurationCount;
+      this.debug(`Setting liveMaxLatencyDuration to ${maxLatency}`);
+      hls.config.liveMaxLatencyDuration = maxLatency;
     }
   }
 

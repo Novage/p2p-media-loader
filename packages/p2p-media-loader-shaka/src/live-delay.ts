@@ -1,0 +1,46 @@
+import type { ProcessedManifest } from "p2p-media-loader-core";
+
+/**
+ * Where the player sits in a live window. Mirrors the hls.js adapter: as deep
+ * as the window allows, one segment inside the tail, never more than a
+ * minute behind the edge. Shaka's own buffering goal then leaves the rest of
+ * the window ahead of the buffer for peers to exchange, and Shaka's own
+ * out-of-window handling covers a playhead that drifts past the tail.
+ * See specs/player-adapters.md, "Shaka Player".
+ */
+const MAX_LIVE_LATENCY = 60;
+const LIVE_TAIL_MARGIN_SEGMENTS = 1;
+
+export type LiveDelay = {
+  /** Seconds behind the live edge to place the playhead. */
+  readonly delay: number;
+  /** Average segment length of the stream the delay was derived from. */
+  readonly segment: number;
+};
+
+/**
+ * The presentation delay a processed manifest calls for, or `undefined` when
+ * it described no live stream with segments. Among the streams the manifest
+ * listed, the widest live main stream decides; on an MPD every
+ * Representation shares one window, and on HLS one media playlist arrives at
+ * a time.
+ */
+export function liveDelayFor(
+  manifest: ProcessedManifest,
+): LiveDelay | undefined {
+  let best: LiveDelay | undefined;
+  for (const stream of manifest.streams) {
+    if (!stream.isLive || stream.type !== "main" || stream.segmentCount === 0) {
+      continue;
+    }
+    const window = stream.end - stream.start;
+    if (!(window > 0)) continue;
+    const segment = window / stream.segmentCount;
+    const delay = Math.max(
+      segment,
+      Math.min(window - LIVE_TAIL_MARGIN_SEGMENTS * segment, MAX_LIVE_LATENCY),
+    );
+    if (!best || delay > best.delay) best = { delay, segment };
+  }
+  return best;
+}

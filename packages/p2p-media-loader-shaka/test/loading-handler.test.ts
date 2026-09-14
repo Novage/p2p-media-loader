@@ -43,14 +43,28 @@ function setup(loadable = true) {
   } as unknown as Shaka;
 
   const data = new Uint8Array([9, 9]).buffer;
+  const processed = { streams: [] };
+  const onManifestProcessed = vi.fn();
   const core = {
-    processManifest: vi.fn(),
+    processManifest: vi.fn(() => processed),
     isSegmentLoadable: vi.fn(() => loadable),
     loadSegment: vi.fn(() => Promise.resolve({ data, bandwidth: 1_000_000 })),
     abortSegmentLoading: vi.fn(),
   };
-  const loader = new Loader(shaka, core as unknown as Core);
-  return { loader, core, parse, manifestResponse, data };
+  const loader = new Loader(
+    shaka,
+    core as unknown as Core,
+    onManifestProcessed,
+  );
+  return {
+    loader,
+    core,
+    parse,
+    manifestResponse,
+    data,
+    processed,
+    onManifestProcessed,
+  };
 }
 
 const request = (headers: Record<string, string> = {}) =>
@@ -67,6 +81,13 @@ describe("Shaka loading handler", () => {
       url: manifestResponse.uri,
       data: manifestResponse.data,
     });
+  });
+
+  it("hands what the core read from a manifest to the engine", async () => {
+    const { loader, onManifestProcessed, processed } = setup();
+    await loader.load(url, request(), RequestType.MANIFEST).promise;
+    await Promise.resolve();
+    expect(onManifestProcessed).toHaveBeenCalledWith(processed);
   });
 
   it("serves a known segment through the core, reading the byte range from the Range header", async () => {

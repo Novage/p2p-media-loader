@@ -9,8 +9,16 @@ core.processManifest({
   url: string; // the response URL, after redirects
   data: string | ArrayBuffer | ArrayBufferView; // as the player's network layer delivered it
   protocol?: "hls" | "dash"; // when the adapter already knows
-}): void;
+}): ProcessedManifest | undefined;
 ```
+
+The return value is what the manifest described: for each stream it listed
+segments for, the stream key, type, whether it is live, the bounds of the
+listed segments on the stream's manifest timeline, and their count. A master
+playlist yields no entries. An adapter that must size its player's live window
+before the player parses the same manifest reads it from here, from the same
+parse that fed the registry, rather than parsing again. `undefined` means the
+manifest was ignored or failed to parse.
 
 The protocol is detected from the payload — an HLS playlist begins with
 `#EXTM3U`, an MPD is XML with an `MPD` root element — and may be stated

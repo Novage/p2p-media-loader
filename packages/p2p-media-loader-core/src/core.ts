@@ -18,6 +18,7 @@ import {
   StreamProperties,
   StreamType,
   DynamicStreamConfig,
+  ProcessedManifest,
 } from "./types.js";
 import {
   BandwidthCalculators,
@@ -329,13 +330,18 @@ export class Core {
    * failure leaves the registry as it was — a transient bad response must not
    * empty a working segment list. Idempotent: re-processing an unchanged
    * manifest changes nothing and emits no events.
+   *
+   * @returns What the manifest described — each stream it listed segments
+   * for, with the bounds of those segments on the manifest timeline — so an
+   * adapter can size its player's live window from the same parse; or
+   * `undefined` when the manifest was ignored or failed to parse.
    */
   processManifest(manifest: {
     url: string;
     /** Text, or the raw bytes a player's networking layer delivers. */
     data: string | ArrayBuffer | ArrayBufferView;
     protocol?: ManifestProtocol;
-  }): void {
+  }): ProcessedManifest | undefined {
     const text =
       typeof manifest.data === "string"
         ? manifest.data
@@ -346,7 +352,7 @@ export class Core {
       : this.manifestParsers.find((p) => p.canParse(text));
     if (!parser) {
       this.manifestLogger("no parser for manifest %s", manifest.url);
-      return;
+      return undefined;
     }
 
     let updates;
@@ -354,7 +360,7 @@ export class Core {
       updates = this.manifestRegistry.apply(parser.parse(text, manifest.url));
     } catch (error) {
       this.manifestLogger("failed to parse %s: %O", manifest.url, error);
-      return;
+      return undefined;
     }
 
     // The first manifest names the swarm unless the integration already did.
@@ -363,17 +369,29 @@ export class Core {
     this.syncStreamsFromRegistry();
 
     if (this.manifestLogger.enabled) {
+      const changed = updates.filter((u) => u.added || u.removed);
       this.manifestLogger(
         "%s — %d streams registered, %s",
         manifest.url,
         this.streams.size,
-        updates.length
-          ? updates
+        changed.length
+          ? changed
               .map((u) => `${u.streamKey}: +${u.added} -${u.removed}`)
               .join(", ")
           : "no segment changes",
       );
     }
+
+    return {
+      streams: updates.map((u) => ({
+        key: u.streamKey,
+        type: u.type,
+        isLive: u.isLive,
+        start: u.start,
+        end: u.end,
+        segmentCount: u.segmentCount,
+      })),
+    };
   }
 
   /**

@@ -79,7 +79,14 @@ describe("ManifestRegistry: timeline stability without PDT", () => {
     expect(before.get(102)).toBe(12);
 
     const updates = registry.apply(hls(HLS_LIVE_NO_PDT_REFRESH_2, MEDIA_1080));
-    expect(updates).toEqual([{ streamKey: MEDIA_1080, added: 2, removed: 2 }]);
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({
+      streamKey: MEDIA_1080,
+      added: 2,
+      removed: 2,
+      segmentCount: 5,
+      isLive: true,
+    });
 
     const after = new Map(
       [...registry.getStream(MEDIA_1080)!.segments.values()].map((s) => [
@@ -97,9 +104,8 @@ describe("ManifestRegistry: timeline stability without PDT", () => {
   it("is idempotent", () => {
     const registry = new ManifestRegistry();
     registry.apply(hls(HLS_LIVE_NO_PDT_REFRESH_1, MEDIA_1080));
-    expect(registry.apply(hls(HLS_LIVE_NO_PDT_REFRESH_1, MEDIA_1080))).toEqual(
-      [],
-    );
+    const [update] = registry.apply(hls(HLS_LIVE_NO_PDT_REFRESH_1, MEDIA_1080));
+    expect(update).toMatchObject({ added: 0, removed: 0, segmentCount: 5 });
   });
 });
 
@@ -142,9 +148,35 @@ describe("Core.processManifest", () => {
     expect(core.getStreams().map((s) => s.runtimeId)).toContain(MUX_720P_URL);
     expect(core.hasSegment(firstSegmentUrl)).toBe(false);
 
-    core.processManifest({ url: MUX_720P_URL, data: mediaText });
+    const processed = core.processManifest({
+      url: MUX_720P_URL,
+      data: mediaText,
+    });
     expect(core.hasSegment(firstSegmentUrl)).toBe(true);
     expect(core.isSegmentLoadable(firstSegmentUrl)).toBe(true);
+
+    // What the media playlist described, for an adapter to size its player by.
+    expect(processed?.streams).toHaveLength(1);
+    expect(processed?.streams[0]).toMatchObject({
+      key: MUX_720P_URL,
+      type: "main",
+      isLive: false,
+      start: 0,
+      segmentCount: 64,
+    });
+    expect(processed?.streams[0].end).toBeCloseTo(634.57, 1);
+  });
+
+  it("describes nothing for a master playlist and undefined for an unparsable one", () => {
+    const core = new Core({ manifestParsers: [hlsManifestParser] });
+    const master = core.processManifest({
+      url: MUX_MASTER_URL,
+      data: readFixture("mux-master.m3u8"),
+    });
+    expect(master?.streams).toEqual([]);
+    expect(
+      core.processManifest({ url: MASTER, data: DASH_SEGMENT_TEMPLATE }),
+    ).toBeUndefined();
   });
 
   it("leaves the registry untouched when a manifest fails to parse", () => {

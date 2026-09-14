@@ -88,6 +88,39 @@ islands, and the final island may be nowhere near the playhead.
 - Segments: `fLoader`, falling back to `config.loader`.
 - Playback: the media element.
 
+The adapter also tunes hls.js's own buffering, because the core's background
+loader is what should fetch ahead, not the player. Every setting below is
+applied only when the integrator has not configured it, and each is applied
+once per value when a playlist loads; between playlists hls.js is left alone.
+
+- **Forward buffer.** `maxBufferLength` is held to the high-demand window. The
+  segments beyond it are the core's to prefetch.
+- **Position in the live window.** Every segment between the player's buffer
+  and the live edge is one peers can fetch for each other, so the player is
+  placed as deep in the window as it can go: the target latency, set through
+  hls.js's `targetLatency` API, is the window length less one segment, and
+  never more than a minute. The player's own forward buffer is what keeps it
+  safe there — the fetch positions sit a buffer length ahead of the playhead,
+  well inside the window, even as jitter carries the playhead a few seconds
+  past the tail. `liveMaxLatencyDuration` is set two segments beyond the
+  target: a viewer who pauses or stalls that far is re-synced to the target
+  before the buffer starves, a controlled skip in place of a stall and jump.
+  Segment length is the playlist's average, not `EXT-X-TARGETDURATION`, which
+  is an upper bound and on some streams several times the real segment.
+- **Low-latency mode off.** hls.js enables it by default; on a low-latency
+  playlist it then requests partial segments, which the core deliberately does
+  not register ([architecture.md](architecture.md)), so those requests would
+  bypass P2P. The mixin passes `lowLatencyMode: false` unless the integrator
+  sets it; an integration that constructs hls.js itself should do the same.
+
+These settings steer only where hls.js starts and re-syncs; where the player
+then puts itself is its own business. An immediate quality switch
+(`hls.currentLevel`) flushes the buffer and resumes at its former end, which
+moves the playhead a buffer length towards the live edge and can leave no
+window ahead of it for peers until the player drifts behind again; a switch at
+the next fragment (`hls.nextLevel`) keeps the position. An integration that
+cares about sharing on live streams should prefer the latter.
+
 ### Shaka Player
 
 - Parsers: HLS and DASH — Shaka plays both.
@@ -97,6 +130,22 @@ islands, and the final island may be nowhere near the playhead.
 
 No manifest-parser decoration and no `segmentIndex` hooking. Shaka's internal
 representation of the stream is not consulted.
+
+The adapter places the player in a live window by the same rule as the hls.js
+adapter — as deep as the window allows, one segment inside the tail, never more
+than a minute behind the edge — through Shaka's `defaultPresentationDelay`,
+and only when the integrator has left Shaka's default in place. Shaka reads the
+delay when it builds its timeline, so the value must be known before Shaka
+parses the manifest: `processManifest` returns what the core read from it, the
+adapter derives the delay from the widest live main stream, and it is
+configured in the same continuation that handed the manifest to the core, ahead
+of Shaka's own parser. It is re-applied only when the window changes by half a
+segment or more. Shaka's buffering goal then leaves the rest of the window
+ahead of the buffer for peers, and Shaka's own out-of-window handling — a seek
+to the window start plus its safe seek offset — covers a playhead that drifts
+past the tail, so no re-sync setting is needed. The MPD's suggested delay is
+ignored for the same reason hls.js's hold-back is overridden: a server's
+suggestion places the player near the edge, where there is nothing to share.
 
 ## Players the boundary is drawn to accommodate
 

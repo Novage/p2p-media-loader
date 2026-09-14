@@ -231,6 +231,10 @@ export class P2PLoader {
     return false;
   }
 
+  get connectedPeerIds(): IterableIterator<string> {
+    return this.#peersMap.keys();
+  }
+
   get connectedPeerCount() {
     return this.#peersMap.size;
   }

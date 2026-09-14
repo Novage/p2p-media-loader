@@ -14,6 +14,8 @@ import { EngineRequest } from "./requests/engine-request.js";
 import * as QueueUtils from "./utils/queue.js";
 import * as LoggerUtils from "./utils/logger.js";
 import * as Utils from "./utils/utils.js";
+import * as ElectionUtils from "./utils/election.js";
+import { getDistanceFromPlayhead } from "./utils/stream.js";
 import debug from "debug";
 import { QueueItem } from "./utils/queue.js";
 import { EventTarget } from "./utils/event-target.js";
@@ -24,6 +26,8 @@ import type { PlaybackState } from "./playback.js";
 
 const FAILED_ATTEMPTS_CLEAR_INTERVAL = 60000;
 const PEER_UPDATE_LATENCY = 1000;
+/** Weight of the newest sample in the running estimate of a stream's segment size. */
+const SEGMENT_BYTES_EWMA_ALPHA = 0.3;
 
 export class HybridLoader {
   private readonly requests: RequestsContainer;
@@ -39,6 +43,8 @@ export class HybridLoader {
   private levelChangedTimestamp?: number;
   private lastQueueProcessingTimeStamp?: number;
   private randomHttpDownloadTimeout?: number;
+  /** Running estimate of segment size per stream, from segments already loaded. */
+  private readonly segmentBytesByStream = new Map<string, number>();
   private initialHttpDelayTimeoutId?: number;
   private isProcessQueueMicrotaskCreated = false;
   private readonly createdAt = performance.now();
@@ -88,7 +94,8 @@ export class HybridLoader {
     const randomTimeout =
       Math.random() * PEER_UPDATE_LATENCY * peersCount + PEER_UPDATE_LATENCY;
     this.randomHttpDownloadTimeout = window.setTimeout(() => {
-      this.loadRandomThroughHttp();
+      // Deadlines pass without any queue event, so re-check on a timer too.
+      this.prefetchThroughHttp();
       this.setIntervalLoading();
     }, randomTimeout);
   }
@@ -235,6 +242,7 @@ export class HybridLoader {
             this.syncPlayback();
           }
           this.requests.remove(request);
+          this.noteSegmentBytes(segment, request.data.byteLength);
 
           this.logger(
             `succeed: ${LoggerUtils.getSegmentString(segment)} (byteLength: ${request.data.byteLength})`,
@@ -400,7 +408,8 @@ export class HybridLoader {
           this.loadThroughP2P(segment);
         }
       } else {
-        // Regular requests load via P2P only (random HTTP loading also runs by interval)
+        // Regular requests load via P2P; HTTP prefetching is the owner's job,
+        // decided below.
 
         const canLoadThroughP2P =
           statuses.isP2PDownloadable &&
@@ -412,6 +421,10 @@ export class HybridLoader {
         }
       }
     }
+
+    // A queue pass runs on every playlist refresh, so the owner of a segment
+    // that just appeared fetches it now rather than on the next timer tick.
+    if (!isInitialHttpWait) this.prefetchThroughHttp();
   }
 
   // api method for engines
@@ -441,7 +454,16 @@ export class HybridLoader {
     this.p2pLoaders.currentLoader.downloadSegment(segment);
   }
 
-  private loadRandomThroughHttp() {
+  /**
+   * HTTP prefetching of segments nobody has yet. Each candidate has one
+   * elected owner among the connected peers (see specs/prefetch.md); the
+   * owner fetches at once, everyone else waits for its announcement and
+   * takes the segment over P2P. The others are ranked as backups by the same
+   * scores, and a backup steps in only when waiting any longer would risk
+   * the fetch landing inside the player's high-demand window — judged from
+   * the time left until then and the fetch time this peer expects.
+   */
+  private prefetchThroughHttp() {
     const { httpDownloadInitialTimeoutMs } = this.config;
     const isInitialHttpWait =
       httpDownloadInitialTimeoutMs > 0 &&
@@ -453,25 +475,25 @@ export class HybridLoader {
       this.getAvailableStorageCapacityPercent();
     if (availableStorageCapacityPercent <= 10) return;
 
-    const { simultaneousHttpDownloads, httpErrorRetries } = this.config;
+    const {
+      simultaneousHttpDownloads,
+      httpErrorRetries,
+      highDemandTimeWindow,
+    } = this.config;
     const p2pLoader = this.p2pLoaders.currentLoader;
-
-    if (
-      this.requests.executingHttpCount >= simultaneousHttpDownloads ||
-      !p2pLoader.connectedPeerCount
-    ) {
-      return;
-    }
+    if (!p2pLoader.connectedPeerCount) return;
 
     this.syncPlayback();
-    const segmentsToLoad: SegmentWithStream[] = [];
+    const peerIds = Array.from(p2pLoader.connectedPeerIds);
+
     for (const { segment, statuses } of QueueUtils.generateQueue(
       this.lastRequestedSegment,
       this.playback,
       this.config,
-      this.p2pLoaders.currentLoader,
+      p2pLoader,
       availableStorageCapacityPercent,
     )) {
+      if (this.requests.executingHttpCount >= simultaneousHttpDownloads) break;
       if (
         !statuses.isHttpDownloadable ||
         statuses.isP2PDownloadable ||
@@ -492,41 +514,70 @@ export class HybridLoader {
       ) {
         continue;
       }
-      segmentsToLoad.push(segment);
-    }
 
-    if (!segmentsToLoad.length) return;
+      const rank = ElectionUtils.rankForSegment(
+        this.peerId,
+        peerIds,
+        segment.externalId,
+      );
+      const secondsToHighDemand =
+        getDistanceFromPlayhead(segment, this.playback).start -
+        highDemandTimeWindow * this.playback.rate;
+      const estimatedFetchSeconds = this.estimateFetchSeconds(segment);
 
-    const availableHttpDownloads =
-      simultaneousHttpDownloads - this.requests.executingHttpCount;
-
-    if (availableHttpDownloads === 0) return;
-
-    const peersCount = p2pLoader.connectedPeerCount + 1;
-    const safeRandomSegmentsCount = Math.min(
-      segmentsToLoad.length,
-      simultaneousHttpDownloads * peersCount,
-    );
-
-    const randomIndices = Utils.shuffleArray(
-      Array.from({ length: safeRandomSegmentsCount }, (_, i) => i),
-    );
-
-    let probability = safeRandomSegmentsCount / peersCount;
-
-    for (const randomIndex of randomIndices) {
-      if (this.requests.executingHttpCount >= simultaneousHttpDownloads) {
-        break;
-      }
-
-      if (probability >= 1 || Math.random() <= probability) {
-        const segment = segmentsToLoad[randomIndex];
+      if (
+        ElectionUtils.shouldFetchNow({
+          rank,
+          secondsToHighDemand,
+          estimatedFetchSeconds,
+        })
+      ) {
+        this.logger(
+          `prefetch ${LoggerUtils.getSegmentString(segment)} as ${rank === 0 ? "owner" : `backup #${rank}`}`,
+        );
         this.loadThroughHttp(segment);
       }
-
-      probability--;
-      if (probability <= 0) break;
     }
+  }
+
+  /**
+   * Expected wall-clock seconds to fetch the segment over HTTP: its size,
+   * estimated from segments of the same stream already loaded or else from
+   * the stream's bitrate, over the throughput HTTP transfers have achieved.
+   * With no transfer measured yet the link is assumed to run at the stream's
+   * bitrate, which errs on the side of stepping in early.
+   */
+  private estimateFetchSeconds(segment: SegmentWithStream): number {
+    const { stream } = segment;
+    const duration = Math.max(0, segment.endTime - segment.startTime);
+    const bitrate = stream.properties.bitrate ?? 0;
+
+    const bytes =
+      this.segmentBytesByStream.get(stream.runtimeId) ??
+      (bitrate * duration) / 8;
+    if (bytes <= 0) return duration;
+
+    const { http } = this.bandwidthCalculators;
+    const measured = Math.max(
+      http.getBandwidthLoadingOnly(10),
+      http.getBandwidthLoadingOnly(30),
+    );
+    const bandwidth = measured > 0 ? measured : bitrate;
+    if (bandwidth <= 0) return duration;
+
+    return (bytes * 8) / bandwidth;
+  }
+
+  private noteSegmentBytes(segment: SegmentWithStream, bytes: number) {
+    if (bytes <= 0) return;
+    const key = segment.stream.runtimeId;
+    const previous = this.segmentBytesByStream.get(key);
+    this.segmentBytesByStream.set(
+      key,
+      previous === undefined
+        ? bytes
+        : previous + SEGMENT_BYTES_EWMA_ALPHA * (bytes - previous),
+    );
   }
 
   private abortLastHttpLoadingInQueueAfterItem(

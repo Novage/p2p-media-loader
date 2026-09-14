@@ -44,8 +44,15 @@ type MutableStream = Omit<RegistryStream, "segments"> & {
   timeline: Map<number, number>;
 };
 
+/** One per stream the manifest listed segments for, changed or not. */
 export type RegistryUpdate = {
   readonly streamKey: string;
+  readonly type: StreamType;
+  readonly isLive: boolean;
+  /** Bounds of the listed segments on the stream's manifest timeline. */
+  readonly start: number;
+  readonly end: number;
+  readonly segmentCount: number;
   readonly added: number;
   readonly removed: number;
 };
@@ -72,8 +79,7 @@ export class ManifestRegistry {
       const stream = this.upsertStream(parsed, manifest);
       if (!parsed.segments) continue;
 
-      const update = this.applySegments(stream, parsed, manifest);
-      if (update.added || update.removed) updates.push(update);
+      updates.push(this.applySegments(stream, parsed, manifest));
     }
 
     return updates;
@@ -160,7 +166,23 @@ export class ManifestRegistry {
       if (!stream.segments.has(key)) added++;
       stream.segments.set(key, segment);
     }
-    return { streamKey: stream.key, added, removed };
+
+    let start = Infinity;
+    let end = -Infinity;
+    for (const segment of next.values()) {
+      start = Math.min(start, segment.startTime);
+      end = Math.max(end, segment.endTime);
+    }
+    return {
+      streamKey: stream.key,
+      type: stream.type,
+      isLive: stream.isLive === true,
+      start: next.size ? start : 0,
+      end: next.size ? end : 0,
+      segmentCount: next.size,
+      added,
+      removed,
+    };
   }
 
   /**

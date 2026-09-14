@@ -917,6 +917,28 @@ export type StreamAddedDetails = {
 };
 
 /**
+ * What a processed manifest described, for each stream it listed segments
+ * for. A master playlist lists none and yields no entries; a media playlist
+ * yields one; an MPD yields one per Representation.
+ */
+export type ProcessedStream = {
+  /** The stream key (see `Stream.runtimeId`). */
+  readonly key: string;
+  readonly type: StreamType;
+  readonly isLive: boolean;
+  /** Start of the earliest listed segment on the stream's manifest timeline. */
+  readonly start: number;
+  /** End of the latest listed segment on the same timeline. */
+  readonly end: number;
+  readonly segmentCount: number;
+};
+
+/** The outcome of `Core.processManifest` for a manifest a parser accepted. */
+export type ProcessedManifest = {
+  readonly streams: readonly ProcessedStream[];
+};
+
+/**
  * A segment request the registry could not resolve. See
  * specs/manifest-registry.md, "Divergence between core and the player".
  */

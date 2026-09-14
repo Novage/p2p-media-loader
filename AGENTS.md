@@ -35,12 +35,18 @@ permitted.
 present tense. Where code does not yet match the spec, track the gap in the
 issue tracker.
 
+**`specs/proposals/` is the one exception.** A proposal describes a design the
+system does not have, together with the measurement that would justify
+building it. It is not a spec: nothing in it may be cited as how the system
+behaves. When a proposal is adopted, fold it into the spec it extends and
+delete it; when rejected, delete it.
+
 ## Conventions
 
 - **Package manager: pnpm.** The workspace is `packages/*` and `demo`. Never run
   `npm install` in a workspace package.
 - **Verify before reporting done:** `pnpm type-check`, `pnpm lint`, `pnpm test`,
-  and `npx prettier --check specs/*.md AGENTS.md` when specs changed.
+  and `npx prettier --check "specs/**/*.md" AGENTS.md` when specs changed.
 - Match the surrounding code's style, comment density and naming. The codebase
   favours comments that explain _why_ over comments that restate the code.
 

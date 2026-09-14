@@ -3,6 +3,7 @@ import { Shaka } from "./types.js";
 import {
   Core,
   CoreRequestError,
+  ProcessedManifest,
   byteRangeFromRangeHeader,
 } from "p2p-media-loader-core";
 
@@ -23,6 +24,9 @@ export class Loader {
   constructor(
     private readonly shaka: Shaka,
     private readonly core: Core,
+    private readonly onManifestProcessed?: (
+      manifest: ProcessedManifest,
+    ) => void,
   ) {}
 
   private defaultLoad() {
@@ -45,10 +49,11 @@ export class Loader {
       // runs on the same bytes. Shaka's parsing is untouched.
       loading.promise
         .then((response) => {
-          this.core.processManifest({
+          const processed = this.core.processManifest({
             url: response.uri,
             data: response.data,
           });
+          if (processed) this.onManifestProcessed?.(processed);
         })
         .catch(() => undefined);
     }
