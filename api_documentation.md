@@ -600,8 +600,15 @@ The global namespaces are `window.p2pml.hlsjs` and `window.p2pml.shaka`.
 <script src="https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@latest/dist/p2p-media-loader-shaka.iife.min.js"></script>
 
 <script>
-  // Wait for the DOM and scripts to load
-  document.addEventListener("DOMContentLoaded", async function () {
+  // Wait for the DOM and scripts to load. The IIFE bundle targets ES2015 for
+  // old Smart TV browsers; keep the page's own script at that level too —
+  // promise chains, not async/await, which such browsers fail to parse.
+  document.addEventListener("DOMContentLoaded", function () {
+    // Install Shaka's polyfills first: old browsers lack MediaCapabilities,
+    // which Shaka's variant filtering relies on, and report error 4032
+    // (no playable variant) without them.
+    shaka.polyfill.installAll();
+
     if (shaka.Player.isBrowserSupported()) {
       var videoElement = document.getElementById("video");
       var streamUrl = "https://example.com/stream.mpd";
@@ -611,19 +618,22 @@ The global namespaces are `window.p2pml.hlsjs` and `window.p2pml.shaka`.
 
       ShakaP2PEngine.registerPlugins();
       var shakaP2PEngine = new ShakaP2PEngine({
-        p2p: {
-          core: {
-            swarmId: "Optional custom swarm ID for stream",
-            // Other P2P engine configuration parameters go here
-          },
+        core: {
+          swarmId: "Optional custom swarm ID for stream",
+          // Other P2P engine configuration parameters go here
         },
       });
 
       var player = new shaka.Player();
-      await player.attach(videoElement);
-
-      shakaP2PEngine.bindShakaPlayer(player);
-      await player.load(streamUrl);
+      player
+        .attach(videoElement)
+        .then(function () {
+          shakaP2PEngine.bindShakaPlayer(player);
+          return player.load(streamUrl);
+        })
+        .catch(function (error) {
+          console.error("Shaka error", error);
+        });
     }
   });
 </script>
