@@ -108,6 +108,10 @@ event keeps its shape; it fires once per failing stream, only for
   recognised and never reported.
 - `byteRangeFromRangeHeader(header)` — converts a `Range: bytes=a-b` header to
   the inclusive `ByteRange` the lookup methods take.
+- `identityProperties(streams)` — the identity input for every stream a
+  manifest declares, with `bitrate` kept only where two same-type streams would
+  otherwise be indistinguishable. Exported from the main entry and from
+  `p2p-media-loader-core/server`, so a server reproduces the client's choice.
 - Bundles: `p2p-media-loader-core.es.min.js` carries both parsers;
   `-hls` and `-dash` variants carry one.
 

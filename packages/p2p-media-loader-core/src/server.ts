@@ -35,7 +35,7 @@
  * With a custom `streamSwarmIdBuilder`, apply `computeInfoHash` to the same string
  * the builder returns on the client.
  *
- * @module
+ * @module p2p-media-loader-core/server
  */
 export {
   computeStreamIdentityHash,

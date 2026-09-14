@@ -47,7 +47,7 @@ This library makes it possible to build large-scale P2P mesh networks — often 
   - [Hls.js integration](https://npmjs.com/package/p2p-media-loader-hlsjs)
   - [Shaka Player integration](https://npmjs.com/package/p2p-media-loader-shaka)
 - ES modules CDN
-  - [Core](https://cdn.jsdelivr.net/npm/p2p-media-loader-core@latest/dist/)
+  - [Core](https://cdn.jsdelivr.net/npm/p2p-media-loader-core@latest/dist/) — three builds: `p2p-media-loader-core.es.min.js` with the HLS and MPEG-DASH manifest parsers, `p2p-media-loader-core-hls.es.min.js` and `p2p-media-loader-core-dash.es.min.js` with one. Load exactly one; each carries its own copy of the core
   - [Hls.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/dist/)
   - [Shaka Player integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@latest/dist/)
 - IIFE builds CDN (for older browsers and Smart TVs)

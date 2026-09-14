@@ -1,3 +1,10 @@
+/**
+ * The core: manifest registry, loaders, P2P, playback tracking. Imports no
+ * manifest parser — pick those from `p2p-media-loader-core/hls` and
+ * `p2p-media-loader-core/dash` so a deployment carries only what it plays.
+ *
+ * @module p2p-media-loader-core
+ */
 export { Core } from "./core.js";
 export * from "./types.js";
 export * from "./playback.js";
