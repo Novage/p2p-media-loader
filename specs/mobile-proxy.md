@@ -78,9 +78,11 @@ match to the contract than browser players manage — but only once the
 application has passed a `CmcdConfiguration.Factory`, which means editing how it
 builds its media source. Any integration willing to do that is better served by
 the shim: it is continuous rather than one sample per request, and it knows when
-playback is paused, which CMCD structurally cannot. CMCD is worth reading when a
-host application happens to have already enabled it; it is not a path to a
-shim-free integration.
+playback is paused, which CMCD structurally cannot. Reading CMCD where a host
+application has already enabled it is recorded as a proposal, with the
+measurement that would justify it
+([proposals/cmcd-playback-source.md](proposals/cmcd-playback-source.md)); it
+is not a path to a shim-free integration.
 
 ## Constraints of the environment
 

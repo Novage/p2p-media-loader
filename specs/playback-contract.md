@@ -50,21 +50,23 @@ See [player-adapters.md](player-adapters.md).
 | Source     | Accuracy                          | Available when                      |
 | ---------- | --------------------------------- | ----------------------------------- |
 | `reported` | exact                             | the integration can read the player |
-| `cmcd`     | exact, `bufferAhead` only         | the player emits CMCD               |
 | `inferred` | approximate, blind to quiet seeks | always                              |
 
 A directly readable player always wins. In a browser the media element is free,
-continuous and unconditional, so neither fallback is ever preferred there.
+continuous and unconditional, so the fallback is never preferred there. A third
+source — a player's own CMCD buffer report, for the proxy architecture where
+nothing can read the player — is recorded as a proposal, not built; see
+[proposals/cmcd-playback-source.md](proposals/cmcd-playback-source.md).
 
 ### Staleness
 
-A `reported` or `cmcd` state describes one instant. Core keeps the most recent
-one and treats it as current for a bounded window (on the order of a couple of
-seconds); past that, it falls to the next source down rather than trusting a
-value the player may have long moved on from. A browser adapter reporting on
-media events never approaches the window while playing; a proxy fed one CMCD
-sample per segment routinely does, which is why inference has to be sound on
-its own.
+A `reported` state describes one instant. Core keeps the most recent one and
+treats it as current for a bounded window (on the order of a couple of
+seconds); past that, it falls to inference rather than trusting a value the
+player may have long moved on from. A browser adapter reporting on media events
+never approaches the window while playing; a proxy that could only sample the
+player once per segment would, which is why inference has to be sound on its
+own.
 
 A **paused** report (`rate` 0) does not expire. Media events stop while paused,
 so nothing would refresh it, and falling to inference would decay the estimate
@@ -163,40 +165,6 @@ wrong by the offset this design exists to avoid.
 The third row is the one that motivates the design. Both terms are anchored to
 the same buffer edge, so seeking within a buffered range needs no new
 information from the player and produces no error.
-
-## Reading playback state from CMCD
-
-Where core intercepts requests but cannot read the player — the proxy
-architecture — a player that emits CMCD (CTA-5004) is describing its own buffer
-in the request core is already handling. That is worth using, with two limits.
-
-**It supplies `bufferAhead`; it cannot tell core about a pause.** `rate` is
-taken from the `pr` key when present and defaults to 1 when absent, as the
-specification directs. But paused is undetectable: the specification defines
-`pr=0` as "not playing", yet implementations report the media element's
-`playbackRate` property, which stays at 1 while paused — and more
-fundamentally, CMCD is request-triggered and a pause is the _absence_ of
-requests, so no implementation could report it. A paused player therefore looks
-like a playing one, with the same consequence as under inference.
-
-**It is a sample, not a stream.** The value is written when a request is issued,
-so in steady state it arrives once per segment duration and is stale between
-times. The same staleness rules apply as to a reported state.
-
-Two details decide correctness:
-
-- `dl` is `bl` divided by playback rate, and is preferred when `pr` is present
-  and non-zero, since it is the quantity the player itself derived. Should a
-  conforming implementation ever send `pr=0`, the division is degenerate —
-  scaling `dl` back would report a fully buffered player as having nothing
-  buffered — so `bl` is authoritative whenever `pr` is zero.
-- `bl` may be measured per media track rather than across the presentation —
-  hls.js reports the requested track's forward buffer, Media3 reports the
-  overall buffered duration from the playhead. The two are not interchangeable
-  with each other or with a media element's intersected buffered ranges, so a
-  CMCD reading is used on its own, never blended with another source.
-
-CMCD is disabled by default in every player, so core never depends on it.
 
 ## When the player reports nothing
 
