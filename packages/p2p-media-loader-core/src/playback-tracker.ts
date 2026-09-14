@@ -21,7 +21,12 @@ type SegmentLike = Pick<
 >;
 
 export type PlaybackTrackerConfig = {
-  /** A reported state older than this is stale; fall back to inference. */
+  /**
+   * A reported state older than this is stale; fall back to inference. A
+   * paused report (rate 0) is exempt: nothing moves while paused, and the
+   * one thing that can change — the buffer growing — fires a media event
+   * that reports again.
+   */
   reportStaleAfterMs: number;
   /** Starting guess for the player's buffer target, learned from there. */
   initialBufferTarget: number;
@@ -145,7 +150,11 @@ export class PlaybackTracker {
     const now = this.now();
     const { reported } = this;
 
-    if (reported && now - reported.at <= this.config.reportStaleAfterMs) {
+    const fresh =
+      reported &&
+      (reported.state.rate === 0 ||
+        now - reported.at <= this.config.reportStaleAfterMs);
+    if (reported && fresh) {
       return {
         bufferEdge: this.bufferEdge,
         bufferAhead: reported.state.bufferAhead,

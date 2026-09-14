@@ -244,6 +244,28 @@ describe("PlaybackTracker staleness", () => {
     clock = 2001;
     expect(t.getPlayback().source).toBe("inferred");
   });
+
+  it("keeps a paused report current however long the pause lasts", () => {
+    // Paused, media events stop, so nothing re-reports. Falling back to
+    // inference would decay the estimate as if playing.
+    let clock = 0;
+    const t = new PlaybackTracker(
+      segment(0),
+      { reportStaleAfterMs: 2000 },
+      () => clock,
+    );
+    t.report({ bufferAhead: 20, rate: 0 });
+    clock = 600_000;
+    expect(t.getPlayback()).toMatchObject({
+      bufferAhead: 20,
+      rate: 0,
+      source: "reported",
+    });
+    // Resuming reports a rate again, and staleness applies as before.
+    t.report({ bufferAhead: 20, rate: 1 });
+    clock += 2001;
+    expect(t.getPlayback().source).toBe("inferred");
+  });
 });
 
 describe("PlaybackTracker inference safety", () => {

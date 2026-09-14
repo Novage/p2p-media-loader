@@ -62,8 +62,17 @@ A `reported` or `cmcd` state describes one instant. Core keeps the most recent
 one and treats it as current for a bounded window (on the order of a couple of
 seconds); past that, it falls to the next source down rather than trusting a
 value the player may have long moved on from. A browser adapter reporting on
-media events never approaches the window; a proxy fed one CMCD sample per
-segment routinely does, which is why inference has to be sound on its own.
+media events never approaches the window while playing; a proxy fed one CMCD
+sample per segment routinely does, which is why inference has to be sound on
+its own.
+
+A **paused** report (`rate` 0) does not expire. Media events stop while paused,
+so nothing would refresh it, and falling to inference would decay the estimate
+as though the player were still consuming — a paused viewer would look like one
+about to run dry. Nothing moves while paused; the one thing that can change,
+the buffer growing, fires `progress`, which reports again. The next `play`,
+`seeking` or `ratechange` event replaces the paused report and ordinary
+staleness resumes.
 
 ## The buffer edge
 
