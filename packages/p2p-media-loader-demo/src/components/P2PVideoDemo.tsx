@@ -106,17 +106,16 @@ export const P2PVideoDemo = ({
     data.current.p2pUploaded += bytesLength;
   }, []);
 
+  // Peers are drawn whichever swarm they share — a stream where only the
+  // audio is sharable (a SegmentBase video with a WebM index, say) still
+  // has peers. The graph dedupes by peer id, so a peer on both swarms shows once.
   const onPeerConnect = useCallback((params: PeerDetails) => {
-    if (params.streamType !== "main") return;
-
     setPeers((peers) => {
       return [...peers, { peerId: params.peerId, infoHash: params.infoHash }];
     });
   }, []);
 
   const onPeerClose = useCallback((params: PeerDetails) => {
-    if (params.streamType !== "main") return;
-
     setPeers((peers) => {
       return peers.filter(
         (peer) =>
