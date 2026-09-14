@@ -5,7 +5,10 @@ import type {
   ParsedStream,
   SegmentIndexSource,
 } from "./types.js";
-import { computeStreamIdentityHash } from "../stream-identity.js";
+import {
+  computeStreamIdentityHash,
+  identityProperties,
+} from "../stream-identity.js";
 import { normalizeUrl, segmentKey } from "./url-key.js";
 import { rangeCovers, type SidxBox } from "./mp4-sidx.js";
 
@@ -75,9 +78,12 @@ export class ManifestRegistry {
    */
   apply(manifest: ParsedManifest): RegistryUpdate[] {
     const updates: RegistryUpdate[] = [];
+    // Bitrate enters a stream's identity only where this manifest needs it to
+    // tell same-type streams apart; see specs/segment-identity.md.
+    const identity = identityProperties(manifest.streams);
 
-    for (const parsed of manifest.streams) {
-      const stream = this.upsertStream(parsed, manifest);
+    for (const [i, parsed] of manifest.streams.entries()) {
+      const stream = this.upsertStream(parsed, manifest, identity[i]);
       if (!parsed.segments) continue;
 
       updates.push(
@@ -153,6 +159,7 @@ export class ManifestRegistry {
   private upsertStream(
     parsed: ParsedStream,
     manifest: ParsedManifest,
+    identityInput: StreamProperties,
   ): MutableStream {
     const key = this.resolveStreamKey(parsed, manifest);
     const existing = this.streams.get(key);
@@ -166,7 +173,7 @@ export class ManifestRegistry {
       type: existing?.type ?? parsed.type,
       properties: carriesIdentity ? parsed.properties : existing.properties,
       identityHash: carriesIdentity
-        ? computeStreamIdentityHash(parsed.properties)
+        ? computeStreamIdentityHash(identityInput)
         : existing.identityHash,
       indexSource: parsed.indexSource,
       initSegment: parsed.initSegment ?? existing?.initSegment,

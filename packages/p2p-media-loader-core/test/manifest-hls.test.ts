@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { hlsManifestParser } from "../src/manifest/hls.js";
-import {
-  computeStreamIdentityHash,
-  type StreamProperties,
-} from "../src/index.js";
+import { computeStreamIdentityHash } from "../src/index.js";
 import {
   HLS_LIVE_LL,
   HLS_LIVE_NO_PDT_REFRESH_1,
@@ -17,20 +14,7 @@ import {
 
 const BASE = "https://cdn.example/live/master.m3u8";
 
-// Identical to the constant pinned by both engine parity tests: a rendition
-// parsed from the manifest must hash exactly as the players' extractors did.
-const CANONICAL_1080P: StreamProperties = {
-  bitrate: 4521000,
-  codecs: "avc1.64002a",
-  width: 1920,
-  height: 1080,
-  frameRate: "29.970",
-  videoRange: "SDR",
-};
 const MISSING_METADATA_IDENTITY_HASH = "UYnLxGhQilEV4D0HbCx+kRv0ZF0=";
-// The hls.js parity test hashes an audio track { mp4a.40.2, en-US, "2/0",
-// "English" } to this value; the same rendition parsed from a master must too.
-const AUDIO_TRACK_IDENTITY_HASH = "bdjQ1B4N2yrcTDHyU5j7iDGV9sY=";
 
 describe("hlsManifestParser: master playlist", () => {
   const parsed = hlsManifestParser.parse(HLS_MASTER_WITH_AUDIO, BASE);
@@ -50,10 +34,16 @@ describe("hlsManifestParser: master playlist", () => {
     expect(main.every((s) => s.segments === undefined)).toBe(true);
   });
 
-  it("hashes a variant exactly as the engines' extractors do", () => {
-    expect(computeStreamIdentityHash(main[0].properties)).toBe(
-      computeStreamIdentityHash(CANONICAL_1080P),
-    );
+  it("reads a variant's properties as the manifest states them", () => {
+    // These feed identity unnormalized, so the exact values matter.
+    expect(main[0].properties).toMatchObject({
+      bitrate: 4521000,
+      codecs: "avc1.64002a",
+      width: 1920,
+      height: 1080,
+      videoRange: "SDR",
+    });
+    expect(Number(main[0].properties.frameRate)).toBe(29.97);
   });
 
   it("keeps only video codecs on a video stream", () => {
@@ -85,7 +75,7 @@ describe("hlsManifestParser: master playlist", () => {
     expect(audio[1].properties.channels).toBe("6");
   });
 
-  it("hashes an alternate audio rendition exactly as hls.js does", () => {
+  it("reads an alternate audio rendition's language and channels as written", () => {
     const master = `#EXTM3U
 #EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="a",NAME="English",LANGUAGE="en-US",CHANNELS="2/0",URI="en.m3u8"
 #EXT-X-STREAM-INF:BANDWIDTH=1000000,CODECS="avc1.4d401f,mp4a.40.2",RESOLUTION=640x360,AUDIO="a"
@@ -94,9 +84,13 @@ v.m3u8
     const [rendition] = hlsManifestParser
       .parse(master, BASE)
       .streams.filter((s) => s.type === "secondary");
-    expect(computeStreamIdentityHash(rendition.properties)).toBe(
-      AUDIO_TRACK_IDENTITY_HASH,
-    );
+    expect(rendition.properties).toEqual({
+      bitrate: 0,
+      codecs: "mp4a.40.2",
+      language: "en-US",
+      channels: "2/0",
+      name: "English",
+    });
   });
 
   it("ignores I-frame playlists", () => {

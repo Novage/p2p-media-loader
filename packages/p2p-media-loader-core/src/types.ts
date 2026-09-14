@@ -52,9 +52,11 @@ export type Segment = {
 };
 
 /**
- * Raw stream properties extracted from the manifest's variant or rendition
- * metadata. They define the stream's identity: streams with equal normalized
- * properties are treated as the same stream by all peers.
+ * Raw stream properties as the core read them from the manifest's variant or
+ * rendition metadata. They define the stream's identity: streams with equal
+ * properties are the same stream to every peer. `bitrate` counts only where
+ * the manifest needs it to tell two same-type streams apart (see
+ * specs/segment-identity.md).
  */
 export type StreamProperties = {
   bitrate?: number | null;
@@ -90,8 +92,8 @@ export type Stream = {
   readonly swarmId: string;
 
   /**
-   * Stream identity hash derived from the normalized stream properties.
-   * The same for all peers regardless of the player in use.
+   * Stream identity hash derived from the stream properties as read from the
+   * manifest. The same for all peers regardless of the player in use.
    */
   readonly identityHash: string;
 
@@ -706,7 +708,7 @@ export type StreamSwarmIdBuilderContext = {
   /** Raw stream properties from the manifest. */
   properties: Readonly<StreamProperties>;
 
-  /** Stream identity hash derived from the normalized stream properties. The same for all peers. */
+  /** Stream identity hash derived from the manifest's stream properties. The same for all peers. */
   identityHash: string;
 
   /**

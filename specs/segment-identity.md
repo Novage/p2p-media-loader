@@ -7,9 +7,9 @@ derivation that is sensible but player-specific does not.
 
 ## Stream identity
 
-A stream's swarm membership is derived from normalized manifest properties —
-bitrate, codecs, resolution, language, channels, name, frame rate, video range —
-hashed into an `identityHash`. Streams with equal normalized properties are the
+A stream's swarm membership is derived from its manifest properties — codecs,
+resolution, frame rate, video range, language, channels, name, and where needed
+bitrate — hashed into an `identityHash`. Streams with equal properties are the
 same stream to every peer, regardless of the player in use or the stream's
 position in the manifest.
 
@@ -27,7 +27,25 @@ A `streamSwarmIdBuilder` may override the composition.
 
 Because core parses the manifest itself, the properties feeding `identityHash`
 are read from the manifest rather than from a player's representation of it.
-Every peer hashes the same input.
+Every peer hashes the same input, so nothing is normalized: a codec string, a
+frame rate, a language tag is hashed as the manifest wrote it. The
+normalization the previous protocol carried existed to reconcile what
+different players reported for one rendition; with one parser there is nothing
+to reconcile.
+
+**Bitrate is part of a stream's identity only where the manifest needs it.**
+Bandwidth is the one attribute an origin may recompute on every request: some
+live packagers (Akamai's, for one) publish the encoder's current output as
+`BANDWIDTH`, so two viewers who fetched the master seconds apart read different
+values for the same rendition and, were it hashed, would never meet. Core
+therefore hashes each stream without its bitrate unless another stream of the
+same type in the same manifest would then be indistinguishable — a ladder with
+two rungs at one resolution and codec — in which case those streams, and only
+those, keep it. The decision is a function of the manifest alone, so every peer
+makes the same one; `identityProperties` implements it and is exported for a
+server reproducing the hash. A ladder whose rungs share a resolution _and_ whose
+origin recomputes bandwidth is the one case left unsolved, and it is the one
+where no manifest attribute short of the rendition URL tells the rungs apart.
 
 Two of those inputs need stating for DASH, because a player's own model gives
 different answers:

@@ -21,10 +21,16 @@
  *   computeStreamSwarmId({
  *     swarmId, // the configured swarmId or the manifest URL without query parameters
  *     streamType: "main",
- *     properties: { bitrate, codecs, width, height },
+ *     properties: { codecs, width, height, frameRate, videoRange },
  *   }),
  * );
  * ```
+ *
+ * Pass the properties exactly as the manifest states them — the client does
+ * not normalize them — and include `bitrate` only when another stream of the
+ * same type in the manifest has the same remaining properties; that is the
+ * rule the client applies (see `identityProperties`, which makes the choice
+ * for a whole manifest's streams).
  *
  * With a custom `streamSwarmIdBuilder`, apply `computeInfoHash` to the same string
  * the builder returns on the client.
@@ -33,6 +39,7 @@
  */
 export {
   computeStreamIdentityHash,
+  identityProperties,
   computeStreamSwarmId,
   buildStreamSwarmId,
   computeInfoHash,

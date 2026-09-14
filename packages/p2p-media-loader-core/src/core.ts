@@ -36,7 +36,6 @@ import * as StreamUtils from "./utils/stream.js";
 import {
   buildStreamSwarmId,
   computeInfoHash,
-  computeStreamIdentityHash,
   PEER_PROTOCOL_VERSION,
 } from "./stream-identity.js";
 import { BandwidthCalculator } from "./bandwidth-calculator.js";
@@ -607,7 +606,9 @@ export class Core {
       );
     }
 
-    const identityHash = computeStreamIdentityHash(properties);
+    // Computed by the registry from the whole manifest: bitrate is part of it
+    // only where the manifest needs it to tell same-type streams apart.
+    const { identityHash } = stream;
 
     let streamSwarmId = buildStreamSwarmId(swarmId, stream.type, identityHash);
     if (config.streamSwarmIdBuilder) {

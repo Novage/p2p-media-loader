@@ -14,6 +14,7 @@ export type { SegmentStorage } from "./segment-storage/index.js";
 export { byteRangeFromRangeHeader } from "./manifest/url-key.js";
 export {
   computeStreamIdentityHash,
+  identityProperties,
   computeStreamSwarmId,
   buildStreamSwarmId,
   computeInfoHash,

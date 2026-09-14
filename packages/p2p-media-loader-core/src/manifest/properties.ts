@@ -6,10 +6,9 @@ import { parseCodecs } from "@videojs/vhs-utils/es/codecs.js";
 import type { StreamProperties } from "../types.js";
 
 /**
- * Stream properties from manifest attributes. These feed `identityHash`, so
- * they must produce what the player integrations produced from the same
- * rendition: a peer on hls.js and a peer on Shaka only meet if they hash the
- * same input. The parity tests in the engine packages pin the expected values.
+ * Stream properties from manifest attributes. These feed `identityHash`
+ * unnormalized, so what is read here is what every peer hashes; the golden
+ * vectors in the core tests pin the results.
  */
 
 export type VideoAttributes = {

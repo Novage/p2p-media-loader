@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   computeStreamIdentityHash,
+  identityProperties,
   buildStreamSwarmId,
   computeInfoHash,
   computeStreamSwarmId as computeStreamSwarmIdFromProperties,
@@ -32,6 +33,14 @@ const PROPS = {
     frameRate: "29.970",
     videoRange: "SDR",
   },
+  // What the registry hashes for a rung no other rung shares a resolution with.
+  hls1080pNoBitrate: {
+    codecs: "avc1.64002a",
+    width: 1920,
+    height: 1080,
+    frameRate: "29.970",
+    videoRange: "SDR",
+  },
   decimalAvc1: {
     bitrate: 800000,
     codecs: "avc1.66.30",
@@ -57,37 +66,48 @@ const PROPS = {
 } satisfies Record<string, StreamProperties>;
 
 /**
- * v3: the manifest-driven core. `identityHash` is derived exactly as in v2;
- * the version in the stream swarm ID changed because `externalId` did (see
- * specs/segment-identity.md, "Version discipline").
+ * v3: the manifest-driven core. Properties are hashed as the manifest states
+ * them — every peer reads the same manifest with the same parser, so the v2
+ * normalization (codec case and order, decimal avc1 profiles, language and
+ * channel trimming) is gone — and `bitrate` enters only where a manifest needs
+ * it to tell two same-type streams apart (see specs/segment-identity.md).
  */
 const GOLDEN_VECTORS = [
   {
-    name: "hls 1080p video variant",
+    name: "hls 1080p video variant, bitrate kept",
     props: PROPS.hls1080p,
     streamType: "main" as StreamType,
-    identityHash: "mskAojmI+F5YyLLvSP3sdMO5nII=",
+    identityHash: "iNz0Nm5CRoj3CPnATwZbzOR36hg=",
     streamSwarmId:
-      "v3-https://example.com/hls/master.m3u8-main-mskAojmI+F5YyLLvSP3sdMO5nII=",
-    infoHash: "fvh4iuUKMgvVHaqNX5Fs",
+      "v3-https://example.com/hls/master.m3u8-main-iNz0Nm5CRoj3CPnATwZbzOR36hg=",
+    infoHash: "jAztisioAey83yeI5VCy",
   },
   {
-    name: "decimal RFC 4281 avc1 codec (normalized to hex)",
+    name: "hls 1080p video variant, bitrate dropped",
+    props: PROPS.hls1080pNoBitrate,
+    streamType: "main" as StreamType,
+    identityHash: "SwyTBJzxGFOXIbAZMJWKG3nnIwc=",
+    streamSwarmId:
+      "v3-https://example.com/hls/master.m3u8-main-SwyTBJzxGFOXIbAZMJWKG3nnIwc=",
+    infoHash: "CS1X23XIwC3hMelxmX8z",
+  },
+  {
+    name: "decimal RFC 4281 avc1 codec (hashed as written)",
     props: PROPS.decimalAvc1,
     streamType: "main" as StreamType,
-    identityHash: "NCMJrr57E8a6HDMfQTyx2FBIVq8=",
+    identityHash: "rKuBJ2P4nH1VBYsYeEcZ8JUn3NI=",
     streamSwarmId:
-      "v3-https://example.com/hls/master.m3u8-main-NCMJrr57E8a6HDMfQTyx2FBIVq8=",
-    infoHash: "sBRCOubk+lCjZMykUr0W",
+      "v3-https://example.com/hls/master.m3u8-main-rKuBJ2P4nH1VBYsYeEcZ8JUn3NI=",
+    infoHash: "uXQspfYQVGGZBRkck6tA",
   },
   {
     name: "audio track",
     props: PROPS.audio,
     streamType: "secondary" as StreamType,
-    identityHash: "bdjQ1B4N2yrcTDHyU5j7iDGV9sY=",
+    identityHash: "GT17s2lVP9juJlJgLa8S/8amjhI=",
     streamSwarmId:
-      "v3-https://example.com/hls/master.m3u8-secondary-bdjQ1B4N2yrcTDHyU5j7iDGV9sY=",
-    infoHash: "5eeweTwwBbybnzYjxP3r",
+      "v3-https://example.com/hls/master.m3u8-secondary-GT17s2lVP9juJlJgLa8S/8amjhI=",
+    infoHash: "A6g5A9j7J9F2myVq+nOB",
   },
   {
     name: "missing metadata (bitrate 0 only)",
@@ -102,17 +122,17 @@ const GOLDEN_VECTORS = [
     name: "dash hdr video variant",
     props: PROPS.dashHdr,
     streamType: "main" as StreamType,
-    identityHash: "xRZQlAX26agaIEVBIZ0SppKubi0=",
+    identityHash: "LWIaIik9Y/3BYajY+Nhh6FZBt70=",
     streamSwarmId:
-      "v3-https://example.com/hls/master.m3u8-main-xRZQlAX26agaIEVBIZ0SppKubi0=",
-    infoHash: "eRIJD/hDDWmtWqLgTHyw",
+      "v3-https://example.com/hls/master.m3u8-main-LWIaIik9Y/3BYajY+Nhh6FZBt70=",
+    infoHash: "8j/DDr/IBPiF9kRGBJRV",
   },
 ];
 
 /**
  * v2: the previous protocol, kept as the record of what those peers announce.
- * The identity hashes are unchanged in v3; the swarm IDs and infohashes are
- * what a v2 client still computes, and a v3 client must never produce them.
+ * The identity hashes were derived from normalized properties, which v3 no
+ * longer reproduces; a v3 client must never produce these swarm IDs.
  */
 const V2_VECTORS = [
   {
@@ -194,12 +214,6 @@ describe("stream identity golden vectors (v3 wire protocol)", () => {
 });
 
 describe("stream identity golden vectors (v2, historical)", () => {
-  it("still derives the same identity hashes", () => {
-    for (const vector of V2_VECTORS) {
-      expect(computeIdentityHash(vector.props)).toBe(vector.identityHash);
-    }
-  });
-
   it("v2 swarm IDs hash to the infohashes v2 peers announce", () => {
     for (const vector of V2_VECTORS) {
       expect(computeInfoHash(vector.streamSwarmId)).toBe(vector.infoHash);
@@ -213,48 +227,90 @@ describe("stream identity golden vectors (v2, historical)", () => {
   });
 });
 
-describe("stream identity normalization semantics", () => {
-  it("treats bitrate 0, undefined, and empty props as the same identity", () => {
+describe("stream identity hashes the manifest's properties as given", () => {
+  it("treats a missing bitrate as 0 and null, undefined and empty strings alike", () => {
     const zero = computeIdentityHash({ bitrate: 0 });
     expect(computeIdentityHash({})).toBe(zero);
-    expect(computeIdentityHash({ bitrate: undefined })).toBe(zero);
+    expect(computeIdentityHash({ bitrate: undefined, codecs: null })).toBe(
+      zero,
+    );
+    expect(computeIdentityHash({ codecs: "", name: undefined })).toBe(zero);
   });
 
-  it("is insensitive to codec order and case", () => {
+  it("does not normalize: codec order, case and number formatting all count", () => {
     const base = computeIdentityHash({ codecs: "avc1.64002a,mp4a.40.2" });
-    expect(computeIdentityHash({ codecs: "mp4a.40.2,avc1.64002a" })).toBe(base);
-    expect(computeIdentityHash({ codecs: "AVC1.64002A,MP4A.40.2" })).toBe(base);
+    expect(computeIdentityHash({ codecs: "mp4a.40.2,avc1.64002a" })).not.toBe(
+      base,
+    );
+    expect(computeIdentityHash({ codecs: "AVC1.64002A,MP4A.40.2" })).not.toBe(
+      base,
+    );
+    expect(computeIdentityHash({ frameRate: "29.970" })).not.toBe(
+      computeIdentityHash({ frameRate: 29.97 }),
+    );
+    expect(computeIdentityHash({ language: "en-US" })).not.toBe(
+      computeIdentityHash({ language: "en" }),
+    );
+  });
+});
+
+describe("identityProperties: bitrate only where a manifest needs it", () => {
+  const rung = (height: number, bitrate: number): StreamProperties => ({
+    bitrate,
+    codecs: "avc1.64002a",
+    width: (height * 16) / 9,
+    height,
+    frameRate: 24,
+  });
+  const main = (properties: StreamProperties) => ({
+    type: "main" as StreamType,
+    properties,
   });
 
-  it("normalizes frame rate representations", () => {
-    const base = computeIdentityHash({ frameRate: 29.97 });
-    expect(computeIdentityHash({ frameRate: "29.970" })).toBe(base);
+  it("drops bitrate from a single rendition, so a recomputed BANDWIDTH cannot split its swarm", () => {
+    const [a] = identityProperties([main(rung(1080, 4390000))]);
+    const [b] = identityProperties([main(rung(1080, 5630000))]);
+    expect(a.bitrate).toBeUndefined();
+    expect(computeIdentityHash(a)).toBe(computeIdentityHash(b));
   });
 
-  it("normalizes language to a two-letter lowercase code", () => {
-    const base = computeIdentityHash({ language: "en" });
-    expect(computeIdentityHash({ language: "en-US" })).toBe(base);
-    expect(computeIdentityHash({ language: "EN" })).toBe(base);
-    expect(computeIdentityHash({ language: "und" })).toBe(
-      computeIdentityHash({}),
+  it("drops bitrate across a ladder whose rungs differ in resolution", () => {
+    const ladder = [rung(360, 800000), rung(720, 2500000), rung(1080, 5000000)];
+    const inputs = identityProperties(ladder.map(main));
+    expect(inputs.map((p) => p.bitrate)).toEqual([
+      undefined,
+      undefined,
+      undefined,
+    ]);
+    expect(inputs[2]).toEqual({ ...rung(1080, 5000000), bitrate: undefined });
+  });
+
+  it("keeps bitrate only for the rungs that would otherwise be indistinguishable", () => {
+    const ladder = [
+      rung(720, 2500000),
+      rung(1080, 5000000),
+      rung(1080, 8000000),
+    ];
+    const inputs = identityProperties(ladder.map(main));
+    expect(inputs.map((p) => p.bitrate)).toEqual([undefined, 5000000, 8000000]);
+    expect(computeIdentityHash(inputs[1])).not.toBe(
+      computeIdentityHash(inputs[2]),
     );
   });
 
-  it("normalizes channels to the count before the slash", () => {
-    const base = computeIdentityHash({ channels: 2 });
-    expect(computeIdentityHash({ channels: "2/0" })).toBe(base);
-    expect(computeIdentityHash({ channels: "2" })).toBe(base);
+  it("scopes the comparison to a stream type", () => {
+    // Identical properties on a main and a secondary stream are no clash: the
+    // stream type is part of the swarm ID.
+    const shared = { codecs: "mp4a.40.2", bitrate: 128000 };
+    const inputs = identityProperties([
+      main(shared),
+      { type: "secondary" as StreamType, properties: shared },
+    ]);
+    expect(inputs.map((p) => p.bitrate)).toEqual([undefined, undefined]);
   });
 
-  it("normalizes video range case", () => {
-    expect(computeIdentityHash({ videoRange: "hlg" })).toBe(
-      computeIdentityHash({ videoRange: "HLG" }),
-    );
-  });
-
-  it("normalizes name case and whitespace", () => {
-    expect(computeIdentityHash({ name: " English " })).toBe(
-      computeIdentityHash({ name: "english" }),
-    );
+  it("leaves properties otherwise untouched", () => {
+    const [a] = identityProperties([main(PROPS.audio)]);
+    expect(a).toEqual({ ...PROPS.audio, bitrate: undefined });
   });
 });

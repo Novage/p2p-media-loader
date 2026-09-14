@@ -10,8 +10,12 @@ peers on different players share one swarm. The design is documented in
 `specs/`.
 
 **Wire compatibility:** none with v4. `externalId` is now the HLS media
-sequence number or the DASH presentation time in 100 ms units, so the peer
-protocol version is `v3` and v5 peers form separate swarms from v4 peers.
+sequence number or the DASH presentation time in 100 ms units, and
+`identityHash` hashes the manifest's properties as written — the v4
+normalization is gone, and `bitrate` counts only where a manifest needs it to
+tell two same-type streams apart, so an origin that recomputes `BANDWIDTH` per
+request no longer splits a rendition's swarm. The peer protocol version is
+`v3` and v5 peers form separate swarms from v4 peers.
 Roll a deployment over in one step; mixed versions do not exchange segments,
 and every stream still plays over HTTP.
 
