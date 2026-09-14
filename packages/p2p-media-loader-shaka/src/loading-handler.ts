@@ -21,17 +21,31 @@ type LoadingHandlerResult = shaka.extern.IAbortableOperation<Response>;
 export class Loader {
   private loadArgs!: LoadingHandlerParams;
 
+  /**
+   * Shaka's own http(s) plugin for this browser: fetch where `fetch` and
+   * `AbortController` both exist, XHR otherwise. Old Smart TV browsers have
+   * fetch without AbortController; forcing the fetch plugin there throws
+   * inside Shaka on the first request, before anything plays.
+   */
+  private readonly defaultPlugin: {
+    parse: shaka.extern.SchemePlugin;
+  };
+
   constructor(
     private readonly shaka: Shaka,
     private readonly core: Core,
     private readonly onManifestProcessed?: (
       manifest: ProcessedManifest,
     ) => void,
-  ) {}
+  ) {
+    const { HttpFetchPlugin, HttpXHRPlugin } = shaka.net;
+    this.defaultPlugin = HttpFetchPlugin.isSupported()
+      ? HttpFetchPlugin
+      : HttpXHRPlugin;
+  }
 
   private defaultLoad() {
-    const fetchPlugin = this.shaka.net.HttpFetchPlugin;
-    return fetchPlugin.parse(...this.loadArgs);
+    return this.defaultPlugin.parse(...this.loadArgs);
   }
 
   load(...args: LoadingHandlerParams): LoadingHandlerResult {
@@ -42,7 +56,7 @@ export class Loader {
       return this.loadSegment(url, request);
     }
 
-    const loading = this.defaultLoad() as LoadingHandlerResult;
+    const loading = this.defaultLoad();
     if (requestType === RequestType.MANIFEST) {
       // Every manifest Shaka fetches — master, media playlist, MPD refresh —
       // is handed to the core, which parses it before Shaka's own parser
@@ -70,7 +84,7 @@ export class Loader {
     // registry: Shaka loads it, and the core reads the segment list from the
     // same bytes. Recognition, not lookup — see specs/manifest-registry.md.
     if (this.core.isSegmentIndex(segmentUrl, byteRange)) {
-      const loading = this.defaultLoad() as LoadingHandlerResult;
+      const loading = this.defaultLoad();
       loading.promise
         .then((response) => {
           this.core.processSegmentIndex({
@@ -86,7 +100,7 @@ export class Loader {
     // Whitelist by lookup: a segment the core's registry does not know, or
     // one whose stream has P2P disabled, loads through Shaka's own fetch.
     if (!this.core.isSegmentLoadable(segmentUrl, byteRange)) {
-      return this.defaultLoad() as LoadingHandlerResult;
+      return this.defaultLoad();
     }
 
     const loadSegment = async (): Promise<Response> => {
@@ -128,10 +142,21 @@ export class Loader {
   }
 }
 
+/**
+ * The download time Shaka's bandwidth estimator is told, in milliseconds,
+ * derived from the core's bandwidth hint: a segment may have come from a peer
+ * or from storage, so wall-clock time says nothing useful about the network.
+ *
+ * Never 0. Shaka weights each sample by its duration and computes
+ * `bytes / durationMs`; a 0 ms sample is `Infinity` at weight 0, which the
+ * EWMA turns into `NaN`, after which every variant comparison is false and
+ * the player lurches between renditions — on a TV decoder, into a decode
+ * error at the switch.
+ */
 function getLoadingDurationBasedOnBandwidth(
   bandwidth: number,
   bytesLoaded: number,
 ) {
-  const bits = bytesLoaded * 8;
-  return bandwidth > 0 ? Math.round(bits / bandwidth) * 1000 : 0;
+  if (bandwidth <= 0) return 1;
+  return Math.max(1, Math.round((bytesLoaded * 8 * 1000) / bandwidth));
 }

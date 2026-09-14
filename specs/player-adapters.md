@@ -127,8 +127,26 @@ cares about sharing on live streams should prefer the latter.
 - Manifest: a scheme plugin, filtering on `RequestType.MANIFEST`.
 - Segments: the same plugin, filtering on `RequestType.SEGMENT`. A segment
   request the core recognises as a stream's external index is let through to
-  Shaka's own fetch and its response handed to `processSegmentIndex`.
+  Shaka's own loader and its response handed to `processSegmentIndex`.
 - Playback: the media element.
+
+A served segment's response carries the download time Shaka's bandwidth
+estimator expects, derived from the core's bandwidth hint as
+`bytes × 8000 / bandwidth` milliseconds — wall-clock time is meaningless for a
+segment that came from a peer or from storage — and never less than 1 ms.
+Shaka weights each sample by its duration and divides bytes by it; a 0 ms
+sample is infinity at zero weight, which its moving average turns into `NaN`,
+after which every variant comparison is false and the player lurches between
+renditions. A decoder that cannot switch mid-stream then fails with a decode
+error, which is how the defect surfaced on a Smart TV.
+
+Whatever the plugin does not serve itself goes to the http plugin Shaka would
+have chosen for this browser: `HttpFetchPlugin` where
+`HttpFetchPlugin.isSupported()` — `fetch` and `AbortController` both present —
+and `HttpXHRPlugin` otherwise. Old Smart TV browsers have `fetch` without
+`AbortController`; forcing the fetch plugin there throws inside Shaka on the
+first request, before anything plays, and the IIFE bundle exists for exactly
+those browsers.
 
 No manifest-parser decoration and no `segmentIndex` hooking. Shaka's internal
 representation of the stream is not consulted.

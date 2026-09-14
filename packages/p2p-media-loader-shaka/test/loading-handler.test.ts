@@ -28,7 +28,7 @@ class FakeShakaError extends Error {
   }
 }
 
-function setup(loadable = true) {
+function setup(loadable = true, fetchSupported = true) {
   const manifestResponse = {
     uri: "https://cdn.example/final/master.m3u8",
     data: new TextEncoder().encode("#EXTM3U").buffer,
@@ -37,8 +37,16 @@ function setup(loadable = true) {
     promise: Promise.resolve(manifestResponse),
     abort: () => Promise.resolve(),
   }));
+  const xhrParse = vi.fn(() => ({
+    promise: Promise.resolve(manifestResponse),
+    abort: () => Promise.resolve(),
+  }));
   const shaka = {
-    net: { NetworkingEngine: { RequestType }, HttpFetchPlugin: { parse } },
+    net: {
+      NetworkingEngine: { RequestType },
+      HttpFetchPlugin: { parse, isSupported: () => fetchSupported },
+      HttpXHRPlugin: { parse: xhrParse },
+    },
     util: { AbortableOperation: FakeAbortableOperation, Error: FakeShakaError },
   } as unknown as Shaka;
 
@@ -62,6 +70,7 @@ function setup(loadable = true) {
     loader,
     core,
     parse,
+    xhrParse,
     manifestResponse,
     data,
     processed,
@@ -113,6 +122,31 @@ describe("Shaka loading handler", () => {
     expect(response.uri).toBe(url);
   });
 
+  it("tells Shaka a download time in milliseconds derived from the core's bandwidth hint, never 0", async () => {
+    const { loader, core } = setup();
+    const oneMiB = new Uint8Array(1_048_576).buffer;
+    core.loadSegment.mockResolvedValueOnce({
+      data: oneMiB,
+      bandwidth: 8_000_000,
+    });
+    let response = await loader.load(url, request(), RequestType.SEGMENT)
+      .promise;
+    // 8 388 608 bits at 8 Mbit/s → 1.048576 s.
+    expect(response.timeMs).toBe(1049);
+
+    // Sub-millisecond and unknown-bandwidth cases floor at 1 ms: a 0 ms
+    // sample poisons Shaka's EWMA estimator with NaN.
+    core.loadSegment.mockResolvedValueOnce({
+      data: new Uint8Array(2).buffer,
+      bandwidth: 1_000_000,
+    });
+    response = await loader.load(url, request(), RequestType.SEGMENT).promise;
+    expect(response.timeMs).toBe(1);
+    core.loadSegment.mockResolvedValueOnce({ data: oneMiB, bandwidth: 0 });
+    response = await loader.load(url, request(), RequestType.SEGMENT).promise;
+    expect(response.timeMs).toBe(1);
+  });
+
   it("falls back to Shaka's fetch for a segment the core does not serve", () => {
     const { loader, core, parse } = setup(false);
     loader.load(url, request(), RequestType.SEGMENT);
@@ -152,6 +186,16 @@ describe("Shaka loading handler", () => {
       byteRange: { start: 786, end: 1009 },
       data: manifestResponse.data,
     });
+  });
+
+  it("falls back to Shaka's XHR plugin where the fetch plugin is unsupported", async () => {
+    // Old Smart TV browsers: fetch without AbortController. Shaka itself
+    // registers XHR there; forcing fetch throws inside Shaka.
+    const { loader, parse, xhrParse, core } = setup(true, false);
+    await loader.load(url, request(), RequestType.MANIFEST).promise;
+    expect(xhrParse).toHaveBeenCalledTimes(1);
+    expect(parse).not.toHaveBeenCalled();
+    expect(core.processManifest).toHaveBeenCalledTimes(1);
   });
 
   it("passes licence and key requests through without consulting the core", () => {
