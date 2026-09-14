@@ -95,8 +95,9 @@ declare module "mpd-parser" {
     resolvedUri: string;
     byterange: MpdByteRange;
     duration?: number;
+    /** The period start the index's segments lay out from. */
     timeline?: number;
-    map?: unknown;
+    map?: { uri: string; resolvedUri: string; byterange?: MpdByteRange };
   };
 
   export type MpdPlaylist = {

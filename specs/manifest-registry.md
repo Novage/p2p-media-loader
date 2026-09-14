@@ -104,7 +104,12 @@ way:
 ```ts
 type SegmentIndexSource =
   | { kind: "manifest" }
-  | { kind: "external"; url: string; byteRange: ByteRange };
+  | {
+      kind: "external";
+      url: string;
+      byteRange: ByteRange;
+      periodStart: number;
+    };
 ```
 
 A stream whose index is `external` is registered with its identity, properties
@@ -130,29 +135,44 @@ request as a stream's pending index and hands the response to core, exactly as
 it does for a manifest:
 
 ```ts
+core.isSegmentIndex(url, byteRange); // true for a request covering a registered stream's index range
 core.processSegmentIndex({
   url: string; // the media file the index was read from
-  byteRange: ByteRange; // the range that was fetched
+  byteRange?: ByteRange; // the range that was fetched
   data: ArrayBuffer | ArrayBufferView;
-}): void;
+}): ProcessedManifest | undefined; // the streams that gained segments
 ```
 
-That recognition is a distinct request type in some players (dash.js issues it
+Recognition goes through core, which knows every registered stream's index
+location: a request whose range covers it is the index. Like an initialization
+segment, it is passed through knowingly and never counted as a registry miss.
+In some players recognition is also a distinct request type (dash.js issues it
 as `INDEX_SEGMENT_TYPE`, not `MEDIA_SEGMENT_TYPE`), and an adapter that handles
 only manifest and media types will watch it go by.
 
 Core locates the `sidx` box by walking the MP4 box structure — a player may
 fetch a range wider than the index alone, initialization and index together, so
 the box is never assumed to sit at the start of the response — reads its
-references, and lays the subsegments onto the timeline from their durations.
-Identity is presentation time, so a segment identifies the same way whichever
-index produced it; see [segment-identity.md](segment-identity.md).
+references, and lays the subsegments out as ISO BMFF defines it: the first
+subsegment starts `first_offset` bytes after the end of the `sidx` box itself,
+and each further subsegment follows the previous. The anchor is the box, not
+the manifest's `indexRange`: an index range may hold more than the `sidx` (a
+`uuid` box after it is common, with `first_offset` set to skip it), and
+anchoring on the range's end would place every segment that many bytes too far.
+Players follow the box, so the registry's byte ranges match the requests they
+make. (`mpd-parser` anchors on the range end and is wrong for such files; the
+registry does not mirror it here.) Presentation time accumulates from the
+period start in the box's timescale. Identity is presentation time, so a
+segment identifies the same way whichever index produced it; see
+[segment-identity.md](segment-identity.md).
 
-Two limits are by design: **hierarchical indexes** — references that point at
-further `sidx` boxes rather than at media — are not followed, and 64-bit offsets
-or times beyond the safe integer range are rejected. Both are rare, and neither
-is silently wrong: an index that cannot be resolved leaves its stream without
-P2P, as above.
+Three limits are by design. **Hierarchical indexes** — references that point
+at further `sidx` boxes rather than at media — are not followed. **64-bit
+offsets or times** beyond the safe integer range are rejected. And the index
+must be an ISO BMFF `sidx` box: a **WebM** representation's `indexRange` points
+at an EBML `Cues` element, which is not read, so such streams keep playing
+through the player's own loader. None of the three is silently wrong: an index
+that cannot be resolved leaves its stream without P2P, as above.
 
 ## URL normalization
 

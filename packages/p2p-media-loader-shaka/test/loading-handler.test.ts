@@ -47,6 +47,8 @@ function setup(loadable = true) {
   const onManifestProcessed = vi.fn();
   const core = {
     processManifest: vi.fn(() => processed),
+    isSegmentIndex: vi.fn(() => false),
+    processSegmentIndex: vi.fn(),
     isSegmentLoadable: vi.fn(() => loadable),
     loadSegment: vi.fn(() => Promise.resolve({ data, bandwidth: 1_000_000 })),
     abortSegmentLoading: vi.fn(),
@@ -130,6 +132,25 @@ describe("Shaka loading handler", () => {
     expect(core.abortSegmentLoading).toHaveBeenCalledWith(url, {
       start: 0,
       end: 699,
+    });
+  });
+
+  it("lets Shaka fetch a stream's external index and hands the bytes to the core", async () => {
+    const { loader, core, parse, manifestResponse } = setup(false);
+    core.isSegmentIndex.mockReturnValue(true);
+    const op = loader.load(
+      url,
+      request({ Range: "bytes=786-1009" }),
+      RequestType.SEGMENT,
+    );
+    await op.promise;
+    await Promise.resolve();
+    expect(parse).toHaveBeenCalledTimes(1);
+    expect(core.loadSegment).not.toHaveBeenCalled();
+    expect(core.processSegmentIndex).toHaveBeenCalledWith({
+      url,
+      byteRange: { start: 786, end: 1009 },
+      data: manifestResponse.data,
     });
   });
 

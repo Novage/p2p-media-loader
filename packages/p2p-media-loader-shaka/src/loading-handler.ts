@@ -66,6 +66,23 @@ export class Loader {
   ): LoadingHandlerResult {
     const byteRange = byteRangeFromRangeHeader(originalRequest.headers.Range);
 
+    // A SegmentBase stream's index is not media and never resolves against the
+    // registry: Shaka loads it, and the core reads the segment list from the
+    // same bytes. Recognition, not lookup — see specs/manifest-registry.md.
+    if (this.core.isSegmentIndex(segmentUrl, byteRange)) {
+      const loading = this.defaultLoad() as LoadingHandlerResult;
+      loading.promise
+        .then((response) => {
+          this.core.processSegmentIndex({
+            url: segmentUrl,
+            byteRange,
+            data: response.data,
+          });
+        })
+        .catch(() => undefined);
+      return loading;
+    }
+
     // Whitelist by lookup: a segment the core's registry does not know, or
     // one whose stream has P2P disabled, loads through Shaka's own fetch.
     if (!this.core.isSegmentLoadable(segmentUrl, byteRange)) {

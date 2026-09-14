@@ -199,9 +199,12 @@ silent if it cannot.
 
 Inference re-anchors on two reliable events and integrates between them:
 
-- **Seek** — a requested `externalId` that is not the successor of the previous
-  one means the player jumped, and a jump means its buffer was discarded.
-  `bufferAhead` resets to zero.
+- **Seek** — a requested segment that does not continue the previous one on
+  the timeline — its start is not the previous end, within half a segment —
+  means the player jumped, and a jump means its buffer was discarded.
+  `bufferAhead` resets to zero. Continuity is judged on time, not on
+  `externalId`, whose step is one for HLS but a segment's length in 100 ms
+  units for DASH (see [segment-identity.md](segment-identity.md)).
 - **Buffer full** — a sequential request arriving after an idle gap longer than
   a fraction of a segment duration means the player was not fetching because it
   had nowhere to put the data. `bufferAhead` is at the player's target, which is

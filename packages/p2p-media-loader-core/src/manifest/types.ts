@@ -15,6 +15,8 @@ export type SegmentIndexSource =
       readonly kind: "external";
       readonly url: string;
       readonly byteRange: ByteRange;
+      /** Where the stream's presentation timeline starts; the index's durations lay out from here. */
+      readonly periodStart: number;
     };
 
 /** A media segment as the tokenizer saw it, before the core interprets it. */

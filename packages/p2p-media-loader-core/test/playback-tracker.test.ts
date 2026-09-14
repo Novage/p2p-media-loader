@@ -194,6 +194,39 @@ describe("PlaybackTracker seek detection", () => {
     expect(t.onSegmentRequested(segment(40))).toBe(true);
     expect(t.onSegmentRequested(segment(2))).toBe(true);
   });
+
+  it("judges continuity on the timeline, so DASH ids stepping by 20 are not seeks", () => {
+    // DASH: externalId is presentation time in 100 ms units, 2 s segments.
+    const dash = (i: number, duration = 2) => ({
+      externalId: i * 20,
+      startTime: i * duration,
+      endTime: (i + 1) * duration,
+    });
+    const t = new PlaybackTracker(dash(5), {}, () => 0);
+    expect(t.onSegmentRequested(dash(6))).toBe(false);
+    expect(t.onSegmentRequested(dash(7))).toBe(false);
+    // Skipping one segment is a jump; so is going back.
+    expect(t.onSegmentRequested(dash(9))).toBe(true);
+    expect(t.onSegmentRequested(dash(3))).toBe(true);
+  });
+
+  it("tolerates timeline rounding but not a missing segment", () => {
+    const t = new PlaybackTracker(
+      { externalId: 0, startTime: 0, endTime: 4.0107 },
+      {},
+      () => 0,
+    );
+    expect(
+      t.onSegmentRequested({ externalId: 40, startTime: 4.01, endTime: 8.02 }),
+    ).toBe(false);
+    expect(
+      t.onSegmentRequested({
+        externalId: 120,
+        startTime: 12.03,
+        endTime: 16.04,
+      }),
+    ).toBe(true);
+  });
 });
 
 describe("PlaybackTracker staleness", () => {

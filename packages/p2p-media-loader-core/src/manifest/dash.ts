@@ -98,6 +98,7 @@ function toStream(
           start: 0,
           end: 0,
         },
+        periodStart: sidx.timeline ?? 0,
       }
     : { kind: "manifest" };
 
@@ -109,7 +110,9 @@ function toStream(
     presentationTime: s.presentationTime,
   }));
 
-  const map = playlist.segments[0]?.map;
+  // A SegmentBase representation lists no segments; its init segment hangs
+  // off the index reference instead.
+  const map = playlist.segments[0]?.map ?? sidx?.map;
 
   return {
     // The representation id is the only stable per-stream name an MPD offers.

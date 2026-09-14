@@ -21,9 +21,10 @@ and every stream still plays over HTTP.
 `ShakaP2PEngine.registerPlugins` now registers only the networking schemes;
 Shaka's own manifest parsers are no longer replaced.
 
-DASH `SegmentBase` streams (an index inside the media file, `sidx`) play on
-Shaka without P2P in this version. Support for reading that index is tracked
-in the repository's issue tracker.
+DASH `SegmentBase` streams keep their segment list in a `sidx` box inside the
+media file; the core reads it from the response the player fetches, so these
+streams share like any other. WebM representations index with an EBML `Cues`
+element instead, which the core does not read; they play without P2P.
 
 ### Custom integrations
 
@@ -92,7 +93,12 @@ event keeps its shape; it fires once per failing stream, only for
 
 - `CoreConfig.manifestParsers` and the `p2p-media-loader-core/hls` and
   `p2p-media-loader-core/dash` subpaths.
-- `Core.processManifest({ url, data, protocol? })`.
+- `Core.processManifest({ url, data, protocol? })`, returning what the
+  manifest described per stream.
+- `Core.isSegmentIndex(url, byteRange?)` and
+  `Core.processSegmentIndex({ url, byteRange?, data })` — a DASH
+  `SegmentBase` stream's `sidx` index, recognised and read from the response
+  the player fetched.
 - `onSegmentRegistryMiss` core event — a segment request the registry did not
   know, which the player then loaded itself. Initialization segments are
   recognised and never reported.

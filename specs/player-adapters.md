@@ -125,7 +125,9 @@ cares about sharing on live streams should prefer the latter.
 
 - Parsers: HLS and DASH — Shaka plays both.
 - Manifest: a scheme plugin, filtering on `RequestType.MANIFEST`.
-- Segments: the same plugin, filtering on `RequestType.SEGMENT`.
+- Segments: the same plugin, filtering on `RequestType.SEGMENT`. A segment
+  request the core recognises as a stream's external index is let through to
+  Shaka's own fetch and its response handed to `processSegmentIndex`.
 - Playback: the media element.
 
 No manifest-parser decoration and no `segmentIndex` hooking. Shaka's internal

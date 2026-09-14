@@ -107,6 +107,7 @@ describe("dashManifestParser", () => {
       kind: "external",
       url: "https://cdn.example/dash/video.mp4",
       byteRange: { start: 700, end: 1500 },
+      periodStart: 0,
     });
   });
 });

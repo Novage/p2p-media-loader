@@ -1,8 +1,13 @@
 import { HybridLoader } from "./hybrid-loader.js";
 import type { PlaybackState } from "./playback.js";
 import type { ManifestParser, ManifestProtocol } from "./manifest/types.js";
-import { ManifestRegistry, type RegistryStream } from "./manifest/registry.js";
+import {
+  ManifestRegistry,
+  type RegistryStream,
+  type RegistryUpdate,
+} from "./manifest/registry.js";
 import { segmentKey } from "./manifest/url-key.js";
+import { parseSidx } from "./manifest/mp4-sidx.js";
 import debug from "debug";
 import {
   Stream,
@@ -368,30 +373,81 @@ export class Core {
 
     this.syncStreamsFromRegistry();
 
-    if (this.manifestLogger.enabled) {
-      const changed = updates.filter((u) => u.added || u.removed);
+    this.logRegistryUpdates(manifest.url, updates);
+    return summarize(updates);
+  }
+
+  /**
+   * Resolves a stream's external segment index — the `sidx` box of a DASH
+   * `SegmentBase` representation — from the bytes the player fetched for it.
+   * The stream, registered from the MPD without segments, gains them here.
+   * See specs/manifest-registry.md, "Resolving an external index".
+   *
+   * Never throws. Data with no parsable `sidx` box, or for which no stream is
+   * waiting, changes nothing.
+   *
+   * @param index.url - The media file the index was read from.
+   * @param index.byteRange - The range that was fetched, if the request had one.
+   * @param index.data - The response body, which may be wider than the index.
+   * @returns The streams that gained segments, or `undefined` when none did.
+   */
+  processSegmentIndex(index: {
+    url: string;
+    byteRange?: ByteRange;
+    data: ArrayBuffer | ArrayBufferView;
+  }): ProcessedManifest | undefined {
+    const sidx = parseSidx(index.data);
+    if (!sidx) {
       this.manifestLogger(
-        "%s — %d streams registered, %s",
-        manifest.url,
-        this.streams.size,
-        changed.length
-          ? changed
-              .map((u) => `${u.streamKey}: +${u.added} -${u.removed}`)
-              .join(", ")
-          : "no segment changes",
+        "no sidx box in the index fetched from %s",
+        index.url,
       );
+      return undefined;
     }
 
-    return {
-      streams: updates.map((u) => ({
-        key: u.streamKey,
-        type: u.type,
-        isLive: u.isLive,
-        start: u.start,
-        end: u.end,
-        segmentCount: u.segmentCount,
-      })),
-    };
+    const updates = this.manifestRegistry.resolveExternalIndex(
+      index.url,
+      index.byteRange,
+      sidx,
+    );
+    if (!updates.length) {
+      this.manifestLogger("no stream awaits an index at %s", index.url);
+      return undefined;
+    }
+
+    this.syncStreamsFromRegistry();
+    this.logRegistryUpdates(index.url, updates);
+    return summarize(updates);
+  }
+
+  /**
+   * Whether a request is for a registered stream's external segment index —
+   * the `sidx` range of a DASH `SegmentBase` representation. Such a request
+   * is not a media segment: the adapter lets the player load it and hands the
+   * response to `processSegmentIndex`.
+   *
+   * @param url - The URL the player is about to request.
+   * @param byteRange - Its byte range, if any; a range covering the index counts.
+   */
+  isSegmentIndex(url: string, byteRange?: ByteRange): boolean {
+    return (
+      this.manifestRegistry.streamsAwaitingIndex(url, byteRange).length > 0
+    );
+  }
+
+  private logRegistryUpdates(url: string, updates: RegistryUpdate[]): void {
+    if (!this.manifestLogger.enabled) return;
+    const changed = updates.filter((u) => u.added || u.removed);
+    this.manifestLogger(
+      "%s — %d streams registered, %s",
+      url,
+      this.streams.size,
+      changed.length
+        ? changed
+            .map((u) => `${u.streamKey}: +${u.added} -${u.removed}`)
+            .join(", ")
+        : "no segment changes",
+    );
   }
 
   /**
@@ -707,7 +763,12 @@ export class Core {
     const key = segmentKey(url, byteRange);
     const segment = StreamUtils.getSegmentFromStreamsMap(this.streams, key);
     if (!segment) {
-      if (!this.initSegmentKeys.has(key)) {
+      // Initialization segments and external indexes are recognised and
+      // passed through knowingly; only an unknown URL is a miss.
+      if (
+        !this.initSegmentKeys.has(key) &&
+        !this.isSegmentIndex(url, byteRange)
+      ) {
         this.eventTarget.dispatchEvent("onSegmentRegistryMiss", {
           url,
           byteRange,
@@ -906,4 +967,17 @@ export class Core {
 
 function stripQuery(url: string): string {
   return url.split("?")[0];
+}
+
+function summarize(updates: readonly RegistryUpdate[]): ProcessedManifest {
+  return {
+    streams: updates.map((u) => ({
+      key: u.streamKey,
+      type: u.type,
+      isLive: u.isLive,
+      start: u.start,
+      end: u.end,
+      segmentCount: u.segmentCount,
+    })),
+  };
 }

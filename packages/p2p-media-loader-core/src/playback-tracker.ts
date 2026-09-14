@@ -105,9 +105,12 @@ export class PlaybackTracker {
     this.anchor = segment;
     this.bufferEdge = segment.startTime;
 
+    // Continuity is judged on the timeline, not on `externalId`: HLS ids step
+    // by one, DASH ids by the segment's length in 100 ms units. A retry of the
+    // same segment is not a jump either.
     const isSuccessor =
-      segment.externalId === previous.externalId + 1 ||
-      segment.externalId === previous.externalId;
+      segment.externalId === previous.externalId ||
+      continues(previous, segment);
 
     if (!isSuccessor) {
       this.reanchor(now, 0);
@@ -186,4 +189,18 @@ export class PlaybackTracker {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+/**
+ * Whether `next` starts where `previous` ends, within half the shorter of the
+ * two durations — enough to absorb timeline rounding, not enough to hide a
+ * skipped segment.
+ */
+function continues(previous: SegmentLike, next: SegmentLike): boolean {
+  const tolerance =
+    Math.min(
+      previous.endTime - previous.startTime,
+      next.endTime - next.startTime,
+    ) / 2;
+  return Math.abs(next.startTime - previous.endTime) <= tolerance;
 }

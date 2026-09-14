@@ -7,6 +7,7 @@ import type {
 } from "./types.js";
 import { computeStreamIdentityHash } from "../stream-identity.js";
 import { normalizeUrl, segmentKey } from "./url-key.js";
+import { rangeCovers, type SidxBox } from "./mp4-sidx.js";
 
 /**
  * The manifest-derived registry: every stream and segment the core knows,
@@ -79,9 +80,73 @@ export class ManifestRegistry {
       const stream = this.upsertStream(parsed, manifest);
       if (!parsed.segments) continue;
 
-      updates.push(this.applySegments(stream, parsed, manifest));
+      updates.push(
+        this.applySegments(stream, parsed.segments, manifest.protocol),
+      );
     }
 
+    return updates;
+  }
+
+  /** Streams whose external index a request for this URL and range would fetch. */
+  streamsAwaitingIndex(
+    url: string,
+    byteRange: ByteRange | undefined,
+  ): RegistryStream[] {
+    const wanted = normalizeUrl(url);
+    const result: RegistryStream[] = [];
+    for (const stream of this.streams.values()) {
+      const source = stream.indexSource;
+      if (source.kind !== "external") continue;
+      if (normalizeUrl(source.url) !== wanted) continue;
+      if (!rangeCovers(byteRange, source.byteRange)) continue;
+      result.push(stream);
+    }
+    return result;
+  }
+
+  /**
+   * Lays a stream's segments out from its `sidx` box the way ISO BMFF defines
+   * it, which is the layout the player requests: the first subsegment starts
+   * `firstOffset` bytes after the end of the `sidx` box itself — not after the
+   * declared index range, which may hold further boxes — and the rest follow
+   * each other. Presentation time accumulates from the period start in the
+   * box's timescale. References to further index boxes are not followed.
+   */
+  resolveExternalIndex(
+    url: string,
+    byteRange: ByteRange | undefined,
+    sidx: SidxBox,
+  ): RegistryUpdate[] {
+    const updates: RegistryUpdate[] = [];
+    for (const stream of this.streamsAwaitingIndex(url, byteRange)) {
+      const source = stream.indexSource;
+      if (source.kind !== "external") continue;
+
+      const segments: ParsedSegment[] = [];
+      // The box was found at `boxOffset` within a response that began at the
+      // requested range's start, so this is its position in the file.
+      const boxEnd = (byteRange?.start ?? 0) + sidx.boxOffset + sidx.boxSize;
+      let start = boxEnd + sidx.firstOffset;
+      let presentationTime = source.periodStart;
+      for (const reference of sidx.references) {
+        if (reference.referenceType === 1) continue;
+        const duration = reference.subsegmentDuration / sidx.timescale;
+        segments.push({
+          url: source.url,
+          byteRange: { start, end: start + reference.referencedSize - 1 },
+          duration,
+          sequence: segments.length,
+          presentationTime,
+        });
+        start += reference.referencedSize;
+        presentationTime += duration;
+      }
+
+      const mutable = this.streams.get(stream.key);
+      if (!mutable) continue;
+      updates.push(this.applySegments(mutable, segments, "dash"));
+    }
     return updates;
   }
 
@@ -134,12 +199,11 @@ export class ManifestRegistry {
 
   private applySegments(
     stream: MutableStream,
-    parsed: ParsedStream,
-    manifest: ParsedManifest,
+    segments: readonly ParsedSegment[] = [],
+    protocol: ParsedManifest["protocol"],
   ): RegistryUpdate {
-    const segments = parsed.segments ?? [];
     const next = new Map<string, RegistrySegment>();
-    const times = this.layoutTimeline(stream, segments, manifest.protocol);
+    const times = this.layoutTimeline(stream, segments, protocol);
 
     segments.forEach((s, i) => {
       const key = segmentKey(s.url, s.byteRange);
@@ -148,7 +212,7 @@ export class ManifestRegistry {
         key,
         url: s.url,
         byteRange: s.byteRange,
-        externalId: externalIdOf(s, manifest.protocol),
+        externalId: externalIdOf(s, protocol),
         startTime,
         endTime: startTime + s.duration,
       });
