@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { VideoJsP2PEngine } from "../src/engine.js";
-import type { VhsXhr, VideoJsLike, VideoJsPlayerLike } from "../src/types.js";
+import type {
+  VhsRequestHook,
+  VhsResponseHook,
+  VhsXhr,
+  VideoJsLike,
+  VideoJsPlayerLike,
+} from "../src/types.js";
 
 function fakeVideoJs() {
   const original = Object.assign(vi.fn(), {
@@ -24,15 +30,47 @@ function fakeVideoJs() {
   };
 }
 
+/** A player whose VHS handler carries the hook registry VHS gives one. */
 function fakePlayer() {
+  const xhr = vi.fn() as unknown as VhsXhr;
+  xhr.onRequest = (cb: VhsRequestHook) => {
+    (xhr._requestCallbackSet ??= new Set()).add(cb);
+  };
+  xhr.offRequest = (cb: VhsRequestHook) => xhr._requestCallbackSet?.delete(cb);
+  xhr.onResponse = (cb: VhsResponseHook) => {
+    (xhr._responseCallbackSet ??= new Set()).add(cb);
+  };
+  xhr.offResponse = (cb: VhsResponseHook) =>
+    xhr._responseCallbackSet?.delete(cb);
+
   const player = {
-    tech: vi.fn(() => ({ el: () => null, vhs: undefined })),
+    tech: vi.fn(() => ({ el: () => null, vhs: { xhr } })),
+    // No source yet: nothing for the engine to read on binding.
     currentSrc: vi.fn(() => ""),
     on: vi.fn(),
     off: vi.fn(),
   };
-  return { player: player as unknown as VideoJsPlayerLike, spies: player };
+  return { player: player as unknown as VideoJsPlayerLike, spies: player, xhr };
 }
+
+describe("VideoJsP2PEngine", () => {
+  it("binds one engine to one player without touching anything global", () => {
+    const { videojs, spies, original } = fakeVideoJs();
+    const { player, xhr } = fakePlayer();
+    const engine = new VideoJsP2PEngine({ core: { swarmId: "s" } }, videojs);
+
+    engine.bindPlayer(player);
+    expect(videojs.Vhs.xhr).toBe(original);
+    expect(spies.registerPlugin).not.toHaveBeenCalled();
+    // The player's own request and response hooks carry the integration.
+    expect(xhr._requestCallbackSet?.size).toBe(1);
+    expect(xhr._responseCallbackSet?.size).toBe(1);
+
+    engine.destroy();
+    expect(xhr._requestCallbackSet?.size ?? 0).toBe(0);
+    expect(xhr._responseCallbackSet?.size ?? 0).toBe(0);
+  });
+});
 
 describe("VideoJsP2PEngine plugins", () => {
   it("replaces videojs.Vhs.xhr once, registers the plugin, and restores both on unregister", () => {

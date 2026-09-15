@@ -54,7 +54,7 @@ const PLAYBACK_EVENTS = [
   "waiting",
 ] as const;
 
-/** Routers of every bound engine, consulted by the one global VHS hook. */
+/** Routers of every bound engine, consulted by the global VHS hook. */
 const registry = new RouterRegistry();
 
 /**
@@ -70,12 +70,25 @@ const registry = new RouterRegistry();
  * element. VHS's own manifest parsing runs untouched; the core parses the same
  * bytes itself.
  *
- * `registerPlugins(videojs)` installs the hook once per page and registers the
- * `p2pMediaLoader` video.js plugin; after that either
- * `player.p2pMediaLoader({ core })` or `new VideoJsP2PEngine({ core })` plus
- * `engine.bindPlayer(player)` attaches an engine to a player.
+ * One engine serves one player, and binding it touches nothing outside that
+ * player: it hooks the player's own VHS request and response hooks. The only
+ * request those hooks cannot see is the first manifest of a source, which VHS
+ * sends from inside its source handler before a hook can be attached, so the
+ * engine reads that one manifest itself.
+ *
+ * `registerPlugins(videojs)` is optional. It replaces `videojs.Vhs.xhr` once
+ * per page — which lets bound players catch that first manifest instead of
+ * fetching it again — and registers the `p2pMediaLoader` video.js plugin.
  *
  * @example
+ * // One engine, one player, no page-wide setup
+ * const player = videojs("video", { html5: { vhs: { overrideNative: true } } });
+ * const engine = new VideoJsP2PEngine({ core: { swarmId: "example-swarm-id" } });
+ * engine.bindPlayer(player);
+ * player.src({ src: manifestUrl, type: "application/x-mpegURL" });
+ *
+ * @example
+ * // As a video.js plugin, with the page-wide hook in place
  * VideoJsP2PEngine.registerPlugins(videojs);
  * const player = videojs("video", { html5: { vhs: { overrideNative: true } } });
  * const engine = player.p2pMediaLoader({ core: { swarmId: "example-swarm-id" } });
@@ -115,12 +128,16 @@ export class VideoJsP2PEngine {
   }
 
   /**
-   * Replaces `videojs.Vhs.xhr` — the function VHS calls for every request of
-   * every player — with one that routes bound players' requests through
-   * their engines, and registers the `p2pMediaLoader` plugin. Call once,
-   * before players load a source. The hook does nothing for players without
-   * an engine, and nothing on platforms where VHS stands aside (Safari and
-   * iOS without `overrideNative`).
+   * Optional page-wide setup. It replaces `videojs.Vhs.xhr` — the function
+   * VHS calls for every request of every player — with one that hands a
+   * bound player the first manifest request of each source, the one request
+   * a player's own hooks cannot see; without it every bound engine fetches
+   * that manifest a second time for itself. It also registers the
+   * `p2pMediaLoader` plugin. Call it once, before players load a source.
+   *
+   * The replacement does nothing for players without an engine, and nothing
+   * on platforms where VHS stands aside (Safari and iOS without
+   * `overrideNative`).
    *
    * @param input The video.js namespace; defaults to the global one.
    */
@@ -167,8 +184,10 @@ export class VideoJsP2PEngine {
   }
 
   /**
-   * Attaches the engine to a video.js player. Its requests are then routed
-   * through the core, from the first manifest of the next source it loads.
+   * Attaches the engine to a video.js player, hooking that player's own VHS
+   * request and response hooks. Its playlists, MPDs and segments go through
+   * the core from then on, whether it has a source already or loads one
+   * later. Nothing outside this player is touched.
    *
    * @param player The video.js player.
    */
@@ -179,7 +198,7 @@ export class VideoJsP2PEngine {
     this.player = player;
     this.router = new RequestRouter(this.core, player, this.videojs);
     registry.add(this.router);
-    this.router.attachHook();
+    this.router.ensureTopLevelManifest();
     player.on("loadstart", this.handleLoadStart);
     player.on("dispose", this.handleDispose);
     this.registerMediaElement();
@@ -232,9 +251,9 @@ export class VideoJsP2PEngine {
     this.core.removeEventListener(eventName, listener);
   }
 
-  /** A new source brings a new VHS handler with its own xhr to tag. */
+  /** A new source brings a new VHS handler, with its own xhr to hook. */
   private handleLoadStart = () => {
-    this.router?.attachHook();
+    this.router?.ensureTopLevelManifest();
     this.registerMediaElement();
   };
 
@@ -243,7 +262,7 @@ export class VideoJsP2PEngine {
   };
 
   private registerMediaElement() {
-    const element = this.player?.tech(true).el();
+    const element = this.player?.tech(true)?.el();
     if (
       typeof HTMLMediaElement === "undefined" ||
       !(element instanceof HTMLMediaElement) ||

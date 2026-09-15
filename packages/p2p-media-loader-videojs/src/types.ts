@@ -33,7 +33,10 @@ export type VhsResponse = {
   statusCode: number;
   headers?: Record<string, string>;
   body?: unknown;
+  /** The requested URL, before any redirect. */
   url?: string;
+  /** The request object the response was read from. */
+  rawRequest?: VhsRequest;
 };
 
 export type VhsCallback = (error: Error | null, response: VhsResponse) => void;
@@ -88,7 +91,7 @@ export type VhsXhr = ((
 };
 
 /** A VHS rendition as `vhs.representations()` lists them. */
-type VhsRepresentation = {
+export type VhsRepresentation = {
   id: string;
   width?: number;
   height?: number;
@@ -96,7 +99,8 @@ type VhsRepresentation = {
   enabled(enable?: boolean): boolean | undefined;
 };
 
-type VhsHandlerLike = {
+/** The VHS handler behind a player's tech. */
+export type VhsHandlerLike = {
   xhr: VhsXhr;
   representations?(): VhsRepresentation[];
 };

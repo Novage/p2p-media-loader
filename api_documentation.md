@@ -125,17 +125,14 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
      player.initialize(videoElement, manifestUrl, true);
      ```
 
-   - video.js 8 integration — the engine replaces `videojs.Vhs.xhr` once per
-     page and registers a `p2pMediaLoader` plugin; HLS and MPEG-DASH both
+   - video.js 8 integration — the engine serves the player, through the
+     request and response hooks VHS gives that player; HLS and MPEG-DASH both
      play through VHS:
 
      ```typescript
      import videojs from "video.js";
      import "video.js/dist/video-js.css";
      import { VideoJsP2PEngine } from "p2p-media-loader-videojs";
-
-     // Once per page, before any player loads a source
-     VideoJsP2PEngine.registerPlugins(videojs);
 
      const player = videojs(videoElement, {
        // VHS stands aside for native HLS on Safari and iOS unless told otherwise
@@ -145,7 +142,8 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
          nativeVideoTracks: false,
        },
      });
-     const engine = player.p2pMediaLoader({
+
+     const engine = new VideoJsP2PEngine({
        core: {
          swarmId: "Optional custom swarm ID for stream",
          // Other P2P engine configuration parameters go here
@@ -154,10 +152,40 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
      engine.addEventListener("onPeerConnect", (params) => {
        console.log("Peer connected:", params.peerId);
      });
+     engine.bindPlayer(player);
 
      // or "application/dash+xml" for an MPD
      player.src({ src: streamUrl, type: "application/x-mpegURL" });
      ```
+
+     Binding touches nothing outside the player, so several players can run
+     side by side, each with its own engine and its own swarm. The one request
+     a player's hooks cannot see is the first manifest of a source, which VHS
+     sends from inside its source handler before any hook exists; the engine
+     fetches that one manifest itself. A page that would rather not pay for
+     that second fetch, or that wants video.js's plugin API, can install the
+     page-wide hook once:
+
+     ```typescript
+     // Once per page, before any player loads a source
+     VideoJsP2PEngine.registerPlugins(videojs);
+
+     const player = videojs(videoElement, {
+       html5: {
+         vhs: { overrideNative: true },
+         nativeAudioTracks: false,
+         nativeVideoTracks: false,
+       },
+     });
+     const engine = player.p2pMediaLoader({
+       core: { swarmId: "Optional custom swarm ID for stream" },
+     });
+     player.src({ src: streamUrl, type: "application/x-mpegURL" });
+     ```
+
+     It replaces `videojs.Vhs.xhr`, carrying over the hook registry VHS keeps
+     there, so a bound player catches its first manifest as it passes instead
+     of fetching it again. Players bound with `bindPlayer` benefit from it too.
 
    - video.js 10 — there is no video.js engine to hook here. v10 dropped VHS
      and plays through media adapters powered by hls.js
@@ -1039,7 +1067,9 @@ first.
 
 video.js 8 plays HLS and MPEG-DASH through VHS (`@videojs/http-streaming`), so
 one import map serves both; it maps the core and both parsers to the core
-bundle that carries them. For video.js 10, see the next section.
+bundle that carries them. One engine serves one player, through that player's
+own VHS hooks; `VideoJsP2PEngine.registerPlugins(videojs)` is optional and is
+covered in the npm section above. For video.js 10, see the next section.
 
 ```html
 <!doctype html>
@@ -1077,9 +1107,6 @@ bundle that carries them. For video.js 10, see the next section.
     <script type="module">
       import { VideoJsP2PEngine } from "p2p-media-loader-videojs";
 
-      // Once per page, before any player loads a source
-      VideoJsP2PEngine.registerPlugins(videojs);
-
       const player = videojs("video", {
         html5: {
           // VHS stands aside for native HLS on Safari and iOS unless told otherwise
@@ -1089,7 +1116,7 @@ bundle that carries them. For video.js 10, see the next section.
         },
       });
 
-      const engine = player.p2pMediaLoader({
+      const engine = new VideoJsP2PEngine({
         core: {
           swarmId: "Optional custom swarm ID for stream",
           // Other P2P engine configuration parameters go here
@@ -1098,6 +1125,7 @@ bundle that carries them. For video.js 10, see the next section.
       engine.addEventListener("onPeerConnect", (params) => {
         console.log("Peer connected:", params.peerId);
       });
+      engine.bindPlayer(player);
 
       player.src({
         src: "https://example.com/stream.m3u8",
@@ -1340,9 +1368,6 @@ pair it with the P2P Media Loader IIFE bundle, which targets ES2015.
   document.addEventListener("DOMContentLoaded", function () {
     var VideoJsP2PEngine = window.p2pml.videojs.VideoJsP2PEngine;
 
-    // Once per page, before any player loads a source
-    VideoJsP2PEngine.registerPlugins(videojs);
-
     var player = videojs("video", {
       html5: {
         vhs: { overrideNative: true },
@@ -1351,12 +1376,13 @@ pair it with the P2P Media Loader IIFE bundle, which targets ES2015.
       },
     });
 
-    player.p2pMediaLoader({
+    var engine = new VideoJsP2PEngine({
       core: {
         swarmId: "Optional custom swarm ID for stream",
         // Other P2P engine configuration parameters go here
       },
     });
+    engine.bindPlayer(player);
 
     player.src({
       src: "https://example.com/stream.m3u8",

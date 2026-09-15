@@ -28,11 +28,6 @@ export const VideoJs = ({
   const qualityRef = useRef<HTMLSelectElement>(null);
 
   useEffect(() => {
-    VideoJsP2PEngine.registerPlugins(videojs);
-    return () => VideoJsP2PEngine.unregisterPlugins(videojs);
-  }, []);
-
-  useEffect(() => {
     if (!containerRef.current || !qualityRef.current) return;
 
     // video.js replaces the element it is given, so it gets one of its own.

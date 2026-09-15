@@ -257,37 +257,52 @@ lower is left alone.
   (`@videojs/http-streaming`), which is built on the same `m3u8-parser` and
   `mpd-parser` the core uses, so a video.js integration and the core interpret
   a manifest through identical code.
-- Manifest and segments: `videojs.Vhs.xhr`, replaced once per page by
-  `VideoJsP2PEngine.registerPlugins(videojs)`. VHS routes every request of
-  every player — playlists, MPDs, media and initialization segments, keys,
-  `sidx` — through a per-player xhr function that runs the player's and the
-  global `onRequest` hooks and then calls `videojs.Vhs.xhr` whenever its
-  `original` flag is not `true`. The replacement carries the original's hook
-  registry over (`onRequest`, `onResponse`, their `off` counterparts and the
-  callback sets), since VHS reads them off `videojs.Vhs.xhr`. Requests are told
-  apart by VHS's `requestType`.
+- Manifest and segments: the `onRequest` and `onResponse` hooks VHS puts on
+  each player's own xhr function, `player.tech().vhs.xhr`. VHS routes every
+  request of that player — playlists, MPDs, media and initialization segments,
+  keys, `sidx` — through that function, which runs the hooks and tells them
+  apart by VHS's `requestType`. One engine serves one player and touches
+  nothing else on the page.
 - Playback: the media element behind `player.tech()`.
 
-Attributing a request to a player: each bound engine adds an `onRequest` hook
-to its player's VHS xhr that tags the options with the engine. The first
-manifest request of a source fires synchronously inside VHS's source handler,
-before any hook can be attached, so an untagged request is matched to a bound
-player by its `currentSrc()` and that player's hook is attached on the spot;
-an untagged request no player claims goes to `videojs.xhr` untouched. A
-change of `currentSrc()` between manifest requests starts a new stream
-context; a playlist or MPD refresh does not.
+Playlists and MPDs are read by the response hook, which sees the bytes VHS
+received, under the response URL, which follows redirects. A media segment the
+registry knows, on a stream with P2P enabled, is served by the core: the
+request hook puts an object of the adapter's own in `options.xhr`, which
+`@videojs/xhr` drives in place of an `XMLHttpRequest` — opening it, sending it,
+and reading the status and response off it — so a served segment reaches VHS
+through the same path an HTTP one does. It carries a preset `bandwidth`, which
+VHS's callback wrapper keeps instead of measuring one from the wall clock,
+meaningless for a segment that came from a peer or from storage. A `sidx`
+response goes to `processSegmentIndex`. Initialization segments, keys, content
+steering and clock sync are left alone. A core failure completes the request as
+an error, which VHS retries by its own rules. An abort — VHS's, or the timeout
+`@videojs/xhr` applies to every request — aborts the core request and then
+completes for nobody, as an aborted `XMLHttpRequest` does; VHS does not wait on
+requests it has aborted. VHS's own wrapper sets `aborted` on the request before
+calling `abort`, so the adapter records a cancellation of its own rather than
+reading that flag back.
 
-Playlists and MPDs pass through to `videojs.xhr` with the completion wrapped,
-so the core reads the bytes — under the response URL, which follows redirects
-— before VHS parses them. A media segment the registry knows, on a stream with
-P2P enabled, is served by the core: the object handed back to VHS carries the
-data, a 200 status and a preset `bandwidth`, which VHS's callback wrapper keeps
-instead of measuring one from the wall clock — meaningless for a segment that
-came from a peer or from storage. A `sidx` request passes through and its
-bytes go to `processSegmentIndex`. Initialization segments, keys, content
-steering and clock sync pass through untouched. An abort from VHS aborts the
-core request and completes as aborted; a core failure completes as an errored
-request, which VHS retries by its own rules.
+**The first manifest of a source reaches no hook.** VHS sends it from inside
+its source handler, which is where the player's xhr function and its hook
+registry are created, so nothing can be attached in front of it. An engine
+bound to a player therefore fetches that one manifest itself, once per source,
+and hands it to the core. Replacing `videojs.Vhs.xhr` — the function every
+player's xhr function delegates to — is what removes that second fetch:
+`VideoJsP2PEngine.registerPlugins(videojs)` installs a replacement that matches
+an unhooked request to a bound player by its `currentSrc()`, attaches that
+player's hooks on the spot and hands the core the manifest as it passes. The
+replacement carries VHS's hook registry over (`onRequest`, `onResponse`, their
+`off` counterparts and the callback sets), since VHS reads them off
+`videojs.Vhs.xhr`, and it also registers the `p2pMediaLoader` video.js plugin.
+It is an optimization and a convenience, not a requirement: with or without it
+the hooks do the work, and a change of `currentSrc()` between manifests starts
+a new stream context while a playlist or MPD refresh does not.
+
+A player whose hooks are attached no longer runs the page's global VHS hooks:
+VHS consults the global callback sets only for players that have none of their
+own. An integrator who relies on `videojs.Vhs.xhr.onRequest` for a bound player
+should move those hooks to that player.
 
 VHS exposes no presentation-delay setting comparable to the other engines': it
 starts a live stream at its own seekable end, honouring `EXT-X-START` and
@@ -296,8 +311,8 @@ starts a live stream at its own seekable end, honouring `EXT-X-START` and
 **On Safari and iOS there is nothing to intercept** unless the integrator opts
 into `overrideNative`: VHS stands aside by default there — `overrideNative`
 defaults to `!(IS_ANY_SAFARI || IS_IOS)` — so HLS plays natively through the
-media element and no request passes through `videojs.Vhs.xhr`. Opting in
-requires MSE and alters playback behaviour on exactly those platforms.
+media element and no request passes through a VHS hook. Opting in requires MSE
+and alters playback behaviour on exactly those platforms.
 
 ## Players the boundary is drawn to accommodate
 
