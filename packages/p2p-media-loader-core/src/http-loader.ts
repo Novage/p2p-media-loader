@@ -206,6 +206,18 @@ export class HttpRequestExecutor {
         );
       }
 
+      // A 200 with no body is not a segment. Nothing downstream would notice:
+      // it would be stored, announced, seeded to peers and appended by the
+      // player, which is a stall or a rendition exclusion rather than an error.
+      // Failing the attempt leaves the retry rules to deal with it.
+      if (this.request.loadedBytes === 0) {
+        this.request.clearLoadedBytes();
+        throw new RequestError<"http-bytes-mismatch">(
+          "http-bytes-mismatch",
+          "HTTP response carried no bytes",
+        );
+      }
+
       const isValid = await this.request.validateData(
         this.httpConfig.validateHTTPSegment,
       );

@@ -266,9 +266,10 @@ checks of segment runtime IDs).
 ### Tightened read-only types
 
 - `ByteRange.start`/`ByteRange.end` are now `readonly`.
-- `SegmentResponse.data` may reference the buffer the core keeps in segment
-  storage for P2P upload: treat it as read-only and copy it (`data.slice(0)`)
-  before transferring it to a worker.
+- `SegmentResponse.data` is the caller's own copy of the segment, never the
+  buffer the core keeps in segment storage for P2P upload. It may be modified,
+  and transferred to a worker the way players transmux; an integration that
+  cloned it before doing so no longer needs to.
 
 ### `SegmentStorage` interface
 

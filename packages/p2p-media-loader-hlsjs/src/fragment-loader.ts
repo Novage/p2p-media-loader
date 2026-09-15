@@ -82,10 +82,10 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       stats.total = loadedBytes;
       stats.loaded = loadedBytes;
 
-      // hls.js transfers the ArrayBuffer to a Web Worker for transmuxing, which
-      // detaches the ArrayBuffer and sets its byteLength to 0. We clone it here
-      // to keep our cached ArrayBuffer intact for seeding to other peers.
-      const engineData = this.#response.data.slice(0);
+      // hls.js transfers this buffer to its transmuxing worker, which detaches
+      // it. That is safe: what the core hands over is already the engine's own
+      // copy, and what it seeds to peers is a buffer no consumer ever sees.
+      const engineData = this.#response.data;
 
       if (this.#callbacks.onProgress) {
         this.#callbacks.onProgress(this.stats, context, engineData, null);

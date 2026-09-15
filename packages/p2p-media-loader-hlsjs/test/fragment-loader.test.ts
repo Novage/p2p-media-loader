@@ -62,11 +62,10 @@ describe("hls.js fragment loader", () => {
     await Promise.resolve();
     expect(callbacks.onSuccess).toHaveBeenCalledTimes(1);
     const [response] = vi.mocked(callbacks.onSuccess).mock.calls[0];
-    // hls.js transfers the buffer to a worker: the core's copy must survive.
-    expect(response.data).not.toBe(data);
-    expect(new Uint8Array(response.data as ArrayBuffer)).toEqual(
-      new Uint8Array(data),
-    );
+    // What the core hands over is already the engine's own copy, so it goes
+    // to hls.js as it is — which is free to transfer it to its worker. The
+    // core's guarantee is covered by its own tests.
+    expect(response.data).toBe(data);
   });
 
   it("passes a fragment without a range as a plain URL", () => {

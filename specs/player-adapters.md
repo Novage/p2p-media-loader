@@ -57,9 +57,11 @@ Two details adapters routinely get wrong:
 - **Byte ranges must round-trip exactly.** A segment defined by
   `EXT-X-BYTERANGE` is identified by URL _and_ range; dropping the range
   collides distinct segments.
-- **Returned buffers may be transferred.** Players that hand data to a worker
-  for transmuxing detach the `ArrayBuffer`. Clone before yielding it, or core's
-  cached copy is destroyed and cannot be seeded to peers.
+- **Returned buffers are the adapter's own.** Players that hand data to a
+  worker for transmuxing detach the `ArrayBuffer`, and that is safe here: core
+  copies at the boundary and never lets a consumer reach what it seeds
+  ([architecture.md](architecture.md)). Do not clone again — the copy is
+  already made, and a second one is pure cost on every segment played.
 
 ## 3. Report playback state
 

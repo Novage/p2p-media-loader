@@ -146,7 +146,20 @@ export class HybridLoader {
           stream.streamSwarmId,
           segment.externalId,
         );
-        if (data) {
+        // Byte length as well as presence: a stored segment that reads back
+        // empty is a storage that let its buffer be detached, and serving it
+        // would hand the player nothing while looking like a hit. Load it
+        // again instead — at once, because the queue still counts the segment
+        // as held and would leave this request waiting on nothing — and say so
+        // loudly enough to be found.
+        if (data?.byteLength === 0) {
+          this.logger(
+            `storage returned an empty segment for ${LoggerUtils.getSegmentString(segment)}; loading it again`,
+          );
+          engineRequest.markAsShouldBeStartedImmediately();
+        }
+
+        if (data && data.byteLength > 0) {
           const { queueDownloadRatio } = this.generateQueue();
           engineRequest.resolve(data, this.getBandwidth(queueDownloadRatio));
           this.playbackTracker.onSegmentDelivered(segment);

@@ -84,11 +84,45 @@ disagrees with the player's about what a URL means, the lookup misses, the
 adapter falls back to its default loader, and playback is unaffected. The
 failure mode of a parse disagreement is _no P2P_, never _wrong bytes_.
 
+**Core owns the bytes it seeds.** What is stored is what peers are served, so
+nothing a player can reach may alias it: the segment handed to an adapter is a
+copy, made in the one place bytes leave core. Players transfer the buffer they
+are given to a transmuxing worker — hls.js and video.js's VHS both do — and a
+transfer detaches the buffer it came from, leaving `byteLength` 0. Were that
+the stored buffer, the peer would go on announcing the segment and uploading
+nothing, while its own player was served nothing on any later request: a stream
+that plays perfectly and shares emptiness. Copying at the boundary rather than
+in each adapter means no integration can get it wrong, and a prefetched segment
+the player never asks for is never copied at all.
+
 **The active variant is implied, not declared.** Core learns which rendition is
 playing from the last requested segment. A player must fetch a media playlist
 before it can know that playlist's segment URLs, so core has always parsed a
 variant before the first segment request from it arrives — including
 immediately after an ABR switch.
+
+## Nothing empty enters the swarm
+
+A segment of no bytes is not a segment, and it is contagious: stored, it is
+announced and uploaded, and every peer that takes it stores and announces it in
+turn, while each of their players is handed nothing and stalls or drops the
+rendition. Core therefore refuses a zero-length segment at every boundary it
+can be met at.
+
+- **From a server.** An HTTP response that carries no bytes fails the attempt;
+  the retry rules then apply as they do to any failure.
+- **From a peer.** A `SegmentData` command announcing zero bytes is a protocol
+  error and the connection is dropped. A peer with nothing to send says so with
+  `SegmentAbsent`. Zero is meaningful only as the remainder of a resumed
+  transfer, where the bytes are already held.
+- **To a peer.** A stored segment that reads back empty is never uploaded;
+  `SegmentAbsent` is sent instead.
+- **To the player.** A stored segment that reads back empty is not a hit: the
+  segment is loaded again, at once.
+
+The last two can only happen where a storage implementation does not own its
+bytes, so both are logged rather than passed over quietly — a peer that seeds
+nothing is otherwise indistinguishable from a peer with no peers.
 
 ## Why manifests are observed, not polled
 

@@ -123,7 +123,7 @@ function createStream(segmentCount: number): StreamWithSegments {
   return stream;
 }
 
-const storage = {
+const emptyStorage = {
   hasSegment: () => false,
   getSegmentData: () => Promise.resolve(undefined),
   onSegmentRequested: () => undefined,
@@ -132,10 +132,22 @@ const storage = {
   getUsage: () => ({ totalCapacity: 100, usedCapacity: 0 }),
 } as unknown as SegmentStorage;
 
+/** A storage holding one segment, with whatever bytes the test wants. */
+const storageHolding = (segmentId: number, data: ArrayBuffer) =>
+  ({
+    ...emptyStorage,
+    hasSegment: (_swarmId: string, _streamSwarmId: string, id: number) =>
+      id === segmentId,
+    getSegmentData: () => Promise.resolve(data),
+  }) as unknown as SegmentStorage;
+
 /** Lets the queued microtask run processQueue. */
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-function setup(configOverrides: Partial<StreamConfig> = {}) {
+function setup(
+  configOverrides: Partial<StreamConfig> = {},
+  storage: SegmentStorage = emptyStorage,
+) {
   const stream = createStream(30);
   const segment = (i: number) => stream.segments.get(`seg-${i}`)!;
   const config: StreamConfig = {
@@ -282,6 +294,50 @@ describe("HybridLoader: making room for a high-demand segment", () => {
     expect(state.httpAborted).toEqual([]);
     expect(status(8)).toBe("loading");
     expect(state.httpStarted).toEqual(["seg-0"]);
+    loader.destroy();
+  });
+});
+
+describe("HybridLoader: a stored segment that reads back empty", () => {
+  beforeEach(() => {
+    vi.stubGlobal("window", globalThis);
+    const { state } = fakes;
+    state.peerCount = 0;
+    state.loadedBySomeone.clear();
+    state.httpStarted.length = 0;
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("is not delivered to the player, and the segment is loaded again", async () => {
+    // A storage implementation that let its buffer be detached: it still
+    // reports the segment, and hands back nothing.
+    const { loader, segment, callbacks, state } = setup(
+      {},
+      storageHolding(0, new ArrayBuffer(0)),
+    );
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+
+    expect(callbacks.onSuccess).not.toHaveBeenCalled();
+    expect(state.httpStarted).toEqual(["seg-0"]);
+    loader.destroy();
+  });
+
+  it("is delivered when the bytes are there", async () => {
+    const { loader, segment, callbacks, state } = setup(
+      {},
+      storageHolding(0, new Uint8Array([1, 2, 3]).buffer),
+    );
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+
+    expect(callbacks.onSuccess).toHaveBeenCalledTimes(1);
+    // The queue moves on to the next segment; this one is not fetched again.
+    expect(state.httpStarted).not.toContain("seg-0");
     loader.destroy();
   });
 });

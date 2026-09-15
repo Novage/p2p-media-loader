@@ -1151,9 +1151,10 @@ export type SegmentResponse = {
   /**
    * Segment data as an ArrayBuffer.
    *
-   * May reference the same buffer the core keeps in segment storage for P2P
-   * upload. Treat it as read-only and never transfer it to a worker — copy it
-   * first (e.g. `data.slice(0)`), otherwise peers receive corrupted segments.
+   * The caller's own copy, never the buffer the core keeps in segment storage
+   * for P2P upload. It may be modified, and transferred to a worker the way
+   * players transmux — doing so detaches it here and leaves what peers are
+   * served untouched.
    */
   data: ArrayBuffer;
 
