@@ -20,7 +20,7 @@ export const PLAYERS = {
   plyr_dashjs: "Plyr",
   mediaElement_dashjs: "MediaElement",
   videojs10_dashjs: "video.js 10",
-  videojs: "video.js",
+  videojs: "video.js 8",
 } as const;
 // The live streams specs/verification.md lists. (The previous HLS default's
 // master playlist now references a variant that does not exist.)
