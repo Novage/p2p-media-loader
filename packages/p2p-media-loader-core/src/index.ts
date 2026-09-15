@@ -19,6 +19,7 @@ export type {
 } from "./manifest/types.js";
 export type { SegmentStorage } from "./segment-storage/index.js";
 export { byteRangeFromRangeHeader } from "./manifest/url-key.js";
+export { liveDelayFor, type LiveDelay } from "./live-delay.js";
 export {
   computeStreamIdentityHash,
   identityProperties,

@@ -1,12 +1,12 @@
-import type { ProcessedManifest } from "p2p-media-loader-core";
+import type { ProcessedManifest } from "./types.js";
 
 /**
  * Where the player sits in a live window. Mirrors the hls.js adapter: as deep
  * as the window allows, one segment inside the tail, never more than a
- * minute behind the edge. Shaka's own buffering goal then leaves the rest of
- * the window ahead of the buffer for peers to exchange, and Shaka's own
+ * minute behind the edge. The player's own buffering goal then leaves the
+ * rest of the window ahead of the buffer for peers to exchange, and its own
  * out-of-window handling covers a playhead that drifts past the tail.
- * See specs/player-adapters.md, "Shaka Player".
+ * Shared by the Shaka and dash.js adapters; see specs/player-adapters.md.
  */
 const MAX_LIVE_LATENCY = 60;
 const LIVE_TAIL_MARGIN_SEGMENTS = 1;

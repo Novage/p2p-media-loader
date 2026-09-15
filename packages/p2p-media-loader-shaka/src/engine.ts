@@ -6,7 +6,6 @@ import {
   P2PMLShakaData,
 } from "./types.js";
 import { Loader } from "./loading-handler.js";
-import { liveDelayFor } from "./live-delay.js";
 import { hlsManifestParser } from "p2p-media-loader-core/hls";
 import { dashManifestParser } from "p2p-media-loader-core/dash";
 import {
@@ -18,6 +17,7 @@ import {
   ProcessedManifest,
   debug,
   getPlaybackStateFromMediaElement,
+  liveDelayFor,
 } from "p2p-media-loader-core";
 
 /** A type for specifying dynamic configuration options that can be changed at runtime for the P2P engine's core. */
@@ -40,7 +40,7 @@ export type PartialShakaP2PEngineConfig = {
 
 /**
  * Presentation delay until the first live manifest says how wide the window
- * is; from then on the delay follows the window (see live-delay.ts). Only
+ * is; from then on the delay follows the window (see the core's liveDelayFor). Only
  * applied when the integrator left Shaka's own default in place.
  */
 const INITIAL_LIVE_EDGE_DELAY = 25;

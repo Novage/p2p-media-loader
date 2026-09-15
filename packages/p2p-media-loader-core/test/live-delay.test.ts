@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ProcessedManifest } from "p2p-media-loader-core";
+import type { ProcessedManifest } from "../src/index.js";
 import { liveDelayFor } from "../src/live-delay.js";
 
 const stream = (
