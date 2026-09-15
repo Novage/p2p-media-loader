@@ -31,6 +31,7 @@ import { DashJsVidstack } from "./players/dashjs/DashJsVidstack";
 import { DashJsDPlayer } from "./players/dashjs/DashJsDPlayer";
 import { DashJsPlyr } from "./players/dashjs/DashJsPlyr";
 import { DashJsMediaElement } from "./players/dashjs/DashJsMediaElement";
+import { VideoJs } from "./players/videojs/VideoJs";
 
 type DemoProps = {
   streamUrl?: string;
@@ -69,6 +70,7 @@ const playerComponents = {
   dplayer_dashjs: DashJsDPlayer,
   plyr_dashjs: DashJsPlyr,
   mediaElement_dashjs: DashJsMediaElement,
+  videojs: VideoJs,
 } as const;
 
 type PeerState = {

@@ -19,10 +19,19 @@ are run against this matrix in the demo before they are considered done.
 | DASH     | live | `SegmentTemplate` `$Number$`      | `https://livesim2.dashif.org/livesim2/testpic_2s/Manifest.mpd`                                                         | `type="dynamic"`, MPD refresh, availability window                                                                                                                                                                    |
 | DASH     | live | `SegmentTimeline`                 | `https://livesim2.dashif.org/livesim2/segtimeline_1/testpic_2s/Manifest.mpd`                                           | explicit `S` timeline, `$Time$` addressing                                                                                                                                                                            |
 
+video.js plays every stream in the table except the Netflix `SegmentBase` one:
+VHS lays that stream's subsegments out through `mpd-parser`, which anchors them
+on the end of the index range rather than the `sidx` box (see
+[manifest-registry.md](manifest-registry.md)), requests media 6297 bytes too
+far, and fails with `MEDIA_ERR_DECODE` with or without P2P. The registry, which
+anchors correctly, does not know the ranges VHS asks for, so those requests
+pass through untouched — the right outcome for a player asking for bytes that
+are not segments.
+
 Not in the table on purpose: `dash264/TestCases/2a/qualcomm/1/MultiResMPEG2.mpd` is a `SegmentBase` stream whose media Chrome refuses to append (Shaka error 3014), on Shaka's own demo page as much as here. It is not a P2P problem; do not use it to judge one.
 
 Every stream is played on every engine that supports its protocol: hls.js for
-HLS; dash.js for DASH; Shaka Player for both.
+HLS; dash.js for DASH; Shaka Player and video.js for both.
 
 ## Isolating a test swarm
 

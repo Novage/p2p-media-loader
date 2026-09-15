@@ -127,15 +127,15 @@ and source maps are emitted alongside, as for every other bundle.
 ## Where the engine packages fit
 
 `<script type="module">` and IIFE consumers load an **engine** bundle, not core.
-`p2p-media-loader-hlsjs`, `p2p-media-loader-shaka` and `p2p-media-loader-dashjs`
-each build `esm`, `esm-min`, `iife` and `iife-min`. The two kinds carry
-different things.
+`p2p-media-loader-hlsjs`, `p2p-media-loader-shaka`, `p2p-media-loader-dashjs`
+and `p2p-media-loader-videojs` each build `esm`, `esm-min`, `iife` and
+`iife-min`. The two kinds carry different things.
 
 The **IIFE** bundles inline core and the engine's parsers: one file, no import
 map, no load order. Parser selection happened at engine build time —
 `p2p-media-loader-hlsjs` imports the HLS parser only, `p2p-media-loader-dashjs`
-the DASH parser only, `p2p-media-loader-shaka` both, because Shaka plays both —
-and is invisible to the page.
+the DASH parser only, `p2p-media-loader-shaka` and `p2p-media-loader-videojs`
+both, because Shaka and VHS play both — and is invisible to the page.
 
 The **ESM** bundles inline neither. They import `p2p-media-loader-core` and the
 parser subpaths by bare specifier, and the page's import map resolves those
@@ -143,11 +143,12 @@ specifiers. Every one of them must point at the **same** core bundle — one
 module instance, so one core, with the parsers exported from the same file —
 and that bundle must carry the parsers the engine imports:
 
-| Engine                    | Specifiers to map                                                                  | Core bundle                            |
-| ------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------- |
-| `p2p-media-loader-hlsjs`  | `p2p-media-loader-core`, `p2p-media-loader-core/hls`                               | `p2p-media-loader-core-hls.es.min.js`  |
-| `p2p-media-loader-shaka`  | `p2p-media-loader-core`, `p2p-media-loader-core/hls`, `p2p-media-loader-core/dash` | `p2p-media-loader-core.es.min.js`      |
-| `p2p-media-loader-dashjs` | `p2p-media-loader-core`, `p2p-media-loader-core/dash`                              | `p2p-media-loader-core-dash.es.min.js` |
+| Engine                     | Specifiers to map                                                                  | Core bundle                            |
+| -------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------- |
+| `p2p-media-loader-hlsjs`   | `p2p-media-loader-core`, `p2p-media-loader-core/hls`                               | `p2p-media-loader-core-hls.es.min.js`  |
+| `p2p-media-loader-shaka`   | `p2p-media-loader-core`, `p2p-media-loader-core/hls`, `p2p-media-loader-core/dash` | `p2p-media-loader-core.es.min.js`      |
+| `p2p-media-loader-dashjs`  | `p2p-media-loader-core`, `p2p-media-loader-core/dash`                              | `p2p-media-loader-core-dash.es.min.js` |
+| `p2p-media-loader-videojs` | `p2p-media-loader-core`, `p2p-media-loader-core/hls`, `p2p-media-loader-core/dash` | `p2p-media-loader-core.es.min.js`      |
 
 A missing entry fails at module resolution, loudly, before anything runs.
 Mapping the specifiers to different files loads two cores (see the warning
@@ -194,8 +195,10 @@ report.
 an unused export, a clone is not automatically a defect: two methods that read
 the same today may be answering to different requirements tomorrow, and pulling
 them together couples them. So this is a budget, not a prohibition —
-`.jscpd.json` fails the run above 1% duplicated lines, roughly three times what
-the code carries now.
+`.jscpd.json` fails the run above 1% duplicated lines. Four engine classes
+delegating the same public methods to core bring the figure close to that line
+on purpose: the budget is spent on those, and any new clone has to justify
+itself against it.
 
 It reads only what is published. The demo deliberately repeats itself: each
 player page is a complete, standalone integration, which is the whole of its

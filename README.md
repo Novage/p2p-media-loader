@@ -47,15 +47,18 @@ This library makes it possible to build large-scale P2P mesh networks — often 
   - [Hls.js integration](https://npmjs.com/package/p2p-media-loader-hlsjs)
   - [Shaka Player integration](https://npmjs.com/package/p2p-media-loader-shaka)
   - [dash.js integration](https://npmjs.com/package/p2p-media-loader-dashjs)
+  - [video.js integration](https://npmjs.com/package/p2p-media-loader-videojs)
 - ES modules CDN
   - [Core](https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/) — three builds: `p2p-media-loader-core.es.min.js` with the HLS and MPEG-DASH manifest parsers, `p2p-media-loader-core-hls.es.min.js` and `p2p-media-loader-core-dash.es.min.js` with one. Load exactly one; each carries its own copy of the core
   - [Hls.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@^5/dist/)
   - [Shaka Player integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@^5/dist/)
   - [dash.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-dashjs@^5/dist/)
+  - [video.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-videojs@^5/dist/)
 - IIFE builds CDN (for older browsers and Smart TVs)
   - [Hls.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@^5/dist/p2p-media-loader-hlsjs.iife.min.js)
   - [Shaka Player integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@^5/dist/p2p-media-loader-shaka.iife.min.js)
   - [dash.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-dashjs@^5/dist/p2p-media-loader-dashjs.iife.min.js)
+  - [video.js integration](https://cdn.jsdelivr.net/npm/p2p-media-loader-videojs@^5/dist/p2p-media-loader-videojs.iife.min.js)
 
 ## Web Browsers Support
 
@@ -70,7 +73,7 @@ This library makes it possible to build large-scale P2P mesh networks — often 
 
 - Supports live and VOD streams over HLS or MPEG-DASH protocols
 - Supports multiple HTML5 video players and engines:
-  - Engines: Hls.js, Shaka Player, dash.js
+  - Engines: Hls.js, Shaka Player, dash.js, video.js (VHS)
   - Video players: [Vidstack](https://www.vidstack.io/), [Clappr](http://clappr.io/), [MediaElement](https://www.mediaelementjs.com/), [Plyr](https://plyr.io/), [DPlayer](https://dplayer.diygod.dev/), [OpenPlayerJS](https://www.openplayerjs.com/), [PlayerJS](https://playerjs.com/) , and others that support Hls.js or Shaka video engines. These players can be integrated via custom integration with the library API.
 - Supports adaptive bitrate streaming of HLS and MPEG-DASH protocols
 - Supports DRM-protected and encrypted streams, including Widevine, PlayReady, FairPlay, and HLS AES-128:

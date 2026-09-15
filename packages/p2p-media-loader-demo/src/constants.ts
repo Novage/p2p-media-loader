@@ -18,13 +18,14 @@ export const PLAYERS = {
   dplayer_dashjs: "DPlayer",
   plyr_dashjs: "Plyr",
   mediaElement_dashjs: "MediaElement",
+  videojs: "video.js",
 } as const;
 // The live streams specs/verification.md lists. (The previous HLS default's
 // master playlist now references a variant that does not exist.)
 export const DEFAULT_STREAM =
   "https://fcc3ddae59ed.us-west-2.playback.live-video.net/api/video/v1/us-west-2.893648527354.channel.DmumNckWFTqz.m3u8";
 // Three video renditions, so quality switching can be exercised on live DASH.
-export const DEFAULT_DASH_STREAM =
+const DEFAULT_DASH_STREAM =
   "https://livesim2.dashif.org/livesim2/testpic4_8s/Manifest.mpd";
 
 /**

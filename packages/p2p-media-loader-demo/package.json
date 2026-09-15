@@ -57,8 +57,10 @@
     "p2p-media-loader-dashjs": "workspace:*",
     "p2p-media-loader-hlsjs": "workspace:*",
     "p2p-media-loader-shaka": "workspace:*",
+    "p2p-media-loader-videojs": "workspace:*",
     "plyr": "^3.8.4",
-    "shaka-player": "^5.2.9"
+    "shaka-player": "^5.2.9",
+    "video.js": "^8.24.0"
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",

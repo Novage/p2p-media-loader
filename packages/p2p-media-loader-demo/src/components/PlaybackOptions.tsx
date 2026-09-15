@@ -21,9 +21,12 @@ export const PlaybackOptions = ({
   const hlsPlayers: Partial<Record<PlayerKey, PlayerName>> = {};
   const shakaPlayers: Partial<Record<PlayerKey, PlayerName>> = {};
   const dashjsPlayers: Partial<Record<PlayerKey, PlayerName>> = {};
+  const videojsPlayers: Partial<Record<PlayerKey, PlayerName>> = {};
 
   Object.entries(PLAYERS).forEach(([key, name]) => {
-    if (key.includes("dashjs")) {
+    if (key.includes("videojs")) {
+      videojsPlayers[key as PlayerKey] = name;
+    } else if (key.includes("dashjs")) {
       dashjsPlayers[key as PlayerKey] = name;
     } else if (key.includes("hls")) {
       hlsPlayers[key as PlayerKey] = name;
@@ -94,6 +97,15 @@ export const PlaybackOptions = ({
           {Object.keys(dashjsPlayers).length > 0 && (
             <optgroup label="dash.js P2P Engine (DASH only)">
               {Object.entries(dashjsPlayers).map(([key, name]) => (
+                <option key={key} value={key}>
+                  {name}
+                </option>
+              ))}
+            </optgroup>
+          )}
+          {Object.keys(videojsPlayers).length > 0 && (
+            <optgroup label="video.js P2P Engine (HLS & DASH)">
+              {Object.entries(videojsPlayers).map(([key, name]) => (
                 <option key={key} value={key}>
                   {name}
                 </option>

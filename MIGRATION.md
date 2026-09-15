@@ -62,6 +62,18 @@ the other engines: map `p2p-media-loader-core` and `p2p-media-loader-core/dash`
 to `p2p-media-loader-core-dash.es.min.js`. Low-latency DASH, which dash.js
 loads through `FetchLoader`, plays through the player without P2P.
 
+### New package: `p2p-media-loader-videojs`
+
+video.js gets an adapter too. `VideoJsP2PEngine.registerPlugins(videojs)`
+replaces `videojs.Vhs.xhr` once per page — the function VHS calls for every
+request — and registers a `p2pMediaLoader` plugin, so
+`player.p2pMediaLoader({ core })` (or `new VideoJsP2PEngine({ core })` plus
+`bindPlayer(player)`) attaches an engine to a player. HLS and MPEG-DASH both
+play through VHS, so its bundles map `p2p-media-loader-core`,
+`p2p-media-loader-core/hls` and `p2p-media-loader-core/dash` to
+`p2p-media-loader-core.es.min.js`. On Safari and iOS VHS stands aside unless
+`overrideNative` is set, and nothing is shared there.
+
 ### Custom integrations
 
 A custom integration must supply the manifest parsers for the protocols its

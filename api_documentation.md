@@ -4,6 +4,7 @@
   - [Hls.js integration](https://npmjs.com/package/p2p-media-loader-hlsjs)
   - [Shaka Player integration](https://npmjs.com/package/p2p-media-loader-shaka)
   - [dash.js integration](https://npmjs.com/package/p2p-media-loader-dashjs)
+  - [video.js integration](https://npmjs.com/package/p2p-media-loader-videojs)
 
 **P2P Media Loader** is an open-source JavaScript library that leverages modern web browser features, such as HTML5 video and WebRTC, to enable media delivery over peer-to-peer (P2P) networks. It integrates smoothly with many popular HTML5 video players and works entirely without browser plugins or add-ons. Experience it in action with our [demo](http://novage.com.ua/p2p-media-loader/demo.html).
 
@@ -27,8 +28,14 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
      ```
 
    - For dash.js integration:
+
      ```bash
      npm install p2p-media-loader-dashjs
+     ```
+
+   - For video.js integration:
+     ```bash
+     npm install p2p-media-loader-videojs
      ```
 
 1. Import and use it in your project:
@@ -111,6 +118,40 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
      const player = MediaPlayer().create();
      engine.bindPlayer(player); // before initialize()
      player.initialize(videoElement, manifestUrl, true);
+     ```
+
+   - video.js integration — the engine replaces `videojs.Vhs.xhr` once per
+     page and registers a `p2pMediaLoader` plugin; HLS and MPEG-DASH both
+     play through VHS:
+
+     ```typescript
+     import videojs from "video.js";
+     import "video.js/dist/video-js.css";
+     import { VideoJsP2PEngine } from "p2p-media-loader-videojs";
+
+     // Once per page, before any player loads a source
+     VideoJsP2PEngine.registerPlugins(videojs);
+
+     const player = videojs(videoElement, {
+       // VHS stands aside for native HLS on Safari and iOS unless told otherwise
+       html5: {
+         vhs: { overrideNative: true },
+         nativeAudioTracks: false,
+         nativeVideoTracks: false,
+       },
+     });
+     const engine = player.p2pMediaLoader({
+       core: {
+         swarmId: "Optional custom swarm ID for stream",
+         // Other P2P engine configuration parameters go here
+       },
+     });
+     engine.addEventListener("onPeerConnect", (params) => {
+       console.log("Peer connected:", params.peerId);
+     });
+
+     // or "application/dash+xml" for an MPD
+     player.src({ src: streamUrl, type: "application/x-mpegURL" });
      ```
 
 For additional examples using npm packages, please refer to our [React demo](https://github.com/Novage/p2p-media-loader/tree/main/packages/p2p-media-loader-demo/src/components/players).
@@ -877,12 +918,85 @@ first.
 </script>
 ```
 
+### Integrating P2P with video.js
+
+video.js plays HLS and MPEG-DASH through VHS (`@videojs/http-streaming`), so
+one import map serves both; it maps the core and both parsers to the core
+bundle that carries them.
+
+```html
+<!doctype html>
+<html>
+  <head>
+    <link
+      href="https://cdn.jsdelivr.net/npm/video.js@^8/dist/video-js.min.css"
+      rel="stylesheet"
+    />
+    <!-- video.js as a global; its ESM build is not needed here -->
+    <script src="https://cdn.jsdelivr.net/npm/video.js@^8/dist/video.min.js"></script>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "p2p-media-loader-core": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core.es.min.js",
+          "p2p-media-loader-core/hls": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core.es.min.js",
+          "p2p-media-loader-core/dash": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core.es.min.js",
+          "p2p-media-loader-videojs": "https://cdn.jsdelivr.net/npm/p2p-media-loader-videojs@^5/dist/p2p-media-loader-videojs.es.min.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <video
+      id="video"
+      class="video-js"
+      controls
+      autoplay
+      muted
+      playsinline
+      style="width: 800px"
+    ></video>
+
+    <script type="module">
+      import { VideoJsP2PEngine } from "p2p-media-loader-videojs";
+
+      // Once per page, before any player loads a source
+      VideoJsP2PEngine.registerPlugins(videojs);
+
+      const player = videojs("video", {
+        html5: {
+          // VHS stands aside for native HLS on Safari and iOS unless told otherwise
+          vhs: { overrideNative: true },
+          nativeAudioTracks: false,
+          nativeVideoTracks: false,
+        },
+      });
+
+      const engine = player.p2pMediaLoader({
+        core: {
+          swarmId: "Optional custom swarm ID for stream",
+          // Other P2P engine configuration parameters go here
+        },
+      });
+      engine.addEventListener("onPeerConnect", (params) => {
+        console.log("Peer connected:", params.peerId);
+      });
+
+      player.src({
+        src: "https://example.com/stream.m3u8",
+        type: "application/x-mpegURL", // "application/dash+xml" for an MPD
+      });
+    </script>
+  </body>
+</html>
+```
+
 ## Using P2P Media Loader in older browsers and Smart TVs (IIFE)
 
 For legacy environments that lack ES module support (such as older Smart TVs and deprecated browsers), you can utilize our IIFE builds. In these builds, the library components are exposed via global variables instead of ES module imports.
 
-The global namespaces are `window.p2pml.hlsjs`, `window.p2pml.shaka` and
-`window.p2pml.dashjs`.
+The global namespaces are `window.p2pml.hlsjs`, `window.p2pml.shaka`,
+`window.p2pml.dashjs` and `window.p2pml.videojs`.
 
 ### Integrating P2P with a standalone Hls.js player (IIFE)
 
@@ -992,6 +1106,48 @@ pair it with the P2P Media Loader IIFE bundle, which targets ES2015.
     var player = dashjs.MediaPlayer().create();
     engine.bindPlayer(player); // before initialize(): it replaces the player's loader
     player.initialize(videoElement, streamUrl, true);
+  });
+</script>
+```
+
+### Integrating P2P with video.js (IIFE)
+
+```html
+<link
+  href="https://cdn.jsdelivr.net/npm/video.js@^8/dist/video-js.min.css"
+  rel="stylesheet"
+/>
+<script src="https://cdn.jsdelivr.net/npm/video.js@^8/dist/video.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p2p-media-loader-videojs@^5/dist/p2p-media-loader-videojs.iife.min.js"></script>
+
+<script>
+  // Keep the page's own script at ES2015: no async/await and no trailing
+  // commas in argument lists, which old Smart TV browsers fail to parse.
+  document.addEventListener("DOMContentLoaded", function () {
+    var VideoJsP2PEngine = window.p2pml.videojs.VideoJsP2PEngine;
+
+    // Once per page, before any player loads a source
+    VideoJsP2PEngine.registerPlugins(videojs);
+
+    var player = videojs("video", {
+      html5: {
+        vhs: { overrideNative: true },
+        nativeAudioTracks: false,
+        nativeVideoTracks: false,
+      },
+    });
+
+    player.p2pMediaLoader({
+      core: {
+        swarmId: "Optional custom swarm ID for stream",
+        // Other P2P engine configuration parameters go here
+      },
+    });
+
+    player.src({
+      src: "https://example.com/stream.m3u8",
+      type: "application/x-mpegURL", // "application/dash+xml" for an MPD
+    });
   });
 </script>
 ```

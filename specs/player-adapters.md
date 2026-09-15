@@ -231,6 +231,54 @@ minutes in and resumes only when the player falls behind the edge again.
 Each of the three settings is a ceiling: one the integrator already holds
 lower is left alone.
 
+### video.js
+
+- Parsers: HLS and DASH — video.js plays both through VHS
+  (`@videojs/http-streaming`), which is built on the same `m3u8-parser` and
+  `mpd-parser` the core uses, so a video.js integration and the core interpret
+  a manifest through identical code.
+- Manifest and segments: `videojs.Vhs.xhr`, replaced once per page by
+  `VideoJsP2PEngine.registerPlugins(videojs)`. VHS routes every request of
+  every player — playlists, MPDs, media and initialization segments, keys,
+  `sidx` — through a per-player xhr function that runs the player's and the
+  global `onRequest` hooks and then calls `videojs.Vhs.xhr` whenever its
+  `original` flag is not `true`. The replacement carries the original's hook
+  registry over (`onRequest`, `onResponse`, their `off` counterparts and the
+  callback sets), since VHS reads them off `videojs.Vhs.xhr`. Requests are told
+  apart by VHS's `requestType`.
+- Playback: the media element behind `player.tech()`.
+
+Attributing a request to a player: each bound engine adds an `onRequest` hook
+to its player's VHS xhr that tags the options with the engine. The first
+manifest request of a source fires synchronously inside VHS's source handler,
+before any hook can be attached, so an untagged request is matched to a bound
+player by its `currentSrc()` and that player's hook is attached on the spot;
+an untagged request no player claims goes to `videojs.xhr` untouched. A
+change of `currentSrc()` between manifest requests starts a new stream
+context; a playlist or MPD refresh does not.
+
+Playlists and MPDs pass through to `videojs.xhr` with the completion wrapped,
+so the core reads the bytes — under the response URL, which follows redirects
+— before VHS parses them. A media segment the registry knows, on a stream with
+P2P enabled, is served by the core: the object handed back to VHS carries the
+data, a 200 status and a preset `bandwidth`, which VHS's callback wrapper keeps
+instead of measuring one from the wall clock — meaningless for a segment that
+came from a peer or from storage. A `sidx` request passes through and its
+bytes go to `processSegmentIndex`. Initialization segments, keys, content
+steering and clock sync pass through untouched. An abort from VHS aborts the
+core request and completes as aborted; a core failure completes as an errored
+request, which VHS retries by its own rules.
+
+VHS exposes no presentation-delay setting comparable to the other engines': it
+starts a live stream at its own seekable end, honouring `EXT-X-START` and
+`HOLD-BACK` where present. The adapter leaves that placement alone.
+
+**On Safari and iOS there is nothing to intercept** unless the integrator opts
+into `overrideNative`: VHS stands aside by default there — `overrideNative`
+defaults to `!(IS_ANY_SAFARI || IS_IOS)` — so HLS plays natively through the
+media element and no request passes through `videojs.Vhs.xhr`. Opting in
+requires MSE and alters playback behaviour on exactly those platforms.
+
 ## Players the boundary is drawn to accommodate
 
 No adapter for these lives in this repository. They are recorded because the
@@ -246,32 +294,3 @@ what belongs here is the shape core must present to it, which is the same three
 responsibilities. It is the case that motivates the playback contract carrying
 no absolute position, since the proxy and the player are in different processes.
 See [mobile-proxy.md](mobile-proxy.md).
-
-### video.js
-
-video.js is a UI framework rather than a playback engine. In practice that
-engine is VHS (`@videojs/http-streaming`), bundled since video.js 7 — the
-plugins that routed video.js through hls.js instead are no longer maintained,
-and the most recent of them is published as deprecated, so VHS is the only path
-worth designing for.
-
-- **The hook is `videojs.Vhs.xhr`**, which VHS consults for every request,
-  manifest and segment alike. It falls back to its own implementation only
-  while `videojs.Vhs.xhr.original === true`, so assigning a replacement takes
-  over loading entirely. Byte ranges arrive as a `Range` header rather than in
-  the URL.
-- **Playback state** is the media element behind `player.tech()`.
-
-**On Safari and iOS there is nothing to intercept.** VHS stands aside by
-default — `overrideNative` defaults to `!(IS_ANY_SAFARI || IS_IOS)` — so HLS
-plays natively through the media element and no request passes through
-`videojs.Vhs.xhr`. No adapter can change this; only the integrator can, by
-opting into `overrideNative`, which requires MSE and alters playback behaviour
-on exactly those platforms. Since the hls.js plugin route is gone, there is no
-alternative engine to fall back to either.
-
-VHS is also why the parser choice in [packaging.md](packaging.md) is worth
-stating explicitly: VHS is built on `m3u8-parser` and `mpd-parser`, the same
-libraries core parses with. A video.js integration and core would interpret a
-manifest through identical code — the strongest available form of the agreement
-that [segment-identity.md](segment-identity.md) depends on.
