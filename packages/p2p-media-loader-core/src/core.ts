@@ -135,6 +135,7 @@ export class Core {
   private readonly manifestParsers: readonly ManifestParser[];
   private manifestRegistry = new ManifestRegistry();
   private readonly manifestLogger = debug("p2pml-core:manifest");
+  private readonly registryMissLogger = debug("p2pml-core:registry-miss");
 
   /**
    * Constructs a new Core instance with optional initial configuration.
@@ -770,6 +771,10 @@ export class Core {
         !this.initSegmentKeys.has(key) &&
         !this.isSegmentIndex(url, byteRange)
       ) {
+        // Logged as well as dispatched: a miss makes the segment load without
+        // P2P and leaves no other trace, so without this a stream that stops
+        // sharing looks the same as one with no peers.
+        this.registryMissLogger("%s", key);
         this.eventTarget.dispatchEvent("onSegmentRegistryMiss", {
           url,
           byteRange,

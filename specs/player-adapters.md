@@ -202,10 +202,32 @@ player's own loading — the low-latency exclusion in
 [architecture.md](architecture.md) at no cost.
 
 Live streams: where the integrator left `streaming.delay.liveDelay` at dash.js's
-default, the adapter sets it and turns `useSuggestedPresentationDelay` off,
-placing the player as the hls.js and Shaka adapters do — the window less one
-segment, at most a minute behind the edge — from the same `liveDelayFor` the
-Shaka adapter uses, re-applied only when the window changes by half a segment.
+default, the adapter places the player in the window, re-applied only when the
+window changes by half a segment. Placement is two settings, not one.
+
+- **Position in the live window.** `streaming.delay.liveDelay` is the window
+  less one segment, at most a minute behind the edge — the hls.js and Shaka
+  rule, from the same `liveDelayFor` the Shaka adapter uses — and
+  `useSuggestedPresentationDelay` is turned off, because a server's suggestion
+  places the player near the edge where there is nothing to share.
+- **Forward buffer.** `bufferTimeDefault`, `bufferTimeAtTopQuality` and
+  `bufferTimeAtTopQualityLongForm` are held to the high-demand window, never
+  closer to the live edge than one segment and never below two segments. The
+  segments beyond it are the core's to prefetch.
+
+The second is not a refinement of the first. A live delay places the
+**playhead**; what the player fetches is a forward buffer ahead of it, and
+dash.js left alone buffers `bufferTimeAtTopQualityLongForm` — a minute, since
+a dynamic stream is long-form by its duration — which on a typical window is
+the whole of it. The playhead then sits a delay behind the edge while the fetch
+position rides the edge itself, where the registry cannot yet know the segment:
+core learns of a segment when dash.js refreshes the MPD, while dash.js derives
+availability from its own clock, synced to the MPD's `UTCTiming`. Every such
+request misses the registry and goes to dash.js's own loader, so the stream
+plays perfectly and shares nothing — visible as a stream that stops sharing
+minutes in and resumes only when the player falls behind the edge again.
+Each of the three settings is a ceiling: one the integrator already holds
+lower is left alone.
 
 ## Players the boundary is drawn to accommodate
 

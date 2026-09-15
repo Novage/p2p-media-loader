@@ -239,6 +239,16 @@ no positional reasoning and no assumptions about registration order.
 A stream whose playlist stops being refreshed retains its segments until the
 stream itself is removed.
 
+A live window also rolls past the segment the player last requested, whenever
+the player has been loading without core for a while — requests that missed the
+registry went to its own loader, or it stopped fetching with a full buffer. That
+segment is what the request queue is anchored on, so losing it must not stop the
+queue: core resumes from the oldest segment the window still holds that is not
+behind the anchor. A peer that holds the window is worth something to the swarm
+even while its own player is not asking for anything. Where the player actually
+is stays unknown until it requests again, so the resume point is the earliest
+position it can possibly have, never the live edge.
+
 ## Timeline stability
 
 `startTime` and `endTime` must mean the same thing across playlist refreshes.
@@ -340,8 +350,11 @@ supports and the other does not, or on unusual structures. The URL-keyed
 registry makes this safe: an unrecognised URL is a lookup miss, the adapter
 falls back to its own loader, and the segment loads without P2P.
 
-Core emits a diagnostic event on a segment request that misses the registry, so
-divergence is observable in production rather than silent.
+Core emits a diagnostic event on a segment request that misses the registry and
+logs the key it looked up under `p2pml-core:registry-miss`, so divergence is
+observable in production rather than silent. Nothing else marks a miss: the
+segment loads through the player's own loader and plays normally, so a stream
+that has stopped sharing entirely looks exactly like one with no peers.
 
 One disagreement is expected and harmless: segment **boundaries**. A player
 corrects its fragment times to the presentation timestamps it finds after

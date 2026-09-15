@@ -10,6 +10,7 @@ import {
   debug,
   getPlaybackStateFromMediaElement,
   liveDelayFor,
+  type LiveDelay,
 } from "p2p-media-loader-core";
 import { createXhrLoaderExtension } from "./loader.js";
 
@@ -37,6 +38,11 @@ export type PartialDashJsP2PEngineConfig = {
  * applied when the integrator left dash.js's own default in place.
  */
 const INITIAL_LIVE_EDGE_DELAY = 25;
+
+/** Least forward buffer to leave the player, whatever the windows work out to. */
+const MIN_BUFFER_SEGMENTS = 2;
+/** Segments left between the player's forward buffer and the live edge. */
+const LIVE_EDGE_MARGIN_SEGMENTS = 1;
 
 const STREAM_INITIALIZED: MediaPlayerEvents["STREAM_INITIALIZED"] =
   "streamInitialized";
@@ -129,7 +135,7 @@ export class DashJsP2PEngine {
     player.extend(
       "XHRLoader",
       createXhrLoaderExtension(this.core, {
-        onManifestProcessed: this.applyLiveDelay,
+        onManifestProcessed: this.applyLivePlacement,
       }),
       true,
     );
@@ -187,12 +193,13 @@ export class DashJsP2PEngine {
   }
 
   /**
-   * Sizes the live delay from the window the core just parsed. The MPD
-   * reaches the core before dash.js parses the same bytes, so the value is in
-   * place when dash.js computes its live position. Re-applied only when the
-   * window changes by at least half a segment.
+   * Places the player in the live window from the window the core just
+   * parsed: how far behind the edge it plays, and how far ahead of the
+   * playhead it may fetch. The MPD reaches the core before dash.js parses the
+   * same bytes, so both are in place when dash.js computes its live position.
+   * Re-applied only when the window changes by at least half a segment.
    */
-  private applyLiveDelay = (manifest: ProcessedManifest) => {
+  private applyLivePlacement = (manifest: ProcessedManifest) => {
     if (!this.player || !this.managesLiveDelay) return;
     const target = liveDelayFor(manifest);
     if (!target) return;
@@ -206,11 +213,61 @@ export class DashJsP2PEngine {
       return;
     }
 
-    this.debug(`Setting liveDelay to ${target.delay}`);
+    const buffer = this.forwardBufferSettings(target);
+    this.debug(
+      `Setting liveDelay to ${target.delay}, forward buffer to ${buffer.bufferTimeDefault}`,
+    );
     this.player.updateSettings({
-      streaming: { delay: { liveDelay: target.delay } },
+      streaming: { delay: { liveDelay: target.delay }, buffer },
     });
   };
+
+  /**
+   * How far ahead of the playhead dash.js may fetch: the high-demand window,
+   * never closer to the live edge than a segment, never less than a couple of
+   * segments. The segments beyond it are the core's to prefetch, and they are
+   * the ones peers exchange.
+   *
+   * Left alone, dash.js buffers `bufferTimeAtTopQualityLongForm` — a minute,
+   * since a dynamic stream is long-form by its duration — which on a live
+   * stream is the whole window. Its playhead then sits a live delay behind the
+   * edge while its *fetch* position rides the edge itself, where the registry
+   * cannot yet know the segment: core learns of one only when dash.js refreshes
+   * the MPD, and dash.js derives availability from its own synced clock. Every
+   * such request misses the registry and falls through to dash.js's own loader,
+   * so the stream plays perfectly with no P2P at all.
+   *
+   * Settings the integrator already holds below this are left alone; the value
+   * is a ceiling, not a target.
+   */
+  private forwardBufferSettings(target: LiveDelay) {
+    const { mainStream, secondaryStream } = this.core.getConfig();
+    const highDemandTimeWindow = Math.max(
+      mainStream.highDemandTimeWindow,
+      secondaryStream.highDemandTimeWindow,
+    );
+    const bufferTime = Math.max(
+      target.segment * MIN_BUFFER_SEGMENTS,
+      Math.min(
+        highDemandTimeWindow,
+        target.delay - target.segment * LIVE_EDGE_MARGIN_SEGMENTS,
+      ),
+    );
+
+    const current = this.player?.getSettings().streaming?.buffer;
+    const lower = (setting: number | undefined) =>
+      setting === undefined || Number.isNaN(setting) || setting > bufferTime
+        ? bufferTime
+        : setting;
+
+    return {
+      bufferTimeDefault: lower(current?.bufferTimeDefault),
+      bufferTimeAtTopQuality: lower(current?.bufferTimeAtTopQuality),
+      bufferTimeAtTopQualityLongForm: lower(
+        current?.bufferTimeAtTopQualityLongForm,
+      ),
+    };
+  }
 
   private handleStreamInitialized = () => {
     this.registerMediaElement();

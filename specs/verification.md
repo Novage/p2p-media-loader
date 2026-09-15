@@ -62,11 +62,14 @@ segment may show a one-segment overstatement that the next report corrects.
 the core logs the registry it derives from each manifest: the streams, their
 identity inputs, and each stream's segment count and timeline range. Every
 segment the player requests must be found in that registry — a request that
-misses it is reported through the registry-miss diagnostic
-([manifest-registry.md](manifest-registry.md)) and, on these streams, there must
-be none. Boundary deltas of tens of milliseconds between the manifest timeline
-and the player's own are expected, because players correct fragment times to
-demuxed timestamps and manifests are not.
+misses it is reported through the registry-miss diagnostic and logged under
+`p2pml-core:registry-miss` ([manifest-registry.md](manifest-registry.md)) and,
+on these streams, there must be none. On a live stream this is the check that
+matters: a player fetching at the live edge misses every segment, which costs
+all P2P and nothing else, so playback looks perfect while the log is silent.
+Boundary deltas of tens of milliseconds between the manifest timeline and the
+player's own are expected, because players correct fragment times to demuxed
+timestamps and manifests are not.
 
 **Cross-player sharing.** Two browser tabs on different engines, playing the
 same stream, exchange segments — the demo's network view shows the peer and the
