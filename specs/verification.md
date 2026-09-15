@@ -15,13 +15,14 @@ are run against this matrix in the demo before they are considered done.
 | DASH     | VOD  | `SegmentTemplate` `$Number$`      | `https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd`                                                            | presentation-time identity, many representations, separate audio                                                                                                                                                      |
 | DASH     | VOD  | `SegmentBase` (`sidx`)            | `https://storage.googleapis.com/shaka-demo-assets/angel-one/dash.mpd`                                                  | external segment index: MP4 renditions gain segments when the index arrives; WebM (VP9) renditions have a `Cues` index and play without P2P                                                                           |
 | DASH     | VOD  | `SegmentBase` (`sidx`)            | `https://dash.akamaized.net/dash264/TestCases/1a/netflix/exMPD_BIP_TC1.mpd`                                            | external index on the main video too: four AVC renditions plus AAC, every `indexRange` holds a `sidx` followed by a `uuid` box with a non-zero `first_offset`, so segments must be anchored on the box, not the range |
+| DASH     | live | `SegmentTemplate` `$Number$`      | `https://livesim2.dashif.org/livesim2/testpic4_8s/Manifest.mpd`                                                        | three video renditions (two at one resolution, told apart by bitrate) plus audio, 8 s segments, one-minute window; the demo's default for dash.js players                                                             |
 | DASH     | live | `SegmentTemplate` `$Number$`      | `https://livesim2.dashif.org/livesim2/testpic_2s/Manifest.mpd`                                                         | `type="dynamic"`, MPD refresh, availability window                                                                                                                                                                    |
 | DASH     | live | `SegmentTimeline`                 | `https://livesim2.dashif.org/livesim2/segtimeline_1/testpic_2s/Manifest.mpd`                                           | explicit `S` timeline, `$Time$` addressing                                                                                                                                                                            |
 
 Not in the table on purpose: `dash264/TestCases/2a/qualcomm/1/MultiResMPEG2.mpd` is a `SegmentBase` stream whose media Chrome refuses to append (Shaka error 3014), on Shaka's own demo page as much as here. It is not a P2P problem; do not use it to judge one.
 
 Every stream is played on every engine that supports its protocol: hls.js for
-HLS; Shaka Player for both.
+HLS; dash.js for DASH; Shaka Player for both.
 
 ## Isolating a test swarm
 

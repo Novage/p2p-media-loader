@@ -127,13 +127,15 @@ and source maps are emitted alongside, as for every other bundle.
 ## Where the engine packages fit
 
 `<script type="module">` and IIFE consumers load an **engine** bundle, not core.
-`p2p-media-loader-hlsjs` and `p2p-media-loader-shaka` each build `esm`,
-`esm-min`, `iife` and `iife-min`. The two kinds carry different things.
+`p2p-media-loader-hlsjs`, `p2p-media-loader-shaka` and `p2p-media-loader-dashjs`
+each build `esm`, `esm-min`, `iife` and `iife-min`. The two kinds carry
+different things.
 
 The **IIFE** bundles inline core and the engine's parsers: one file, no import
 map, no load order. Parser selection happened at engine build time —
-`p2p-media-loader-hlsjs` imports the HLS parser only, `p2p-media-loader-shaka`
-both, because Shaka plays both — and is invisible to the page.
+`p2p-media-loader-hlsjs` imports the HLS parser only, `p2p-media-loader-dashjs`
+the DASH parser only, `p2p-media-loader-shaka` both, because Shaka plays both —
+and is invisible to the page.
 
 The **ESM** bundles inline neither. They import `p2p-media-loader-core` and the
 parser subpaths by bare specifier, and the page's import map resolves those
@@ -141,10 +143,11 @@ specifiers. Every one of them must point at the **same** core bundle — one
 module instance, so one core, with the parsers exported from the same file —
 and that bundle must carry the parsers the engine imports:
 
-| Engine                   | Specifiers to map                                                                  | Core bundle                           |
-| ------------------------ | ---------------------------------------------------------------------------------- | ------------------------------------- |
-| `p2p-media-loader-hlsjs` | `p2p-media-loader-core`, `p2p-media-loader-core/hls`                               | `p2p-media-loader-core-hls.es.min.js` |
-| `p2p-media-loader-shaka` | `p2p-media-loader-core`, `p2p-media-loader-core/hls`, `p2p-media-loader-core/dash` | `p2p-media-loader-core.es.min.js`     |
+| Engine                    | Specifiers to map                                                                  | Core bundle                            |
+| ------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------- |
+| `p2p-media-loader-hlsjs`  | `p2p-media-loader-core`, `p2p-media-loader-core/hls`                               | `p2p-media-loader-core-hls.es.min.js`  |
+| `p2p-media-loader-shaka`  | `p2p-media-loader-core`, `p2p-media-loader-core/hls`, `p2p-media-loader-core/dash` | `p2p-media-loader-core.es.min.js`      |
+| `p2p-media-loader-dashjs` | `p2p-media-loader-core`, `p2p-media-loader-core/dash`                              | `p2p-media-loader-core-dash.es.min.js` |
 
 A missing entry fails at module resolution, loudly, before anything runs.
 Mapping the specifiers to different files loads two cores (see the warning

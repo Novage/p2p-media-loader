@@ -2,7 +2,8 @@
   "path": [
     "packages/p2p-media-loader-core/src",
     "packages/p2p-media-loader-hlsjs/src",
-    "packages/p2p-media-loader-shaka/src"
+    "packages/p2p-media-loader-shaka/src",
+    "packages/p2p-media-loader-dashjs/src"
   ],
   "format": "typescript",
   "minLines": 5,

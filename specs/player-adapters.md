@@ -167,6 +167,46 @@ past the tail, so no re-sync setting is needed. The MPD's suggested delay is
 ignored for the same reason hls.js's hold-back is overridden: a server's
 suggestion places the player near the edge, where there is nothing to share.
 
+### dash.js
+
+- Parsers: DASH only.
+- Manifest and segments: the player's `XHRLoader`, replaced per player through
+  `player.extend("XHRLoader", extension, true)` before `initialize()`.
+  dash.js's `FactoryMaker` resolves the override when `HTTPLoader` first
+  instantiates the loader, so it applies even though `HTTPLoader` imports the
+  loader module directly; with `override` set it builds the real loader, calls
+  the extension with it as `this.parent`, and takes only `load` and `abort`
+  from what the extension returns. Every request dash.js makes over HTTP —
+  MPD, initialization, media and index segments, licences — arrives at that
+  `load`, told apart by the type of the `FragmentRequest` behind it.
+- Playback: the media element, from `STREAM_INITIALIZED` on.
+
+An MPD request goes to dash.js's own loader with its completion wrapped, so the
+core reads the bytes before dash.js parses them. A media segment the registry
+knows, on a stream with P2P enabled, is served by the core: the adapter fills
+the response dash.js's `HTTPLoader` reads and emits two progress events, the
+first at zero bytes and the second at the full length with a `time` equal to
+the core's bandwidth hint — dash.js measures throughput from progress traces,
+dropping the first as latency and taking the download time from the rest, and
+`time` on the event replaces the wall clock, which says nothing about the
+network for a segment that came from a peer or from storage. A segment request
+the core recognises as a stream's external index is let through and its
+response handed to `processSegmentIndex`. Everything else — initialization
+segments, licences, certificates, steering, XLink — passes through untouched.
+A core failure is reported as a failed response so dash.js's own retry rules
+run; an abort from dash.js aborts the core request.
+
+`FetchLoader` is left unhooked. dash.js routes a request to it only when
+`availabilityTimeComplete === false`, so low-latency DASH falls through to the
+player's own loading — the low-latency exclusion in
+[architecture.md](architecture.md) at no cost.
+
+Live streams: where the integrator left `streaming.delay.liveDelay` at dash.js's
+default, the adapter sets it and turns `useSuggestedPresentationDelay` off,
+placing the player as the hls.js and Shaka adapters do — the window less one
+segment, at most a minute behind the edge — from the same `liveDelayFor` the
+Shaka adapter uses, re-applied only when the window changes by half a segment.
+
 ## Players the boundary is drawn to accommodate
 
 No adapter for these lives in this repository. They are recorded because the
@@ -182,27 +222,6 @@ what belongs here is the shape core must present to it, which is the same three
 responsibilities. It is the case that motivates the playback contract carrying
 no absolute position, since the proxy and the player are in different processes.
 See [mobile-proxy.md](mobile-proxy.md).
-
-### dash.js
-
-Each responsibility has a known home:
-
-- Manifest and segments: `player.extend("XHRLoader", …)`. The override resolves
-  through dash.js's `FactoryMaker` at instantiation, so it applies even though
-  `HTTPLoader` imports the loader module directly. Manifest and segment requests
-  both arrive there, distinguished by `request.type` — as do `SegmentBase` index
-  fetches, under their own `INDEX_SEGMENT_TYPE`, which the adapter observes and
-  forwards rather than serves.
-- Playback: the media element.
-- Parsers: DASH only.
-
-`FetchLoader` would be left unhooked. dash.js routes a request to it only when
-`availabilityTimeComplete === false`, so low-latency DASH falls through to the
-player's own loading — matching the low-latency exclusion in
-[architecture.md](architecture.md) at no cost.
-
-`SegmentBase` streams carry no segment list in the MPD, so this adapter also
-forwards index responses, as described under responsibility 1.
 
 ### video.js
 

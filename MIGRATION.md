@@ -53,6 +53,15 @@ media file; the core reads it from the response the player fetches, so these
 streams share like any other. WebM representations index with an EBML `Cues`
 element instead, which the core does not read; they play without P2P.
 
+### New package: `p2p-media-loader-dashjs`
+
+dash.js gets an adapter of its own. `DashJsP2PEngine` replaces the player's
+`XHRLoader` through `player.extend` when bound, so call `bindPlayer(player)`
+before `player.initialize()`. Its bundles follow the same import map rule as
+the other engines: map `p2p-media-loader-core` and `p2p-media-loader-core/dash`
+to `p2p-media-loader-core-dash.es.min.js`. Low-latency DASH, which dash.js
+loads through `FetchLoader`, plays through the player without P2P.
+
 ### Custom integrations
 
 A custom integration must supply the manifest parsers for the protocols its

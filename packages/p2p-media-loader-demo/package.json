@@ -48,11 +48,13 @@
   "dependencies": {
     "@vidstack/react": "^1.15.6",
     "d3": "^7.9.0",
+    "dashjs": "^5.2.1",
     "dplayer": "^1.27.1",
     "hls.js": "^1.7.2",
     "mediaelement": "^7.1.0",
     "openplayerjs": "^2.14.12",
     "p2p-media-loader-core": "workspace:*",
+    "p2p-media-loader-dashjs": "workspace:*",
     "p2p-media-loader-hlsjs": "workspace:*",
     "p2p-media-loader-shaka": "workspace:*",
     "plyr": "^3.8.4",
