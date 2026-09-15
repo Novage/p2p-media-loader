@@ -1,0 +1,13 @@
+{
+  "path": [
+    "packages/p2p-media-loader-core/src",
+    "packages/p2p-media-loader-hlsjs/src",
+    "packages/p2p-media-loader-shaka/src"
+  ],
+  "format": "typescript",
+  "minLines": 5,
+  "minTokens": 50,
+  "mode": "weak",
+  "threshold": 1,
+  "reporters": ["console"]
+}

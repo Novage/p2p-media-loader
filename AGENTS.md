@@ -47,8 +47,8 @@ delete it; when rejected, delete it.
   `npm install` in a workspace package.
 - **Verify before reporting done:** `pnpm type-check`, `pnpm lint`, `pnpm test`,
   and `npx prettier --check "specs/**/*.md" AGENTS.md` when specs changed.
-- **Before a release:** `pnpm knip` as well, with no findings. See
-  [`specs/packaging.md`](specs/packaging.md).
+- **Before a release:** `pnpm knip` as well, with no findings, and `pnpm jscpd`
+  within its budget. See [`specs/packaging.md`](specs/packaging.md).
 - Match the surrounding code's style, comment density and naming. The codebase
   favours comments that explain _why_ over comments that restate the code.
 

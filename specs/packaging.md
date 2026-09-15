@@ -162,7 +162,9 @@ core's own size is the entire payload and the protocol split matters most there.
 An iOS application playing HLS loads the HLS bundle and never carries the DASH
 parser. See [mobile-proxy.md](mobile-proxy.md).
 
-## Before a release: `pnpm knip`
+## Before a release
+
+### `pnpm knip` — nothing unused ships
 
 Every module under `src/` is emitted to `lib/` and published, so an `export`
 nobody calls is not only dead code: it is a deep-importable surface a consumer
@@ -182,3 +184,21 @@ states outright:
 Each is listed there with its reason. A finding that is a false positive is
 fixed in that config, with the reason written down — never by ignoring the
 report.
+
+### `pnpm jscpd` — duplication stays within budget
+
+`pnpm jscpd` looks for copy-paste across the three published packages. Unlike
+an unused export, a clone is not automatically a defect: two methods that read
+the same today may be answering to different requirements tomorrow, and pulling
+them together couples them. So this is a budget, not a prohibition —
+`.jscpd.json` fails the run above 1% duplicated lines, roughly three times what
+the code carries now.
+
+It reads only what is published. The demo deliberately repeats itself: each
+player page is a complete, standalone integration, which is the whole of its
+value as an example, and factoring the shared half into a wrapper would make it
+a worse one.
+
+One clone stands, and is expected to: the engine classes' `addEventListener`
+and `removeEventListener` are thin, separately documented delegations to core,
+mirrored on purpose because they are public API.

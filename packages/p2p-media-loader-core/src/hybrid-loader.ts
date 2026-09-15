@@ -1,5 +1,5 @@
 import { HttpRequestExecutor } from "./http-loader.js";
-import { CoreEventMap, StreamConfig } from "./types.js";
+import { CoreEventMap, DownloadSource, StreamConfig } from "./types.js";
 import {
   Playback,
   BandwidthCalculators,
@@ -377,7 +377,7 @@ export class HybridLoader {
             canLoadThroughHttp &&
             request.downloadSource === "p2p" &&
             (this.requests.executingHttpCount < simultaneousHttpDownloads ||
-              this.abortLastHttpLoadingInQueueAfterItem(queue, segment));
+              this.abortLastLoadingInQueueAfterItem(queue, segment, "http"));
 
           if (shouldSwitchFromP2PToHttp) {
             request.cancel();
@@ -392,7 +392,7 @@ export class HybridLoader {
         const shouldLoadThroughHttp =
           canLoadThroughHttp &&
           (this.requests.executingHttpCount < simultaneousHttpDownloads ||
-            this.abortLastHttpLoadingInQueueAfterItem(queue, segment));
+            this.abortLastLoadingInQueueAfterItem(queue, segment, "http"));
 
         if (shouldLoadThroughHttp) {
           this.loadThroughHttp(segment);
@@ -402,7 +402,7 @@ export class HybridLoader {
         const canLoadThroughP2P =
           this.p2pLoaders.currentLoader.isSegmentLoadedBySomeone(segment) &&
           (this.requests.executingP2PCount < simultaneousP2PDownloads ||
-            this.abortLastP2PLoadingInQueueAfterItem(queue, segment));
+            this.abortLastLoadingInQueueAfterItem(queue, segment, "p2p"));
 
         if (canLoadThroughP2P) {
           this.loadThroughP2P(segment);
@@ -580,29 +580,18 @@ export class HybridLoader {
     );
   }
 
-  private abortLastHttpLoadingInQueueAfterItem(
+  private abortLastLoadingInQueueAfterItem(
     queue: QueueUtils.QueueItem[],
     segment: SegmentWithStream,
+    downloadSource: DownloadSource,
   ): boolean {
     for (const { segment: itemSegment } of Utils.arrayBackwards(queue)) {
       if (itemSegment === segment) break;
       const request = this.requests.get(itemSegment);
-      if (request?.downloadSource === "http" && request.status === "loading") {
-        request.cancel();
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private abortLastP2PLoadingInQueueAfterItem(
-    queue: QueueUtils.QueueItem[],
-    segment: SegmentWithStream,
-  ): boolean {
-    for (const { segment: itemSegment } of Utils.arrayBackwards(queue)) {
-      if (itemSegment === segment) break;
-      const request = this.requests.get(itemSegment);
-      if (request?.downloadSource === "p2p" && request.status === "loading") {
+      if (
+        request?.downloadSource === downloadSource &&
+        request.status === "loading"
+      ) {
         request.cancel();
         return true;
       }
