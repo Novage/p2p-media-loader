@@ -161,3 +161,24 @@ The native proxy runs core in a WebView with no JavaScript player beside it, so
 core's own size is the entire payload and the protocol split matters most there.
 An iOS application playing HLS loads the HLS bundle and never carries the DASH
 parser. See [mobile-proxy.md](mobile-proxy.md).
+
+## Before a release: `pnpm knip`
+
+Every module under `src/` is emitted to `lib/` and published, so an `export`
+nobody calls is not only dead code: it is a deep-importable surface a consumer
+can start depending on, and it lands in the bundle for anyone whose tooling
+does not tree-shake. `pnpm knip` reports unused files, exports and dependencies
+across the workspace. Run it before cutting a release and leave it with no
+findings — by deleting the code, or by narrowing an `export` to the module that
+uses it.
+
+Two kinds of reachability the tool cannot derive, which `knip.jsonc` therefore
+states outright:
+
+- the per-variant bundle entries, which `vite.config.ts` names through a
+  template literal, so only the default variant is resolved for it;
+- the parser shims, which reach a bundle only through `resolve.alias`.
+
+Each is listed there with its reason. A finding that is a false positive is
+fixed in that config, with the reason written down — never by ignoring the
+report.

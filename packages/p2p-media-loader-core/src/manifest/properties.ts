@@ -39,7 +39,7 @@ function codecsOfType(
 }
 
 /** The video codecs out of a mixed `CODECS` list; audio and text are dropped. */
-export function videoCodecs(codecs: string | undefined): string | undefined {
+function videoCodecs(codecs: string | undefined): string | undefined {
   return codecsOfType(codecs, "video");
 }
 

@@ -2,7 +2,7 @@ import { BandwidthCalculator } from "./bandwidth-calculator.js";
 import { CoreRequestError, Segment, SegmentResponse, Stream } from "./types.js";
 
 /** Where the core's current playback estimate came from. */
-export type PlaybackStateSource = "reported" | "inferred";
+type PlaybackStateSource = "reported" | "inferred";
 
 /**
  * The playhead as the request queue sees it. No absolute position: every

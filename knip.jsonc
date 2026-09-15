@@ -1,0 +1,54 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/*.js"],
+      "project": ["scripts/*.js", "*.config.ts", "*.common.config.ts"],
+    },
+    "packages/p2p-media-loader-core": {
+      // The exports map and the default bundle entry are derived automatically;
+      // only what knip cannot see statically is listed here.
+      "entry": [
+        // vite.config.ts builds `src/bundle-${variant}.ts` from a template
+        // literal, so only the default variant ("all") is resolved for us.
+        "src/bundle-hls.ts",
+        "src/bundle-dash.ts",
+        // Substituted into browser bundles by the `browserBundleAliases` in
+        // vite.common.config.ts, so nothing imports them by path.
+        "src/manifest/shims/*.ts",
+        "test/**/*.test.ts",
+      ],
+    },
+    "packages/p2p-media-loader-hlsjs": {
+      "entry": ["test/**/*.test.ts"],
+    },
+    "packages/p2p-media-loader-shaka": {
+      "entry": ["test/**/*.test.ts"],
+    },
+    "packages/p2p-media-loader-demo": {
+      "ignoreDependencies": [
+        // Applied through the shared eslint.common.react.config.ts at the root.
+        "eslint-plugin-react-hooks",
+        "eslint-plugin-react-refresh",
+        // Backs the `react-dom` peer dependency; no source file imports it.
+        "react-dom",
+        "@types/react-dom",
+      ],
+    },
+    "demo": {
+      // The module-demo pages under public/ are plain scripts served as-is,
+      // outside the vite graph.
+      "entry": ["public/**/*.js"],
+      "project": ["src/**/*.{ts,tsx}", "public/**/*.js"],
+      "ignoreDependencies": [
+        // Applied through the shared eslint.common.react.config.ts at the root.
+        "eslint-plugin-react-hooks",
+        "eslint-plugin-react-refresh",
+        // Pulled in by the built bundles the module-demo pages load through
+        // symlinks into packages/*/dist, never imported by name here. The
+        // workspace dep also keeps `pnpm --recursive build` ordering demo last.
+        "p2p-media-loader-core",
+      ],
+    },
+  },
+}

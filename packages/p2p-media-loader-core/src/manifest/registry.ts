@@ -21,7 +21,7 @@ import { rangeCovers, type SidxBox } from "./mp4-sidx.js";
  * canonical identity, the stable timeline, live detection.
  */
 
-export type RegistrySegment = {
+type RegistrySegment = {
   readonly key: string;
   readonly url: string;
   readonly byteRange?: ByteRange;

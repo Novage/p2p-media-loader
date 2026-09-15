@@ -31,7 +31,7 @@ export function hash32(input: string): number {
   return hash >>> 0;
 }
 
-export function scoreForSegment(peerId: string, externalId: number): number {
+function scoreForSegment(peerId: string, externalId: number): number {
   return hash32(`${peerId}|${externalId}`);
 }
 
@@ -71,7 +71,7 @@ export function isHttpOwner(
  * counts the owner as absent. Covers a playlist refresh's worth of skew
  * between peers seeing the segment plus the announcement's own latency.
  */
-export const ANNOUNCEMENT_ALLOWANCE_SECONDS = 0.5;
+const ANNOUNCEMENT_ALLOWANCE_SECONDS = 0.5;
 
 /**
  * Whether a peer should fetch a segment over HTTP now.

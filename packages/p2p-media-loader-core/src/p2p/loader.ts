@@ -465,7 +465,7 @@ export class P2PLoader {
   }
 }
 
-export function selectPeerForDownload(peersWithSegment: Peer[]): Peer {
+function selectPeerForDownload(peersWithSegment: Peer[]): Peer {
   if (peersWithSegment.length === 1) {
     return peersWithSegment[0];
   }

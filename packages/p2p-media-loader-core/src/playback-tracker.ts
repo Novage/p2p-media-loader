@@ -42,7 +42,7 @@ export type PlaybackTrackerConfig = {
   idleFullBufferRatio: number;
 };
 
-export const DEFAULT_PLAYBACK_TRACKER_CONFIG: PlaybackTrackerConfig = {
+const DEFAULT_PLAYBACK_TRACKER_CONFIG: PlaybackTrackerConfig = {
   reportStaleAfterMs: 2000,
   initialBufferTarget: 30,
   maxBufferTarget: 120,

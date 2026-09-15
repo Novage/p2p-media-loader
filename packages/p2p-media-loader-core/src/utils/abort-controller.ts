@@ -37,5 +37,3 @@ export const isAbortControllerSupported =
 export const SafeAbortController = isAbortControllerSupported
   ? AbortController
   : AbortControllerPolyfill;
-
-export type SafeAbortSignal = AbortSignal | AbortSignalPolyfill;

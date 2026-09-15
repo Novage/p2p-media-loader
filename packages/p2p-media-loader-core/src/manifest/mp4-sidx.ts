@@ -4,7 +4,7 @@ import type { ByteRange } from "../types.js";
  * The `sidx` box of an ISO BMFF file: a DASH `SegmentBase` stream's segment
  * index. See specs/manifest-registry.md, "Resolving an external index".
  */
-export type SidxReference = {
+type SidxReference = {
   /** 0 references media; 1 references another `sidx` box (not followed). */
   readonly referenceType: 0 | 1;
   readonly referencedSize: number;
