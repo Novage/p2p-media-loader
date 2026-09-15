@@ -34,9 +34,6 @@ export type PlaybackState = {
   readonly rate: number;
 };
 
-/** Where the core's current playback estimate came from. */
-export type PlaybackStateSource = "reported" | "inferred";
-
 /**
  * Seconds buffered ahead of `currentTime`, taken from the range that contains
  * it.
