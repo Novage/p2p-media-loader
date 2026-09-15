@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { PLAYERS } from "../constants";
+import { compatibleStreamUrl, PLAYERS } from "../constants";
 import { PlayerKey, PlayerName } from "../types";
 
 type PlaybackOptions = {
@@ -20,14 +20,26 @@ export const PlaybackOptions = ({
 
   const hlsPlayers: Partial<Record<PlayerKey, PlayerName>> = {};
   const shakaPlayers: Partial<Record<PlayerKey, PlayerName>> = {};
+  const dashjsPlayers: Partial<Record<PlayerKey, PlayerName>> = {};
 
   Object.entries(PLAYERS).forEach(([key, name]) => {
-    if (key.includes("hls")) {
+    if (key.includes("dashjs")) {
+      dashjsPlayers[key as PlayerKey] = name;
+    } else if (key.includes("hls")) {
       hlsPlayers[key as PlayerKey] = name;
     } else if (key.includes("shaka")) {
       shakaPlayers[key as PlayerKey] = name;
     }
   });
+
+  // Switching engines swaps in a stream the new engine can play, so the URL
+  // shown is the one Apply will use.
+  const handlePlayerChange = () => {
+    const player = playerSelectRef.current?.value;
+    const input = streamUrlInputRef.current;
+    if (!player || !input) return;
+    input.value = compatibleStreamUrl(player, input.value);
+  };
 
   const handleApply = () => {
     const player = playerSelectRef.current?.value;
@@ -61,6 +73,7 @@ export const PlaybackOptions = ({
           ref={playerSelectRef}
           id="player"
           defaultValue={currentPlayer}
+          onChange={handlePlayerChange}
         >
           <optgroup label="Hls.js P2P Engine (HLS Only)">
             {Object.entries(hlsPlayers).map(([key, name]) => (
@@ -70,8 +83,17 @@ export const PlaybackOptions = ({
             ))}
           </optgroup>
           {Object.keys(shakaPlayers).length > 0 && (
-            <optgroup label="Shaka Players">
+            <optgroup label="Shaka Player P2P Engine (HLS & DASH)">
               {Object.entries(shakaPlayers).map(([key, name]) => (
+                <option key={key} value={key}>
+                  {name}
+                </option>
+              ))}
+            </optgroup>
+          )}
+          {Object.keys(dashjsPlayers).length > 0 && (
+            <optgroup label="dash.js P2P Engine (DASH only)">
+              {Object.entries(dashjsPlayers).map(([key, name]) => (
                 <option key={key} value={key}>
                   {name}
                 </option>
