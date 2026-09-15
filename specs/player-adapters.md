@@ -115,6 +115,16 @@ once per value when a playlist loads; between playlists hls.js is left alone.
   bypass P2P. The mixin passes `lowLatencyMode: false` unless the integrator
   sets it; an integration that constructs hls.js itself should do the same.
 
+**Hosted in video.js 10.** v10 has no streaming layer of its own; its
+`HlsJsAdapter` constructs hls.js from `source.engine.hlsJs`, handed to hls.js
+untouched, and exposes the instance as a read-only `engine`. The whole
+integration is two calls, with nothing added to this package:
+`getConfigForHlsJs()` spread into `source.engine.hlsJs`, and
+`bindHls(() => adapter.engine)` — a getter, resolved when hls.js constructs
+the playlist loader, by which time the adapter has its instance. Playback
+should be pinned to MSE (`preferPlayback`): native HLS on Safari would bypass
+hls.js and with it the core. The demo's `videojs10_hls` player is this.
+
 These settings steer only where hls.js starts and re-syncs; where the player
 then puts itself is its own business. An immediate quality switch
 (`hls.currentLevel`) flushes the buffer and resumes at its former end, which
@@ -173,7 +183,8 @@ suggestion places the player near the edge, where there is nothing to share.
 
 - Parsers: DASH only.
 - Manifest and segments: the player's `XHRLoader`, replaced per player through
-  `player.extend("XHRLoader", extension, true)` before `initialize()`.
+  `player.extend("XHRLoader", extension, true)` before the player's first
+  request — `initialize()` alone makes none; `attachSource()` does.
   dash.js's `FactoryMaker` resolves the override when `HTTPLoader` first
   instantiates the loader, so it applies even though `HTTPLoader` imports the
   loader module directly; with `override` set it builds the real loader, calls
@@ -197,6 +208,15 @@ response handed to `processSegmentIndex`. Everything else — initialization
 segments, licences, certificates, steering, XLink — passes through untouched.
 A core failure is reported as a failed response so dash.js's own retry rules
 run; an abort from dash.js aborts the core request.
+
+**Hosted in video.js 10.** v10's `DashAdapter` creates its dash.js player and
+calls `initialize()` in its constructor, and attaches a source only when one
+is set, so `bindPlayer(adapter.engine)` fits between the two with nothing
+added to this package. It must be bound exactly once per player: dash.js
+keeps the loader it first resolved, so a second engine bound to the same
+player never sees a request — under React StrictMode's simulated remount
+that is the binding to get right. The demo's `videojs10_dashjs` player is
+this.
 
 `FetchLoader` is left unhooked. dash.js routes a request to it only when
 `availabilityTimeComplete === false`, so low-latency DASH falls through to the

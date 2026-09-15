@@ -9,6 +9,7 @@ export const PLAYERS = {
   openPlayer_hls: "OpenPlayerJS",
   mediaElement_hls: "MediaElement",
   vidstack_indexeddb_hls: "Vidstack IndexedDB example",
+  videojs10_hls: "video.js 10",
   shaka: "Shaka Player (raw)",
   dplayer_shaka: "DPlayer",
   clappr_shaka: "Clappr (DASH only)",
@@ -18,6 +19,7 @@ export const PLAYERS = {
   dplayer_dashjs: "DPlayer",
   plyr_dashjs: "Plyr",
   mediaElement_dashjs: "MediaElement",
+  videojs10_dashjs: "video.js 10",
   videojs: "video.js",
 } as const;
 // The live streams specs/verification.md lists. (The previous HLS default's

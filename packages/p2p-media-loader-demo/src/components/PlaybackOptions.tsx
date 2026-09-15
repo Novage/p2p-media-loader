@@ -24,7 +24,9 @@ export const PlaybackOptions = ({
   const videojsPlayers: Partial<Record<PlayerKey, PlayerName>> = {};
 
   Object.entries(PLAYERS).forEach(([key, name]) => {
-    if (key.includes("videojs")) {
+    // video.js 10 hosts the hls.js and dash.js engines; only video.js 8 has an
+    // engine of its own.
+    if (key.includes("videojs") && !key.includes("videojs10")) {
       videojsPlayers[key as PlayerKey] = name;
     } else if (key.includes("dashjs")) {
       dashjsPlayers[key as PlayerKey] = name;
@@ -104,7 +106,7 @@ export const PlaybackOptions = ({
             </optgroup>
           )}
           {Object.keys(videojsPlayers).length > 0 && (
-            <optgroup label="video.js P2P Engine (HLS & DASH)">
+            <optgroup label="video.js 8 P2P Engine (HLS & DASH)">
               {Object.entries(videojsPlayers).map(([key, name]) => (
                 <option key={key} value={key}>
                   {name}

@@ -31,7 +31,9 @@ are not segments.
 Not in the table on purpose: `dash264/TestCases/2a/qualcomm/1/MultiResMPEG2.mpd` is a `SegmentBase` stream whose media Chrome refuses to append (Shaka error 3014), on Shaka's own demo page as much as here. It is not a P2P problem; do not use it to judge one.
 
 Every stream is played on every engine that supports its protocol: hls.js for
-HLS; dash.js for DASH; Shaka Player and video.js for both.
+HLS; dash.js for DASH; Shaka Player and video.js for both. video.js 10 hosts
+the hls.js and dash.js engines rather than bringing one of its own, and is
+played through both.
 
 ## Isolating a test swarm
 
