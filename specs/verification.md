@@ -38,6 +38,13 @@ HLS; dash.js for DASH; Shaka Player and video.js for both. video.js 10 hosts
 the hls.js and dash.js engines rather than bringing one of its own, and is
 played through both.
 
+Also not a P2P problem, and Firefox only: Vidstack calls its dash.js provider
+ready when dash.js reports the manifest loaded, and autoplays there, while
+dash.js is still attaching its MediaSource; attaching it replaces the source
+on the media element and aborts that play request, leaving the player paused
+on a ready stream. The demo's Vidstack dash.js player plays once more when the
+media is ready. It reproduces with P2P switched off.
+
 ## Isolating a test swarm
 
 The default swarm ID is the manifest URL, so every demo instance playing one of
@@ -102,7 +109,11 @@ are deterministic where a live MPD is not.
 ## Stability of the streams
 
 The DASH-IF `livesim2` simulator and the Shaka demo assets are maintained as
-public test infrastructure. The mux stream is a widely used public test asset.
+public test infrastructure. `livesim2` allows 10000 requests per IP address per
+day, which a day of two-tab live runs can reach; past it every request answers
+`429` and dash.js reports error 25, "manifest is not available". Its
+`/reqcount` says where the count stands and when it resets. The mux stream is a
+widely used public test asset.
 The IVS channel is a third party's live channel and may stop broadcasting; when
 it does, any HLS live stream carrying `EXT-X-PROGRAM-DATE-TIME` on every segment
 and signed rendition URLs exercises the same paths.

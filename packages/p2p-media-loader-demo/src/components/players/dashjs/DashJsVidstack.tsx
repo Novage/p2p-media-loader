@@ -26,10 +26,13 @@ export const DashJsVidstack = ({
   onChunkUploaded,
 }: PlayerProps) => {
   const engineRef = useRef<DashJsP2PEngine>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const onProviderChange = useCallback(
     (provider: MediaProviderAdapter | null) => {
       if (!isDASHProvider(provider)) return;
+
+      videoRef.current = provider.video;
 
       // Vidstack would otherwise load dash.js from a CDN; use the bundled one.
       provider.library = MediaPlayer;
@@ -67,6 +70,21 @@ export const DashJsVidstack = ({
     };
   }, []);
 
+  /**
+   * Firefox only: Vidstack calls the provider ready when dash.js reports the
+   * manifest loaded and autoplays there, while dash.js is still attaching its
+   * MediaSource. Attaching it replaces the element's source, which aborts that
+   * play request — "The fetching process for the media resource was aborted".
+   * The media is ready a moment later, so play it then.
+   */
+  const onAutoPlayFail = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const play = () => void video.play().catch(() => undefined);
+    if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) play();
+    else video.addEventListener("canplay", play, { once: true });
+  }, []);
+
   const playerRef = useRef<MediaPlayerInstance>(null);
   useEffect(() => {
     // Switch quality at the next segment rather than flushing the buffer,
@@ -80,6 +98,7 @@ export const DashJsVidstack = ({
         ref={playerRef}
         autoPlay
         muted
+        onAutoPlayFail={onAutoPlayFail}
         onProviderChange={onProviderChange}
         src={streamUrl}
         playsInline
