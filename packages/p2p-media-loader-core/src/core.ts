@@ -733,7 +733,13 @@ export class Core {
       };
       const onAbort = () => loader.abortSegmentRequest(key);
       signal?.addEventListener("abort", onAbort);
-      void loader.loadSegment(segment, callbacks);
+      // The loader reports its own failures through the callbacks; this is
+      // the backstop for a throw it never saw, which would otherwise leave
+      // this promise pending and the abort listener attached for ever.
+      loader.loadSegment(segment, callbacks).catch((error: unknown) => {
+        this.logger("loader failed to start %s: %O", key, error);
+        callbacks.onError(new CoreRequestError("failed", String(error)));
+      });
     });
   }
 

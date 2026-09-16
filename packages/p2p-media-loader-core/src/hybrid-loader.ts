@@ -107,33 +107,40 @@ export class HybridLoader {
   ) {
     this.logger(`requests: ${LoggerUtils.getSegmentString(segment)}`);
     const { stream } = segment;
-    if (stream !== this.lastRequestedSegment.stream) {
-      this.logger(`stream changed to ${LoggerUtils.getStreamString(stream)}`);
-      this.p2pLoaders.changeCurrentLoader(stream);
-      // The active rendition follows from the requested segment; bandwidth
-      // measured before the switch says nothing about the new one.
-      this.levelChangedTimestamp = performance.now();
-    }
-    this.lastRequestedSegment = segment;
-    const isSeek = this.playbackTracker.onSegmentRequested(segment);
-    this.syncPlayback();
-    if (isSeek) this.logger("seek detected: buffer edge re-anchored");
-
-    this.segmentStorage.onSegmentRequested(
-      stream.swarmId,
-      stream.streamSwarmId,
-      segment.externalId,
-      segment.startTime,
-      segment.endTime,
-      stream.type,
-      this.streamDetails.isLive,
-    );
+    // Created first, and everything else done inside the try: the request has
+    // to be able to fail. A throw from here on — a custom segment storage is
+    // the integrator's own code — would otherwise settle nothing, and the
+    // player would wait on that promise for ever.
     const engineRequest = new EngineRequest(segment, callbacks);
-    // After a seek the player has nothing buffered at the new position; do not
-    // wait for peers before starting this request.
-    if (isSeek) engineRequest.markAsShouldBeStartedImmediately();
 
     try {
+      if (stream !== this.lastRequestedSegment.stream) {
+        this.logger(`stream changed to ${LoggerUtils.getStreamString(stream)}`);
+        this.p2pLoaders.changeCurrentLoader(stream);
+        // The active rendition follows from the requested segment; bandwidth
+        // measured before the switch says nothing about the new one.
+        this.levelChangedTimestamp = performance.now();
+      }
+      this.lastRequestedSegment = segment;
+      const isSeek = this.playbackTracker.onSegmentRequested(segment);
+      this.syncPlayback();
+      if (isSeek) {
+        this.logger("seek detected: buffer edge re-anchored");
+        // After a seek the player has nothing buffered at the new position; do
+        // not wait for peers before starting this request.
+        engineRequest.markAsShouldBeStartedImmediately();
+      }
+
+      this.segmentStorage.onSegmentRequested(
+        stream.swarmId,
+        stream.streamSwarmId,
+        segment.externalId,
+        segment.startTime,
+        segment.endTime,
+        stream.type,
+        this.streamDetails.isLive,
+      );
+
       const hasSegment = this.segmentStorage.hasSegment(
         stream.swarmId,
         stream.streamSwarmId,

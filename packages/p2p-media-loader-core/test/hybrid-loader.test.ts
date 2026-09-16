@@ -326,6 +326,25 @@ describe("HybridLoader: a stored segment that reads back empty", () => {
     loader.destroy();
   });
 
+  it("fails the request when the storage throws as it starts", async () => {
+    // A custom storage is the integrator's code. Whatever it throws, the
+    // request settles: a caller left waiting on it would wait for ever.
+    const broken = {
+      ...emptyStorage,
+      onSegmentRequested: () => {
+        throw new Error("storage is broken");
+      },
+    } as unknown as SegmentStorage;
+    const { loader, segment, callbacks } = setup({}, broken);
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+
+    expect(callbacks.onError).toHaveBeenCalledTimes(1);
+    expect(callbacks.onSuccess).not.toHaveBeenCalled();
+    loader.destroy();
+  });
+
   it("is delivered when the bytes are there", async () => {
     const { loader, segment, callbacks, state } = setup(
       {},

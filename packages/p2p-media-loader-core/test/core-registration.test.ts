@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { Core } from "../src/core.js";
+import { HybridLoader } from "../src/hybrid-loader.js";
 import { hlsManifestParser } from "../src/manifest/hls.js";
 import {
   computeInfoHash,
@@ -399,6 +400,61 @@ describe("segment lookup", () => {
     core.destroy();
     release();
     await expect(loading).rejects.toMatchObject({ type: "aborted" });
+  });
+
+  it("fails a request whose storage throws as it starts, rather than hanging it", async () => {
+    // A custom storage is the integrator's code; whatever it does, the
+    // request has to settle, or the player waits on a promise for ever.
+    const storage = {
+      initialize: () => Promise.resolve(),
+      setSegmentChangeCallback: () => undefined,
+      onSegmentRequested: () => {
+        throw new Error("storage is broken");
+      },
+      hasSegment: () => false,
+      getSegmentData: () => Promise.resolve(undefined),
+      getStoredSegmentIds: () => [],
+      onPlaybackUpdated: () => undefined,
+      storeSegment: () => Promise.resolve(),
+      getUsage: () => ({ totalCapacity: 100, usedCapacity: 0 }),
+      destroy: () => undefined,
+    };
+    const core = createVodCore({
+      customSegmentStorageFactory: () => storage as never,
+    });
+    // HybridLoader schedules its prefetch timer on `window`.
+    vi.stubGlobal("window", globalThis);
+
+    const outcome = await Promise.race([
+      core
+        .loadSegment(MEDIA_MP4, { byteRange: { start: 600, end: 1599 } })
+        .then(
+          () => "resolved" as unknown,
+          (error: unknown) => error,
+        ),
+      new Promise((resolve) => setTimeout(() => resolve("never settled"), 200)),
+    ]);
+    expect(outcome).toMatchObject({ type: "failed" });
+    vi.unstubAllGlobals();
+    core.destroy();
+  });
+
+  it("fails a request whose loader throws before it can report anything", async () => {
+    // The backstop for a throw no loader handled: without it the promise
+    // stays pending and the abort listener stays on the signal.
+    const core = createVodCore();
+    vi.stubGlobal("window", globalThis);
+    vi.spyOn(HybridLoader.prototype, "loadSegment").mockRejectedValueOnce(
+      new Error("loader is broken"),
+    );
+
+    await expect(
+      core.loadSegment(MEDIA_MP4, { byteRange: { start: 600, end: 1599 } }),
+    ).rejects.toMatchObject({ type: "failed" });
+
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    core.destroy();
   });
 
   it("rejects an already-aborted load before touching any loader", async () => {
