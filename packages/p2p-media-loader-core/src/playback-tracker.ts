@@ -90,10 +90,15 @@ export class PlaybackTracker {
 
   /** Integration push: media events in a browser, or a native bridge. */
   report(state: PlaybackState): void {
-    this.reported = {
-      state: { bufferAhead: Math.max(0, state.bufferAhead), rate: state.rate },
-      at: this.now(),
-    };
+    const now = this.now();
+    const bufferAhead = Math.max(0, state.bufferAhead);
+    this.reported = { state: { bufferAhead, rate: state.rate }, at: now };
+    // A report is the one measurement of the buffer there is, so inference
+    // anchors on it as well. An integration that samples its player rarely —
+    // a proxy once per segment — spends most of its time inferring, and
+    // without this each of those stretches would resume from whatever seek or
+    // idle gap last anchored it, carrying every error accumulated since.
+    this.reanchor(now, bufferAhead);
   }
 
   /**

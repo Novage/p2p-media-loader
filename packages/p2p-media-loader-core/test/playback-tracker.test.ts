@@ -268,6 +268,50 @@ describe("PlaybackTracker staleness", () => {
   });
 });
 
+describe("PlaybackTracker inference after reports stop", () => {
+  it("resumes from the last reported buffer, not from an old anchor", () => {
+    let clock = 0;
+    const t = new PlaybackTracker(
+      segment(0),
+      { initialBufferTarget: 60, inferredSafetyFactor: 1 },
+      () => clock,
+    );
+
+    // Ten minutes of playback the core never saw: an integration reporting
+    // while the player fetched the stream through its own loader.
+    clock += 600_000;
+    t.report({ bufferAhead: 24, rate: 1 });
+
+    // Reports stop. One second later the buffer has drained by a second.
+    clock += 1000;
+    expect(t.getPlayback().source).toBe("reported");
+    clock += 1001;
+    const playback = t.getPlayback();
+    expect(playback.source).toBe("inferred");
+    // Anchored on the report: 24 seconds, drained for the 2.001 elapsed since.
+    expect(playback.bufferAhead).toBeCloseTo(22, 1);
+  });
+
+  it("counts what the core delivered after the report", () => {
+    let clock = 0;
+    const t = new PlaybackTracker(
+      segment(0),
+      { initialBufferTarget: 60, inferredSafetyFactor: 1 },
+      () => clock,
+    );
+    t.report({ bufferAhead: 10, rate: 1 });
+
+    // Two segments delivered, three seconds of wall clock gone by.
+    t.onSegmentRequested(segment(1));
+    t.onSegmentDelivered(segment(1));
+    t.onSegmentRequested(segment(2));
+    t.onSegmentDelivered(segment(2));
+    clock += 3000;
+
+    expect(t.getPlayback().bufferAhead).toBeCloseTo(10 + 2 * SEG - 3, 6);
+  });
+});
+
 describe("PlaybackTracker inference safety", () => {
   it("scales the inferred buffer down by the safety factor", () => {
     let clock = 0;

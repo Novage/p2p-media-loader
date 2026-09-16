@@ -174,8 +174,13 @@ the request pattern it already observes. Inference is a fallback _inside_ core,
 not a second contract: an adapter's only job is to report if it can and stay
 silent if it cannot.
 
-Inference re-anchors on two reliable events and integrates between them:
+Inference re-anchors on three reliable events and integrates between them:
 
+- **Report** — an integration that reports at all reports the truth, so the
+  most recent one anchors inference too. An integration that samples its player
+  rarely — a proxy once per segment — spends most of its time inferred, and
+  each of those stretches then starts from a measurement seconds old rather
+  than from whichever seek or idle gap last anchored it.
 - **Seek** — a requested segment that does not continue the previous one on
   the timeline — its start is not the previous end, within half a segment —
   means the player jumped, and a jump means its buffer was discarded.
@@ -188,6 +193,10 @@ Inference re-anchors on two reliable events and integrates between them:
   itself learned as a moving average of the estimate at these moments.
 - **Between anchors** — delivered media time minus elapsed wall-clock time,
   clamped to the learned target.
+
+The learned target is not taken from reports: a report arriving mid-fill is
+below the player's target and would drag it down. It stays what the idle gaps
+say it is.
 
 Inferred estimates are scaled down by a safety factor before use.
 Underestimating the buffer costs P2P ratio; overestimating it stalls the viewer.
