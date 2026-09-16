@@ -126,6 +126,30 @@ v.m3u8
     });
   });
 
+  it("records an initialization segment a discontinuity introduces", () => {
+    const playlist = `#EXTM3U
+#EXT-X-VERSION:7
+#EXT-X-TARGETDURATION:6
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-MAP:URI="init-a.mp4"
+#EXTINF:6.0,
+a1.mp4
+#EXT-X-DISCONTINUITY
+#EXT-X-MAP:URI="init-b.mp4"
+#EXTINF:6.0,
+b1.mp4
+#EXT-X-ENDLIST
+`;
+    const [stream] = hlsManifestParser.parse(
+      playlist,
+      "https://cdn.example/vod/720p/index.m3u8",
+    ).streams;
+    expect(stream.initSegments?.map((i) => i.url)).toEqual([
+      "https://cdn.example/vod/720p/init-a.mp4",
+      "https://cdn.example/vod/720p/init-b.mp4",
+    ]);
+  });
+
   it("ignores I-frame playlists", () => {
     expect(parsed.streams.some((s) => s.key.includes("iframes"))).toBe(false);
   });
@@ -141,10 +165,12 @@ describe("hlsManifestParser: media playlist", () => {
 
     expect(stream.key).toBe(url);
     expect(stream.isLive).toBe(false);
-    expect(stream.initSegment).toEqual({
-      url: "https://cdn.example/vod/720p/init.mp4",
-      byteRange: { start: 0, end: 599 },
-    });
+    expect(stream.initSegments).toEqual([
+      {
+        url: "https://cdn.example/vod/720p/init.mp4",
+        byteRange: { start: 0, end: 599 },
+      },
+    ]);
     expect(stream.segments).toEqual([
       {
         url: "https://cdn.example/vod/720p/media.mp4",

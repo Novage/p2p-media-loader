@@ -347,10 +347,12 @@ never stored, and never requested from one.
 
 Recognition is what distinguishes this from an unknown URL: the request is
 passed through knowingly rather than counted as a registry miss, so the
-diagnostics below stay meaningful. It is recognition of the one a stream
-declares now, not of every one it has ever declared: an initialization segment
-rotates on a discontinuity, a new period or an ad break, and a request for the
-one it replaced counts as a miss like any other URL the manifests no longer
+diagnostics below stay meaningful. A stream has as many of them as its manifest
+lists — a playlist that spans an HLS discontinuity or a DASH period boundary
+carries one per section — and recognition covers every one of them. It covers
+only what the manifest lists now, though: an initialization segment that has
+rolled out of the window is forgotten with the parse that replaced it, and a
+request for it counts as a miss like any other URL the manifests no longer
 name. Remembering them all instead would grow for the life of a live session.
 
 The case for sharing them is superficially strong — every peer on a rendition

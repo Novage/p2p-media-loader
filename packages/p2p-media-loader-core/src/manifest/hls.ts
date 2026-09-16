@@ -3,13 +3,22 @@
 // eslint-disable-next-line @typescript-eslint/triple-slash-reference
 /// <reference path="./vendor-types.d.ts" />
 import { Parser, type M3u8Manifest } from "m3u8-parser";
-import type { ManifestParser, ParsedSegment, ParsedStream } from "./types.js";
+import type {
+  ManifestParser,
+  ParsedSegment,
+  ParsedStream,
+  ParsedInitSegment,
+} from "./types.js";
 import {
   audioCodecs,
   audioStreamProperties,
   videoStreamProperties,
 } from "./properties.js";
-import { byteRangeFromOffsetLength, resolveUrl } from "./url-key.js";
+import {
+  byteRangeFromOffsetLength,
+  distinctInitSegments,
+  resolveUrl,
+} from "./url-key.js";
 
 /**
  * HLS tokenizer over m3u8-parser. Produces `ParsedManifest`; interprets
@@ -110,7 +119,14 @@ function mediaStream(manifest: M3u8Manifest, url: string): ParsedStream {
     }),
   );
 
-  const map = manifest.segments?.[0]?.map;
+  const initSegments: ParsedInitSegment[] = [];
+  for (const { map } of manifest.segments ?? []) {
+    if (!map) continue;
+    initSegments.push({
+      url: resolveUrl(map.uri, url),
+      byteRange: byteRangeFromOffsetLength(map.byterange),
+    });
+  }
 
   return {
     key: url,
@@ -119,12 +135,7 @@ function mediaStream(manifest: M3u8Manifest, url: string): ParsedStream {
     type: "main",
     properties: { bitrate: 0 },
     segments,
-    initSegment: map
-      ? {
-          url: resolveUrl(map.uri, url),
-          byteRange: byteRangeFromOffsetLength(map.byterange),
-        }
-      : undefined,
+    initSegments: distinctInitSegments(initSegments),
     indexSource: { kind: "manifest" },
     // The sole reliable live signal is EXT-X-ENDLIST; PLAYLIST-TYPE is
     // optional and its absence proves nothing.

@@ -337,6 +337,33 @@ describe("segment lookup", () => {
     );
   });
 
+  it("recognises every initialization segment a playlist lists", () => {
+    // A discontinuity introduces a second one; a request for it is not a
+    // miss just because it is not the first.
+    const core = new Core({ manifestParsers: [hlsManifestParser] });
+    core.processManifest({
+      url: MEDIA_URL,
+      data: `${HLS_MEDIA_VOD_BYTERANGE.replace("#EXT-X-ENDLIST", "")}#EXT-X-DISCONTINUITY
+#EXT-X-MAP:URI="init-2.mp4"
+#EXTINF:6.0,
+#EXT-X-BYTERANGE:800@3600
+media.mp4
+#EXT-X-ENDLIST
+`,
+    });
+    const onMiss = vi.fn();
+    core.addEventListener("onSegmentRegistryMiss", onMiss);
+
+    // The first is a byte range of a file, the second a file of its own.
+    expect(core.isSegmentLoadable(INIT_MP4, { start: 0, end: 599 })).toBe(
+      false,
+    );
+    expect(core.isSegmentLoadable("https://cdn.example/vod/init-2.mp4")).toBe(
+      false,
+    );
+    expect(onMiss).not.toHaveBeenCalled();
+  });
+
   it("stops recognising an initialization segment the manifest has replaced", () => {
     const core = createVodCore();
     const onMiss = vi.fn();

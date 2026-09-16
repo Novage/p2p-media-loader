@@ -59,7 +59,12 @@ export type ParsedStream = {
    * stream; an MPD carries both.
    */
   readonly segments?: readonly ParsedSegment[];
-  readonly initSegment?: ParsedInitSegment;
+  /**
+   * Every initialization segment this manifest lists for the stream. A
+   * playlist carries more than one where its media changes mid-stream: an
+   * HLS discontinuity with a new `EXT-X-MAP`, or a period boundary in DASH.
+   */
+  readonly initSegments?: readonly ParsedInitSegment[];
   readonly indexSource: SegmentIndexSource;
   /** Known only from a manifest that carries segments. */
   readonly isLive?: boolean;

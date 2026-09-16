@@ -28,7 +28,7 @@ describe("dashManifestParser", () => {
       type: "main",
       isLive: false,
       indexSource: { kind: "manifest" },
-      initSegment: { url: "https://cdn.example/dash/v720-init.mp4" },
+      initSegments: [{ url: "https://cdn.example/dash/v720-init.mp4" }],
     });
     expect(video.properties).toMatchObject({
       bitrate: 1000000,
@@ -101,6 +101,14 @@ describe("dashManifestParser", () => {
     ]);
   });
 
+  it("records the initialization segment of every period it spans", () => {
+    const [video] = dashManifestParser.parse(DASH_MULTI_PERIOD, URL).streams;
+    expect(video.initSegments?.map((i) => i.url)).toEqual([
+      "https://cdn.example/dash/p0-init.mp4",
+      "https://cdn.example/dash/p1-init.mp4",
+    ]);
+  });
+
   it("takes the period start from the playlist when the index carries none", () => {
     // A DASH segment's external ID is its presentation time, so a period
     // start read as 0 shifts every segment of the period on the wire.
@@ -168,7 +176,7 @@ describe("dashManifestParser: real manifests", () => {
       height: 576,
       frameRate: 30,
     });
-    expect(video.initSegment?.url).toBe(
+    expect(video.initSegments?.[0].url).toBe(
       `${BASE}bbb_30fps_1024x576_2500k/bbb_30fps_1024x576_2500k_0.m4v`,
     );
     expect(video.segments?.[0].url).toBe(

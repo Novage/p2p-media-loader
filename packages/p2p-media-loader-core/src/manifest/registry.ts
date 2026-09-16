@@ -45,7 +45,13 @@ export type RegistryStream = {
    */
   readonly identified: boolean;
   readonly indexSource: SegmentIndexSource;
-  readonly initSegment?: { url: string; byteRange?: ByteRange };
+  /**
+   * Every initialization segment the stream's manifest lists. More than one
+   * where its media changes mid-stream — an HLS discontinuity with a new
+   * `EXT-X-MAP`, a DASH period boundary — and replaced wholesale by each
+   * parse, so one that has rolled out of the window is not kept.
+   */
+  readonly initSegments: readonly { url: string; byteRange?: ByteRange }[];
   readonly isLive?: boolean;
   readonly segments: ReadonlyMap<string, RegistrySegment>;
 };
@@ -113,10 +119,10 @@ export class ManifestRegistry {
    */
   isInitSegment(key: string): boolean {
     for (const stream of this.streams.values()) {
-      const { initSegment } = stream;
-      if (!initSegment) continue;
-      if (segmentKey(initSegment.url, initSegment.byteRange) === key) {
-        return true;
+      for (const initSegment of stream.initSegments) {
+        if (segmentKey(initSegment.url, initSegment.byteRange) === key) {
+          return true;
+        }
       }
     }
     return false;
@@ -215,7 +221,9 @@ export class ManifestRegistry {
         ? identifies(identityInput)
         : existing.identified,
       indexSource: parsed.indexSource,
-      initSegment: parsed.initSegment ?? existing?.initSegment,
+      initSegments: parsed.initSegments?.length
+        ? parsed.initSegments
+        : (existing?.initSegments ?? []),
       isLive: parsed.isLive ?? existing?.isLive,
       segments: existing?.segments ?? new Map<string, RegistrySegment>(),
       timeline: existing?.timeline ?? new Map<number, number>(),

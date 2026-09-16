@@ -9,9 +9,10 @@ import type {
   ParsedSegment,
   ParsedStream,
   SegmentIndexSource,
+  ParsedInitSegment,
 } from "./types.js";
 import { audioStreamProperties, videoStreamProperties } from "./properties.js";
-import { byteRangeFromOffsetLength } from "./url-key.js";
+import { byteRangeFromOffsetLength, distinctInitSegments } from "./url-key.js";
 import type { StreamProperties, StreamType } from "../types.js";
 
 // Supplies a builtin mpd-parser assumes; must run before the first parse.
@@ -117,8 +118,19 @@ function toStream(
   }));
 
   // A SegmentBase representation lists no segments; its init segment hangs
-  // off the index reference instead.
-  const map = playlist.segments[0]?.map ?? sidx?.map;
+  // off the index reference instead. A representation spanning periods lists
+  // one per period.
+  const refs = playlist.segments.length
+    ? playlist.segments.map((s) => s.map)
+    : [sidx?.map];
+  const initSegments: ParsedInitSegment[] = [];
+  for (const map of refs) {
+    if (!map) continue;
+    initSegments.push({
+      url: map.resolvedUri,
+      byteRange: byteRangeFromOffsetLength(map.byterange),
+    });
+  }
 
   return {
     // The representation id is the only stable per-stream name an MPD offers.
@@ -126,12 +138,7 @@ function toStream(
     type,
     properties: properties(playlist.attributes),
     segments,
-    initSegment: map
-      ? {
-          url: map.resolvedUri,
-          byteRange: byteRangeFromOffsetLength(map.byterange),
-        }
-      : undefined,
+    initSegments: distinctInitSegments(initSegments),
     indexSource,
     isLive,
   };

@@ -1,4 +1,5 @@
 import type { ByteRange } from "../types.js";
+import type { ParsedInitSegment } from "./types.js";
 
 /**
  * Registry keys. A segment is looked up by the URL the player will request
@@ -99,4 +100,24 @@ export function byteRangeFromHalfOpen(
     return undefined;
   }
   return { start, end: end - 1 };
+}
+
+/**
+ * The initialization segments of a stream, each kept once. A playlist repeats
+ * the same reference on every segment it applies to, and carries more than one
+ * where its media changes mid-stream: an HLS discontinuity with a new
+ * `EXT-X-MAP`, or a period boundary in DASH.
+ */
+export function distinctInitSegments(
+  list: readonly ParsedInitSegment[],
+): ParsedInitSegment[] {
+  const seen = new Set<string>();
+  const result: ParsedInitSegment[] = [];
+  for (const initSegment of list) {
+    const key = segmentKey(initSegment.url, initSegment.byteRange);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(initSegment);
+  }
+  return result;
 }
