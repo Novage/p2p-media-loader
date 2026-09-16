@@ -77,7 +77,6 @@ export class Core {
     httpErrorRetries: 3,
     p2pErrorRetries: 3,
     announceTrackers: [
-      "wss://tracker.novage.com.ua",
       "wss://tracker.webtorrent.dev",
       "wss://tracker.openwebtorrent.com",
     ],

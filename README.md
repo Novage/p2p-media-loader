@@ -82,7 +82,7 @@ This library makes it possible to build large-scale P2P mesh networks — often 
   - Key and license requests are never intercepted and never travel between peers — they always go directly to your license server
   - Not applicable to per-session encryption or forensic watermarking, where every viewer receives different bytes for the same segment. P2P must be disabled for such content
 - There is no need for server-side software for simple use cases. By default **P2P Media Loader** uses publicly available servers:
-  - WebTorrent trackers - [wss://tracker.novage.com.ua](https://novage.com.ua/), [wss://tracker.webtorrent.dev](https://webtorrent.dev/), [wss://tracker.openwebtorrent.com](https://openwebtorrent.com/)
+  - WebTorrent trackers - [wss://tracker.webtorrent.dev](https://webtorrent.dev/), [wss://tracker.openwebtorrent.com](https://openwebtorrent.com/)
   - STUN servers - [Public STUN server list](https://gist.github.com/mondain/b0ec1cf5f60ae726202e)
 
 ## Key Components of the P2P Network
@@ -100,7 +100,7 @@ All the components of the P2P network are free and open-source.
 There are many running public servers available on [Public STUN server list](https://gist.github.com/mondain/b0ec1cf5f60ae726202e).
 
 A compatible [**WebTorrent**](https://webtorrent.io/) tracker is required for WebRTC signaling and to create swarms of peers downloading the same media stream.
-A few running public trackers are available: [wss://tracker.novage.com.ua](https://novage.com.ua/), [wss://tracker.webtorrent.dev](https://webtorrent.dev/), [wss://tracker.openwebtorrent.com](https://openwebtorrent.com/).
+A few running public trackers are available: [wss://tracker.webtorrent.dev](https://webtorrent.dev/), [wss://tracker.openwebtorrent.com](https://openwebtorrent.com/).
 
 It is possible to run personal WebTorrent tracker using open-source implementations: [wt-tracker](https://github.com/Novage/wt-tracker), [Aquatic](https://github.com/greatest-ape/aquatic), [OpenWebtorrent Tracker](https://github.com/OpenWebTorrent/openwebtorrent-tracker), [bittorrent-tracker](https://github.com/webtorrent/bittorrent-tracker).
 
