@@ -98,7 +98,13 @@ function toStream(
           start: 0,
           end: 0,
         },
-        periodStart: sidx.timeline ?? 0,
+        // Where the period this index lays out from begins. The parser
+        // carries it on the index only when the MPD gives a duration to work
+        // from — a live `SegmentBase` stream gives none — while the playlist
+        // carries it always. Getting it wrong shifts every segment of the
+        // period on the presentation timeline, and a DASH segment's external
+        // ID is that timeline: see specs/segment-identity.md.
+        periodStart: sidx.timeline ?? playlist.timeline,
       }
     : { kind: "manifest" };
 

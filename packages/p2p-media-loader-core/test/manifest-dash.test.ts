@@ -5,6 +5,7 @@ import {
   BBB_MPD_URL,
   DASH_MULTI_PERIOD,
   DASH_SEGMENT_BASE,
+  DASH_SEGMENT_BASE_LIVE,
   DASH_SEGMENT_TEMPLATE,
   DASH_SEGMENT_TIMELINE_DYNAMIC,
   readFixture,
@@ -98,6 +99,21 @@ describe("dashManifestParser", () => {
       "p1-1.m4s",
       "p1-2.m4s",
     ]);
+  });
+
+  it("takes the period start from the playlist when the index carries none", () => {
+    // A DASH segment's external ID is its presentation time, so a period
+    // start read as 0 shifts every segment of the period on the wire.
+    const [video] = dashManifestParser.parse(
+      DASH_SEGMENT_BASE_LIVE,
+      URL,
+    ).streams;
+    expect(video.indexSource).toEqual({
+      kind: "external",
+      url: "https://cdn.example/dash/video.mp4",
+      byteRange: { start: 700, end: 1500 },
+      periodStart: 30,
+    });
   });
 
   it("reports SegmentBase as an external index with no segments", () => {

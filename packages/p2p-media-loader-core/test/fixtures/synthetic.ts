@@ -145,6 +145,23 @@ export const DASH_MULTI_PERIOD = MPD(
   </Period>`,
 );
 
+/**
+ * A live `SegmentBase` stream, whose period starts 30 s in. Its MPD gives no
+ * duration for the parser to lay the index out from, so the index carries no
+ * period start and only the playlist does.
+ */
+export const DASH_SEGMENT_BASE_LIVE = `<?xml version="1.0" encoding="UTF-8"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="dynamic" minBufferTime="PT2S" availabilityStartTime="2026-01-01T00:00:00Z">
+  <Period id="1" start="PT30S">
+    <AdaptationSet mimeType="video/mp4">
+      <Representation id="v-sidx" bandwidth="1000000" codecs="avc1.4d401f" width="1280" height="720">
+        <BaseURL>video.mp4</BaseURL>
+        <SegmentBase indexRange="700-1500"><Initialization range="0-699"/></SegmentBase>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>`;
+
 export const DASH_SEGMENT_BASE = MPD(
   "static",
   `  <Period>
