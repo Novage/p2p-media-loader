@@ -98,4 +98,19 @@ describe("hls.js fragment loader", () => {
     });
     expect(callbacks.onAbort).toHaveBeenCalled();
   });
+
+  it("delivers nothing for a fragment it has already reported as aborted", async () => {
+    const { loader, callbacks } = setup(true);
+    loader.load(context(600, 1600), loaderConfig, callbacks);
+    loader.abort();
+
+    // The core cannot always cancel in time — a request still waiting for the
+    // segment storage has no loader yet — and hls.js has been told this
+    // fragment was aborted.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(callbacks.onSuccess).not.toHaveBeenCalled();
+    expect(callbacks.onProgress).not.toHaveBeenCalled();
+    expect(callbacks.onError).not.toHaveBeenCalled();
+  });
 });

@@ -319,6 +319,25 @@ describe("a player's own VHS hooks", () => {
     expect(core.abortSegmentLoading).toHaveBeenCalledTimes(1);
   });
 
+  it("delivers nothing for a segment that arrives after the abort", async () => {
+    // The core cannot always cancel in time: a request still waiting for the
+    // segment storage has no loader to carry the abort.
+    const { router, core, request, segmentData } = setup({ loadable: true });
+    router.ensureTopLevelManifest();
+    const { request: served, callback } = request({
+      uri: SEGMENT,
+      requestType: "segment",
+      responseType: "arraybuffer",
+    });
+
+    served.abort();
+    await flush();
+    expect(core.loadSegment).toHaveBeenCalledTimes(1);
+    expect(served.response).not.toBe(segmentData);
+    expect(served.status).toBe(0);
+    expect(callback).not.toHaveBeenCalled();
+  });
+
   it("reports a core failure as an errored request so VHS applies its own retries", async () => {
     const { router, core, request } = setup({ loadable: true });
     core.loadSegment.mockRejectedValueOnce(

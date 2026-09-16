@@ -70,7 +70,10 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     }
 
     const onSuccess = (response: SegmentResponse) => {
-      if (!this.#callbacks) return;
+      // `abort` reports the fragment as aborted and leaves the callbacks in
+      // place for hls.js to tear down, so a response that arrives after it —
+      // the core cannot always cancel in time — is delivered to nobody.
+      if (!this.#callbacks || stats.aborted) return;
 
       this.#response = response;
       const loadedBytes = this.#response.data.byteLength;

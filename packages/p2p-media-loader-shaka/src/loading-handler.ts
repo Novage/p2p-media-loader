@@ -103,11 +103,16 @@ export class Loader {
       return this.defaultLoad();
     }
 
+    let aborted = false;
     const loadSegment = async (): Promise<Response> => {
       try {
         const { data, bandwidth } = await this.core.loadSegment(segmentUrl, {
           byteRange,
         });
+        // The core cannot always cancel in time — a request waiting for the
+        // segment storage has no loader yet — and Shaka expects the operation
+        // it aborted to fail, not to deliver a segment it abandoned.
+        if (aborted) throw new CoreRequestError("aborted");
         return {
           data,
           headers: {},
@@ -141,6 +146,7 @@ export class Loader {
     };
 
     return new this.shaka.util.AbortableOperation(loadSegment(), () => {
+      aborted = true;
       this.core.abortSegmentLoading(segmentUrl, byteRange);
       return Promise.resolve();
     });

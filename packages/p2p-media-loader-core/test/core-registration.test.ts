@@ -351,6 +351,56 @@ describe("segment lookup", () => {
     ).rejects.toThrow(/not in the registry/);
   });
 
+  /**
+   * A core whose segment storage stays half-initialized until the test
+   * releases it: the window in which a request has entered `loadSegment` and
+   * has no loader to carry an abort.
+   */
+  function createCoreWithHeldStorage() {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const storage = {
+      initialize: () => held,
+      setSegmentChangeCallback: () => undefined,
+      hasSegment: () => false,
+      getSegmentData: () => Promise.resolve(undefined),
+      onSegmentRequested: () => undefined,
+      onPlaybackUpdated: () => undefined,
+      storeSegment: () => Promise.resolve(),
+      getUsage: () => ({ totalCapacity: 100, usedCapacity: 0 }),
+      destroy: () => undefined,
+    };
+    const core = createVodCore({
+      customSegmentStorageFactory: () => storage as never,
+    });
+    return { core, release };
+  }
+
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it("aborts a request that is still waiting for the segment storage", async () => {
+    const { core, release } = createCoreWithHeldStorage();
+    const byteRange = { start: 600, end: 1599 };
+    const loading = core.loadSegment(MEDIA_MP4, { byteRange });
+    await settle();
+
+    // No loader exists yet to carry the abort; the request takes it itself.
+    core.abortSegmentLoading(MEDIA_MP4, byteRange);
+    release();
+    await expect(loading).rejects.toMatchObject({ type: "aborted" });
+  });
+
+  it("aborts requests waiting for the segment storage when the core is destroyed", async () => {
+    const { core, release } = createCoreWithHeldStorage();
+    const byteRange = { start: 600, end: 1599 };
+    const loading = core.loadSegment(MEDIA_MP4, { byteRange });
+    await settle();
+
+    core.destroy();
+    release();
+    await expect(loading).rejects.toMatchObject({ type: "aborted" });
+  });
+
   it("rejects an already-aborted load before touching any loader", async () => {
     const core = createVodCore();
     const controller = new AbortController();

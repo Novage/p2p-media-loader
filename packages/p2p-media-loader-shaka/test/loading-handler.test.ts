@@ -171,7 +171,7 @@ describe("Shaka loading handler", () => {
     expect(parse).toHaveBeenCalledTimes(1);
   });
 
-  it("aborts a core request with the same URL and range", async () => {
+  it("aborts a core request with the same URL and range, and delivers nothing after it", async () => {
     const { loader, core } = setup(true);
     const op = loader.load(
       url,
@@ -182,6 +182,12 @@ describe("Shaka loading handler", () => {
     expect(core.abortSegmentLoading).toHaveBeenCalledWith(url, {
       start: 0,
       end: 699,
+    });
+    // The core cannot always cancel in time — a request still waiting for the
+    // segment storage has no loader yet — and a segment that arrives anyway
+    // is reported to Shaka as the abort it asked for, not as a download.
+    await expect(op.promise).rejects.toMatchObject({
+      code: FakeShakaError.Code.OPERATION_ABORTED,
     });
   });
 

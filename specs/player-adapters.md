@@ -44,7 +44,15 @@ is what makes a disagreement between core's parse and the player's harmless.
 the registry does not know and for a stream whose P2P is switched off, and it
 reports the former through the registry-miss diagnostic. Cancellation goes
 through the request's `signal`; an environment without `AbortController` calls
-`core.abortSegmentLoading(url, byteRange)` instead.
+`core.abortSegmentLoading(url, byteRange)` instead. Either way the request
+rejects as aborted, including while it is still waiting for the segment
+storage to open, where it has no loader yet to carry the cancellation.
+
+**An adapter that has reported a request as aborted delivers nothing for it
+afterwards.** The core cancels what it can, but a player may abort through a
+path the core never sees, and a response that is already on its way must not
+reach a player that has moved on. Each adapter keeps that record itself, next
+to the callbacks it is about to fire.
 
 **Handle manifest and segment requests only, and pass every other type through
 untouched.** Licence, key, certificate, timing and steering requests belong to

@@ -131,6 +131,16 @@ export class Core {
   private secondaryStreamLoader?: HybridLoader;
   private streamDetails: StreamDetails = { isLive: false };
   private storageInitPromise?: Promise<void>;
+  /**
+   * Requests that have entered `loadSegment` but have no stream loader yet,
+   * because the segment storage is still being initialized. There is nothing
+   * for `abortSegmentLoading` to cancel in that window, so it marks them here
+   * instead. See specs/player-adapters.md.
+   */
+  private readonly startingRequests = new Set<{
+    key: string;
+    aborted: boolean;
+  }>();
   private readonly manifestParsers: readonly ManifestParser[];
   private manifestRegistry = new ManifestRegistry();
   private readonly manifestLogger = debug("p2pml-core:manifest");
@@ -696,8 +706,16 @@ export class Core {
     const { signal } = options;
     if (signal?.aborted) throw new CoreRequestError("aborted");
 
-    await this.initializeSegmentStorage();
-    if (signal?.aborted) throw new CoreRequestError("aborted");
+    const starting = { key, aborted: false };
+    this.startingRequests.add(starting);
+    try {
+      await this.initializeSegmentStorage();
+    } finally {
+      this.startingRequests.delete(starting);
+    }
+    if (starting.aborted || signal?.aborted) {
+      throw new CoreRequestError("aborted");
+    }
 
     const segment = this.identifySegment(key);
     const loader = this.getStreamHybridLoader(segment);
@@ -728,6 +746,11 @@ export class Core {
    */
   abortSegmentLoading(url: string, byteRange?: ByteRange): void {
     const key = segmentKey(url, byteRange);
+    // A request still waiting for the segment storage has no loader to carry
+    // the abort; it is told here and gives up as soon as it has one.
+    for (const starting of this.startingRequests) {
+      if (starting.key === key) starting.aborted = true;
+    }
     this.mainStreamLoader?.abortSegmentRequest(key);
     this.secondaryStreamLoader?.abortSegmentRequest(key);
   }
@@ -800,6 +823,9 @@ export class Core {
    * unsubscribe explicitly.
    */
   destroy(): void {
+    // Nothing that was waiting for the old segment storage may go on to load
+    // against the new one.
+    for (const starting of this.startingRequests) starting.aborted = true;
     this.manifestRegistry = new ManifestRegistry();
     this.streams.clear();
     this.failedStreamKeys.clear();

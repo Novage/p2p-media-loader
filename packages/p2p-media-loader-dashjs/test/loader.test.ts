@@ -215,6 +215,25 @@ describe("dash.js XHRLoader extension", () => {
     expect(events.loadend).toBe(0);
   });
 
+  it("reports an abort, not a download, for a segment that arrives after it", async () => {
+    // The core cannot always cancel in time: a request still waiting for the
+    // segment storage has no loader to carry the abort.
+    const { loader } = setup({ loadable: true });
+    const { request, response, events } = makeRequest(
+      "MediaSegment",
+      SEGMENT_URL,
+    );
+    loader.load(request, response);
+
+    request.customData?.abort?.();
+    await flush();
+
+    expect(events.abort).toBe(1);
+    expect(events.loadend).toBe(0);
+    expect(events.progress).toEqual([]);
+    expect(response.data).toBeUndefined();
+  });
+
   it("reports a core failure as a failed response so dash.js retries", async () => {
     const { loader, core } = setup({ loadable: true });
     core.loadSegment.mockRejectedValueOnce(

@@ -152,9 +152,11 @@ class RequestRouter {
     request.customData ??= {};
     const { customData } = request;
     let settled = false;
+    let aborted = false;
 
     const abort = () => {
       if (settled) return;
+      aborted = true;
       this.core.abortSegmentLoading(url, byteRange);
     };
     customData.abort = abort;
@@ -163,6 +165,14 @@ class RequestRouter {
     this.core
       .loadSegment(url, { byteRange })
       .then(({ data, bandwidth }) => {
+        // The core cannot always cancel in time — a request waiting for the
+        // segment storage has no loader yet — so what dash.js has abandoned
+        // is dropped here rather than reported as a download.
+        if (aborted) {
+          settled = true;
+          customData.onabort?.();
+          return;
+        }
         settled = true;
         response.url = url;
         response.status = 200;
