@@ -102,6 +102,26 @@ export class ManifestRegistry {
     return updates;
   }
 
+  /**
+   * Whether this key is the initialization segment of a registered stream.
+   *
+   * Asked rather than remembered: an initialization segment rotates on a
+   * discontinuity, a new period or an ad break, and the registry holds the
+   * one a stream currently declares. A core that instead kept every key it
+   * had ever seen would grow for the life of a live session and go on
+   * recognising URLs no stream declares any more.
+   */
+  isInitSegment(key: string): boolean {
+    for (const stream of this.streams.values()) {
+      const { initSegment } = stream;
+      if (!initSegment) continue;
+      if (segmentKey(initSegment.url, initSegment.byteRange) === key) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /** Streams whose external index a request for this URL and range would fetch. */
   streamsAwaitingIndex(
     url: string,

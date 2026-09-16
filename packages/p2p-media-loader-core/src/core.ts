@@ -108,12 +108,6 @@ export class Core {
   /** Stream keys whose registration failed; reported once, then left alone. */
   private readonly failedStreamKeys = new Set<string>();
   /**
-   * Initialization segments, recognised so a request for one is passed
-   * through knowingly rather than counted as a registry miss. Never shared.
-   * See specs/manifest-registry.md, "Initialization segments".
-   */
-  private readonly initSegmentKeys = new Set<string>();
-  /**
    * Streams no manifest ever identified. Each computes the same identity as
    * every other unidentified stream of its type, so one may be shared only
    * where it is alone; see `isShareable`.
@@ -476,11 +470,6 @@ export class Core {
     for (const registryStream of this.manifestRegistry.getStreams()) {
       isLive ||= registryStream.isLive === true;
 
-      if (registryStream.initSegment) {
-        const { url, byteRange } = registryStream.initSegment;
-        this.initSegmentKeys.add(segmentKey(url, byteRange));
-      }
-
       let stream = this.streams.get(registryStream.key);
       if (!stream) {
         if (this.failedStreamKeys.has(registryStream.key)) continue;
@@ -805,7 +794,7 @@ export class Core {
       // Initialization segments and external indexes are recognised and
       // passed through knowingly; only an unknown URL is a miss.
       if (
-        !this.initSegmentKeys.has(key) &&
+        !this.manifestRegistry.isInitSegment(key) &&
         !this.isSegmentIndex(url, byteRange)
       ) {
         // Logged as well as dispatched: a miss makes the segment load without
@@ -878,7 +867,6 @@ export class Core {
     this.manifestRegistry = new ManifestRegistry();
     this.streams.clear();
     this.failedStreamKeys.clear();
-    this.initSegmentKeys.clear();
     this.unidentifiedStreamKeys.clear();
     this.unshareableLogged.clear();
     this.mainStreamLoader?.destroy();

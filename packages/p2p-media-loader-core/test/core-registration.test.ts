@@ -326,6 +326,40 @@ describe("segment lookup", () => {
     );
   });
 
+  it("stops recognising an initialization segment the manifest has replaced", () => {
+    const core = createVodCore();
+    const onMiss = vi.fn();
+    core.addEventListener("onSegmentRegistryMiss", onMiss);
+    expect(core.isSegmentLoadable(INIT_MP4, { start: 0, end: 599 })).toBe(
+      false,
+    );
+    expect(onMiss).not.toHaveBeenCalled();
+
+    // A discontinuity, a new period or an ad break rotates it. The registry
+    // holds the one the stream declares now, and the core asks rather than
+    // remembering every key it ever saw.
+    core.processManifest({
+      url: MEDIA_URL,
+      data: HLS_MEDIA_VOD_BYTERANGE.replace(
+        'URI="init.mp4"',
+        'URI="init-2.mp4"',
+      ),
+    });
+
+    expect(
+      core.isSegmentLoadable("https://cdn.example/vod/init-2.mp4", {
+        start: 0,
+        end: 599,
+      }),
+    ).toBe(false);
+    expect(onMiss).not.toHaveBeenCalled();
+
+    expect(core.isSegmentLoadable(INIT_MP4, { start: 0, end: 599 })).toBe(
+      false,
+    );
+    expect(onMiss).toHaveBeenCalledTimes(1);
+  });
+
   it("refuses a known segment when P2P is disabled for its stream type, without a miss", () => {
     const core = createVodCore({ mainStream: { isP2PDisabled: true } });
     const onMiss = vi.fn();
