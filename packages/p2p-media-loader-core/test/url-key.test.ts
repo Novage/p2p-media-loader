@@ -23,6 +23,30 @@ describe("normalizeUrl", () => {
     );
   });
 
+  it("carries a signed token over exactly as the manifest wrote it", () => {
+    // Serializing the surviving query again would re-encode these, and the
+    // manifest, having nothing to strip, is never re-encoded: every lookup
+    // from a request would miss and P2P would quietly never engage.
+    const signed = [
+      "https://cdn.example/s.ts?hdnts=exp=1758000000~acl=/*~hmac=9f2c1a",
+      "https://cdn.example/s.ts?Policy=eyJTdGF0ZW1lbnQi~&Signature=Gd3-x_y~z",
+      "https://cdn.example/s.ts?sv=2021-08-06&se=2026-01-01T00:00:00Z",
+      "https://cdn.example/s.ts?a=one%20two&b=one+two&c=(x)",
+    ];
+    for (const url of signed) {
+      expect(normalizeUrl(`${url}&CMCD=br%3D1200%2Cot%3Dv`)).toBe(url);
+    }
+  });
+
+  it("strips every CMCD parameter, with or without a value", () => {
+    expect(normalizeUrl("https://cdn.example/s.ts?CMCD=a&k=1&CMCD=b")).toBe(
+      "https://cdn.example/s.ts?k=1",
+    );
+    expect(normalizeUrl("https://cdn.example/s.ts?CMCD&k=1")).toBe(
+      "https://cdn.example/s.ts?k=1",
+    );
+  });
+
   it("returns the input untouched when there is nothing to strip", () => {
     const signed = "https://cdn.example/s.ts?token=xyz&Expires=1";
     expect(normalizeUrl(signed)).toBe(signed);
@@ -48,6 +72,13 @@ describe("segmentKey", () => {
   it("normalizes before keying so a CMCD request finds its segment", () => {
     expect(segmentKey("https://cdn.example/s.ts?CMCD=x")).toBe(
       segmentKey("https://cdn.example/s.ts"),
+    );
+  });
+
+  it("keys a CMCD request the same as the signed URL the manifest listed", () => {
+    const signed = "https://cdn.example/s.ts?hdnts=exp=1758000000~hmac=9f2c1a";
+    expect(segmentKey(`${signed}&CMCD=br%3D1200`, { start: 0, end: 9 })).toBe(
+      segmentKey(signed, { start: 0, end: 9 }),
     );
   });
 });

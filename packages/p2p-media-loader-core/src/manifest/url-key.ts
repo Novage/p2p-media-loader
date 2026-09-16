@@ -26,23 +26,28 @@ export function resolveUrl(uri: string, baseUrl: string): string {
  * Removes per-request telemetry parameters and nothing else. Signed URLs keep
  * their tokens, so a normalized URL is still fetchable — but the core never
  * fetches a normalized URL; it fetches what the player asked for.
+ *
+ * What survives is carried over as the manifest wrote it, character for
+ * character. Parsing the query and serializing it again would re-encode it —
+ * the `~` and `=` inside an Akamai token, the `:` in an Azure expiry, a space
+ * as `+` — and only the request carries a parameter to strip, so the key built
+ * from it would no longer match the key built from the manifest.
  */
 export function normalizeUrl(url: string): string {
   const query = url.indexOf("?");
   if (query === -1) return url;
 
-  const params = new URLSearchParams(url.slice(query + 1));
-  let changed = false;
-  for (const name of PER_REQUEST_QUERY_PARAMS) {
-    if (params.has(name)) {
-      params.delete(name);
-      changed = true;
-    }
-  }
-  if (!changed) return url;
+  const params = url.slice(query + 1).split("&");
+  const kept = params.filter((param) => {
+    const equals = param.indexOf("=");
+    const name = equals === -1 ? param : param.slice(0, equals);
+    return !PER_REQUEST_QUERY_PARAMS.has(name);
+  });
+  if (kept.length === params.length) return url;
 
-  const rest = params.toString();
-  return rest ? `${url.slice(0, query)}?${rest}` : url.slice(0, query);
+  return kept.length
+    ? `${url.slice(0, query)}?${kept.join("&")}`
+    : url.slice(0, query);
 }
 
 /** `url|start-end` with an inclusive end, matching the engines' runtime IDs. */
