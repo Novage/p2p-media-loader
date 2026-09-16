@@ -57,13 +57,25 @@ export function segmentKey(url: string, byteRange?: ByteRange): string {
   return `${normalized}|${byteRange.start}-${byteRange.end}`;
 }
 
-/** m3u8 `{ offset, length }` → inclusive `[start, end]`. */
+/**
+ * m3u8 `{ offset, length }` → inclusive `[start, end]`.
+ *
+ * A byte range written as a bare length — an `EXT-X-MAP` with
+ * `BYTERANGE="600"` — starts at the beginning of the resource, which is what
+ * a player requests for it. Nothing here may produce a key holding `NaN`: it
+ * would match no request ever made, and the segment would look unknown.
+ */
 export function byteRangeFromOffsetLength(range?: {
-  offset: number;
+  offset?: number;
   length: number;
 }): ByteRange | undefined {
-  if (!range || range.length <= 0) return undefined;
-  return { start: range.offset, end: range.offset + range.length - 1 };
+  if (!range || !Number.isFinite(range.length) || range.length <= 0) {
+    return undefined;
+  }
+  const { offset } = range;
+  const start =
+    typeof offset === "number" && Number.isFinite(offset) ? offset : 0;
+  return { start, end: start + range.length - 1 };
 }
 
 /** `Range: bytes=a-b` → inclusive `[a, b]`; open-ended ranges are not keys. */

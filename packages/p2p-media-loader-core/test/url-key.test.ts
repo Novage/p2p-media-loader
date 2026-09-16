@@ -93,6 +93,29 @@ describe("byte range conversions", () => {
     expect(byteRangeFromOffsetLength(undefined)).toBeUndefined();
   });
 
+  it("starts a range written as a bare length at the beginning of the resource", () => {
+    // `EXT-X-MAP:BYTERANGE="600"`: m3u8-parser fills the offset in for media
+    // segments, from the end of the previous one, and leaves it out here.
+    expect(byteRangeFromOffsetLength({ length: 600 })).toEqual({
+      start: 0,
+      end: 599,
+    });
+  });
+
+  it("makes no range at all out of a length that is not a number", () => {
+    // A key holding NaN would match no request ever made, and the segment
+    // would look unknown to every lookup.
+    const broken = { offset: NaN, length: NaN } as unknown as {
+      offset: number;
+      length: number;
+    };
+    expect(byteRangeFromOffsetLength(broken)).toBeUndefined();
+    expect(byteRangeFromOffsetLength({ offset: NaN, length: 600 })).toEqual({
+      start: 0,
+      end: 599,
+    });
+  });
+
   it("a Range header becomes an inclusive range", () => {
     expect(byteRangeFromRangeHeader("bytes=0-699")).toEqual({
       start: 0,

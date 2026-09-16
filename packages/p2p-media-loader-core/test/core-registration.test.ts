@@ -360,6 +360,27 @@ describe("segment lookup", () => {
     expect(onMiss).toHaveBeenCalledTimes(1);
   });
 
+  it("recognises an initialization segment whose byte range has no offset", () => {
+    // `EXT-X-MAP:BYTERANGE="600"` — a bare length. Read as no range at all,
+    // the key would carry NaN, match nothing the player ever asks for, and
+    // report a miss for every initialization request.
+    const core = new Core({ manifestParsers: [hlsManifestParser] });
+    core.processManifest({
+      url: MEDIA_URL,
+      data: HLS_MEDIA_VOD_BYTERANGE.replace(
+        'BYTERANGE="600@0"',
+        'BYTERANGE="600"',
+      ),
+    });
+    const onMiss = vi.fn();
+    core.addEventListener("onSegmentRegistryMiss", onMiss);
+
+    expect(core.isSegmentLoadable(INIT_MP4, { start: 0, end: 599 })).toBe(
+      false,
+    );
+    expect(onMiss).not.toHaveBeenCalled();
+  });
+
   it("refuses a known segment when P2P is disabled for its stream type, without a miss", () => {
     const core = createVodCore({ mainStream: { isP2PDisabled: true } });
     const onMiss = vi.fn();

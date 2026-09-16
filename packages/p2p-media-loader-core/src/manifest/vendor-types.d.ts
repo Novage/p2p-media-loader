@@ -5,7 +5,12 @@
  */
 
 declare module "m3u8-parser" {
-  export type M3u8ByteRange = { length: number; offset: number };
+  /**
+   * `offset` is absent where the manifest wrote none: an `EXT-X-MAP` whose
+   * BYTERANGE is a bare length. The parser fills it in for media segments
+   * only, from the end of the previous one.
+   */
+  export type M3u8ByteRange = { length: number; offset?: number };
 
   export type M3u8Segment = {
     uri: string;
@@ -66,7 +71,7 @@ declare module "m3u8-parser" {
 }
 
 declare module "mpd-parser" {
-  export type MpdByteRange = { length: number; offset: number };
+  export type MpdByteRange = { length: number; offset?: number };
 
   export type MpdSegment = {
     uri: string;
