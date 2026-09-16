@@ -35,7 +35,7 @@ This library makes it possible to build large-scale P2P mesh networks — often 
 
 - Guides [for HTML pages and web apps](https://novage.com.ua/blog/setting-up-p2p-video-on-a-web-page-in-5-minutes-for-free) and [for native mobile apps](https://novage.com.ua/blog/integrate-p2p-video-streaming-into-mobile-application)
 - [API documentation](https://novage.github.io/p2p-media-loader/docs/v5.0/)
-- [v3 → v4 migration guide](https://github.com/Novage/p2p-media-loader/blob/main/MIGRATION.md)
+- [v4 → v5 migration guide](https://github.com/Novage/p2p-media-loader/blob/main/MIGRATION.md)
 - [P2P development, support & consulting](https://novage.com.ua/)
 - [Demo](http://novage.com.ua/p2p-media-loader/demo.html)
 - [Contributing to our project](https://github.com/Novage/p2p-media-loader/blob/main/CONTRIBUTING.md)
