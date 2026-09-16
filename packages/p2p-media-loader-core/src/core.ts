@@ -113,6 +113,13 @@ export class Core {
    * See specs/manifest-registry.md, "Initialization segments".
    */
   private readonly initSegmentKeys = new Set<string>();
+  /**
+   * Streams no manifest ever identified. Each computes the same identity as
+   * every other unidentified stream of its type, so one may be shared only
+   * where it is alone; see `isShareable`.
+   */
+  private readonly unidentifiedStreamKeys = new Set<string>();
+  private readonly unshareableLogged = new Set<string>();
   private mainStreamConfig: StreamConfig;
   private secondaryStreamConfig: StreamConfig;
   private commonCoreConfig: CommonCoreConfig;
@@ -664,6 +671,8 @@ export class Core {
       }
     }
 
+    if (!stream.identified) this.unidentifiedStreamKeys.add(stream.key);
+
     const registeredStream: StreamWithSegments = {
       runtimeId: stream.key,
       type: stream.type,
@@ -815,7 +824,41 @@ export class Core {
       segment.stream.type === "main"
         ? this.mainStreamConfig
         : this.secondaryStreamConfig;
-    return !config.isP2PDisabled;
+    if (config.isP2PDisabled) return false;
+
+    return this.isShareable(segment.stream);
+  }
+
+  /**
+   * A stream no manifest identified carries the identity every unidentified
+   * stream of its type carries — the hash of nothing — so it is the same
+   * swarm for all of them. That is right for a media playlist loaded on its
+   * own, which is the whole stream: every viewer of that URL plays the same
+   * bytes. It is wrong as soon as another stream of that type is registered
+   * in the same swarm, which means a rendition whose media playlist the
+   * registry could not match to the master that named it — a CDN that signs
+   * its playlist URLs per response is enough. Peers would then exchange
+   * segments of different renditions by number, so it is not shared.
+   */
+  private isShareable(stream: StreamWithSegments): boolean {
+    if (!this.unidentifiedStreamKeys.has(stream.runtimeId)) return true;
+
+    for (const other of this.streams.values()) {
+      if (other === stream) continue;
+      if (other.type !== stream.type || other.swarmId !== stream.swarmId) {
+        continue;
+      }
+      if (!this.unshareableLogged.has(stream.runtimeId)) {
+        this.unshareableLogged.add(stream.runtimeId);
+        this.logger(
+          "no manifest identified %s and it is not the only %s stream of its swarm; it loads without P2P",
+          stream.runtimeId,
+          stream.type,
+        );
+      }
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -836,6 +879,8 @@ export class Core {
     this.streams.clear();
     this.failedStreamKeys.clear();
     this.initSegmentKeys.clear();
+    this.unidentifiedStreamKeys.clear();
+    this.unshareableLogged.clear();
     this.mainStreamLoader?.destroy();
     this.secondaryStreamLoader?.destroy();
     this.segmentStorage?.setSegmentChangeCallback(undefined);

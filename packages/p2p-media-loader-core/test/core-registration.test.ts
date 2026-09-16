@@ -295,6 +295,37 @@ describe("segment lookup", () => {
     });
   });
 
+  it("shares a media playlist loaded on its own, which is the whole stream", () => {
+    const core = createVodCore();
+    expect(core.getStreams()).toHaveLength(1);
+    expect(core.isSegmentLoadable(MEDIA_MP4, { start: 600, end: 1599 })).toBe(
+      true,
+    );
+  });
+
+  it("refuses to share a stream no manifest identified beside ones it did", () => {
+    // A rendition whose media playlist the registry could not match to the
+    // master that named it — a CDN signing playlist URLs per response is
+    // enough. It carries the identity every unidentified stream carries, so
+    // peers would exchange segments of different renditions by number.
+    const core = new Core({ manifestParsers: [hlsManifestParser] });
+    core.processManifest({ url: MEDIA_URL, data: HLS_MEDIA_VOD_BYTERANGE });
+    expect(core.isSegmentLoadable(MEDIA_MP4, { start: 600, end: 1599 })).toBe(
+      true,
+    );
+
+    core.processManifest({
+      url: "https://cdn.example/vod/master.m3u8",
+      data: HLS_MASTER_WITH_AUDIO,
+    });
+
+    expect(core.getStreams().length).toBeGreaterThan(1);
+    expect(core.hasSegment(MEDIA_MP4, { start: 600, end: 1599 })).toBe(true);
+    expect(core.isSegmentLoadable(MEDIA_MP4, { start: 600, end: 1599 })).toBe(
+      false,
+    );
+  });
+
   it("refuses a known segment when P2P is disabled for its stream type, without a miss", () => {
     const core = createVodCore({ mainStream: { isP2PDisabled: true } });
     const onMiss = vi.fn();

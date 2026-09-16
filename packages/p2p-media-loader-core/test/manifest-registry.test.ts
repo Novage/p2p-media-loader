@@ -53,6 +53,39 @@ describe("ManifestRegistry: HLS streams and segments", () => {
     registry.apply(hls(HLS_MEDIA_VOD_BYTERANGE, MEDIA_1080));
     expect(registry.getStreams()).toHaveLength(1);
     expect(registry.getStream(MEDIA_1080)?.segments.size).toBe(3);
+    // Nothing told it apart from any other stream; the core reads this to
+    // decide whether such a stream may be shared.
+    expect(registry.getStream(MEDIA_1080)?.identified).toBe(false);
+  });
+
+  it("lets a master identify a stream its media playlist registered first", () => {
+    const registry = new ManifestRegistry();
+    registry.apply(hls(HLS_MEDIA_VOD_BYTERANGE, MEDIA_1080));
+    const anonymous = registry.getStream(MEDIA_1080)!.identityHash;
+
+    registry.apply(hls(HLS_MASTER_WITH_AUDIO, MASTER));
+    const stream = registry.getStream(MEDIA_1080)!;
+    expect(stream.identified).toBe(true);
+    expect(stream.identityHash).not.toBe(anonymous);
+    expect(stream.segments.size).toBe(3);
+  });
+
+  it("keeps the identity the first master gave, whatever a later one says", () => {
+    const registry = new ManifestRegistry();
+    registry.apply(hls(HLS_MASTER_WITH_AUDIO, MASTER));
+    const identity = registry.getStream(MEDIA_1080)!.identityHash;
+
+    // A live packager republishing its master with another BANDWIDTH must not
+    // move a playing stream to a swarm with no peers in it.
+    const republished = HLS_MASTER_WITH_AUDIO.replace(
+      "BANDWIDTH=4521000",
+      "BANDWIDTH=4498000",
+    );
+    registry.apply(hls(republished, MASTER));
+
+    const stream = registry.getStream(MEDIA_1080)!;
+    expect(stream.identityHash).toBe(identity);
+    expect(stream.properties.bitrate).toBe(4521000);
   });
 
   it("uses the media sequence number as externalId", () => {

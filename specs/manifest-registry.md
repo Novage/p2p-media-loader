@@ -61,6 +61,23 @@ Core registers **streams** from the master manifest (or the MPD's
 playlist. A media playlist fetched directly, with no master above it, is a
 single anonymous stream.
 
+A stream's identity is decided by the first manifest that carries one and
+never changes afterwards, because that identity is its swarm: a live packager
+republishing its master with another `BANDWIDTH` would otherwise move a playing
+stream into a swarm with no peers in it. A master that arrives after a media
+playlist registered the stream anonymously does identify it, since nothing had
+identified it before.
+
+**An anonymous stream is shared only where it is the only stream of its type in
+its swarm.** It carries the identity every unidentified stream of its type
+carries — the hash of nothing — which is exactly right for a media playlist
+that is the whole stream, since every viewer of that URL plays the same bytes.
+It is wrong the moment another stream of that type is registered beside it,
+which means a rendition whose media playlist could not be matched to the master
+that named it; a CDN signing its playlist URLs per response is enough to cause
+that. Peers would then exchange segments of different renditions by number, so
+such a stream loads without P2P and the reason is logged.
+
 ## The registry
 
 ```

@@ -36,6 +36,14 @@ export type RegistryStream = {
   readonly type: StreamType;
   readonly properties: StreamProperties;
   readonly identityHash: string;
+  /**
+   * Whether a manifest ever told this stream apart from another. False for a
+   * media playlist that reached the registry without the master that names
+   * it: its identity is the empty one every such stream computes, so it can
+   * only be shared where it is the only stream of its type. See
+   * specs/segment-identity.md.
+   */
+  readonly identified: boolean;
   readonly indexSource: SegmentIndexSource;
   readonly initSegment?: { url: string; byteRange?: ByteRange };
   readonly isLive?: boolean;
@@ -165,8 +173,12 @@ export class ManifestRegistry {
     const existing = this.streams.get(key);
 
     // A media playlist says nothing about the stream's identity; only the
-    // master does. Keep whatever the master registered.
-    const carriesIdentity = !parsed.segments || !existing;
+    // master does. The first manifest that does decides it, and nothing
+    // changes it afterwards: a stream's identity is its swarm, and a live
+    // packager republishing its master — a changed BANDWIDTH is enough —
+    // would otherwise move a playing stream to a swarm with no peers in it.
+    const carriesIdentity =
+      !existing || (!parsed.segments && !existing.identified);
 
     const stream: MutableStream = {
       key,
@@ -175,6 +187,9 @@ export class ManifestRegistry {
       identityHash: carriesIdentity
         ? computeStreamIdentityHash(identityInput)
         : existing.identityHash,
+      identified: carriesIdentity
+        ? identifies(identityInput)
+        : existing.identified,
       indexSource: parsed.indexSource,
       initSegment: parsed.initSegment ?? existing?.initSegment,
       isLive: parsed.isLive ?? existing?.isLive,
@@ -345,4 +360,16 @@ function externalIdOf(
 function stripQuery(url: string): string {
   const i = url.indexOf("?");
   return i === -1 ? url : url.slice(0, i);
+}
+
+/**
+ * Whether an identity input says anything at all. Every absent property is
+ * present and undefined, so counting keys would make the empty identity — the
+ * one a media playlist with no master computes — look like an identity of its
+ * own.
+ */
+function identifies(properties: StreamProperties): boolean {
+  return Object.keys(properties).some(
+    (key) => properties[key as keyof StreamProperties] !== undefined,
+  );
 }
