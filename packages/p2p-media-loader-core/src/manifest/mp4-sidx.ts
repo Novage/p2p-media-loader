@@ -17,6 +17,13 @@ export type SidxBox = {
   readonly boxOffset: number;
   readonly boxSize: number;
   readonly timescale: number;
+  /**
+   * Read because the cursor must step over it — its width depends on the box
+   * version — and deliberately not used for identity: subsegments are laid
+   * out from the start of their period, not from this. See
+   * specs/segment-identity.md, "Where a `SegmentBase` subsegment sits on that
+   * timeline".
+   */
   readonly earliestPresentationTime: number;
   /** Bytes from the end of the box to the first referenced subsegment. */
   readonly firstOffset: number;

@@ -162,6 +162,10 @@ export class ManifestRegistry {
       // requested range's start, so this is its position in the file.
       const boxEnd = (byteRange?.start ?? 0) + sidx.boxOffset + sidx.boxSize;
       let start = boxEnd + sidx.firstOffset;
+      // From the start of the period, by accumulated duration. Neither the
+      // box's earliest presentation time nor the MPD's presentation time
+      // offset is applied; that is an identity decision, recorded in
+      // specs/segment-identity.md, and changing it is a protocol bump.
       let presentationTime = source.periodStart;
       for (const reference of sidx.references) {
         if (reference.referenceType === 1) continue;

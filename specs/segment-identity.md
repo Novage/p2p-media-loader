@@ -127,6 +127,30 @@ Presentation time is measured on the presentation timeline, not relative to a
 period, so a multi-period presentation does not restart identities at each
 period boundary.
 
+### Where a `SegmentBase` subsegment sits on that timeline
+
+A `SegmentBase` representation lists no segments: its subsegments come from the
+`sidx` box the player fetches, and the registry lays them out **from the start
+of the period, by accumulated subsegment duration**. The box's
+`earliest_presentation_time` and the MPD's `@presentationTimeOffset` are read
+past, not applied. `mpd-parser` lays the same subsegments out the same way,
+which is what video.js plays them from; Shaka and dash.js apply both values.
+That divergence is harmless, because an `externalId` is exchanged between peers
+and never shown to a player.
+
+Applying the earliest presentation time on its own would be wrong rather than
+merely different: a DASH presentation time is the period start plus the media
+time less `@presentationTimeOffset`, and a multi-period presentation with a
+continuous media timeline sets that offset precisely to cancel the media clock.
+Honouring one without the other would count the period's offset twice for
+exactly those streams.
+
+What this costs is a uniform shift, by the earliest presentation time, of every
+subsegment of a stream whose MPD declares no offset. It is the same shift for
+every peer, and nothing compares times between streams, so identity and the
+request queue stay consistent. **Changing it shifts every `SegmentBase`
+`externalId` and requires a protocol version bump**, by the rule below.
+
 ## Version discipline
 
 `PEER_PROTOCOL_VERSION` is part of every stream swarm ID, so peers with
