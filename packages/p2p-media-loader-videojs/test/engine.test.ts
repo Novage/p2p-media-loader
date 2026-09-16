@@ -12,6 +12,16 @@ function fakeVideoJs() {
   const original = Object.assign(vi.fn(), {
     original: true,
   }) as unknown as VhsXhr;
+  original.onRequest = (cb: VhsRequestHook) => {
+    (original._requestCallbackSet ??= new Set()).add(cb);
+  };
+  original.offRequest = (cb: VhsRequestHook) =>
+    original._requestCallbackSet?.delete(cb);
+  original.onResponse = (cb: VhsResponseHook) => {
+    (original._responseCallbackSet ??= new Set()).add(cb);
+  };
+  original.offResponse = (cb: VhsResponseHook) =>
+    original._responseCallbackSet?.delete(cb);
   const plugins = new Map<string, unknown>();
   const videojs = {
     xhr: vi.fn(),
@@ -54,39 +64,42 @@ function fakePlayer() {
 }
 
 describe("VideoJsP2PEngine", () => {
-  it("binds one engine to one player without touching anything global", () => {
+  it("binds one engine to one player, and hooks the page only for first manifests", () => {
     const { videojs, spies, original } = fakeVideoJs();
     const { player, xhr } = fakePlayer();
     const engine = new VideoJsP2PEngine({ core: { swarmId: "s" } }, videojs);
 
     engine.bindPlayer(player);
+    // The page's xhr function keeps its identity; only its hook set grows.
     expect(videojs.Vhs.xhr).toBe(original);
+    expect(original._requestCallbackSet?.size).toBe(1);
+    expect(original._responseCallbackSet?.size).toBe(1);
     expect(spies.registerPlugin).not.toHaveBeenCalled();
-    // The player's own request and response hooks carry the integration.
+    // The player's own request and response hooks carry every other request.
     expect(xhr._requestCallbackSet?.size).toBe(1);
     expect(xhr._responseCallbackSet?.size).toBe(1);
 
     engine.destroy();
     expect(xhr._requestCallbackSet?.size ?? 0).toBe(0);
     expect(xhr._responseCallbackSet?.size ?? 0).toBe(0);
+    expect(original._requestCallbackSet?.size ?? 0).toBe(0);
+    expect(original._responseCallbackSet?.size ?? 0).toBe(0);
   });
 });
 
 describe("VideoJsP2PEngine plugins", () => {
-  it("replaces videojs.Vhs.xhr once, registers the plugin, and restores both on unregister", () => {
+  it("registers the plugin and removes it again, touching nothing else", () => {
     const { videojs, spies, original, plugins } = fakeVideoJs();
     VideoJsP2PEngine.registerPlugins(videojs);
-    expect(videojs.Vhs.xhr).not.toBe(original);
-    expect(videojs.Vhs.xhr.original).not.toBe(true);
     expect(plugins.has(VideoJsP2PEngine.PLUGIN_NAME)).toBe(true);
-    const replaced = videojs.Vhs.xhr;
+    // The page's own xhr function is left exactly as VHS made it.
+    expect(videojs.Vhs.xhr).toBe(original);
     VideoJsP2PEngine.registerPlugins(videojs); // idempotent
-    expect(videojs.Vhs.xhr).toBe(replaced);
     expect(spies.registerPlugin).toHaveBeenCalledTimes(1);
 
     VideoJsP2PEngine.unregisterPlugins(videojs);
-    expect(videojs.Vhs.xhr).toBe(original);
     expect(plugins.has(VideoJsP2PEngine.PLUGIN_NAME)).toBe(false);
+    expect(videojs.Vhs.xhr).toBe(original);
   });
 
   it("the plugin creates an engine bound to the player it is called on", () => {

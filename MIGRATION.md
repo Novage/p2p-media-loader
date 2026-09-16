@@ -66,12 +66,10 @@ loads through `FetchLoader`, plays through the player without P2P.
 
 video.js gets an adapter too. `new VideoJsP2PEngine({ core })` plus
 `engine.bindPlayer(player)` attaches one engine to one player, through the
-request and response hooks VHS gives that player; nothing page-wide is
-involved. `VideoJsP2PEngine.registerPlugins(videojs)` is optional: it replaces
-`videojs.Vhs.xhr` once per page so that a bound player catches the first
-manifest of a source — the one request its own hooks cannot see — instead of
-fetching it a second time, and it registers a `p2pMediaLoader` plugin, so
-`player.p2pMediaLoader({ core })` attaches an engine as well. HLS and MPEG-DASH
+request and response hooks VHS gives that player; bind it before the player
+loads a source. `VideoJsP2PEngine.registerPlugins(videojs)` is optional and
+only registers a `p2pMediaLoader` plugin, so that `player.p2pMediaLoader({ core })`
+attaches an engine as well. HLS and MPEG-DASH
 both play through VHS, so its bundles map `p2p-media-loader-core`,
 `p2p-media-loader-core/hls` and `p2p-media-loader-core/dash` to
 `p2p-media-loader-core.es.min.js`. On Safari and iOS VHS stands aside unless

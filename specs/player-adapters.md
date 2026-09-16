@@ -283,21 +283,30 @@ requests it has aborted. VHS's own wrapper sets `aborted` on the request before
 calling `abort`, so the adapter records a cancellation of its own rather than
 reading that flag back.
 
-**The first manifest of a source reaches no hook.** VHS sends it from inside
-its source handler, which is where the player's xhr function and its hook
-registry are created, so nothing can be attached in front of it. An engine
-bound to a player therefore fetches that one manifest itself, once per source,
-and hands it to the core. Replacing `videojs.Vhs.xhr` — the function every
-player's xhr function delegates to — is what removes that second fetch:
-`VideoJsP2PEngine.registerPlugins(videojs)` installs a replacement that matches
-an unhooked request to a bound player by its `currentSrc()`, attaches that
-player's hooks on the spot and hands the core the manifest as it passes. The
-replacement carries VHS's hook registry over (`onRequest`, `onResponse`, their
-`off` counterparts and the callback sets), since VHS reads them off
-`videojs.Vhs.xhr`, and it also registers the `p2pMediaLoader` video.js plugin.
-It is an optimization and a convenience, not a requirement: with or without it
-the hooks do the work, and a change of `currentSrc()` between manifests starts
-a new stream context while a playlist or MPD refresh does not.
+**The first manifest of a source reaches no hook of the player's.** VHS sends
+it from inside its source handler, which is where the player's xhr function and
+its hook registry are created, so nothing can be attached in front of it. VHS
+falls back to the page-wide hooks — `videojs.Vhs.xhr.onRequest` and
+`onResponse` — for a player that has none of its own, which is that request and
+no other, so the adapter installs a pair there as well. They match the request
+to a bound player by its `currentSrc()`, put that player's own hooks on, and
+hand the core the manifest as it passes; they are added when the first engine
+binds and removed when the last one is destroyed, and they leave every other
+player alone. `VideoJsP2PEngine.registerPlugins(videojs)` is unrelated to any
+of this: it registers the `p2pMediaLoader` video.js plugin and nothing else.
+
+**Reading the manifest the player itself fetched is not an optimization.**
+An adapter that fetches it a second time gets a second response, and a CDN that
+signs its media playlist URLs per response — Amazon IVS does — names a
+different set of playlists in each one. The core would then hold renditions the
+player never asks for, and see the ones it does ask for as a stream of their
+own, with no identity from any master playlist: every such viewer lands in one
+swarm keyed by nothing, sharing with no player that read the manifest properly.
+The adapter falls back to fetching a manifest itself only for a player that
+already loaded a source before an engine was bound to it.
+
+A change of `currentSrc()` between manifests starts a new stream context; a
+playlist or MPD refresh does not.
 
 A player whose hooks are attached no longer runs the page's global VHS hooks:
 VHS consults the global callback sets only for players that have none of their
@@ -307,6 +316,13 @@ should move those hooks to that player.
 VHS exposes no presentation-delay setting comparable to the other engines': it
 starts a live stream at its own seekable end, honouring `EXT-X-START` and
 `HOLD-BACK` where present. The adapter leaves that placement alone.
+
+VHS is also the only engine here that caps the rendition by the size the player
+is rendered at — `limitRenditionByPlayerDimensions`, on unless set to `false`.
+A rendition is a swarm, so a video.js viewer in a small window can end up in a
+swarm no hls.js, dash.js or Shaka viewer of the same stream is ever in. The
+adapter does not touch the setting, which is the integrator's to make; a
+deployment that mixes players and wants one swarm per rendition turns it off.
 
 **On Safari and iOS there is nothing to intercept** unless the integrator opts
 into `overrideNative`: VHS stands aside by default there — `overrideNative`

@@ -12,9 +12,8 @@ import {
   DynamicCoreConfig,
   getPlaybackStateFromMediaElement,
 } from "p2p-media-loader-core";
-import { RequestRouter, RouterRegistry, createVhsXhr } from "./xhr.js";
+import { FirstManifestHooks, RequestRouter, RouterRegistry } from "./xhr.js";
 import type {
-  VhsXhr,
   VideoJsLike,
   VideoJsNamespace,
   VideoJsPlayerLike,
@@ -54,8 +53,11 @@ const PLAYBACK_EVENTS = [
   "waiting",
 ] as const;
 
-/** Routers of every bound engine, consulted by the global VHS hook. */
+/** Routers of every bound engine, consulted by the page-wide VHS hooks. */
 const registry = new RouterRegistry();
+
+/** The hooks that hand each bound player its first manifest of a source. */
+const firstManifestHooks = new FirstManifestHooks(registry);
 
 /**
  * Represents a Peer-to-Peer (P2P) engine designed to enhance media streaming efficiency.
@@ -70,15 +72,14 @@ const registry = new RouterRegistry();
  * element. VHS's own manifest parsing runs untouched; the core parses the same
  * bytes itself.
  *
- * One engine serves one player, and binding it touches nothing outside that
- * player: it hooks the player's own VHS request and response hooks. The only
- * request those hooks cannot see is the first manifest of a source, which VHS
- * sends from inside its source handler before a hook can be attached, so the
- * engine reads that one manifest itself.
+ * One engine serves one player: binding it puts the engine on that player's
+ * own VHS request and response hooks. The first manifest request of a source
+ * is the one request those hooks cannot see, because VHS sends it from inside
+ * the source handler that creates them; VHS runs its page-wide hooks for a
+ * player that has none of its own, and the engine reads that manifest there.
  *
- * `registerPlugins(videojs)` is optional. It replaces `videojs.Vhs.xhr` once
- * per page — which lets bound players catch that first manifest instead of
- * fetching it again — and registers the `p2pMediaLoader` video.js plugin.
+ * `registerPlugins(videojs)` is optional, and only registers the
+ * `p2pMediaLoader` video.js plugin for integrators who prefer that style.
  *
  * @example
  * // One engine, one player, no page-wide setup
@@ -98,10 +99,11 @@ export class VideoJsP2PEngine {
   /** The video.js plugin `registerPlugins` adds: `player.p2pMediaLoader(config)`. */
   static readonly PLUGIN_NAME = "p2pMediaLoader";
 
-  private static installed?: { videojs: VideoJsLike; original: VhsXhr };
+  private static plugin?: VideoJsLike;
 
   private player?: VideoJsPlayerLike;
   private router?: RequestRouter;
+  private hooksInstalled = false;
   private media?: HTMLMediaElement;
   private readonly core: Core;
   private readonly videojs: VideoJsLike;
@@ -128,27 +130,16 @@ export class VideoJsP2PEngine {
   }
 
   /**
-   * Optional page-wide setup. It replaces `videojs.Vhs.xhr` — the function
-   * VHS calls for every request of every player — with one that hands a
-   * bound player the first manifest request of each source, the one request
-   * a player's own hooks cannot see; without it every bound engine fetches
-   * that manifest a second time for itself. It also registers the
-   * `p2pMediaLoader` plugin. Call it once, before players load a source.
-   *
-   * The replacement does nothing for players without an engine, and nothing
-   * on platforms where VHS stands aside (Safari and iOS without
-   * `overrideNative`).
+   * Registers the `p2pMediaLoader` video.js plugin, so that a player can be
+   * given an engine with `player.p2pMediaLoader({ core })`. Optional:
+   * `new VideoJsP2PEngine(config)` and `engine.bindPlayer(player)` do the
+   * same without it. Nothing else on the page is touched.
    *
    * @param input The video.js namespace; defaults to the global one.
    */
   static registerPlugins(input: VideoJsInput | undefined = window.videojs) {
     const videojs = validateVideoJs(input);
-    if (VideoJsP2PEngine.installed?.videojs === videojs) return;
-    if (VideoJsP2PEngine.installed) VideoJsP2PEngine.unregisterPlugins();
-
-    const original = videojs.Vhs.xhr;
-    videojs.Vhs.xhr = createVhsXhr(videojs, registry, original);
-    VideoJsP2PEngine.installed = { videojs, original };
+    VideoJsP2PEngine.plugin = videojs;
 
     if (!videojs.getPlugin(VideoJsP2PEngine.PLUGIN_NAME)) {
       videojs.registerPlugin(
@@ -166,21 +157,21 @@ export class VideoJsP2PEngine {
   }
 
   /**
-   * Restores `videojs.Vhs.xhr` and removes the plugin.
+   * Removes the `p2pMediaLoader` plugin.
    *
-   * @param input The video.js namespace; defaults to the one plugins were registered on.
+   * @param input The video.js namespace; defaults to the one the plugin was registered on.
    */
   static unregisterPlugins(
-    input: VideoJsInput | undefined = VideoJsP2PEngine.installed?.videojs,
+    input: VideoJsInput | undefined = VideoJsP2PEngine.plugin,
   ) {
-    const { installed } = VideoJsP2PEngine;
     const videojs = input as VideoJsLike | undefined;
-    if (!installed || !videojs || installed.videojs !== videojs) return;
-    videojs.Vhs.xhr = installed.original;
+    if (!videojs) return;
     if (videojs.getPlugin(VideoJsP2PEngine.PLUGIN_NAME)) {
       videojs.deregisterPlugin(VideoJsP2PEngine.PLUGIN_NAME);
     }
-    VideoJsP2PEngine.installed = undefined;
+    if (VideoJsP2PEngine.plugin === videojs) {
+      VideoJsP2PEngine.plugin = undefined;
+    }
   }
 
   /**
@@ -198,6 +189,7 @@ export class VideoJsP2PEngine {
     this.player = player;
     this.router = new RequestRouter(this.core, player, this.videojs);
     registry.add(this.router);
+    this.hooksInstalled = firstManifestHooks.retain(this.videojs);
     this.router.ensureTopLevelManifest();
     player.on("loadstart", this.handleLoadStart);
     player.on("dispose", this.handleDispose);
@@ -299,6 +291,10 @@ export class VideoJsP2PEngine {
       registry.remove(this.router);
       this.router.detachHooks();
       this.router = undefined;
+    }
+    if (this.hooksInstalled) {
+      firstManifestHooks.release();
+      this.hooksInstalled = false;
     }
     if (this.player) {
       this.player.off("loadstart", this.handleLoadStart);

@@ -158,13 +158,9 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
      player.src({ src: streamUrl, type: "application/x-mpegURL" });
      ```
 
-     Binding touches nothing outside the player, so several players can run
-     side by side, each with its own engine and its own swarm. The one request
-     a player's hooks cannot see is the first manifest of a source, which VHS
-     sends from inside its source handler before any hook exists; the engine
-     fetches that one manifest itself. A page that would rather not pay for
-     that second fetch, or that wants video.js's plugin API, can install the
-     page-wide hook once:
+     Bind the engine before the player loads a source, and several players can
+     run side by side, each with its own engine and its own swarm. The same
+     integration is available as a video.js plugin:
 
      ```typescript
      // Once per page, before any player loads a source
@@ -183,9 +179,11 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
      player.src({ src: streamUrl, type: "application/x-mpegURL" });
      ```
 
-     It replaces `videojs.Vhs.xhr`, carrying over the hook registry VHS keeps
-     there, so a bound player catches its first manifest as it passes instead
-     of fetching it again. Players bound with `bindPlayer` benefit from it too.
+     Note that VHS caps the rendition it plays by the size the player is
+     rendered at, which no other engine does, and that a rendition is a swarm:
+     a page mixing video.js with other players usually wants
+     `vhs: { limitRenditionByPlayerDimensions: false }` so that its viewers
+     can share.
 
    - video.js 10 — there is no video.js engine to hook here. v10 dropped VHS
      and plays through media adapters powered by hls.js
@@ -1068,8 +1066,8 @@ first.
 video.js 8 plays HLS and MPEG-DASH through VHS (`@videojs/http-streaming`), so
 one import map serves both; it maps the core and both parsers to the core
 bundle that carries them. One engine serves one player, through that player's
-own VHS hooks; `VideoJsP2PEngine.registerPlugins(videojs)` is optional and is
-covered in the npm section above. For video.js 10, see the next section.
+own VHS hooks; the `p2pMediaLoader` plugin covered in the npm section above is
+another way to attach one. For video.js 10, see the next section.
 
 ```html
 <!doctype html>

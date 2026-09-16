@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { CoreRequestError, type Core } from "p2p-media-loader-core";
-import { RequestRouter, RouterRegistry, createVhsXhr } from "../src/xhr.js";
+import {
+  FirstManifestHooks,
+  RequestRouter,
+  RouterRegistry,
+} from "../src/xhr.js";
 import type {
   VhsCallback,
   VhsRequest,
@@ -198,6 +202,7 @@ function setup(options: { loadable?: boolean; index?: boolean } = {}) {
   const registry = new RouterRegistry();
   const router = new RequestRouter(core as unknown as Core, player, videojs);
   registry.add(router);
+  const hooks = new FirstManifestHooks(registry);
 
   return {
     router,
@@ -216,10 +221,9 @@ function setup(options: { loadable?: boolean; index?: boolean } = {}) {
       )(o, callback),
       callback,
     }),
-    installGlobalHook: () => {
-      videojs.Vhs.xhr = createVhsXhr(videojs, registry, original);
-      return videojs.Vhs.xhr;
-    },
+    hooks,
+    original,
+    installPageHooks: () => hooks.retain(videojs),
     setSrc: (value: string) => (src = value),
     newHandler: () => (playerXhr = createPlayerXhr(videojs)),
   };
@@ -396,50 +400,76 @@ describe("a player's own VHS hooks", () => {
   });
 });
 
-describe("the global videojs.Vhs.xhr replacement", () => {
-  it("carries VHS's hook registry over so onRequest keeps working", () => {
-    const { installGlobalHook } = setup();
-    const replacement = installGlobalHook();
-    expect(replacement.original).not.toBe(true);
-    expect(typeof replacement.onRequest).toBe("function");
-    expect(typeof replacement.offRequest).toBe("function");
-  });
-
-  it("passes a request from a player with no engine to videojs.xhr untouched", () => {
-    const { installGlobalHook, videojsXhr, core } = setup();
-    const replacement = installGlobalHook();
-    replacement(
-      { uri: "https://elsewhere.example/x.m3u8", requestType: "hls-playlist" },
-      vi.fn(),
-    );
-    expect(videojsXhr).toHaveBeenCalledTimes(1);
-    expect(core.processManifest).not.toHaveBeenCalled();
-  });
-
-  it("catches the first manifest of a source, so nothing is fetched twice", () => {
-    const { router, core, videojsXhr, request, respond, installGlobalHook } =
+describe("the page-wide hooks for a source's first manifest", () => {
+  it("reads the manifest VHS fetched itself, so nothing is fetched twice", () => {
+    const { router, core, videojsXhr, request, respond, installPageHooks } =
       setup();
-    installGlobalHook();
-    // VHS sends this one from inside its source handler, before any hook.
+    expect(installPageHooks()).toBe(true);
+
+    // VHS sends this one from inside its source handler, before the player
+    // has hooks of its own, so VHS runs the page-wide ones.
     request({ uri: MASTER, requestType: "hls-playlist" });
     respond(200, "#EXTM3U", "https://cdn.example/hls/redirected.m3u8");
     expect(core.processManifest).toHaveBeenCalledWith({
       url: "https://cdn.example/hls/redirected.m3u8",
       data: "#EXTM3U",
     });
+    expect(videojsXhr).toHaveBeenCalledTimes(1);
 
-    // The player's hooks are on now, so binding reads no manifest of its own.
+    // The player's own hooks are on now, so binding reads no manifest itself.
     router.ensureTopLevelManifest();
     expect(videojsXhr).toHaveBeenCalledTimes(1);
   });
 
   it("hands a top-level refresh to the core exactly once", () => {
-    const { core, request, respond, installGlobalHook } = setup();
-    installGlobalHook();
+    const { core, request, respond, installPageHooks } = setup();
+    installPageHooks();
     request({ uri: MASTER, requestType: "hls-playlist" });
     respond(200, "#EXTM3U");
+    // From here the player's own hooks run instead of the page-wide ones.
     request({ uri: MASTER, requestType: "hls-playlist" });
     respond(200, "#EXTM3U\n#EXT-X-MEDIA-SEQUENCE:2");
     expect(core.processManifest).toHaveBeenCalledTimes(2);
+  });
+
+  it("ignores a request from a player with no engine", () => {
+    const { core, request, respond, installPageHooks, setSrc } = setup();
+    installPageHooks();
+    setSrc("https://elsewhere.example/other.m3u8");
+    request({ uri: MASTER, requestType: "hls-playlist" });
+    respond(200, "#EXTM3U");
+    expect(core.processManifest).not.toHaveBeenCalled();
+  });
+
+  it("leaves the manifest to be read again when the first request fails", () => {
+    const { router, core, videojsXhr, request, respond, installPageHooks } =
+      setup();
+    installPageHooks();
+    request({ uri: MASTER, requestType: "hls-playlist" });
+    respond(500, "nope");
+    expect(core.processManifest).not.toHaveBeenCalled();
+
+    router.ensureTopLevelManifest();
+    expect(videojsXhr).toHaveBeenCalledTimes(2);
+  });
+
+  it("installs once for many engines and comes off with the last of them", () => {
+    const { videojs, hooks, original } = setup();
+    expect(hooks.retain(videojs)).toBe(true);
+    expect(hooks.retain(videojs)).toBe(true);
+    expect(original._requestCallbackSet?.size).toBe(1);
+    expect(original._responseCallbackSet?.size).toBe(1);
+
+    hooks.release();
+    expect(original._requestCallbackSet?.size).toBe(1);
+    hooks.release();
+    expect(original._requestCallbackSet?.size ?? 0).toBe(0);
+    expect(original._responseCallbackSet?.size ?? 0).toBe(0);
+  });
+
+  it("reports that it could not install on a video.js without hooks", () => {
+    const { videojs, hooks } = setup();
+    videojs.Vhs.xhr = (() => undefined) as unknown as typeof videojs.Vhs.xhr;
+    expect(hooks.retain(videojs)).toBe(false);
   });
 });

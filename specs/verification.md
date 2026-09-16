@@ -93,9 +93,16 @@ player's own are expected, because players correct fragment times to demuxed
 timestamps and manifests are not.
 
 **Cross-player sharing.** Two browser tabs on different engines, playing the
-same stream, exchange segments — the demo's network view shows the peer and the
-P2P share. This is the observable consequence of identity being derived from
-the manifest ([segment-identity.md](segment-identity.md)).
+same stream **at the same rendition**, exchange segments — the demo's network
+view shows the peer and the P2P share. This is the observable consequence of
+identity being derived from the manifest
+([segment-identity.md](segment-identity.md)).
+
+Pin the rendition in both tabs with the demo's quality selector before reading
+anything into the result. A rendition is a swarm, and each engine's adaptive
+bitrate logic picks one on its own measurements, so two engines left on Auto
+usually sit in different swarms and share nothing. That is the engines
+disagreeing about quality, not P2P failing to work.
 
 ## Fixtures
 

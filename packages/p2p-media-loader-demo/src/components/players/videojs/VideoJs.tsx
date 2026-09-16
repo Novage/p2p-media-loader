@@ -8,7 +8,7 @@ import { subscribeToUiEvents } from "../utils";
 
 const AUTO_QUALITY = "auto";
 
-type VhsRepresentation = {
+export type VhsRepresentation = {
   id: string;
   height?: number;
   bandwidth?: number;
@@ -43,9 +43,16 @@ export const VideoJs = ({
       muted: true,
       playsinline: true,
       html5: {
-        // VHS stands aside for native HLS on Safari and iOS unless told
-        // otherwise; there is nothing to route through the core natively.
-        vhs: { overrideNative: true },
+        vhs: {
+          // VHS stands aside for native HLS on Safari and iOS unless told
+          // otherwise; there is nothing to route through the core natively.
+          overrideNative: true,
+          // VHS alone caps the rendition by the size the player is rendered
+          // at, so in a small window it picks a lower one than hls.js,
+          // dash.js and Shaka do and shares with none of them: a rendition is
+          // a swarm. Every engine in this demo chooses on bandwidth alone.
+          limitRenditionByPlayerDimensions: false,
+        },
         nativeAudioTracks: false,
         nativeVideoTracks: false,
       },
@@ -65,8 +72,28 @@ export const VideoJs = ({
     const representations = () =>
       (player.tech(true) as unknown as TechWithVhs).vhs?.representations?.() ??
       [];
+    // A rendition is named by what it is rather than by its VHS id, which
+    // carries the playlist URL: a live stream whose CDN signs those per
+    // response renames every rendition each time the manifest is refreshed.
+    const labelOf = (r: VhsRepresentation) =>
+      `${r.height ?? "?"}p (${Math.round((r.bandwidth ?? 0) / 1000)}k)`;
+    let chosen: string = AUTO_QUALITY;
+    // Enabling a single representation pins it; enabling all restores ABR.
+    const applyChoice = () => {
+      for (const r of representations()) {
+        r.enabled(chosen === AUTO_QUALITY || labelOf(r) === chosen);
+      }
+    };
+
+    // VHS fills its rendition list as it parses the manifest, and builds it
+    // again on a refresh, so the list is rebuilt whenever it has changed —
+    // and the viewer's choice is carried over and applied to the new one.
+    let listed = "";
     const updateQualityOptions = () => {
       const reps = representations();
+      const ids = reps.map((r) => r.id).join();
+      if (ids === listed) return;
+      listed = ids;
       if (reps.length < 2) {
         qualityElement.style.display = "none";
         return;
@@ -75,19 +102,23 @@ export const VideoJs = ({
       qualityElement.options.length = 0;
       qualityElement.add(new Option("Auto", AUTO_QUALITY));
       for (const r of reps) {
-        const label = `${r.height ?? "?"}p (${Math.round((r.bandwidth ?? 0) / 1000)}k)`;
-        qualityElement.add(new Option(label, r.id));
+        qualityElement.add(new Option(labelOf(r)));
       }
+      qualityElement.value = chosen;
+      applyChoice();
     };
     const onQualityChange = () => {
-      const chosen = qualityElement.value;
-      // Enabling a single representation pins it; enabling all restores ABR.
-      for (const r of representations()) {
-        r.enabled(chosen === AUTO_QUALITY || r.id === chosen);
-      }
+      chosen = qualityElement.value;
+      applyChoice();
     };
     qualityElement.addEventListener("change", onQualityChange);
-    player.on("loadedmetadata", updateQualityOptions);
+    const QUALITY_EVENTS = [
+      "loadedmetadata",
+      "loadeddata",
+      "canplay",
+      "progress",
+    ];
+    for (const event of QUALITY_EVENTS) player.on(event, updateQualityOptions);
 
     const isDash = /\.mpd(\?|#|$)/i.test(streamUrl);
     player.src({
@@ -96,6 +127,9 @@ export const VideoJs = ({
     });
 
     return () => {
+      for (const event of QUALITY_EVENTS) {
+        player.off(event, updateQualityOptions);
+      }
       qualityElement.removeEventListener("change", onQualityChange);
       engine.destroy();
       player.dispose();

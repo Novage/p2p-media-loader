@@ -6,10 +6,8 @@ import {
 } from "p2p-media-loader-core";
 import {
   REQUEST_TYPE,
-  VhsCallback,
   VhsRequest,
   VhsRequestHook,
-  VhsRequestOptions,
   VhsResponse,
   VhsResponseHook,
   VhsXhr,
@@ -41,45 +39,69 @@ export class RouterRegistry {
 }
 
 /**
- * The optional replacement for `videojs.Vhs.xhr`, which VHS calls for every
- * request of every player once `original` is not `true`. Bound players route
- * their requests through their own engine's hooks; all this replacement adds
- * is the one request those hooks cannot see — the first manifest of a source,
- * which VHS sends from inside its source handler before any hook can be
- * attached. Every other request goes straight on to `videojs.xhr`.
+ * The hooks VHS runs for a player that has none of its own.
  *
- * VHS reads its hook registry (`onRequest`, `_requestCallbackSet`, …) off
- * `videojs.Vhs.xhr`, so the replacement carries the original's over.
+ * Every source's first request is such a request: VHS creates the player's
+ * own hook registry and sends the manifest request from inside its source
+ * handler, so nothing can be put in front of it. VHS falls back to the
+ * page-wide hooks for exactly that window, which is where these come in: they
+ * hand the manifest to the engine bound to the player and put that player's
+ * own hooks in place for everything after it.
+ *
+ * Reading the manifest VHS itself fetched, rather than fetching it again, is
+ * what keeps the core and the player on one set of media playlist URLs — a
+ * CDN that signs them per response, as Amazon IVS does, hands out a different
+ * set to every request.
  */
-export function createVhsXhr(
-  videojs: VideoJsLike,
-  registry: RouterRegistry,
-  original: VhsXhr,
-): VhsXhr {
-  const replacement = function vhsXhrWithP2P(
-    options: VhsRequestOptions,
-    callback: VhsCallback,
-  ): VhsRequest {
-    const router = registry.findBySrc(options.uri);
-    if (!router) return videojs.xhr(options, callback);
-    return router.loadUnhooked(options, callback);
-  } as VhsXhr;
+export class FirstManifestHooks {
+  private xhr?: VhsXhr;
+  private engines = 0;
 
-  for (const key of [
-    "beforeRequest",
-    "_requestCallbackSet",
-    "_responseCallbackSet",
-    "onRequest",
-    "offRequest",
-    "onResponse",
-    "offResponse",
-  ] as const) {
-    const value: unknown = Reflect.get(original, key);
-    if (value !== undefined) {
-      Object.assign(replacement, { [key]: value });
+  constructor(private readonly registry: RouterRegistry) {}
+
+  /**
+   * Installs the hooks, once, for as long as an engine is bound.
+   *
+   * @returns `false` when this video.js has no hook registry to install them
+   * on, and the engine has to read the manifest itself instead.
+   */
+  retain(videojs: VideoJsLike): boolean {
+    const { xhr } = videojs.Vhs;
+    if (this.xhr === xhr) {
+      this.engines += 1;
+      return true;
     }
+    if (!xhr.onRequest || !xhr.onResponse) return false;
+    xhr.onRequest(this.handleRequest);
+    xhr.onResponse(this.handleResponse);
+    this.xhr = xhr;
+    this.engines += 1;
+    return true;
   }
-  return replacement;
+
+  /** Takes them off again once the last engine is gone. */
+  release() {
+    if (this.engines > 0) this.engines -= 1;
+    if (this.engines > 0 || !this.xhr) return;
+    this.xhr.offRequest?.(this.handleRequest);
+    this.xhr.offResponse?.(this.handleResponse);
+    this.xhr = undefined;
+  }
+
+  private readonly handleRequest: VhsRequestHook = (options) => {
+    const router = this.registry.findBySrc(options.uri);
+    router?.noteTopLevelManifestRequest(options.uri);
+    return options;
+  };
+
+  private readonly handleResponse: VhsResponseHook = (
+    request,
+    error,
+    response,
+  ) => {
+    const router = this.registry.findBySrc(request.uri ?? "");
+    router?.readTopLevelManifest(request, error, response);
+  };
 }
 
 /**
@@ -140,10 +162,15 @@ export class RequestRouter {
 
   /**
    * Attaches the hooks and makes sure the core has the top-level manifest of
-   * the player's current source. VHS requests that manifest from inside its
-   * source handler, before an engine bound to the player can hook anything,
-   * so unless the global `videojs.Vhs.xhr` replacement caught it the adapter
-   * fetches it once itself.
+   * the player's current source.
+   *
+   * Reading it here is the fallback for the two cases the page-wide hooks
+   * cannot cover: an engine bound to a player that already loaded a source,
+   * and a video.js with no hook registry to install them on. It costs a
+   * second fetch of that manifest, and on a CDN that signs its media playlist
+   * URLs per response — Amazon IVS does — the second response names playlists
+   * the player will never ask for, leaving the core unable to recognize the
+   * ones it does. Binding before the player loads a source avoids both.
    */
   ensureTopLevelManifest() {
     this.attachHooks();
@@ -170,27 +197,33 @@ export class RequestRouter {
   }
 
   /**
-   * A request of this player's that reached the global `videojs.Vhs.xhr`
-   * replacement without passing through this router's hooks. Only the first
-   * manifest of a source can do that, and only once: the hooks go on here.
+   * The player's first manifest request of a source has gone out, seen
+   * through the page-wide hooks. Its own hooks take every request after it.
    */
-  loadUnhooked(options: VhsRequestOptions, callback: VhsCallback): VhsRequest {
-    if (!this.attachHooks()) return this.videojs.xhr(options, callback);
-
-    const { uri } = options;
+  noteTopLevelManifestRequest(uri: string) {
+    this.attachHooks();
     this.topLevelSrc = uri;
     this.noteSource(this.player.currentSrc());
-    return this.videojs.xhr(options, (error, response) => {
-      if (!error && isOk(response.statusCode)) {
-        this.process(() =>
-          this.core.processManifest({
-            url: urlOf(response.rawRequest, uri),
-            data: bodyOf(response, response.rawRequest),
-          }),
-        );
-      }
-      callback(error, response);
-    });
+  }
+
+  /** That request's response, which is the manifest naming the streams. */
+  readTopLevelManifest(
+    request: VhsRequest,
+    error: Error | null | undefined,
+    response: VhsResponse,
+  ) {
+    if (error ?? !isOk(response.statusCode)) {
+      // Let the next attempt at this source be read again.
+      this.topLevelSrc = undefined;
+      return;
+    }
+    const uri = request.uri ?? "";
+    this.process(() =>
+      this.core.processManifest({
+        url: urlOf(request, uri),
+        data: bodyOf(response, request),
+      }),
+    );
   }
 
   /**
