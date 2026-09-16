@@ -64,7 +64,10 @@ export class Loader {
       loading.promise
         .then((response) => {
           const processed = this.core.processManifest({
+            // Shaka's `uri` follows redirects and `originalUri` is what was
+            // asked for: the name the master gave this playlist.
             url: response.uri,
+            requestedUrl: response.originalUri,
             data: response.data,
           });
           if (processed) this.onManifestProcessed?.(processed);

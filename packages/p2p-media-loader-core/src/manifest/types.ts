@@ -69,6 +69,13 @@ export type ParsedManifest = {
   readonly protocol: ManifestProtocol;
   /** The URL the manifest was fetched from, after redirects. */
   readonly url: string;
+  /**
+   * The URL that was asked for, where it differs from the one the response
+   * came from. A master names the URL of each media playlist, so that is the
+   * one a stream is known by; the response URL only says where this viewer's
+   * copy came from, and a CDN may answer every request from somewhere else.
+   */
+  readonly requestedUrl?: string;
   readonly streams: readonly ParsedStream[];
 };
 

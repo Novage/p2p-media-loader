@@ -48,6 +48,41 @@ describe("ManifestRegistry: HLS streams and segments", () => {
     expect(registry.getStream(MEDIA_1080)?.segments.size).toBe(3);
   });
 
+  it("matches a media playlist the CDN redirected to another path", () => {
+    const registry = new ManifestRegistry();
+    registry.apply(hls(HLS_MASTER_WITH_AUDIO, MASTER));
+    // The master named MEDIA_1080; the response came from somewhere else.
+    registry.apply({
+      ...hls(HLS_MEDIA_VOD_BYTERANGE, "https://edge7.example/x/aaa/index.m3u8"),
+      requestedUrl: MEDIA_1080,
+    });
+
+    expect(registry.getStreams()).toHaveLength(4);
+    const stream = registry.getStream(MEDIA_1080)!;
+    expect(stream.segments.size).toBe(3);
+    expect(stream.identified).toBe(true);
+    // Segment URIs still resolve against the URL the response came from.
+    expect([...stream.segments.keys()][0]).toBe(
+      "https://edge7.example/x/aaa/media.mp4|600-1599",
+    );
+  });
+
+  it("knows an unmatched playlist by what was asked for, however the CDN answers", () => {
+    const registry = new ManifestRegistry();
+    for (const path of ["aaa", "bbb", "ccc"]) {
+      registry.apply({
+        ...hls(
+          HLS_MEDIA_VOD_BYTERANGE,
+          `https://edge7.example/x/${path}/index.m3u8`,
+        ),
+        requestedUrl: MEDIA_1080,
+      });
+    }
+    // One stream, not one per refresh.
+    expect(registry.getStreams()).toHaveLength(1);
+    expect(registry.getStream(MEDIA_1080)).toBeDefined();
+  });
+
   it("registers a media playlist loaded without a master as one anonymous stream", () => {
     const registry = new ManifestRegistry();
     registry.apply(hls(HLS_MEDIA_VOD_BYTERANGE, MEDIA_1080));

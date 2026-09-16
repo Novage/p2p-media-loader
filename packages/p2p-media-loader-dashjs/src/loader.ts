@@ -83,6 +83,7 @@ class RequestRouter {
         const processed = this.core.processManifest({
           url:
             responseUrl !== undefined && responseUrl !== "" ? responseUrl : url,
+          requestedUrl: url,
           data,
         });
         if (processed) this.hooks.onManifestProcessed?.(processed);

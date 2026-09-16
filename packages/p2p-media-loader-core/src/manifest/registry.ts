@@ -226,8 +226,14 @@ export class ManifestRegistry {
 
   /**
    * An HLS media playlist is matched to the stream its master declared by
-   * URL, tolerating a differing query string (signed tokens rotate). No match
-   * means a media playlist loaded directly, which is a single anonymous stream.
+   * URL, tolerating a differing query string (signed tokens rotate) and a
+   * redirect (the master named what was asked for, not where the response
+   * came from). No match means a media playlist loaded directly, which is a
+   * single anonymous stream.
+   *
+   * An unmatched playlist is known by what was asked for rather than by where
+   * the response came from: a CDN that answers each request from somewhere
+   * else would otherwise leave a new stream behind on every refresh.
    */
   private resolveStreamKey(
     parsed: ParsedStream,
@@ -236,11 +242,22 @@ export class ManifestRegistry {
     if (this.streams.has(parsed.key)) return parsed.key;
     if (manifest.protocol !== "hls" || !parsed.segments) return parsed.key;
 
-    const wanted = stripQuery(normalizeUrl(parsed.key));
-    for (const key of this.streams.keys()) {
-      if (stripQuery(normalizeUrl(key)) === wanted) return key;
+    // The playlist is its own stream's key, so the URL asked for is the only
+    // other name it can be known by.
+    const requested =
+      parsed.key === manifest.url ? manifest.requestedUrl : undefined;
+    if (requested !== undefined && this.streams.has(requested)) {
+      return requested;
     }
-    return parsed.key;
+
+    for (const candidate of [parsed.key, requested]) {
+      if (candidate === undefined) continue;
+      const wanted = stripQuery(normalizeUrl(candidate));
+      for (const key of this.streams.keys()) {
+        if (stripQuery(normalizeUrl(key)) === wanted) return key;
+      }
+    }
+    return requested ?? parsed.key;
   }
 
   private applySegments(

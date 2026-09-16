@@ -87,7 +87,7 @@ function setup(options: { loadable?: boolean; index?: boolean } = {}) {
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("dash.js XHRLoader extension", () => {
-  it("lets dash.js load the MPD and hands the bytes to the core first, under the response URL", () => {
+  it("lets dash.js load the MPD and hands the bytes to the core first, under both URLs", () => {
     const { loader, core, parent, parentResult, onManifestProcessed } = setup();
     parentResult.data = "<MPD/>";
     parentResult.url = "https://cdn.example/dash/redirected.mpd";
@@ -98,6 +98,7 @@ describe("dash.js XHRLoader extension", () => {
     expect(parent.load).toHaveBeenCalledTimes(1);
     expect(core.processManifest).toHaveBeenCalledWith({
       url: "https://cdn.example/dash/redirected.mpd",
+      requestedUrl: MPD_URL,
       data: "<MPD/>",
     });
     expect(onManifestProcessed).toHaveBeenCalledWith({ streams: [] });

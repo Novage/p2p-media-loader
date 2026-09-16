@@ -18,8 +18,10 @@ streamSwarmId = `${PEER_PROTOCOL_VERSION}-${swarmId}-${type}-${identityHash}`
 infoHash      = derived from streamSwarmId, announced to trackers
 ```
 
-`swarmId` is the configured value or, if unset, the manifest response URL with
-its **entire query string discarded** — a session-scoped parameter such as CMCD
+`swarmId` is the configured value or, if unset, the URL of the first manifest
+with its **entire query string discarded** — the URL that was asked for where
+an adapter reports one, since every viewer asks for the same URL and a CDN may
+answer each of them from a different one — a session-scoped parameter such as CMCD
 would otherwise place each viewer in a swarm of one. This is stricter than the
 normalization applied to segment registry keys, deliberately so; see
 [manifest-registry.md](manifest-registry.md#why-swarm-id-is-normalized-differently).

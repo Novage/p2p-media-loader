@@ -352,7 +352,15 @@ export class Core {
    * `undefined` when the manifest was ignored or failed to parse.
    */
   processManifest(manifest: {
+    /** Where the response came from, which is what its URIs resolve against. */
     url: string;
+    /**
+     * What the player asked for, where a redirect made it differ from `url`.
+     * A master names the URL of each of its media playlists, so that is the
+     * one the core knows a stream by, and the one every viewer of the stream
+     * agrees on when nothing else names the swarm.
+     */
+    requestedUrl?: string;
     /** Text, or the raw bytes a player's networking layer delivers. */
     data: string | ArrayBuffer | ArrayBufferView;
     protocol?: ManifestProtocol;
@@ -370,16 +378,24 @@ export class Core {
       return undefined;
     }
 
+    const { requestedUrl } = manifest;
     let updates;
     try {
-      updates = this.manifestRegistry.apply(parser.parse(text, manifest.url));
+      const parsed = parser.parse(text, manifest.url);
+      updates = this.manifestRegistry.apply(
+        requestedUrl !== undefined && requestedUrl !== manifest.url
+          ? { ...parsed, requestedUrl }
+          : parsed,
+      );
     } catch (error) {
       this.manifestLogger("failed to parse %s: %O", manifest.url, error);
       return undefined;
     }
 
     // The first manifest names the swarm unless the integration already did.
-    this.manifestResponseUrl ??= stripQuery(manifest.url);
+    // By what was asked for: every viewer asks for the same URL, and a CDN
+    // may answer each of them from a different one.
+    this.manifestResponseUrl ??= stripQuery(requestedUrl ?? manifest.url);
 
     this.syncStreamsFromRegistry();
 

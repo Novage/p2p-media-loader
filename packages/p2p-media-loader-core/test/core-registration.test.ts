@@ -295,6 +295,17 @@ describe("segment lookup", () => {
     });
   });
 
+  it("names the swarm by what was asked for, not by where the CDN answered", () => {
+    // Every viewer asks for the same URL; a CDN may answer each from its own.
+    const core = new Core({ manifestParsers: [hlsManifestParser] });
+    core.processManifest({
+      url: "https://edge7.example/x/aaa/index.m3u8",
+      requestedUrl: MEDIA_URL,
+      data: HLS_MEDIA_VOD_BYTERANGE,
+    });
+    expect(core.getStreams()[0].swarmId).toBe(MEDIA_URL);
+  });
+
   it("shares a media playlist loaded on its own, which is the whole stream", () => {
     const core = createVodCore();
     expect(core.getStreams()).toHaveLength(1);

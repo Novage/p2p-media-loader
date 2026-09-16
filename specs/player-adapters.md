@@ -12,7 +12,9 @@ see [packaging.md](packaging.md).
 ## 1. Feed manifest bytes to core
 
 Hook the player's manifest/playlist loading and pass every response body to
-`core.processManifest({ url, data })` before or as the player consumes it.
+`core.processManifest({ url, requestedUrl, data })` before or as the player
+consumes it: `url` is where the response came from, which its URIs resolve
+against, and `requestedUrl` is what the player asked for.
 
 Do not fetch manifests separately — see the rationale in
 [architecture.md](architecture.md).

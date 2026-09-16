@@ -61,6 +61,13 @@ Core registers **streams** from the master manifest (or the MPD's
 playlist. A media playlist fetched directly, with no master above it, is a
 single anonymous stream.
 
+A media playlist is matched to the stream its master declared by URL,
+tolerating a query string that differs (signed tokens rotate) and a redirect
+(the master named what was asked for, not where the response came from — which
+is why an adapter reports both). A playlist that matches nothing is known by
+what was asked for, so a CDN answering every request from somewhere else
+leaves one stream behind rather than one per refresh.
+
 A stream's identity is decided by the first manifest that carries one and
 never changes afterwards, because that identity is its swarm: a live packager
 republishing its master with another `BANDWIDTH` would otherwise move a playing

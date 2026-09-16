@@ -190,6 +190,7 @@ export class RequestRouter {
       this.process(() =>
         this.core.processManifest({
           url: urlOf(response.rawRequest, src),
+          requestedUrl: src,
           data: bodyOf(response),
         }),
       );
@@ -220,7 +221,10 @@ export class RequestRouter {
     const uri = request.uri ?? "";
     this.process(() =>
       this.core.processManifest({
+        // A request's URI is what VHS asked for; its response URL follows
+        // redirects, and the manifest's own URIs resolve against that.
         url: urlOf(request, uri),
+        requestedUrl: uri,
         data: bodyOf(response, request),
       }),
     );
@@ -261,6 +265,7 @@ export class RequestRouter {
       this.process(() =>
         this.core.processManifest({
           url: urlOf(request, uri),
+          requestedUrl: uri,
           data: bodyOf(response, request),
         }),
       );

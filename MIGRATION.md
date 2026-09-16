@@ -90,7 +90,11 @@ const core = new Core({
 });
 
 // in the player's manifest loader, for every response:
-core.processManifest({ url: response.url, data: response.data });
+core.processManifest({
+  url: response.url, // where the response came from; URIs resolve against it
+  requestedUrl: request.url, // what was asked for, where a redirect differs
+  data: response.data,
+});
 ```
 
 Segment requests are resolved by URL and byte range rather than by a
@@ -142,7 +146,7 @@ event keeps its shape; it fires once per failing stream, only for
 
 - `CoreConfig.manifestParsers` and the `p2p-media-loader-core/hls` and
   `p2p-media-loader-core/dash` subpaths.
-- `Core.processManifest({ url, data, protocol? })`, returning what the
+- `Core.processManifest({ url, requestedUrl?, data, protocol? })`, returning what the
   manifest described per stream.
 - `Core.isSegmentIndex(url, byteRange?)` and
   `Core.processSegmentIndex({ url, byteRange?, data })` — a DASH

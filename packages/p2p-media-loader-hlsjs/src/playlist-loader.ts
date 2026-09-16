@@ -39,9 +39,11 @@ export class PlaylistLoaderBase implements Loader<PlaylistLoaderContext> {
       onSuccess(response, stats, loaderContext, networkDetails) {
         if (typeof response.data === "string") {
           core.processManifest({
-            // The response URL is post-redirect; the context URL is what
-            // was asked for. Prefer the former, as hls.js itself does.
+            // The response URL is post-redirect, and URIs resolve against it,
+            // as hls.js itself does. What was asked for goes along with it:
+            // that is the name the master gave this playlist.
             url: response.url || loaderContext.url,
+            requestedUrl: loaderContext.url,
             data: response.data,
           });
         }

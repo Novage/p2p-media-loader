@@ -239,6 +239,7 @@ describe("a player's own VHS hooks", () => {
     respond(200, "#EXTM3U", "https://cdn.example/hls/redirected.m3u8");
     expect(core.processManifest).toHaveBeenCalledWith({
       url: "https://cdn.example/hls/redirected.m3u8",
+      requestedUrl: MASTER,
       data: "#EXTM3U",
     });
 
@@ -431,6 +432,7 @@ describe("the page-wide hooks for a source's first manifest", () => {
     respond(200, "#EXTM3U", "https://cdn.example/hls/redirected.m3u8");
     expect(core.processManifest).toHaveBeenCalledWith({
       url: "https://cdn.example/hls/redirected.m3u8",
+      requestedUrl: MASTER,
       data: "#EXTM3U",
     });
     expect(videojsXhr).toHaveBeenCalledTimes(1);
