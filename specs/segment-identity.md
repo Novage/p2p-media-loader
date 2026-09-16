@@ -47,6 +47,15 @@ server reproducing the hash. A ladder whose rungs share a resolution _and_ whose
 origin recomputes bandwidth is the one case left unsolved, and it is the one
 where no manifest attribute short of the rendition URL tells the rungs apart.
 
+**A missing attribute says nothing about the others.** A variant that declares
+no `BANDWIDTH` is malformed — the attribute is required — but its resolution
+and codec string are still read the same way by every peer, so they still tell
+it from the other variants and they are still hashed. Only bandwidth is
+special, and only because an origin may recompute it. A stream whose manifest
+gives it nothing to be identified by hashes the empty identity, which every
+such stream shares; [manifest-registry.md](manifest-registry.md) says when one
+of those may be shared.
+
 Two of those inputs need stating for DASH, because a player's own model gives
 different answers:
 

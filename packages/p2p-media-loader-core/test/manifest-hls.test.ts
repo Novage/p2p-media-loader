@@ -54,8 +54,41 @@ describe("hlsManifestParser: master playlist", () => {
     expect(main[0].properties.bitrate).toBe(4521000);
   });
 
-  it("blanks metadata for a variant without bandwidth", () => {
-    expect(computeStreamIdentityHash(main[1].properties)).toBe(
+  it("keeps a variant's metadata when it declares no usable bandwidth", () => {
+    // Bandwidth is the one attribute an origin recomputes per request, which
+    // is why identity drops it. A resolution and a codec string are read the
+    // same by every peer whether it is there or not, and they are what tells
+    // this variant from the others.
+    expect(main[1].properties).toMatchObject({
+      bitrate: 0,
+      codecs: "avc1.4d401f",
+      width: 640,
+      height: 360,
+    });
+    expect(computeStreamIdentityHash(main[1].properties)).not.toBe(
+      MISSING_METADATA_IDENTITY_HASH,
+    );
+  });
+
+  it("identifies a variant declaring nothing at all by nothing at all", () => {
+    const master = `#EXTM3U
+#EXT-X-STREAM-INF:BANDWIDTH=1000000,CODECS="avc1.64002a",RESOLUTION=1920x1080
+hi.m3u8
+#EXT-X-STREAM-INF:PROGRAM-ID=1
+bare.m3u8
+`;
+    const bare = hlsManifestParser
+      .parse(master, BASE)
+      .streams.find((s) => s.key.endsWith("bare.m3u8"))!;
+    expect(bare.properties).toEqual({
+      bitrate: 0,
+      codecs: undefined,
+      width: undefined,
+      height: undefined,
+      frameRate: undefined,
+      videoRange: undefined,
+    });
+    expect(computeStreamIdentityHash(bare.properties)).toBe(
       MISSING_METADATA_IDENTITY_HASH,
     );
   });

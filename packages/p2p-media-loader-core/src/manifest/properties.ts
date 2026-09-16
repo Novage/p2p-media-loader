@@ -49,19 +49,20 @@ export function audioCodecs(codecs: string | undefined): string | undefined {
 }
 
 /**
- * A variant with no bandwidth carries no trustworthy metadata; every other
- * property is blanked so such variants hash identically everywhere.
+ * A variant's properties, each as the manifest states it. A missing
+ * `BANDWIDTH` says nothing about the rest: bandwidth is the one attribute an
+ * origin recomputes per request, which is why identity drops it, and a
+ * resolution or a codec string is read the same by every peer whether it is
+ * there or not. See specs/segment-identity.md.
  */
 export function videoStreamProperties(a: VideoAttributes): StreamProperties {
-  const bitrate = a.bandwidth ?? 0;
-  const isMissingMetadata = bitrate === 0;
   return {
-    bitrate,
-    codecs: isMissingMetadata ? undefined : videoCodecs(a.codecs),
-    width: isMissingMetadata ? undefined : a.width,
-    height: isMissingMetadata ? undefined : a.height,
-    frameRate: isMissingMetadata ? undefined : a.frameRate,
-    videoRange: isMissingMetadata ? undefined : a.videoRange,
+    bitrate: a.bandwidth ?? 0,
+    codecs: videoCodecs(a.codecs),
+    width: a.width,
+    height: a.height,
+    frameRate: a.frameRate,
+    videoRange: a.videoRange,
   };
 }
 
