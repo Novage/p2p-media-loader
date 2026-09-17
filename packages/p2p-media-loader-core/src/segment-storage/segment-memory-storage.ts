@@ -105,6 +105,11 @@ export class SegmentMemoryStorage implements SegmentStorage {
     this.clear(isLiveStream, data.byteLength);
 
     const storageId = getStorageItemId(streamSwarmId, segmentId);
+    // Storing replaces, so what the entry held stops counting. The map is
+    // idempotent under a repeated store and the byte count has to be too.
+    const replaced = this.cache.get(storageId);
+    if (replaced) this.decreaseStorageUsage(replaced.data.byteLength);
+
     this.cache.set(storageId, {
       data,
       segmentId,

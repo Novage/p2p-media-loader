@@ -7,8 +7,7 @@ const SEGMENT_BYTES = MiB / 4;
 const STREAM_SWARM_ID = "v3-swarm-main-hash";
 const SWARM_ID = "https://cdn.example/v/master.m3u8";
 
-/** Three consecutive segments of a stream, stored as the loader would. */
-async function createStorage(isLiveStream: boolean) {
+async function initStorage() {
   const storage = new SegmentMemoryStorage();
   await storage.initialize(
     { ...Core.DEFAULT_COMMON_CORE_CONFIG, segmentMemoryStorageLimit: 1 },
@@ -16,6 +15,12 @@ async function createStorage(isLiveStream: boolean) {
     { ...Core.DEFAULT_STREAM_CONFIG, highDemandTimeWindow: 15 },
   );
   storage.setSegmentChangeCallback(() => undefined);
+  return storage;
+}
+
+/** Three consecutive segments of a stream, stored as the loader would. */
+async function createStorage(isLiveStream: boolean) {
+  const storage = await initStorage();
   storage.onPlaybackUpdated(0, 1);
 
   for (let index = 0; index < 3; index++) {
@@ -101,5 +106,26 @@ describe("SegmentMemoryStorage usage reporting", () => {
       1, 2, 3,
     ]);
     expect(storage.getUsage().usedCapacity).toBe(before + SEGMENT_BYTES / MiB);
+  });
+
+  it("counts a re-stored segment once", async () => {
+    const storage = await initStorage();
+
+    // Before the first request there is no playhead to measure against, so
+    // usage is the byte count the storage keeps.
+    for (const _ of [0, 1]) {
+      await storage.storeSegment(
+        SWARM_ID,
+        STREAM_SWARM_ID,
+        0,
+        new ArrayBuffer(SEGMENT_BYTES),
+        0,
+        10,
+        "main",
+        false,
+      );
+    }
+
+    expect(storage.getUsage().usedCapacity).toBe(SEGMENT_BYTES / MiB);
   });
 });

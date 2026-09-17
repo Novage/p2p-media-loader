@@ -45,7 +45,9 @@ export interface SegmentStorage {
   ): void;
 
   /**
-   * Stores the data for a specific segment.
+   * Stores the data for a specific segment. Storing a segment that is already
+   * stored replaces it, and what it held stops counting towards the storage's
+   * usage.
    * @param swarmId The swarm identifier.
    * @param streamSwarmId The stream's stream swarm ID (`Stream.streamSwarmId`), unique per stream identity.
    * @param segmentId The segment identifier.
