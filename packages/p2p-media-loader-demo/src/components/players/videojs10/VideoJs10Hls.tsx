@@ -82,6 +82,14 @@ const P2PHlsVideo = ({
       onChunkDownloaded,
       onChunkUploaded,
     });
+    // The adapter defaults to `preload: "metadata"` and holds hls.js at
+    // `maxBufferLength: 1` until the element fires `play`, widening the
+    // limits only then — and it writes that default onto the element, so the
+    // attribute cannot say otherwise. Firefox starts an autoplaying element
+    // at HAVE_ENOUGH_DATA, which a live stream of two second segments never
+    // reaches on one fragment, so nothing ever plays and nothing ever asks
+    // for more. Asking for the whole buffer up front is what autoplay means.
+    media.preload = "auto";
     // Resolved when hls.js constructs the playlist loader, by which time the
     // adapter has its instance.
     engine.bindHls(() => media.engine);
