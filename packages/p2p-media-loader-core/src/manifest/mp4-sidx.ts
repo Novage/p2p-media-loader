@@ -1,4 +1,3 @@
-import type { ByteRange } from "../types.js";
 
 /**
  * The `sidx` box of an ISO BMFF file: a DASH `SegmentBase` stream's segment
@@ -133,13 +132,4 @@ function readUint64(view: DataView, pos: number): number | undefined {
   const high = view.getUint32(pos);
   if (high > MAX_SAFE_HIGH_WORD) return undefined;
   return high * 0x100000000 + view.getUint32(pos + 4);
-}
-
-/** Whether the requested range covers the index range entirely. */
-export function rangeCovers(
-  requested: ByteRange | undefined,
-  index: ByteRange,
-): boolean {
-  if (!requested) return true;
-  return requested.start <= index.start && requested.end >= index.end;
 }

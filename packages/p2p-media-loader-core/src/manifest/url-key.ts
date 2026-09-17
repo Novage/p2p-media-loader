@@ -132,3 +132,12 @@ export function distinctInitSegments(
   }
   return result;
 }
+
+/** Whether the requested range covers the index range entirely. */
+export function rangeCovers(
+  requested: ByteRange | undefined,
+  index: ByteRange,
+): boolean {
+  if (!requested) return true;
+  return requested.start <= index.start && requested.end >= index.end;
+}

@@ -13,6 +13,7 @@ import type {
 } from "./types.js";
 import { audioStreamProperties, videoStreamProperties } from "./properties.js";
 import { byteRangeFromOffsetLength, distinctInitSegments } from "./url-key.js";
+import { parseSidx } from "./mp4-sidx.js";
 import type { StreamProperties, StreamType } from "../types.js";
 
 // Supplies a builtin mpd-parser assumes; must run before the first parse.
@@ -29,6 +30,8 @@ export const dashManifestParser: ManifestParser = {
   canParse(text) {
     return /<MPD[\s>]/.test(text.slice(0, 2048));
   },
+
+  parseSegmentIndex: parseSidx,
 
   parse(text, url) {
     const manifest = parse(text, { manifestUri: url });

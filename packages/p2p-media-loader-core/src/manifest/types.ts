@@ -1,4 +1,5 @@
 import type { ByteRange, StreamProperties, StreamType } from "../types.js";
+import type { SidxBox } from "./mp4-sidx.js";
 
 /** Streaming protocols the core can parse manifests for. */
 export type ManifestProtocol = "hls" | "dash";
@@ -98,4 +99,13 @@ export type ManifestParser = {
   canParse(text: string): boolean;
   /** May throw on malformed input; the core treats that as "no change". */
   parse(text: string, url: string): ParsedManifest;
+  /**
+   * Reads the segment index a manifest pointed at instead of listing, where
+   * the protocol has one: a DASH `SegmentBase` stream's `sidx` box. Bytes in,
+   * structure out, like `parse` — where the subsegments it describes sit on
+   * the timeline is the core's to say. Absent on a protocol that lists its
+   * segments in the manifest, which is what keeps the box reader out of
+   * bundles built for that protocol alone. See specs/packaging.md.
+   */
+  parseSegmentIndex?(data: ArrayBuffer | ArrayBufferView): SidxBox | undefined;
 };

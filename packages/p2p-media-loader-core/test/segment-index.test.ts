@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { Core } from "../src/core.js";
 import { dashManifestParser } from "../src/manifest/dash.js";
+import { hlsManifestParser } from "../src/manifest/hls.js";
 import {
   ANGEL_ONE_AUDIO_EN_URL,
   ANGEL_ONE_MPD_URL,
@@ -194,5 +195,22 @@ describe("external segment index (SegmentBase)", () => {
         .slice(0, 3)
         .map((s) => s.externalId),
     ).toEqual([0, 20, 40]);
+  });
+
+  it("reads the index with the parser whose protocol has one", () => {
+    // The reader travels with the DASH parser rather than sitting in core, so
+    // an HLS-only deployment never links it. A core given the HLS parser
+    // alone has nothing to read an index with. See specs/packaging.md.
+    const core = new Core({ manifestParsers: [hlsManifestParser] });
+
+    expect(hlsManifestParser.parseSegmentIndex).toBeUndefined();
+    expect(dashManifestParser.parseSegmentIndex).toBeDefined();
+    expect(
+      core.processSegmentIndex({
+        url: ANGEL_ONE_AUDIO_EN_URL,
+        byteRange: INDEX_RANGE,
+        data: readBinaryFixture("angel-one-audio-en.sidx"),
+      }),
+    ).toBeUndefined();
   });
 });

@@ -9,8 +9,13 @@ import {
   computeStreamIdentityHash,
   identityProperties,
 } from "../stream-identity.js";
-import { normalizeUrl, segmentKey, stripQuery } from "./url-key.js";
-import { rangeCovers, type SidxBox } from "./mp4-sidx.js";
+import {
+  normalizeUrl,
+  rangeCovers,
+  segmentKey,
+  stripQuery,
+} from "./url-key.js";
+import type { SidxBox } from "./mp4-sidx.js";
 
 /**
  * The manifest-derived registry: every stream and segment the core knows,

@@ -39,7 +39,11 @@ the elimination possible at all.
 
 A parser package may grow beyond the manifest itself. Resolving a DASH
 `SegmentBase` index requires reading an MP4 `sidx` box, which belongs with the
-DASH parser rather than in core: only DASH deployments should carry it. The
+DASH parser rather than in core: only DASH deployments carry it. A parser
+therefore offers an optional second tokenizer, `parseSegmentIndex`, which the
+DASH parser supplies and the HLS parser does not; core asks the parsers it was
+given rather than reading the box itself, so nothing links the reader into a
+bundle built for a protocol that lists its segments in the manifest. The
 selection mechanism is unchanged — it is still one static import.
 
 ### What may be swapped, and what may not
@@ -95,7 +99,12 @@ Bundles built in this repository substitute the platform implementations for
 both, through `resolve.alias` in `vite.common.config.ts`, applied to **builds
 only** — tests run in Node and resolve the real packages. This is what brings
 the DASH bundle from 66 KB to 41 KB gzipped, and it is why no bundle here
-contains xmldom or a Babel helper.
+contains xmldom or a parser's Babel helper.
+
+The IIFE bundles do carry one helper of their own: downlevelling to ES2015
+emits a `typeof` helper, which the toolchain labels the way Babel labels its
+own. It is a few hundred bytes and comes from the target, not from a
+dependency; the ESM bundles, which are not downlevelled, have none.
 
 The DASH tokenizer also installs a three-line `Object.values` polyfill, because
 mpd-parser's build calls that ES2017 builtin once and the IIFE builds target

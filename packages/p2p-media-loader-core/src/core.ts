@@ -1,13 +1,13 @@
 import { HybridLoader } from "./hybrid-loader.js";
 import type { PlaybackState } from "./playback.js";
 import type { ManifestParser, ManifestProtocol } from "./manifest/types.js";
+import type { SidxBox } from "./manifest/mp4-sidx.js";
 import {
   ManifestRegistry,
   type RegistryStream,
   type RegistryUpdate,
 } from "./manifest/registry.js";
 import { segmentKey, stripQuery } from "./manifest/url-key.js";
-import { parseSidx } from "./manifest/mp4-sidx.js";
 import debug from "debug";
 import {
   Stream,
@@ -422,7 +422,19 @@ export class Core {
     byteRange?: ByteRange;
     data: ArrayBuffer | ArrayBufferView;
   }): ProcessedManifest | undefined {
-    const sidx = parseSidx(index.data);
+    // Reading the index is the protocol tokenizer's job, as reading the
+    // manifest is; where the subsegments it describes sit is decided below.
+    // Only a protocol with an external index supplies a reader, and only such
+    // a protocol leaves a stream awaiting one, so the parser that registered
+    // the stream is the parser that reads this.
+    let sidx: SidxBox | undefined;
+    for (const parser of this.manifestParsers) {
+      if (parser.parseSegmentIndex) {
+        sidx = parser.parseSegmentIndex(index.data);
+        break;
+      }
+    }
+
     if (!sidx) {
       this.manifestLogger(
         "no sidx box in the index fetched from %s",
