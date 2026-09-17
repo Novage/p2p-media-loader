@@ -72,3 +72,67 @@ export function getPlaybackStateFromMediaElement(
     rate: media.paused ? 0 : media.playbackRate,
   };
 }
+
+/**
+ * Every event after which the buffer ahead of the playhead or the rate may
+ * have changed. `progress` covers buffer growth without playhead movement.
+ */
+const PLAYBACK_EVENTS = [
+  "timeupdate",
+  "progress",
+  "seeking",
+  "seeked",
+  "ratechange",
+  "play",
+  "pause",
+  "waiting",
+] as const;
+
+/** Watches one media element at a time; see `trackMediaElementPlayback`. */
+export type MediaElementPlaybackTracker = {
+  /**
+   * Starts reporting the playback of `media`, or stops reporting when it is
+   * absent. Handing over the element already being watched does nothing, so
+   * an adapter may call this on every player event that might have attached
+   * a new one.
+   */
+  watch(media: HTMLMediaElement | undefined): void;
+  /** Stops watching. Safe to call more than once. */
+  stop(): void;
+};
+
+/**
+ * Reports a media element's playback to a receiver. Every adapter whose
+ * player plays through a media element uses this, so the events the core
+ * learns from are one list rather than one per adapter, and so is the
+ * bookkeeping of which element is being watched.
+ *
+ * @param report - Called with the state after every event that can change it,
+ * and with the element it was read from, for an adapter's own diagnostics.
+ */
+export function trackMediaElementPlayback(
+  report: (state: PlaybackState, media: HTMLMediaElement) => void,
+): MediaElementPlaybackTracker {
+  let watched: HTMLMediaElement | undefined;
+
+  const handle = (event: Event) => {
+    const target = event.target as HTMLMediaElement;
+    report(getPlaybackStateFromMediaElement(target), target);
+  };
+
+  const watch = (media: HTMLMediaElement | undefined) => {
+    if (media === watched) return;
+    if (watched) {
+      for (const event of PLAYBACK_EVENTS) {
+        watched.removeEventListener(event, handle);
+      }
+    }
+    watched = media;
+    if (!media) return;
+    for (const event of PLAYBACK_EVENTS) {
+      media.addEventListener(event, handle);
+    }
+  };
+
+  return { watch, stop: () => watch(undefined) };
+}

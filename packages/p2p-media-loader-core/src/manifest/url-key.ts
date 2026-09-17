@@ -51,6 +51,17 @@ export function normalizeUrl(url: string): string {
     : url.slice(0, query);
 }
 
+/**
+ * A URL with its entire query string discarded. Stricter than `normalizeUrl`,
+ * which removes named parameters only: this is for naming a swarm and for
+ * matching a playlist whose signed token rotates, where every parameter is
+ * suspect. See specs/segment-identity.md.
+ */
+export function stripQuery(url: string): string {
+  const query = url.indexOf("?");
+  return query === -1 ? url : url.slice(0, query);
+}
+
 /** `url|start-end` with an inclusive end, matching the engines' runtime IDs. */
 export function segmentKey(url: string, byteRange?: ByteRange): string {
   const normalized = normalizeUrl(url);

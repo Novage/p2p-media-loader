@@ -30,6 +30,21 @@ export type LiveDelay = {
  * Representation shares one window, and on HLS one media playlist arrives at
  * a time.
  */
+/**
+ * How far behind the live edge to place a player, given the window it has and
+ * the length of a segment in it: as deep as the window allows, one segment
+ * inside the tail, never more than a minute behind, and never less than a
+ * segment. Adapters that read the window from their player rather than from a
+ * processed manifest — hls.js reports it on every level update — size the
+ * placement with this directly.
+ */
+export function liveDelayFromWindow(window: number, segment: number): number {
+  return Math.max(
+    segment,
+    Math.min(window - LIVE_TAIL_MARGIN_SEGMENTS * segment, MAX_LIVE_LATENCY),
+  );
+}
+
 export function liveDelayFor(
   manifest: ProcessedManifest,
 ): LiveDelay | undefined {
@@ -41,10 +56,7 @@ export function liveDelayFor(
     const window = stream.end - stream.start;
     if (!(window > 0)) continue;
     const segment = window / stream.segmentCount;
-    const delay = Math.max(
-      segment,
-      Math.min(window - LIVE_TAIL_MARGIN_SEGMENTS * segment, MAX_LIVE_LATENCY),
-    );
+    const delay = liveDelayFromWindow(window, segment);
     if (!best || delay > best.delay) best = { delay, segment };
   }
   return best;

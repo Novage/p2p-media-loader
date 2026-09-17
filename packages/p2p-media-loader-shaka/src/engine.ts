@@ -17,7 +17,7 @@ import {
   DefinedCoreConfig,
   ProcessedManifest,
   debug,
-  getPlaybackStateFromMediaElement,
+  trackMediaElementPlayback,
   liveDelayFor,
 } from "p2p-media-loader-core";
 
@@ -47,19 +47,6 @@ export type PartialShakaP2PEngineConfig = {
 const INITIAL_LIVE_EDGE_DELAY = 25;
 /** Shaka's default: "derive from the manifest", which places the player near the edge. */
 const SHAKA_DEFAULT_PRESENTATION_DELAY = 0;
-
-// Every event after which the buffer ahead of the playhead or the rate may
-// have changed. `progress` covers buffer growth without playhead movement.
-const PLAYBACK_EVENTS = [
-  "timeupdate",
-  "progress",
-  "seeking",
-  "seeked",
-  "ratechange",
-  "play",
-  "pause",
-  "waiting",
-] as const;
 
 /**
  * Represents a Peer-to-Peer (P2P) engine designed to enhance media streaming efficiency.
@@ -94,6 +81,12 @@ const PLAYBACK_EVENTS = [
  */
 export class ShakaP2PEngine {
   private player?: shaka.Player;
+  private readonly playback = trackMediaElementPlayback((state, media) => {
+    if (this.oracle.enabled) {
+      this.oracle(`media.currentTime=${media.currentTime.toFixed(3)}`);
+    }
+    this.core.updatePlayback(state);
+  });
   private readonly shaka: Shaka;
   private readonly core: Core;
   private requestFilter?: shaka.extern.RequestFilter;
@@ -311,21 +304,11 @@ export class ShakaP2PEngine {
   private updateMediaElementEventHandlers = (
     type: "register" | "unregister",
   ) => {
-    const media = this.player?.getMediaElement();
-    if (!media) return;
-    const method =
-      type === "register" ? "addEventListener" : "removeEventListener";
-    for (const event of PLAYBACK_EVENTS) {
-      media[method](event, this.handlePlaybackUpdate);
-    }
-  };
-
-  private handlePlaybackUpdate = (event: Event) => {
-    const media = event.target as HTMLVideoElement;
-    if (this.oracle.enabled) {
-      this.oracle(`media.currentTime=${media.currentTime.toFixed(3)}`);
-    }
-    this.core.updatePlayback(getPlaybackStateFromMediaElement(media));
+    this.playback.watch(
+      type === "register"
+        ? (this.player?.getMediaElement() ?? undefined)
+        : undefined,
+    );
   };
 
   /** Cleans up and releases all resources, and unregisters all event handlers. */

@@ -10,7 +10,7 @@ import {
   CoreEventMap,
   DefinedCoreConfig,
   DynamicCoreConfig,
-  getPlaybackStateFromMediaElement,
+  trackMediaElementPlayback,
 } from "p2p-media-loader-core";
 import { FirstManifestHooks, RequestRouter, RouterRegistry } from "./xhr.js";
 import type {
@@ -39,19 +39,6 @@ export type PartialVideoJsP2PEngineConfig = {
   /** Partial core config */
   core?: Partial<CoreConfig>;
 };
-
-// Every event after which the buffer ahead of the playhead or the rate may
-// have changed. `progress` covers buffer growth without playhead movement.
-const PLAYBACK_EVENTS = [
-  "timeupdate",
-  "progress",
-  "seeking",
-  "seeked",
-  "ratechange",
-  "play",
-  "pause",
-  "waiting",
-] as const;
 
 /** Routers of every bound engine, consulted by the page-wide VHS hooks. */
 const registry = new RouterRegistry();
@@ -104,7 +91,9 @@ export class VideoJsP2PEngine {
   private player?: VideoJsPlayerLike;
   private router?: RequestRouter;
   private hooksInstalled = false;
-  private media?: HTMLMediaElement;
+  private readonly playback = trackMediaElementPlayback((state) =>
+    this.core.updatePlayback(state),
+  );
   private readonly core: Core;
   private readonly videojs: VideoJsLike;
 
@@ -257,36 +246,17 @@ export class VideoJsP2PEngine {
     const element = this.player?.tech(true)?.el();
     if (
       typeof HTMLMediaElement === "undefined" ||
-      !(element instanceof HTMLMediaElement) ||
-      element === this.media
+      !(element instanceof HTMLMediaElement)
     ) {
       return;
     }
-    this.unregisterMediaElement();
-    this.media = element;
-    for (const event of PLAYBACK_EVENTS) {
-      element.addEventListener(event, this.handlePlaybackUpdate);
-    }
+    this.playback.watch(element);
   }
-
-  private unregisterMediaElement() {
-    const { media } = this;
-    if (!media) return;
-    for (const event of PLAYBACK_EVENTS) {
-      media.removeEventListener(event, this.handlePlaybackUpdate);
-    }
-    this.media = undefined;
-  }
-
-  private handlePlaybackUpdate = (event: Event) => {
-    const media = event.target as HTMLMediaElement;
-    this.core.updatePlayback(getPlaybackStateFromMediaElement(media));
-  };
 
   /** Cleans up and releases all resources, and unregisters all event handlers. */
   destroy() {
     this.core.destroy();
-    this.unregisterMediaElement();
+    this.playback.stop();
     if (this.router) {
       registry.remove(this.router);
       this.router.detachHooks();

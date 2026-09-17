@@ -8,7 +8,7 @@ import {
   DynamicCoreConfig,
   ProcessedManifest,
   debug,
-  getPlaybackStateFromMediaElement,
+  trackMediaElementPlayback,
   liveDelayFor,
   type LiveDelay,
 } from "p2p-media-loader-core";
@@ -49,19 +49,6 @@ const STREAM_INITIALIZED: MediaPlayerEvents["STREAM_INITIALIZED"] =
 const STREAM_TEARDOWN_COMPLETE: MediaPlayerEvents["STREAM_TEARDOWN_COMPLETE"] =
   "streamTeardownComplete";
 
-// Every event after which the buffer ahead of the playhead or the rate may
-// have changed. `progress` covers buffer growth without playhead movement.
-const PLAYBACK_EVENTS = [
-  "timeupdate",
-  "progress",
-  "seeking",
-  "seeked",
-  "ratechange",
-  "play",
-  "pause",
-  "waiting",
-] as const;
-
 /**
  * Represents a Peer-to-Peer (P2P) engine designed to enhance media streaming efficiency.
  * This class integrates P2P technologies into dash.js, enabling the distribution of media segments via a peer network
@@ -86,7 +73,9 @@ const PLAYBACK_EVENTS = [
  */
 export class DashJsP2PEngine {
   private player?: MediaPlayerClass;
-  private media?: HTMLMediaElement;
+  private readonly playback = trackMediaElementPlayback((state) =>
+    this.core.updatePlayback(state),
+  );
   private readonly core: Core;
   /** False when the integrator configured a live delay themselves. */
   private managesLiveDelay = false;
@@ -275,7 +264,7 @@ export class DashJsP2PEngine {
 
   private handleStreamTeardown = () => {
     this.core.destroy();
-    this.unregisterMediaElement();
+    this.playback.stop();
   };
 
   private registerMediaElement() {
@@ -286,32 +275,13 @@ export class DashJsP2PEngine {
     } catch {
       return;
     }
-    if (!media || media === this.media) return;
-    this.unregisterMediaElement();
-    this.media = media;
-    for (const event of PLAYBACK_EVENTS) {
-      media.addEventListener(event, this.handlePlaybackUpdate);
-    }
+    if (media) this.playback.watch(media);
   }
-
-  private unregisterMediaElement() {
-    const { media } = this;
-    if (!media) return;
-    for (const event of PLAYBACK_EVENTS) {
-      media.removeEventListener(event, this.handlePlaybackUpdate);
-    }
-    this.media = undefined;
-  }
-
-  private handlePlaybackUpdate = (event: Event) => {
-    const media = event.target as HTMLMediaElement;
-    this.core.updatePlayback(getPlaybackStateFromMediaElement(media));
-  };
 
   /** Cleans up and releases all resources, and unregisters all event handlers. */
   destroy() {
     this.core.destroy();
-    this.unregisterMediaElement();
+    this.playback.stop();
     if (this.player) {
       this.player.off(STREAM_INITIALIZED, this.handleStreamInitialized);
       this.player.off(STREAM_TEARDOWN_COMPLETE, this.handleStreamTeardown);

@@ -9,7 +9,7 @@ import {
   computeStreamIdentityHash,
   identityProperties,
 } from "../stream-identity.js";
-import { normalizeUrl, segmentKey } from "./url-key.js";
+import { normalizeUrl, segmentKey, stripQuery } from "./url-key.js";
 import { rangeCovers, type SidxBox } from "./mp4-sidx.js";
 
 /**
@@ -404,11 +404,6 @@ function externalIdOf(
   return protocol === "dash"
     ? Math.round((s.presentationTime ?? 0) * 10)
     : s.sequence;
-}
-
-function stripQuery(url: string): string {
-  const i = url.indexOf("?");
-  return i === -1 ? url : url.slice(0, i);
 }
 
 /**

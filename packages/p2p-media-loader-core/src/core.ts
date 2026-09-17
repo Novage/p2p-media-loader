@@ -6,7 +6,7 @@ import {
   type RegistryStream,
   type RegistryUpdate,
 } from "./manifest/registry.js";
-import { segmentKey } from "./manifest/url-key.js";
+import { segmentKey, stripQuery } from "./manifest/url-key.js";
 import { parseSidx } from "./manifest/mp4-sidx.js";
 import debug from "debug";
 import {
@@ -1049,10 +1049,6 @@ export class Core {
       this.peerId,
     );
   }
-}
-
-function stripQuery(url: string): string {
-  return url.split("?")[0];
 }
 
 function summarize(updates: readonly RegistryUpdate[]): ProcessedManifest {
