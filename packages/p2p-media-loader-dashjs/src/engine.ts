@@ -79,6 +79,8 @@ export class DashJsP2PEngine {
   private readonly core: Core;
   /** False when the integrator configured a live delay themselves. */
   private managesLiveDelay = false;
+  /** The live delay this engine placed, if any; see `applyLivePlacement`. */
+  private appliedLiveDelay?: number;
   private readonly debug = debug("p2pml-dashjs:engine");
 
   /**
@@ -108,6 +110,7 @@ export class DashJsP2PEngine {
 
     const liveDelay = player.getSettings().streaming?.delay?.liveDelay;
     this.managesLiveDelay = liveDelay === undefined || Number.isNaN(liveDelay);
+    this.appliedLiveDelay = undefined;
     if (this.managesLiveDelay) {
       player.updateSettings({
         streaming: {
@@ -193,11 +196,15 @@ export class DashJsP2PEngine {
     const target = liveDelayFor(manifest);
     if (!target) return;
 
-    const current = this.player.getSettings().streaming?.delay?.liveDelay;
+    // Against the delay this placed, never against the one the player holds:
+    // until a window is known that is INITIAL_LIVE_EDGE_DELAY, and a first
+    // window whose delay lands within half a segment of it would read as
+    // already placed. The delay would happen to be right and the forward
+    // buffer would be left at dash.js's own minute, which is the half that
+    // decides whether anything is shared at all.
     if (
-      current !== undefined &&
-      !Number.isNaN(current) &&
-      Math.abs(current - target.delay) < target.segment / 2
+      this.appliedLiveDelay !== undefined &&
+      Math.abs(this.appliedLiveDelay - target.delay) < target.segment / 2
     ) {
       return;
     }
@@ -209,6 +216,7 @@ export class DashJsP2PEngine {
     this.player.updateSettings({
       streaming: { delay: { liveDelay: target.delay }, buffer },
     });
+    this.appliedLiveDelay = target.delay;
   };
 
   /**
@@ -287,5 +295,6 @@ export class DashJsP2PEngine {
       this.player.off(STREAM_TEARDOWN_COMPLETE, this.handleStreamTeardown);
     }
     this.player = undefined;
+    this.appliedLiveDelay = undefined;
   }
 }

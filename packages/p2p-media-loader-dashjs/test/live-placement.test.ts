@@ -146,6 +146,20 @@ describe("dash.js live window placement", () => {
     expect(player.updateSettings).not.toHaveBeenCalled();
   });
 
+  it("places a window whose delay lands on the pre-manifest one", () => {
+    const { settings, deliverMpd } = setup();
+    // A 30 s window of 6 s segments — a common DVR window — asks for 24 s,
+    // within half a segment of the delay bindPlayer set before any manifest.
+    // The forward buffer still has to come down from dash.js's own minute.
+    deliverMpd(mpd(5, 6));
+    expect(settings.streaming.delay.liveDelay).toBe(24);
+    expect(settings.streaming.buffer).toEqual({
+      bufferTimeDefault: 15,
+      bufferTimeAtTopQuality: 15,
+      bufferTimeAtTopQualityLongForm: 15,
+    });
+  });
+
   it("re-applies only when the window itself changes", () => {
     const { player, settings, deliverMpd } = setup();
     deliverMpd(mpd(7, 8));
