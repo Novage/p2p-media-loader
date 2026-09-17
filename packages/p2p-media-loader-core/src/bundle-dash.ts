@@ -6,3 +6,4 @@
  */
 export * from "./index.js";
 export { dashManifestParser } from "./manifest/dash.js";
+export { stripPatchLocation } from "./manifest/patch-location.js";

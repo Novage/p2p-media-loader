@@ -19,6 +19,19 @@ against, and `requestedUrl` is what the player asked for.
 Do not fetch manifests separately — see the rationale in
 [architecture.md](architecture.md).
 
+**An adapter whose player follows `PatchLocation` removes the element from the
+MPD it passes on.** The element names a document describing the next refresh as
+a diff against the MPD the player holds, and a player that follows it — dash.js
+and Shaka both do — stops fetching whole manifests. Every refresh after the
+first would then be a patch the core cannot read: the registry would freeze at
+the window the first MPD described while playback continued on the patched one,
+and P2P would fade out within a window while the stream played perfectly. The
+element is an optimization over a refresh the player performs either way, so
+removing it costs a manifest body per period and changes nothing else. This is
+the one place an adapter alters what the player receives; the core is handed
+the same bytes the player parses. `stripPatchLocation` from
+`p2p-media-loader-core/dash` does it.
+
 The same applies to a stream's segment index when it lives outside the manifest
 (DASH `SegmentBase`). The player fetches it before any media; the adapter
 recognises that request and hands the bytes to `core.processSegmentIndex`. It

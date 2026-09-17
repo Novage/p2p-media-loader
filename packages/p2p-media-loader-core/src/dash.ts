@@ -7,4 +7,5 @@
  * @module p2p-media-loader-core/dash
  */
 export { dashManifestParser } from "./manifest/dash.js";
+export { stripPatchLocation } from "./manifest/patch-location.js";
 export type { ManifestParser } from "./manifest/types.js";

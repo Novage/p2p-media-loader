@@ -5,6 +5,7 @@ import {
   byteRangeFromRangeHeader,
   debug,
 } from "p2p-media-loader-core";
+import { stripPatchLocation } from "p2p-media-loader-core/dash";
 import {
   CommonMediaRequestLike,
   CommonMediaResponseLike,
@@ -78,13 +79,24 @@ class RequestRouter {
     if (type === REQUEST_TYPE.MPD) {
       return this.passThroughAndObserve(request, response, (data) => {
         if (typeof data !== "string" && !isBinary(data)) return;
+        // Take `PatchLocation` out before dash.js reads the same bytes: a
+        // player following it refreshes by patch, which the core cannot read,
+        // and its registry would freeze at this window. The wrap runs ahead
+        // of dash.js's own handler, so what it parses is what is left here.
+        // See specs/player-adapters.md.
+        const manifest =
+          typeof data === "string" ? stripPatchLocation(data) : data;
+        if (manifest !== data) {
+          response.data = manifest;
+          this.logger("removed PatchLocation from %s", url);
+        }
         // The response URL, when the loader filled it in, follows redirects.
         const responseUrl = response.url;
         const processed = this.core.processManifest({
           url:
             responseUrl !== undefined && responseUrl !== "" ? responseUrl : url,
           requestedUrl: url,
-          data,
+          data: manifest,
         });
         if (processed) this.hooks.onManifestProcessed?.(processed);
       });

@@ -106,6 +106,29 @@ describe("dash.js XHRLoader extension", () => {
     expect(events.loadend).toBe(1);
   });
 
+  it("takes PatchLocation out of the MPD dash.js goes on to parse", () => {
+    const { loader, core, parentResult } = setup();
+    // Following it, dash.js would refresh by patch, which the core cannot
+    // read, and the registry would freeze at this window.
+    parentResult.data = `<MPD><PatchLocation ttl="60">patch.mpp</PatchLocation><Period/></MPD>`;
+    const { request, response } = makeRequest("MPD", MPD_URL);
+
+    loader.load(request, response);
+
+    expect(response.data).toBe("<MPD><Period/></MPD>");
+    expect(core.processManifest).toHaveBeenCalledWith(
+      expect.objectContaining({ data: "<MPD><Period/></MPD>" }),
+    );
+  });
+
+  it("leaves an MPD without one exactly as dash.js received it", () => {
+    const { loader, parentResult } = setup();
+    parentResult.data = "<MPD><Period/></MPD>";
+    const { request, response } = makeRequest("MPD", MPD_URL);
+    loader.load(request, response);
+    expect(response.data).toBe("<MPD><Period/></MPD>");
+  });
+
   it("does not hand a failed MPD response to the core", () => {
     const { loader, core, parentResult } = setup();
     parentResult.status = 404;

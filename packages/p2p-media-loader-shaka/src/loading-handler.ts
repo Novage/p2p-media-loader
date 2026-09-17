@@ -7,6 +7,7 @@ import {
   ProcessedManifest,
   byteRangeFromRangeHeader,
 } from "p2p-media-loader-core";
+import { stripPatchLocation } from "p2p-media-loader-core/dash";
 
 type LoadingHandlerParams = Parameters<shaka.extern.SchemePlugin>;
 type Response = shaka.extern.Response;
@@ -51,6 +52,12 @@ export class Loader {
       // runs on the same bytes. Shaka's parsing is untouched.
       loading.promise
         .then((response) => {
+          // Take `PatchLocation` out before Shaka parses the same response: a
+          // player following it refreshes by patch, which the core cannot
+          // read, and its registry would freeze at this window. This handler
+          // is attached before Shaka's own, so what it parses is what is left
+          // here. See specs/player-adapters.md.
+          response.data = withoutPatchLocation(response.data);
           const processed = this.core.processManifest({
             // Shaka's `uri` follows redirects and `originalUri` is what was
             // asked for: the name the master gave this playlist.
@@ -161,4 +168,23 @@ function getLoadingDurationBasedOnBandwidth(
 ) {
   if (bandwidth <= 0) return 1;
   return Math.max(1, Math.round((bytesLoaded * 8 * 1000) / bandwidth));
+}
+
+/**
+ * A manifest response's bytes without its `PatchLocation` elements. Shaka
+ * hands its parser bytes rather than text, so this decodes and re-encodes —
+ * as UTF-8, which is what Shaka assumes of a manifest without a byte order
+ * mark — and returns the original bytes whenever there is nothing to remove
+ * or they do not decode.
+ */
+function withoutPatchLocation(data: Response["data"]): Response["data"] {
+  let text;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(data);
+  } catch {
+    return data;
+  }
+  const stripped = stripPatchLocation(text);
+  if (stripped === text) return data;
+  return new TextEncoder().encode(stripped).buffer;
 }

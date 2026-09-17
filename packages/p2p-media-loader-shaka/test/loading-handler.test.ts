@@ -103,6 +103,33 @@ describe("Shaka loading handler", () => {
     });
   });
 
+  it("takes PatchLocation out of the MPD Shaka goes on to parse", async () => {
+    const { loader, core, manifestResponse } = setup();
+    // Following it, Shaka would refresh by patch, which the core cannot read,
+    // and the registry would freeze at this window.
+    manifestResponse.data = new TextEncoder().encode(
+      `<MPD><PatchLocation ttl="60">patch.mpp</PatchLocation><Period/></MPD>`,
+    ).buffer;
+
+    const response = await loader.load(url, request(), RequestType.MANIFEST)
+      .promise;
+
+    expect(new TextDecoder().decode(response.data)).toBe(
+      "<MPD><Period/></MPD>",
+    );
+    expect(core.processManifest).toHaveBeenCalledWith(
+      expect.objectContaining({ data: response.data }),
+    );
+  });
+
+  it("leaves a manifest without one byte for byte as Shaka received it", async () => {
+    const { loader, manifestResponse } = setup();
+    const data = manifestResponse.data;
+    const response = await loader.load(url, request(), RequestType.MANIFEST)
+      .promise;
+    expect(response.data).toBe(data);
+  });
+
   it("hands what the core read from a manifest to the engine", async () => {
     const { loader, onManifestProcessed, processed } = setup();
     await loader.load(url, request(), RequestType.MANIFEST).promise;

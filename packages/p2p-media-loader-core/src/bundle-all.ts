@@ -7,3 +7,4 @@
 export * from "./index.js";
 export { hlsManifestParser } from "./manifest/hls.js";
 export { dashManifestParser } from "./manifest/dash.js";
+export { stripPatchLocation } from "./manifest/patch-location.js";
