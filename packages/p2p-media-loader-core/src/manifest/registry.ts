@@ -338,9 +338,9 @@ export class ManifestRegistry {
     if (protocol === "dash") {
       return segments.map((s) => s.presentationTime ?? 0);
     }
-    if (segments.every((s) => s.programDateTime !== undefined)) {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      return segments.map((s) => s.programDateTime! / 1000);
+    const dates = segments.map((s) => s.programDateTime);
+    if (dates.every((date): date is number => date !== undefined)) {
+      return dates.map((date) => date / 1000);
     }
 
     const { timeline } = stream;

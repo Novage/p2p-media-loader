@@ -190,14 +190,8 @@ function readMpd(text: string): {
 const MPEG_CHANNEL_SCHEME = "23003:3:audio_channel_configuration";
 
 function channelCountOf(element: Element): number | undefined {
-  for (const child of Array.from(element.childNodes)) {
-    if (
-      child.nodeType !== 1 ||
-      (child as Element).localName !== "AudioChannelConfiguration"
-    ) {
-      continue;
-    }
-    const config = child as Element;
+  for (const config of childElementsOf(element)) {
+    if (config.localName !== "AudioChannelConfiguration") continue;
     if (
       !(config.getAttribute("schemeIdUri") ?? "").includes(MPEG_CHANNEL_SCHEME)
     ) {
@@ -207,4 +201,19 @@ function channelCountOf(element: Element): number | undefined {
     if (Number.isInteger(value) && value > 0) return value;
   }
   return undefined;
+}
+
+/**
+ * The child elements of a node. `instanceof Element` is no help: the DOM here
+ * is whatever `mpd-parser` resolved — xmldom under Node — whose classes are
+ * not the global ones, so an element is recognised by its node type, as
+ * mpd-parser recognises its own.
+ */
+function childElementsOf(parent: Element): Element[] {
+  const ELEMENT_NODE = 1;
+  const elements: Element[] = [];
+  for (const child of Array.from(parent.childNodes)) {
+    if (child.nodeType === ELEMENT_NODE) elements.push(child as Element);
+  }
+  return elements;
 }

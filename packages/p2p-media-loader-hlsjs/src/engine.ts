@@ -111,7 +111,7 @@ const LIVE_RESYNC_MARGIN_SEGMENTS = 2;
  */
 export class HlsJsP2PEngine {
   private readonly core: Core;
-  private hlsInstanceGetter?: () => Hls;
+  private hlsInstanceGetter?: () => Hls | undefined;
   private currentHlsInstance?: Hls;
   private readonly playback = trackMediaElementPlayback((state, media) => {
     if (this.oracle.enabled) {
@@ -253,12 +253,24 @@ export class HlsJsP2PEngine {
   }
 
   /**
-   * Sets the HLS instance used for handling media.
-   * @param hls The HLS instance, or a function that returns an HLS instance.
+   * Sets the hls.js instance used for handling media, or a function that
+   * returns it. The function may return nothing while the player has not
+   * built one yet; the engine binds when it appears.
+   *
+   * The instance is not typed as this package's own `Hls`, and deliberately:
+   * an application often has a second copy of hls.js with its own types —
+   * `@videojs/hlsjs-video` bundles one, and its `Hls` and ours differ by
+   * whole methods — so requiring this package's type would make our
+   * development dependency's version part of the integration contract.
+   *
+   * @param hls The hls.js instance, or a function that returns it.
    */
-  bindHls<T = unknown>(hls: T | (() => T)) {
-    this.hlsInstanceGetter =
-      typeof hls === "function" ? (hls as () => Hls) : () => hls as Hls;
+  bindHls<T = unknown>(hls: T | (() => T | undefined | null)) {
+    const get =
+      typeof hls === "function"
+        ? (hls as () => T | undefined | null)
+        : () => hls;
+    this.hlsInstanceGetter = () => (get() ?? undefined) as Hls | undefined;
   }
 
   private initHlsEvents() {
