@@ -114,7 +114,7 @@ These predate 5.0.0 and affect 4.x deployments as well.
   frees it, so the brake on prefetching engaged late on live streams; and a
   re-stored segment was counted twice, which evicted while capacity was free.
 
-## 4.0.0 — 19 August 2026
+## 4.0.0
 
 Stream identity derivation moved from the player integrations into the core.
 Integrations pass raw stream properties and the core computes the identity
