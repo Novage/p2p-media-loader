@@ -10,7 +10,7 @@ import {
 import { Core } from "p2p-media-loader-core";
 
 /**
- * Wraps hls.js's own playlist loader so every manifest it fetches is also
+ * Wraps HLS.js's own playlist loader so every manifest it fetches is also
  * handed to the core. Loading itself is untouched: the core observes the
  * response the player already made rather than fetching its own.
  * See specs/architecture.md, "Why manifests are observed, not polled".
@@ -40,7 +40,7 @@ export class PlaylistLoaderBase implements Loader<PlaylistLoaderContext> {
         if (typeof response.data === "string") {
           core.processManifest({
             // The response URL is post-redirect, and URIs resolve against it,
-            // as hls.js itself does. What was asked for goes along with it:
+            // as HLS.js itself does. What was asked for goes along with it:
             // that is the name the master gave this playlist.
             url: response.url || loaderContext.url,
             requestedUrl: loaderContext.url,

@@ -1,6 +1,6 @@
 /**
- * The slice of video.js and VHS (`@videojs/http-streaming`) the adapter
- * touches, typed structurally: video.js's declarations do not describe
+ * The slice of Video.js and VHS (`@videojs/http-streaming`) the adapter
+ * touches, typed structurally: Video.js's declarations do not describe
  * `videojs.Vhs`, and the adapter needs a handful of fields.
  */
 
@@ -122,7 +122,7 @@ export type VideoJsPlayerLike = {
 export type VideoJsNamespace = typeof import("video.js").default;
 
 /**
- * The video.js namespace surface the engine uses. video.js's declarations do
+ * The Video.js namespace surface the engine uses. Video.js's declarations do
  * not describe `Vhs`, so the real namespace is accepted alongside this shape
  * and checked at runtime.
  */

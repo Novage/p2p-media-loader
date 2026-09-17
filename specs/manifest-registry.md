@@ -213,7 +213,7 @@ indication that P2P stopped working.
 
 | Player             | CMCD | Default mode when enabled |
 | ------------------ | ---- | ------------------------- |
-| hls.js             | yes  | query (`useHeaders` off)  |
+| HLS.js             | yes  | query (`useHeaders` off)  |
 | dash.js            | yes  | query                     |
 | Shaka Player       | yes  | query (`useHeaders` off)  |
 | ExoPlayer / Media3 | yes  | configurable              |

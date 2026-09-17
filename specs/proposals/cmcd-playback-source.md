@@ -69,7 +69,7 @@ is stale between times; the same staleness window applies to it as to a
 reported state, and past the window core falls to inference as it does today.
 
 **Never blended.** `bl` may be measured per media track rather than across the
-presentation — hls.js reports the requested track's forward buffer, Media3 the
+presentation — HLS.js reports the requested track's forward buffer, Media3 the
 overall buffered duration from the playhead — and neither is interchangeable
 with a media element's intersected buffered ranges. A CMCD reading therefore
 stands on its own: it is never averaged with, or used to correct, another

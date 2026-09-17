@@ -16,23 +16,23 @@
     <script type="module">
       import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 
-      // Override global Hls.js class with P2P enabled mixin
+      // Override global HLS.js class with P2P enabled mixin
       // It will be used by all <vm-hls> elements
       window.Hls = HlsJsP2PEngine.injectMixin(window.Hls);
 
       // Configure all <vm-hls> elements
       for (const vmHls of document.querySelectorAll("vm-hls")) {
         vmHls.config = {
-          startLevel: 0, // example of Hls.js config parameter
+          startLevel: 0, // example of HLS.js config parameter
 
-          // ... other Hls.js config parameters go here
+          // ... other HLS.js config parameters go here
 
           // example of P2P engine config section
           p2p: {
             onHlsJsCreated: (hls) => {
-              // Subscribe to P2P engine and Hls.js events here
+              // Subscribe to P2P engine and HLS.js events here
               console.log(
-                "Hls.js engine with P2P mixin created",
+                "HLS.js engine with P2P mixin created",
                 hls.p2pEngine.getConfig(),
                 hls.config,
               );

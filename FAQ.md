@@ -93,7 +93,7 @@ const hls = new HlsWithP2P({
       },
     },
     onHlsJsCreated(hls) {
-      // Subscribe to P2P engine and Hls.js events here
+      // Subscribe to P2P engine and HLS.js events here
       hls.p2pEngine.addEventListener("onSegmentLoaded", (details) => {
         console.log("Segment Loaded:", details);
       });
@@ -124,7 +124,7 @@ const hls = new HlsWithP2P({
       swarmId: "https://somecdn.com/mystream_12345.m3u8", // any unique string
     },
     onHlsJsCreated(hls) {
-      // Subscribe to P2P engine and Hls.js events here
+      // Subscribe to P2P engine and HLS.js events here
       hls.p2pEngine.addEventListener("onSegmentLoaded", (details) => {
         console.log("Segment Loaded:", details);
       });

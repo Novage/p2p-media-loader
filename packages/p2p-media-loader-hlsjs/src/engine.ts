@@ -62,7 +62,7 @@ export type HlsWithP2PConfig<HlsType extends abstract new () => unknown> =
 
 /**
  * Where the player sits in a live window. See specs/player-adapters.md,
- * "hls.js".
+ * "HLS.js".
  *
  * Every segment between the player's buffer and the live edge is one peers
  * can fetch for each other, so the player is placed as deep in the window as
@@ -79,12 +79,12 @@ const LIVE_RESYNC_MARGIN_SEGMENTS = 2;
 
 /**
  * Represents a Peer-to-Peer (P2P) engine for HLS (HTTP Live Streaming) to enhance media streaming efficiency.
- * This class integrates P2P technologies into Hls.js, enabling the distribution of media segments via a peer network
+ * This class integrates P2P technologies into HLS.js, enabling the distribution of media segments via a peer network
  * alongside traditional HTTP fetching. This reduces server bandwidth costs and improves scalability by sharing the load
  * across multiple clients.
  *
  * The engine has three responsibilities (see specs/player-adapters.md): it
- * hands every playlist hls.js fetches to the core, routes fragment requests
+ * hands every playlist HLS.js fetches to the core, routes fragment requests
  * through the core, and reports playback state from the media element. The
  * core parses the playlists itself; nothing here describes streams to it.
  *
@@ -125,22 +125,22 @@ export class HlsJsP2PEngine {
   private readonly oracle = debug("p2pml:playback-oracle");
 
   /**
-   * Enhances a given `Hls.js` class by injecting additional Peer-to-Peer (P2P) functionalities.
+   * Enhances a given HLS.js class by injecting additional Peer-to-Peer (P2P) functionalities.
    *
-   * @returns The enhanced `Hls.js` class with P2P functionalities.
+   * @returns The enhanced HLS.js class with P2P functionalities.
    *
    * @example
    * const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
    *
    * const hls = new HlsWithP2P({
-   *   // Hls.js configuration
-   *   startLevel: 0, // Example of Hls.js config parameter
+   *   // HLS.js configuration
+   *   startLevel: 0, // Example of HLS.js config parameter
    *   p2p: {
    *     core: {
    *       // P2P core configuration
    *     },
    *     onHlsJsCreated(hls) {
-   *       // Do something with the Hls.js instance
+   *       // Do something with the HLS.js instance
    *     },
    *   },
    * });
@@ -156,7 +156,7 @@ export class HlsJsP2PEngine {
   constructor(config?: PartialHlsJsP2PEngineConfig) {
     this.core = new Core({
       ...config?.core,
-      // hls.js plays HLS only; a bundle of this engine carries no DASH parser.
+      // HLS.js plays HLS only; a bundle of this engine carries no DASH parser.
       manifestParsers: config?.core?.manifestParsers ?? [hlsManifestParser],
     });
   }
@@ -204,11 +204,11 @@ export class HlsJsP2PEngine {
   }
 
   /**
-   * Provides the Hls.js P2P specific configuration for Hls.js loaders.
+   * Provides the HLS.js P2P specific configuration for HLS.js loaders.
    *
-   * An integration that constructs hls.js itself should also pass
+   * An integration that constructs HLS.js itself should also pass
    * `lowLatencyMode: false` (the mixin does so unless the integrator sets it):
-   * in low-latency mode hls.js requests partial segments, which the core does
+   * in low-latency mode HLS.js requests partial segments, which the core does
    * not register, so those requests bypass P2P.
    *
    * @returns An object containing the fragment loader (`fLoader`) and playlist loader (`pLoader`).
@@ -221,7 +221,7 @@ export class HlsJsP2PEngine {
   }
 
   /**
-   * Retrieves the current configuration of the Hls.js P2P engine.
+   * Retrieves the current configuration of the HLS.js P2P engine.
    * @returns A readonly version of the `HlsJsP2PEngineConfig`.
    */
   getConfig(): HlsJsP2PEngineConfig {
@@ -253,17 +253,17 @@ export class HlsJsP2PEngine {
   }
 
   /**
-   * Sets the hls.js instance used for handling media, or a function that
+   * Sets the HLS.js instance used for handling media, or a function that
    * returns it. The function may return nothing while the player has not
    * built one yet; the engine binds when it appears.
    *
    * The instance is not typed as this package's own `Hls`, and deliberately:
-   * an application often has a second copy of hls.js with its own types —
+   * an application often has a second copy of HLS.js with its own types —
    * `@videojs/hlsjs-video` bundles one, and its `Hls` and ours differ by
    * whole methods — so requiring this package's type would make our
    * development dependency's version part of the integration contract.
    *
-   * @param hls The hls.js instance, or a function that returns it.
+   * @param hls The HLS.js instance, or a function that returns it.
    */
   bindHls<T = unknown>(hls: T | (() => T | undefined | null)) {
     const get =
@@ -352,9 +352,9 @@ export class HlsJsP2PEngine {
   /**
    * Places the player deep in the live window so that the segments between
    * its buffer and the live edge — the ones peers exchange — are as many as
-   * the window allows. Applied through hls.js's own `targetLatency` API and
+   * the window allows. Applied through HLS.js's own `targetLatency` API and
    * only when the integrator has not configured the live sync settings
-   * themselves. Set once per value; hls.js then re-syncs to it on start, on a
+   * themselves. Set once per value; HLS.js then re-syncs to it on start, on a
    * stall, and when the max latency is exceeded.
    *
    * Segment length is the playlist's average: `EXT-X-TARGETDURATION` is an
@@ -374,7 +374,7 @@ export class HlsJsP2PEngine {
     // Segment durations are not exact multiples, so the window length drifts
     // by fractions of a second between refreshes. Only a change of at least
     // half a segment means the window itself changed; anything smaller is
-    // noise, and re-applying the target would reset hls.js's stall tracking.
+    // noise, and re-applying the target would reset HLS.js's stall tracking.
     const tolerance = segment / 2;
     const differs = (current: number | undefined, next: number) =>
       current === undefined || Math.abs(current - next) >= tolerance;
@@ -407,8 +407,8 @@ export class HlsJsP2PEngine {
       config.mainStream.highDemandTimeWindow,
       config.secondaryStream.highDemandTimeWindow,
     );
-    // Hls.js maxBufferLength dictates how many seconds AHEAD OF THE PLAYHEAD it buffers.
-    // To ensure Hls.js only buffers up to the highDemandTimeWindow and lets the
+    // HLS.js maxBufferLength dictates how many seconds AHEAD OF THE PLAYHEAD it buffers.
+    // To ensure HLS.js only buffers up to the highDemandTimeWindow and lets the
     // background loader do all the advance fetching, we set p2pOptimalBufferLength
     // directly equal to highDemandTimeWindow, but with a lower bound based on fragment duration.
     const p2pOptimalBufferLength = Math.max(

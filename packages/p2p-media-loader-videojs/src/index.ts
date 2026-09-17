@@ -13,7 +13,7 @@ export type {
   VideoJsLike,
   VideoJsNamespace,
 } from "./types.js";
-// The slice of VHS the types above describe. video.js ships no declarations
+// The slice of VHS the types above describe. Video.js ships no declarations
 // for it, so an integrator building a namespace of their own needs these.
 export type {
   VhsCallback,

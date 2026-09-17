@@ -55,7 +55,7 @@ function masterStreams(
   const channelsByGroupAndName = scanAudioChannels(text);
 
   // Alternate audio renditions inherit codecs from the variants that reference
-  // their group, the way hls.js assigns `audioCodec` to an audio track.
+  // their group, the way HLS.js assigns `audioCodec` to an audio track.
   const audioCodecsByGroup = new Map<string, string>();
 
   for (const playlist of manifest.playlists ?? []) {
@@ -144,7 +144,7 @@ function mediaStream(manifest: M3u8Manifest, url: string): ParsedStream {
 
 /**
  * `CHANNELS` per `(GROUP-ID, NAME)` from the raw `EXT-X-MEDIA` lines.
- * m3u8-parser does not retain the attribute, and hls.js does, so without this
+ * m3u8-parser does not retain the attribute, and HLS.js does, so without this
  * the two would hash audio renditions differently.
  */
 function scanAudioChannels(text: string): Map<string, string> {

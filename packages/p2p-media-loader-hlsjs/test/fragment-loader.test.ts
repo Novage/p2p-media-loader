@@ -45,8 +45,8 @@ const context = (rangeStart?: number, rangeEnd?: number) =>
   ({ url: URL, rangeStart, rangeEnd }) as FragmentLoaderContext;
 const loaderConfig = {} as LoaderConfiguration;
 
-describe("hls.js fragment loader", () => {
-  it("asks the core by URL and inclusive byte range, converting hls.js's half-open range", async () => {
+describe("HLS.js fragment loader", () => {
+  it("asks the core by URL and inclusive byte range, converting HLS.js's half-open range", async () => {
     const { core, loader, callbacks, data } = setup(true);
     loader.load(context(600, 1600), loaderConfig, callbacks);
 
@@ -63,7 +63,7 @@ describe("hls.js fragment loader", () => {
     expect(callbacks.onSuccess).toHaveBeenCalledTimes(1);
     const [response] = vi.mocked(callbacks.onSuccess).mock.calls[0];
     // What the core hands over is already the engine's own copy, so it goes
-    // to hls.js as it is — which is free to transfer it to its worker. The
+    // to HLS.js as it is — which is free to transfer it to its worker. The
     // core's guarantee is covered by its own tests.
     expect(response.data).toBe(data);
   });
@@ -74,7 +74,7 @@ describe("hls.js fragment loader", () => {
     expect(core.isSegmentLoadable).toHaveBeenCalledWith(URL, undefined);
   });
 
-  it("falls back to hls.js's own loader when the core does not serve the fragment", () => {
+  it("falls back to HLS.js's own loader when the core does not serve the fragment", () => {
     const { core, loader, callbacks } = setup(false);
     const ctx = context(0, 100);
     loader.load(ctx, loaderConfig, callbacks);
@@ -105,7 +105,7 @@ describe("hls.js fragment loader", () => {
     loader.abort();
 
     // The core cannot always cancel in time — a request still waiting for the
-    // segment storage has no loader yet — and hls.js has been told this
+    // segment storage has no loader yet — and HLS.js has been told this
     // fragment was aborted.
     await Promise.resolve();
     await Promise.resolve();

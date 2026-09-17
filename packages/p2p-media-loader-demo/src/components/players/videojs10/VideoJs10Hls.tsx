@@ -17,18 +17,18 @@ import { subscribeToUiEvents } from "../utils";
 type P2PLoaders = NonNullable<HlsEngineConfig["hlsJs"]>;
 
 /**
- * video.js 10 on the hls.js P2P engine. v10 has no streaming layer of its
- * own to hook: its `HlsJsAdapter` constructs hls.js from the config in
+ * Video.js 10 on the HLS.js P2P engine. v10 has no streaming layer of its
+ * own to hook: its `HlsJsAdapter` constructs HLS.js from the config in
  * `source.engine.hlsJs`, handed over untouched, so the engine's loaders go in
  * there; and it exposes the instance as `engine`, which `bindHls` takes as a
  * getter and resolves at the first playlist load. Nothing in the packages
  * changes for this — the two calls in `P2PHlsVideo` are the whole integration.
  *
- * Quality selection is the skin's own, from the renditions hls.js reports;
+ * Quality selection is the skin's own, from the renditions HLS.js reports;
  * the other demo players carry a `<select>` because their skins have none.
  */
 export const VideoJs10Hls = (props: PlayerProps) => {
-  // A new adapter, hls.js and engine per stream and per set of options, the
+  // A new adapter, HLS.js and engine per stream and per set of options, the
   // way the other players tear down and rebuild.
   const playerKey = useMemo(
     () => JSON.stringify([props.streamUrl, props.coreOptions]),
@@ -46,7 +46,7 @@ export const VideoJs10Hls = (props: PlayerProps) => {
     </div>
   ) : (
     <div className="error-message">
-      <h3>hls.js is not supported in this browser</h3>
+      <h3>HLS.js is not supported in this browser</h3>
     </div>
   );
 };
@@ -73,7 +73,7 @@ const P2PHlsVideo = ({
   useDestroy(engine);
 
   // `setup` runs once per adapter, before it is attached. Setting the source
-  // is what constructs hls.js — with the engine's loaders in its config.
+  // is what constructs HLS.js — with the engine's loaders in its config.
   const media = useMediaInstance(HlsJsAdapter, (media) => {
     subscribeToUiEvents({
       engine,
@@ -82,7 +82,7 @@ const P2PHlsVideo = ({
       onChunkDownloaded,
       onChunkUploaded,
     });
-    // The adapter defaults to `preload: "metadata"` and holds hls.js at
+    // The adapter defaults to `preload: "metadata"` and holds HLS.js at
     // `maxBufferLength: 1` until the element fires `play`, widening the
     // limits only then — and it writes that default onto the element, so the
     // attribute cannot say otherwise. Firefox starts an autoplaying element
@@ -90,12 +90,12 @@ const P2PHlsVideo = ({
     // reaches on one fragment, so nothing ever plays and nothing ever asks
     // for more. Asking for the whole buffer up front is what autoplay means.
     media.preload = "auto";
-    // Resolved when hls.js constructs the playlist loader, by which time the
+    // Resolved when HLS.js constructs the playlist loader, by which time the
     // adapter has its instance.
     engine.bindHls(() => media.engine);
     setSource(media, {
       src: streamUrl,
-      // Native HLS on Safari would bypass hls.js, and with it the core.
+      // Native HLS on Safari would bypass HLS.js, and with it the core.
       preferPlayback: PlaybackTypes.MSE,
       engine: { hlsJs: engine.getConfigForHlsJs() as P2PLoaders },
     });

@@ -48,7 +48,7 @@ const firstManifestHooks = new FirstManifestHooks(registry);
 
 /**
  * Represents a Peer-to-Peer (P2P) engine designed to enhance media streaming efficiency.
- * This class integrates P2P technologies into video.js — whose HLS and MPEG-DASH playback is VHS,
+ * This class integrates P2P technologies into Video.js — whose HLS and MPEG-DASH playback is VHS,
  * `@videojs/http-streaming` — enabling the distribution of media segments via a peer network
  * alongside traditional HTTP fetching. This reduces server bandwidth costs and improves scalability
  * by sharing the load across multiple clients.
@@ -66,7 +66,7 @@ const firstManifestHooks = new FirstManifestHooks(registry);
  * player that has none of its own, and the engine reads that manifest there.
  *
  * `registerPlugins(videojs)` is optional, and only registers the
- * `p2pMediaLoader` video.js plugin for integrators who prefer that style.
+ * `p2pMediaLoader` Video.js plugin for integrators who prefer that style.
  *
  * @example
  * // One engine, one player, no page-wide setup
@@ -76,14 +76,14 @@ const firstManifestHooks = new FirstManifestHooks(registry);
  * player.src({ src: manifestUrl, type: "application/x-mpegURL" });
  *
  * @example
- * // As a video.js plugin, with the page-wide hook in place
+ * // As a Video.js plugin, with the page-wide hook in place
  * VideoJsP2PEngine.registerPlugins(videojs);
  * const player = videojs("video", { html5: { vhs: { overrideNative: true } } });
  * const engine = player.p2pMediaLoader({ core: { swarmId: "example-swarm-id" } });
  * player.src({ src: manifestUrl, type: "application/x-mpegURL" });
  */
 export class VideoJsP2PEngine {
-  /** The video.js plugin `registerPlugins` adds: `player.p2pMediaLoader(config)`. */
+  /** The Video.js plugin `registerPlugins` adds: `player.p2pMediaLoader(config)`. */
   static readonly PLUGIN_NAME = "p2pMediaLoader";
 
   private static plugin?: VideoJsLike;
@@ -101,7 +101,7 @@ export class VideoJsP2PEngine {
    * Constructs an instance of `VideoJsP2PEngine`.
    *
    * @param config An optional configuration for customizing the P2P engine's behavior.
-   * @param videojs The video.js namespace; defaults to the global one.
+   * @param videojs The Video.js namespace; defaults to the global one.
    */
   constructor(
     config?: PartialVideoJsP2PEngineConfig,
@@ -119,12 +119,12 @@ export class VideoJsP2PEngine {
   }
 
   /**
-   * Registers the `p2pMediaLoader` video.js plugin, so that a player can be
+   * Registers the `p2pMediaLoader` Video.js plugin, so that a player can be
    * given an engine with `player.p2pMediaLoader({ core })`. Optional:
    * `new VideoJsP2PEngine(config)` and `engine.bindPlayer(player)` do the
    * same without it. Nothing else on the page is touched.
    *
-   * @param input The video.js namespace; defaults to the global one.
+   * @param input The Video.js namespace; defaults to the global one.
    */
   static registerPlugins(input: VideoJsInput | undefined = window.videojs) {
     const videojs = validateVideoJs(input);
@@ -148,7 +148,7 @@ export class VideoJsP2PEngine {
   /**
    * Removes the `p2pMediaLoader` plugin.
    *
-   * @param input The video.js namespace; defaults to the one the plugin was registered on.
+   * @param input The Video.js namespace; defaults to the one the plugin was registered on.
    */
   static unregisterPlugins(
     input: VideoJsInput | undefined = VideoJsP2PEngine.plugin,
@@ -164,12 +164,12 @@ export class VideoJsP2PEngine {
   }
 
   /**
-   * Attaches the engine to a video.js player, hooking that player's own VHS
+   * Attaches the engine to a Video.js player, hooking that player's own VHS
    * request and response hooks. Its playlists, MPDs and segments go through
    * the core from then on, whether it has a source already or loads one
    * later. Nothing outside this player is touched.
    *
-   * @param player The video.js player.
+   * @param player The Video.js player.
    */
   bindPlayer(player: VideoJsPlayerLike) {
     if (this.player === player) return;
@@ -277,7 +277,7 @@ export class VideoJsP2PEngine {
 function validateVideoJs(videojs: unknown): VideoJsLike {
   if (!videojs) {
     throw new Error(
-      "videojs is not defined in global scope and not passed as an argument to the video.js P2P engine",
+      "videojs is not defined in global scope and not passed as an argument to the Video.js P2P engine",
     );
   }
   const candidate = videojs as Partial<VideoJsLike>;
@@ -286,7 +286,7 @@ function validateVideoJs(videojs: unknown): VideoJsLike {
     typeof candidate.xhr !== "function"
   ) {
     throw new Error(
-      "videojs.Vhs is missing: the video.js P2P engine needs video.js with VHS (@videojs/http-streaming), bundled since video.js 7",
+      "videojs.Vhs is missing: the Video.js P2P engine needs Video.js with VHS (@videojs/http-streaming), bundled since Video.js 7",
     );
   }
   return videojs as VideoJsLike;

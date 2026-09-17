@@ -93,24 +93,24 @@ islands, and the final island may be nowhere near the playhead.
 
 ## Supported players
 
-### hls.js
+### HLS.js
 
 - Parsers: HLS only.
 - Manifest: `pLoader`.
 - Segments: `fLoader`, falling back to `config.loader`.
 - Playback: the media element.
 
-The adapter also tunes hls.js's own buffering, because the core's background
+The adapter also tunes HLS.js's own buffering, because the core's background
 loader is what should fetch ahead, not the player. Every setting below is
 applied only when the integrator has not configured it, and each is applied
-once per value when a playlist loads; between playlists hls.js is left alone.
+once per value when a playlist loads; between playlists HLS.js is left alone.
 
 - **Forward buffer.** `maxBufferLength` is held to the high-demand window. The
   segments beyond it are the core's to prefetch.
 - **Position in the live window.** Every segment between the player's buffer
   and the live edge is one peers can fetch for each other, so the player is
   placed as deep in the window as it can go: the target latency, set through
-  hls.js's `targetLatency` API, is the window length less one segment, and
+  HLS.js's `targetLatency` API, is the window length less one segment, and
   never more than a minute. The player's own forward buffer is what keeps it
   safe there — the fetch positions sit a buffer length ahead of the playhead,
   well inside the window, even as jitter carries the playhead a few seconds
@@ -119,23 +119,23 @@ once per value when a playlist loads; between playlists hls.js is left alone.
   before the buffer starves, a controlled skip in place of a stall and jump.
   Segment length is the playlist's average, not `EXT-X-TARGETDURATION`, which
   is an upper bound and on some streams several times the real segment.
-- **Low-latency mode off.** hls.js enables it by default; on a low-latency
+- **Low-latency mode off.** HLS.js enables it by default; on a low-latency
   playlist it then requests partial segments, which the core deliberately does
   not register ([architecture.md](architecture.md)), so those requests would
   bypass P2P. The mixin passes `lowLatencyMode: false` unless the integrator
-  sets it; an integration that constructs hls.js itself should do the same.
+  sets it; an integration that constructs HLS.js itself should do the same.
 
-**Hosted in video.js 10.** v10 has no streaming layer of its own; its
-`HlsJsAdapter` constructs hls.js from `source.engine.hlsJs`, handed to hls.js
+**Hosted in Video.js 10.** v10 has no streaming layer of its own; its
+`HlsJsAdapter` constructs HLS.js from `source.engine.hlsJs`, handed to HLS.js
 untouched, and exposes the instance as a read-only `engine`. The whole
 integration is two calls, with nothing added to this package:
 `getConfigForHlsJs()` spread into `source.engine.hlsJs`, and
-`bindHls(() => adapter.engine)` — a getter, resolved when hls.js constructs
+`bindHls(() => adapter.engine)` — a getter, resolved when HLS.js constructs
 the playlist loader, by which time the adapter has its instance. Playback
 should be pinned to MSE (`preferPlayback`): native HLS on Safari would bypass
-hls.js and with it the core. The demo's `videojs10_hls` player is this.
+HLS.js and with it the core. The demo's `videojs10_hls` player is this.
 
-These settings steer only where hls.js starts and re-syncs; where the player
+These settings steer only where HLS.js starts and re-syncs; where the player
 then puts itself is its own business. An immediate quality switch
 (`hls.currentLevel`) flushes the buffer and resumes at its former end, which
 moves the playhead a buffer length towards the live edge and can leave no
@@ -179,7 +179,7 @@ priority outranks every registration Shaka makes for it.
 No manifest-parser decoration and no `segmentIndex` hooking. Shaka's internal
 representation of the stream is not consulted.
 
-The adapter places the player in a live window by the same rule as the hls.js
+The adapter places the player in a live window by the same rule as the HLS.js
 adapter — as deep as the window allows, one segment inside the tail, never more
 than a minute behind the edge — through Shaka's `defaultPresentationDelay`,
 and only when the integrator has left Shaka's default in place. Shaka reads the
@@ -203,7 +203,7 @@ Shaka's buffering goal leaves the rest of the window ahead of the buffer for
 peers, and its own out-of-window handling — a seek to the window start plus its
 safe seek offset — covers a playhead that drifts past the tail, so no re-sync
 setting is needed. The MPD's suggested delay is
-ignored for the same reason hls.js's hold-back is overridden: a server's
+ignored for the same reason HLS.js's hold-back is overridden: a server's
 suggestion places the player near the edge, where there is nothing to share.
 
 ### dash.js
@@ -236,7 +236,7 @@ segments, licences, certificates, steering, XLink — passes through untouched.
 A core failure is reported as a failed response so dash.js's own retry rules
 run; an abort from dash.js aborts the core request.
 
-**Hosted in video.js 10.** v10's `DashAdapter` creates its dash.js player and
+**Hosted in Video.js 10.** v10's `DashAdapter` creates its dash.js player and
 calls `initialize()` in its constructor, and attaches a source only when one
 is set, so `bindPlayer(adapter.engine)` fits between the two with nothing
 added to this package. It must be bound exactly once per player: dash.js
@@ -255,7 +255,7 @@ default, the adapter places the player in the window, re-applied only when the
 window changes by half a segment. Placement is two settings, not one.
 
 - **Position in the live window.** `streaming.delay.liveDelay` is the window
-  less one segment, at most a minute behind the edge — the hls.js and Shaka
+  less one segment, at most a minute behind the edge — the HLS.js and Shaka
   rule, from the same `liveDelayFor` the Shaka adapter uses — and
   `useSuggestedPresentationDelay` is turned off, because a server's suggestion
   places the player near the edge where there is nothing to share.
@@ -278,11 +278,11 @@ minutes in and resumes only when the player falls behind the edge again.
 Each of the three settings is a ceiling: one the integrator already holds
 lower is left alone.
 
-### video.js
+### Video.js
 
-- Parsers: HLS and DASH — video.js plays both through VHS
+- Parsers: HLS and DASH — Video.js plays both through VHS
   (`@videojs/http-streaming`), which is built on the same `m3u8-parser` and
-  `mpd-parser` the core uses, so a video.js integration and the core interpret
+  `mpd-parser` the core uses, so a Video.js integration and the core interpret
   a manifest through identical code.
 - Manifest and segments: the `onRequest` and `onResponse` hooks VHS puts on
   each player's own xhr function, `player.tech().vhs.xhr`. VHS routes every
@@ -320,7 +320,7 @@ to a bound player by its `currentSrc()`, put that player's own hooks on, and
 hand the core the manifest as it passes; they are added when the first engine
 binds and removed when the last one is destroyed, and they leave every other
 player alone. `VideoJsP2PEngine.registerPlugins(videojs)` is unrelated to any
-of this: it registers the `p2pMediaLoader` video.js plugin and nothing else.
+of this: it registers the `p2pMediaLoader` Video.js plugin and nothing else.
 
 **Reading the manifest the player itself fetched is not an optimization.**
 An adapter that fetches it a second time gets a second response, and a CDN that
@@ -346,8 +346,8 @@ starts a live stream at its own seekable end, honouring `EXT-X-START` and
 
 VHS is also the only engine here that caps the rendition by the size the player
 is rendered at — `limitRenditionByPlayerDimensions`, on unless set to `false`.
-A rendition is a swarm, so a video.js viewer in a small window can end up in a
-swarm no hls.js, dash.js or Shaka viewer of the same stream is ever in. The
+A rendition is a swarm, so a Video.js viewer in a small window can end up in a
+swarm no HLS.js, dash.js or Shaka viewer of the same stream is ever in. The
 adapter does not touch the setting, which is the integrator's to make; a
 deployment that mixes players and wants one swarm per rendition turns it off.
 

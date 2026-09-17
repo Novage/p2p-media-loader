@@ -10,7 +10,7 @@ import { PlayerProps } from "../../../types";
 import { subscribeToUiEvents } from "../utils";
 
 /**
- * video.js 10 on the dash.js P2P engine. v10's `DashAdapter` creates and
+ * Video.js 10 on the dash.js P2P engine. v10's `DashAdapter` creates and
  * initializes its dash.js player up front and attaches a source only when
  * one is set, so the window the engine needs — `bindPlayer` before dash.js
  * makes its first request — is any moment before the source goes in.

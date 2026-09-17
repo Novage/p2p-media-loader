@@ -46,7 +46,7 @@ export type ParsedInitSegment = {
 export type ParsedStream = {
   /**
    * Stable key for this stream within the registry. HLS: the absolute media
-   * playlist URL — the same identifier hls.js uses for a level. DASH: the
+   * playlist URL — the same identifier HLS.js uses for a level. DASH: the
    * representation id.
    */
   readonly key: string;

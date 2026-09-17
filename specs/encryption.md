@@ -39,7 +39,7 @@ today is wrong after the next release.
 The risk is uneven across players, which is why the rule is stated rather than
 left to each adapter:
 
-- **hls.js** loads keys through a separate `KeyLoader` built on `config.loader`,
+- **HLS.js** loads keys through a separate `KeyLoader` built on `config.loader`,
   so they never reach the segment hook at all.
 - **Shaka** routes every type through one scheme plugin, so the whitelist is
   what keeps licences out.

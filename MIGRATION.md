@@ -64,7 +64,7 @@ loads through `FetchLoader`, plays through the player without P2P.
 
 ### New package: `p2p-media-loader-videojs`
 
-video.js gets an adapter too. `new VideoJsP2PEngine({ core })` plus
+Video.js gets an adapter too. `new VideoJsP2PEngine({ core })` plus
 `engine.bindPlayer(player)` attaches one engine to one player, through the
 request and response hooks VHS gives that player; bind it before the player
 loads a source. `VideoJsP2PEngine.registerPlugins(videojs)` is optional and

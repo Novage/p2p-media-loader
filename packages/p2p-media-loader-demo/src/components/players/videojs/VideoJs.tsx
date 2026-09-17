@@ -30,7 +30,7 @@ export const VideoJs = ({
   useEffect(() => {
     if (!containerRef.current || !qualityRef.current) return;
 
-    // video.js replaces the element it is given, so it gets one of its own.
+    // Video.js replaces the element it is given, so it gets one of its own.
     const videoElement = document.createElement("video");
     videoElement.className = "video-js vjs-default-skin";
     videoElement.style.width = "100%";
@@ -48,7 +48,7 @@ export const VideoJs = ({
           // otherwise; there is nothing to route through the core natively.
           overrideNative: true,
           // VHS alone caps the rendition by the size the player is rendered
-          // at, so in a small window it picks a lower one than hls.js,
+          // at, so in a small window it picks a lower one than HLS.js,
           // dash.js and Shaka do and shares with none of them: a rendition is
           // a swarm. Every engine in this demo chooses on bandwidth alone.
           limitRenditionByPlayerDimensions: false,

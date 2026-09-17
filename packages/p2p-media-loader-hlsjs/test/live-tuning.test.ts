@@ -4,8 +4,8 @@ import { HlsJsP2PEngine } from "../src/engine.js";
 import { injectMixin } from "../src/engine-static.js";
 
 /**
- * A stand-in for the hls.js instance: enough surface for the engine to bind
- * its event handlers and tune live sync, mirroring how hls.js's own
+ * A stand-in for the HLS.js instance: enough surface for the engine to bind
+ * its event handlers and tune live sync, mirroring how HLS.js's own
  * `targetLatency` setter writes `config.liveSyncDuration`.
  */
 function createFakeHls() {
@@ -63,7 +63,7 @@ function setup() {
   const engine = new HlsJsP2PEngine();
   const hls = createFakeHls();
   engine.bindHls(hls);
-  // The playlist loader's construction is where the engine attaches to hls.js.
+  // The playlist loader's construction is where the engine attaches to HLS.js.
   const { pLoader } = engine.getConfigForHlsJs() as {
     pLoader: new (config: HlsConfig) => unknown;
   };
@@ -78,7 +78,7 @@ function setup() {
   return { engine, hls };
 }
 
-describe("hls.js live window placement", () => {
+describe("HLS.js live window placement", () => {
   it("places the player one segment inside the tail, re-syncing two segments beyond", () => {
     const { hls } = setup();
     // A 28 s window of 2 s segments: target 26, re-sync past 30.
@@ -116,7 +116,7 @@ describe("hls.js live window placement", () => {
     expect(hls.config.liveSyncDuration).toBe(26);
   });
 
-  it("sets each value once and leaves hls.js alone while the window only jitters", () => {
+  it("sets each value once and leaves HLS.js alone while the window only jitters", () => {
     const { hls } = setup();
     // Real playlists report 28.03, 27.97, 28.05… as segments of unequal
     // length slide through the window. None of that is a change of window.
@@ -188,7 +188,7 @@ describe("hls.js live window placement", () => {
 
   it("respects a buffer length of zero, which is a setting and not an absence", () => {
     const { hls } = setup();
-    // Zero leaves hls.js to size the buffer from `maxBufferSize` alone.
+    // Zero leaves HLS.js to size the buffer from `maxBufferSize` alone.
     hls.userConfig.maxBufferLength = 0;
     hls.config.maxBufferLength = 0;
     levelUpdated(hls, {
@@ -201,7 +201,7 @@ describe("hls.js live window placement", () => {
   });
 });
 
-describe("hls.js construction through the mixin", () => {
+describe("HLS.js construction through the mixin", () => {
   class FakeHlsClass {
     static received: Record<string, unknown> | undefined;
     constructor(config: Record<string, unknown>) {

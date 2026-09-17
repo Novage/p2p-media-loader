@@ -488,7 +488,7 @@ describe("the page-wide hooks for a source's first manifest", () => {
     expect(original._responseCallbackSet?.size ?? 0).toBe(0);
   });
 
-  it("reports that it could not install on a video.js without hooks", () => {
+  it("reports that it could not install on a Video.js without hooks", () => {
     const { videojs, hooks } = setup();
     videojs.Vhs.xhr = (() => undefined) as unknown as typeof videojs.Vhs.xhr;
     expect(hooks.retain(videojs)).toBe(false);

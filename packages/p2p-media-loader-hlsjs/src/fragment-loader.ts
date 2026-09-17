@@ -36,7 +36,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       loading: { start: 0, first: 0, end: 0 },
       buffering: { start: 0, first: 0, end: 0 },
       parsing: { start: 0, end: 0 },
-      // set total and loaded to 1 to prevent hls.js
+      // set total and loaded to 1 to prevent HLS.js
       // on progress loading monitoring in AbrController
       total: 1,
       loaded: 1,
@@ -55,13 +55,13 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     this.#callbacks = callbacks;
     const { stats } = this;
 
-    // hls.js carries a half-open [rangeStart, rangeEnd); the core keys
+    // HLS.js carries a half-open [rangeStart, rangeEnd); the core keys
     // segments by the inclusive range the playlist declared.
     const byteRange = inclusiveByteRange(context.rangeStart, context.rangeEnd);
     this.#request = { url: context.url, byteRange };
 
     // Whitelist by lookup: a fragment the core's registry does not know, or
-    // one whose stream has P2P disabled, loads through hls.js's own loader.
+    // one whose stream has P2P disabled, loads through HLS.js's own loader.
     if (!this.#core.isSegmentLoadable(context.url, byteRange)) {
       this.#defaultLoader = this.#createDefaultLoader();
       this.#defaultLoader.stats = this.stats;
@@ -71,7 +71,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
 
     const onSuccess = (response: SegmentResponse) => {
       // `abort` reports the fragment as aborted and leaves the callbacks in
-      // place for hls.js to tear down, so a response that arrives after it —
+      // place for HLS.js to tear down, so a response that arrives after it —
       // the core cannot always cancel in time — is delivered to nobody.
       if (!this.#callbacks || stats.aborted) return;
 
@@ -85,7 +85,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       stats.total = loadedBytes;
       stats.loaded = loadedBytes;
 
-      // hls.js transfers this buffer to its transmuxing worker, which detaches
+      // HLS.js transfers this buffer to its transmuxing worker, which detaches
       // it. That is safe: what the core hands over is already the engine's own
       // copy, and what it seeds to peers is a buffer no consumer ever sees.
       const engineData = this.#response.data;
@@ -122,7 +122,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       thrownError.type === "failed"
     ) {
       // A core failure carries no HTTP status of its own: every source it
-      // tried failed, and hls.js reads the text.
+      // tried failed, and HLS.js reads the text.
       error.text = thrownError.message;
     } else if (thrownError instanceof Error) {
       error.text = thrownError.message;

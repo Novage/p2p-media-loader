@@ -62,7 +62,7 @@ export class FirstManifestHooks {
   /**
    * Installs the hooks, once, for as long as an engine is bound.
    *
-   * @returns `false` when this video.js has no hook registry to install them
+   * @returns `false` when this Video.js has no hook registry to install them
    * on, and the engine has to read the manifest itself instead.
    */
   retain(videojs: VideoJsLike): boolean {
@@ -107,7 +107,7 @@ export class FirstManifestHooks {
 /**
  * One player's requests: a pair of VHS hooks on that player's own xhr
  * function, and the decisions they make. See specs/player-adapters.md,
- * "video.js".
+ * "Video.js".
  *
  * The request hook hands VHS a request object of its own for every segment
  * the core can serve; the response hook reads the bytes of every playlist,
@@ -166,7 +166,7 @@ export class RequestRouter {
    *
    * Reading it here is the fallback for the two cases the page-wide hooks
    * cannot cover: an engine bound to a player that already loaded a source,
-   * and a video.js with no hook registry to install them on. It costs a
+   * and a Video.js with no hook registry to install them on. It costs a
    * second fetch of that manifest, and on a CDN that signs its media playlist
    * URLs per response — Amazon IVS does — the second response names playlists
    * the player will never ask for, leaving the core unable to recognize the

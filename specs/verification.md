@@ -19,7 +19,7 @@ are run against this matrix in the demo before they are considered done.
 | DASH     | live | `SegmentTemplate` `$Number$`      | `https://livesim2.dashif.org/livesim2/testpic_2s/Manifest.mpd`                                                         | `type="dynamic"`, MPD refresh, availability window                                                                                                                                                                    |
 | DASH     | live | `SegmentTimeline`                 | `https://livesim2.dashif.org/livesim2/segtimeline_1/testpic_2s/Manifest.mpd`                                           | explicit `S` timeline, `$Time$` addressing                                                                                                                                                                            |
 
-video.js plays every stream in the table except the two `SegmentBase` ones,
+Video.js plays every stream in the table except the two `SegmentBase` ones,
 neither of which VHS plays with P2P or without it. On the Netflix stream VHS
 lays the subsegments out through `mpd-parser`, which anchors them on the end of
 the index range rather than on the `sidx` box (see
@@ -28,14 +28,14 @@ far, and fails with `MEDIA_ERR_DECODE`. On `angel-one` VHS fetches the indexes
 and then abandons every rendition in turn, the audio track first. The registry,
 which anchors correctly, does not know the ranges VHS asks for, so those
 requests pass through untouched — the right outcome for a player asking for
-bytes that are not segments. Check both against plain video.js before reading
+bytes that are not segments. Check both against plain Video.js before reading
 anything into them.
 
 Not in the table on purpose: `dash264/TestCases/2a/qualcomm/1/MultiResMPEG2.mpd` is a `SegmentBase` stream whose media Chrome refuses to append (Shaka error 3014), on Shaka's own demo page as much as here. It is not a P2P problem; do not use it to judge one.
 
-Every stream is played on every engine that supports its protocol: hls.js for
-HLS; dash.js for DASH; Shaka Player and video.js for both. video.js 10 hosts
-the hls.js and dash.js engines rather than bringing one of its own, and is
+Every stream is played on every engine that supports its protocol: HLS.js for
+HLS; dash.js for DASH; Shaka Player and Video.js for both. Video.js 10 hosts
+the HLS.js and dash.js engines rather than bringing one of its own, and is
 played through both.
 
 Also not a P2P problem, and Firefox only: Vidstack calls its dash.js provider

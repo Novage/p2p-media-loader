@@ -47,7 +47,7 @@ translate timelines, or tell core which variant is active.
 
 **Identity must be identical across players.** `externalId` is on the wire. Two
 peers only exchange a segment if they agree on its identity, so a browser peer
-on hls.js, a browser peer on Shaka, and a mobile peer behind the proxy must all
+on HLS.js, a browser peer on Shaka, and a mobile peer behind the proxy must all
 derive it the same way. One parser, running everywhere, guarantees that by
 construction. Per-player derivation cannot.
 
@@ -87,7 +87,7 @@ failure mode of a parse disagreement is _no P2P_, never _wrong bytes_.
 **Core owns the bytes it seeds.** What is stored is what peers are served, so
 nothing a player can reach may alias it: the segment handed to an adapter is a
 copy, made in the one place bytes leave core. Players transfer the buffer they
-are given to a transmuxing worker — hls.js and video.js's VHS both do — and a
+are given to a transmuxing worker — HLS.js and Video.js's VHS both do — and a
 transfer detaches the buffer it came from, leaving `byteLength` 0. Were that
 the stored buffer, the peer would go on announcing the segment and uploading
 nothing, while its own player was served nothing on any later request: a stream

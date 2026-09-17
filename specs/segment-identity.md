@@ -145,7 +145,7 @@ A `SegmentBase` representation lists no segments: its subsegments come from the
 of the period, by accumulated subsegment duration**. The box's
 `earliest_presentation_time` and the MPD's `@presentationTimeOffset` are read
 past, not applied. `mpd-parser` lays the same subsegments out the same way,
-which is what video.js plays them from; Shaka and dash.js apply both values.
+which is what Video.js plays them from; Shaka and dash.js apply both values.
 That divergence is harmless, because an `externalId` is exchanged between peers
 and never shown to a player.
 

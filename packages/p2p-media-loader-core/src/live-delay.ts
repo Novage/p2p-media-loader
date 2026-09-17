@@ -1,7 +1,7 @@
 import type { ProcessedManifest } from "./types.js";
 
 /**
- * Where the player sits in a live window. Mirrors the hls.js adapter: as deep
+ * Where the player sits in a live window. Mirrors the HLS.js adapter: as deep
  * as the window allows, one segment inside the tail, never more than a
  * minute behind the edge. Its own out-of-window handling covers a playhead
  * that drifts past the tail.
@@ -35,7 +35,7 @@ export type LiveDelay = {
  * the length of a segment in it: as deep as the window allows, one segment
  * inside the tail, never more than a minute behind, and never less than a
  * segment. Adapters that read the window from their player rather than from a
- * processed manifest — hls.js reports it on every level update — size the
+ * processed manifest — HLS.js reports it on every level update — size the
  * placement with this directly.
  */
 export function liveDelayFromWindow(window: number, segment: number): number {

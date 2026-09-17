@@ -24,7 +24,7 @@ export class EngineRequest {
    *
    * What the core keeps in storage is what it seeds to peers, and players
    * transfer the buffer they are given to a transmuxing worker, which detaches
-   * it: `byteLength` becomes 0 and the bytes are gone. hls.js and video.js's
+   * it: `byteLength` becomes 0 and the bytes are gone. HLS.js and Video.js's
    * VHS both do it. A detached buffer in storage is uploaded to peers as an
    * empty segment and served to the player itself as one, so the stream keeps
    * playing while the swarm quietly circulates nothing.
