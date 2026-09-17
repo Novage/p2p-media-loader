@@ -6,6 +6,7 @@ import {
   P2PMLShakaData,
 } from "./types.js";
 import { Loader } from "./loading-handler.js";
+import { defaultPluginFor } from "./default-plugin.js";
 import { hlsManifestParser } from "p2p-media-loader-core/hls";
 import { dashManifestParser } from "p2p-media-loader-core/dash";
 import {
@@ -342,9 +343,9 @@ export class ShakaP2PEngine {
       const request = args[1] as HookedRequest;
       const { p2pml } = request;
       if (!p2pml) {
-        return shaka.net.HttpFetchPlugin.parse(
-          ...args,
-        ) as shaka.extern.IAbortableOperation<shaka.extern.Response>;
+        // A player with no engine bound, on a scheme this registration took
+        // over from Shaka: load it the way Shaka would have.
+        return defaultPluginFor(shaka, args[0]).parse(...args);
       }
 
       const loader = new Loader(

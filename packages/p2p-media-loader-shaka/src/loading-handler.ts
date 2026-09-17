@@ -1,5 +1,6 @@
 import type shaka from "shaka-player/dist/shaka-player.compiled.d.ts";
 import { Shaka } from "./types.js";
+import { defaultPluginFor } from "./default-plugin.js";
 import {
   Core,
   CoreRequestError,
@@ -21,31 +22,18 @@ type LoadingHandlerResult = shaka.extern.IAbortableOperation<Response>;
 export class Loader {
   private loadArgs!: LoadingHandlerParams;
 
-  /**
-   * Shaka's own http(s) plugin for this browser: fetch where `fetch` and
-   * `AbortController` both exist, XHR otherwise. Old Smart TV browsers have
-   * fetch without AbortController; forcing the fetch plugin there throws
-   * inside Shaka on the first request, before anything plays.
-   */
-  private readonly defaultPlugin: {
-    parse: shaka.extern.SchemePlugin;
-  };
-
   constructor(
     private readonly shaka: Shaka,
     private readonly core: Core,
     private readonly onManifestProcessed?: (
       manifest: ProcessedManifest,
     ) => void,
-  ) {
-    const { HttpFetchPlugin, HttpXHRPlugin } = shaka.net;
-    this.defaultPlugin = HttpFetchPlugin.isSupported()
-      ? HttpFetchPlugin
-      : HttpXHRPlugin;
-  }
+  ) {}
 
+  /** Whatever Shaka would have loaded this request with. */
   private defaultLoad() {
-    return this.defaultPlugin.parse(...this.loadArgs);
+    const [uri] = this.loadArgs;
+    return defaultPluginFor(this.shaka, uri).parse(...this.loadArgs);
   }
 
   load(...args: LoadingHandlerParams): LoadingHandlerResult {

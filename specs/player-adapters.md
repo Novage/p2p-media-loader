@@ -162,13 +162,19 @@ after which every variant comparison is false and the player lurches between
 renditions. A decoder that cannot switch mid-stream then fails with a decode
 error, which is how the defect surfaced on a Smart TV.
 
-Whatever the plugin does not serve itself goes to the http plugin Shaka would
-have chosen for this browser: `HttpFetchPlugin` where
+Whatever the plugin does not serve itself goes to the plugin Shaka would have
+chosen for that request: `HttpFetchPlugin` where
 `HttpFetchPlugin.isSupported()` — `fetch` and `AbortController` both present —
-and `HttpXHRPlugin` otherwise. Old Smart TV browsers have `fetch` without
-`AbortController`; forcing the fetch plugin there throws inside Shaka on the
-first request, before anything plays, and the IIFE bundle exists for exactly
-those browsers.
+`HttpXHRPlugin` otherwise, and `DataUriPlugin` for a data URI, which no HTTP
+plugin is meant to open and an XHR cannot. Old Smart TV browsers have `fetch`
+without `AbortController`; forcing the fetch plugin there throws inside Shaka
+on the first request, before anything plays, and the IIFE bundle exists for
+exactly those browsers.
+
+The choice is made in one place for both paths that need it: a request of a
+type the adapter passes through, and a request of a player with no engine
+bound, which reaches the adapter because registering a scheme without a
+priority outranks every registration Shaka makes for it.
 
 No manifest-parser decoration and no `segmentIndex` hooking. Shaka's internal
 representation of the stream is not consulted.

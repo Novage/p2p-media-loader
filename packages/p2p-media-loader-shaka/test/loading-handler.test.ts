@@ -44,11 +44,16 @@ function setup(loadable = true, fetchSupported = true) {
     promise: Promise.resolve(manifestResponse),
     abort: () => Promise.resolve(),
   }));
+  const dataParse = vi.fn(() => ({
+    promise: Promise.resolve(manifestResponse),
+    abort: () => Promise.resolve(),
+  }));
   const shaka = {
     net: {
       NetworkingEngine: { RequestType },
       HttpFetchPlugin: { parse, isSupported: () => fetchSupported },
       HttpXHRPlugin: { parse: xhrParse },
+      DataUriPlugin: { parse: dataParse },
     },
     util: { AbortableOperation: FakeAbortableOperation, Error: FakeShakaError },
   } as unknown as Shaka;
@@ -74,6 +79,7 @@ function setup(loadable = true, fetchSupported = true) {
     core,
     parse,
     xhrParse,
+    dataParse,
     manifestResponse,
     data,
     processed,
@@ -218,6 +224,27 @@ describe("Shaka loading handler", () => {
     expect(xhrParse).toHaveBeenCalledTimes(1);
     expect(parse).not.toHaveBeenCalled();
     expect(core.processManifest).toHaveBeenCalledTimes(1);
+  });
+
+  it("decodes a data URI with the plugin Shaka uses for one", async () => {
+    // Shaka registers `data:` to a plugin that decodes it with no network
+    // stack. The adapter's own registration takes that scheme over, so it
+    // makes the same choice — and an XHR cannot open a data URI at all.
+    for (const fetchSupported of [true, false]) {
+      const { loader, parse, xhrParse, dataParse, core } = setup(
+        true,
+        fetchSupported,
+      );
+      await loader.load(
+        "data:application/dash+xml;base64,PE1QRC8+",
+        request(),
+        RequestType.MANIFEST,
+      ).promise;
+      expect(dataParse).toHaveBeenCalledTimes(1);
+      expect(parse).not.toHaveBeenCalled();
+      expect(xhrParse).not.toHaveBeenCalled();
+      expect(core.processManifest).toHaveBeenCalledTimes(1);
+    }
   });
 
   it("passes licence and key requests through without consulting the core", () => {
