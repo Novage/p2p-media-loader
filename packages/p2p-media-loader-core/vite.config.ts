@@ -6,8 +6,8 @@ type Variant = "all" | "hls" | "dash";
 
 /**
  * One self-contained bundle per parser combination, for consumers who resolve
- * no exports map. The unprefixed name carries both parsers, keeping the
- * `p2pml:core-as-bundle` export condition meaningful. See specs/packaging.md.
+ * no exports map: a page's import map, or a bundler aliased at the bundle.
+ * The unprefixed name carries both parsers. See specs/packaging.md.
  */
 const getESMConfig = ({
   minify,

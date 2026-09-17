@@ -43,7 +43,6 @@
     "exports": {
       ".": {
         "types": "./lib/index.d.ts",
-        "p2pml:core-as-bundle": "./dist/p2p-media-loader-core.es.js",
         "import": "./lib/index.js"
       },
       "./hls": {

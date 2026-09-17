@@ -112,9 +112,15 @@ inside `mpd-parser`, not in this code; such an integrator playing DASH should
 alias `@xmldom/xmldom` to a module exporting the platform `DOMParser`, exactly
 as the shim in `src/manifest/shims/` does, or carry the 25 KB.
 
-The unprefixed name is the batteries-included build. It keeps the
-`p2pml:core-as-bundle` export condition — which points at
-`dist/p2p-media-loader-core.es.js` — meaningful for existing consumers.
+The unprefixed name is the batteries-included build, for a page whose import
+map names one file for every specifier.
+
+**The exports map names `lib/` and nothing else.** A consumer who wants a
+bundle points every specifier at it, through an import map or a bundler alias,
+by the same rule the tables below follow: the core and the parser subpaths
+must resolve to one file, or a page gets two copies of every parser,
+`@xmldom/xmldom` back in a browser build, and parsers from a different module
+instance than the core they are passed to.
 
 Because `src/index.ts` carries no parser, each bundle has its own entry module
 that composes core with the parsers for that combination. Unminified variants
