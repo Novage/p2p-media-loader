@@ -35,7 +35,6 @@ export type ParsedSegment = {
   readonly programDateTime?: number;
   /** DASH presentation time in seconds; stable across refreshes. */
   readonly presentationTime?: number;
-  readonly discontinuity?: boolean;
 };
 
 export type ParsedInitSegment = {

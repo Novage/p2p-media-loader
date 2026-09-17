@@ -121,7 +121,8 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       thrownError instanceof CoreRequestError &&
       thrownError.type === "failed"
     ) {
-      // error.code = thrownError.code;
+      // A core failure carries no HTTP status of its own: every source it
+      // tried failed, and hls.js reads the text.
       error.text = thrownError.message;
     } else if (thrownError instanceof Error) {
       error.text = thrownError.message;

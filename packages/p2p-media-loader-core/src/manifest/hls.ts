@@ -115,7 +115,6 @@ function mediaStream(manifest: M3u8Manifest, url: string): ParsedStream {
       duration: s.duration,
       sequence: mediaSequence + index,
       programDateTime: s.programDateTime,
-      discontinuity: s.discontinuity,
     }),
   );
 

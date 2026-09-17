@@ -178,7 +178,6 @@ describe("hlsManifestParser: media playlist", () => {
         duration: 6,
         sequence: 0,
         programDateTime: undefined,
-        discontinuity: undefined,
       },
       {
         url: "https://cdn.example/vod/720p/media.mp4",
@@ -186,7 +185,6 @@ describe("hlsManifestParser: media playlist", () => {
         duration: 6,
         sequence: 1,
         programDateTime: undefined,
-        discontinuity: undefined,
       },
       {
         url: "https://cdn.example/vod/720p/media.mp4",
@@ -194,7 +192,6 @@ describe("hlsManifestParser: media playlist", () => {
         duration: 4,
         sequence: 2,
         programDateTime: undefined,
-        discontinuity: true,
       },
     ]);
   });

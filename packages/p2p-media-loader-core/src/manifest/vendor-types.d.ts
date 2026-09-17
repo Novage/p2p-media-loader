@@ -18,15 +18,12 @@ declare module "m3u8-parser" {
     byterange?: M3u8ByteRange;
     /** Milliseconds since the epoch; present or extrapolated when any PDT tag exists. */
     programDateTime?: number;
-    discontinuity?: boolean;
     timeline: number;
     map?: { uri: string; byterange?: M3u8ByteRange };
-    parts?: unknown[];
   };
 
   export type M3u8PlaylistAttributes = {
     BANDWIDTH?: number;
-    "AVERAGE-BANDWIDTH"?: string | number;
     CODECS?: string;
     RESOLUTION?: { width: number; height: number };
     "FRAME-RATE"?: number;
@@ -43,10 +40,8 @@ declare module "m3u8-parser" {
 
   export type M3u8MediaGroupItem = {
     default: boolean;
-    autoselect: boolean;
     language?: string;
     uri?: string;
-    characteristics?: string;
   };
 
   export type M3u8Manifest = {
@@ -54,13 +49,10 @@ declare module "m3u8-parser" {
     mediaGroups?: {
       AUDIO?: Record<string, Record<string, M3u8MediaGroupItem>>;
     };
-    iFramePlaylists?: unknown[];
     segments?: M3u8Segment[];
     mediaSequence?: number;
-    targetDuration?: number;
     endList?: boolean;
     playlistType?: "VOD" | "EVENT";
-    preloadSegment?: unknown;
   };
 
   export class Parser {
@@ -113,14 +105,12 @@ declare module "mpd-parser" {
     sidx?: MpdSidx;
     endList?: boolean;
     mediaSequence?: number;
-    targetDuration?: number;
     timeline: number;
   };
 
   export type MpdMediaGroupItem = {
     language?: string;
     default: boolean;
-    autoselect: boolean;
     playlists: MpdPlaylist[];
   };
 

@@ -1,10 +1,5 @@
 import type shaka from "shaka-player/dist/shaka-player.compiled.d.ts";
-import {
-  Shaka,
-  HookedNetworkingEngine,
-  HookedRequest,
-  P2PMLShakaData,
-} from "./types.js";
+import { Shaka, HookedRequest, P2PMLShakaData } from "./types.js";
 import { Loader } from "./loading-handler.js";
 import { defaultPluginFor } from "./default-plugin.js";
 import { hlsManifestParser } from "p2p-media-loader-core/hls";
@@ -232,12 +227,10 @@ export class ShakaP2PEngine {
     const { player } = this;
     if (!player) return;
 
-    const networkingEngine: HookedNetworkingEngine | null =
-      player.getNetworkingEngine();
+    const networkingEngine = player.getNetworkingEngine();
     if (networkingEngine) {
       if (type === "register") {
         const p2pml: P2PMLShakaData = {
-          player,
           shaka: this.shaka,
           core: this.core,
           onManifestProcessed: this.applyLiveDelay,
@@ -245,10 +238,8 @@ export class ShakaP2PEngine {
         this.requestFilter = (requestType, request) => {
           (request as HookedRequest).p2pml = p2pml;
         };
-        networkingEngine.p2pml = p2pml;
         networkingEngine.registerRequestFilter(this.requestFilter);
       } else {
-        networkingEngine.p2pml = undefined;
         if (this.requestFilter) {
           networkingEngine.unregisterRequestFilter(this.requestFilter);
         }
