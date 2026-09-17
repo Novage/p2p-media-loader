@@ -27,6 +27,25 @@ normalization applied to segment registry keys, deliberately so; see
 [manifest-registry.md](manifest-registry.md#why-swarm-id-is-normalized-differently).
 A `streamSwarmIdBuilder` may override the composition.
 
+**A configured `swarmId` is the integration's own identifier for the content** —
+the key it already has for it, a database row id, an asset id — not another
+URL. It only has to be stable and unique in that system: every viewer of that
+content must resolve to the same value, and no other content may use it. That
+is what makes it worth configuring, since an identifier from the system that
+publishes the stream survives what a URL does not — a CDN migration, a
+per-viewer edge host, a signed path, a re-published manifest.
+
+It names a set of streams, not a rendition. Every viewer under one `swarmId`
+must be playing the same content, so an integration that configures one has to
+hand the core the manifest that declares the whole set — the master or the MPD.
+Two viewers given one `swarmId` and a different media playlist each, with no
+master between them, register a stream the manifest identified nothing about
+(see [manifest-registry.md](manifest-registry.md)); alone in its core each such
+stream is shareable, and the two would then be one swarm exchanging segments of
+different renditions by number.
+
+The value is read once, when a stream is registered, and never re-read.
+
 Because core parses the manifest itself, the properties feeding `identityHash`
 are read from the manifest rather than from a player's representation of it.
 Every peer hashes the same input, so nothing is normalized: a codec string, a

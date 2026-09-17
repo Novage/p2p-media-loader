@@ -484,6 +484,12 @@ export type StreamConfig = {
    * differs between viewers of the same content, for example a redirect to a
    * per-viewer edge host or a token in the path (see specs/segment-identity.md).
    *
+   * The natural value is the identifier the surrounding system already has for
+   * the content — a database row key, an asset id — rather than another URL:
+   * it only has to be the same for every viewer of that content and unique to
+   * it. It names the whole set of streams the manifest declares, so a
+   * deployment that configures one should hand the core the master or the MPD.
+   *
    * This property cannot be changed at runtime: stream identity is derived
    * from it once, when a stream is registered.
    *
