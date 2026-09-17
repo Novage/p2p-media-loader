@@ -65,7 +65,9 @@ export const HlsjsVidstack = ({
     // flushes the buffer and resumes at the live edge, which leaves no window
     // ahead of the playhead for peers to fill.
     if (playerRef.current) playerRef.current.qualities.switch = "next";
-  });
+    // Once: the player keeps one quality list for its lifetime, and a new
+    // source empties that list without touching this setting.
+  }, []);
 
   return (
     <div className="video-container">
