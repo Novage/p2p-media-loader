@@ -444,7 +444,7 @@ export class HybridLoader {
 
     // A queue pass runs on every playlist refresh, so the owner of a segment
     // that just appeared fetches it now rather than on the next timer tick.
-    if (!isInitialHttpWait) this.prefetchThroughHttp();
+    if (!isInitialHttpWait) this.prefetchThroughHttp(queue);
   }
 
   // api method for engines
@@ -483,7 +483,16 @@ export class HybridLoader {
    * the fetch landing inside the player's high-demand window — judged from
    * the time left until then and the fetch time this peer expects.
    */
-  private prefetchThroughHttp() {
+  /**
+   * Fetches the segments this peer owns, before they reach high demand.
+   *
+   * @param queue - The queue of the pass this runs at the end of. Generating
+   * one walks the stream's segments from the first to the one last requested,
+   * which is the length of the stream on a long VOD, so a pass generates one
+   * queue and uses it twice. The prefetch timer has no pass behind it and
+   * passes nothing.
+   */
+  private prefetchThroughHttp(queue?: readonly QueueItem[]) {
     const { httpDownloadInitialTimeoutMs } = this.config;
     const isInitialHttpWait =
       httpDownloadInitialTimeoutMs > 0 &&
@@ -503,16 +512,21 @@ export class HybridLoader {
     const p2pLoader = this.p2pLoaders.currentLoader;
     if (!p2pLoader.connectedPeerCount) return;
 
-    this.syncPlayback();
+    // The pass has already done this for the queue it handed over.
+    if (!queue) this.syncPlayback();
     const peerIds = Array.from(p2pLoader.connectedPeerIds);
 
-    for (const { segment, statuses } of QueueUtils.generateQueue(
-      this.lastRequestedSegment,
-      this.playback,
-      this.config,
-      p2pLoader,
-      availableStorageCapacityPercent,
-    )) {
+    const items =
+      queue ??
+      QueueUtils.generateQueue(
+        this.lastRequestedSegment,
+        this.playback,
+        this.config,
+        p2pLoader,
+        availableStorageCapacityPercent,
+      );
+
+    for (const { segment, statuses } of items) {
       if (this.requests.executingHttpCount >= simultaneousHttpDownloads) break;
       if (
         !statuses.isHttpDownloadable ||

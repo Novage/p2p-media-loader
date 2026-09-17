@@ -84,6 +84,21 @@ const fakes = vi.hoisted(() => {
   return { state, FakeP2PLoadersContainer, FakeHttpRequestExecutor };
 });
 
+// Counts how many times a pass walks the stream to build a queue: the walk
+// starts at the first segment and runs to the one last requested, so on a
+// long VOD it is the length of the stream.
+const queueGenerations = vi.hoisted(() => ({ count: 0 }));
+vi.mock("../src/utils/queue.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/utils/queue.js")>();
+  return {
+    ...actual,
+    generateQueue: (...args: Parameters<typeof actual.generateQueue>) => {
+      queueGenerations.count++;
+      return actual.generateQueue(...args);
+    },
+  };
+});
+
 vi.mock("../src/p2p/loaders-container.js", () => ({
   P2PLoadersContainer: fakes.FakeP2PLoadersContainer,
 }));
@@ -342,6 +357,46 @@ describe("HybridLoader: a stored segment that reads back empty", () => {
 
     expect(callbacks.onError).toHaveBeenCalledTimes(1);
     expect(callbacks.onSuccess).not.toHaveBeenCalled();
+    loader.destroy();
+  });
+
+  it("builds one queue per pass, and prefetches from it", async () => {
+    const { loader, segment, callbacks, state } = setup({
+      httpDownloadInitialTimeoutMs: 0,
+    });
+    // A peer is connected, so the pass ends by prefetching what this peer owns.
+    state.peerCount = 3;
+    queueGenerations.count = 0;
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+
+    expect(queueGenerations.count).toBe(1);
+    expect(state.httpStarted.length).toBeGreaterThan(0);
+    loader.destroy();
+  });
+
+  it("does not fetch over HTTP what the same pass just asked a peer for", async () => {
+    // The queue the pass hands to the prefetch carries statuses from the
+    // moment it was built, and the pass starts downloads after that. What
+    // moves is whether a segment is being loaded by someone; what covers it
+    // is that the prefetch reads the request state live, not from the queue.
+    const { loader, segment, callbacks, state } = setup({
+      httpDownloadInitialTimeoutMs: 0,
+      simultaneousP2PDownloads: 3,
+    });
+    state.peerCount = 3;
+    // Peers have the segments just ahead of the playhead.
+    for (let i = 1; i <= 3; i++) state.loadedBySomeone.add(`seg-${i}`);
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+
+    const both = state.p2pStarted.filter((id) =>
+      state.httpStarted.includes(id),
+    );
+    expect(state.p2pStarted.length).toBeGreaterThan(0);
+    expect(both).toEqual([]);
     loader.destroy();
   });
 
