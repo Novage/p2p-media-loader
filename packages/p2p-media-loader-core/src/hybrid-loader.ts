@@ -67,8 +67,6 @@ export class HybridLoader {
     this.requests = new RequestsContainer(
       this.requestProcessQueueMicrotask,
       this.bandwidthCalculators,
-      this.playback,
-      this.config,
       this.eventTarget,
     );
 

@@ -6,7 +6,6 @@ import { EventTarget } from "../src/utils/event-target.js";
 import { Core } from "../src/core.js";
 import type { CoreEventMap, StreamConfig } from "../src/types.js";
 import type {
-  Playback,
   SegmentWithStream,
   StreamWithSegments,
 } from "../src/internal-types.js";
@@ -29,21 +28,12 @@ const segment = {
   stream,
 } as SegmentWithStream;
 
-const playback: Playback = {
-  bufferEdge: 0,
-  bufferAhead: 0,
-  rate: 1,
-  source: "reported",
-};
-
 function execute(body: BodyInit | null, status = 200) {
   const eventTarget = new EventTarget<CoreEventMap>();
   const request = new SegmentRequest(
     segment,
     () => undefined,
     { all: new BandwidthCalculator(), http: new BandwidthCalculator() },
-    playback,
-    Core.DEFAULT_STREAM_CONFIG,
     eventTarget,
     "infohash",
   );

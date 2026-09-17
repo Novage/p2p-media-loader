@@ -22,16 +22,6 @@ type Playback = {
   rate: number;
 };
 
-type LastRequestedSegmentInfo = {
-  streamSwarmId: string;
-  segmentId: number;
-  startTime: number;
-  endTime: number;
-  swarmId: string;
-  streamType: StreamType;
-  isLiveStream: boolean;
-};
-
 const BYTES_PER_MiB = 1048576;
 
 export class SegmentMemoryStorage implements SegmentStorage {
@@ -45,7 +35,13 @@ export class SegmentMemoryStorage implements SegmentStorage {
   private mainStreamConfig?: StreamConfig;
   private secondaryStreamConfig?: StreamConfig;
   private currentPlayback?: Playback;
-  private lastRequestedSegment?: LastRequestedSegmentInfo;
+  /**
+   * Whether the stream the player last asked a segment of is live, which is
+   * what tells the retention rule to keep a trailing window. Undefined until
+   * the first request, when there is no playhead to measure anything against
+   * either.
+   */
+  private lastRequestedIsLive?: boolean;
   private segmentChangeCallback?: (streamSwarmId: string) => void;
 
   constructor() {
@@ -72,23 +68,15 @@ export class SegmentMemoryStorage implements SegmentStorage {
   }
 
   onSegmentRequested(
-    swarmId: string,
-    streamSwarmId: string,
-    segmentId: number,
-    startTime: number,
-    endTime: number,
-    streamType: StreamType,
+    _swarmId: string,
+    _streamSwarmId: string,
+    _segmentId: number,
+    _startTime: number,
+    _endTime: number,
+    _streamType: StreamType,
     isLiveStream: boolean,
   ): void {
-    this.lastRequestedSegment = {
-      streamSwarmId,
-      segmentId,
-      startTime,
-      endTime,
-      swarmId,
-      streamType,
-      isLiveStream,
-    };
+    this.lastRequestedIsLive = isLiveStream;
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
@@ -144,14 +132,14 @@ export class SegmentMemoryStorage implements SegmentStorage {
   }
 
   getUsage() {
-    if (!this.lastRequestedSegment || !this.currentPlayback) {
+    if (this.lastRequestedIsLive === undefined || !this.currentPlayback) {
       return {
         totalCapacity: this.segmentMemoryStorageLimit,
         usedCapacity: this.currentStorageUsage,
       };
     }
     const playbackPosition = this.currentPlayback.position;
-    const { isLiveStream } = this.lastRequestedSegment;
+    const isLiveStream = this.lastRequestedIsLive;
 
     let calculatedUsedCapacity = 0;
     for (const segmentData of this.cache.values()) {

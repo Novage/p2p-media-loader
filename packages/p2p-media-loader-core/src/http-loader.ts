@@ -146,8 +146,6 @@ export class HttpRequestExecutor {
 
       this.handleResponseHeaders(response);
 
-      requestControls.firstBytesReceived();
-
       if (!response.body || typeof response.body.getReader !== "function") {
         // Fallback for older browsers (e.g. Chrome < 43) that do not support ReadableStream
         // or response.body.getReader. Reads the entire segment into an ArrayBuffer instead.

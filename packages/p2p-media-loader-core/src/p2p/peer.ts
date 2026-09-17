@@ -151,7 +151,7 @@ export class Peer {
           if (!this.#downloadingContext) break;
           if (this.#downloadingContext.isSegmentDataCommandReceived) break;
 
-          const { request, controls, requestId } = this.#downloadingContext;
+          const { request, requestId } = this.#downloadingContext;
           if (
             request.segment.externalId !== command.i ||
             requestId !== command.r
@@ -173,7 +173,6 @@ export class Peer {
           }
 
           this.#downloadingContext.isSegmentDataCommandReceived = true;
-          controls.firstBytesReceived();
 
           if (request.totalBytes === undefined) {
             request.setTotalBytes(request.loadedBytes + command.s);

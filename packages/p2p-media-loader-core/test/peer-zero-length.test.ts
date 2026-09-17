@@ -7,7 +7,6 @@ import { Core } from "../src/core.js";
 import * as Command from "../src/p2p/commands/index.js";
 import type { CoreEventMap } from "../src/types.js";
 import type {
-  Playback,
   SegmentWithStream,
   StreamWithSegments,
 } from "../src/internal-types.js";
@@ -91,8 +90,6 @@ function setup() {
     segment,
     () => undefined,
     { all: new BandwidthCalculator(), http: new BandwidthCalculator() },
-    { bufferEdge: 0, bufferAhead: 0, rate: 1, source: "reported" } as Playback,
-    Core.DEFAULT_STREAM_CONFIG,
     eventTarget,
     "infohash",
   );
