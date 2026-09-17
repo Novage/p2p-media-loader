@@ -339,9 +339,10 @@ export class HlsJsP2PEngine {
     ) {
       if (data.details.live) this.updateLiveSync(data.details);
 
+      const { userConfig } = this.currentHlsInstance;
       if (
-        !this.currentHlsInstance.userConfig.maxBufferLength &&
-        !this.currentHlsInstance.userConfig.maxMaxBufferLength
+        userConfig.maxBufferLength === undefined &&
+        userConfig.maxMaxBufferLength === undefined
       ) {
         this.updateMaxBufferLength(data.details.targetduration);
       }

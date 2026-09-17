@@ -185,6 +185,20 @@ describe("hls.js live window placement", () => {
     });
     expect(hls.config.maxBufferLength).toBe(60);
   });
+
+  it("respects a buffer length of zero, which is a setting and not an absence", () => {
+    const { hls } = setup();
+    // Zero leaves hls.js to size the buffer from `maxBufferSize` alone.
+    hls.userConfig.maxBufferLength = 0;
+    hls.config.maxBufferLength = 0;
+    levelUpdated(hls, {
+      live: true,
+      totalduration: 28,
+      averagetargetduration: 2,
+    });
+    expect(hls.config.maxBufferLength).toBe(0);
+    expect(hls.config.maxMaxBufferLength).toBe(600);
+  });
 });
 
 describe("hls.js construction through the mixin", () => {
