@@ -149,7 +149,8 @@ declare module "mpd-parser" {
    * The DOM step of `parse`, exported by mpd-parser for custom pipelines.
    * Throws on malformed XML.
    */
-  export function stringToMpdXml(manifestString: string): Document;
+  /** The `MPD` element itself, not the document around it. */
+  export function stringToMpdXml(manifestString: string): Element;
 }
 
 declare module "@videojs/vhs-utils/es/codecs.js" {

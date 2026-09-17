@@ -101,6 +101,17 @@ describe("dashManifestParser", () => {
     ]);
   });
 
+  it("reads live off the MPD however far into the document its tag sits", () => {
+    // A comment header, a long list of namespaces, a profile URN: the
+    // opening tag is not guaranteed to be near the start of the file.
+    const padded = DASH_SEGMENT_TIMELINE_DYNAMIC.replace(
+      "<MPD ",
+      `<!--${"x".repeat(5000)}-->\n<MPD `,
+    );
+    const [video] = dashManifestParser.parse(padded, URL).streams;
+    expect(video.isLive).toBe(true);
+  });
+
   it("records the initialization segment of every period it spans", () => {
     const [video] = dashManifestParser.parse(DASH_MULTI_PERIOD, URL).streams;
     expect(video.initSegments?.map((i) => i.url)).toEqual([

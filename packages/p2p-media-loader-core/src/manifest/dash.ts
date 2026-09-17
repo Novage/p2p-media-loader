@@ -32,14 +32,10 @@ export const dashManifestParser: ManifestParser = {
 
   parse(text, url) {
     const manifest = parse(text, { manifestUri: url });
-    // `type="dynamic"` is authoritative for live, and reading the attribute
-    // directly survives changes in how the tokenizer summarises it.
-    const isLive = /<MPD[^>]*\btype\s*=\s*["']dynamic["']/.test(
-      text.slice(0, 4096),
-    );
-
-    // mpd-parser drops AudioChannelConfiguration; read it from the MPD itself.
-    const channelsByRepresentation = scanAudioChannels(text);
+    // One pass over the MPD's own document for the two things the tokenizer
+    // does not report: whether the presentation is live, and the channel
+    // count of each audio Representation.
+    const { isLive, channelsByRepresentation } = readMpd(text);
 
     const streams: ParsedStream[] = [];
     for (const playlist of manifest.playlists) {
@@ -151,20 +147,34 @@ function toStream(
  * value is a plain count, is read; vendor schemes encode channel masks and are
  * left undefined rather than guessed.
  */
-function scanAudioChannels(text: string): Map<string, number> {
+function readMpd(text: string): {
+  isLive: boolean;
+  channelsByRepresentation: Map<string, number>;
+} {
   const result = new Map<string, number>();
   // mpd-parser's own DOM step, so the core has no XML dependency of its own:
   // in Node it resolves xmldom transitively, in browser bundles the alias in
   // vite.common.config.ts hands it the platform DOMParser.
-  let doc: Document;
+  // The DOM step hands back the `MPD` element, not the document around it.
+  let mpd: Element;
   try {
-    doc = stringToMpdXml(text);
+    mpd = stringToMpdXml(text);
   } catch {
-    return result;
+    // Nothing to read the attribute off; the whole text is searched for it
+    // rather than assuming the presentation is static.
+    return {
+      isLive: /<MPD[^>]*\btype\s*=\s*["']dynamic["']/.test(text),
+      channelsByRepresentation: result,
+    };
   }
 
+  // `type="dynamic"` is authoritative for live. Read off the element itself,
+  // so neither the length of its opening tag nor a change in how the
+  // tokenizer summarises the document can hide it.
+  const isLive = mpd.getAttribute("type") === "dynamic";
+
   // Array.from: DOM collections are not iterable under the ES2015 lib target.
-  for (const set of Array.from(doc.getElementsByTagName("AdaptationSet"))) {
+  for (const set of Array.from(mpd.getElementsByTagName("AdaptationSet"))) {
     const setChannels = channelCountOf(set);
     for (const representation of Array.from(
       set.getElementsByTagName("Representation"),
@@ -174,7 +184,7 @@ function scanAudioChannels(text: string): Map<string, number> {
       if (id && channels !== undefined) result.set(id, channels);
     }
   }
-  return result;
+  return { isLive, channelsByRepresentation: result };
 }
 
 const MPEG_CHANNEL_SCHEME = "23003:3:audio_channel_configuration";
