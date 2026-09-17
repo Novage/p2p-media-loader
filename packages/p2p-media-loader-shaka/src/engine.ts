@@ -87,6 +87,8 @@ export class ShakaP2PEngine {
   private requestFilter?: shaka.extern.RequestFilter;
   /** False when the integrator configured a presentation delay themselves. */
   private managesPresentationDelay = false;
+  /** The presentation delay this engine applied, if any; see `applyLiveDelay`. */
+  private appliedPresentationDelay?: number;
   private readonly debug = debug("p2pml-shaka:engine");
   // See HybridLoader.oracleLogger: logs media.currentTime beside the core's
   // estimate so the two can be compared while the playback contract beds in.
@@ -122,6 +124,7 @@ export class ShakaP2PEngine {
     if (this.player) this.destroy();
 
     this.player = player;
+    this.appliedPresentationDelay = undefined;
     this.managesPresentationDelay =
       player.getConfiguration().manifest.defaultPresentationDelay ===
       SHAKA_DEFAULT_PRESENTATION_DELAY;
@@ -271,12 +274,21 @@ export class ShakaP2PEngine {
     const target = liveDelayFor(manifest);
     if (!target) return;
 
-    const current =
-      this.player.getConfiguration().manifest.defaultPresentationDelay;
-    if (Math.abs(current - target.delay) < target.segment / 2) return;
+    // Against the delay this applied, never against the one the player holds:
+    // until a window is known that is INITIAL_LIVE_EDGE_DELAY, and a first
+    // window whose delay lands within half a segment of it would read as
+    // already applied.
+    if (
+      this.appliedPresentationDelay !== undefined &&
+      Math.abs(this.appliedPresentationDelay - target.delay) <
+        target.segment / 2
+    ) {
+      return;
+    }
 
     this.debug(`Setting defaultPresentationDelay to ${target.delay}`);
     this.player.configure("manifest.defaultPresentationDelay", target.delay);
+    this.appliedPresentationDelay = target.delay;
   };
 
   private handlePlayerLoaded = () => {
@@ -308,6 +320,7 @@ export class ShakaP2PEngine {
     this.updatePlayerEventHandlers("unregister");
     this.updateMediaElementEventHandlers("unregister");
     this.player = undefined;
+    this.appliedPresentationDelay = undefined;
   }
 
   private static registerNetworkingEngineSchemes(shaka: Shaka) {
