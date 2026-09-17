@@ -39,9 +39,9 @@ export type PartialShakaP2PEngineConfig = {
 };
 
 /**
- * Presentation delay until the first live manifest says how wide the window
- * is; from then on the delay follows the window (see the core's liveDelayFor). Only
- * applied when the integrator left Shaka's own default in place.
+ * Presentation delay until a live manifest says how wide the window is, at
+ * which point the delay is sized from it (see the core's `liveDelayFor`).
+ * Only applied when the integrator left Shaka's own default in place.
  */
 const INITIAL_LIVE_EDGE_DELAY = 25;
 /** Shaka's default: "derive from the manifest", which places the player near the edge. */
@@ -270,9 +270,16 @@ export class ShakaP2PEngine {
   /**
    * Sizes the presentation delay from the window the core just parsed. The
    * manifest reaches the core before Shaka's parser sees the same bytes, so
-   * the value is in place when Shaka builds its timeline. Re-applied only
-   * when the window changes by at least half a segment; fractional drift in
-   * the window length is not a change.
+   * the value is in place when Shaka builds its timeline — which is the one
+   * moment it is read. A refresh reuses that timeline, so what is configured
+   * here after the first manifest of a presentation is what the next load
+   * starts from, not a change to the one playing. (The exception is a
+   * low-latency DASH stream: Shaka re-applies the delay on every parse there,
+   * unless the MPD suggests one of its own.)
+   *
+   * Configured anyway on every manifest, and only when the window has changed
+   * by at least half a segment: fractional drift in the window length is not
+   * a change worth carrying into the next load.
    */
   private applyLiveDelay = (manifest: ProcessedManifest) => {
     if (!this.player || !this.managesPresentationDelay) return;

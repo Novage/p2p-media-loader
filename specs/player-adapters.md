@@ -181,11 +181,22 @@ delay when it builds its timeline, so the value must be known before Shaka
 parses the manifest: `processManifest` returns what the core read from it, the
 adapter derives the delay from the widest live main stream, and it is
 configured in the same continuation that handed the manifest to the core, ahead
-of Shaka's own parser. It is re-applied only when the window changes by half a
-segment or more. Shaka's buffering goal then leaves the rest of the window
-ahead of the buffer for peers, and Shaka's own out-of-window handling — a seek
-to the window start plus its safe seek offset — covers a playhead that drifts
-past the tail, so no re-sync setting is needed. The MPD's suggested delay is
+of Shaka's own parser.
+
+**Building the timeline is the only moment it is read.** A manifest refresh
+reuses the timeline it already has, so what the adapter configures after the
+first manifest of a presentation is what the next load starts from rather than
+a change to the one playing. It is written on every manifest all the same, and
+only when the window has moved by half a segment or more, since fractional
+drift in the window length is not worth carrying forward. The exception is a
+low-latency DASH stream, where Shaka applies the configured delay on every
+parse unless the MPD suggests one of its own. A window that changes mid-stream
+therefore does not move a playing viewer.
+
+Shaka's buffering goal leaves the rest of the window ahead of the buffer for
+peers, and its own out-of-window handling — a seek to the window start plus its
+safe seek offset — covers a playhead that drifts past the tail, so no re-sync
+setting is needed. The MPD's suggested delay is
 ignored for the same reason hls.js's hold-back is overridden: a server's
 suggestion places the player near the edge, where there is nothing to share.
 
