@@ -30,9 +30,6 @@
         // Applied through the shared eslint.common.react.config.ts at the root.
         "eslint-plugin-react-hooks",
         "eslint-plugin-react-refresh",
-        // Backs the `react-dom` peer dependency; no source file imports it.
-        "react-dom",
-        "@types/react-dom",
       ],
     },
     "demo": {
