@@ -223,7 +223,8 @@ export class DashJsP2PEngine {
    * parsed: how far behind the edge it plays, and how far ahead of the
    * playhead it may fetch. The MPD reaches the core before dash.js parses the
    * same bytes, so both are in place when dash.js computes its live position.
-   * Re-applied only when the window changes by at least half a segment.
+   * Re-applied when the window moves by at least half a segment, or when
+   * anything else it writes would change.
    */
   private applyLivePlacement = (manifest: ProcessedManifest) => {
     if (!this.player || !this.managesLiveDelay) return;
@@ -238,20 +239,25 @@ export class DashJsP2PEngine {
       return;
     }
 
-    // Against the delay this placed, never against the one the player holds:
-    // until a window is known that is INITIAL_LIVE_EDGE_DELAY, and a first
-    // window whose delay lands within half a segment of it would read as
-    // already placed. The delay would happen to be right and the forward
+    const buffer = this.forwardBufferSettings(target);
+
+    // Against what this engine placed, never against what the player holds:
+    // until a window is known the player holds INITIAL_LIVE_EDGE_DELAY, and a
+    // first window whose delay lands within half a segment of it would read
+    // as already placed — the delay would happen to be right and the forward
     // buffer would be left at dash.js's own minute, which is the half that
     // decides whether anything is shared at all.
-    if (
+    //
+    // Both halves are compared, because the ceiling also follows the high
+    // demand window, which the integrator may change at runtime: a steady
+    // live window would otherwise never carry that change to the player.
+    const placed =
       this.appliedLiveDelay !== undefined &&
-      Math.abs(this.appliedLiveDelay - target.delay) < target.segment / 2
-    ) {
-      return;
-    }
-
-    const buffer = this.forwardBufferSettings(target);
+      Math.abs(this.appliedLiveDelay - target.delay) < target.segment / 2 &&
+      FORWARD_BUFFER_KEYS.every(
+        (key) => this.appliedBuffer?.[key] === buffer[key],
+      );
+    if (placed) return;
     this.debug(
       `Setting liveDelay to ${target.delay}, forward buffer to ${buffer.bufferTimeDefault}`,
     );

@@ -401,6 +401,26 @@ describe("dash.js live window placement", () => {
     expect(settings.streaming.delay.useSuggestedPresentationDelay).toBe(true);
   });
 
+  it("carries a high demand window changed at runtime to the player", () => {
+    const { settings, player, deliverMpd, engine } = setup();
+    deliverMpd(mpd(7, 8));
+    expect(settings.streaming.buffer.bufferTimeDefault).toBe(16);
+    const afterFirst = player.updateSettings.mock.calls.length;
+
+    // The ceiling follows the high demand window, which is a dynamic setting,
+    // so a steady live window must not hide a change to it.
+    engine.applyDynamicConfig({
+      core: { mainStream: { highDemandTimeWindow: 40 } },
+    });
+    deliverMpd(mpd(7, 8));
+    expect(settings.streaming.buffer.bufferTimeDefault).toBe(40);
+    expect(player.updateSettings.mock.calls.length).toBe(afterFirst + 1);
+
+    // And an unchanged window with unchanged settings still writes nothing.
+    deliverMpd(mpd(7, 8));
+    expect(player.updateSettings.mock.calls.length).toBe(afterFirst + 1);
+  });
+
   it("re-applies only when the window itself changes", () => {
     const { player, settings, deliverMpd } = setup();
     deliverMpd(mpd(7, 8));
