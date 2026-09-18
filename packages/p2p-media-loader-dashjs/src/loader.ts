@@ -17,6 +17,14 @@ import {
 export type LoaderHooks = {
   /** Called with what the core read from each MPD, before dash.js parses it. */
   onManifestProcessed?: (manifest: ProcessedManifest) => void;
+  /**
+   * Whether the engine is still driving the player this was installed on.
+   * dash.js keeps an extension for the life of the player and offers no way
+   * to remove one, so an engine that has let the player go — destroyed, or
+   * bound to another player — says so here and every request passes through
+   * to dash.js's own loader. Absent means always.
+   */
+  isActive?: () => boolean;
 };
 
 const SEGMENT_TYPES: ReadonlySet<string> = new Set([
@@ -68,6 +76,14 @@ class RequestRouter {
     request: CommonMediaRequestLike,
     response: CommonMediaResponseLike,
   ): boolean {
+    // Nothing reaches the core once the engine has let this player go: the
+    // extension cannot be taken off the player, and a core the engine
+    // destroyed would otherwise be rebuilt by the next MPD refresh, resuming
+    // P2P the integrator had stopped.
+    if (this.hooks.isActive?.() === false) {
+      return this.parent.load(request, response);
+    }
+
     const type = request.customData?.request?.type ?? undefined;
     const { url } = request;
     const byteRange = byteRangeFromRangeHeader(

@@ -143,6 +143,10 @@ export class DashJsP2PEngine {
       "XHRLoader",
       createXhrLoaderExtension(this.core, {
         onManifestProcessed: this.applyLivePlacement,
+        // dash.js keeps an extension for the life of the player, so the
+        // router asks rather than being removed: this engine has let this
+        // player go once it is destroyed or bound to another one.
+        isActive: () => this.player === player,
       }),
       true,
     );

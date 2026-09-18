@@ -259,6 +259,39 @@ describe("dash.js live window placement", () => {
     expect(settings.streaming.buffer.bufferTimeDefault).toBe(16);
   });
 
+  it("stops routing through the core once the engine is destroyed", () => {
+    const { deliverMpd, engine } = setup();
+    const registered: unknown[] = [];
+    engine.addEventListener("onStreamAdded", (details) =>
+      registered.push(details),
+    );
+
+    deliverMpd(mpd(7, 8));
+    expect(registered.length).toBe(1);
+
+    // dash.js keeps the extension for the life of the player, so the router
+    // has to stand aside by itself: a core the engine destroyed would be
+    // rebuilt by the next refresh and P2P would resume after being stopped.
+    engine.destroy();
+    deliverMpd(mpd(7, 8));
+    expect(registered.length).toBe(1);
+  });
+
+  it("routes again when the same player is bound again", () => {
+    const { deliverMpd, engine, player } = setup();
+    const registered: unknown[] = [];
+    engine.addEventListener("onStreamAdded", (details) =>
+      registered.push(details),
+    );
+
+    deliverMpd(mpd(7, 8));
+    engine.destroy();
+    engine.bindPlayer(player as unknown as MediaPlayerClass);
+
+    deliverMpd(mpd(7, 8));
+    expect(registered.length).toBe(2);
+  });
+
   it("re-applies only when the window itself changes", () => {
     const { player, settings, deliverMpd } = setup();
     deliverMpd(mpd(7, 8));
