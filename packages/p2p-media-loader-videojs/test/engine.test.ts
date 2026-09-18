@@ -85,6 +85,28 @@ describe("VideoJsP2PEngine", () => {
     expect(original._requestCallbackSet?.size ?? 0).toBe(0);
     expect(original._responseCallbackSet?.size ?? 0).toBe(0);
   });
+
+  it("lets a second engine take a player over rather than run beside it", () => {
+    // Changing what an engine cannot change at runtime — a swarm ID, the
+    // trackers — means a new engine. Both bound at once would read every
+    // manifest into a core of their own, so one media element would drive two
+    // peers in one swarm.
+    const { videojs } = fakeVideoJs();
+    const { player, xhr } = fakePlayer();
+    const first = new VideoJsP2PEngine({ core: { swarmId: "a" } }, videojs);
+    const second = new VideoJsP2PEngine({ core: { swarmId: "b" } }, videojs);
+
+    first.bindPlayer(player);
+    second.bindPlayer(player);
+
+    // One set of hooks on the player, and one on the page.
+    expect(xhr._requestCallbackSet?.size).toBe(1);
+    expect(xhr._responseCallbackSet?.size).toBe(1);
+    expect(videojs.Vhs.xhr._requestCallbackSet?.size).toBe(1);
+
+    second.destroy();
+    expect(xhr._requestCallbackSet?.size ?? 0).toBe(0);
+  });
 });
 
 describe("VideoJsP2PEngine plugins", () => {

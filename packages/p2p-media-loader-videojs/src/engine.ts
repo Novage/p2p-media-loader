@@ -10,6 +10,7 @@ import {
   CoreEventMap,
   DefinedCoreConfig,
   DynamicCoreConfig,
+  debug,
   trackMediaElementPlayback,
 } from "p2p-media-loader-core";
 import { FirstManifestHooks, RequestRouter, RouterRegistry } from "./xhr.js";
@@ -45,6 +46,12 @@ const registry = new RouterRegistry();
 
 /** The hooks that hand each bound player its first manifest of a source. */
 const firstManifestHooks = new FirstManifestHooks(registry);
+
+/**
+ * The engine driving each player, so a second one bound to the same player
+ * takes it over from the first rather than running beside it.
+ */
+const bound = new WeakMap<VideoJsPlayerLike, VideoJsP2PEngine>();
 
 /**
  * Represents a Peer-to-Peer (P2P) engine designed to enhance media streaming efficiency.
@@ -96,6 +103,7 @@ export class VideoJsP2PEngine {
   );
   private readonly core: Core;
   private readonly videojs: VideoJsLike;
+  private readonly debug = debug("p2pml-videojs:engine");
 
   /**
    * Constructs an instance of `VideoJsP2PEngine`.
@@ -174,6 +182,18 @@ export class VideoJsP2PEngine {
   bindPlayer(player: VideoJsPlayerLike) {
     if (this.player === player) return;
     if (this.player) this.destroy();
+
+    // One engine per player. Both would hook the same requests and read every
+    // manifest into a core of their own, so one media element would drive two
+    // peers in one swarm — each fetching and announcing what the other has.
+    // Changing what an engine cannot change at runtime, a swarm ID or the
+    // trackers, means a new engine, and this is what that costs the old one.
+    const previous = bound.get(player);
+    if (previous) {
+      previous.debug("another engine has taken this player on");
+      previous.destroy();
+    }
+    bound.set(player, this);
 
     this.player = player;
     this.router = new RequestRouter(this.core, player, this.videojs);
@@ -269,6 +289,8 @@ export class VideoJsP2PEngine {
     if (this.player) {
       this.player.off("loadstart", this.handleLoadStart);
       this.player.off("dispose", this.handleDispose);
+      // Only if it is still ours: another engine may have taken it on since.
+      if (bound.get(this.player) === this) bound.delete(this.player);
     }
     this.player = undefined;
   }
