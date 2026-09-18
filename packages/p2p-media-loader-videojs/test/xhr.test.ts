@@ -426,6 +426,51 @@ describe("a player's own VHS hooks", () => {
     expect(next.bandwidth).toBe(7_500_000);
   });
 
+  it("leaves a bandwidth VHS cannot use alone, so it measures again", async () => {
+    // VHS's own estimate goes to `Infinity` on a segment the browser cache
+    // answers instantly, and to `NaN` from a Network Information API with no
+    // `downlink`. Handing either back would pin it there for the session,
+    // since VHS keeps a bandwidth the request already carries.
+    const { router, core, request, setVhsBandwidth } = setup({
+      loadable: true,
+    });
+    router.attachHooks();
+    core.loadSegment.mockResolvedValue({
+      data: new ArrayBuffer(1024),
+      bandwidth: 0,
+    });
+
+    setVhsBandwidth(Number.POSITIVE_INFINITY);
+    const { request: first } = request({
+      uri: SEGMENT,
+      requestType: "segment",
+    });
+    await flush();
+    expect(first.bandwidth).toBeUndefined();
+
+    setVhsBandwidth(Number.NaN);
+    const { request: second } = request({
+      uri: SEGMENT,
+      requestType: "segment",
+    });
+    await flush();
+    expect(second.bandwidth).toBeUndefined();
+  });
+
+  it("lets the core go when the player is left on no source at all", () => {
+    // `player.reset()` clears the source and disposes the handler. A context
+    // for a stream no player is on seeds it to nobody's benefit.
+    const { router, core, respond, setSrc, setHandler } = setup();
+    router.ensureTopLevelManifest();
+    respond(200, "#EXTM3U");
+    expect(core.destroy).not.toHaveBeenCalled();
+
+    setSrc("");
+    setHandler(false);
+    router.ensureTopLevelManifest();
+    expect(core.destroy).toHaveBeenCalledTimes(1);
+  });
+
   it("does not guess between two players on one source", () => {
     // VHS's page-wide hooks say nothing about which player asked, so a second
     // bound player on the same source is a second answer to one question:
@@ -905,6 +950,59 @@ describe("the page-wide hooks for a source's first manifest", () => {
     expect(core.processManifest).toHaveBeenCalledWith(
       expect.objectContaining({ data: "#EXTM3U mine" }),
     );
+  });
+
+  it("stops waiting page-wide once it has read a manifest of its own", () => {
+    // A page-wide request whose response never comes back — two bound players
+    // on one source leave `findBySrc` with no answer — would otherwise leave
+    // the URL waiting, and admit the next request another player makes for it.
+    const { router, core, hooks, videojs, request, respond } = setup();
+    hooks.retain(videojs);
+
+    const requests = videojs.Vhs.xhr._requestCallbackSet;
+    requests?.forEach((hook) =>
+      hook({ uri: MASTER, requestType: "hls-playlist" }),
+    );
+
+    // Its response never arrives. This player's own hooks read the next one.
+    request({ uri: MEDIA, requestType: "hls-playlist" });
+    respond(200, "#EXTM3U mine");
+    expect(core.processManifest).toHaveBeenCalledTimes(1);
+
+    // Another player's response for the same URL is no longer awaited.
+    const responses = videojs.Vhs.xhr._responseCallbackSet;
+    responses?.forEach((hook) =>
+      hook({ uri: MASTER, requestType: "hls-playlist" } as VhsRequest, null, {
+        statusCode: 200,
+        headers: {},
+        body: "#EXTM3U another player",
+      }),
+    );
+    expect(core.processManifest).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores a page-wide request while this player has no handler yet", () => {
+    // `player.src(X)` puts X in `currentSrc()` at once but reaches the tech a
+    // tick later. A second, unbound player already on X that asks in between
+    // is matched by `findBySrc` — and its manifest is not this one's to read.
+    const { router, core, hooks, videojs, setHandler } = setup();
+    hooks.retain(videojs);
+    setHandler(false);
+
+    const requests = videojs.Vhs.xhr._requestCallbackSet;
+    requests?.forEach((hook) =>
+      hook({ uri: MASTER, requestType: "hls-playlist" }),
+    );
+    const responses = videojs.Vhs.xhr._responseCallbackSet;
+    responses?.forEach((hook) =>
+      hook({ uri: MASTER, requestType: "hls-playlist" } as VhsRequest, null, {
+        statusCode: 200,
+        headers: {},
+        body: "#EXTM3U another player",
+      }),
+    );
+
+    expect(core.processManifest).not.toHaveBeenCalled();
   });
 
   it("ignores a request from a player with no engine", () => {

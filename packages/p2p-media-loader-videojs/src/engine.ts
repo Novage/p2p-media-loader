@@ -139,9 +139,12 @@ export class VideoJsP2PEngine {
    */
   static registerPlugins(input: VideoJsInput | undefined = window.videojs) {
     const videojs = validateVideoJs(input);
-    VideoJsP2PEngine.plugin = videojs;
-
+    // Someone else's already, if it is there: a second copy of this package
+    // on the page, or an integrator's own plugin under the same name. Taking
+    // the record for it would let `unregisterPlugins` tear down a plugin this
+    // call never registered, and leave its callers without one.
     if (!videojs.getPlugin(VideoJsP2PEngine.PLUGIN_NAME)) {
+      VideoJsP2PEngine.plugin = videojs;
       videojs.registerPlugin(
         VideoJsP2PEngine.PLUGIN_NAME,
         function p2pMediaLoader(

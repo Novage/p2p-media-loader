@@ -255,7 +255,10 @@ export class RequestRouter {
   ensureTopLevelManifest() {
     this.attachHooks();
     const src = this.player.currentSrc();
-    if (!src) return;
+    if (!src) {
+      this.leave();
+      return;
+    }
     // The player has moved to this source, so the core stops holding the one
     // before it — whatever this one is. A source VHS does not handle at all,
     // a progressive MP4 or native HLS, gets no further than here, and a peer
@@ -370,8 +373,12 @@ export class RequestRouter {
     // the same source. Its manifest is not this player's to read: on a CDN
     // that signs its media playlist URLs per response the two name different
     // playlists, and the core would hold a set this player never asks for.
+    // A player with no handler at all cannot be the one asking: VHS builds
+    // the handler and sends the source's first request from inside the same
+    // call, so this player's own request always finds one here. What it does
+    // not find yet is this router's hooks, which is what tells the two apart.
     const xhr = this.player.tech(true)?.vhs?.xhr;
-    if (xhr && this.hooked.has(xhr)) return;
+    if (!xhr || this.hooked.has(xhr)) return;
     this.pageWideRequest = uri;
     this.attachHooks();
     this.claim(uri);
@@ -389,9 +396,13 @@ export class RequestRouter {
     // this one arrives here whatever was attached since.
     if (uri !== this.pageWideRequest) return;
     this.pageWideRequest = undefined;
+    // The player may have moved on while this was in flight, as it may while
+    // the fallback fetch is: what comes back then belongs to the source left
+    // behind, not to the one the core now holds.
+    if (this.source?.src !== uri || this.released) return;
     if (error ?? !isOk(response.statusCode)) {
       // Let the next attempt at this source be read again.
-      if (this.source) this.source.claimed = false;
+      this.source.claimed = false;
       return;
     }
     this.process(() =>
@@ -455,6 +466,10 @@ export class RequestRouter {
 
     const uri = request.uri ?? "";
     if (isManifest(request.requestType)) {
+      // Reading one here settles anything still awaited page-wide: that
+      // response either arrived already or never will, and a URL left waiting
+      // would admit the next request some other player makes for it.
+      this.pageWideRequest = undefined;
       this.process(() =>
         this.core.processManifest({
           url: urlOf(request, uri),
@@ -486,8 +501,20 @@ export class RequestRouter {
    */
   private enter(src: string) {
     if (this.source?.src === src) return;
-    if (this.source) this.core.destroy();
+    this.leave();
     this.source = { src, claimed: false };
+  }
+
+  /**
+   * The player is on no source at all — `player.reset()` clears it and
+   * disposes the handler. A context for a stream no player is on is a peer
+   * announcing and seeding it for as long as the page lives, which is the
+   * same harm as holding the one before a source it did move to.
+   */
+  private leave() {
+    if (!this.source) return;
+    this.core.destroy();
+    this.source = undefined;
   }
 
   /**
@@ -632,10 +659,17 @@ class ServedRequest implements VhsRequest {
   #reportedBandwidth(bandwidth: number): number | undefined {
     if (bandwidth > 0) return Math.round(bandwidth);
     const current = this.#estimate();
-    // No handler to hold an estimate means none to corrupt either.
-    return current !== undefined && current > 0
-      ? Math.round(current)
-      : undefined;
+    // Only a real number is an estimate. VHS's own can be `Infinity` — it
+    // divides by a round trip the clock puts at zero, which a plain HTTP
+    // segment out of the browser cache does — or `NaN`, from a Network
+    // Information API with no `downlink`. Handing either back would pin it
+    // there: VHS keeps a bandwidth a request already carries, so it would
+    // never measure again, and every rendition would look affordable for the
+    // rest of the session. Left empty, VHS measures this one and moves on.
+    if (current === undefined || !Number.isFinite(current) || current <= 0) {
+      return undefined;
+    }
+    return Math.round(current);
   }
 
   /**

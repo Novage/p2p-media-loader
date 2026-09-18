@@ -174,6 +174,22 @@ describe("VideoJsP2PEngine", () => {
 });
 
 describe("VideoJsP2PEngine plugins", () => {
+  it("does not take the record for a plugin it did not register", () => {
+    // A second copy of this package on the page, or an integrator's own
+    // plugin under this name: `registerPlugins` finds one already there and
+    // registers nothing, so `unregisterPlugins` has nothing to take away.
+    const { videojs, spies, plugins } = fakeVideoJs();
+    const theirs = () => undefined;
+    plugins.set(VideoJsP2PEngine.PLUGIN_NAME, theirs);
+
+    VideoJsP2PEngine.registerPlugins(videojs);
+    expect(spies.registerPlugin).not.toHaveBeenCalled();
+
+    VideoJsP2PEngine.unregisterPlugins();
+    expect(spies.deregisterPlugin).not.toHaveBeenCalled();
+    expect(plugins.get(VideoJsP2PEngine.PLUGIN_NAME)).toBe(theirs);
+  });
+
   it("registers the plugin and removes it again, touching nothing else", () => {
     const { videojs, spies, original, plugins } = fakeVideoJs();
     VideoJsP2PEngine.registerPlugins(videojs);
