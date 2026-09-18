@@ -80,6 +80,8 @@ function createLibraryXhr(pending: Pending[]) {
       complete(error, { statusCode: 0, headers: {}, rawRequest: request });
     driven.onabort = () => (aborted = true);
 
+    // What `@videojs/xhr` writes onto the object it drives, before sending.
+    (driven as unknown as { url?: string }).url = options.uri;
     driven.open?.("GET", options.uri, true);
     for (const [name, value] of Object.entries(request.headers)) {
       if (value !== undefined) driven.setRequestHeader?.(name, value);
@@ -89,6 +91,37 @@ function createLibraryXhr(pending: Pending[]) {
     if (!options.xhr) pending.push({ request, complete });
     return request;
   });
+}
+
+/**
+ * The page-wide xhr function as VHS builds one. Its hook methods close over
+ * VHS's own namespace — `Vhs.xhr.offRequest = cb => removeOnRequestHook(Vhs.xhr, cb)`
+ * — so they act on whatever is page-wide when they are called, not on the
+ * function they were put on. A fake that closed over the function instead
+ * would hide what happens once that function is replaced.
+ */
+function pageHookRegistry(fn: VhsXhr, current: () => VhsXhr): VhsXhr {
+  const drop = (
+    key: "_requestCallbackSet" | "_responseCallbackSet",
+    cb: never,
+  ) => {
+    const xhr = current();
+    const set = xhr[key] as Set<never> | undefined;
+    if (!set) return;
+    set.delete(cb);
+    if (!set.size) delete xhr[key];
+  };
+  fn.onRequest = (cb: VhsRequestHook) => {
+    (current()._requestCallbackSet ??= new Set()).add(cb);
+  };
+  fn.offRequest = (cb: VhsRequestHook) =>
+    drop("_requestCallbackSet", cb as never);
+  fn.onResponse = (cb: VhsResponseHook) => {
+    (current()._responseCallbackSet ??= new Set()).add(cb);
+  };
+  fn.offResponse = (cb: VhsResponseHook) =>
+    drop("_responseCallbackSet", cb as never);
+  return fn;
 }
 
 function hookRegistry(fn: VhsXhr): VhsXhr {
@@ -150,16 +183,18 @@ function createPlayerXhr(videojs: VideoJsLike): VhsXhr {
 function setup(options: { loadable?: boolean; index?: boolean } = {}) {
   const pending: Pending[] = [];
   const videojsXhr = createLibraryXhr(pending);
-  const original = hookRegistry(
-    Object.assign(vi.fn(), { original: true }) as unknown as VhsXhr,
-  );
   const videojs = {
     xhr: videojsXhr,
-    Vhs: { xhr: original },
+    Vhs: { xhr: undefined as unknown as VhsXhr },
     registerPlugin: vi.fn(),
     getPlugin: vi.fn(),
     deregisterPlugin: vi.fn(),
   } as unknown as VideoJsLike;
+  const original = pageHookRegistry(
+    Object.assign(vi.fn(), { original: true }) as unknown as VhsXhr,
+    () => videojs.Vhs.xhr,
+  );
+  videojs.Vhs.xhr = original;
 
   /** Completes the oldest request `videojs.xhr` made itself. */
   const respond = (status: number, data: unknown, responseURL?: string) => {
@@ -180,10 +215,25 @@ function setup(options: { loadable?: boolean; index?: boolean } = {}) {
   let src = MASTER;
   let playerXhr = createPlayerXhr(videojs);
   let withCredentials = false;
+  let bandwidth: number | undefined = 4_194_304;
+  let handler = true;
+  let handled = MASTER;
+  let held = false;
   const player = {
     tech: () => ({
       el: () => null,
-      vhs: { xhr: playerXhr, options_: { withCredentials } },
+      // VHS puts the handler on the tech when it takes a source on, and the
+      // one before it stays there until then — so the player can carry a
+      // source with no handler, or with the previous source's.
+      vhs: handler
+        ? {
+            xhr: playerXhr,
+            bandwidth,
+            source_: { src: handled },
+            playlistController_: { loadOnPlay_: held ? () => undefined : null },
+            options_: { withCredentials },
+          }
+        : undefined,
     }),
     currentSrc: () => src,
     on: vi.fn(),
@@ -215,12 +265,24 @@ function setup(options: { loadable?: boolean; index?: boolean } = {}) {
     core,
     videojs,
     videojsXhr,
+    player,
     respond,
     segmentData,
+    original,
     /** What the player is playing now, as `player.src(...)` would change it. */
     setSrc: (next: string) => (src = next),
     /** Whether VHS sends this player's playlist requests with credentials. */
     setWithCredentials: (value: boolean) => (withCredentials = value),
+    /** Whether VHS has taken the player's source on yet. */
+    setHandler: (value: boolean) => (handler = value),
+    /** The source the handler on the tech was created for. */
+    setHandled: (value: string) => (handled = value),
+    /** Whether VHS is holding the manifest request back, as `preload="none"`. */
+    setLoadHeld: (value: boolean) => (held = value),
+    /** The xhr function of the player's current VHS handler. */
+    playerHooks: () => playerXhr,
+    /** VHS's own bandwidth estimate, as its handler carries it. */
+    setVhsBandwidth: (value: number | undefined) => (bandwidth = value),
     /** A request as VHS makes it, through the player's own xhr function. */
     request: (o: VhsRequestOptions, callback = vi.fn()) => ({
       request: (
@@ -231,11 +293,13 @@ function setup(options: { loadable?: boolean; index?: boolean } = {}) {
       )(o, callback),
       callback,
     }),
-    hooks,
-    original,
     installPageHooks: () => hooks.retain(videojs),
-    setSrc: (value: string) => (src = value),
-    newHandler: () => (playerXhr = createPlayerXhr(videojs)),
+    /** VHS taking a new source on: a new handler, with a new xhr function. */
+    newHandler: (next?: string) => {
+      playerXhr = createPlayerXhr(videojs);
+      if (next !== undefined) handled = next;
+      return playerXhr;
+    },
   };
 }
 
@@ -258,13 +322,15 @@ describe("a player's own VHS hooks", () => {
   });
 
   it("drops a manifest that arrives after the player moved on", () => {
-    const { router, core, setSrc, respond } = setup();
+    const { router, core, setSrc, newHandler, respond } = setup();
     router.ensureTopLevelManifest();
 
     // The integrator loads another source while that fetch is in flight. Its
     // response would otherwise name the swarm after the source left behind,
     // and every viewer of the new one would be in a swarm of their own.
-    setSrc("https://cdn.example/hls/second.m3u8");
+    const SECOND = "https://cdn.example/hls/second.m3u8";
+    setSrc(SECOND);
+    newHandler(SECOND);
     router.ensureTopLevelManifest();
     respond(200, "#EXTM3U");
 
@@ -301,6 +367,63 @@ describe("a player's own VHS hooks", () => {
     // A source noted as read but never read blocks every later attempt.
     router.ensureTopLevelManifest();
     expect(videojsXhr).toHaveBeenCalledTimes(2);
+  });
+
+  it("serves the segment it checked, whatever a later hook does to the URI", async () => {
+    // An integrator's signing hook runs after this adapter's, and
+    // `@videojs/xhr` writes the rewritten URI onto the object it drives — so
+    // the core would be asked for a URL its registry never saw.
+    const { router, core, player, request } = setup({ loadable: true });
+    router.attachHooks();
+    // Added after this adapter's, on the same player, as an integrator's is.
+    const playerXhr = (player.tech(true) as unknown as { vhs: { xhr: VhsXhr } })
+      .vhs.xhr;
+    playerXhr.onRequest?.((options) => ({
+      ...options,
+      uri: `${options.uri}?token=signed-later`,
+    }));
+
+    request({ uri: SEGMENT, requestType: "segment" });
+    await flush();
+
+    expect(core.loadSegment).toHaveBeenCalledWith(SEGMENT, {
+      byteRange: undefined,
+    });
+  });
+
+  it("keeps VHS's own estimate when the core has measured nothing yet", async () => {
+    // The core reports 0 until it has a sample, which is every session's
+    // first segment. VHS fills an empty `bandwidth` by dividing the bytes by
+    // the time they took, and a segment out of storage takes none of it —
+    // `Infinity`, which VHS saves and reads back as room for any rendition.
+    const { router, core, request, setVhsBandwidth } = setup({
+      loadable: true,
+    });
+    router.attachHooks();
+    core.loadSegment.mockResolvedValue({
+      data: new ArrayBuffer(1024),
+      bandwidth: 0,
+    });
+    setVhsBandwidth(3_000_000);
+
+    const { request: served } = request({
+      uri: SEGMENT,
+      requestType: "segment",
+    });
+    await flush();
+    expect(served.bandwidth).toBe(3_000_000);
+
+    // Once the core has one of its own, that is what VHS is told.
+    core.loadSegment.mockResolvedValue({
+      data: new ArrayBuffer(1024),
+      bandwidth: 7_500_000.4,
+    });
+    const { request: next } = request({
+      uri: SEGMENT,
+      requestType: "segment",
+    });
+    await flush();
+    expect(next.bandwidth).toBe(7_500_000);
   });
 
   it("does not guess between two players on one source", () => {
@@ -492,8 +615,9 @@ describe("a player's own VHS hooks", () => {
     respond(200, "#EXTM3U");
     expect(core.destroy).not.toHaveBeenCalled();
 
-    setSrc("https://cdn.example/other/master.m3u8");
-    newHandler(); // a new source brings a new VHS handler
+    const OTHER = "https://cdn.example/other/master.m3u8";
+    setSrc(OTHER);
+    newHandler(OTHER); // a new source brings a new VHS handler
     router.ensureTopLevelManifest();
     expect(core.destroy).toHaveBeenCalledTimes(1);
   });
@@ -503,7 +627,7 @@ describe("the page-wide hooks for a source's first manifest", () => {
   it("reads the manifest VHS fetched itself, so nothing is fetched twice", () => {
     const { router, core, videojsXhr, request, respond, installPageHooks } =
       setup();
-    expect(installPageHooks()).toBe(true);
+    expect(installPageHooks()).toBeDefined();
 
     // VHS sends this one from inside its source handler, before the player
     // has hooks of its own, so VHS runs the page-wide ones.
@@ -521,6 +645,220 @@ describe("the page-wide hooks for a source's first manifest", () => {
     expect(videojsXhr).toHaveBeenCalledTimes(1);
   });
 
+  it("leaves the first manifest to VHS when it has not taken the source on", () => {
+    // `player.src(...)` caches the source and hands it to the tech a tick
+    // later, so an engine can bind in between: the source is there, the VHS
+    // handler is not. Fetching the manifest here would read one response
+    // while VHS reads another of the same URL — two sets of media playlists
+    // from a CDN that signs them, and neither the set the player asks for.
+    const {
+      router,
+      core,
+      videojsXhr,
+      request,
+      respond,
+      installPageHooks,
+      setHandler,
+    } = setup();
+    installPageHooks();
+    setHandler(false);
+
+    router.ensureTopLevelManifest();
+    expect(videojsXhr).not.toHaveBeenCalled();
+
+    // VHS creates the handler and asks for the manifest; the page-wide hooks
+    // read it, and it is read once.
+    setHandler(true);
+    request({ uri: MASTER, requestType: "hls-playlist" });
+    respond(200, "#EXTM3U");
+    expect(core.processManifest).toHaveBeenCalledTimes(1);
+    expect(videojsXhr).toHaveBeenCalledTimes(1);
+
+    // And binding again reads nothing more.
+    router.ensureTopLevelManifest();
+    expect(videojsXhr).toHaveBeenCalledTimes(1);
+    expect(core.processManifest).toHaveBeenCalledTimes(1);
+  });
+
+  it("waits for a manifest VHS holds back, rather than fetching one", () => {
+    // With `preload="none"` VHS creates the handler and its hooks but holds
+    // the manifest request until playback starts — long after `loadstart`,
+    // where the fallback would otherwise step in and fetch a manifest the
+    // player was told not to load, for the core to read twice.
+    const { router, core, videojsXhr, request, respond, setHandler } = setup();
+    setHandler(false);
+    router.ensureTopLevelManifest();
+
+    // VHS takes the source on and announces the hooks; no request yet.
+    setHandler(true);
+    router.expectFirstManifest();
+    expect(videojsXhr).not.toHaveBeenCalled();
+
+    // `loadstart`, still with nothing asked for.
+    router.ensureTopLevelManifest();
+    expect(videojsXhr).not.toHaveBeenCalled();
+
+    // The viewer presses play and VHS finally asks.
+    request({ uri: MASTER, requestType: "hls-playlist" });
+    respond(200, "#EXTM3U");
+    expect(core.processManifest).toHaveBeenCalledTimes(1);
+    expect(videojsXhr).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves the first manifest to VHS while the old handler is still there", () => {
+    // `player.src(B)` on a player already playing A: the new source is the
+    // player's at once, but the tech keeps A's handler until a tick later.
+    // A handler is not the handler, and reading the manifest on the strength
+    // of the wrong one costs the same second response as reading it with none.
+    const { router, core, videojsXhr, request, respond, setSrc, newHandler } =
+      setup();
+    const NEXT = "https://cdn.example/hls/next.m3u8";
+    setSrc(NEXT);
+
+    router.ensureTopLevelManifest();
+    expect(videojsXhr).not.toHaveBeenCalled();
+
+    // The tech takes the new source on and VHS asks for its manifest.
+    newHandler(NEXT);
+    router.expectFirstManifest();
+    request({ uri: NEXT, requestType: "hls-playlist" });
+    respond(200, "#EXTM3U");
+    expect(core.processManifest).toHaveBeenCalledTimes(1);
+    expect(videojsXhr).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets go of the xhr function of every source it has left behind", () => {
+    // VHS gives each source a fresh xhr function whose hook methods close
+    // over that source's handler, so one kept here keeps a disposed handler.
+    const { router, newHandler } = setup();
+    router.attachHooks();
+    const attached = router as unknown as { hooked: Set<VhsXhr> };
+    const [firstXhr] = attached.hooked;
+    expect(firstXhr._requestCallbackSet?.size).toBe(1);
+
+    const secondXhr = newHandler("https://cdn.example/hls/next.m3u8");
+    router.attachHooks();
+    expect(attached.hooked.size).toBe(1);
+    expect(attached.hooked.has(secondXhr)).toBe(true);
+    expect(firstXhr._requestCallbackSet?.size ?? 0).toBe(0);
+    expect(firstXhr._responseCallbackSet?.size ?? 0).toBe(0);
+  });
+
+  it("lets the core go when the player moves to a source VHS cannot play", () => {
+    // A progressive MP4, or native HLS on Safari, reaches no VHS handler and
+    // so no manifest hook. The core still has to stop holding the stream the
+    // player has left, or the peer announces and seeds it for as long as the
+    // page lives while the player shows something else.
+    const { router, core, videojsXhr, respond, setSrc, setHandler } = setup();
+    router.ensureTopLevelManifest();
+    respond(200, "#EXTM3U");
+    expect(core.destroy).not.toHaveBeenCalled();
+
+    setSrc("https://cdn.example/movie.mp4");
+    setHandler(false);
+    router.ensureTopLevelManifest();
+
+    expect(core.destroy).toHaveBeenCalledTimes(1);
+    // And nothing was fetched for it: there is no manifest to read.
+    expect(videojsXhr).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets the core go when VHS takes a source on, not when it asks", () => {
+    // Under `preload="none"` VHS holds the manifest request until playback
+    // starts. Waiting for it to reset the core would leave the peer on the
+    // old stream until the viewer presses play, and for ever if they do not.
+    const { router, core, videojsXhr, respond, setSrc, newHandler } = setup();
+    router.ensureTopLevelManifest();
+    respond(200, "#EXTM3U");
+    expect(core.destroy).not.toHaveBeenCalled();
+
+    const NEXT = "https://cdn.example/hls/next.m3u8";
+    setSrc(NEXT);
+    newHandler(NEXT);
+    router.expectFirstManifest();
+
+    expect(core.destroy).toHaveBeenCalledTimes(1);
+    // Still nothing fetched: the request VHS holds back is VHS's to make.
+    expect(videojsXhr).toHaveBeenCalledTimes(1);
+    router.ensureTopLevelManifest();
+    expect(videojsXhr).toHaveBeenCalledTimes(1);
+  });
+
+  it("pins the source the handler was built for, not the player's newest", () => {
+    // `player.src(A)` then `player.src(B)` before the tech has taken A on:
+    // VHS builds A's handler and announces its hooks while `currentSrc()`
+    // already reads B, and the request that follows is A's.
+    const { router, setSrc } = setup();
+    setSrc("https://cdn.example/hls/next.m3u8"); // the player has moved on
+    router.expectFirstManifest(); // the handler is still MASTER's
+
+    expect((router as unknown as { topLevelSrc?: string }).topLevelSrc).toBe(
+      MASTER,
+    );
+  });
+
+  it("lets go of a disposed handler's xhr when nothing replaces it", () => {
+    // `player.reset()` disposes the tech and its handler and puts no other in
+    // its place. The function left behind still holds that handler through
+    // the hook methods bound to it.
+    const { router, setHandler } = setup();
+    router.attachHooks();
+    const hooked = (router as unknown as { hooked: Set<VhsXhr> }).hooked;
+    const [xhr] = hooked;
+    expect(xhr._requestCallbackSet?.size).toBe(1);
+
+    setHandler(false);
+    router.attachHooks();
+
+    expect(hooked.size).toBe(0);
+    expect(xhr._requestCallbackSet?.size ?? 0).toBe(0);
+    expect(xhr._responseCallbackSet?.size ?? 0).toBe(0);
+  });
+
+  it("does not fetch a manifest VHS is holding for the first play", () => {
+    // Bound to a player that already has a handler for its source, which is
+    // when the fallback is right — except under `preload="none"`, where VHS
+    // has the source but has parked the request until playback starts.
+    const { router, core, videojsXhr, request, respond, setLoadHeld } = setup();
+    setLoadHeld(true);
+
+    router.ensureTopLevelManifest();
+    expect(videojsXhr).not.toHaveBeenCalled();
+    router.ensureTopLevelManifest();
+    expect(videojsXhr).not.toHaveBeenCalled();
+
+    // The viewer presses play, VHS makes the request, the hooks read it once.
+    setLoadHeld(false);
+    request({ uri: MASTER, requestType: "hls-playlist" });
+    respond(200, "#EXTM3U");
+    expect(core.processManifest).toHaveBeenCalledTimes(1);
+    expect(videojsXhr).toHaveBeenCalledTimes(1);
+  });
+
+  it("resets the core for the source that arrives, not the one announced", () => {
+    // `player.src(A)` then `player.src(B)` before the tech has taken A on:
+    // VHS builds A's handler and asks for A while the player already reads B.
+    // Reading the player there would reset the core for B before B exists and
+    // leave nothing to reset when VHS finally takes B on.
+    const A = MASTER;
+    const B = "https://cdn.example/hls/second.m3u8";
+    const { router, core, request, respond, setSrc, newHandler } = setup();
+    router.expectFirstManifest(); // A's handler announces its hooks
+    setSrc(B); // the player has moved on already
+
+    request({ uri: A, requestType: "hls-playlist" });
+    respond(200, "#EXTM3U");
+    expect(core.destroy).not.toHaveBeenCalled();
+
+    // VHS takes B on: now the context changes, once.
+    newHandler(B);
+    router.expectFirstManifest();
+    expect(core.destroy).toHaveBeenCalledTimes(1);
+    request({ uri: B, requestType: "hls-playlist" });
+    respond(200, "#EXTM3U");
+    expect(core.destroy).toHaveBeenCalledTimes(1);
+  });
+
   it("hands a top-level refresh to the core exactly once", () => {
     const { core, request, respond, installPageHooks } = setup();
     installPageHooks();
@@ -530,6 +868,41 @@ describe("the page-wide hooks for a source's first manifest", () => {
     request({ uri: MASTER, requestType: "hls-playlist" });
     respond(200, "#EXTM3U\n#EXT-X-MEDIA-SEQUENCE:2");
     expect(core.processManifest).toHaveBeenCalledTimes(2);
+  });
+
+  it("ignores a page-wide request once this player has hooks of its own", () => {
+    // VHS runs the page-wide hooks only for a player with none of its own, so
+    // a bound player on a VHS that announces its hooks never reaches them.
+    // What does reach them is a second, unbound player on the same source —
+    // whose manifest is a different response, naming different playlists on a
+    // signing CDN, and is not this player's to read.
+    const { router, core, hooks, videojs, request, respond } = setup();
+    hooks.retain(videojs);
+    router.expectFirstManifest(); // this player's own hooks go on
+
+    // The other player has none, so VHS runs the page-wide pair for it.
+    const pageRequest = videojs.Vhs.xhr._requestCallbackSet;
+    pageRequest?.forEach((hook) =>
+      hook({ uri: MASTER, requestType: "hls-playlist" }),
+    );
+    request({ uri: MASTER, requestType: "hls-playlist" });
+    const page = videojs.Vhs.xhr._responseCallbackSet;
+    page?.forEach((hook) =>
+      hook({ uri: MASTER, requestType: "hls-playlist" } as VhsRequest, null, {
+        statusCode: 200,
+        headers: {},
+        body: "#EXTM3U other player",
+      }),
+    );
+
+    expect(core.processManifest).not.toHaveBeenCalledWith(
+      expect.objectContaining({ data: "#EXTM3U other player" }),
+    );
+    // This player's own manifest still reaches the core through its own hooks.
+    respond(200, "#EXTM3U mine");
+    expect(core.processManifest).toHaveBeenCalledWith(
+      expect.objectContaining({ data: "#EXTM3U mine" }),
+    );
   });
 
   it("ignores a request from a player with no engine", () => {
@@ -555,21 +928,45 @@ describe("the page-wide hooks for a source's first manifest", () => {
 
   it("installs once for many engines and comes off with the last of them", () => {
     const { videojs, hooks, original } = setup();
-    expect(hooks.retain(videojs)).toBe(true);
-    expect(hooks.retain(videojs)).toBe(true);
+    expect(hooks.retain(videojs)).toBe(original);
+    expect(hooks.retain(videojs)).toBe(original);
     expect(original._requestCallbackSet?.size).toBe(1);
     expect(original._responseCallbackSet?.size).toBe(1);
 
-    hooks.release();
+    hooks.release(original);
     expect(original._requestCallbackSet?.size).toBe(1);
-    hooks.release();
+    hooks.release(original);
     expect(original._requestCallbackSet?.size ?? 0).toBe(0);
     expect(original._responseCallbackSet?.size ?? 0).toBe(0);
+  });
+
+  it("holds each xhr function on its own, and lets go of each", () => {
+    // `videojs.Vhs.xhr` is built once per Video.js namespace, but an
+    // integrator may replace it and a page may carry two namespaces. Counting
+    // the two together would leave the first function hooked for good.
+    const { videojs, hooks, original } = setup();
+    const replacement = pageHookRegistry(
+      Object.assign(vi.fn(), { original: false }) as unknown as VhsXhr,
+      () => videojs.Vhs.xhr,
+    );
+    expect(hooks.retain(videojs)).toBe(original);
+
+    videojs.Vhs.xhr = replacement;
+    expect(hooks.retain(videojs)).toBe(replacement);
+    expect(original._requestCallbackSet?.size).toBe(1);
+    expect(replacement._requestCallbackSet?.size).toBe(1);
+
+    // The engine that took the first one lets go of the first one.
+    hooks.release(original);
+    expect(original._requestCallbackSet?.size ?? 0).toBe(0);
+    expect(replacement._requestCallbackSet?.size).toBe(1);
+    hooks.release(replacement);
+    expect(replacement._requestCallbackSet?.size ?? 0).toBe(0);
   });
 
   it("reports that it could not install on a Video.js without hooks", () => {
     const { videojs, hooks } = setup();
     videojs.Vhs.xhr = (() => undefined) as unknown as typeof videojs.Vhs.xhr;
-    expect(hooks.retain(videojs)).toBe(false);
+    expect(hooks.retain(videojs)).toBeUndefined();
   });
 });

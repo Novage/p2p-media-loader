@@ -15,6 +15,7 @@ import {
 } from "p2p-media-loader-core";
 import { FirstManifestHooks, RequestRouter, RouterRegistry } from "./xhr.js";
 import type {
+  VhsXhr,
   VideoJsLike,
   VideoJsNamespace,
   VideoJsPlayerLike,
@@ -67,10 +68,11 @@ const bound = new WeakMap<VideoJsPlayerLike, VideoJsP2PEngine>();
  * bytes itself.
  *
  * One engine serves one player: binding it puts the engine on that player's
- * own VHS request and response hooks. The first manifest request of a source
- * is the one request those hooks cannot see, because VHS sends it from inside
- * the source handler that creates them; VHS runs its page-wide hooks for a
- * player that has none of its own, and the engine reads that manifest there.
+ * own VHS request and response hooks. VHS creates those hooks with the
+ * handler for a source and announces them with `xhr-hooks-ready` before it
+ * asks for the manifest, so the engine attaches there and sees every request
+ * of the source. A VHS too old to announce them sends its first manifest
+ * request through the page-wide hooks instead, which the engine also holds.
  *
  * `registerPlugins(videojs)` is optional, and only registers the
  * `p2pMediaLoader` Video.js plugin for integrators who prefer that style.
@@ -97,7 +99,8 @@ export class VideoJsP2PEngine {
 
   private player?: VideoJsPlayerLike;
   private router?: RequestRouter;
-  private hooksInstalled = false;
+  /** The page-wide xhr function whose hooks this engine holds, if any. */
+  private retainedXhr?: VhsXhr;
   private readonly playback = trackMediaElementPlayback((state) =>
     this.core.updatePlayback(state),
   );
@@ -198,10 +201,11 @@ export class VideoJsP2PEngine {
     this.player = player;
     this.router = new RequestRouter(this.core, player, this.videojs);
     registry.add(this.router);
-    this.hooksInstalled = firstManifestHooks.retain(this.videojs);
-    this.router.ensureTopLevelManifest();
+    this.retainedXhr = firstManifestHooks.retain(this.videojs);
+    player.on("xhr-hooks-ready", this.handleXhrHooksReady);
     player.on("loadstart", this.handleLoadStart);
     player.on("dispose", this.handleDispose);
+    this.router.ensureTopLevelManifest();
     this.registerMediaElement();
   }
 
@@ -252,6 +256,16 @@ export class VideoJsP2PEngine {
     this.core.removeEventListener(eventName, listener);
   }
 
+  /**
+   * VHS creates the player's xhr function, and fires this on the player, in
+   * the same breath as it creates the handler for a source — and before it
+   * asks for that source's manifest. Hooks put on here take every request of
+   * the source, its first one included.
+   */
+  private handleXhrHooksReady = () => {
+    this.router?.expectFirstManifest();
+  };
+
   /** A new source brings a new VHS handler, with its own xhr to hook. */
   private handleLoadStart = () => {
     this.router?.ensureTopLevelManifest();
@@ -282,11 +296,12 @@ export class VideoJsP2PEngine {
       this.router.detachHooks();
       this.router = undefined;
     }
-    if (this.hooksInstalled) {
-      firstManifestHooks.release();
-      this.hooksInstalled = false;
+    if (this.retainedXhr) {
+      firstManifestHooks.release(this.retainedXhr);
+      this.retainedXhr = undefined;
     }
     if (this.player) {
+      this.player.off("xhr-hooks-ready", this.handleXhrHooksReady);
       this.player.off("loadstart", this.handleLoadStart);
       this.player.off("dispose", this.handleDispose);
       // Only if it is still ours: another engine may have taken it on since.

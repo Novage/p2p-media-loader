@@ -339,7 +339,12 @@ request hook puts an object of the adapter's own in `options.xhr`, which
 and reading the status and response off it — so a served segment reaches VHS
 through the same path an HTTP one does. It carries a preset `bandwidth`, which
 VHS's callback wrapper keeps instead of measuring one from the wall clock,
-meaningless for a segment that came from a peer or from storage. A `sidx`
+meaningless for a segment that came from a peer or from storage. Where the core
+has no estimate to give — a session's first segment, before a single sample —
+VHS's own is handed back rather than nothing, because an empty field is what
+makes VHS measure: bytes over a delivery that took no measurable time is
+`Infinity`, which VHS saves as its estimate and reads back as room for every
+rendition there is. A `sidx`
 response goes to `processSegmentIndex`. Initialization segments, keys, content
 steering and clock sync are left alone. A core failure completes the request as
 an error, which VHS retries by its own rules. An abort — VHS's, or the timeout
@@ -349,17 +354,43 @@ requests it has aborted. VHS's own wrapper sets `aborted` on the request before
 calling `abort`, so the adapter records a cancellation of its own rather than
 reading that flag back.
 
-**The first manifest of a source reaches no hook of the player's.** VHS sends
-it from inside its source handler, which is where the player's xhr function and
-its hook registry are created, so nothing can be attached in front of it. VHS
-falls back to the page-wide hooks — `videojs.Vhs.xhr.onRequest` and
-`onResponse` — for a player that has none of its own, which is that request and
-no other, so the adapter installs a pair there as well. They match the request
-to a bound player by its `currentSrc()`, put that player's own hooks on, and
-hand the core the manifest as it passes; they are added when the first engine
-binds and removed when the last one is destroyed, and they leave every other
-player alone. `VideoJsP2PEngine.registerPlugins(videojs)` is unrelated to any
-of this: it registers the `p2pMediaLoader` Video.js plugin and nothing else.
+**The player's hooks go on when VHS says they are ready.** VHS creates a
+source's handler, its xhr function and its hook registry, fires
+`xhr-hooks-ready` on the player, and only then asks for the manifest, so an
+engine listening for that event covers every request of the source, its first
+included. This is what the event is for. The event also marks the source as
+VHS's to read, which is not the same as the request having gone out: under
+`preload="none"` VHS holds it back until playback starts, and nothing may
+fetch that manifest in the meantime.
+
+A VHS too old to fire it sends that first request through the page-wide hooks
+instead — `videojs.Vhs.xhr.onRequest` and `onResponse`, which VHS runs for a
+player that has none of its own — so the adapter installs a pair there as well.
+They match the request to a bound player by its `currentSrc()`, put that
+player's own hooks on, and hand the core the manifest as it passes; they are
+held per xhr function for as long as an engine that installed them is bound,
+and they leave every other player alone.
+
+A player that already carries this adapter's hooks is one VHS would not have
+run the page-wide pair for, so a request that reaches them from such a player's
+source came from a different player — a second, unbound one on the same URL —
+and is left alone as well. Its response is a different response, and on a CDN
+that signs its media playlist URLs it names playlists the bound player will
+never ask for. `VideoJsP2PEngine.registerPlugins(videojs)`
+is unrelated to any of this: it registers the `p2pMediaLoader` Video.js plugin
+and nothing else.
+
+**A DASH `SegmentBase` index often reaches no hook either.** Before VHS
+requests the index it probes the representation's container: an open-ended
+request over the media URL, with no byte range and no `requestType`, read as it
+arrives and aborted the moment the container can be named. When those bytes
+already cover the index's byte range, VHS takes the `sidx` from them and never
+makes the `dash-sidx` request. The probe is a request the adapter cannot
+recognise — it carries no range to match against the registry — and an aborted
+one carries no response to read. Such a stream stays registered with no segments
+of its own and its media is fetched over HTTP; a representation whose index sits
+past the probe's reach is requested separately, and that request is served as
+this section describes.
 
 **Reading the manifest the player itself fetched is not an optimization.**
 An adapter that fetches it a second time gets a second response, and a CDN that
@@ -368,11 +399,24 @@ different set of playlists in each one. The core would then hold renditions the
 player never asks for, and see the ones it does ask for as a stream of their
 own, with no identity from any master playlist: every such viewer lands in one
 swarm keyed by nothing, sharing with no player that read the manifest properly.
-The adapter falls back to fetching a manifest itself only for a player that
-already loaded a source before an engine was bound to it.
+The adapter falls back to fetching a manifest itself only for a player whose
+VHS handler already holds the source when the engine binds and has already
+asked for it, since only then is that request behind the hooks rather than
+ahead. A handler that holds the source has not necessarily asked: under
+`preload="none"` VHS parks the request until the first `play`, and a fetch
+before then would load what the player was told not to load. A player that carries a source with no
+handler for it yet — `player.src(...)` caches the source and hands it to the
+tech a tick later — is left alone: its manifest request has not gone out, and
+reading a second response of it would leave the core holding a second set of
+media playlists that the player will never ask for.
 
 A change of `currentSrc()` between manifests starts a new stream context; a
-playlist or MPD refresh does not.
+playlist or MPD refresh does not. The context ends as soon as the player
+leaves the source, at whichever comes first of VHS taking the next source on
+and the `loadstart` for it — not when the next manifest is read, which under
+`preload="none"` is not until playback starts. A source VHS does not handle at
+all, a progressive file or native HLS, ends it just the same: the core holds
+no stream the player has left, so no peer announces or seeds one.
 
 A player whose hooks are attached no longer runs the page's global VHS hooks:
 VHS consults the global callback sets only for players that have none of their

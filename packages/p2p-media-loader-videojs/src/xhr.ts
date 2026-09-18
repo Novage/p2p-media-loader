@@ -43,7 +43,8 @@ export class RouterRegistry {
    * a request came from, so two bound players on one source are two answers
    * to the same question: handing the manifest to the first would give it to
    * a player that never asked for it, and leave the other without. Neither
-   * gets it here; each reads its own on `loadstart` instead.
+   * gets it here; each reads its own on `loadstart` instead. Only a VHS that
+   * does not announce its per-player hooks gets this far at all.
    */
   findBySrc(uri: string): RequestRouter | undefined {
     let found: RequestRouter | undefined;
@@ -72,38 +73,65 @@ export class RouterRegistry {
  * set to every request.
  */
 export class FirstManifestHooks {
-  private xhr?: VhsXhr;
-  private engines = 0;
+  /**
+   * How many bound engines each xhr function's hooks are held for. Counted
+   * per function rather than once overall: `videojs.Vhs.xhr` is built once
+   * per Video.js namespace, but an integrator may replace it and a page may
+   * carry two namespaces, and hooks left on a function no engine holds any
+   * more would stay there for good.
+   */
+  private readonly held = new Map<VhsXhr, number>();
 
   constructor(private readonly registry: RouterRegistry) {}
 
   /**
    * Installs the hooks, once, for as long as an engine is bound.
    *
-   * @returns `false` when this Video.js has no hook registry to install them
-   * on, and the engine has to read the manifest itself instead.
+   * @returns the function they went on, to hand back to `release`, or
+   * `undefined` when this Video.js has no hook registry to install them on
+   * and the engine has to read the manifest itself instead.
    */
-  retain(videojs: VideoJsLike): boolean {
+  retain(videojs: VideoJsLike): VhsXhr | undefined {
     const { xhr } = videojs.Vhs;
-    if (this.xhr === xhr) {
-      this.engines += 1;
-      return true;
+    const engines = this.held.get(xhr);
+    if (engines !== undefined) {
+      this.held.set(xhr, engines + 1);
+      return xhr;
     }
-    if (!xhr.onRequest || !xhr.onResponse) return false;
+    if (!xhr.onRequest || !xhr.onResponse) return undefined;
     xhr.onRequest(this.handleRequest);
     xhr.onResponse(this.handleResponse);
-    this.xhr = xhr;
-    this.engines += 1;
-    return true;
+    this.held.set(xhr, 1);
+    return xhr;
   }
 
-  /** Takes them off again once the last engine is gone. */
-  release() {
-    if (this.engines > 0) this.engines -= 1;
-    if (this.engines > 0 || !this.xhr) return;
-    this.xhr.offRequest?.(this.handleRequest);
-    this.xhr.offResponse?.(this.handleResponse);
-    this.xhr = undefined;
+  /** Takes them off again once the last engine holding that one is gone. */
+  release(xhr: VhsXhr) {
+    const engines = this.held.get(xhr);
+    if (engines === undefined) return;
+    if (engines > 1) {
+      this.held.set(xhr, engines - 1);
+      return;
+    }
+    this.held.delete(xhr);
+    // Taken off the sets rather than through `offRequest`: VHS's page-wide
+    // hook methods close over its own namespace and resolve `Vhs.xhr` when
+    // they are called, not the function they were put on. Asking a function
+    // that is no longer the page's to drop a hook would take it off the one
+    // that replaced it — which another engine is still relying on — and leave
+    // it on this one for good. The sets are where the hooks live, and VHS
+    // reads them off the function it is handed; an empty one is dropped, as
+    // VHS's own remove helpers do.
+    const requests = xhr._requestCallbackSet;
+    if (requests) {
+      requests.delete(this.handleRequest);
+      if (!requests.size) delete xhr._requestCallbackSet;
+    }
+    const responses = xhr._responseCallbackSet;
+    if (responses) {
+      responses.delete(this.handleResponse);
+      if (!responses.size) delete xhr._responseCallbackSet;
+    }
   }
 
   private readonly handleRequest: VhsRequestHook = (options) => {
@@ -138,6 +166,8 @@ export class RequestRouter {
   private topLevelSrc?: string;
   /** Set once the engine lets this player go; nothing more reaches the core. */
   private released = false;
+  /** The page-wide request this router took on, awaiting its response. */
+  private pageWideRequest?: string;
 
   constructor(
     private readonly core: Core,
@@ -153,7 +183,25 @@ export class RequestRouter {
    */
   attachHooks(): boolean {
     const xhr = this.player.tech(true)?.vhs?.xhr;
+    // VHS builds a new xhr function for every source, and the hook methods it
+    // puts on that function close over the handler behind it. Holding one
+    // after its source is gone holds a handler VHS has disposed, with its
+    // controller and loaders, until the engine is destroyed — so let go of
+    // every function that is no longer this player's. That includes the case
+    // of no function at all, as after `player.reset()`, where the handler is
+    // disposed and nothing replaces it.
+    for (const previous of this.hooked) {
+      if (previous !== xhr) this.removeHooks(previous);
+    }
     if (!xhr || this.hooked.has(xhr)) return false;
+    // A VHS that offers neither the hook methods nor the sets behind them is
+    // one this adapter cannot reach: say so rather than appear to work, since
+    // every request would go on loading over HTTP with nothing to show why.
+    if (!xhr.onRequest && !xhr._requestCallbackSet) {
+      this.logger(
+        "this Video.js has no VHS request hooks; the player loads without P2P",
+      );
+    }
     if (xhr.onRequest) xhr.onRequest(this.handleRequest);
     else (xhr._requestCallbackSet ??= new Set()).add(this.handleRequest);
     if (xhr.onResponse) xhr.onResponse(this.handleResponse);
@@ -164,13 +212,16 @@ export class RequestRouter {
 
   detachHooks() {
     this.released = true;
-    for (const xhr of this.hooked) {
-      if (xhr.offRequest) xhr.offRequest(this.handleRequest);
-      else xhr._requestCallbackSet?.delete(this.handleRequest);
-      if (xhr.offResponse) xhr.offResponse(this.handleResponse);
-      else xhr._responseCallbackSet?.delete(this.handleResponse);
-    }
-    this.hooked.clear();
+    for (const xhr of this.hooked) this.removeHooks(xhr);
+  }
+
+  /** Takes this router's hooks off one xhr function and forgets it. */
+  private removeHooks(xhr: VhsXhr) {
+    if (xhr.offRequest) xhr.offRequest(this.handleRequest);
+    else xhr._requestCallbackSet?.delete(this.handleRequest);
+    if (xhr.offResponse) xhr.offResponse(this.handleResponse);
+    else xhr._responseCallbackSet?.delete(this.handleResponse);
+    this.hooked.delete(xhr);
   }
 
   matchesSrc(uri: string): boolean {
@@ -185,20 +236,45 @@ export class RequestRouter {
    * Attaches the hooks and makes sure the core has the top-level manifest of
    * the player's current source.
    *
-   * Reading it here is the fallback for the two cases the page-wide hooks
-   * cannot cover: an engine bound to a player that already loaded a source,
-   * and a Video.js with no hook registry to install them on. It costs a
-   * second fetch of that manifest, and on a CDN that signs its media playlist
-   * URLs per response — Amazon IVS does — the second response names playlists
-   * the player will never ask for, leaving the core unable to recognize the
-   * ones it does. Binding before the player loads a source avoids both.
+   * Reading it here is the fallback for the cases the hooks cannot cover: an
+   * engine bound to a player that already loaded a source, and a Video.js
+   * with no hook registry to install them on. It costs a second fetch of that
+   * manifest, and on a CDN that signs its media playlist URLs per response —
+   * Amazon IVS does — the second response names playlists the player will
+   * never ask for, leaving the core unable to recognize the ones it does.
    */
   ensureTopLevelManifest() {
     this.attachHooks();
     const src = this.player.currentSrc();
-    if (!src || src === this.topLevelSrc) return;
-    this.topLevelSrc = src;
+    if (!src) return;
+    // The player has moved to this source, so the core stops holding the one
+    // before it — whatever this one is. A source VHS does not handle at all,
+    // a progressive MP4 or native HLS, gets no further than here, and a peer
+    // left announcing and seeding the stream its player has left would go on
+    // doing so for as long as the page lives. Only the fetch below depends on
+    // VHS having taken the source on.
     this.noteSource(src);
+    if (src === this.topLevelSrc) return;
+    // A player can carry a source that VHS has no handler for yet, and can
+    // carry one while the handler on the tech is still the source before it:
+    // `player.src(...)` caches the new source at once and hands it to the
+    // tech a tick later, which is when the old handler goes. Either way this
+    // source's manifest request is still ahead of these hooks rather than
+    // behind them, and fetching it here would read a second response of the
+    // same manifest while the player reads the first. `xhr-hooks-ready` and
+    // `loadstart` both come back to this.
+    const handler = this.player.tech(true)?.vhs;
+    if (!handler) return;
+    const handled = handler.source_?.src;
+    if (handled !== undefined && handled !== src) return;
+    // Holding the source is not having asked for it. Under `preload="none"`
+    // VHS builds the handler and parks the manifest request until the first
+    // `play`, so fetching here would load what the player was told not to
+    // load, and the core would read the manifest a second time when the
+    // viewer finally presses play. The hooks are on; the request comes to
+    // them whenever VHS makes it.
+    if (handler.playlistController_?.loadOnPlay_) return;
+    this.topLevelSrc = src;
     this.logger("reading the manifest VHS fetched before binding: %s", src);
 
     // Carrying the request options VHS carries for the same manifest: a CDN
@@ -254,13 +330,47 @@ export class RequestRouter {
   }
 
   /**
+   * VHS has created this player's hooks for a source and has not yet asked
+   * for its manifest: it announces them for exactly this, so the request goes
+   * through them wherever it goes. Noting the source as VHS's to read keeps
+   * the fallback off it however long that takes — with `preload="none"` VHS
+   * holds the request back until playback starts, which is well after
+   * `loadstart`, and a fetch there would both read a second response of the
+   * manifest and load what the player was told not to load.
+   */
+  expectFirstManifest() {
+    this.attachHooks();
+    // The source this handler was built for, which is the one it is about to
+    // ask for — not whatever the player is carrying now, which a second
+    // `player.src(...)` may already have moved on from while this handler was
+    // still being made.
+    const handler = this.player.tech(true)?.vhs;
+    const src = handler?.source_?.src ?? this.player.currentSrc();
+    if (!src) return;
+    this.topLevelSrc = src;
+    // Claiming the source without resetting the core would leave the reset to
+    // the manifest request, which under `preload="none"` does not go out
+    // until playback starts — and never, for a viewer who never presses play.
+    this.noteSource(src);
+  }
+
+  /**
    * The player's first manifest request of a source has gone out, seen
    * through the page-wide hooks. Its own hooks take every request after it.
    */
   noteTopLevelManifestRequest(uri: string) {
+    // VHS runs the page-wide hooks only for a player that has none of its
+    // own, so once this router's are on this player's xhr function, whatever
+    // reaches them came from a different player — a second, unbound one on
+    // the same source. Its manifest is not this player's to read: on a CDN
+    // that signs its media playlist URLs per response the two name different
+    // playlists, and the core would hold a set this player never asks for.
+    const xhr = this.player.tech(true)?.vhs?.xhr;
+    if (xhr && this.hooked.has(xhr)) return;
+    this.pageWideRequest = uri;
     this.attachHooks();
     this.topLevelSrc = uri;
-    this.noteSource(this.player.currentSrc());
+    this.noteSource(uri);
   }
 
   /** That request's response, which is the manifest naming the streams. */
@@ -269,12 +379,17 @@ export class RequestRouter {
     error: Error | null | undefined,
     response: VhsResponse,
   ) {
+    const uri = request.uri ?? "";
+    // The response to the one request this router took through the page-wide
+    // hooks, and no other; VHS settles the response hooks at request time, so
+    // this one arrives here whatever was attached since.
+    if (uri !== this.pageWideRequest) return;
+    this.pageWideRequest = undefined;
     if (error ?? !isOk(response.statusCode)) {
       // Let the next attempt at this source be read again.
       this.topLevelSrc = undefined;
       return;
     }
-    const uri = request.uri ?? "";
     this.process(() =>
       this.core.processManifest({
         // A request's URI is what VHS asked for; its response URL follows
@@ -295,15 +410,36 @@ export class RequestRouter {
   private readonly handleRequest: VhsRequestHook = (options) => {
     const { uri, requestType } = options;
     if (isManifest(requestType)) {
-      if (uri === this.player.currentSrc()) this.topLevelSrc = uri;
-      this.noteSource(this.player.currentSrc());
+      // Only a request for the source the player is on says anything about
+      // which source that is. A media playlist belongs to whichever source is
+      // current, and a top-level manifest for a source the player has already
+      // left — VHS can still be asking for one while `player.src(...)` has
+      // moved on — names the source behind, not the one ahead. Noting the
+      // player's newest source here would reset the core for it before it
+      // arrives, and leave nothing to reset when it does.
+      if (uri === this.player.currentSrc()) {
+        this.topLevelSrc = uri;
+        this.noteSource(uri);
+      }
       return options;
     }
     if (requestType !== REQUEST_TYPE.SEGMENT) return options;
 
     const byteRange = byteRangeOf(options.headers);
     if (!this.core.isSegmentLoadable(uri, byteRange)) return options;
-    return { ...options, xhr: new ServedRequest(this.core, uri, byteRange) };
+    return {
+      ...options,
+      xhr: new ServedRequest(this.core, uri, byteRange, this.bandwidth),
+    };
+  };
+
+  /** What VHS makes of the network now, for a segment that did not use it. */
+  private readonly bandwidth = (): number | undefined => {
+    try {
+      return this.player.tech(true)?.vhs?.bandwidth;
+    } catch {
+      return undefined;
+    }
   };
 
   /** Reads the bytes of everything VHS fetches that the core parses. */
@@ -395,11 +531,31 @@ class ServedRequest implements VhsRequest {
    */
   private cancelled = false;
 
+  /**
+   * What this request is for, kept where nothing else can reach it.
+   * `@videojs/xhr` drives the object it is handed as an `XMLHttpRequest` and
+   * assigns `xhr.url = options.uri` on it, so a plain field of that name
+   * would be replaced at send time by whatever the last request hook made of
+   * the URI — a signed one, say — and the core would be asked for a segment
+   * its registry never saw. The segment this serves is the one the hook
+   * checked against the registry, whatever a later hook does to the request.
+   */
+  readonly #core: Core;
+  readonly #url: string;
+  readonly #byteRange: ByteRange;
+  readonly #estimate: () => number | undefined;
+
   constructor(
-    private readonly core: Core,
-    private readonly url: string,
-    private readonly byteRange: ByteRange,
-  ) {}
+    core: Core,
+    url: string,
+    byteRange: ByteRange,
+    estimate: () => number | undefined,
+  ) {
+    this.#core = core;
+    this.#url = url;
+    this.#byteRange = byteRange;
+    this.#estimate = estimate;
+  }
 
   open() {
     this.readyState = 1;
@@ -424,15 +580,15 @@ class ServedRequest implements VhsRequest {
   send() {
     if (this.sent) return;
     this.sent = true;
-    this.core
-      .loadSegment(this.url, { byteRange: this.byteRange })
+    this.#core
+      .loadSegment(this.#url, { byteRange: this.#byteRange })
       .then(({ data, bandwidth }) => {
         if (this.cancelled) return;
         this.response = data;
-        this.responseURL = this.url;
+        this.responseURL = this.#url;
         this.status = 200;
         this.readyState = 4;
-        if (bandwidth > 0) this.bandwidth = Math.round(bandwidth);
+        this.bandwidth = this.#reportedBandwidth(bandwidth);
         this.onload?.();
       })
       .catch((error: unknown) => {
@@ -447,6 +603,26 @@ class ServedRequest implements VhsRequest {
   }
 
   /**
+   * What to tell VHS the network is doing, having just told it nothing about
+   * the network. The core's figure goes through when it has one; when it has
+   * none — every session's first segment, before a single sample has been
+   * recorded — VHS's own estimate goes back unchanged. Leaving the field
+   * empty is not the same as leaving that estimate alone: VHS fills an empty
+   * one by dividing the bytes by the time they took to arrive, and a segment
+   * handed over from storage or a peer arrives in the same millisecond it was
+   * asked for, which makes that `Infinity`. VHS saves it and reads it back as
+   * room for every rendition there is.
+   */
+  #reportedBandwidth(bandwidth: number): number | undefined {
+    if (bandwidth > 0) return Math.round(bandwidth);
+    const current = this.#estimate();
+    // No handler to hold an estimate means none to corrupt either.
+    return current !== undefined && current > 0
+      ? Math.round(current)
+      : undefined;
+  }
+
+  /**
    * VHS aborts a segment when it gives up on it or tears the loader down,
    * and `@videojs/xhr` aborts one that outran its timeout. Like an aborted
    * `XMLHttpRequest`, this one then completes for nobody.
@@ -455,7 +631,7 @@ class ServedRequest implements VhsRequest {
     if (this.cancelled) return;
     this.cancelled = true;
     this.aborted = true;
-    this.core.abortSegmentLoading(this.url, this.byteRange);
+    this.#core.abortSegmentLoading(this.#url, this.#byteRange);
     this.onabort?.();
   }
 

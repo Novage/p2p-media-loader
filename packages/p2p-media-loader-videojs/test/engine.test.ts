@@ -63,6 +63,47 @@ function fakePlayer() {
   return { player: player as unknown as VideoJsPlayerLike, spies: player, xhr };
 }
 
+/**
+ * A player that has no VHS handler yet, as one has between `player.src(...)`
+ * caching a source and the tech taking it on, and that dispatches the events
+ * VHS and Video.js fire on it.
+ */
+function fakeLoadingPlayer() {
+  const xhr = vi.fn() as unknown as VhsXhr;
+  xhr.onRequest = (cb: VhsRequestHook) => {
+    (xhr._requestCallbackSet ??= new Set()).add(cb);
+  };
+  xhr.offRequest = (cb: VhsRequestHook) => xhr._requestCallbackSet?.delete(cb);
+  xhr.onResponse = (cb: VhsResponseHook) => {
+    (xhr._responseCallbackSet ??= new Set()).add(cb);
+  };
+  xhr.offResponse = (cb: VhsResponseHook) =>
+    xhr._responseCallbackSet?.delete(cb);
+
+  let vhs: { xhr: VhsXhr } | undefined;
+  const listeners = new Map<string, Set<() => void>>();
+  const player = {
+    tech: () => ({ el: () => null, vhs }),
+    currentSrc: () => "https://cdn.example/hls/master.m3u8",
+    on: (type: string, listener: () => void) => {
+      (listeners.get(type) ?? listeners.set(type, new Set()).get(type))!.add(
+        listener,
+      );
+    },
+    off: (type: string, listener: () => void) =>
+      listeners.get(type)?.delete(listener),
+  };
+  return {
+    player: player as unknown as VideoJsPlayerLike,
+    xhr,
+    /** VHS taking the source on: the handler, its xhr, then the event. */
+    handleSource: () => {
+      vhs = { xhr };
+      for (const listener of listeners.get("xhr-hooks-ready") ?? []) listener();
+    },
+  };
+}
+
 describe("VideoJsP2PEngine", () => {
   it("binds one engine to one player, and hooks the page only for first manifests", () => {
     const { videojs, spies, original } = fakeVideoJs();
@@ -84,6 +125,29 @@ describe("VideoJsP2PEngine", () => {
     expect(xhr._responseCallbackSet?.size ?? 0).toBe(0);
     expect(original._requestCallbackSet?.size ?? 0).toBe(0);
     expect(original._responseCallbackSet?.size ?? 0).toBe(0);
+  });
+
+  it("hooks the player when VHS says its hooks are ready, before it asks", () => {
+    // VHS creates the handler, its xhr function and its hooks, fires
+    // `xhr-hooks-ready`, and only then requests the source's manifest — so
+    // hooks put on there cover every request of the source, its first
+    // included, and nothing has to be fetched a second time to be read.
+    const { videojs, spies } = fakeVideoJs();
+    const { player, xhr, handleSource } = fakeLoadingPlayer();
+    const engine = new VideoJsP2PEngine({ core: { swarmId: "s" } }, videojs);
+
+    engine.bindPlayer(player);
+    // No handler to hook, and no manifest fetched behind VHS's back either.
+    expect(xhr._requestCallbackSet?.size ?? 0).toBe(0);
+    expect(spies.xhr).not.toHaveBeenCalled();
+
+    handleSource();
+    expect(xhr._requestCallbackSet?.size).toBe(1);
+    expect(xhr._responseCallbackSet?.size).toBe(1);
+    expect(spies.xhr).not.toHaveBeenCalled();
+
+    engine.destroy();
+    expect(xhr._requestCallbackSet?.size ?? 0).toBe(0);
   });
 
   it("lets a second engine take a player over rather than run beside it", () => {
@@ -136,11 +200,13 @@ describe("VideoJsP2PEngine plugins", () => {
     expect(engine).toBeInstanceOf(VideoJsP2PEngine);
     expect(engine.getConfig().core.mainStream.swarmId).toBe("s");
     expect(spies.on.mock.calls.map((c) => c[0])).toEqual([
+      "xhr-hooks-ready",
       "loadstart",
       "dispose",
     ]);
     engine.destroy();
     expect(spies.off.mock.calls.map((c) => c[0])).toEqual([
+      "xhr-hooks-ready",
       "loadstart",
       "dispose",
     ]);

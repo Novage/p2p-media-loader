@@ -102,7 +102,17 @@ export type VhsRepresentation = {
 /** The VHS handler behind a player's tech. */
 export type VhsHandlerLike = {
   xhr: VhsXhr;
+  /** The source this handler was created for, as VHS records it. */
+  source_?: { src?: string };
+  /**
+   * VHS's controller for that source. `loadOnPlay_` is the manifest request
+   * it has not made yet: under `preload="none"` VHS parks the load here and
+   * runs it on the first `play`, clearing the field as it goes.
+   */
+  playlistController_?: { loadOnPlay_?: (() => void) | null };
   representations?(): VhsRepresentation[];
+  /** VHS's own bandwidth estimate, in bits per second. */
+  bandwidth?: number;
 };
 
 export type VideoJsTechLike = {
