@@ -94,6 +94,11 @@ export class DashJsP2PEngine {
   private appliedBuffer?: ForwardBuffer;
   /** What the player held before this engine lowered it; see `restoreForwardBuffer`. */
   private heldBuffer?: Partial<ForwardBuffer>;
+  /** What the player held before this engine placed it; see `restorePlacement`. */
+  private heldDelay?: {
+    liveDelay?: number;
+    useSuggestedPresentationDelay?: boolean;
+  };
   private readonly debug = debug("p2pml-dashjs:engine");
 
   /**
@@ -132,6 +137,10 @@ export class DashJsP2PEngine {
     this.appliedLiveDelay = undefined;
     this.appliedBuffer = undefined;
     this.heldBuffer = readForwardBuffer(player);
+    this.heldDelay = {
+      liveDelay: delay?.liveDelay,
+      useSuggestedPresentationDelay: delay?.useSuggestedPresentationDelay,
+    };
     if (this.managesLiveDelay) {
       player.updateSettings({
         streaming: {
@@ -320,7 +329,7 @@ export class DashJsP2PEngine {
     this.playback.stop();
     // The next source starts from the player's own settings, and is placed on
     // its own window rather than measured against this one's.
-    this.restoreForwardBuffer();
+    this.restorePlacement();
   };
 
   /**
@@ -350,6 +359,34 @@ export class DashJsP2PEngine {
     this.player.updateSettings({ streaming: { buffer } });
   }
 
+  /**
+   * Puts back the whole placement: the delay this engine wrote as well as the
+   * buffer it lowered. `liveDelay` is read before anything else dash.js could
+   * place the player by, so a player left with one this engine chose stays
+   * where P2P wanted it — and with the manifest's own suggestion disabled —
+   * for as long as it lives, whether or not P2P is still running.
+   */
+  private restorePlacement() {
+    this.restoreForwardBuffer();
+    if (!this.player || !this.managesLiveDelay) return;
+
+    const delay: {
+      liveDelay: number;
+      useSuggestedPresentationDelay?: boolean;
+    } = {
+      // NaN is how dash.js says a delay was never configured, which is the
+      // only state this engine ever takes a player over from.
+      liveDelay: this.heldDelay?.liveDelay ?? NaN,
+    };
+    const suggested = this.heldDelay?.useSuggestedPresentationDelay;
+    if (suggested !== undefined) {
+      delay.useSuggestedPresentationDelay = suggested;
+    }
+
+    this.debug("Restoring the live delay to the player's own");
+    this.player.updateSettings({ streaming: { delay } });
+  }
+
   private registerMediaElement() {
     let media: HTMLMediaElement | undefined;
     try {
@@ -369,9 +406,10 @@ export class DashJsP2PEngine {
       this.player.off(STREAM_INITIALIZED, this.handleStreamInitialized);
       this.player.off(STREAM_TEARDOWN_COMPLETE, this.handleStreamTeardown);
     }
-    this.restoreForwardBuffer();
+    this.restorePlacement();
     this.player = undefined;
     this.heldBuffer = undefined;
+    this.heldDelay = undefined;
   }
 }
 

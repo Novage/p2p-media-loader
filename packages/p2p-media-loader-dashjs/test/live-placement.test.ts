@@ -65,7 +65,10 @@ function vodMpd() {
 
 type Settings = {
   streaming: {
-    delay: { liveDelay: number | undefined };
+    delay: {
+      liveDelay: number | undefined;
+      useSuggestedPresentationDelay?: boolean;
+    };
     buffer: Record<string, number | undefined>;
   };
 };
@@ -75,7 +78,11 @@ function setup(
   buffer: Record<string, number | undefined> = {},
 ) {
   const settings: Settings = {
-    streaming: { delay: { liveDelay }, buffer: { ...buffer } },
+    streaming: {
+      // dash.js's own defaults for the two the engine writes.
+      delay: { liveDelay, useSuggestedPresentationDelay: true },
+      buffer: { ...buffer },
+    },
   };
   const player = {
     getSettings: vi.fn(() => settings),
@@ -362,6 +369,36 @@ describe("dash.js live window placement", () => {
     deliverMpd(mpd(30, 2));
     expect(settings.streaming.buffer.bufferTimeDefault).toBe(8);
     expect(settings.streaming.buffer.bufferTimeAtTopQuality).toBe(15);
+  });
+
+  it("gives the player its own placement back, delay and all", () => {
+    const held = {
+      bufferTimeDefault: 18,
+      bufferTimeAtTopQuality: 30,
+      bufferTimeAtTopQualityLongForm: 60,
+    };
+    const { settings, deliverMpd, engine } = setup(NaN, held);
+    deliverMpd(mpd(7, 8));
+    expect(settings.streaming.delay.liveDelay).toBe(48);
+    expect(settings.streaming.delay.useSuggestedPresentationDelay).toBe(false);
+
+    // Turning P2P off leaves the player where it was found: dash.js reads
+    // liveDelay before anything else, so a delay left behind would park the
+    // player where P2P wanted it for the rest of the session.
+    engine.destroy();
+    expect(settings.streaming.delay.liveDelay).toBeNaN();
+    expect(settings.streaming.delay.useSuggestedPresentationDelay).toBe(true);
+    expect(settings.streaming.buffer).toEqual(held);
+  });
+
+  it("gives the placement back on stream teardown too", () => {
+    const { settings, deliverMpd, fire } = setup();
+    deliverMpd(mpd(7, 8));
+    expect(settings.streaming.delay.liveDelay).toBe(48);
+
+    fire("streamTeardownComplete");
+    expect(settings.streaming.delay.liveDelay).toBeNaN();
+    expect(settings.streaming.delay.useSuggestedPresentationDelay).toBe(true);
   });
 
   it("re-applies only when the window itself changes", () => {
