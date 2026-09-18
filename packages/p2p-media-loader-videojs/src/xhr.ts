@@ -162,8 +162,17 @@ export class FirstManifestHooks {
 export class RequestRouter {
   private readonly logger = debug("p2pml-videojs:loader");
   private readonly hooked = new Set<VhsXhr>();
-  private lastSrc?: string;
-  private topLevelSrc?: string;
+  /**
+   * The source the player is on, and whether its top-level manifest has been
+   * taken care of — read already, or VHS's to read through these hooks.
+   *
+   * The two belong together. Which source the player is on decides what the
+   * core holds, and what has been done about that source's manifest decides
+   * whether anything here should fetch it; asking the player, the handler and
+   * the request separately, at different moments, is how the two drift apart.
+   * `enter` and `claim` are the only ways in.
+   */
+  private source?: { readonly src: string; claimed: boolean };
   /** Set once the engine lets this player go; nothing more reaches the core. */
   private released = false;
   /** The page-wide request this router took on, awaiting its response. */
@@ -253,8 +262,8 @@ export class RequestRouter {
     // left announcing and seeding the stream its player has left would go on
     // doing so for as long as the page lives. Only the fetch below depends on
     // VHS having taken the source on.
-    this.noteSource(src);
-    if (src === this.topLevelSrc) return;
+    this.enter(src);
+    if (this.source?.claimed) return;
     // A player can carry a source that VHS has no handler for yet, and can
     // carry one while the handler on the tech is still the source before it:
     // `player.src(...)` caches the new source at once and hands it to the
@@ -274,7 +283,7 @@ export class RequestRouter {
     // viewer finally presses play. The hooks are on; the request comes to
     // them whenever VHS makes it.
     if (handler.playlistController_?.loadOnPlay_) return;
-    this.topLevelSrc = src;
+    this.claim(src);
     this.logger("reading the manifest VHS fetched before binding: %s", src);
 
     // Carrying the request options VHS carries for the same manifest: a CDN
@@ -296,14 +305,14 @@ export class RequestRouter {
           // Let a later attempt at this source read it again; the core sees
           // this source's next manifest refresh meanwhile, and a VOD stream
           // that refreshes none stays on HTTP.
-          if (this.topLevelSrc === src) this.topLevelSrc = undefined;
+          if (this.source?.src === src) this.source.claimed = false;
           this.logger("could not read %s: %O", src, error);
           return;
         }
         // The player may have moved on, or the engine let go, while this was
         // in flight: what comes back then belongs to neither, and naming the
         // swarm after it would put this player in a swarm of its own.
-        if (this.lastSrc !== src || this.released) {
+        if (this.source?.src !== src || this.released) {
           this.logger("dropping the manifest of a source left behind: %s", src);
           return;
         }
@@ -347,11 +356,7 @@ export class RequestRouter {
     const handler = this.player.tech(true)?.vhs;
     const src = handler?.source_?.src ?? this.player.currentSrc();
     if (!src) return;
-    this.topLevelSrc = src;
-    // Claiming the source without resetting the core would leave the reset to
-    // the manifest request, which under `preload="none"` does not go out
-    // until playback starts — and never, for a viewer who never presses play.
-    this.noteSource(src);
+    this.claim(src);
   }
 
   /**
@@ -369,8 +374,7 @@ export class RequestRouter {
     if (xhr && this.hooked.has(xhr)) return;
     this.pageWideRequest = uri;
     this.attachHooks();
-    this.topLevelSrc = uri;
-    this.noteSource(uri);
+    this.claim(uri);
   }
 
   /** That request's response, which is the manifest naming the streams. */
@@ -387,7 +391,7 @@ export class RequestRouter {
     this.pageWideRequest = undefined;
     if (error ?? !isOk(response.statusCode)) {
       // Let the next attempt at this source be read again.
-      this.topLevelSrc = undefined;
+      if (this.source) this.source.claimed = false;
       return;
     }
     this.process(() =>
@@ -417,10 +421,7 @@ export class RequestRouter {
       // moved on — names the source behind, not the one ahead. Noting the
       // player's newest source here would reset the core for it before it
       // arrives, and leave nothing to reset when it does.
-      if (uri === this.player.currentSrc()) {
-        this.topLevelSrc = uri;
-        this.noteSource(uri);
-      }
+      if (uri === this.player.currentSrc()) this.claim(uri);
       return options;
     }
     if (requestType !== REQUEST_TYPE.SEGMENT) return options;
@@ -477,11 +478,26 @@ export class RequestRouter {
     }
   };
 
-  /** A change of source starts a new stream context; a refresh does not. */
-  private noteSource(src: string) {
-    if (src === this.lastSrc) return;
-    if (this.lastSrc !== undefined) this.core.destroy();
-    this.lastSrc = src;
+  /**
+   * The player is on this source. Moving to one it was not on ends the core's
+   * stream context: a peer left announcing and seeding a stream its player
+   * has left would go on doing so for as long as the page lives. A refresh of
+   * the same source is not a move, and changes nothing.
+   */
+  private enter(src: string) {
+    if (this.source?.src === src) return;
+    if (this.source) this.core.destroy();
+    this.source = { src, claimed: false };
+  }
+
+  /**
+   * This source's top-level manifest is read, or is VHS's to read through
+   * these hooks — which is the same answer to the only question the fallback
+   * asks, since both mean nothing here should fetch it.
+   */
+  private claim(src: string) {
+    this.enter(src);
+    if (this.source) this.source.claimed = true;
   }
 
   /** Nothing the core does with what it is handed may break playback. */

@@ -788,13 +788,15 @@ describe("the page-wide hooks for a source's first manifest", () => {
     // `player.src(A)` then `player.src(B)` before the tech has taken A on:
     // VHS builds A's handler and announces its hooks while `currentSrc()`
     // already reads B, and the request that follows is A's.
-    const { router, setSrc } = setup();
+    const { router, core, setSrc } = setup();
     setSrc("https://cdn.example/hls/next.m3u8"); // the player has moved on
     router.expectFirstManifest(); // the handler is still MASTER's
+    expect(core.destroy).not.toHaveBeenCalled();
 
-    expect((router as unknown as { topLevelSrc?: string }).topLevelSrc).toBe(
-      MASTER,
-    );
+    // Entering the player's newer source now ends the context entered for the
+    // handler's, which is what says the handler's was the one taken on.
+    router.ensureTopLevelManifest();
+    expect(core.destroy).toHaveBeenCalledTimes(1);
   });
 
   it("lets go of a disposed handler's xhr when nothing replaces it", () => {
