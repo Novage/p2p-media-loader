@@ -160,6 +160,36 @@ describe("dash.js live window placement", () => {
     });
   });
 
+  it("gives the buffer back when the window grows", () => {
+    const { settings, deliverMpd } = setup();
+    // A stream that has just started publishing: three 2 s segments, so the
+    // player sits 4 s back and buffers the two segments that leaves room for.
+    deliverMpd(mpd(3, 2));
+    expect(settings.streaming.delay.liveDelay).toBe(4);
+    expect(settings.streaming.buffer.bufferTimeDefault).toBe(4);
+
+    // Minutes later the timeline has filled out to a full DVR window. The
+    // buffer this engine set for the short one is not a setting to keep.
+    deliverMpd(mpd(30, 2));
+    expect(settings.streaming.delay.liveDelay).toBe(58);
+    expect(settings.streaming.buffer).toEqual({
+      bufferTimeDefault: 15,
+      bufferTimeAtTopQuality: 15,
+      bufferTimeAtTopQualityLongForm: 15,
+    });
+  });
+
+  it("still holds to a buffer the integrator lowered while playing", () => {
+    const { settings, deliverMpd } = setup();
+    deliverMpd(mpd(3, 2));
+    // The integrator asks for less than the engine placed, mid-stream.
+    settings.streaming.buffer.bufferTimeDefault = 3;
+
+    deliverMpd(mpd(30, 2));
+    expect(settings.streaming.buffer.bufferTimeDefault).toBe(3);
+    expect(settings.streaming.buffer.bufferTimeAtTopQuality).toBe(15);
+  });
+
   it("re-applies only when the window itself changes", () => {
     const { player, settings, deliverMpd } = setup();
     deliverMpd(mpd(7, 8));

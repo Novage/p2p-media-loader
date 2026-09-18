@@ -44,6 +44,13 @@ const MIN_BUFFER_SEGMENTS = 2;
 /** Segments left between the player's forward buffer and the live edge. */
 const LIVE_EDGE_MARGIN_SEGMENTS = 1;
 
+/** The three dash.js settings that bound how far ahead of the playhead it fetches. */
+type ForwardBuffer = {
+  bufferTimeDefault: number;
+  bufferTimeAtTopQuality: number;
+  bufferTimeAtTopQualityLongForm: number;
+};
+
 const STREAM_INITIALIZED: MediaPlayerEvents["STREAM_INITIALIZED"] =
   "streamInitialized";
 const STREAM_TEARDOWN_COMPLETE: MediaPlayerEvents["STREAM_TEARDOWN_COMPLETE"] =
@@ -81,6 +88,8 @@ export class DashJsP2PEngine {
   private managesLiveDelay = false;
   /** The live delay this engine placed, if any; see `applyLivePlacement`. */
   private appliedLiveDelay?: number;
+  /** The forward buffer this engine placed, if any; see `forwardBufferSettings`. */
+  private appliedBuffer?: ForwardBuffer;
   private readonly debug = debug("p2pml-dashjs:engine");
 
   /**
@@ -217,6 +226,7 @@ export class DashJsP2PEngine {
       streaming: { delay: { liveDelay: target.delay }, buffer },
     });
     this.appliedLiveDelay = target.delay;
+    this.appliedBuffer = buffer;
   };
 
   /**
@@ -252,16 +262,31 @@ export class DashJsP2PEngine {
     );
 
     const current = this.player?.getSettings().streaming?.buffer;
-    const lower = (setting: number | undefined) =>
-      setting === undefined || Number.isNaN(setting) || setting > bufferTime
+    const applied = this.appliedBuffer;
+    // A setting this engine wrote is not one to hold to: reading it back as
+    // the integrator's would let the ceiling only ever fall, and a window
+    // that grows — a stream whose timeline fills out after it starts
+    // publishing — would keep the buffer it needed when it was seconds long.
+    const lower = (setting: number | undefined, ours: number | undefined) =>
+      setting === undefined ||
+      Number.isNaN(setting) ||
+      setting === ours ||
+      setting > bufferTime
         ? bufferTime
         : setting;
 
     return {
-      bufferTimeDefault: lower(current?.bufferTimeDefault),
-      bufferTimeAtTopQuality: lower(current?.bufferTimeAtTopQuality),
+      bufferTimeDefault: lower(
+        current?.bufferTimeDefault,
+        applied?.bufferTimeDefault,
+      ),
+      bufferTimeAtTopQuality: lower(
+        current?.bufferTimeAtTopQuality,
+        applied?.bufferTimeAtTopQuality,
+      ),
       bufferTimeAtTopQualityLongForm: lower(
         current?.bufferTimeAtTopQualityLongForm,
+        applied?.bufferTimeAtTopQualityLongForm,
       ),
     };
   }
@@ -296,5 +321,6 @@ export class DashJsP2PEngine {
     }
     this.player = undefined;
     this.appliedLiveDelay = undefined;
+    this.appliedBuffer = undefined;
   }
 }
