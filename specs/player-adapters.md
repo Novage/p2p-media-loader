@@ -46,7 +46,7 @@ Hook the player's segment loader. For each request:
 if (core.isSegmentLoadable(url, byteRange)) {
   // core resolves the URL against its registry and returns bytes,
   // from a peer, from its store, or over HTTP
-  const response = await core.loadSegment(url, { byteRange, signal });
+  const response = await core.loadSegment(url, { byteRange });
 } else {
   // core does not recognise this URL: use the player's own loader
 }
@@ -57,11 +57,22 @@ is what makes a disagreement between core's parse and the player's harmless.
 
 `isSegmentLoadable` is the one check to make: it answers `false` both for a URL
 the registry does not know and for a stream whose P2P is switched off, and it
-reports the former through the registry-miss diagnostic. Cancellation goes
-through the request's `signal`; an environment without `AbortController` calls
-`core.abortSegmentLoading(url, byteRange)` instead. Either way the request
-rejects as aborted, including while it is still waiting for the segment
-storage to open, where it has no loader yet to carry the cancellation.
+reports the former through the registry-miss diagnostic.
+
+**Cancellation is `core.abortSegmentLoading(url, byteRange)`**, which is what
+every adapter here calls. A player announces an abort by calling something —
+`customData.abort`, an `AbortableOperation`'s cancel, a loader's `abort()`, an
+`XMLHttpRequest`'s — never by carrying a signal the adapter could pass on, so
+an adapter that wanted one would have to manufacture it per request; and the
+IIFE builds serve browsers older than `AbortController` (Chromium gained it in
+66, the builds target 49), whose polyfill is core's own business and not
+exported. `loadSegment` also takes a `signal` for an integration that already
+has one and runs where the class exists. Either way the request rejects as
+aborted, including while it is still waiting for the segment storage to open,
+where it has no loader yet to carry the cancellation.
+
+Naming the segment is enough to name the request: a stream's loader holds one
+engine request at a time, and a new one aborts the request it replaces.
 
 **An adapter that has reported a request as aborted delivers nothing for it
 afterwards.** The core cancels what it can, but a player may abort through a
