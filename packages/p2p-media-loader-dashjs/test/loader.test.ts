@@ -258,6 +258,36 @@ describe("dash.js XHRLoader extension", () => {
     expect(response.data).toBeUndefined();
   });
 
+  it("reports an abort dash.js asked for even when the core failed instead", async () => {
+    // ABR abandons a segment while the core is losing its own race: dash.js
+    // drops onloadend when it aborts and keeps onabort, so a failure reported
+    // here would tell it nothing and the segment would wait for the next
+    // schedule tick to be asked for again.
+    const { loader, core } = setup({ loadable: true });
+    core.loadSegment.mockImplementationOnce(
+      () =>
+        new Promise((_, reject) => {
+          core.abortSegmentLoading.mockImplementationOnce(() =>
+            reject(
+              new CoreRequestError("failed", "peers and http both failed"),
+            ),
+          );
+        }),
+    );
+    const { request, response, events } = makeRequest(
+      "MediaSegment",
+      SEGMENT_URL,
+    );
+    loader.load(request, response);
+
+    request.customData?.abort?.();
+    await flush();
+
+    expect(events.abort).toBe(1);
+    expect(events.loadend).toBe(0);
+    expect(response.status).toBe(0);
+  });
+
   it("reports a core failure as a failed response so dash.js retries", async () => {
     const { loader, core } = setup({ loadable: true });
     core.loadSegment.mockRejectedValueOnce(

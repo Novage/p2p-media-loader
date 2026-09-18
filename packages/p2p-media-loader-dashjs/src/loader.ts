@@ -238,7 +238,15 @@ class RequestRouter {
       })
       .catch((error: unknown) => {
         settled = true;
-        if (error instanceof CoreRequestError && error.type === "aborted") {
+        // What dash.js abandoned is reported as the abort it asked for,
+        // whatever the core went on to say: it drops `onloadend` when it
+        // aborts and keeps `onabort`, so a failure reported here instead
+        // would tell it nothing and leave the segment waiting for the next
+        // schedule tick to be asked for again.
+        if (
+          aborted ||
+          (error instanceof CoreRequestError && error.type === "aborted")
+        ) {
           customData.onabort?.();
           return;
         }
