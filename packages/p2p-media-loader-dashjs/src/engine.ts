@@ -12,7 +12,7 @@ import {
   liveDelayFor,
   type LiveDelay,
 } from "p2p-media-loader-core";
-import { createXhrLoaderExtension } from "./loader.js";
+import { createXhrLoaderExtension, type LoaderBinding } from "./loader.js";
 
 /** A type for specifying dynamic configuration options that can be changed at runtime for the P2P engine's core. */
 export type DynamicDashJsP2PEngineConfig = {
@@ -53,6 +53,32 @@ const FORWARD_BUFFER_KEYS = [
 
 type ForwardBuffer = Record<(typeof FORWARD_BUFFER_KEYS)[number], number>;
 
+type Placement = {
+  /** False where the integrator placed the player in the live window. */
+  readonly managed: boolean;
+  /**
+   * What the player held before this engine wrote any of it, and what it is
+   * given back. The buffer part follows later writes from outside — the
+   * integrator's, and dash.js's own when a quota error makes it shrink the
+   * buffer it can afford — keeping the latest of them rather than the lowest,
+   * so the last word on a setting is the one honoured and the one restored.
+   */
+  readonly held: {
+    readonly liveDelay?: number;
+    readonly useSuggestedPresentationDelay?: boolean;
+    readonly buffer: Partial<ForwardBuffer>;
+  };
+};
+
+/**
+ * The engine driving a player's requests, by player. dash.js keeps an
+ * `XHRLoader` extension for the life of the player and ignores every later
+ * `extend` for the same name, so the extension the first engine installs must
+ * serve whichever engine is bound now — a second engine would otherwise
+ * install nothing and quietly do nothing.
+ */
+const bindings = new WeakMap<MediaPlayerClass, LoaderBinding>();
+
 const STREAM_INITIALIZED: MediaPlayerEvents["STREAM_INITIALIZED"] =
   "streamInitialized";
 const STREAM_TEARDOWN_COMPLETE: MediaPlayerEvents["STREAM_TEARDOWN_COMPLETE"] =
@@ -86,19 +112,17 @@ export class DashJsP2PEngine {
     this.core.updatePlayback(state),
   );
   private readonly core: Core;
-  /** False when the integrator placed the player in the live window themselves. */
-  private managesLiveDelay = false;
-  /** The live delay this engine placed, if any; see `applyLivePlacement`. */
+  /**
+   * What this engine found and what it decided when it took the current
+   * source over, or undefined before the first live manifest of one. Read
+   * then rather than at bind: `bindPlayer` runs before `initialize`, and the
+   * settings an integrator passes in between are theirs to keep.
+   */
+  private placement?: Placement;
+  /** The live delay this engine wrote, if any; see `applyLivePlacement`. */
   private appliedLiveDelay?: number;
-  /** The forward buffer this engine placed, if any; see `forwardBufferSettings`. */
+  /** The forward buffer this engine wrote, if any; see `forwardBufferSettings`. */
   private appliedBuffer?: ForwardBuffer;
-  /** What the player held before this engine lowered it; see `restoreForwardBuffer`. */
-  private heldBuffer?: Partial<ForwardBuffer>;
-  /** What the player held before this engine placed it; see `restorePlacement`. */
-  private heldDelay?: {
-    liveDelay?: number;
-    useSuggestedPresentationDelay?: boolean;
-  };
   private readonly debug = debug("p2pml-dashjs:engine");
 
   /**
@@ -126,43 +150,26 @@ export class DashJsP2PEngine {
     if (this.player) this.destroy();
     this.player = player;
 
-    const delay = player.getSettings().streaming?.delay;
-    // dash.js takes the placement from `liveDelay` when it has one and from
-    // `liveDelayFragmentCount` otherwise, so either one is an integrator who
-    // placed the player themselves. `useSuggestedPresentationDelay` is not:
-    // it is on by default, so it says nothing about what they chose.
-    this.managesLiveDelay =
-      !isConfigured(delay?.liveDelay) &&
-      !isConfigured(delay?.liveDelayFragmentCount);
+    this.placement = undefined;
     this.appliedLiveDelay = undefined;
     this.appliedBuffer = undefined;
-    this.heldBuffer = readForwardBuffer(player);
-    this.heldDelay = {
-      liveDelay: delay?.liveDelay,
-      useSuggestedPresentationDelay: delay?.useSuggestedPresentationDelay,
-    };
-    if (this.managesLiveDelay) {
-      player.updateSettings({
-        streaming: {
-          delay: {
-            liveDelay: INITIAL_LIVE_EDGE_DELAY,
-            // A server's suggestion places the player near the edge, where
-            // there is nothing to share.
-            useSuggestedPresentationDelay: false,
-          },
-        },
-      });
-    }
 
+    // The player's settings are read when the first live manifest of a source
+    // arrives, not here: `bindPlayer` runs before `initialize`, so what the
+    // integrator configures in between would otherwise be taken for dash.js's
+    // own defaults and overwritten.
+    // An engine that had this player gives it back before this one reads it:
+    // a delay left behind by another engine is indistinguishable from one the
+    // integrator set, and would be read as a placement that is not ours.
+    bindings.get(player)?.release?.();
+    bindings.set(player, {
+      core: this.core,
+      onManifestProcessed: this.applyLivePlacement,
+      release: this.releasePlayer,
+    });
     player.extend(
       "XHRLoader",
-      createXhrLoaderExtension(this.core, {
-        onManifestProcessed: this.applyLivePlacement,
-        // dash.js keeps an extension for the life of the player, so the
-        // router asks rather than being removed: this engine has let this
-        // player go once it is destroyed or bound to another one.
-        isActive: () => this.player === player,
-      }),
+      createXhrLoaderExtension(() => bindings.get(player)),
       true,
     );
 
@@ -227,42 +234,61 @@ export class DashJsP2PEngine {
    * anything else it writes would change.
    */
   private applyLivePlacement = (manifest: ProcessedManifest) => {
-    if (!this.player || !this.managesLiveDelay) return;
+    if (!this.player) return;
     const target = liveDelayFor(manifest);
     if (!target) {
-      // A presentation with nothing live in it is not this engine's to place
-      // — and is the one that would otherwise inherit a live window's
-      // ceiling, since the settings are the player's and outlive the source.
-      if (!manifest.streams.some((stream) => stream.isLive)) {
-        this.restoreForwardBuffer();
+      if (manifest.streams.some((stream) => stream.isLive)) {
+        // Live, but not yet measurable — a `SegmentBase` stream has no
+        // segments until its index is fetched. Hold the player off the edge
+        // until a refresh can size the window.
+        this.holdOffTheEdge();
+      } else {
+        // A presentation with nothing live in it is not this engine's to
+        // place — and is the one that would otherwise inherit a live window's
+        // ceiling, since the settings are the player's and outlive the source.
+        this.restorePlacement();
       }
       return;
     }
 
+    if (!this.takeOver()) return;
     const buffer = this.forwardBufferSettings(target);
 
-    // Against what this engine placed, never against what the player holds:
-    // until a window is known the player holds INITIAL_LIVE_EDGE_DELAY, and a
-    // first window whose delay lands within half a segment of it would read
-    // as already placed — the delay would happen to be right and the forward
-    // buffer would be left at dash.js's own minute, which is the half that
-    // decides whether anything is shared at all.
+    // The delay is compared against what this engine placed, never against
+    // what the player holds: its own pre-manifest delay would otherwise read
+    // as a placement, and a first window landing within half a segment of it
+    // would be left with the forward buffer at dash.js's own minute.
     //
-    // Both halves are compared, because the ceiling also follows the high
-    // demand window, which the integrator may change at runtime: a steady
-    // live window would otherwise never carry that change to the player.
+    // The buffer is compared against what the player holds, because a ceiling
+    // is only a ceiling while it is enforced: a setting raised from outside —
+    // by the integrator, the only one who raises these — must be brought back
+    // down, and comparing against what this engine last intended would leave
+    // it raised for as long as the window holds steady.
+    const held = this.player.getSettings().streaming?.buffer;
     const placed =
       this.appliedLiveDelay !== undefined &&
       Math.abs(this.appliedLiveDelay - target.delay) < target.segment / 2 &&
-      FORWARD_BUFFER_KEYS.every(
-        (key) => this.appliedBuffer?.[key] === buffer[key],
-      );
-    if (placed) return;
+      FORWARD_BUFFER_KEYS.every((key) => held?.[key] === buffer[key]);
+    if (placed) {
+      // Nothing to write, but this is what the player holds and this engine
+      // asked for, so it is this engine's — recording it keeps a later change
+      // from outside recognisable as one.
+      this.appliedBuffer = buffer;
+      return;
+    }
     this.debug(
       `Setting liveDelay to ${target.delay}, forward buffer to ${buffer.bufferTimeDefault}`,
     );
     this.player.updateSettings({
-      streaming: { delay: { liveDelay: target.delay }, buffer },
+      streaming: {
+        delay: {
+          liveDelay: target.delay,
+          // A server's suggestion places the player near the edge, where
+          // there is nothing to share.
+          useSuggestedPresentationDelay: false,
+        },
+        buffer,
+      },
     });
     this.appliedLiveDelay = target.delay;
     this.appliedBuffer = buffer;
@@ -301,21 +327,23 @@ export class DashJsP2PEngine {
     );
 
     const current = this.player?.getSettings().streaming?.buffer;
+    const ceilings = this.placement?.held.buffer ?? {};
     const settings = {} as ForwardBuffer;
     for (const key of FORWARD_BUFFER_KEYS) {
-      // Whatever the player holds that this engine did not write is the
-      // integrator's latest word on the setting, and the next write hides it,
-      // so it is remembered here. Reading back what the engine wrote as
-      // theirs instead would let the ceiling only ever fall — a window that
-      // grows would keep the buffer it needed when it was seconds long — and
-      // treating it as nobody's would raise a setting they hold below the
-      // ceiling, which is the one thing a ceiling must not do.
+      // Whatever the player holds that this engine did not write is somebody
+      // else's latest word on the setting — the integrator's, or dash.js's
+      // own when a quota error makes it shrink the two top-quality buffers it
+      // can no longer afford — and the next write hides it, so it is kept
+      // here. Reading back what the engine wrote as theirs instead would let
+      // the ceiling only ever fall, and treating it as nobody's would raise a
+      // setting held below the ceiling, which is the one thing a ceiling must
+      // not do.
       const value = current?.[key];
       if (isBufferTime(value) && value !== this.appliedBuffer?.[key]) {
-        this.heldBuffer = { ...this.heldBuffer, [key]: value };
+        ceilings[key] = value;
       }
 
-      const held = this.heldBuffer?.[key];
+      const held = ceilings[key];
       settings[key] =
         held !== undefined && held < bufferTime ? held : bufferTime;
     }
@@ -335,58 +363,112 @@ export class DashJsP2PEngine {
   };
 
   /**
-   * Puts back what the player held before this engine lowered it. dash.js
-   * keeps `streaming.buffer` across `attachSource`, so a live window's
-   * ceiling would otherwise be inherited by whatever plays next — a VOD
-   * source included, which would then buffer a live stream's few seconds
-   * ahead for the rest of the session.
+   * Takes the current source over, once, on its first live manifest: reads
+   * what the player holds — which is the integrator's, since nothing of this
+   * engine's has been written for this source — and decides from it whether
+   * the placement is theirs or ours.
+   *
+   * dash.js places the player from `liveDelay` when it has one and from
+   * `liveDelayFragmentCount` otherwise, so either one is an integrator who
+   * placed it themselves. `useSuggestedPresentationDelay` is not: it is on by
+   * default, so it says nothing about what they chose.
+   *
+   * @returns whether this engine places this source.
    */
-  private restoreForwardBuffer() {
-    // The delay goes back with the buffer: they are the two halves of one
-    // placement, and a delay remembered without the buffer beside it would
-    // make the window that returns look already placed — leaving the ceiling
-    // off for the rest of the session.
-    this.appliedLiveDelay = undefined;
-    if (!this.player || !this.appliedBuffer) return;
-    this.appliedBuffer = undefined;
+  private takeOver(): boolean {
+    if (this.placement) return this.placement.managed;
+    const { player } = this;
+    if (!player) return false;
 
-    const buffer: Partial<ForwardBuffer> = {};
-    for (const key of FORWARD_BUFFER_KEYS) {
-      const value = this.heldBuffer?.[key];
-      if (value !== undefined) buffer[key] = value;
-    }
-    if (Object.keys(buffer).length === 0) return;
-
-    this.debug(`Restoring forward buffer to ${buffer.bufferTimeDefault}`);
-    this.player.updateSettings({ streaming: { buffer } });
+    const delay = player.getSettings().streaming?.delay;
+    this.placement = {
+      managed:
+        !isConfigured(delay?.liveDelay) &&
+        !isConfigured(delay?.liveDelayFragmentCount),
+      held: {
+        liveDelay: delay?.liveDelay,
+        useSuggestedPresentationDelay: delay?.useSuggestedPresentationDelay,
+        buffer: readForwardBuffer(player),
+      },
+    };
+    return this.placement.managed;
   }
 
   /**
-   * Puts back the whole placement: the delay this engine wrote as well as the
-   * buffer it lowered. `liveDelay` is read before anything else dash.js could
-   * place the player by, so a player left with one this engine chose stays
-   * where P2P wanted it — and with the manifest's own suggestion disabled —
-   * for as long as it lives, whether or not P2P is still running.
+   * Where a live player sits until a manifest says how wide its window is.
+   * Written for each source that needs it rather than once for the player: a
+   * source whose window cannot be sized yet would otherwise be left wherever
+   * dash.js puts it, which is at the edge, where there is nothing to share.
+   */
+  private holdOffTheEdge() {
+    if (!this.takeOver() || !this.player) return;
+    if (this.appliedLiveDelay !== undefined) return;
+
+    this.debug(`Holding liveDelay at ${INITIAL_LIVE_EDGE_DELAY}`);
+    this.player.updateSettings({
+      streaming: {
+        delay: {
+          liveDelay: INITIAL_LIVE_EDGE_DELAY,
+          // A server's suggestion places the player near the edge, where
+          // there is nothing to share.
+          useSuggestedPresentationDelay: false,
+        },
+      },
+    });
+    this.appliedLiveDelay = INITIAL_LIVE_EDGE_DELAY;
+  }
+
+  /**
+   * Puts back what the player held before this engine wrote anything: the
+   * delay and the buffer alike, since they are the two halves of one
+   * placement. dash.js keeps both across `attachSource`, so a live window's
+   * ceiling would otherwise be inherited by whatever plays next — a VOD
+   * source included — and a delay left behind would park the player where P2P
+   * wanted it for as long as the player lives.
+   *
+   * The next source is taken over afresh, and placed on its own window rather
+   * than measured against this one's.
    */
   private restorePlacement() {
-    this.restoreForwardBuffer();
-    if (!this.player || !this.managesLiveDelay) return;
+    const { placement, appliedLiveDelay, appliedBuffer } = this;
+    this.placement = undefined;
+    this.appliedLiveDelay = undefined;
+    this.appliedBuffer = undefined;
+    if (!this.player || !placement) return;
 
-    const delay: {
-      liveDelay: number;
-      useSuggestedPresentationDelay?: boolean;
-    } = {
-      // NaN is how dash.js says a delay was never configured, which is the
-      // only state this engine ever takes a player over from.
-      liveDelay: this.heldDelay?.liveDelay ?? NaN,
-    };
-    const suggested = this.heldDelay?.useSuggestedPresentationDelay;
-    if (suggested !== undefined) {
-      delay.useSuggestedPresentationDelay = suggested;
+    // Each half is given back only if this engine wrote it. A live window it
+    // only held the player in never had its buffer touched, and writing one
+    // back would revert whatever the integrator has set since.
+    const streaming: {
+      delay?: { liveDelay: number; useSuggestedPresentationDelay?: boolean };
+      buffer?: Partial<ForwardBuffer>;
+    } = {};
+    const { held } = placement;
+
+    if (appliedLiveDelay !== undefined) {
+      streaming.delay = {
+        // NaN is how dash.js says a delay was never configured.
+        liveDelay: held.liveDelay ?? NaN,
+        ...(held.useSuggestedPresentationDelay === undefined
+          ? {}
+          : {
+              useSuggestedPresentationDelay: held.useSuggestedPresentationDelay,
+            }),
+      };
     }
 
-    this.debug("Restoring the live delay to the player's own");
-    this.player.updateSettings({ streaming: { delay } });
+    if (appliedBuffer) {
+      const buffer: Partial<ForwardBuffer> = {};
+      for (const key of FORWARD_BUFFER_KEYS) {
+        const value = held.buffer[key];
+        if (value !== undefined) buffer[key] = value;
+      }
+      if (Object.keys(buffer).length > 0) streaming.buffer = buffer;
+    }
+
+    if (Object.keys(streaming).length === 0) return;
+    this.debug("Restoring the placement the player came with");
+    this.player.updateSettings({ streaming });
   }
 
   private registerMediaElement() {
@@ -402,6 +484,25 @@ export class DashJsP2PEngine {
 
   /** Cleans up and releases all resources, and unregisters all event handlers. */
   destroy() {
+    // Only if it is still ours: another engine may have taken this player on
+    // since, and it has already been given back to it.
+    if (this.player && bindings.get(this.player)?.core === this.core) {
+      bindings.delete(this.player);
+    }
+    this.releasePlayer();
+  }
+
+  /**
+   * Lets the player go: stops working for it, gives back what was written to
+   * it, and forgets it. Called on `destroy`, and by the next engine to bind
+   * the same player.
+   *
+   * An engine with no player has nothing to load for, so its core is reset
+   * and its playback tracker detached. Leaving them running would keep a
+   * second core fetching and announcing in the swarm the engine that took the
+   * player over is in, driven by the same media element.
+   */
+  private releasePlayer = () => {
     this.core.destroy();
     this.playback.stop();
     if (this.player) {
@@ -410,9 +511,7 @@ export class DashJsP2PEngine {
     }
     this.restorePlacement();
     this.player = undefined;
-    this.heldBuffer = undefined;
-    this.heldDelay = undefined;
-  }
+  };
 }
 
 /** The forward buffer settings a player currently holds. */

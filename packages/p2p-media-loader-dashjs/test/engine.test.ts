@@ -41,31 +41,13 @@ describe("DashJsP2PEngine.bindPlayer", () => {
     engine.destroy();
   });
 
-  it("takes over the live delay only where the integrator left dash.js's default", () => {
-    const managed = fakePlayer(NaN);
-    new DashJsP2PEngine().bindPlayer(managed.player);
-    expect(managed.spies.updateSettings).toHaveBeenCalledWith({
-      streaming: {
-        delay: { liveDelay: 25, useSuggestedPresentationDelay: false },
-      },
-    });
-
-    const configured = fakePlayer(8);
-    new DashJsP2PEngine().bindPlayer(configured.player);
-    expect(configured.spies.updateSettings).not.toHaveBeenCalled();
-  });
-
-  it("leaves a player placed by fragment count alone as well", () => {
-    // dash.js reads liveDelayFragmentCount when liveDelay has no value, so an
-    // integrator who set it has placed the player just as deliberately.
-    const byFragmentCount = fakePlayer(NaN, 3);
-    new DashJsP2PEngine().bindPlayer(byFragmentCount.player);
-    expect(byFragmentCount.spies.updateSettings).not.toHaveBeenCalled();
-
-    // A null is dash.js's other way of saying unset.
-    const unset = fakePlayer(NaN, null as unknown as number);
-    new DashJsP2PEngine().bindPlayer(unset.player);
-    expect(unset.spies.updateSettings).toHaveBeenCalled();
+  it("writes no settings of its own at bind", () => {
+    // bindPlayer runs before initialize, and dash.js's API invites settings
+    // in between, so the player is read and written when its first manifest
+    // arrives rather than here. See the placement tests.
+    const { player, spies } = fakePlayer(NaN);
+    new DashJsP2PEngine().bindPlayer(player);
+    expect(spies.updateSettings).not.toHaveBeenCalled();
   });
 
   it("subscribes to stream lifecycle events and unsubscribes on destroy", () => {

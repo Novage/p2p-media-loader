@@ -135,9 +135,11 @@ describe("dashManifestParser", () => {
     });
   });
 
-  it("reports SegmentBase as an external index with no segments", () => {
+  it("reports SegmentBase as an external index and says nothing of segments", () => {
     const [video] = dashManifestParser.parse(DASH_SEGMENT_BASE, URL).streams;
-    expect(video.segments).toEqual([]);
+    // Not an empty list: that would be read as "these are all there are" and
+    // take away what the index gave, on every refresh.
+    expect(video.segments).toBeUndefined();
     expect(video.indexSource).toEqual({
       kind: "external",
       url: "https://cdn.example/dash/video.mp4",

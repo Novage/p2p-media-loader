@@ -136,7 +136,14 @@ function toStream(
     key: playlist.attributes.NAME ?? playlist.resolvedUri,
     type,
     properties: properties(playlist.attributes),
-    segments,
+    // A `SegmentBase` representation lists none, and says nothing about the
+    // ones its index holds: an empty list would be read as "these are all the
+    // segments there are" and take away what the index gave, on every refresh
+    // of a live presentation and on any re-parse of a static one.
+    segments:
+      segments.length === 0 && indexSource.kind === "external"
+        ? undefined
+        : segments,
     initSegments: distinctInitSegments(initSegments),
     indexSource,
     isLive,

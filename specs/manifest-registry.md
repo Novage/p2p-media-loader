@@ -119,8 +119,18 @@ manifest is that index, and the segments are known the moment it is parsed:
 
 `SegmentBase` is the exception. The MPD carries only an `indexRange` pointing at
 a `sidx` box **inside the media file**; the segment list does not exist in the
-manifest at all. Parsing such an MPD yields a stream with no segments and an
-external index reference.
+manifest at all. Parsing such an MPD yields a stream that says nothing about
+segments — not an empty list of them — and an external index reference.
+
+The distinction matters on the second parse. A manifest that lists segments is
+the whole truth about that stream, so what it leaves out is removed; a
+manifest that lists none of them says only that it never does, and what the
+index gave stays. Reading the two alike would take a `SegmentBase` stream's
+segments away on the first refresh of a live presentation, and on any
+re-parse of a static one, leaving a stream that plays perfectly and shares
+nothing. Such a stream is still reported on every parse — how live it is, and
+what it holds so far — so an adapter learns of a presentation it has to place
+before the index has been read.
 
 Core models both cases with one shape, so that a stream is registered either
 way:

@@ -1,6 +1,5 @@
 import {
   Core,
-  CoreRequestError,
   ProcessedManifest,
   byteRangeFromRangeHeader,
   debug,
@@ -14,17 +13,23 @@ import {
   XhrLoaderLike,
 } from "./types.js";
 
-export type LoaderHooks = {
+/**
+ * The engine a player's requests belong to, looked up per request rather than
+ * captured: dash.js keeps an extension for the life of the player and offers
+ * no way to remove or replace one, so the extension the first engine installs
+ * is the one every later engine has to be served by. No binding — the engine
+ * was destroyed, or bound to another player — means every request passes
+ * through to dash.js's own loader.
+ */
+export type LoaderBinding = {
+  core: Core;
   /** Called with what the core read from each MPD, before dash.js parses it. */
   onManifestProcessed?: (manifest: ProcessedManifest) => void;
   /**
-   * Whether the engine is still driving the player this was installed on.
-   * dash.js keeps an extension for the life of the player and offers no way
-   * to remove one, so an engine that has let the player go — destroyed, or
-   * bound to another player — says so here and every request passes through
-   * to dash.js's own loader. Absent means always.
+   * Called when another engine takes this player on, so the one that had it
+   * gives back what it wrote to the player before the new one reads it.
    */
-  isActive?: () => boolean;
+  release?: () => void;
 };
 
 const SEGMENT_TYPES: ReadonlySet<string> = new Set([
@@ -43,7 +48,9 @@ const SEGMENT_TYPES: ReadonlySet<string> = new Set([
  * media and index segments, licences — and is told apart by the type of the
  * `FragmentRequest` behind it. See specs/player-adapters.md, "dash.js".
  */
-export function createXhrLoaderExtension(core: Core, hooks: LoaderHooks = {}) {
+export function createXhrLoaderExtension(
+  binding: () => LoaderBinding | undefined,
+) {
   return function xhrLoaderExtension(this: FactoryMakerThis): XhrLoaderLike {
     // FactoryMaker copies the returned `load` and `abort` onto the parent
     // instance itself, so `this.parent.load` would point back here once the
@@ -53,7 +60,7 @@ export function createXhrLoaderExtension(core: Core, hooks: LoaderHooks = {}) {
       load: parent.load.bind(parent),
       abort: parent.abort.bind(parent),
     };
-    const router = new RequestRouter(core, original, hooks);
+    const router = new RequestRouter(binding, original);
     return {
       load: (request, response) => router.load(request, response),
       abort: () => router.abort(),
@@ -67,22 +74,20 @@ class RequestRouter {
   private abortCurrent?: () => void;
 
   constructor(
-    private readonly core: Core,
+    private readonly binding: () => LoaderBinding | undefined,
     private readonly parent: XhrLoaderLike,
-    private readonly hooks: LoaderHooks,
   ) {}
 
   load(
     request: CommonMediaRequestLike,
     response: CommonMediaResponseLike,
   ): boolean {
-    // Nothing reaches the core once the engine has let this player go: the
-    // extension cannot be taken off the player, and a core the engine
-    // destroyed would otherwise be rebuilt by the next MPD refresh, resuming
-    // P2P the integrator had stopped.
-    if (this.hooks.isActive?.() === false) {
-      return this.parent.load(request, response);
-    }
+    // Nothing reaches a core no engine is driving this player with: an engine
+    // that was destroyed would otherwise have its core rebuilt by the next MPD
+    // refresh, resuming P2P the integrator had stopped.
+    const binding = this.binding();
+    if (!binding) return this.parent.load(request, response);
+    const { core } = binding;
 
     const type = request.customData?.request?.type ?? undefined;
     const { url } = request;
@@ -93,7 +98,7 @@ class RequestRouter {
     // Every MPD dash.js fetches — first load and each refresh — reaches the
     // core before dash.js parses the same bytes.
     if (type === REQUEST_TYPE.MPD) {
-      return this.passThroughAndObserve(request, response, (data) => {
+      return this.passThroughAndObserve(binding, request, response, (data) => {
         if (typeof data !== "string" && !isBinary(data)) return;
         // Take `PatchLocation` out before dash.js reads the same bytes: a
         // player following it refreshes by patch, which the core cannot read,
@@ -108,24 +113,38 @@ class RequestRouter {
         }
         // The response URL, when the loader filled it in, follows redirects.
         const responseUrl = response.url;
-        const processed = this.core.processManifest({
+        const processed = core.processManifest({
           url:
             responseUrl !== undefined && responseUrl !== "" ? responseUrl : url,
           requestedUrl: url,
           data: manifest,
         });
-        if (processed) this.hooks.onManifestProcessed?.(processed);
+        if (processed) binding.onManifestProcessed?.(processed);
       });
     }
 
     if (type !== undefined && SEGMENT_TYPES.has(type)) {
       // A SegmentBase stream's index: dash.js loads it, the core reads the
       // segment list from the same bytes. Recognition, not lookup.
-      if (this.core.isSegmentIndex(url, byteRange)) {
-        return this.passThroughAndObserve(request, response, (data) => {
-          if (!isBinary(data)) return;
-          this.core.processSegmentIndex({ url, byteRange, data });
-        });
+      if (core.isSegmentIndex(url, byteRange)) {
+        return this.passThroughAndObserve(
+          binding,
+          request,
+          response,
+          (data) => {
+            if (!isBinary(data)) return;
+            // The window a `SegmentBase` presentation has is known only once
+            // its index is read, so what the index says goes the same way a
+            // manifest's does: it is the first thing that can place a live
+            // player of one.
+            const processed = core.processSegmentIndex({
+              url,
+              byteRange,
+              data,
+            });
+            if (processed) binding.onManifestProcessed?.(processed);
+          },
+        );
       }
 
       // Whitelist by lookup: a segment the registry knows on a stream with
@@ -133,9 +152,9 @@ class RequestRouter {
       // anything the registry does not know load through dash.js itself.
       if (
         type === REQUEST_TYPE.MEDIA_SEGMENT &&
-        this.core.isSegmentLoadable(url, byteRange)
+        core.isSegmentLoadable(url, byteRange)
       ) {
-        this.serve(request, response, byteRange);
+        this.serve(core, request, response, byteRange);
         return true;
       }
     }
@@ -150,6 +169,7 @@ class RequestRouter {
   }
 
   private passThroughAndObserve(
+    binding: LoaderBinding,
     request: CommonMediaRequestLike,
     response: CommonMediaResponseLike,
     observe: (data: unknown) => void,
@@ -161,11 +181,12 @@ class RequestRouter {
     // wrap has to be in place before the parent runs.
     customData.onloadend = () => {
       try {
-        // Asked again here, not only when the request was made: a response
-        // that lands after the engine let the player go would otherwise
-        // rebuild the core it released, on a refresh already in flight.
+        // The same binding, not merely some binding: what this observes was
+        // made against that engine's core, and a response landing after that
+        // engine let the player go would otherwise rebuild the core it
+        // released — even where another engine has since taken the player on.
         if (
-          this.hooks.isActive?.() !== false &&
+          this.binding() === binding &&
           response.status >= 200 &&
           response.status <= 299
         ) {
@@ -180,6 +201,7 @@ class RequestRouter {
   }
 
   private serve(
+    core: Core,
     request: CommonMediaRequestLike,
     response: CommonMediaResponseLike,
     byteRange: ReturnType<typeof byteRangeFromRangeHeader>,
@@ -193,12 +215,12 @@ class RequestRouter {
     const abort = () => {
       if (settled) return;
       aborted = true;
-      this.core.abortSegmentLoading(url, byteRange);
+      core.abortSegmentLoading(url, byteRange);
     };
     customData.abort = abort;
     this.abortCurrent = abort;
 
-    this.core
+    core
       .loadSegment(url, { byteRange })
       .then(({ data, bandwidth }) => {
         // The core cannot always cancel in time — a request waiting for the
@@ -238,15 +260,16 @@ class RequestRouter {
       })
       .catch((error: unknown) => {
         settled = true;
-        // What dash.js abandoned is reported as the abort it asked for,
-        // whatever the core went on to say: it drops `onloadend` when it
-        // aborts and keeps `onabort`, so a failure reported here instead
-        // would tell it nothing and leave the segment waiting for the next
-        // schedule tick to be asked for again.
-        if (
-          aborted ||
-          (error instanceof CoreRequestError && error.type === "aborted")
-        ) {
+        // What dash.js abandoned is reported as the abort it asked for: it
+        // drops `onloadend` when it aborts and keeps `onabort`, so a failure
+        // reported here instead would tell it nothing and leave the segment
+        // waiting for the next schedule tick to be asked for again.
+        //
+        // An abort dash.js did not ask for is not one — the core gives up on
+        // a request superseded by the next one, or when the engine lets the
+        // player go — and is reported below as the failure it is, so dash.js
+        // fetches the segment itself.
+        if (aborted) {
           customData.onabort?.();
           return;
         }

@@ -415,7 +415,10 @@ export class Core {
    * @param index.url - The media file the index was read from.
    * @param index.byteRange - The range that was fetched, if the request had one.
    * @param index.data - The response body, which may be wider than the index.
-   * @returns The streams that gained segments, or `undefined` when none did.
+   * @returns How the presentation stands once the index is read — every
+   * stream of it, not only the one the index resolved, since a presentation
+   * whose streams each carry their own index would otherwise be described one
+   * stream at a time. `undefined` when no stream awaited an index here.
    */
   processSegmentIndex(index: {
     url: string;
@@ -455,7 +458,11 @@ export class Core {
 
     this.syncStreamsFromRegistry();
     this.logRegistryUpdates(index.url, updates);
-    return summarize(updates);
+    // Every stream, not only the one this index resolved: a presentation whose
+    // streams each carry their own index would otherwise be described one
+    // stream at a time, and a caller sizing a live window from it would size
+    // it from whichever index arrived last.
+    return summarize(this.manifestRegistry.describeAll());
   }
 
   /**

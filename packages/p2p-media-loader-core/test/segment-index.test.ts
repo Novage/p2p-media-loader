@@ -63,15 +63,17 @@ describe("external segment index (SegmentBase)", () => {
       data: readBinaryFixture("angel-one-audio-en.sidx"),
     });
 
-    expect(processed?.streams).toHaveLength(1);
-    expect(processed?.streams[0]).toMatchObject({
+    // The whole presentation is described, with this index's stream filled in.
+    const resolved = processed?.streams.filter((s) => s.segmentCount > 0);
+    expect(resolved).toHaveLength(1);
+    expect(resolved?.[0]).toMatchObject({
       type: "secondary",
       isLive: false,
       start: 0,
       segmentCount: 16,
     });
     // Fifteen ~4.01 s subsegments and a 512-sample tail: 60.021 s.
-    expect(processed?.streams[0].end).toBeCloseTo(60.021, 3);
+    expect(resolved?.[0].end).toBeCloseTo(60.021, 3);
 
     // Subsegments follow each other from the end of the index (firstOffset 0).
     expect(
@@ -127,7 +129,9 @@ describe("external segment index (SegmentBase)", () => {
       byteRange: { start: 0, end: 1009 },
       data: combined,
     });
-    expect(processed?.streams[0]?.segmentCount).toBe(16);
+    expect(
+      processed?.streams.find((stream) => stream.segmentCount > 0),
+    ).toMatchObject({ segmentCount: 16 });
 
     expect(
       core.processSegmentIndex({
@@ -165,10 +169,9 @@ describe("external segment index (SegmentBase)", () => {
       byteRange: indexRange,
       data: readBinaryFixture("netflix-tc1-video-0500.sidx"),
     });
-    expect(processed?.streams[0]).toMatchObject({
-      type: "main",
-      segmentCount: 327,
-    });
+    expect(
+      processed?.streams.find((stream) => stream.segmentCount > 0),
+    ).toMatchObject({ type: "main", segmentCount: 327 });
 
     const first = { start: 11246, end: 11246 + 100613 - 1 };
     expect(core.isSegmentLoadable(NETFLIX_TC1_VIDEO_0500_URL, first)).toBe(
@@ -189,12 +192,34 @@ describe("external segment index (SegmentBase)", () => {
       core as unknown as {
         streams: Map<string, { segments: Map<string, { externalId: number }> }>;
       }
-    ).streams.get(processed!.streams[0].key)?.segments;
+    ).streams.get(
+      processed!.streams.find((stream) => stream.segmentCount > 0)!.key,
+    )?.segments;
     expect(
       Array.from(segments?.values() ?? [])
         .slice(0, 3)
         .map((s) => s.externalId),
     ).toEqual([0, 20, 40]);
+  });
+
+  it("keeps what the index gave through a refresh of the manifest", () => {
+    const core = createCore();
+    core.processSegmentIndex({
+      url: ANGEL_ONE_AUDIO_EN_URL,
+      byteRange: INDEX_RANGE,
+      data: readBinaryFixture("angel-one-audio-en.sidx"),
+    });
+    const segment = { start: 1010, end: 1010 + 0xcd24 - 1 };
+    expect(core.isSegmentLoadable(ANGEL_ONE_AUDIO_EN_URL, segment)).toBe(true);
+
+    // The MPD lists no segments for a SegmentBase representation, on the
+    // first parse and on every refresh alike.
+    core.processManifest({
+      url: ANGEL_ONE_MPD_URL,
+      data: readFixture("angel-one.mpd"),
+    });
+
+    expect(core.isSegmentLoadable(ANGEL_ONE_AUDIO_EN_URL, segment)).toBe(true);
   });
 
   it("reads the index with the parser whose protocol has one", () => {

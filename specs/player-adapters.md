@@ -263,11 +263,13 @@ run; an abort from dash.js aborts the core request.
 **Hosted in Video.js 10.** v10's `DashAdapter` creates its dash.js player and
 calls `initialize()` in its constructor, and attaches a source only when one
 is set, so `bindPlayer(adapter.engine)` fits between the two with nothing
-added to this package. It must be bound exactly once per player: dash.js
-keeps the loader it first resolved, so a second engine bound to the same
-player never sees a request — under React StrictMode's simulated remount
-that is the binding to get right. The demo's `videojs10_dashjs` player is
-this.
+added to this package. dash.js keeps the `XHRLoader` extension a player is
+first given and ignores every later one, so the adapter records which engine
+drives which player and the installed extension looks that up per request:
+binding a second engine replaces the entry the first left, an engine that is
+destroyed removes its own, and a player nobody is bound to loads everything
+through dash.js itself. A response already in flight is observed only by the
+engine that asked for it. The demo's `videojs10_dashjs` player is this.
 
 `FetchLoader` is left unhooked. dash.js routes a request to it only when
 `availabilityTimeComplete === false`, so low-latency DASH falls through to the
@@ -275,8 +277,21 @@ player's own loading — the low-latency exclusion in
 [architecture.md](architecture.md) at no cost.
 
 Live streams: where the integrator left `streaming.delay.liveDelay` at dash.js's
-default, the adapter places the player in the window, re-applied only when the
-window changes by half a segment. Placement is two settings, not one.
+default, the adapter places the player in the window, re-applied when the
+window moves by half a segment or when anything else it writes would change —
+the ceiling follows the high demand window, which is configurable at runtime.
+Placement is two settings, not one.
+
+**The player is read on the first live manifest of each source, not at bind.**
+`bindPlayer` has to run before `initialize()`, and dash.js's API invites
+`updateSettings` in between, so settings read at bind would be dash.js's
+defaults rather than the integrator's word — and a placement decided there
+would be decided against the wrong ones. Reading when the first manifest
+arrives also re-arms per source: what the adapter wrote is given back when a
+source ends, and the next one is taken over afresh. A live presentation whose
+window cannot be measured yet — a `SegmentBase` stream before its index has
+been fetched — is held at a fixed delay until a refresh can size it, rather
+than left wherever dash.js puts it, which is at the edge.
 
 - **Position in the live window.** `streaming.delay.liveDelay` is the window
   less one segment, at most a minute behind the edge — the HLS.js and Shaka

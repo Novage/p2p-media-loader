@@ -37,11 +37,27 @@ function makeRequest(
   return { request, response, events };
 }
 
+/** What the core reads from a segment index: the presentation it completes. */
+const processedIndex = {
+  streams: [
+    {
+      key: "v",
+      type: "main" as const,
+      isLive: true,
+      start: 0,
+      end: 56,
+      segmentCount: 7,
+    },
+  ],
+};
+
 function setup(options: { loadable?: boolean; index?: boolean } = {}) {
   const segmentData = new Uint8Array(1_048_576).buffer;
   const core = {
     processManifest: vi.fn(() => ({ streams: [] })),
-    processSegmentIndex: vi.fn(),
+    processSegmentIndex: vi.fn(() =>
+      options.index ? processedIndex : undefined,
+    ),
     isSegmentIndex: vi.fn(() => options.index ?? false),
     isSegmentLoadable: vi.fn(() => options.loadable ?? false),
     loadSegment: vi.fn(() =>
@@ -66,9 +82,15 @@ function setup(options: { loadable?: boolean; index?: boolean } = {}) {
     abort: vi.fn(),
   };
   const onManifestProcessed = vi.fn();
-  const extension = createXhrLoaderExtension(core as unknown as Core, {
+  const binding = {
+    core: core as unknown as Core,
     onManifestProcessed,
-  });
+  };
+  // The engine bound to the player, looked up per request: undefined stands
+  // for an engine that has let the player go.
+  let bound: typeof binding | undefined = binding;
+  const unbind = () => (bound = undefined);
+  const extension = createXhrLoaderExtension(() => bound);
   const loader = extension.call({
     context: {},
     factory: undefined,
@@ -81,6 +103,7 @@ function setup(options: { loadable?: boolean; index?: boolean } = {}) {
     parentResult,
     segmentData,
     onManifestProcessed,
+    unbind,
   };
 }
 
@@ -157,6 +180,20 @@ describe("dash.js XHRLoader extension", () => {
       data: parentResult.data,
     });
     expect(core.loadSegment).not.toHaveBeenCalled();
+  });
+
+  it("hands what the core read from an index on, as it does for a manifest", () => {
+    // A SegmentBase presentation is sized by its index, not by its MPD, so
+    // the index is the first thing that can place a live player of one.
+    const { loader, onManifestProcessed, parentResult } = setup({
+      index: true,
+    });
+    parentResult.data = new Uint8Array([1, 2, 3]).buffer;
+    const { request, response } = makeRequest("IndexSegment", SEGMENT_URL);
+
+    loader.load(request, response);
+
+    expect(onManifestProcessed).toHaveBeenCalledWith(processedIndex);
   });
 
   it("serves a known media segment through the core with a download-time trace dash.js can measure", async () => {
@@ -288,6 +325,25 @@ describe("dash.js XHRLoader extension", () => {
     expect(response.status).toBe(0);
   });
 
+  it("reports an abort the core made on its own as a failure", async () => {
+    // The core gives up on a request the next one supersedes, and when the
+    // engine lets the player go. dash.js asked for neither, and is still
+    // waiting for the segment: a failure is what lets it fetch the segment
+    // itself.
+    const { loader, core } = setup({ loadable: true });
+    core.loadSegment.mockRejectedValueOnce(new CoreRequestError("aborted"));
+    const { request, response, events } = makeRequest(
+      "MediaSegment",
+      SEGMENT_URL,
+    );
+    loader.load(request, response);
+    await flush();
+
+    expect(events.abort).toBe(0);
+    expect(events.loadend).toBe(1);
+    expect(response.status).toBe(0);
+  });
+
   it("reports a core failure as a failed response so dash.js retries", async () => {
     const { loader, core } = setup({ loadable: true });
     core.loadSegment.mockRejectedValueOnce(
@@ -306,6 +362,20 @@ describe("dash.js XHRLoader extension", () => {
     expect(events.abort).toBe(0);
   });
 
+  it("passes everything through once no engine is bound to the player", () => {
+    // dash.js keeps an extension for the life of the player, so the one an
+    // engine installed has to stand aside when that engine lets the player go
+    // — and serve another engine that binds after it.
+    const { loader, core, parent, unbind } = setup();
+    unbind();
+
+    const { request, response } = makeRequest("MPD", MPD_URL);
+    expect(loader.load(request, response)).toBe(true);
+
+    expect(core.processManifest).not.toHaveBeenCalled();
+    expect(parent.load).toHaveBeenCalledTimes(1);
+  });
+
   it("still reaches dash.js's loader after FactoryMaker copies the override onto it", () => {
     // FactoryMaker's `override` merge assigns the returned methods onto the
     // parent instance; the extension must have kept the originals or every
@@ -319,7 +389,9 @@ describe("dash.js XHRLoader extension", () => {
       },
     );
     const parent = { load: originalLoad, abort: vi.fn() };
-    const extension = createXhrLoaderExtension(core as unknown as Core);
+    const extension = createXhrLoaderExtension(() => ({
+      core: core as unknown as Core,
+    }));
     const overrides = extension.call({
       context: {},
       factory: undefined,

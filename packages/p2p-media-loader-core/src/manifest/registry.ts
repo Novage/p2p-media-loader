@@ -91,6 +91,11 @@ export class ManifestRegistry {
     return this.streams.get(key);
   }
 
+  /** Every stream as it now stands, for a caller that needs the whole picture. */
+  describeAll(): RegistryUpdate[] {
+    return this.getStreams().map(describe);
+  }
+
   /**
    * Applies one parsed manifest. Idempotent: re-applying an unchanged
    * manifest changes nothing and reports no updates.
@@ -103,7 +108,18 @@ export class ManifestRegistry {
 
     for (const [i, parsed] of manifest.streams.entries()) {
       const stream = this.upsertStream(parsed, manifest, identity[i]);
-      if (!parsed.segments) continue;
+      if (!parsed.segments) {
+        // A stream whose segments live in an external index is still reported
+        // — how live it is, and what it holds so far — so a caller learns of
+        // a presentation it has to place before the index has been read. Its
+        // segments are not touched: they are the index's, not this
+        // manifest's, and a refresh listing none of them means only that the
+        // manifest never lists them.
+        if (stream.indexSource.kind === "external") {
+          updates.push(describe(stream));
+        }
+        continue;
+      }
 
       updates.push(
         this.applySegments(stream, parsed.segments, manifest.protocol),
@@ -421,4 +437,25 @@ function identifies(properties: StreamProperties): boolean {
   return Object.keys(properties).some(
     (key) => properties[key as keyof StreamProperties] !== undefined,
   );
+}
+
+/** A stream's current state, for a manifest that listed no segments of it. */
+function describe(stream: RegistryStream): RegistryUpdate {
+  let start = Infinity;
+  let end = -Infinity;
+  for (const segment of stream.segments.values()) {
+    start = Math.min(start, segment.startTime);
+    end = Math.max(end, segment.endTime);
+  }
+  const segmentCount = stream.segments.size;
+  return {
+    streamKey: stream.key,
+    type: stream.type,
+    isLive: stream.isLive === true,
+    start: segmentCount ? start : 0,
+    end: segmentCount ? end : 0,
+    segmentCount,
+    added: 0,
+    removed: 0,
+  };
 }
