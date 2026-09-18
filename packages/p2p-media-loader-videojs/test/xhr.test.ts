@@ -179,8 +179,12 @@ function setup(options: { loadable?: boolean; index?: boolean } = {}) {
 
   let src = MASTER;
   let playerXhr = createPlayerXhr(videojs);
+  let withCredentials = false;
   const player = {
-    tech: () => ({ el: () => null, vhs: { xhr: playerXhr } }),
+    tech: () => ({
+      el: () => null,
+      vhs: { xhr: playerXhr, options_: { withCredentials } },
+    }),
     currentSrc: () => src,
     on: vi.fn(),
     off: vi.fn(),
@@ -206,11 +210,17 @@ function setup(options: { loadable?: boolean; index?: boolean } = {}) {
 
   return {
     router,
+    registry,
+    hooks,
     core,
     videojs,
     videojsXhr,
     respond,
     segmentData,
+    /** What the player is playing now, as `player.src(...)` would change it. */
+    setSrc: (next: string) => (src = next),
+    /** Whether VHS sends this player's playlist requests with credentials. */
+    setWithCredentials: (value: boolean) => (withCredentials = value),
     /** A request as VHS makes it, through the player's own xhr function. */
     request: (o: VhsRequestOptions, callback = vi.fn()) => ({
       request: (
@@ -245,6 +255,75 @@ describe("a player's own VHS hooks", () => {
 
     router.ensureTopLevelManifest();
     expect(videojsXhr).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops a manifest that arrives after the player moved on", () => {
+    const { router, core, setSrc, respond } = setup();
+    router.ensureTopLevelManifest();
+
+    // The integrator loads another source while that fetch is in flight. Its
+    // response would otherwise name the swarm after the source left behind,
+    // and every viewer of the new one would be in a swarm of their own.
+    setSrc("https://cdn.example/hls/second.m3u8");
+    router.ensureTopLevelManifest();
+    respond(200, "#EXTM3U");
+
+    expect(core.processManifest).not.toHaveBeenCalled();
+  });
+
+  it("drops a manifest that arrives after the engine let the player go", () => {
+    const { router, core, respond } = setup();
+    router.ensureTopLevelManifest();
+
+    router.detachHooks();
+    respond(200, "#EXTM3U");
+
+    expect(core.processManifest).not.toHaveBeenCalled();
+  });
+
+  it("asks for the manifest the way VHS asks for it", () => {
+    const { router, videojsXhr, setWithCredentials } = setup();
+    setWithCredentials(true);
+
+    router.ensureTopLevelManifest();
+
+    expect(videojsXhr).toHaveBeenCalledWith(
+      expect.objectContaining({ withCredentials: true, timeout: 20_000 }),
+      expect.any(Function),
+    );
+  });
+
+  it("lets a failed read be tried again", () => {
+    const { router, videojsXhr, respond } = setup();
+    router.ensureTopLevelManifest();
+    respond(500, "");
+
+    // A source noted as read but never read blocks every later attempt.
+    router.ensureTopLevelManifest();
+    expect(videojsXhr).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not guess between two players on one source", () => {
+    // VHS's page-wide hooks say nothing about which player asked, so a second
+    // bound player on the same source is a second answer to one question:
+    // handing the manifest to the first would feed a player that never asked
+    // for it, and leave the other with none. Each reads its own instead.
+    const { router, registry, core, videojs } = setup();
+    expect(registry.findBySrc(MASTER)).toBe(router);
+
+    const second = new RequestRouter(
+      core as unknown as Core,
+      {
+        currentSrc: () => MASTER,
+        tech: () => undefined,
+        on: vi.fn(),
+        off: vi.fn(),
+      } as unknown as VideoJsPlayerLike,
+      videojs,
+    );
+    registry.add(second);
+
+    expect(registry.findBySrc(MASTER)).toBeUndefined();
   });
 
   it("hands every playlist and MPD to the core, but not a failed one", () => {

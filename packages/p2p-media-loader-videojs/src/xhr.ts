@@ -17,6 +17,14 @@ import {
 
 type ByteRange = ReturnType<typeof byteRangeFromRangeHeader>;
 
+/**
+ * How long the fallback manifest fetch may take. It is not a request the
+ * player is waiting on — playback proceeds either way — but one that never
+ * settles would leave its source noted as read and block every later attempt
+ * at it.
+ */
+const MANIFEST_FETCH_TIMEOUT_MS = 20_000;
+
 /** The routers of every bound engine on the page, for the one global hook. */
 export class RouterRegistry {
   private readonly routers = new Set<RequestRouter>();
@@ -29,12 +37,22 @@ export class RouterRegistry {
     this.routers.delete(router);
   }
 
-  /** The router whose player is loading exactly this URL, if any. */
+  /**
+   * The router whose player is loading exactly this URL — and only when it is
+   * the one such player. VHS's page-wide hooks say nothing about which player
+   * a request came from, so two bound players on one source are two answers
+   * to the same question: handing the manifest to the first would give it to
+   * a player that never asked for it, and leave the other without. Neither
+   * gets it here; each reads its own on `loadstart` instead.
+   */
   findBySrc(uri: string): RequestRouter | undefined {
+    let found: RequestRouter | undefined;
     for (const router of this.routers) {
-      if (router.matchesSrc(uri)) return router;
+      if (!router.matchesSrc(uri)) continue;
+      if (found) return undefined;
+      found = router;
     }
-    return undefined;
+    return found;
   }
 }
 
@@ -118,6 +136,8 @@ export class RequestRouter {
   private readonly hooked = new Set<VhsXhr>();
   private lastSrc?: string;
   private topLevelSrc?: string;
+  /** Set once the engine lets this player go; nothing more reaches the core. */
+  private released = false;
 
   constructor(
     private readonly core: Core,
@@ -143,6 +163,7 @@ export class RequestRouter {
   }
 
   detachHooks() {
+    this.released = true;
     for (const xhr of this.hooked) {
       if (xhr.offRequest) xhr.offRequest(this.handleRequest);
       else xhr._requestCallbackSet?.delete(this.handleRequest);
@@ -180,21 +201,56 @@ export class RequestRouter {
     this.noteSource(src);
     this.logger("reading the manifest VHS fetched before binding: %s", src);
 
-    this.videojs.xhr({ uri: src }, (error, response) => {
-      if (error ?? !isOk(response.statusCode)) {
-        // The core sees this source's next manifest refresh instead; a VOD
-        // stream stays on HTTP.
-        this.logger("could not read %s: %O", src, error);
-        return;
-      }
-      this.process(() =>
-        this.core.processManifest({
-          url: urlOf(response.rawRequest, src),
-          requestedUrl: src,
-          data: bodyOf(response),
-        }),
-      );
-    });
+    // Carrying the request options VHS carries for the same manifest: a CDN
+    // that wants credentials answers a request without them 401, and a fetch
+    // without a timeout that never settles would leave this source noted as
+    // read and block every later attempt at it. What this cannot carry is the
+    // player's own `onRequest` hooks — running them would mean running this
+    // adapter's too, and reading the response twice — so an integrator who
+    // signs requests in one of those must bind the engine before the player
+    // loads a source, which is the better path regardless.
+    this.videojs.xhr(
+      {
+        uri: src,
+        withCredentials: this.withCredentials(),
+        timeout: MANIFEST_FETCH_TIMEOUT_MS,
+      },
+      (error, response) => {
+        if (error ?? !isOk(response.statusCode)) {
+          // Let a later attempt at this source read it again; the core sees
+          // this source's next manifest refresh meanwhile, and a VOD stream
+          // that refreshes none stays on HTTP.
+          if (this.topLevelSrc === src) this.topLevelSrc = undefined;
+          this.logger("could not read %s: %O", src, error);
+          return;
+        }
+        // The player may have moved on, or the engine let go, while this was
+        // in flight: what comes back then belongs to neither, and naming the
+        // swarm after it would put this player in a swarm of its own.
+        if (this.lastSrc !== src || this.released) {
+          this.logger("dropping the manifest of a source left behind: %s", src);
+          return;
+        }
+        this.process(() =>
+          this.core.processManifest({
+            url: urlOf(response.rawRequest, src),
+            requestedUrl: src,
+            data: bodyOf(response),
+          }),
+        );
+      },
+    );
+  }
+
+  /** Whether VHS sends this player's playlist requests with credentials. */
+  private withCredentials(): boolean {
+    try {
+      const tech = this.player.tech(true) as unknown as
+        { vhs?: { options_?: { withCredentials?: boolean } } } | undefined;
+      return tech?.vhs?.options_?.withCredentials === true;
+    } catch {
+      return false;
+    }
   }
 
   /**
