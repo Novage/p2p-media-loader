@@ -29,6 +29,12 @@ export type LiveDelay = {
  * listed, the widest live main stream decides; on an MPD every
  * Representation shares one window, and on HLS one media playlist arrives at
  * a time.
+ *
+ * A presentation with no main stream at all is placed by the widest live
+ * stream it does have. An audio-only one is the case that matters: live radio
+ * is an MPD of audio Representations, which the parsers type as secondary
+ * because that is what an audio track is beside a video one, and without this
+ * it would be the one live presentation nobody places.
  */
 /**
  * How far behind the live edge to place a player, given the window it has and
@@ -48,16 +54,18 @@ export function liveDelayFromWindow(window: number, segment: number): number {
 export function liveDelayFor(
   manifest: ProcessedManifest,
 ): LiveDelay | undefined {
-  let best: LiveDelay | undefined;
+  let main: LiveDelay | undefined;
+  let widest: LiveDelay | undefined;
   for (const stream of manifest.streams) {
-    if (!stream.isLive || stream.type !== "main" || stream.segmentCount === 0) {
-      continue;
-    }
+    if (!stream.isLive || stream.segmentCount === 0) continue;
     const window = stream.end - stream.start;
     if (!(window > 0)) continue;
     const segment = window / stream.segmentCount;
     const delay = liveDelayFromWindow(window, segment);
-    if (!best || delay > best.delay) best = { delay, segment };
+    if (stream.type === "main" && (!main || delay > main.delay)) {
+      main = { delay, segment };
+    }
+    if (!widest || delay > widest.delay) widest = { delay, segment };
   }
-  return best;
+  return main ?? widest;
 }

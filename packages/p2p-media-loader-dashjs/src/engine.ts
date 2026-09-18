@@ -220,11 +220,12 @@ export class DashJsP2PEngine {
     if (!this.player || !this.managesLiveDelay) return;
     const target = liveDelayFor(manifest);
     if (!target) {
-      // A presentation that declares streams and none of them live is not
-      // this engine's to place — and is the one that would otherwise inherit
-      // a live window's ceiling, since the settings are the player's and
-      // outlive the source.
-      if (manifest.streams.length > 0) this.restoreForwardBuffer();
+      // A presentation with nothing live in it is not this engine's to place
+      // — and is the one that would otherwise inherit a live window's
+      // ceiling, since the settings are the player's and outlive the source.
+      if (!manifest.streams.some((stream) => stream.isLive)) {
+        this.restoreForwardBuffer();
+      }
       return;
     }
 

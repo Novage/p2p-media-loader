@@ -53,6 +53,23 @@ describe("Shaka live presentation delay", () => {
     expect(target?.delay).toBe(58);
   });
 
+  it("places an audio-only presentation by the stream it has", () => {
+    // Live radio: an MPD of audio Representations, typed secondary because
+    // that is what an audio track is beside a video one.
+    const target = liveDelayFor({
+      streams: [
+        stream({
+          key: "audio",
+          type: "secondary",
+          start: 0,
+          end: 60,
+          segmentCount: 15,
+        }),
+      ],
+    });
+    expect(target).toEqual({ delay: 56, segment: 4 });
+  });
+
   it("says nothing for a master playlist, a VOD, or an empty stream", () => {
     expect(liveDelayFor({ streams: [] })).toBeUndefined();
     expect(

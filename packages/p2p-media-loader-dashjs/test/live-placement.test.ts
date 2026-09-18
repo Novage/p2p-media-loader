@@ -31,6 +31,24 @@ function mpd(segmentCount: number, segmentSeconds: number) {
 </MPD>`;
 }
 
+/** A live MPD of audio alone, as a radio station publishes. */
+function audioMpd(segmentCount: number, segmentSeconds: number) {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="dynamic" availabilityStartTime="1970-01-01T00:00:00Z" minimumUpdatePeriod="PT8S">
+  <Period id="0" start="PT0S">
+    <AdaptationSet mimeType="audio/mp4" lang="en">
+      <Representation id="a" bandwidth="128000" codecs="mp4a.40.2">
+        <SegmentTemplate media="a-$Time$.m4s" initialization="a-init.mp4" timescale="1000">
+          <SegmentTimeline>
+            <S t="0" d="${segmentSeconds * 1000}" r="${segmentCount - 1}"/>
+          </SegmentTimeline>
+        </SegmentTemplate>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>`;
+}
+
 /** A static MPD: a presentation with a duration and no live window. */
 function vodMpd() {
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -290,6 +308,16 @@ describe("dash.js live window placement", () => {
 
     deliverMpd(mpd(7, 8));
     expect(registered.length).toBe(2);
+  });
+
+  it("places a live presentation that is audio alone", () => {
+    const { settings, deliverMpd } = setup();
+    // Live radio: every stream is typed secondary, since that is what an
+    // audio track is beside a video one, and nothing would place it if the
+    // main stream were the only one that counted.
+    deliverMpd(audioMpd(15, 4));
+    expect(settings.streaming.delay.liveDelay).toBe(56);
+    expect(settings.streaming.buffer.bufferTimeDefault).toBe(15);
   });
 
   it("re-applies only when the window itself changes", () => {
