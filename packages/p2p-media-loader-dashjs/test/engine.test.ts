@@ -2,8 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 import type { MediaPlayerClass } from "dashjs";
 import { DashJsP2PEngine } from "../src/engine.js";
 
-function fakePlayer(liveDelay: number | undefined) {
-  const settings = { streaming: { delay: { liveDelay } } };
+function fakePlayer(
+  liveDelay: number | undefined,
+  liveDelayFragmentCount: number = NaN,
+) {
+  const settings = {
+    streaming: { delay: { liveDelay, liveDelayFragmentCount } },
+  };
   const player = {
     getSettings: vi.fn(() => settings),
     updateSettings: vi.fn((update: { streaming?: { delay?: object } }) => {
@@ -48,6 +53,19 @@ describe("DashJsP2PEngine.bindPlayer", () => {
     const configured = fakePlayer(8);
     new DashJsP2PEngine().bindPlayer(configured.player);
     expect(configured.spies.updateSettings).not.toHaveBeenCalled();
+  });
+
+  it("leaves a player placed by fragment count alone as well", () => {
+    // dash.js reads liveDelayFragmentCount when liveDelay has no value, so an
+    // integrator who set it has placed the player just as deliberately.
+    const byFragmentCount = fakePlayer(NaN, 3);
+    new DashJsP2PEngine().bindPlayer(byFragmentCount.player);
+    expect(byFragmentCount.spies.updateSettings).not.toHaveBeenCalled();
+
+    // A null is dash.js's other way of saying unset.
+    const unset = fakePlayer(NaN, null as unknown as number);
+    new DashJsP2PEngine().bindPlayer(unset.player);
+    expect(unset.spies.updateSettings).toHaveBeenCalled();
   });
 
   it("subscribes to stream lifecycle events and unsubscribes on destroy", () => {

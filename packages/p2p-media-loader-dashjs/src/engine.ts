@@ -86,7 +86,7 @@ export class DashJsP2PEngine {
     this.core.updatePlayback(state),
   );
   private readonly core: Core;
-  /** False when the integrator configured a live delay themselves. */
+  /** False when the integrator placed the player in the live window themselves. */
   private managesLiveDelay = false;
   /** The live delay this engine placed, if any; see `applyLivePlacement`. */
   private appliedLiveDelay?: number;
@@ -121,8 +121,14 @@ export class DashJsP2PEngine {
     if (this.player) this.destroy();
     this.player = player;
 
-    const liveDelay = player.getSettings().streaming?.delay?.liveDelay;
-    this.managesLiveDelay = liveDelay === undefined || Number.isNaN(liveDelay);
+    const delay = player.getSettings().streaming?.delay;
+    // dash.js takes the placement from `liveDelay` when it has one and from
+    // `liveDelayFragmentCount` otherwise, so either one is an integrator who
+    // placed the player themselves. `useSuggestedPresentationDelay` is not:
+    // it is on by default, so it says nothing about what they chose.
+    this.managesLiveDelay =
+      !isConfigured(delay?.liveDelay) &&
+      !isConfigured(delay?.liveDelayFragmentCount);
     this.appliedLiveDelay = undefined;
     this.appliedBuffer = undefined;
     this.heldBuffer = readForwardBuffer(player);
@@ -378,4 +384,9 @@ function readForwardBuffer(player: MediaPlayerClass): Partial<ForwardBuffer> {
     if (typeof value === "number" && !Number.isNaN(value)) held[key] = value;
   }
   return held;
+}
+
+/** Whether a dash.js setting holds a value rather than its unset default. */
+function isConfigured(value: number | null | undefined): boolean {
+  return value !== undefined && value !== null && !Number.isNaN(value);
 }
