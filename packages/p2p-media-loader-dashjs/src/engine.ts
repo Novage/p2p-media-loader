@@ -311,11 +311,7 @@ export class DashJsP2PEngine {
       // treating it as nobody's would raise a setting they hold below the
       // ceiling, which is the one thing a ceiling must not do.
       const value = current?.[key];
-      if (
-        value !== undefined &&
-        !Number.isNaN(value) &&
-        value !== this.appliedBuffer?.[key]
-      ) {
+      if (isBufferTime(value) && value !== this.appliedBuffer?.[key]) {
         this.heldBuffer = { ...this.heldBuffer, [key]: value };
       }
 
@@ -425,9 +421,20 @@ function readForwardBuffer(player: MediaPlayerClass): Partial<ForwardBuffer> {
   const held: Partial<ForwardBuffer> = {};
   for (const key of FORWARD_BUFFER_KEYS) {
     const value = buffer?.[key];
-    if (typeof value === "number" && !Number.isNaN(value)) held[key] = value;
+    if (isBufferTime(value)) held[key] = value;
   }
   return held;
+}
+
+/**
+ * Whether a buffer setting the player holds is a length this engine can reason
+ * about. dash.js validates nothing an integrator passes to `updateSettings`
+ * and its own typings promise a number, so a `null` left by someone clearing
+ * a setting would otherwise be read as a length, compared as zero, and handed
+ * back to the player as its ceiling.
+ */
+function isBufferTime(value: unknown): value is number {
+  return typeof value === "number" && !Number.isNaN(value);
 }
 
 /** Whether a dash.js setting holds a value rather than its unset default. */

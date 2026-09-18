@@ -452,6 +452,19 @@ describe("dash.js live window placement", () => {
     expect(player.updateSettings.mock.calls.length).toBe(afterFirst + 1);
   });
 
+  it("ignores a buffer setting that is not a length", () => {
+    const { settings, deliverMpd } = setup();
+    deliverMpd(mpd(3, 2));
+
+    // dash.js validates nothing it is given, and its typings promise a
+    // number: a null left by someone clearing the setting must not come back
+    // to the player as its ceiling, where it would read as no buffer at all.
+    settings.streaming.buffer.bufferTimeDefault = null as unknown as number;
+    deliverMpd(mpd(30, 2));
+
+    expect(settings.streaming.buffer.bufferTimeDefault).toBe(15);
+  });
+
   it("re-applies only when the window itself changes", () => {
     const { player, settings, deliverMpd } = setup();
     deliverMpd(mpd(7, 8));
