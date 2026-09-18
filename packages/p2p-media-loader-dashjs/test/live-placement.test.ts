@@ -320,6 +320,27 @@ describe("dash.js live window placement", () => {
     expect(settings.streaming.buffer.bufferTimeDefault).toBe(15);
   });
 
+  it("places a live window again after a presentation that was not live", () => {
+    const held = {
+      bufferTimeDefault: 18,
+      bufferTimeAtTopQuality: 30,
+      bufferTimeAtTopQualityLongForm: 60,
+    };
+    const { settings, deliverMpd } = setup(NaN, held);
+    deliverMpd(mpd(7, 8));
+    expect(settings.streaming.buffer.bufferTimeDefault).toBe(16);
+
+    // Giving the settings back gives up what was placed with them, or the
+    // same window returning would read as already placed and the ceiling
+    // would stay off for the rest of the session.
+    deliverMpd(vodMpd());
+    expect(settings.streaming.buffer).toEqual(held);
+
+    deliverMpd(mpd(7, 8));
+    expect(settings.streaming.delay.liveDelay).toBe(48);
+    expect(settings.streaming.buffer.bufferTimeDefault).toBe(16);
+  });
+
   it("re-applies only when the window itself changes", () => {
     const { player, settings, deliverMpd } = setup();
     deliverMpd(mpd(7, 8));

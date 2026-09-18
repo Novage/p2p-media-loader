@@ -325,7 +325,6 @@ export class DashJsP2PEngine {
     // The next source starts from the player's own settings, and is placed on
     // its own window rather than measured against this one's.
     this.restoreForwardBuffer();
-    this.appliedLiveDelay = undefined;
   };
 
   /**
@@ -336,6 +335,11 @@ export class DashJsP2PEngine {
    * ahead for the rest of the session.
    */
   private restoreForwardBuffer() {
+    // The delay goes back with the buffer: they are the two halves of one
+    // placement, and a delay remembered without the buffer beside it would
+    // make the window that returns look already placed — leaving the ceiling
+    // off for the rest of the session.
+    this.appliedLiveDelay = undefined;
     if (!this.player || !this.appliedBuffer) return;
     this.appliedBuffer = undefined;
 
@@ -371,7 +375,6 @@ export class DashJsP2PEngine {
     }
     this.restoreForwardBuffer();
     this.player = undefined;
-    this.appliedLiveDelay = undefined;
     this.heldBuffer = undefined;
   }
 }
