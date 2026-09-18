@@ -161,7 +161,14 @@ class RequestRouter {
     // wrap has to be in place before the parent runs.
     customData.onloadend = () => {
       try {
-        if (response.status >= 200 && response.status <= 299) {
+        // Asked again here, not only when the request was made: a response
+        // that lands after the engine let the player go would otherwise
+        // rebuild the core it released, on a refresh already in flight.
+        if (
+          this.hooks.isActive?.() !== false &&
+          response.status >= 200 &&
+          response.status <= 299
+        ) {
           observe(response.data);
         }
       } catch (error) {

@@ -108,14 +108,20 @@ function setup(
     string,
     (this: FactoryMakerThis) => XhrLoaderLike,
   ];
+  // Set while a test wants the response held back, as a refresh in flight is.
+  let held: (() => void) | undefined;
   const parent: XhrLoaderLike = {
     load: (
       request: CommonMediaRequestLike,
       response: CommonMediaResponseLike,
     ) => {
-      response.status = 200;
-      response.url = request.url;
-      request.customData?.onloadend?.();
+      const complete = () => {
+        response.status = 200;
+        response.url = request.url;
+        request.customData?.onloadend?.();
+      };
+      if (held === undefined) complete();
+      else held = complete;
       return true;
     },
     abort: () => undefined,
@@ -143,7 +149,16 @@ function setup(
     }
   };
 
-  return { settings, player, deliverMpd, engine, fire };
+  /** Starts an MPD request and hands back the response, to land when called. */
+  const holdMpd = (data: string) => {
+    held = () => undefined;
+    deliverMpd(data);
+    const complete = held;
+    held = undefined;
+    return complete;
+  };
+
+  return { settings, player, deliverMpd, holdMpd, engine, fire };
 }
 
 describe("dash.js live window placement", () => {
@@ -300,6 +315,22 @@ describe("dash.js live window placement", () => {
     engine.destroy();
     deliverMpd(mpd(7, 8));
     expect(registered.length).toBe(1);
+  });
+
+  it("drops a manifest that lands after the engine is destroyed", () => {
+    const { holdMpd, engine } = setup();
+    const registered: unknown[] = [];
+    engine.addEventListener("onStreamAdded", (details) =>
+      registered.push(details),
+    );
+
+    // A live MPD refreshes every couple of seconds, so one is in flight
+    // whenever the integrator switches P2P off.
+    const land = holdMpd(mpd(7, 8));
+    engine.destroy();
+    land();
+
+    expect(registered.length).toBe(0);
   });
 
   it("routes again when the same player is bound again", () => {
