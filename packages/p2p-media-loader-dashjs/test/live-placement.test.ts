@@ -31,6 +31,20 @@ function mpd(segmentCount: number, segmentSeconds: number) {
 </MPD>`;
 }
 
+/** A static MPD: a presentation with a duration and no live window. */
+function vodMpd() {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="static" mediaPresentationDuration="PT600S">
+  <Period id="0" start="PT0S">
+    <AdaptationSet mimeType="video/mp4">
+      <Representation id="v" bandwidth="2000000" codecs="avc1.64001f" width="1280" height="720">
+        <SegmentTemplate media="v-$Number$.m4s" initialization="v-init.mp4" timescale="1000" duration="4000" startNumber="1"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>`;
+}
+
 type Settings = {
   streaming: {
     delay: { liveDelay: number | undefined };
@@ -95,7 +109,16 @@ function setup(
       data,
     } satisfies CommonMediaResponseLike);
 
-  return { settings, player, deliverMpd, engine };
+  const fire = (event: string) => {
+    for (const [name, handler] of player.on.mock.calls as [
+      string,
+      () => void,
+    ][]) {
+      if (name === event) handler();
+    }
+  };
+
+  return { settings, player, deliverMpd, engine, fire };
 }
 
 describe("dash.js live window placement", () => {
@@ -188,6 +211,52 @@ describe("dash.js live window placement", () => {
     deliverMpd(mpd(30, 2));
     expect(settings.streaming.buffer.bufferTimeDefault).toBe(3);
     expect(settings.streaming.buffer.bufferTimeAtTopQuality).toBe(15);
+  });
+
+  it("gives the player its own buffer back when the next source is not live", () => {
+    const held = {
+      bufferTimeDefault: 18,
+      bufferTimeAtTopQuality: 30,
+      bufferTimeAtTopQualityLongForm: 60,
+    };
+    const { settings, deliverMpd } = setup(NaN, held);
+    deliverMpd(mpd(4, 4));
+    expect(settings.streaming.buffer.bufferTimeDefault).toBe(8);
+
+    // One player, one engine, the next item in a playlist: dash.js keeps the
+    // settings object across attachSource, so a VOD source would otherwise
+    // play with the live stream's ceiling.
+    deliverMpd(vodMpd());
+    expect(settings.streaming.buffer).toEqual(held);
+  });
+
+  it("gives it back on stream teardown as well", () => {
+    const held = {
+      bufferTimeDefault: 18,
+      bufferTimeAtTopQuality: 30,
+      bufferTimeAtTopQualityLongForm: 60,
+    };
+    const { settings, deliverMpd, fire } = setup(NaN, held);
+    deliverMpd(mpd(4, 4));
+    fire("streamTeardownComplete");
+    expect(settings.streaming.buffer).toEqual(held);
+  });
+
+  it("places the next live source on its own window", () => {
+    const { settings, deliverMpd, fire } = setup(NaN, {
+      bufferTimeDefault: 18,
+      bufferTimeAtTopQuality: 30,
+      bufferTimeAtTopQualityLongForm: 60,
+    });
+    deliverMpd(mpd(7, 8));
+    expect(settings.streaming.delay.liveDelay).toBe(48);
+    fire("streamTeardownComplete");
+
+    // A window whose delay is within half a segment of the last source's is
+    // still this source's to place.
+    deliverMpd(mpd(7, 8));
+    expect(settings.streaming.delay.liveDelay).toBe(48);
+    expect(settings.streaming.buffer.bufferTimeDefault).toBe(16);
   });
 
   it("re-applies only when the window itself changes", () => {

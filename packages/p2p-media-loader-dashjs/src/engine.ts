@@ -45,11 +45,13 @@ const MIN_BUFFER_SEGMENTS = 2;
 const LIVE_EDGE_MARGIN_SEGMENTS = 1;
 
 /** The three dash.js settings that bound how far ahead of the playhead it fetches. */
-type ForwardBuffer = {
-  bufferTimeDefault: number;
-  bufferTimeAtTopQuality: number;
-  bufferTimeAtTopQualityLongForm: number;
-};
+const FORWARD_BUFFER_KEYS = [
+  "bufferTimeDefault",
+  "bufferTimeAtTopQuality",
+  "bufferTimeAtTopQualityLongForm",
+] as const;
+
+type ForwardBuffer = Record<(typeof FORWARD_BUFFER_KEYS)[number], number>;
 
 const STREAM_INITIALIZED: MediaPlayerEvents["STREAM_INITIALIZED"] =
   "streamInitialized";
@@ -90,6 +92,8 @@ export class DashJsP2PEngine {
   private appliedLiveDelay?: number;
   /** The forward buffer this engine placed, if any; see `forwardBufferSettings`. */
   private appliedBuffer?: ForwardBuffer;
+  /** What the player held before this engine lowered it; see `restoreForwardBuffer`. */
+  private heldBuffer?: Partial<ForwardBuffer>;
   private readonly debug = debug("p2pml-dashjs:engine");
 
   /**
@@ -120,6 +124,8 @@ export class DashJsP2PEngine {
     const liveDelay = player.getSettings().streaming?.delay?.liveDelay;
     this.managesLiveDelay = liveDelay === undefined || Number.isNaN(liveDelay);
     this.appliedLiveDelay = undefined;
+    this.appliedBuffer = undefined;
+    this.heldBuffer = readForwardBuffer(player);
     if (this.managesLiveDelay) {
       player.updateSettings({
         streaming: {
@@ -203,7 +209,14 @@ export class DashJsP2PEngine {
   private applyLivePlacement = (manifest: ProcessedManifest) => {
     if (!this.player || !this.managesLiveDelay) return;
     const target = liveDelayFor(manifest);
-    if (!target) return;
+    if (!target) {
+      // A presentation that declares streams and none of them live is not
+      // this engine's to place — and is the one that would otherwise inherit
+      // a live window's ceiling, since the settings are the player's and
+      // outlive the source.
+      if (manifest.streams.length > 0) this.restoreForwardBuffer();
+      return;
+    }
 
     // Against the delay this placed, never against the one the player holds:
     // until a window is known that is INITIAL_LIVE_EDGE_DELAY, and a first
@@ -298,7 +311,33 @@ export class DashJsP2PEngine {
   private handleStreamTeardown = () => {
     this.core.destroy();
     this.playback.stop();
+    // The next source starts from the player's own settings, and is placed on
+    // its own window rather than measured against this one's.
+    this.restoreForwardBuffer();
+    this.appliedLiveDelay = undefined;
   };
+
+  /**
+   * Puts back what the player held before this engine lowered it. dash.js
+   * keeps `streaming.buffer` across `attachSource`, so a live window's
+   * ceiling would otherwise be inherited by whatever plays next — a VOD
+   * source included, which would then buffer a live stream's few seconds
+   * ahead for the rest of the session.
+   */
+  private restoreForwardBuffer() {
+    if (!this.player || !this.appliedBuffer) return;
+    this.appliedBuffer = undefined;
+
+    const buffer: Partial<ForwardBuffer> = {};
+    for (const key of FORWARD_BUFFER_KEYS) {
+      const value = this.heldBuffer?.[key];
+      if (value !== undefined) buffer[key] = value;
+    }
+    if (Object.keys(buffer).length === 0) return;
+
+    this.debug(`Restoring forward buffer to ${buffer.bufferTimeDefault}`);
+    this.player.updateSettings({ streaming: { buffer } });
+  }
 
   private registerMediaElement() {
     let media: HTMLMediaElement | undefined;
@@ -319,8 +358,20 @@ export class DashJsP2PEngine {
       this.player.off(STREAM_INITIALIZED, this.handleStreamInitialized);
       this.player.off(STREAM_TEARDOWN_COMPLETE, this.handleStreamTeardown);
     }
+    this.restoreForwardBuffer();
     this.player = undefined;
     this.appliedLiveDelay = undefined;
-    this.appliedBuffer = undefined;
+    this.heldBuffer = undefined;
   }
+}
+
+/** The forward buffer settings a player currently holds. */
+function readForwardBuffer(player: MediaPlayerClass): Partial<ForwardBuffer> {
+  const buffer = player.getSettings().streaming?.buffer;
+  const held: Partial<ForwardBuffer> = {};
+  for (const key of FORWARD_BUFFER_KEYS) {
+    const value = buffer?.[key];
+    if (typeof value === "number" && !Number.isNaN(value)) held[key] = value;
+  }
+  return held;
 }
