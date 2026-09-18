@@ -77,12 +77,29 @@ export const VideoJs = ({
     // response renames every rendition each time the manifest is refreshed.
     const labelOf = (r: VhsRepresentation) =>
       `${r.height ?? "?"}p (${Math.round((r.bandwidth ?? 0) / 1000)}k)`;
+    // Two renditions can render the same name — an audio-only master with a
+    // language per rendition at one bitrate, or two variants at one height
+    // whose bandwidths round together. A name that fits both pins neither,
+    // since every rendition it fits is enabled and ABR keeps its choice, so
+    // repeats are numbered. VHS lists them in manifest order, which holds
+    // across refreshes.
+    const namesOf = (reps: VhsRepresentation[]) => {
+      const seen = new Map<string, number>();
+      return reps.map((r) => {
+        const name = labelOf(r);
+        const count = (seen.get(name) ?? 0) + 1;
+        seen.set(name, count);
+        return count === 1 ? name : `${name} #${count}`;
+      });
+    };
     let chosen: string = AUTO_QUALITY;
     // Enabling a single representation pins it; enabling all restores ABR.
     const applyChoice = () => {
-      for (const r of representations()) {
-        r.enabled(chosen === AUTO_QUALITY || labelOf(r) === chosen);
-      }
+      const reps = representations();
+      const names = namesOf(reps);
+      reps.forEach((r, i) =>
+        r.enabled(chosen === AUTO_QUALITY || names[i] === chosen),
+      );
     };
 
     // VHS fills its rendition list as it parses the manifest, and builds it
@@ -91,18 +108,32 @@ export const VideoJs = ({
     let listed = "";
     const updateQualityOptions = () => {
       const reps = representations();
-      const ids = reps.map((r) => r.id).join();
-      if (ids === listed) return;
-      listed = ids;
+      // Keyed on the names, not the VHS ids: an id carries the playlist URL,
+      // which a signing CDN changes on every refresh, and a rendition
+      // re-advertised at another bitrate keeps its id while its name moves.
+      // The names are what the selector offers and what the pinned choice is
+      // matched against, so they are what has to stay in step with it.
+      const names = namesOf(reps);
+      const shown = names.join();
+      if (shown === listed) return;
+      listed = shown;
+      // A live master may stop advertising the pinned rendition, or advertise
+      // it at another bitrate under a new label. Keeping the old choice would
+      // enable no rendition at all, and VHS would have nothing to select —
+      // which is as true of a master that comes back down to a single one as
+      // of one that keeps several, so this runs before the selector is hidden
+      // rather than after.
+      if (!names.includes(chosen)) chosen = AUTO_QUALITY;
       if (reps.length < 2) {
         qualityElement.style.display = "none";
+        applyChoice();
         return;
       }
       qualityElement.style.display = "block";
       qualityElement.options.length = 0;
       qualityElement.add(new Option("Auto", AUTO_QUALITY));
-      for (const r of reps) {
-        qualityElement.add(new Option(labelOf(r)));
+      for (const name of names) {
+        qualityElement.add(new Option(name));
       }
       qualityElement.value = chosen;
       applyChoice();
