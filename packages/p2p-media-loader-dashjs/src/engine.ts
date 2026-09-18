@@ -286,33 +286,29 @@ export class DashJsP2PEngine {
     );
 
     const current = this.player?.getSettings().streaming?.buffer;
-    const applied = this.appliedBuffer;
-    // A setting this engine wrote is not one to hold to: reading it back as
-    // the integrator's would let the ceiling only ever fall, and a window
-    // that grows — a stream whose timeline fills out after it starts
-    // publishing — would keep the buffer it needed when it was seconds long.
-    const lower = (setting: number | undefined, ours: number | undefined) =>
-      setting === undefined ||
-      Number.isNaN(setting) ||
-      setting === ours ||
-      setting > bufferTime
-        ? bufferTime
-        : setting;
+    const settings = {} as ForwardBuffer;
+    for (const key of FORWARD_BUFFER_KEYS) {
+      // Whatever the player holds that this engine did not write is the
+      // integrator's latest word on the setting, and the next write hides it,
+      // so it is remembered here. Reading back what the engine wrote as
+      // theirs instead would let the ceiling only ever fall — a window that
+      // grows would keep the buffer it needed when it was seconds long — and
+      // treating it as nobody's would raise a setting they hold below the
+      // ceiling, which is the one thing a ceiling must not do.
+      const value = current?.[key];
+      if (
+        value !== undefined &&
+        !Number.isNaN(value) &&
+        value !== this.appliedBuffer?.[key]
+      ) {
+        this.heldBuffer = { ...this.heldBuffer, [key]: value };
+      }
 
-    return {
-      bufferTimeDefault: lower(
-        current?.bufferTimeDefault,
-        applied?.bufferTimeDefault,
-      ),
-      bufferTimeAtTopQuality: lower(
-        current?.bufferTimeAtTopQuality,
-        applied?.bufferTimeAtTopQuality,
-      ),
-      bufferTimeAtTopQualityLongForm: lower(
-        current?.bufferTimeAtTopQualityLongForm,
-        applied?.bufferTimeAtTopQualityLongForm,
-      ),
-    };
+      const held = this.heldBuffer?.[key];
+      settings[key] =
+        held !== undefined && held < bufferTime ? held : bufferTime;
+    }
+    return settings;
   }
 
   private handleStreamInitialized = () => {
