@@ -1,24 +1,19 @@
 import type shaka from "shaka-player/dist/shaka-player.compiled.d.ts";
-import {
-  HlsManifestParser,
-  DashManifestParser,
-} from "./manifest-parser-decorator.js";
-import { SegmentManager } from "./segment-manager.js";
-import {
-  StreamInfo,
-  Shaka,
-  Stream,
-  HookedNetworkingEngine,
-  HookedRequest,
-  P2PMLShakaData,
-} from "./types.js";
+import { Shaka, HookedRequest, P2PMLShakaData } from "./types.js";
 import { Loader } from "./loading-handler.js";
+import { defaultPluginFor } from "./default-plugin.js";
+import { hlsManifestParser } from "p2p-media-loader-core/hls";
+import { dashManifestParser } from "p2p-media-loader-core/dash";
 import {
   CoreConfig,
   Core,
   CoreEventMap,
   DynamicCoreConfig,
   DefinedCoreConfig,
+  ProcessedManifest,
+  debug,
+  trackMediaElementPlayback,
+  liveDelayFor,
 } from "p2p-media-loader-core";
 
 /** A type for specifying dynamic configuration options that can be changed at runtime for the P2P engine's core. */
@@ -39,7 +34,14 @@ export type PartialShakaP2PEngineConfig = {
   core?: Partial<CoreConfig>;
 };
 
-const LIVE_EDGE_DELAY = 25;
+/**
+ * Presentation delay until a live manifest says how wide the window is, at
+ * which point the delay is sized from it (see the core's `liveDelayFor`).
+ * Only applied when the integrator left Shaka's own default in place.
+ */
+const INITIAL_LIVE_EDGE_DELAY = 25;
+/** Shaka's default: "derive from the manifest", which places the player near the edge. */
+const SHAKA_DEFAULT_PRESENTATION_DELAY = 0;
 
 /**
  * Represents a Peer-to-Peer (P2P) engine designed to enhance media streaming efficiency.
@@ -47,8 +49,10 @@ const LIVE_EDGE_DELAY = 25;
  * alongside traditional HTTP fetching. This reduces server bandwidth costs and improves scalability by sharing the load
  * across multiple clients.
  *
- * The engine manages core functionalities such as segment fetching, segment management, peer connection management,
- * and event handling related to the P2P and HLS processes.
+ * The engine has three responsibilities (see specs/player-adapters.md): it
+ * hands every manifest Shaka fetches to the core, routes segment requests
+ * through the core, and reports playback state from the media element. Shaka's
+ * own manifest parsers run untouched; the core parses the same bytes itself.
  *
  * @example
  * // Initializing the ShakaP2PEngine with custom configuration
@@ -72,11 +76,23 @@ const LIVE_EDGE_DELAY = 25;
  */
 export class ShakaP2PEngine {
   private player?: shaka.Player;
+  private readonly playback = trackMediaElementPlayback((state, media) => {
+    if (this.oracle.enabled) {
+      this.oracle(`media.currentTime=${media.currentTime.toFixed(3)}`);
+    }
+    this.core.updatePlayback(state);
+  });
   private readonly shaka: Shaka;
-  private readonly streamInfo: StreamInfo = {};
-  private readonly core: Core<Stream>;
-  private readonly segmentManager: SegmentManager;
+  private readonly core: Core;
   private requestFilter?: shaka.extern.RequestFilter;
+  /** False when the integrator configured a presentation delay themselves. */
+  private managesPresentationDelay = false;
+  /** The presentation delay this engine applied, if any; see `applyLiveDelay`. */
+  private appliedPresentationDelay?: number;
+  private readonly debug = debug("p2pml-shaka:engine");
+  // See HybridLoader.oracleLogger: logs media.currentTime beside the core's
+  // estimate so the two can be compared while the playback contract beds in.
+  private readonly oracle = debug("p2pml:playback-oracle");
 
   /**
    * Constructs an instance of `ShakaP2PEngine`.
@@ -88,8 +104,14 @@ export class ShakaP2PEngine {
     validateShaka(shaka);
 
     this.shaka = shaka;
-    this.core = new Core(config?.core);
-    this.segmentManager = new SegmentManager(this.streamInfo, this.core);
+    this.core = new Core({
+      ...config?.core,
+      // Shaka plays both protocols, so its bundle carries both parsers.
+      manifestParsers: config?.core?.manifestParsers ?? [
+        hlsManifestParser,
+        dashManifestParser,
+      ],
+    });
   }
 
   /**
@@ -102,11 +124,20 @@ export class ShakaP2PEngine {
     if (this.player) this.destroy();
 
     this.player = player;
-    this.player.configure("manifest.defaultPresentationDelay", LIVE_EDGE_DELAY);
-    this.player.configure(
-      "manifest.dash.ignoreSuggestedPresentationDelay",
-      true,
-    );
+    this.appliedPresentationDelay = undefined;
+    this.managesPresentationDelay =
+      player.getConfiguration().manifest.defaultPresentationDelay ===
+      SHAKA_DEFAULT_PRESENTATION_DELAY;
+    if (this.managesPresentationDelay) {
+      this.player.configure(
+        "manifest.defaultPresentationDelay",
+        INITIAL_LIVE_EDGE_DELAY,
+      );
+      this.player.configure(
+        "manifest.dash.ignoreSuggestedPresentationDelay",
+        true,
+      );
+    }
 
     const versionMatch = /\d+/.exec(this.shaka.Player.version);
     const versionMajor = parseInt(versionMatch ? versionMatch[0] : "0", 10);
@@ -199,24 +230,19 @@ export class ShakaP2PEngine {
     const { player } = this;
     if (!player) return;
 
-    const networkingEngine: HookedNetworkingEngine | null =
-      player.getNetworkingEngine();
+    const networkingEngine = player.getNetworkingEngine();
     if (networkingEngine) {
       if (type === "register") {
         const p2pml: P2PMLShakaData = {
-          player,
           shaka: this.shaka,
           core: this.core,
-          streamInfo: this.streamInfo,
-          segmentManager: this.segmentManager,
+          onManifestProcessed: this.applyLiveDelay,
         };
         this.requestFilter = (requestType, request) => {
           (request as HookedRequest).p2pml = p2pml;
         };
-        networkingEngine.p2pml = p2pml;
         networkingEngine.registerRequestFilter(this.requestFilter);
       } else {
-        networkingEngine.p2pml = undefined;
         if (this.requestFilter) {
           networkingEngine.unregisterRequestFilter(this.requestFilter);
         }
@@ -227,23 +253,45 @@ export class ShakaP2PEngine {
     player[method]("loaded", this.handlePlayerLoaded);
     player[method]("loading", this.destroyCurrentStreamContext);
     player[method]("unloading", this.handlePlayerUnloading);
-    player[method]("adaptation", this.onVariantChanged);
-    player[method]("variantchanged", this.onVariantChanged);
   };
 
-  private onVariantChanged = () => {
-    if (!this.player) return;
-    const activeTrack = this.player
-      .getVariantTracks()
-      .find((track) => track.active);
+  /**
+   * Sizes the presentation delay from the window the core just parsed. The
+   * manifest reaches the core before Shaka's parser sees the same bytes, so
+   * the value is in place when Shaka builds its timeline — which is the one
+   * moment it is read. A refresh reuses that timeline, so what is configured
+   * here after the first manifest of a presentation is what the next load
+   * starts from, not a change to the one playing. (The exception is a
+   * low-latency DASH stream: Shaka re-applies the delay on every parse there,
+   * unless the MPD suggests one of its own.)
+   *
+   * Configured anyway on every manifest, and only when the window has changed
+   * by at least half a segment: fractional drift in the window length is not
+   * a change worth carrying into the next load.
+   */
+  private applyLiveDelay = (manifest: ProcessedManifest) => {
+    if (!this.player || !this.managesPresentationDelay) return;
+    const target = liveDelayFor(manifest);
+    if (!target) return;
 
-    if (!activeTrack) return;
-    this.core.setActiveLevelBitrate(activeTrack.bandwidth);
+    // Against the delay this applied, never against the one the player holds:
+    // until a window is known that is INITIAL_LIVE_EDGE_DELAY, and a first
+    // window whose delay lands within half a segment of it would read as
+    // already applied.
+    if (
+      this.appliedPresentationDelay !== undefined &&
+      Math.abs(this.appliedPresentationDelay - target.delay) <
+        target.segment / 2
+    ) {
+      return;
+    }
+
+    this.debug(`Setting defaultPresentationDelay to ${target.delay}`);
+    this.player.configure("manifest.defaultPresentationDelay", target.delay);
+    this.appliedPresentationDelay = target.delay;
   };
 
   private handlePlayerLoaded = () => {
-    if (!this.player) return;
-    this.core.setIsLive(this.player.isLive());
     this.updateMediaElementEventHandlers("register");
   };
 
@@ -253,26 +301,17 @@ export class ShakaP2PEngine {
   };
 
   private destroyCurrentStreamContext = () => {
-    this.streamInfo.protocol = undefined;
-    this.streamInfo.manifestResponseUrl = undefined;
     this.core.destroy();
   };
 
   private updateMediaElementEventHandlers = (
     type: "register" | "unregister",
   ) => {
-    const media = this.player?.getMediaElement();
-    if (!media) return;
-    const method =
-      type === "register" ? "addEventListener" : "removeEventListener";
-    media[method]("timeupdate", this.handlePlaybackUpdate);
-    media[method]("ratechange", this.handlePlaybackUpdate);
-    media[method]("seeking", this.handlePlaybackUpdate);
-  };
-
-  private handlePlaybackUpdate = (event: Event) => {
-    const media = event.target as HTMLVideoElement;
-    this.core.updatePlayback(media.currentTime, media.playbackRate);
+    this.playback.watch(
+      type === "register"
+        ? (this.player?.getMediaElement() ?? undefined)
+        : undefined,
+    );
   };
 
   /** Cleans up and releases all resources, and unregisters all event handlers. */
@@ -281,28 +320,7 @@ export class ShakaP2PEngine {
     this.updatePlayerEventHandlers("unregister");
     this.updateMediaElementEventHandlers("unregister");
     this.player = undefined;
-  }
-
-  private static registerManifestParsers(shaka: Shaka) {
-    const hlsParserFactory = () => new HlsManifestParser(shaka);
-    const dashParserFactory = () => new DashManifestParser(shaka);
-
-    const Parser = shaka.media.ManifestParser;
-    Parser.registerParserByMime("application/dash+xml", dashParserFactory);
-    Parser.registerParserByMime("application/x-mpegurl", hlsParserFactory);
-    Parser.registerParserByMime(
-      "application/vnd.apple.mpegurl",
-      hlsParserFactory,
-    );
-  }
-
-  private static unregisterManifestParsers(shaka: Shaka) {
-    const Parser = shaka.media.ManifestParser;
-    Parser.unregisterParserByMime("mpd");
-    Parser.unregisterParserByMime("application/dash+xml");
-    Parser.unregisterParserByMime("m3u8");
-    Parser.unregisterParserByMime("application/x-mpegurl");
-    Parser.unregisterParserByMime("application/vnd.apple.mpegurl");
+    this.appliedPresentationDelay = undefined;
   }
 
   private static registerNetworkingEngineSchemes(shaka: Shaka) {
@@ -312,12 +330,16 @@ export class ShakaP2PEngine {
       const request = args[1] as HookedRequest;
       const { p2pml } = request;
       if (!p2pml) {
-        return shaka.net.HttpFetchPlugin.parse(
-          ...args,
-        ) as shaka.extern.IAbortableOperation<shaka.extern.Response>;
+        // A player with no engine bound, on a scheme this registration took
+        // over from Shaka: load it the way Shaka would have.
+        return defaultPluginFor(shaka, args[0]).parse(...args);
       }
 
-      const loader = new Loader(p2pml.shaka, p2pml.core, p2pml.streamInfo);
+      const loader = new Loader(
+        p2pml.shaka,
+        p2pml.core,
+        p2pml.onManifestProcessed,
+      );
       return loader.load(...args);
     };
     NetworkingEngine.registerScheme("http", handleLoading);
@@ -333,15 +355,15 @@ export class ShakaP2PEngine {
   }
 
   /**
-   * Registers plugins related to P2P functionality into the Shaka Player.
-   * Plugins must be registered before initializing the player to ensure proper integration.
+   * Registers the networking scheme plugins the P2P engine needs into Shaka
+   * Player. Plugins must be registered before initializing the player.
+   * Shaka's manifest parsers are left as they are.
    *
    * @param shaka The Shaka Player library. Defaults to the global Shaka Player instance if not provided.
    */
   static registerPlugins(shaka = window.shaka) {
     validateShaka(shaka);
 
-    ShakaP2PEngine.registerManifestParsers(shaka);
     ShakaP2PEngine.registerNetworkingEngineSchemes(shaka);
   }
 
@@ -353,7 +375,6 @@ export class ShakaP2PEngine {
   static unregisterPlugins(shaka = window.shaka) {
     validateShaka(shaka);
 
-    ShakaP2PEngine.unregisterManifestParsers(shaka);
     ShakaP2PEngine.unregisterNetworkingEngineSchemes(shaka);
   }
 }

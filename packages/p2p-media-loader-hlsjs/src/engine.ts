@@ -1,16 +1,13 @@
 import type Hls from "hls.js";
 import type {
-  AudioTrackLoadedData,
+  LevelDetails,
   LevelUpdatedData,
-  ManifestLoadedData,
-  LevelSwitchingData,
   PlaylistLevelType,
   HlsConfig,
   Events,
 } from "hls.js";
 import { FragmentLoaderBase } from "./fragment-loader.js";
 import { PlaylistLoaderBase } from "./playlist-loader.js";
-import { SegmentManager } from "./segment-manager.js";
 import {
   CoreConfig,
   Core,
@@ -18,8 +15,11 @@ import {
   DynamicCoreConfig,
   debug,
   DefinedCoreConfig,
+  liveDelayFromWindow,
+  trackMediaElementPlayback,
 } from "p2p-media-loader-core";
 import { injectMixin } from "./engine-static.js";
+import { hlsManifestParser } from "p2p-media-loader-core/hls";
 
 /** Represents the complete configuration for the `HlsJsP2PEngine`. */
 export type HlsJsP2PEngineConfig = {
@@ -59,16 +59,34 @@ export type HlsWithP2PConfig<HlsType extends abstract new () => unknown> =
     };
   };
 
-const MAX_LIVE_SYNC_DURATION = 120;
+/**
+ * Where the player sits in a live window. See specs/player-adapters.md,
+ * "HLS.js".
+ *
+ * Every segment between the player's buffer and the live edge is one peers
+ * can fetch for each other, so the player is placed as deep in the window as
+ * it can go. Where exactly is the core's `liveDelayFromWindow` to say, the
+ * same answer every adapter gets. Its own forward buffer keeps the fetch
+ * positions inside the window even as the playhead drifts past the tail.
+ */
+
+/**
+ * How far beyond the target the re-sync threshold sits, so a viewer who pauses
+ * or stalls is brought back to the target before the buffer starves.
+ */
+const LIVE_RESYNC_MARGIN_SEGMENTS = 2;
 
 /**
  * Represents a Peer-to-Peer (P2P) engine for HLS (HTTP Live Streaming) to enhance media streaming efficiency.
- * This class integrates P2P technologies into Hls.js, enabling the distribution of media segments via a peer network
+ * This class integrates P2P technologies into HLS.js, enabling the distribution of media segments via a peer network
  * alongside traditional HTTP fetching. This reduces server bandwidth costs and improves scalability by sharing the load
  * across multiple clients.
  *
- * The engine manages core functionalities such as segment fetching, segment management, peer connection management,
- * and event handling related to the P2P and HLS processes.
+ * The engine has three responsibilities (see specs/player-adapters.md): it
+ * hands the playlists that describe this presentation to the core, routes
+ * fragment requests through the core, and reports playback state from the
+ * media element. The core parses the playlists itself; nothing here describes
+ * streams to it.
  *
  * @example
  * // Creating an instance of HlsJsP2PEngine with custom configuration
@@ -93,28 +111,36 @@ const MAX_LIVE_SYNC_DURATION = 120;
  */
 export class HlsJsP2PEngine {
   private readonly core: Core;
-  private readonly segmentManager: SegmentManager;
-  private hlsInstanceGetter?: () => Hls;
+  private hlsInstanceGetter?: () => Hls | undefined;
   private currentHlsInstance?: Hls;
+  private readonly playback = trackMediaElementPlayback((state, media) => {
+    if (this.oracle.enabled) {
+      this.oracle(`media.currentTime=${media.currentTime.toFixed(3)}`);
+    }
+    this.core.updatePlayback(state);
+  });
   private readonly debug = debug("p2pml-hlsjs:engine");
+  // See HybridLoader.oracleLogger: logs media.currentTime beside the core's
+  // estimate so the two can be compared while the playback contract beds in.
+  private readonly oracle = debug("p2pml:playback-oracle");
 
   /**
-   * Enhances a given `Hls.js` class by injecting additional Peer-to-Peer (P2P) functionalities.
+   * Enhances a given HLS.js class by injecting additional Peer-to-Peer (P2P) functionalities.
    *
-   * @returns The enhanced `Hls.js` class with P2P functionalities.
+   * @returns The enhanced HLS.js class with P2P functionalities.
    *
    * @example
    * const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
    *
    * const hls = new HlsWithP2P({
-   *   // Hls.js configuration
-   *   startLevel: 0, // Example of Hls.js config parameter
+   *   // HLS.js configuration
+   *   startLevel: 0, // Example of HLS.js config parameter
    *   p2p: {
    *     core: {
    *       // P2P core configuration
    *     },
    *     onHlsJsCreated(hls) {
-   *       // Do something with the Hls.js instance
+   *       // Do something with the HLS.js instance
    *     },
    *   },
    * });
@@ -128,8 +154,11 @@ export class HlsJsP2PEngine {
    * @param config An optional configuration for the P2P engine setup.
    */
   constructor(config?: PartialHlsJsP2PEngineConfig) {
-    this.core = new Core(config?.core);
-    this.segmentManager = new SegmentManager(this.core);
+    this.core = new Core({
+      ...config?.core,
+      // HLS.js plays HLS only; a bundle of this engine carries no DASH parser.
+      manifestParsers: config?.core?.manifestParsers ?? [hlsManifestParser],
+    });
   }
 
   /**
@@ -175,7 +204,13 @@ export class HlsJsP2PEngine {
   }
 
   /**
-   * Provides the Hls.js P2P specific configuration for Hls.js loaders.
+   * Provides the HLS.js P2P specific configuration for HLS.js loaders.
+   *
+   * An integration that constructs HLS.js itself should also pass
+   * `lowLatencyMode: false` (the mixin does so unless the integrator sets it):
+   * in low-latency mode HLS.js requests partial segments, which the core does
+   * not register, so those requests bypass P2P.
+   *
    * @returns An object containing the fragment loader (`fLoader`) and playlist loader (`pLoader`).
    */
   getConfigForHlsJs(): { fLoader: unknown; pLoader: unknown } {
@@ -186,7 +221,7 @@ export class HlsJsP2PEngine {
   }
 
   /**
-   * Retrieves the current configuration of the Hls.js P2P engine.
+   * Retrieves the current configuration of the HLS.js P2P engine.
    * @returns A readonly version of the `HlsJsP2PEngineConfig`.
    */
   getConfig(): HlsJsP2PEngineConfig {
@@ -218,12 +253,24 @@ export class HlsJsP2PEngine {
   }
 
   /**
-   * Sets the HLS instance used for handling media.
-   * @param hls The HLS instance, or a function that returns an HLS instance.
+   * Sets the HLS.js instance used for handling media, or a function that
+   * returns it. The function may return nothing while the player has not
+   * built one yet; the engine binds when it appears.
+   *
+   * The instance is not typed as this package's own `Hls`, and deliberately:
+   * an application often has a second copy of HLS.js with its own types —
+   * `@videojs/hlsjs-video` bundles one, and its `Hls` and ours differ by
+   * whole methods — so requiring this package's type would make our
+   * development dependency's version part of the integration contract.
+   *
+   * @param hls The HLS.js instance, or a function that returns it.
    */
-  bindHls<T = unknown>(hls: T | (() => T)) {
-    this.hlsInstanceGetter =
-      typeof hls === "function" ? (hls as () => Hls) : () => hls as Hls;
+  bindHls<T = unknown>(hls: T | (() => T | undefined | null)) {
+    const get =
+      typeof hls === "function"
+        ? (hls as () => T | undefined | null)
+        : () => hls;
+    this.hlsInstanceGetter = () => (get() ?? undefined) as Hls | undefined;
   }
 
   private initHlsEvents() {
@@ -241,26 +288,17 @@ export class HlsJsP2PEngine {
     const method = type === "register" ? "on" : "off";
 
     hls[method](
-      "hlsManifestLoaded" as Events.MANIFEST_LOADED,
-      this.handleManifestLoaded,
-    );
-    hls[method](
-      "hlsLevelSwitching" as Events.LEVEL_SWITCHING,
-      this.handleLevelSwitching,
-    );
-    hls[method](
       "hlsLevelUpdated" as Events.LEVEL_UPDATED,
       this.handleLevelUpdated,
     );
-    hls[method](
-      "hlsAudioTrackLoaded" as Events.AUDIO_TRACK_LOADED,
-      this.handleLevelUpdated,
-    );
     hls[method]("hlsDestroying" as Events.DESTROYING, this.destroy);
-    hls[method](
-      "hlsMediaAttaching" as Events.MEDIA_ATTACHING,
-      this.destroyCore,
-    );
+    // Loading a source starts a new stream; attaching a media element does
+    // not. HLS.js fetches the playlists as soon as the master is parsed,
+    // whether or not an element is attached, and re-attaches one mid-playback
+    // of its own accord — `recoverMediaError()` detaches and attaches to get
+    // past a media error. Letting the core go there would drop the registry
+    // the playlists filled, and a VOD stream never fetches them again, so
+    // every fragment after it would miss and load over HTTP in silence.
     hls[method](
       "hlsManifestLoading" as Events.MANIFEST_LOADING,
       this.destroyCore,
@@ -278,84 +316,90 @@ export class HlsJsP2PEngine {
   private updateMediaElementEventHandlers = (
     type: "register" | "unregister",
   ) => {
-    const media = this.currentHlsInstance?.media;
-    if (!media) return;
-    const method =
-      type === "register" ? "addEventListener" : "removeEventListener";
-    media[method]("timeupdate", this.handlePlaybackUpdate);
-    media[method]("seeking", this.handlePlaybackUpdate);
-    media[method]("ratechange", this.handlePlaybackUpdate);
+    this.playback.watch(
+      type === "register"
+        ? (this.currentHlsInstance?.media ?? undefined)
+        : undefined,
+    );
   };
 
-  private handleManifestLoaded = (event: string, data: ManifestLoadedData) => {
-    // hls.js already resolves this URL for us (getResponseUrl): it is the
-    // loader-reported response URL — post-redirect for any loader that honors
-    // the `response.url` contract, including both default loaders — with a
-    // guarded fallback to the request URL (custom loaders that omit
-    // `response.url`, or legacy WebViews without `xhr.responseURL`). A custom
-    // loader that omits `response.url` on a redirecting manifest degrades to
-    // the pre-redirect URL: its peers still form a consistent swarm among
-    // themselves, but not with default-loader peers.
-    this.core.setManifestResponseUrl(data.url);
-    this.segmentManager.processMainManifest(data);
-  };
-
-  private handleLevelSwitching = (event: string, data: LevelSwitchingData) => {
-    if (data.bitrate) this.core.setActiveLevelBitrate(data.bitrate);
-  };
-
-  private handleLevelUpdated = (
-    event: string,
-    data: LevelUpdatedData | AudioTrackLoadedData,
-  ) => {
+  /**
+   * Buffer tuning only. Streams and segments reach the core through the
+   * playlist loader; live state is derived from the playlist by the core.
+   *
+   * The main level's playlist is what this reads. An alternate audio track's
+   * would describe the same window, and HLS.js announces one through
+   * `AUDIO_TRACK_LOADED` — but every fragment it parses from such a playlist
+   * carries `PlaylistLevelType.AUDIO`, so listening for it would be work that
+   * the fragment type below always turns away. That test is what keeps an
+   * alternate rendition's playlist from tuning the main level, and is not
+   * redundant with the one on length beside it.
+   */
+  private handleLevelUpdated = (event: string, data: LevelUpdatedData) => {
     if (
       this.currentHlsInstance &&
-      data.details.fragments[0].type === ("main" as PlaylistLevelType) &&
-      data.details.fragments.length > 4
+      data.details.fragments.length > 4 &&
+      data.details.fragments[0].type === ("main" as PlaylistLevelType)
     ) {
-      if (
-        data.details.live &&
-        !this.currentHlsInstance.userConfig.liveSyncDuration &&
-        !this.currentHlsInstance.userConfig.liveSyncDurationCount
-      ) {
-        this.updateLiveSyncDurationCount(data);
-      }
+      if (data.details.live) this.updateLiveSync(data.details);
 
+      const { userConfig } = this.currentHlsInstance;
       if (
-        !this.currentHlsInstance.userConfig.maxBufferLength &&
-        !this.currentHlsInstance.userConfig.maxMaxBufferLength
+        userConfig.maxBufferLength === undefined &&
+        userConfig.maxMaxBufferLength === undefined
       ) {
         this.updateMaxBufferLength(data.details.targetduration);
       }
     }
-
-    this.core.setIsLive(data.details.live);
-    this.segmentManager.updatePlaylist(data);
   };
 
-  private updateLiveSyncDurationCount(
-    data: LevelUpdatedData | AudioTrackLoadedData,
-  ) {
-    const fragmentDuration = data.details.targetduration;
+  /**
+   * Places the player deep in the live window so that the segments between
+   * its buffer and the live edge — the ones peers exchange — are as many as
+   * the window allows. Applied through HLS.js's own `targetLatency` API and
+   * only when the integrator has not configured the live sync settings
+   * themselves. Set once per value; HLS.js then re-syncs to it on start, on a
+   * stall, and when the max latency is exceeded.
+   *
+   * Segment length is the playlist's average: `EXT-X-TARGETDURATION` is an
+   * upper bound and can be several times the real segment.
+   */
+  private updateLiveSync(details: LevelDetails) {
+    const hls = this.currentHlsInstance;
+    if (!hls) return;
 
-    const maxLiveSyncCount = Math.floor(
-      MAX_LIVE_SYNC_DURATION / fragmentDuration,
-    );
-    const newLiveSyncDurationCount = Math.min(
-      data.details.fragments.length - 1,
-      maxLiveSyncCount,
-    );
+    const segment = details.averagetargetduration ?? details.targetduration;
+    const window = details.totalduration;
+    if (!(segment > 0) || !(window > 0)) return;
+
+    const targetLatency = liveDelayFromWindow(window, segment);
+    const maxLatency = targetLatency + LIVE_RESYNC_MARGIN_SEGMENTS * segment;
+
+    // Segment durations are not exact multiples, so the window length drifts
+    // by fractions of a second between refreshes. Only a change of at least
+    // half a segment means the window itself changed; anything smaller is
+    // noise, and re-applying the target would reset HLS.js's stall tracking.
+    const tolerance = segment / 2;
+    const differs = (current: number | undefined, next: number) =>
+      current === undefined || Math.abs(current - next) >= tolerance;
+
+    const { userConfig } = hls;
+    if (
+      userConfig.liveSyncDuration === undefined &&
+      userConfig.liveSyncDurationCount === undefined &&
+      differs(hls.config.liveSyncDuration, targetLatency)
+    ) {
+      this.debug(`Setting targetLatency to ${targetLatency}`);
+      hls.targetLatency = targetLatency;
+    }
 
     if (
-      this.currentHlsInstance &&
-      this.currentHlsInstance.config.liveSyncDurationCount !==
-        newLiveSyncDurationCount
+      userConfig.liveMaxLatencyDuration === undefined &&
+      userConfig.liveMaxLatencyDurationCount === undefined &&
+      differs(hls.config.liveMaxLatencyDuration, maxLatency)
     ) {
-      this.debug(
-        `Setting liveSyncDurationCount to ${newLiveSyncDurationCount}`,
-      );
-      this.currentHlsInstance.config.liveSyncDurationCount =
-        newLiveSyncDurationCount;
+      this.debug(`Setting liveMaxLatencyDuration to ${maxLatency}`);
+      hls.config.liveMaxLatencyDuration = maxLatency;
     }
   }
 
@@ -367,8 +411,8 @@ export class HlsJsP2PEngine {
       config.mainStream.highDemandTimeWindow,
       config.secondaryStream.highDemandTimeWindow,
     );
-    // Hls.js maxBufferLength dictates how many seconds AHEAD OF THE PLAYHEAD it buffers.
-    // To ensure Hls.js only buffers up to the highDemandTimeWindow and lets the
+    // HLS.js maxBufferLength dictates how many seconds AHEAD OF THE PLAYHEAD it buffers.
+    // To ensure HLS.js only buffers up to the highDemandTimeWindow and lets the
     // background loader do all the advance fetching, we set p2pOptimalBufferLength
     // directly equal to highDemandTimeWindow, but with a lower bound based on fragment duration.
     const p2pOptimalBufferLength = Math.max(
@@ -400,11 +444,6 @@ export class HlsJsP2PEngine {
     this.updateMediaElementEventHandlers("unregister");
   };
 
-  private handlePlaybackUpdate = (event: Event) => {
-    const media = event.target as HTMLMediaElement;
-    this.core.updatePlayback(media.currentTime, media.playbackRate);
-  };
-
   private destroyCore = () => this.core.destroy();
 
   /** Cleans up and releases all resources, and unregisters all event handlers. */
@@ -432,11 +471,12 @@ export class HlsJsP2PEngine {
   }
 
   private createPlaylistLoaderClass() {
+    const { core } = this;
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const engine = this;
     return class PlaylistLoader extends PlaylistLoaderBase {
       constructor(config: HlsConfig) {
-        super(config);
+        super(config, core);
         engine.initHlsEvents();
       }
     };

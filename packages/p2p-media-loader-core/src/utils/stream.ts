@@ -36,19 +36,6 @@ export function getSegmentFromStreamByExternalId(
   }
 }
 
-export function getSegmentAvgDuration(stream: StreamWithSegments) {
-  const { segments } = stream;
-  let sumDuration = 0;
-  const { size } = segments;
-  if (size === 0) return 0;
-  for (const segment of segments.values()) {
-    const duration = segment.endTime - segment.startTime;
-    sumDuration += duration;
-  }
-
-  return sumDuration / size;
-}
-
 function calculateTimeWindows(
   timeWindowsConfig: PlaybackTimeWindowsConfig,
   availableMemoryInPercent: number,
@@ -105,13 +92,31 @@ export function getSegmentPlaybackStatuses(
   };
 }
 
-function isSegmentInTimeWindow(
-  segment: SegmentWithStream,
-  playback: Playback,
+/**
+ * Seconds from the playhead to a segment's edges, positive ahead.
+ *
+ * The buffer edge sits exactly `bufferAhead` in front of the playhead, so
+ * subtracting it converts manifest time into distance from the playhead. Both
+ * terms are differences — a manifest-space delta and a player-space duration —
+ * so the offset between the two timelines cancels and never has to be known.
+ */
+export function getDistanceFromPlayhead(
+  segment: Pick<SegmentWithStream, "startTime" | "endTime">,
+  playback: Pick<Playback, "bufferEdge" | "bufferAhead">,
+): { start: number; end: number } {
+  const { bufferEdge, bufferAhead } = playback;
+  return {
+    start: segment.startTime - bufferEdge + bufferAhead,
+    end: segment.endTime - bufferEdge + bufferAhead,
+  };
+}
+
+export function isSegmentInTimeWindow(
+  segment: Pick<SegmentWithStream, "startTime" | "endTime">,
+  playback: Pick<Playback, "bufferEdge" | "bufferAhead" | "rate">,
   timeWindowLength: number,
-) {
-  const { startTime, endTime } = segment;
-  const { position, rate } = playback;
-  const rightMargin = position + timeWindowLength * rate;
-  return !(rightMargin < startTime || position > endTime);
+): boolean {
+  const { start, end } = getDistanceFromPlayhead(segment, playback);
+  const rightMargin = timeWindowLength * playback.rate;
+  return !(rightMargin < start || 0 > end);
 }

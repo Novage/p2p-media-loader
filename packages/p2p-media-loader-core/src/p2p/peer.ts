@@ -151,7 +151,7 @@ export class Peer {
           if (!this.#downloadingContext) break;
           if (this.#downloadingContext.isSegmentDataCommandReceived) break;
 
-          const { request, controls, requestId } = this.#downloadingContext;
+          const { request, requestId } = this.#downloadingContext;
           if (
             request.segment.externalId !== command.i ||
             requestId !== command.r
@@ -159,8 +159,20 @@ export class Peer {
             break;
           }
 
+          // A peer answering with a segment of no bytes at all. Accepting it
+          // would store an empty segment, announce it, and pass it on: one
+          // peer's defect becomes the swarm's. A peer that has nothing to
+          // send says so with SegmentAbsent. Zero is only meaningful as the
+          // remainder of a resumed transfer, where the bytes are already here.
+          if (command.s === 0 && request.loadedBytes === 0) {
+            this.#destroyOnPeerError(
+              "bytes-length-mismatch",
+              "Peer sent a segment of zero length",
+            );
+            break;
+          }
+
           this.#downloadingContext.isSegmentDataCommandReceived = true;
-          controls.firstBytesReceived();
 
           if (request.totalBytes === undefined) {
             request.setTotalBytes(request.loadedBytes + command.s);

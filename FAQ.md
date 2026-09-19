@@ -93,7 +93,7 @@ const hls = new HlsWithP2P({
       },
     },
     onHlsJsCreated(hls) {
-      // Subscribe to P2P engine and Hls.js events here
+      // Subscribe to P2P engine and HLS.js events here
       hls.p2pEngine.addEventListener("onSegmentLoaded", (details) => {
         console.log("Segment Loaded:", details);
       });
@@ -124,7 +124,7 @@ const hls = new HlsWithP2P({
       swarmId: "https://somecdn.com/mystream_12345.m3u8", // any unique string
     },
     onHlsJsCreated(hls) {
-      // Subscribe to P2P engine and Hls.js events here
+      // Subscribe to P2P engine and HLS.js events here
       hls.p2pEngine.addEventListener("onSegmentLoaded", (details) => {
         console.log("Segment Loaded:", details);
       });
@@ -135,7 +135,7 @@ const hls = new HlsWithP2P({
 
 ## How to see that P2P is actually working?
 
-The easiest way is to subscribe to P2P [events](https://novage.github.io/p2p-media-loader/docs/v4.0/types/p2p-media-loader-core.CoreEventMap.html) and log them:
+The easiest way is to subscribe to P2P [events](https://novage.github.io/p2p-media-loader/docs/v5.0/types/p2p-media-loader-core.p2p-media-loader-core.CoreEventMap.html) and log them:
 
 ```javascript
 const engine = new HlsJsP2PEngine();

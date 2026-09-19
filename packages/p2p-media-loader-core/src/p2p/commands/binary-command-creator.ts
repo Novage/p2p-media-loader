@@ -45,7 +45,7 @@ function isLastCommandChunk(buffer: Uint8Array) {
   );
 }
 
-export class BinaryCommandJoiningError extends Error {
+class BinaryCommandJoiningError extends Error {
   constructor(readonly type: "incomplete-joining" | "no-first-chunk") {
     super();
   }
