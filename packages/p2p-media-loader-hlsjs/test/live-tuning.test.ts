@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { HlsConfig } from "hls.js";
 import { HlsJsP2PEngine } from "../src/engine.js";
 import { injectMixin } from "../src/engine-static.js";
@@ -198,6 +198,49 @@ describe("HLS.js live window placement", () => {
     });
     expect(hls.config.maxBufferLength).toBe(0);
     expect(hls.config.maxMaxBufferLength).toBe(600);
+  });
+});
+
+describe("HLS.js engine event wiring", () => {
+  it("keeps the registry when a media element is attached", () => {
+    // HLS.js fetches the playlists as soon as the master is parsed, whether
+    // or not an element is attached, and re-attaches one of its own accord:
+    // `recoverMediaError()` detaches and attaches to get past a media error.
+    // Dropping the registry there leaves a VOD stream, which never fetches
+    // its playlists again, loading every fragment over HTTP in silence.
+    const { engine, hls } = setup();
+    const core = (engine as unknown as { core: { destroy: () => void } }).core;
+    const destroy = vi.fn();
+    core.destroy = destroy;
+
+    hls.handlers.get("hlsMediaAttaching")?.("hlsMediaAttaching", {});
+    expect(destroy).not.toHaveBeenCalled();
+
+    // Loading a source is a new stream, and does let the core go.
+    hls.handlers.get("hlsManifestLoading")?.("hlsManifestLoading", {});
+    expect(destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it("survives a playlist that lists no fragments", () => {
+    // A level whose media playlist momentarily lists none: reading
+    // `fragments[0].type` before the length is checked throws inside an
+    // HLS.js event dispatch, which HLS.js reports as an internal-exception
+    // ERROR.
+    const { hls } = setup();
+    expect(hls.handlers.has("hlsLevelUpdated")).toBe(true);
+    expect(() =>
+      hls.handlers.get("hlsLevelUpdated")?.("hlsLevelUpdated", {
+        details: { live: false, totalduration: 0, fragments: [] },
+      }),
+    ).not.toThrow();
+  });
+
+  it("listens for the level playlist alone", () => {
+    // HLS.js parses an alternate audio track's playlist with
+    // `PlaylistLevelType.AUDIO` on every fragment, so an AUDIO_TRACK_LOADED
+    // listener could never reach the tuning below its `main` test.
+    const { hls } = setup();
+    expect(hls.handlers.has("hlsAudioTrackLoaded")).toBe(false);
   });
 });
 

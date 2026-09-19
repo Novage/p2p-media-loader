@@ -1,6 +1,5 @@
 import type Hls from "hls.js";
 import type {
-  AudioTrackLoadedData,
   LevelDetails,
   LevelUpdatedData,
   PlaylistLevelType,
@@ -84,9 +83,10 @@ const LIVE_RESYNC_MARGIN_SEGMENTS = 2;
  * across multiple clients.
  *
  * The engine has three responsibilities (see specs/player-adapters.md): it
- * hands every playlist HLS.js fetches to the core, routes fragment requests
- * through the core, and reports playback state from the media element. The
- * core parses the playlists itself; nothing here describes streams to it.
+ * hands the playlists that describe this presentation to the core, routes
+ * fragment requests through the core, and reports playback state from the
+ * media element. The core parses the playlists itself; nothing here describes
+ * streams to it.
  *
  * @example
  * // Creating an instance of HlsJsP2PEngine with custom configuration
@@ -291,15 +291,14 @@ export class HlsJsP2PEngine {
       "hlsLevelUpdated" as Events.LEVEL_UPDATED,
       this.handleLevelUpdated,
     );
-    hls[method](
-      "hlsAudioTrackLoaded" as Events.AUDIO_TRACK_LOADED,
-      this.handleLevelUpdated,
-    );
     hls[method]("hlsDestroying" as Events.DESTROYING, this.destroy);
-    hls[method](
-      "hlsMediaAttaching" as Events.MEDIA_ATTACHING,
-      this.destroyCore,
-    );
+    // Loading a source starts a new stream; attaching a media element does
+    // not. HLS.js fetches the playlists as soon as the master is parsed,
+    // whether or not an element is attached, and re-attaches one mid-playback
+    // of its own accord — `recoverMediaError()` detaches and attaches to get
+    // past a media error. Letting the core go there would drop the registry
+    // the playlists filled, and a VOD stream never fetches them again, so
+    // every fragment after it would miss and load over HTTP in silence.
     hls[method](
       "hlsManifestLoading" as Events.MANIFEST_LOADING,
       this.destroyCore,
@@ -327,15 +326,20 @@ export class HlsJsP2PEngine {
   /**
    * Buffer tuning only. Streams and segments reach the core through the
    * playlist loader; live state is derived from the playlist by the core.
+   *
+   * The main level's playlist is what this reads. An alternate audio track's
+   * would describe the same window, and HLS.js announces one through
+   * `AUDIO_TRACK_LOADED` — but every fragment it parses from such a playlist
+   * carries `PlaylistLevelType.AUDIO`, so listening for it would be work that
+   * the fragment type below always turns away. That test is what keeps an
+   * alternate rendition's playlist from tuning the main level, and is not
+   * redundant with the one on length beside it.
    */
-  private handleLevelUpdated = (
-    event: string,
-    data: LevelUpdatedData | AudioTrackLoadedData,
-  ) => {
+  private handleLevelUpdated = (event: string, data: LevelUpdatedData) => {
     if (
       this.currentHlsInstance &&
-      data.details.fragments[0].type === ("main" as PlaylistLevelType) &&
-      data.details.fragments.length > 4
+      data.details.fragments.length > 4 &&
+      data.details.fragments[0].type === ("main" as PlaylistLevelType)
     ) {
       if (data.details.live) this.updateLiveSync(data.details);
 

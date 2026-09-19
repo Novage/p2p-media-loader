@@ -13,6 +13,7 @@ import {
   CoreRequestError,
   ByteRange,
 } from "p2p-media-loader-core";
+import { isSecondaryPlayer } from "./secondary-player.js";
 
 const DEFAULT_DOWNLOAD_LATENCY = 10;
 
@@ -26,9 +27,11 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   #core: Core;
   #response?: SegmentResponse;
   #request?: { url: string; byteRange?: ByteRange };
+  readonly #ofAnotherPlayer: boolean;
 
   constructor(config: HlsConfig, core: Core) {
     this.#core = core;
+    this.#ofAnotherPlayer = isSecondaryPlayer(config);
     this.#createDefaultLoader = () => new config.loader(config);
     this.stats = {
       aborted: false,
@@ -61,8 +64,13 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     this.#request = { url: context.url, byteRange };
 
     // Whitelist by lookup: a fragment the core's registry does not know, or
-    // one whose stream has P2P disabled, loads through HLS.js's own loader.
-    if (!this.#core.isSegmentLoadable(context.url, byteRange)) {
+    // one whose stream has P2P disabled, loads through HLS.js's own loader —
+    // as does every fragment of an interstitial's own player, whose segments
+    // are not the ones this core holds.
+    if (
+      this.#ofAnotherPlayer ||
+      !this.#core.isSegmentLoadable(context.url, byteRange)
+    ) {
       this.#defaultLoader = this.#createDefaultLoader();
       this.#defaultLoader.stats = this.stats;
       this.#defaultLoader.load(context, config, callbacks);

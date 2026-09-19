@@ -120,9 +120,36 @@ islands, and the final island may be nowhere near the playhead.
 ### HLS.js
 
 - Parsers: HLS only.
-- Manifest: `pLoader`.
+- Manifest: `pLoader`, for the playlists that name streams — the master, a
+  variant's media playlist, an audio rendition's. A subtitle track's playlist
+  passes through it too and is not the core's to read: no master declares it
+  as a stream, so the core would register the WebVTT playlist as one of its
+  own.
 - Segments: `fLoader`, falling back to `config.loader`.
 - Playback: the media element.
+
+A player HLS.js builds beside the primary is not this presentation. An
+interstitial's ad break and trick-play I-frames each get a second `Hls`
+instance made from the primary's own config, so each carries these loaders and
+the core behind them, and nothing either loads reaches the engine's event
+handlers. Neither their playlists nor their fragments are the core's: they name
+streams no master here declared, and left alone they would stay in the registry
+— one per break or rendition — and be announced in this presentation's swarm
+under the identity of nothing. `primarySessionId` is what HLS.js puts on both
+and on no primary, and both loaders stand aside for an instance carrying it.
+
+What HLS.js reads back off a playlist loader it was handed, the wrapper answers
+from the loader that did the work: the context of the request in flight, its
+stats, and the cache age a live playlist needs to advance a blocking reload
+past what the CDN already holds.
+
+The core's stream context ends when HLS.js loads a source, and at no other
+time. Attaching a media element is not a new stream: HLS.js fetches the
+playlists as soon as the master is parsed, whether or not an element is
+attached, and re-attaches one of its own accord — `recoverMediaError()`
+detaches and attaches to get past a media error. Letting the core go there
+would drop the registry those playlists filled, and a VOD stream never fetches
+them again, so every fragment after it would load over HTTP in silence.
 
 The adapter also tunes HLS.js's own buffering, because the core's background
 loader is what should fetch ahead, not the player. Every setting below is

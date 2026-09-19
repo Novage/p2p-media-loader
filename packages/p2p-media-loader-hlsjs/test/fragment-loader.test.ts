@@ -22,7 +22,7 @@ class FakeDefaultLoader {
   }
 }
 
-function setup(loadable: boolean) {
+function setup(loadable: boolean, extraConfig: Record<string, unknown> = {}) {
   const data = new Uint8Array([1, 2, 3]).buffer;
   const core = {
     isSegmentLoadable: vi.fn(() => loadable),
@@ -30,7 +30,10 @@ function setup(loadable: boolean) {
     abortSegmentLoading: vi.fn(),
   };
   FakeDefaultLoader.instances = [];
-  const config = { loader: FakeDefaultLoader } as unknown as HlsConfig;
+  const config = {
+    loader: FakeDefaultLoader,
+    ...extraConfig,
+  } as unknown as HlsConfig;
   const loader = new FragmentLoaderBase(config, core as unknown as Core);
   const callbacks = {
     onSuccess: vi.fn(),
@@ -112,5 +115,24 @@ describe("HLS.js fragment loader", () => {
     expect(callbacks.onSuccess).not.toHaveBeenCalled();
     expect(callbacks.onProgress).not.toHaveBeenCalled();
     expect(callbacks.onError).not.toHaveBeenCalled();
+  });
+});
+
+describe("HLS.js fragment loader for an interstitial", () => {
+  it("never serves a fragment of an ad from the core", () => {
+    // HLS.js plays an ad break with a second instance built from this one's
+    // config, so it carries this loader and this core. Even a URL the
+    // registry knows belongs to the presentation the core holds, not to the
+    // ad: an interstitial's player fetches its own fragments itself.
+    const { core, loader, callbacks } = setup(true, {
+      primarySessionId: "s1",
+      assetPlayerId: "interstitial-1",
+    });
+
+    loader.load(context(), loaderConfig, callbacks);
+
+    expect(core.loadSegment).not.toHaveBeenCalled();
+    expect(FakeDefaultLoader.instances).toHaveLength(1);
+    expect(FakeDefaultLoader.instances[0].load).toHaveBeenCalledTimes(1);
   });
 });
