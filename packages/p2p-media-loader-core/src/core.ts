@@ -1,4 +1,5 @@
 import { HybridLoader } from "./hybrid-loader.js";
+import { runAll } from "./run-all.js";
 import type { PlaybackState } from "./playback.js";
 import type { ManifestParser, ManifestProtocol } from "./manifest/types.js";
 import type { SidxBox } from "./manifest/mp4-sidx.js";
@@ -904,17 +905,28 @@ export class Core {
     this.failedStreamKeys.clear();
     this.unidentifiedStreamKeys.clear();
     this.unshareableLogged.clear();
-    this.mainStreamLoader?.destroy();
-    this.secondaryStreamLoader?.destroy();
-    this.segmentStorage?.setSegmentChangeCallback(undefined);
-    this.segmentStorage?.destroy();
+    // Each part is torn down whatever the ones before it made of themselves,
+    // and this core is left empty either way. An integrator's own segment
+    // storage is destroyed here and is free to throw; stopping at it would
+    // leave destroyed loaders still referenced and the failed storage still
+    // set, so the next stream to use this core would take both back and run
+    // with P2P silently dead. The first failure is raised once there is
+    // nothing left to reset.
+    const failures = runAll([
+      () => this.mainStreamLoader?.destroy(),
+      () => this.secondaryStreamLoader?.destroy(),
+      () => this.segmentStorage?.setSegmentChangeCallback(undefined),
+      () => this.segmentStorage?.destroy(),
+      () => this.webTorrentSocketPool.destroy(),
+    ]);
+
     this.mainStreamLoader = undefined;
     this.secondaryStreamLoader = undefined;
     this.segmentStorage = undefined;
     this.manifestResponseUrl = undefined;
     this.streamDetails = { isLive: false };
     this.storageInitPromise = undefined;
-    this.webTorrentSocketPool.destroy();
+    if (failures.length) throw failures[0];
   }
 
   private async initializeSegmentStorage() {

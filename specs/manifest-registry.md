@@ -20,6 +20,13 @@ before the player parses the same manifest reads it from here, from the same
 parse that fed the registry, rather than parsing again. `undefined` means the
 manifest was ignored or failed to parse.
 
+Destroying a core empties it whatever any part of the teardown makes of
+itself. An integrator's own segment storage is destroyed there and is free to
+throw; a teardown that stopped at it would leave destroyed loaders still
+referenced and the failed storage still set, and the next stream to use that
+core would take both back and run with P2P silently dead. The first failure is
+raised once there is nothing left to reset.
+
 The protocol is detected from the payload — an HLS playlist begins with
 `#EXTM3U`, an MPD is XML with an `MPD` root element — and may be stated
 explicitly when the adapter knows it. Parsing uses

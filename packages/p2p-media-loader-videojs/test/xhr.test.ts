@@ -906,6 +906,33 @@ describe("the page-wide hooks for a source's first manifest", () => {
     expect(core.destroy).toHaveBeenCalledTimes(1);
   });
 
+  it("leaves a source even when the core fails to be torn down", () => {
+    // An integrator's own segment storage is destroyed with the core and is
+    // free to throw. Holding on to the source it was leaving would have the
+    // router treat a later return to that source as no change at all.
+    const { router, core, videojsXhr, respond, setSrc, setHandler } = setup();
+    router.ensureTopLevelManifest();
+    respond(200, "#EXTM3U");
+    expect(videojsXhr).toHaveBeenCalledTimes(1);
+    core.destroy.mockImplementation(() => {
+      throw new Error("storage teardown failed");
+    });
+
+    setSrc("");
+    setHandler(false);
+    expect(() => router.ensureTopLevelManifest()).toThrow(
+      "storage teardown failed",
+    );
+
+    // Coming back to it is a new context, and its manifest is read again —
+    // rather than the router believing it never left.
+    core.destroy.mockImplementation(() => undefined);
+    setSrc(MASTER);
+    setHandler(true);
+    router.ensureTopLevelManifest();
+    expect(videojsXhr).toHaveBeenCalledTimes(2);
+  });
+
   it("hands a top-level refresh to the core exactly once", () => {
     const { core, request, respond, installPageHooks } = setup();
     installPageHooks();

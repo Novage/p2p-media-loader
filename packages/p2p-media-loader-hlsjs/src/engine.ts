@@ -16,6 +16,7 @@ import {
   debug,
   DefinedCoreConfig,
   liveDelayFromWindow,
+  runAll,
   trackMediaElementPlayback,
 } from "p2p-media-loader-core";
 import { injectMixin } from "./engine-static.js";
@@ -448,10 +449,18 @@ export class HlsJsP2PEngine {
 
   /** Cleans up and releases all resources, and unregisters all event handlers. */
   destroy = () => {
-    this.destroyCore();
-    this.updateHlsEventsHandlers("unregister");
-    this.updateMediaElementEventHandlers("unregister");
+    // Each step runs whatever the ones before it made of themselves: the core
+    // destroys an integrator's own segment storage and is free to throw, and
+    // HLS.js reports what a listener throws as a non-fatal internal exception
+    // — so a teardown that stopped there would leave this engine's loaders
+    // and listeners on a destroyed instance with nothing to show for it.
+    const failures = runAll([
+      this.destroyCore,
+      () => this.updateHlsEventsHandlers("unregister"),
+      () => this.updateMediaElementEventHandlers("unregister"),
+    ]);
     this.currentHlsInstance = undefined;
+    if (failures.length) throw failures[0];
   };
 
   private createFragmentLoaderClass() {

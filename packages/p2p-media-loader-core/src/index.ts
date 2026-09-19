@@ -6,6 +6,7 @@
  * @module p2p-media-loader-core
  */
 export { Core } from "./core.js";
+export { runAll } from "./run-all.js";
 export * from "./types.js";
 export * from "./playback.js";
 export type {

@@ -11,6 +11,7 @@ import {
   DefinedCoreConfig,
   DynamicCoreConfig,
   debug,
+  runAll,
   trackMediaElementPlayback,
 } from "p2p-media-loader-core";
 import { FirstManifestHooks, RequestRouter, RouterRegistry } from "./xhr.js";
@@ -292,25 +293,35 @@ export class VideoJsP2PEngine {
 
   /** Cleans up and releases all resources, and unregisters all event handlers. */
   destroy() {
-    this.core.destroy();
-    this.playback.stop();
-    if (this.router) {
-      registry.remove(this.router);
-      this.router.detachHooks();
-      this.router = undefined;
-    }
-    if (this.retainedXhr) {
-      firstManifestHooks.release(this.retainedXhr);
-      this.retainedXhr = undefined;
-    }
-    if (this.player) {
-      this.player.off("xhr-hooks-ready", this.handleXhrHooksReady);
-      this.player.off("loadstart", this.handleLoadStart);
-      this.player.off("dispose", this.handleDispose);
-      // Only if it is still ours: another engine may have taken it on since.
-      if (bound.get(this.player) === this) bound.delete(this.player);
-    }
+    // Each step runs whatever the ones before it made of themselves: the core
+    // destroys an integrator's own segment storage and is free to throw, and
+    // a teardown that stopped there would leave this router in the page-wide
+    // registry with its hooks still on a disposed player.
+    const failures = runAll([
+      () => this.core.destroy(),
+      () => this.playback.stop(),
+      () => {
+        if (!this.router) return;
+        registry.remove(this.router);
+        this.router.detachHooks();
+        this.router = undefined;
+      },
+      () => {
+        if (!this.retainedXhr) return;
+        firstManifestHooks.release(this.retainedXhr);
+        this.retainedXhr = undefined;
+      },
+      () => {
+        if (!this.player) return;
+        this.player.off("xhr-hooks-ready", this.handleXhrHooksReady);
+        this.player.off("loadstart", this.handleLoadStart);
+        this.player.off("dispose", this.handleDispose);
+        // Only if it is still ours: another engine may have taken it on since.
+        if (bound.get(this.player) === this) bound.delete(this.player);
+      },
+    ]);
     this.player = undefined;
+    if (failures.length) throw failures[0];
   }
 }
 

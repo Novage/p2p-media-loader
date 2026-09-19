@@ -200,8 +200,76 @@ cares about sharing on live streams should prefer the latter.
 - Manifest: a scheme plugin, filtering on `RequestType.MANIFEST`.
 - Segments: the same plugin, filtering on `RequestType.SEGMENT`. A segment
   request the core recognises as a stream's external index is let through to
-  Shaka's own loader and its response handed to `processSegmentIndex`.
+  Shaka's own loader and its response handed to `processSegmentIndex`, whose
+  answer sizes the live placement as a manifest's does — for the next load. A
+  `SegmentBase` stream registers from its MPD with no segments, so the index
+  is the first description of the presentation with a measurable window, and
+  it arrives after Shaka has built the timeline for this one: such a stream
+  plays its first session at the pre-manifest delay.
 - Playback: the media element.
+
+The live window is sized from a main stream once one has been seen, for as
+long as the source lasts. Loading another starts that over, and puts the
+player back to the delay a source begins from: a source with no main stream at
+all — live radio after a video stream — would otherwise be refused a
+placement, and one whose first manifest carries no measurable window at all —
+a live `SegmentBase` MPD registers its streams with no segments — would be
+placed at the window of the source before it, which may be well outside its
+own. Both happen before the core is torn down for the new source, since that
+tears down an integrator's own segment storage and is free to throw, and Shaka
+swallows what a listener throws. An HLS
+presentation arrives a manifest at a time — the master names the variants and
+the audio renditions, then each media playlist comes on its own — so a
+rendition's playlist describes a presentation with no main stream in it, and
+the window it offers is the audio window. The fallback to the widest stream is
+for a presentation that has no main stream at all, and stops applying the
+moment one shows up.
+
+Destroying the engine runs every step of its teardown, whatever the ones
+before made of themselves: the core tears down an integrator's own segment
+storage there and is free to throw, and a teardown that stopped at the first
+failure would leave the engine's request filter stamping every request of a
+player it reports as released. The first failure is raised once there is
+nothing left to let go of.
+
+A manifest or segment index reaching the core belongs to the source it was
+asked for. One still in flight when the player moves to another
+source, unloads the one it had, or is let go by the engine, describes the
+presentation before it: it
+sizes neither the player the engine has moved to nor the one it has let go,
+and it is not read into the core either. A live manifest refreshes every few
+seconds, so one is usually in flight at a switch, and a core that took it
+would register streams nothing plays — and, winning the race with the first
+manifest of the presentation that is playing, would name the swarm after a
+stream this player never asked for.
+
+One engine serves one player: a second bound to the same player takes it over
+from the first. Both would place that player and stamp its requests for cores
+of their own, and the first to be destroyed would give back settings the
+second is still relying on — the live placement, or native HLS, which plays
+outside the networking engine where nothing can be served at all.
+
+One place owns what the engine has done to the player it is bound to, and
+what it has learned about the source playing on it — two lifetimes that have
+to stay in step, since a setting given back by halves leaves a player carrying
+a placement nothing manages, and knowledge carried from one source to the next
+places a source by a window that is not its own.
+
+Every setting the engine writes is given back as it was when the engine is
+destroyed: the two that place the player in a live window —
+`manifest.defaultPresentationDelay` and
+`manifest.dash.ignoreSuggestedPresentationDelay` — and the one that keeps
+playback inside the networking engine, `streaming.preferNativeHls` on Shaka 5
+or `streaming.useNativeHlsOnSafari` before it, since native HLS plays where
+nothing can be served. Given back only while the player is still there to take
+them: a player being destroyed drops its configuration, and Shaka's
+`configure` asserts it has one. Its load mode is what says so, since its
+networking engine outlives the configuration by as long as the requests in
+flight take to settle. A player outliving its engine would otherwise
+keep a placement nothing is managing, and a second binding to that player
+would read the delay the first one wrote as the integrator's own choice and
+stop managing it at all. The engine leaves both alone for a player whose delay
+is not Shaka's default, since that is the integrator's to set.
 
 A served segment's response carries the download time Shaka's bandwidth
 estimator expects, derived from the core's bandwidth hint as

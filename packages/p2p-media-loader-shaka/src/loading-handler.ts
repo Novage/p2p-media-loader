@@ -22,14 +22,30 @@ type LoadingHandlerResult = shaka.extern.IAbortableOperation<Response>;
  */
 export class Loader {
   private loadArgs!: LoadingHandlerParams;
+  /** The presentation this request was made for; see `currentSource`. */
+  private readonly source: object | undefined;
 
   constructor(
     private readonly shaka: Shaka,
     private readonly core: Core,
+    private readonly currentSource: () => object | undefined,
     private readonly onManifestProcessed?: (
       manifest: ProcessedManifest,
     ) => void,
-  ) {}
+  ) {
+    this.source = currentSource();
+  }
+
+  /**
+   * Whether what this request is about to hand the core is still the core's
+   * to take: the presentation it was made for is the one playing now. A
+   * request made when there was none at all — the engine let the player go
+   * between the filter stamping this request and Shaka sending it — is of no
+   * presentation, and neither is one whose own has since been left.
+   */
+  private ofThisPresentation(): boolean {
+    return this.source !== undefined && this.currentSource() === this.source;
+  }
 
   /** Whatever Shaka would have loaded this request with. */
   private defaultLoad() {
@@ -52,6 +68,7 @@ export class Loader {
       // runs on the same bytes. Shaka's parsing is untouched.
       loading.promise
         .then((response) => {
+          if (!this.ofThisPresentation()) return;
           // Take `PatchLocation` out before Shaka parses the same response: a
           // player following it refreshes by patch, which the core cannot
           // read, and its registry would freeze at this window. This handler
@@ -85,11 +102,25 @@ export class Loader {
       const loading = this.defaultLoad();
       loading.promise
         .then((response) => {
-          this.core.processSegmentIndex({
+          if (!this.ofThisPresentation()) return;
+          // What comes back is the whole presentation, not just the stream
+          // this index resolved — and for a `SegmentBase` live stream it is
+          // the first description with a measurable window, since the MPD
+          // registers every stream with no segments at all.
+          //
+          // What it can reach is the next load, not this one: Shaka builds
+          // the presentation timeline with the delay it has before it parses
+          // the representations that send these index requests, and reuses
+          // that timeline across refreshes. A `SegmentBase` live stream
+          // therefore plays its first session at the pre-manifest delay. The
+          // exception is low-latency DASH, where Shaka re-reads the delay on
+          // every parse.
+          const processed = this.core.processSegmentIndex({
             url: segmentUrl,
             byteRange,
             data: response.data,
           });
+          if (processed) this.onManifestProcessed?.(processed);
         })
         .catch(() => undefined);
       return loading;

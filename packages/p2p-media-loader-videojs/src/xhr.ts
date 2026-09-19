@@ -513,8 +513,11 @@ export class RequestRouter {
    */
   private leave() {
     if (!this.source) return;
-    this.core.destroy();
+    // The source is left whatever the core makes of being torn down: holding
+    // on to it would have `enter` treat a return to the same source as no
+    // change at all, and never start a context for it again.
     this.source = undefined;
+    this.core.destroy();
   }
 
   /**

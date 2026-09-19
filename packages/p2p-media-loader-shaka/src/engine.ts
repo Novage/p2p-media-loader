@@ -1,6 +1,7 @@
 import type shaka from "shaka-player/dist/shaka-player.compiled.d.ts";
 import { Shaka, HookedRequest, P2PMLShakaData } from "./types.js";
 import { Loader } from "./loading-handler.js";
+import { BoundPlayer } from "./bound-player.js";
 import { defaultPluginFor } from "./default-plugin.js";
 import { hlsManifestParser } from "p2p-media-loader-core/hls";
 import { dashManifestParser } from "p2p-media-loader-core/dash";
@@ -10,10 +11,9 @@ import {
   CoreEventMap,
   DynamicCoreConfig,
   DefinedCoreConfig,
-  ProcessedManifest,
   debug,
+  runAll,
   trackMediaElementPlayback,
-  liveDelayFor,
 } from "p2p-media-loader-core";
 
 /** A type for specifying dynamic configuration options that can be changed at runtime for the P2P engine's core. */
@@ -35,13 +35,10 @@ export type PartialShakaP2PEngineConfig = {
 };
 
 /**
- * Presentation delay until a live manifest says how wide the window is, at
- * which point the delay is sized from it (see the core's `liveDelayFor`).
- * Only applied when the integrator left Shaka's own default in place.
+ * The engine driving each player, so a second one bound to the same player
+ * takes it over rather than running beside it.
  */
-const INITIAL_LIVE_EDGE_DELAY = 25;
-/** Shaka's default: "derive from the manifest", which places the player near the edge. */
-const SHAKA_DEFAULT_PRESENTATION_DELAY = 0;
+const boundEngines = new WeakMap<shaka.Player, ShakaP2PEngine>();
 
 /**
  * Represents a Peer-to-Peer (P2P) engine designed to enhance media streaming efficiency.
@@ -75,7 +72,6 @@ const SHAKA_DEFAULT_PRESENTATION_DELAY = 0;
  * });
  */
 export class ShakaP2PEngine {
-  private player?: shaka.Player;
   private readonly playback = trackMediaElementPlayback((state, media) => {
     if (this.oracle.enabled) {
       this.oracle(`media.currentTime=${media.currentTime.toFixed(3)}`);
@@ -85,10 +81,8 @@ export class ShakaP2PEngine {
   private readonly shaka: Shaka;
   private readonly core: Core;
   private requestFilter?: shaka.extern.RequestFilter;
-  /** False when the integrator configured a presentation delay themselves. */
-  private managesPresentationDelay = false;
-  /** The presentation delay this engine applied, if any; see `applyLiveDelay`. */
-  private appliedPresentationDelay?: number;
+  /** The player this engine is bound to, and what it has done to it. */
+  private bound?: BoundPlayer;
   private readonly debug = debug("p2pml-shaka:engine");
   // See HybridLoader.oracleLogger: logs media.currentTime beside the core's
   // estimate so the two can be compared while the playback contract beds in.
@@ -120,34 +114,40 @@ export class ShakaP2PEngine {
    * @param player The Shaka Player instance to configure.
    */
   bindShakaPlayer(player: shaka.Player) {
-    if (this.player === player) return;
-    if (this.player) this.destroy();
+    if (this.bound?.player === player) return;
+    // Whatever letting the last player go made of itself, this one is bound:
+    // an integrator's segment storage failing to tear down is no reason for
+    // the player they are switching to to stream without P2P or live
+    // placement for the rest of the session. The failure is raised after.
+    const failures: unknown[] = this.bound ? this.releaseBinding() : [];
 
-    this.player = player;
-    this.appliedPresentationDelay = undefined;
-    this.managesPresentationDelay =
-      player.getConfiguration().manifest.defaultPresentationDelay ===
-      SHAKA_DEFAULT_PRESENTATION_DELAY;
-    if (this.managesPresentationDelay) {
-      this.player.configure(
-        "manifest.defaultPresentationDelay",
-        INITIAL_LIVE_EDGE_DELAY,
-      );
-      this.player.configure(
-        "manifest.dash.ignoreSuggestedPresentationDelay",
-        true,
-      );
+    // One engine per player. Both would place the same player and stamp its
+    // requests for cores of their own, and the first to be destroyed would
+    // give back settings the second is still relying on — the live placement,
+    // or native HLS, which plays outside the networking engine where nothing
+    // can be served at all. Changing what an engine cannot change at runtime,
+    // a swarm ID or the trackers, means a new engine, and this is what that
+    // costs the old one.
+    const previous = boundEngines.get(player);
+    if (previous && previous !== this) {
+      previous.debug("another engine has taken this player on");
+      failures.push(...runAll([() => previous.destroy()]));
     }
+    boundEngines.set(player, this);
 
-    const versionMatch = /\d+/.exec(this.shaka.Player.version);
-    const versionMajor = parseInt(versionMatch ? versionMatch[0] : "0", 10);
-    if (versionMajor >= 5) {
-      this.player.configure("streaming.preferNativeHls", false);
-    } else {
-      this.player.configure("streaming.useNativeHlsOnSafari", false);
-    }
-
-    this.updatePlayerEventHandlers("register");
+    this.bound = new BoundPlayer(player, this.shaka, this.debug);
+    // Both steps run whatever the other makes of itself. A player that cannot
+    // be read — one already being destroyed has no configuration, and Shaka's
+    // own accessor throws on it — would otherwise leave this engine bound
+    // with no filter and no listeners, and a second bind to the same player
+    // returns at the top, so it would stay that way until it is destroyed.
+    failures.push(
+      ...runAll([
+        () => failures.push(...(this.bound?.takeOver() ?? [])),
+        () => this.updatePlayerEventHandlers("register"),
+      ]),
+    );
+    if (failures.length) throw failures[0];
   }
 
   /**
@@ -227,16 +227,24 @@ export class ShakaP2PEngine {
   }
 
   private updatePlayerEventHandlers = (type: "register" | "unregister") => {
-    const { player } = this;
+    const player = this.bound?.player;
     if (!player) return;
 
     const networkingEngine = player.getNetworkingEngine();
     if (networkingEngine) {
       if (type === "register") {
+        // Bound to this binding, not to `this.bound`: a manifest or segment
+        // index still in flight when the engine moves to another player
+        // describes the source that player was showing, and would otherwise
+        // size whichever player is bound when it settles — and latch that
+        // one's bookkeeping with the old source's window.
+        const { bound } = this;
         const p2pml: P2PMLShakaData = {
           shaka: this.shaka,
           core: this.core,
-          onManifestProcessed: this.applyLiveDelay,
+          currentSource: () =>
+            this.bound === bound ? bound?.source : undefined,
+          onManifestProcessed: (manifest) => bound?.sizeFrom(manifest),
         };
         this.requestFilter = (requestType, request) => {
           (request as HookedRequest).p2pml = p2pml;
@@ -251,53 +259,45 @@ export class ShakaP2PEngine {
     const method =
       type === "register" ? "addEventListener" : "removeEventListener";
     player[method]("loaded", this.handlePlayerLoaded);
-    player[method]("loading", this.destroyCurrentStreamContext);
+    player[method]("loading", this.handleSourceLoading);
     player[method]("unloading", this.handlePlayerUnloading);
-  };
-
-  /**
-   * Sizes the presentation delay from the window the core just parsed. The
-   * manifest reaches the core before Shaka's parser sees the same bytes, so
-   * the value is in place when Shaka builds its timeline — which is the one
-   * moment it is read. A refresh reuses that timeline, so what is configured
-   * here after the first manifest of a presentation is what the next load
-   * starts from, not a change to the one playing. (The exception is a
-   * low-latency DASH stream: Shaka re-applies the delay on every parse there,
-   * unless the MPD suggests one of its own.)
-   *
-   * Configured anyway on every manifest, and only when the window has changed
-   * by at least half a segment: fractional drift in the window length is not
-   * a change worth carrying into the next load.
-   */
-  private applyLiveDelay = (manifest: ProcessedManifest) => {
-    if (!this.player || !this.managesPresentationDelay) return;
-    const target = liveDelayFor(manifest);
-    if (!target) return;
-
-    // Against the delay this applied, never against the one the player holds:
-    // until a window is known that is INITIAL_LIVE_EDGE_DELAY, and a first
-    // window whose delay lands within half a segment of it would read as
-    // already applied.
-    if (
-      this.appliedPresentationDelay !== undefined &&
-      Math.abs(this.appliedPresentationDelay - target.delay) <
-        target.segment / 2
-    ) {
-      return;
-    }
-
-    this.debug(`Setting defaultPresentationDelay to ${target.delay}`);
-    this.player.configure("manifest.defaultPresentationDelay", target.delay);
-    this.appliedPresentationDelay = target.delay;
   };
 
   private handlePlayerLoaded = () => {
     this.updateMediaElementEventHandlers("register");
   };
 
+  /**
+   * The player is letting its source go. Ending the source here as well as on
+   * `loading` is what keeps a response still in flight from being read back
+   * into the core that was just emptied for it: unloading without loading
+   * anything after is the one way a source ends that `loading` never sees.
+   *
+   * Each step runs whatever the ones before it made of themselves, and the
+   * core is torn down last: it destroys an integrator's own segment storage
+   * and is free to throw, and Shaka only logs what a listener throws.
+   */
   private handlePlayerUnloading = () => {
-    this.destroyCurrentStreamContext();
-    this.updateMediaElementEventHandlers("unregister");
+    const failures = runAll([
+      () => this.updateMediaElementEventHandlers("unregister"),
+      () => this.bound?.startSource(),
+      this.destroyCurrentStreamContext,
+    ]);
+    if (failures.length) throw failures[0];
+  };
+
+  /**
+   * A new source is a new presentation: what the last one taught this engine,
+   * and where its window put the playhead, do not carry over. Before the core is torn down for it,
+   * since that tears down an integrator's own segment storage and is free to
+   * throw, and Shaka swallows what a listener throws.
+   */
+  private handleSourceLoading = () => {
+    const failures = runAll([
+      () => this.bound?.startSource(),
+      this.destroyCurrentStreamContext,
+    ]);
+    if (failures.length) throw failures[0];
   };
 
   private destroyCurrentStreamContext = () => {
@@ -309,18 +309,42 @@ export class ShakaP2PEngine {
   ) => {
     this.playback.watch(
       type === "register"
-        ? (this.player?.getMediaElement() ?? undefined)
+        ? (this.bound?.player.getMediaElement() ?? undefined)
         : undefined,
     );
   };
 
   /** Cleans up and releases all resources, and unregisters all event handlers. */
   destroy() {
-    this.destroyCurrentStreamContext();
-    this.updatePlayerEventHandlers("unregister");
-    this.updateMediaElementEventHandlers("unregister");
-    this.player = undefined;
-    this.appliedPresentationDelay = undefined;
+    const failures = this.releaseBinding();
+    if (failures.length) throw failures[0];
+  }
+
+  /**
+   * Lets the bound player go, running every step whatever the ones before it
+   * made of themselves. The core tears down an integrator's own segment
+   * storage here and is free to throw; a teardown that stopped there would
+   * leave this engine's request filter stamping every request of a player it
+   * reports as released, its settings never given back, and what it held
+   * ready to be written onto whichever player it is bound to next.
+   *
+   * @returns What failed along the way, for the caller to raise once there is
+   * nothing left to let go of.
+   */
+  private releaseBinding(): unknown[] {
+    const player = this.bound?.player;
+    const failures = runAll([
+      this.destroyCurrentStreamContext,
+      () => this.updatePlayerEventHandlers("unregister"),
+      () => this.updateMediaElementEventHandlers("unregister"),
+      () => this.bound?.release(),
+    ]);
+    this.bound = undefined;
+    // Only if it is still ours: another engine may have taken it on since.
+    if (player && boundEngines.get(player) === this) {
+      boundEngines.delete(player);
+    }
+    return failures;
   }
 
   private static registerNetworkingEngineSchemes(shaka: Shaka) {
@@ -338,6 +362,7 @@ export class ShakaP2PEngine {
       const loader = new Loader(
         p2pml.shaka,
         p2pml.core,
+        p2pml.currentSource,
         p2pml.onManifestProcessed,
       );
       return loader.load(...args);

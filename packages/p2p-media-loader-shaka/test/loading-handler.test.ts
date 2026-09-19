@@ -60,23 +60,54 @@ function setup(loadable = true, fetchSupported = true) {
 
   const data = new Uint8Array([9, 9]).buffer;
   const processed = { streams: [] };
+  /**
+   * What the core makes of the presentation once an index is read — told
+   * apart from a manifest's summary, so an assertion pins which one arrived.
+   */
+  const indexed = {
+    streams: [
+      {
+        key: "https://cdn.example/v/1080p.mp4",
+        type: "main" as const,
+        isLive: true,
+        start: 0,
+        end: 120,
+        segmentCount: 20,
+      },
+    ],
+  };
   const onManifestProcessed = vi.fn();
   const core = {
     processManifest: vi.fn(() => processed),
     isSegmentIndex: vi.fn(() => false),
-    processSegmentIndex: vi.fn(),
+    processSegmentIndex: vi.fn(() => indexed),
     isSegmentLoadable: vi.fn(() => loadable),
     loadSegment: vi.fn(() => Promise.resolve({ data, bandwidth: 1_000_000 })),
     abortSegmentLoading: vi.fn(),
   };
-  const loader = new Loader(
-    shaka,
-    core as unknown as Core,
-    onManifestProcessed,
-  );
+  /** The presentation playing now, as the engine reports it. */
+  let source: object | undefined = {};
+  /** As Shaka does, a loader per request — built when the request is sent. */
+  const makeLoader = () =>
+    new Loader(
+      shaka,
+      core as unknown as Core,
+      () => source,
+      onManifestProcessed,
+    );
+  const loader = makeLoader();
+  /** The engine letting the player go. */
+  const release = () => (source = undefined);
+  /** The same player loading another source. */
+  const startNewSource = () => (source = {});
+
   return {
     loader,
+    makeLoader,
     core,
+    release,
+    startNewSource,
+    indexed,
     parse,
     xhrParse,
     dataParse,
@@ -122,6 +153,72 @@ describe("Shaka loading handler", () => {
     );
   });
 
+  it("gives the core nothing once the engine has moved on", async () => {
+    // A live manifest refreshes every few seconds, so one is usually in
+    // flight when the integrator switches player or source. Read into a core
+    // that now serves another presentation it registers streams nothing
+    // plays — and, winning the race with that presentation's own first
+    // manifest, names the swarm after a stream this player never asked for.
+    const { loader, core, release } = setup();
+    const loading = loader.load(url, request(), RequestType.MANIFEST);
+    release();
+
+    await loading.promise;
+    await Promise.resolve();
+
+    expect(core.processManifest).not.toHaveBeenCalled();
+  });
+
+  it("gives the core nothing when it was made for no presentation", async () => {
+    // Shaka separates the filter that stamps a request from the scheme
+    // plugin that sends it by an await, and by a whole backoff on a retry, so
+    // a request can be built after the engine has already let the player go.
+    const { core, onManifestProcessed, release, makeLoader } = setup();
+    release();
+    const built = makeLoader();
+    core.isSegmentIndex.mockReturnValue(true);
+
+    await built.load(url, request({ Range: "bytes=0-99" }), RequestType.SEGMENT)
+      .promise;
+    await built.load(url, request(), RequestType.MANIFEST).promise;
+    await Promise.resolve();
+
+    expect(core.processSegmentIndex).not.toHaveBeenCalled();
+    expect(core.processManifest).not.toHaveBeenCalled();
+    expect(onManifestProcessed).not.toHaveBeenCalled();
+  });
+
+  it("gives the core nothing from the source before this one", async () => {
+    // The same player loading another source. A live manifest refreshes every
+    // few seconds, so one is usually in flight at the switch — and the core
+    // has just been emptied for the source that is starting.
+    const { loader, core, onManifestProcessed, startNewSource } = setup();
+    const loading = loader.load(url, request(), RequestType.MANIFEST);
+    startNewSource();
+
+    await loading.promise;
+    await Promise.resolve();
+
+    expect(core.processManifest).not.toHaveBeenCalled();
+    expect(onManifestProcessed).not.toHaveBeenCalled();
+  });
+
+  it("gives the core no segment index once the engine has moved on", async () => {
+    const { loader, core, release } = setup();
+    core.isSegmentIndex.mockReturnValue(true);
+    const loading = loader.load(
+      url,
+      request({ Range: "bytes=0-99" }),
+      RequestType.SEGMENT,
+    );
+    release();
+
+    await loading.promise;
+    await Promise.resolve();
+
+    expect(core.processSegmentIndex).not.toHaveBeenCalled();
+  });
+
   it("leaves a manifest without one byte for byte as Shaka received it", async () => {
     const { loader, manifestResponse } = setup();
     const data = manifestResponse.data;
@@ -135,6 +232,26 @@ describe("Shaka loading handler", () => {
     await loader.load(url, request(), RequestType.MANIFEST).promise;
     await Promise.resolve();
     expect(onManifestProcessed).toHaveBeenCalledWith(processed);
+  });
+
+  it("hands what the core read from a segment index to the engine", async () => {
+    // A `SegmentBase` live stream registers from its MPD with no segments at
+    // all, so nothing there can size a live window. The index is the first
+    // description of the presentation that can, and the core answers with all
+    // of it — dropping that leaves the player at the pre-manifest delay for
+    // the session.
+    const { loader, core, onManifestProcessed, indexed } = setup();
+    core.isSegmentIndex.mockReturnValue(true);
+
+    await loader.load(
+      url,
+      request({ Range: "bytes=0-99" }),
+      RequestType.SEGMENT,
+    ).promise;
+    await Promise.resolve();
+
+    expect(core.processSegmentIndex).toHaveBeenCalled();
+    expect(onManifestProcessed).toHaveBeenCalledWith(indexed);
   });
 
   it("serves a known segment through the core, reading the byte range from the Range header", async () => {
