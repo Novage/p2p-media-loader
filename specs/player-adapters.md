@@ -306,10 +306,48 @@ without `AbortController`; forcing the fetch plugin there throws inside Shaka
 on the first request, before anything plays, and the IIFE bundle exists for
 exactly those browsers.
 
+The schemes are registered at Shaka's APPLICATION priority, which outranks its
+own plugins, and without progress support, which Shaka's own http(s) plugins
+declare. Progress support is a property of the registration, and it decides
+whether Shaka arms its connection and stall timers for a request on the
+scheme. Those timers are stopped and re-armed only by the plugin's progress
+callback, and a core-served segment cannot report progress: the callback also
+feeds Shaka's bandwidth estimator wall-clock samples and makes it discard the
+`timeMs` the response carries, which is where the core's bandwidth hint goes.
+Declared, the connection timeout — ten seconds by default — would be a
+deadline on the whole delivery, and a segment the core is fetching over a slow
+link, bytes arriving all the while, would be aborted and retried into a fatal
+TIMEOUT. Undeclared, a served segment is bounded by the core's own
+not-receiving-bytes fallbacks, and a request passed through to Shaka's plugin
+by that plugin's own `timeout`, which the plugin applies itself.
+
+Unregistering puts Shaka's own plugins back as Shaka registered them, rather
+than leaving the schemes empty: Shaka registers its defaults once, at module
+load, and a bare removal would leave every http, https and data request from
+any other Shaka player on the page failing as an unsupported scheme. The
+registry is one per Shaka library, shared by every player made from it, so
+each `unregisterPlugins` call matches one `registerPlugins` call and the
+schemes go back only when the last is matched — two players on a page, each
+registering on mount and unregistering on unmount, keep P2P until the second
+leaves. What is counted is calls, not engines: nothing in the adapter holds an
+engine, so one dropped without `destroy()` is collected along with its player.
+Binding an engine while no registration is in effect — `registerPlugins`
+never called for that Shaka, or matched by `unregisterPlugins` before the
+bind — is refused with an error naming the cause, rather than stamping
+requests no plugin of the adapter's will read and playing on without P2P with
+nothing to say why. The check is at the bind, once, not on every request: an
+unmount lets the schemes go and destroys the engine in the same breath, in
+whichever order its cleanups run, and an engine already bound when the schemes
+go back is served by Shaka's own plugins from then on. Both the restore and
+the count are all-or-nothing: what the restore needs is resolved before the
+first scheme is removed, so a library missing a plugin throws with the
+registry untouched, and a registration is counted only once installed, a
+restore uncounted only once done.
+
 The choice is made in one place for both paths that need it: a request of a
 type the adapter passes through, and a request of a player with no engine
-bound, which reaches the adapter because registering a scheme without a
-priority outranks every registration Shaka makes for it.
+bound, which reaches the adapter because it registers at Shaka's APPLICATION
+priority, above the PREFERRED and FALLBACK at which Shaka registers its own.
 
 No manifest-parser decoration and no `segmentIndex` hooking. Shaka's internal
 representation of the stream is not consulted.

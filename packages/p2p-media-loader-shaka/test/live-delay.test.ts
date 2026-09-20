@@ -81,10 +81,20 @@ function setup() {
 
   const shakaLib = {
     Player: { version: "4.7.0", LoadMode },
-    net: { NetworkingEngine: { RequestType: {} } },
+    net: {
+      NetworkingEngine: {
+        RequestType: {},
+        PluginPriority: { FALLBACK: 1, PREFERRED: 2, APPLICATION: 3 },
+        registerScheme: () => {},
+        unregisterScheme: () => {},
+      },
+    },
     util: {},
   } as unknown as Shaka;
 
+  // As an integrator does before binding; a bind with no registration in
+  // effect is refused.
+  ShakaP2PEngine.registerPlugins(shakaLib);
   const engine = new ShakaP2PEngine(undefined, shakaLib);
   engine.bindShakaPlayer(player as unknown as shaka.Player);
 

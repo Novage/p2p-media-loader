@@ -41,6 +41,15 @@ export type PartialShakaP2PEngineConfig = {
 const boundEngines = new WeakMap<shaka.Player, ShakaP2PEngine>();
 
 /**
+ * `registerPlugins` calls not yet matched by an `unregisterPlugins`, per Shaka
+ * library: the scheme registry is the library's, shared by every player made
+ * from it, and the schemes go back to Shaka when the last call is matched. A
+ * count of calls, not of engines — nothing here holds an engine, so one
+ * dropped without `destroy()` stays collectable along with its player.
+ */
+const registrations = new WeakMap<Shaka, number>();
+
+/**
  * Represents a Peer-to-Peer (P2P) engine designed to enhance media streaming efficiency.
  * This class integrates P2P technologies into Shaka Player, enabling the distribution of media segments via a peer network
  * alongside traditional HTTP fetching. This reduces server bandwidth costs and improves scalability by sharing the load
@@ -115,6 +124,20 @@ export class ShakaP2PEngine {
    */
   bindShakaPlayer(player: shaka.Player) {
     if (this.bound?.player === player) return;
+    // The stamps the binding puts on requests are read by a scheme plugin of
+    // the adapter's; with the schemes in Shaka's hands the player would play
+    // on without P2P, with nothing to say why. Refused here, once, naming the
+    // cause — `registerPlugins` never called for this Shaka, or matched by
+    // `unregisterPlugins` before this bind — rather than on every request:
+    // an unmount lets the schemes go and destroys the engine in the same
+    // breath, in whichever order its cleanups run, and neither is wrong.
+    if (!registrations.has(this.shaka)) {
+      throw new Error(
+        "ShakaP2PEngine.registerPlugins() is not in effect for this Shaka: " +
+          "call it before binding a player, and match it with " +
+          "unregisterPlugins() once the players are gone",
+      );
+    }
     // Whatever letting the last player go made of itself, this one is bound:
     // an integrator's segment storage failing to tear down is no reason for
     // the player they are switching to to stream without P2P or live
@@ -367,16 +390,79 @@ export class ShakaP2PEngine {
       );
       return loader.load(...args);
     };
-    NetworkingEngine.registerScheme("http", handleLoading);
-    NetworkingEngine.registerScheme("https", handleLoading);
+    // At APPLICATION priority, which outranks Shaka's own, and without
+    // progress support, which Shaka's own http(s) plugins declare. It is a
+    // property of the registration, and it decides whether Shaka's `send_`
+    // arms its connection and stall timers for a request on the scheme. Those
+    // timers are stopped, and re-armed, only by the plugin's progress
+    // callback — and a core-served segment cannot report progress: the
+    // callback also feeds Shaka's bandwidth estimator wall-clock samples and
+    // makes it discard the `timeMs` the response carries, which is where the
+    // core's bandwidth goes. Declared, the ten-second connection timeout
+    // would be a deadline on the whole delivery — a segment the core is
+    // fetching over a slow link, bytes arriving all the while, aborted and
+    // retried into a fatal TIMEOUT. Undeclared, a served segment is bounded
+    // by the core's own not-receiving-bytes fallbacks, and a request passed
+    // through to Shaka's plugin by that plugin's own `timeout`, which it
+    // applies itself. `data` is registered as Shaka registers it.
+    const { PluginPriority } = NetworkingEngine;
+    NetworkingEngine.registerScheme(
+      "http",
+      handleLoading,
+      PluginPriority.APPLICATION,
+      false,
+    );
+    NetworkingEngine.registerScheme(
+      "https",
+      handleLoading,
+      PluginPriority.APPLICATION,
+      false,
+    );
     NetworkingEngine.registerScheme("data", handleLoading);
   }
 
+  /**
+   * Puts Shaka's own plugins back, as Shaka registered them at module load.
+   * `unregisterScheme` deletes the scheme's one entry outright, and Shaka
+   * registers its defaults only once, so a bare delete would leave every
+   * http, https and data request from any Shaka player on the page failing
+   * with UNSUPPORTED_SCHEME — the demo's players call this from an unmount,
+   * and one leaving would take the others down with it.
+   */
   private static unregisterNetworkingEngineSchemes(shaka: Shaka) {
-    const { NetworkingEngine } = shaka.net;
-    NetworkingEngine.unregisterScheme("http");
-    NetworkingEngine.unregisterScheme("https");
+    const { NetworkingEngine, DataUriPlugin, HttpFetchPlugin, HttpXHRPlugin } =
+      shaka.net;
+    const { PluginPriority } = NetworkingEngine;
+    // Everything the restore needs, resolved before the first removal: a
+    // library missing one of these — a trimmed build, a test double — throws
+    // here with the registry untouched, not between a scheme's removal and
+    // what was to replace it. Shaka's `parse` functions are static and use
+    // no `this`, and Shaka registers them bare at module load; `bind` only
+    // satisfies the unbound-method rule, which cannot see that.
+    const http = [
+      ...(HttpFetchPlugin.isSupported()
+        ? [
+            {
+              plugin: HttpFetchPlugin.parse.bind(HttpFetchPlugin),
+              priority: PluginPriority.PREFERRED,
+            },
+          ]
+        : []),
+      {
+        plugin: HttpXHRPlugin.parse.bind(HttpXHRPlugin),
+        priority: PluginPriority.FALLBACK,
+      },
+    ];
+    const data = DataUriPlugin.parse.bind(DataUriPlugin);
+
+    for (const scheme of ["http", "https"] as const) {
+      NetworkingEngine.unregisterScheme(scheme);
+      for (const { plugin, priority } of http) {
+        NetworkingEngine.registerScheme(scheme, plugin, priority, true);
+      }
+    }
     NetworkingEngine.unregisterScheme("data");
+    NetworkingEngine.registerScheme("data", data);
   }
 
   /**
@@ -390,17 +476,37 @@ export class ShakaP2PEngine {
     validateShaka(shaka);
 
     ShakaP2PEngine.registerNetworkingEngineSchemes(shaka);
+    // Counted once installed: a registration that threw is not one.
+    registrations.set(shaka, (registrations.get(shaka) ?? 0) + 1);
   }
 
   /**
-   * Unregisters plugins related to P2P functionality from the Shaka Player.
+   * Unregisters plugins related to P2P functionality from the Shaka Player,
+   * handing the schemes back to Shaka's own plugins.
+   *
+   * The registry is shared by every player made from the library, so each
+   * call matches one `registerPlugins` call, and the schemes go back to Shaka
+   * when the last is matched: two players on a page, each registering on
+   * mount and unregistering on unmount, keep P2P until the second leaves.
+   * Binding an engine while no registration is in effect is refused with an
+   * error saying so; an engine already bound when the schemes go back is
+   * served by Shaka's own plugins from then on, which is what an unmount
+   * that unregisters a moment before it destroys the engine asks for.
    *
    * @param shaka The Shaka Player library. Defaults to the global Shaka Player instance if not provided.
    */
   static unregisterPlugins(shaka = window.shaka) {
     validateShaka(shaka);
 
+    const outstanding = registrations.get(shaka) ?? 0;
+    if (outstanding > 1) {
+      registrations.set(shaka, outstanding - 1);
+      return;
+    }
+    // The restore is all-or-nothing, and the count follows it: a restore
+    // that threw left the adapter's schemes in place, still registered.
     ShakaP2PEngine.unregisterNetworkingEngineSchemes(shaka);
+    registrations.delete(shaka);
   }
 }
 

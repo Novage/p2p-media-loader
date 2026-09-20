@@ -11,9 +11,9 @@ type SchemePlugin = { parse: shaka.extern.SchemePlugin };
  * Shaka registers its own http(s) plugins by support and priority — fetch as
  * preferred, and only where `fetch`, `AbortController` and `ReadableStream`
  * all exist, XHR as the fallback — and a data URI to a plugin that decodes it
- * with no network stack at all. The adapter's own scheme registration wins
- * over every one of those (no priority is the highest priority), so it has to
- * make the same choice on their behalf. Old Smart TV browsers are where this
+ * with no network stack at all. The adapter's own scheme registration, at
+ * APPLICATION priority, wins over every one of those, so it has to make the
+ * same choice on their behalf. Old Smart TV browsers are where this
  * is not academic: forcing the fetch plugin there throws inside Shaka on the
  * first request, before anything plays.
  */
