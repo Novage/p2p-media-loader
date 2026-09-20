@@ -21,6 +21,7 @@ export type {
 export type { SegmentStorage } from "./segment-storage/index.js";
 export { byteRangeFromRangeHeader } from "./manifest/url-key.js";
 export {
+  INITIAL_LIVE_DELAY,
   liveDelayFor,
   liveDelayFromWindow,
   type LiveDelay,

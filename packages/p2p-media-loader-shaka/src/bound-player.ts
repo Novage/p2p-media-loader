@@ -1,16 +1,13 @@
 import type shaka from "shaka-player/dist/shaka-player.compiled.d.ts";
-import { type ProcessedManifest, liveDelayFor } from "p2p-media-loader-core";
+import {
+  type ProcessedManifest,
+  liveDelayFor,
+  INITIAL_LIVE_DELAY,
+} from "p2p-media-loader-core";
 import type { Shaka } from "./types.js";
 
 /** Shaka's own default: the integrator has set no presentation delay. */
 const SHAKA_DEFAULT_PRESENTATION_DELAY = 0;
-
-/**
- * Where a source starts, before any manifest has said how wide its window is.
- * Deep enough that a peer has something to fetch ahead of the playhead, and
- * shallow enough to sit inside any window worth sharing.
- */
-const INITIAL_LIVE_EDGE_DELAY = 25;
 
 /**
  * What the engine has done to the player it is bound to, and what it has
@@ -41,7 +38,13 @@ export class BoundPlayer {
   readonly #shaka: Shaka;
   /** The delay this engine applied for the current source, if any. */
   #applied?: number;
-  /** Whether any manifest of the current source described a live main stream. */
+  /**
+   * Whether any manifest of the current source described a live main stream.
+   * Kept here rather than had from the core: `processManifest` describes the
+   * streams the manifest listed, and making it describe the whole
+   * presentation instead was tried and pinned the delay to streams the
+   * presentation no longer had.
+   */
   #seenMainStream = false;
 
   /**
@@ -87,13 +90,23 @@ export class BoundPlayer {
       }
     };
 
-    const { manifest, streaming } = this.#player.getConfiguration();
+    // A player already being destroyed has no configuration, and Shaka's own
+    // accessor throws on it: as much a failure of the takeover as a
+    // `configure` that throws, reported the same way.
+    let configuration: ReturnType<shaka.Player["getConfiguration"]>;
+    try {
+      configuration = this.#player.getConfiguration();
+    } catch (failure) {
+      failures.push(failure);
+      return failures;
+    }
+    const { manifest, streaming } = configuration;
     this.#sizesLiveWindow =
       manifest.defaultPresentationDelay === SHAKA_DEFAULT_PRESENTATION_DELAY;
     if (this.#sizesLiveWindow) {
       take(
         "manifest.defaultPresentationDelay",
-        INITIAL_LIVE_EDGE_DELAY,
+        INITIAL_LIVE_DELAY,
         manifest.defaultPresentationDelay,
       );
       take(
@@ -143,7 +156,7 @@ export class BoundPlayer {
     try {
       this.#player.configure(
         "manifest.defaultPresentationDelay",
-        INITIAL_LIVE_EDGE_DELAY,
+        INITIAL_LIVE_DELAY,
       );
     } catch (failure) {
       this.#debug(`could not reset the presentation delay: ${String(failure)}`);
@@ -181,7 +194,7 @@ export class BoundPlayer {
     if (!target) return;
 
     // Against the delay this applied, never against the one the player holds:
-    // until a window is known that is INITIAL_LIVE_EDGE_DELAY, and a first
+    // until a window is known that is INITIAL_LIVE_DELAY, and a first
     // window whose delay lands within half a segment of it would read as
     // already applied. Only when the window has changed by at least half a
     // segment: fractional drift is not a change worth carrying to the next

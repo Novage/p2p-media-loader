@@ -57,8 +57,11 @@ function setup() {
     }
     node[last] = value;
   });
+  /** The media element the engine watches for playback reports. */
+  const media = { addEventListener: vi.fn(), removeEventListener: vi.fn() };
   const player = {
     getConfiguration: () => configuration,
+    getMediaElement: () => media,
     configure,
     /** Always a number, as Shaka's is; DESTROYED once it has been torn down. */
     getLoadMode: () => (alive ? LoadMode.MEDIA_SOURCE : LoadMode.DESTROYED),
@@ -144,6 +147,7 @@ function setup() {
   return {
     configuration,
     configure,
+    media,
     deliver,
     deliverNow,
     engine,
@@ -572,5 +576,12 @@ describe("shaka live window placement", () => {
 
     deliver(manifest(12, 8));
     expect(configure.mock.calls.length).toBe(afterFirst + 1);
+  });
+
+  it("watches the media element from the bind, not only from the next load", () => {
+    // Bound after the player loaded — P2P toggled on at runtime — the engine
+    // would otherwise report no playback until the integrator loads again.
+    const { media } = setup();
+    expect(media.addEventListener).toHaveBeenCalled();
   });
 });

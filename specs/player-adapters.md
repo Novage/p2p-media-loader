@@ -261,13 +261,6 @@ raised: dash.js invokes its event handlers with no `try` of its own, so a
 throw out of a stream teardown would abort `StreamController`'s own reset
 half way and surface from the integrator's `attachSource`.
 
-Destroying the engine runs every step of its teardown, whatever the ones
-before made of themselves: the core tears down an integrator's own segment
-storage there and is free to throw, and a teardown that stopped at the first
-failure would leave the engine's request filter stamping every request of a
-player it reports as released. The first failure is raised once there is
-nothing left to let go of.
-
 A manifest or segment index reaching the core belongs to the source it was
 asked for. One still in flight when the player moves to another
 source, unloads the one it had, or is let go by the engine, describes the
@@ -398,6 +391,16 @@ safe seek offset — covers a playhead that drifts past the tail, so no re-sync
 setting is needed. The MPD's suggested delay is
 ignored for the same reason HLS.js's hold-back is overridden: a server's
 suggestion places the player near the edge, where there is nothing to share.
+
+Two Shaka features are outside what the adapter supports. `player.preload()`
+fetches a manifest through the networking engine without a `loading` event, so
+the adapter processes it under the source that is playing, into that source's
+core — which the `load()` of the preloaded source then tears down, and Shaka
+does not fetch the manifest again; the new source plays without P2P. Call
+`load(uri)` directly. And a registry the adapter never took over is not its to
+hand back: `unregisterPlugins` with no registration in effect leaves the
+schemes alone, so an integrator's own plugin survives a cleanup that runs
+twice.
 
 ### dash.js
 

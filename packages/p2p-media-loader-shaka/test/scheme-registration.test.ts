@@ -25,6 +25,7 @@ function fakePlayer() {
       node[last] = value;
     },
     getLoadMode: () => 2,
+    getMediaElement: () => null,
     getNetworkingEngine: () => ({
       registerRequestFilter: (filter: unknown) => filters.push(filter),
       unregisterRequestFilter: (filter: unknown) => {
@@ -187,17 +188,20 @@ describe("Shaka scheme registration", () => {
     expect(HttpFetchPlugin.parse).toHaveBeenCalledTimes(1);
   });
 
-  it("hands the schemes back on an unmatched unregister too", () => {
+  it("leaves a registry it never took over alone", () => {
+    // An integrator's own APPLICATION-priority plugin, and an unmatched
+    // `unregisterPlugins` — a cleanup run twice, or one with no registration
+    // behind it. Not this adapter's registry to hand back to Shaka.
     const { shakaLib, schemes } = fakeShaka();
-    ShakaP2PEngine.registerPlugins(shakaLib);
+    const theirs = () => undefined;
+    shakaLib.net.NetworkingEngine.registerScheme("https", theirs);
     ShakaP2PEngine.unregisterPlugins(shakaLib);
-    ShakaP2PEngine.unregisterPlugins(shakaLib);
-    expect(schemes.get("http")).toMatchObject({ priority: 2 });
+    expect(schemes.get("https")?.plugin).toBe(theirs);
 
-    // And counts from zero again after it.
     ShakaP2PEngine.registerPlugins(shakaLib);
     ShakaP2PEngine.unregisterPlugins(shakaLib);
-    expect(schemes.get("http")).toMatchObject({ priority: 2 });
+    ShakaP2PEngine.unregisterPlugins(shakaLib);
+    expect(schemes.get("https")).toMatchObject({ priority: 2 });
   });
 
   it("refuses to bind while no registration is in effect", () => {

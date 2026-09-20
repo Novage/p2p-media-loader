@@ -128,9 +128,11 @@ describe("Shaka loading handler", () => {
     const op = loader.load(url, request(), RequestType.MANIFEST);
     await op.promise;
     expect(parse).toHaveBeenCalledTimes(1);
+    // The text the bytes decoded to: decoded once, for the core and for the
+    // PatchLocation check alike.
     expect(core.processManifest).toHaveBeenCalledWith({
       url: manifestResponse.uri,
-      data: manifestResponse.data,
+      data: "#EXTM3U",
     });
   });
 
@@ -149,7 +151,7 @@ describe("Shaka loading handler", () => {
       "<MPD><Period/></MPD>",
     );
     expect(core.processManifest).toHaveBeenCalledWith(
-      expect.objectContaining({ data: response.data }),
+      expect.objectContaining({ data: "<MPD><Period/></MPD>" }),
     );
   });
 

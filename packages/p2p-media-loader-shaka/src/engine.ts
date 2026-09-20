@@ -158,16 +158,19 @@ export class ShakaP2PEngine {
     }
     boundEngines.set(player, this);
 
-    this.bound = new BoundPlayer(player, this.shaka, this.debug);
-    // Both steps run whatever the other makes of itself. A player that cannot
-    // be read — one already being destroyed has no configuration, and Shaka's
-    // own accessor throws on it — would otherwise leave this engine bound
-    // with no filter and no listeners, and a second bind to the same player
-    // returns at the top, so it would stay that way until it is destroyed.
+    const bound = new BoundPlayer(player, this.shaka, this.debug);
+    this.bound = bound;
+    // Every step runs whatever the others make of themselves: a player that
+    // cannot be taken over would otherwise leave this engine bound with no
+    // filter and no listeners, and a second bind to the same player returns
+    // at the top, so it would stay that way until it is destroyed. The media
+    // element is watched from here, not only from `loaded`: a player bound
+    // after it loaded would otherwise report no playback until its next load.
     failures.push(
+      ...bound.takeOver(),
       ...runAll([
-        () => failures.push(...(this.bound?.takeOver() ?? [])),
         () => this.updatePlayerEventHandlers("register"),
+        () => this.updateMediaElementEventHandlers("register"),
       ]),
     );
     if (failures.length) throw failures[0];
@@ -282,8 +285,8 @@ export class ShakaP2PEngine {
     const method =
       type === "register" ? "addEventListener" : "removeEventListener";
     player[method]("loaded", this.handlePlayerLoaded);
-    player[method]("loading", this.handleSourceLoading);
-    player[method]("unloading", this.handlePlayerUnloading);
+    player[method]("loading", this.endSource);
+    player[method]("unloading", this.endSource);
   };
 
   private handlePlayerLoaded = () => {
@@ -291,32 +294,22 @@ export class ShakaP2PEngine {
   };
 
   /**
-   * The player is letting its source go. Ending the source here as well as on
-   * `loading` is what keeps a response still in flight from being read back
-   * into the core that was just emptied for it: unloading without loading
-   * anything after is the one way a source ends that `loading` never sees.
+   * The source ends: a new one is a new presentation, and what the last one
+   * taught this engine, and where its window put the playhead, do not carry
+   * over. Run on `unloading` and on `loading` both — Shaka fires the first
+   * before the second on every `load()`, and unloading with nothing loaded
+   * after is the one way a source ends that `loading` never sees; ending it
+   * on both is what keeps a response still in flight from being read back
+   * into the core just emptied for it. Twice on a switch, then, and cheap the
+   * second time: an emptied core has nothing to empty.
    *
    * Each step runs whatever the ones before it made of themselves, and the
    * core is torn down last: it destroys an integrator's own segment storage
    * and is free to throw, and Shaka only logs what a listener throws.
    */
-  private handlePlayerUnloading = () => {
+  private endSource = () => {
     const failures = runAll([
       () => this.updateMediaElementEventHandlers("unregister"),
-      () => this.bound?.startSource(),
-      this.destroyCurrentStreamContext,
-    ]);
-    if (failures.length) throw failures[0];
-  };
-
-  /**
-   * A new source is a new presentation: what the last one taught this engine,
-   * and where its window put the playhead, do not carry over. Before the core is torn down for it,
-   * since that tears down an integrator's own segment storage and is free to
-   * throw, and Shaka swallows what a listener throws.
-   */
-  private handleSourceLoading = () => {
-    const failures = runAll([
       () => this.bound?.startSource(),
       this.destroyCurrentStreamContext,
     ]);
@@ -499,6 +492,9 @@ export class ShakaP2PEngine {
     validateShaka(shaka);
 
     const outstanding = registrations.get(shaka) ?? 0;
+    // Nothing registered, nothing to hand back: the registry is not this
+    // adapter's to touch, and may hold a plugin the integrator registered.
+    if (outstanding === 0) return;
     if (outstanding > 1) {
       registrations.set(shaka, outstanding - 1);
       return;

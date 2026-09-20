@@ -31,6 +31,14 @@ export type LiveDelay = {
  * processed manifest — HLS.js reports it on every level update — size the
  * placement with this directly.
  */
+/**
+ * Where a live source starts, before any manifest has said how wide its
+ * window is: deep enough that a peer has something to fetch ahead of the
+ * playhead, and shallow enough to sit inside any window worth sharing. The
+ * adapters that place a player before its first manifest hold it here.
+ */
+export const INITIAL_LIVE_DELAY = 25;
+
 export function liveDelayFromWindow(window: number, segment: number): number {
   return Math.max(
     segment,

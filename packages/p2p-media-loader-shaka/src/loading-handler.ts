@@ -74,13 +74,16 @@ export class Loader {
           // read, and its registry would freeze at this window. This handler
           // is attached before Shaka's own, so what it parses is what is left
           // here. See specs/player-adapters.md.
-          response.data = withoutPatchLocation(response.data);
+          const manifest = withoutPatchLocation(response.data);
+          response.data = manifest.data;
           const processed = this.core.processManifest({
             // Shaka's `uri` follows redirects and `originalUri` is what was
             // asked for: the name the master gave this playlist.
             url: response.uri,
             requestedUrl: response.originalUri,
-            data: response.data,
+            // The text where the bytes decoded — decoded once, here, for
+            // both the core and the strip above — and the bytes otherwise.
+            data: manifest.text ?? manifest.data,
           });
           if (processed) this.onManifestProcessed?.(processed);
         })
@@ -208,14 +211,17 @@ function getLoadingDurationBasedOnBandwidth(
  * mark — and returns the original bytes whenever there is nothing to remove
  * or they do not decode.
  */
-function withoutPatchLocation(data: Response["data"]): Response["data"] {
+function withoutPatchLocation(data: Response["data"]): {
+  data: Response["data"];
+  text?: string;
+} {
   let text;
   try {
     text = new TextDecoder("utf-8", { fatal: true }).decode(data);
   } catch {
-    return data;
+    return { data };
   }
   const stripped = stripPatchLocation(text);
-  if (stripped === text) return data;
-  return new TextEncoder().encode(stripped).buffer;
+  if (stripped === text) return { data, text };
+  return { data: new TextEncoder().encode(stripped).buffer, text: stripped };
 }

@@ -12,6 +12,7 @@ import {
   trackMediaElementPlayback,
   liveDelayFor,
   type LiveDelay,
+  INITIAL_LIVE_DELAY,
 } from "p2p-media-loader-core";
 import { createXhrLoaderExtension, type LoaderBinding } from "./loader.js";
 
@@ -32,13 +33,6 @@ export type PartialDashJsP2PEngineConfig = {
   /** Partial core config */
   core?: Partial<CoreConfig>;
 };
-
-/**
- * Live delay until the first live manifest says how wide the window is; from
- * then on the delay follows the window (see the core's liveDelayFor). Only
- * applied when the integrator left dash.js's own default in place.
- */
-const INITIAL_LIVE_EDGE_DELAY = 25;
 
 /** Least forward buffer to leave the player, whatever the windows work out to. */
 const MIN_BUFFER_SEGMENTS = 2;
@@ -433,18 +427,18 @@ export class DashJsP2PEngine {
     if (!this.takeOver() || !this.player) return;
     if (this.appliedLiveDelay !== undefined) return;
 
-    this.debug(`Holding liveDelay at ${INITIAL_LIVE_EDGE_DELAY}`);
+    this.debug(`Holding liveDelay at ${INITIAL_LIVE_DELAY}`);
     this.player.updateSettings({
       streaming: {
         delay: {
-          liveDelay: INITIAL_LIVE_EDGE_DELAY,
+          liveDelay: INITIAL_LIVE_DELAY,
           // A server's suggestion places the player near the edge, where
           // there is nothing to share.
           useSuggestedPresentationDelay: false,
         },
       },
     });
-    this.appliedLiveDelay = INITIAL_LIVE_EDGE_DELAY;
+    this.appliedLiveDelay = INITIAL_LIVE_DELAY;
   }
 
   /**

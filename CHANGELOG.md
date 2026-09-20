@@ -75,7 +75,16 @@ throughout.
   core bundle; a missing entry fails at module resolution rather than silently.
   See [`specs/packaging.md`](specs/packaging.md).
 - `ShakaP2PEngine.registerPlugins` registers only the networking schemes.
-  Shaka's own manifest parsers are no longer replaced.
+  Shaka's own manifest parsers are no longer replaced. Calls are counted, and
+  `unregisterPlugins` hands the schemes back to Shaka's own plugins when the
+  last call is matched — two players on a page each registering on mount keep
+  P2P until the second leaves. `bindShakaPlayer` throws when no registration
+  is in effect; register before binding.
+- **Every engine's `destroy()` runs each teardown step whatever the others
+  made of themselves, and raises the first failure once it is done.** A
+  segment storage supplied through `customSegmentStorageFactory` that throws
+  from its own teardown now surfaces from `destroy()` rather than being lost;
+  a call that expected `destroy()` never to throw should be prepared for it.
 - `Stream.runtimeId` is the manifest-derived stream key: the media playlist URL
   for HLS, the Representation id for DASH.
 
