@@ -223,13 +223,16 @@ export class ManifestRegistry {
     const key = this.resolveStreamKey(parsed, manifest);
     const existing = this.streams.get(key);
 
-    // A media playlist says nothing about the stream's identity; only the
-    // master does. The first manifest that does decides it, and nothing
-    // changes it afterwards: a stream's identity is its swarm, and a live
-    // packager republishing its master — a changed BANDWIDTH is enough —
-    // would otherwise move a playing stream to a swarm with no peers in it.
-    const carriesIdentity =
-      !existing || (!parsed.segments && !existing.identified);
+    // The first manifest to register a stream decides its identity and its
+    // type, and nothing changes them afterwards: a stream's identity is its
+    // swarm, and a live packager republishing its master — a changed
+    // BANDWIDTH is enough — would otherwise move a playing stream to a swarm
+    // with no peers in it. A media playlist processed before its master
+    // registers an anonymous stream, and the master arriving later does not
+    // identify it: no player produces that order (the master is the first
+    // manifest a player fetches, and the adapters are in the path from the
+    // start), and it is not supported. See specs/manifest-registry.md.
+    const carriesIdentity = !existing;
 
     const stream: MutableStream = {
       key,
@@ -260,6 +263,17 @@ export class ManifestRegistry {
    * came from). No match means a media playlist loaded directly, which is a
    * single anonymous stream.
    *
+   * A match by URL with the query stripped is taken only where one declared
+   * stream matches: a master that tells its variants apart by query string
+   * alone leaves every one of them matching, and attaching the playlist to
+   * whichever came first would register one rendition's segments under
+   * another's identity — peers would then serve the wrong bytes by sequence
+   * number. The playlist is an anonymous stream instead, shared only if it is
+   * alone of its type. An anonymous stream already registered at the same
+   * stripped URL is that stream on its next load, whatever token it carries;
+   * counted among the matches, it would make every load ambiguous and leave
+   * a stream behind on each one.
+   *
    * An unmatched playlist is known by what was asked for rather than by where
    * the response came from: a CDN that answers each request from somewhere
    * else would otherwise leave a new stream behind on every refresh.
@@ -269,7 +283,8 @@ export class ManifestRegistry {
     manifest: ParsedManifest,
   ): string {
     if (this.streams.has(parsed.key)) return parsed.key;
-    if (manifest.protocol !== "hls" || !parsed.segments) return parsed.key;
+    if (manifest.protocol !== "hls") return parsed.key;
+    if (!parsed.segments) return this.resolveDeclaredKey(parsed, manifest);
 
     // The playlist is its own stream's key, so the URL asked for is the only
     // other name it can be known by.
@@ -282,11 +297,47 @@ export class ManifestRegistry {
     for (const candidate of [parsed.key, requested]) {
       if (candidate === undefined) continue;
       const wanted = stripQuery(normalizeUrl(candidate));
-      for (const key of this.streams.keys()) {
-        if (stripQuery(normalizeUrl(key)) === wanted) return key;
+      const declared: string[] = [];
+      let anonymous: string | undefined;
+      for (const [key, stream] of this.streams) {
+        if (stripQuery(normalizeUrl(key)) !== wanted) continue;
+        if (stream.identified) declared.push(key);
+        else anonymous ??= key;
       }
+      if (declared.length === 1) return declared[0];
+      if (anonymous !== undefined) return anonymous;
     }
     return requested ?? parsed.key;
+  }
+
+  /**
+   * A stream a master declares under a URL a registered stream already has,
+   * query aside, is that stream: a media playlist loaded first under one
+   * token and named by the master under another, or a master re-fetched
+   * with its playlist tokens rotated. Registered beside it, the master's
+   * stream would take the playlist's next refresh and leave the first behind
+   * with a stale segment set and no P2P. Only a sole such stream, and only
+   * where the master declares one stream at that URL: a master telling its
+   * variants apart by query alone cannot say which of them a stream was. An
+   * identified stream keeps the identity its first master gave it.
+   */
+  private resolveDeclaredKey(
+    parsed: ParsedStream,
+    manifest: ParsedManifest,
+  ): string {
+    const wanted = stripQuery(normalizeUrl(parsed.key));
+    const declaredHere = manifest.streams.filter(
+      (s) => stripQuery(normalizeUrl(s.key)) === wanted,
+    );
+    if (declaredHere.length !== 1) return parsed.key;
+
+    let match: string | undefined;
+    for (const key of this.streams.keys()) {
+      if (stripQuery(normalizeUrl(key)) !== wanted) continue;
+      if (match !== undefined) return parsed.key;
+      match = key;
+    }
+    return match ?? parsed.key;
   }
 
   private applySegments(

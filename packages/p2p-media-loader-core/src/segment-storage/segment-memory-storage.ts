@@ -34,6 +34,14 @@ export class SegmentMemoryStorage implements SegmentStorage {
   private coreConfig?: CommonCoreConfig;
   private mainStreamConfig?: StreamConfig;
   private secondaryStreamConfig?: StreamConfig;
+  /**
+   * The latest position reported, whichever loader reported it. Each loader
+   * reports on its own stream's timeline, and on live HLS without programme
+   * dates the two timelines can differ by seconds — within the trailing
+   * window kept below. A position per stream or per type would be exact
+   * while both report, and would freeze, retaining segments for ever, the
+   * moment one stops.
+   */
   private currentPlayback?: Playback;
   /**
    * Whether the stream the player last asked a segment of is live, which is
@@ -132,20 +140,19 @@ export class SegmentMemoryStorage implements SegmentStorage {
   }
 
   getUsage() {
-    if (this.lastRequestedIsLive === undefined || !this.currentPlayback) {
+    const { currentPlayback } = this;
+    if (this.lastRequestedIsLive === undefined || !currentPlayback) {
       return {
         totalCapacity: this.segmentMemoryStorageLimit,
         usedCapacity: this.currentStorageUsage,
       };
     }
-    const playbackPosition = this.currentPlayback.position;
     const isLiveStream = this.lastRequestedIsLive;
+    const { position } = currentPlayback;
 
     let calculatedUsedCapacity = 0;
     for (const segmentData of this.cache.values()) {
-      if (!this.isRetained(segmentData, isLiveStream, playbackPosition)) {
-        continue;
-      }
+      if (!this.isRetained(segmentData, isLiveStream, position)) continue;
 
       calculatedUsedCapacity += segmentData.data.byteLength;
     }
@@ -178,8 +185,9 @@ export class SegmentMemoryStorage implements SegmentStorage {
   }
 
   private clear(isLiveStream: boolean, newSegmentSize: number) {
+    const { currentPlayback } = this;
     if (
-      !this.currentPlayback ||
+      !currentPlayback ||
       !this.mainStreamConfig ||
       !this.secondaryStreamConfig ||
       !this.coreConfig
@@ -201,11 +209,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
       const storageId = getStorageItemId(streamSwarmId, segmentId);
 
       if (
-        this.isRetained(
-          segmentData,
-          isLiveStream,
-          this.currentPlayback.position,
-        )
+        this.isRetained(segmentData, isLiveStream, currentPlayback.position)
       ) {
         continue;
       }

@@ -106,14 +106,14 @@ export class Core {
   private manifestResponseUrl?: string;
   /** Registered streams, keyed by the manifest-derived stream key. */
   private readonly streams = new Map<string, StreamWithSegments>();
-  /** Stream keys whose registration failed; reported once, then left alone. */
-  private readonly failedStreamKeys = new Set<string>();
   /**
    * Streams no manifest ever identified. Each computes the same identity as
    * every other unidentified stream of its type, so one may be shared only
    * where it is alone; see `isShareable`.
    */
   private readonly unidentifiedStreamKeys = new Set<string>();
+  /** Stream keys whose registration failed; reported once, then left alone. */
+  private readonly failedStreamKeys = new Set<string>();
   private readonly unshareableLogged = new Set<string>();
   private mainStreamConfig: StreamConfig;
   private secondaryStreamConfig: StreamConfig;
@@ -133,6 +133,8 @@ export class Core {
   private secondaryStreamLoader?: HybridLoader;
   private streamDetails: StreamDetails = { isLive: false };
   private storageInitPromise?: Promise<void>;
+  /** Bumped by every initialization and every `destroy()`; see below. */
+  private storageGeneration = 0;
   /**
    * Requests that have entered `loadSegment` but have no stream loader yet,
    * because the segment storage is still being initialized. There is nothing
@@ -744,6 +746,13 @@ export class Core {
     this.startingRequests.add(starting);
     try {
       await this.initializeSegmentStorage();
+    } catch (error) {
+      // A storage torn down by the `destroy()` that aborted this request may
+      // reject its initialization; the request was aborted, and says so.
+      if (starting.aborted || signal?.aborted) {
+        throw new CoreRequestError("aborted");
+      }
+      throw error;
     } finally {
       this.startingRequests.delete(starting);
     }
@@ -902,8 +911,8 @@ export class Core {
     for (const starting of this.startingRequests) starting.aborted = true;
     this.manifestRegistry = new ManifestRegistry();
     this.streams.clear();
-    this.failedStreamKeys.clear();
     this.unidentifiedStreamKeys.clear();
+    this.failedStreamKeys.clear();
     this.unshareableLogged.clear();
     // Each part is torn down whatever the ones before it made of themselves,
     // and this core is left empty either way. An integrator's own segment
@@ -926,6 +935,7 @@ export class Core {
     this.manifestResponseUrl = undefined;
     this.streamDetails = { isLive: false };
     this.storageInitPromise = undefined;
+    this.storageGeneration++;
     if (failures.length) throw failures[0];
   }
 
@@ -933,52 +943,67 @@ export class Core {
     if (this.segmentStorage) return;
     if (this.storageInitPromise) return this.storageInitPromise;
 
-    this.storageInitPromise = (async () => {
-      const { isLive } = this.streamDetails;
-      const createCustomStorage =
-        this.commonCoreConfig.customSegmentStorageFactory;
-
-      if (createCustomStorage && typeof createCustomStorage !== "function") {
-        throw new Error("Storage configuration is invalid");
-      }
-
-      const segmentStorage = createCustomStorage
-        ? createCustomStorage(isLive)
-        : new SegmentMemoryStorage();
-
-      try {
-        await segmentStorage.initialize(
-          this.commonCoreConfig,
-          this.mainStreamConfig,
-          this.secondaryStreamConfig,
-        );
-      } catch (error) {
-        segmentStorage.destroy();
-        throw error;
-      }
-
-      if (!this.storageInitPromise) {
-        segmentStorage.setSegmentChangeCallback(undefined);
-        segmentStorage.destroy();
-        return;
-      }
-
-      segmentStorage.setSegmentChangeCallback((streamSwarmId: string) => {
-        (
-          this.eventTarget as unknown as EventTarget<
-            CoreEventMap & Record<`onStorageUpdated-${string}`, () => void>
-          >
-        ).dispatchEvent(`onStorageUpdated-${streamSwarmId}`);
-      });
-
-      this.segmentStorage = segmentStorage;
-    })();
+    // Known by its generation, not by there being an initialization: a
+    // `destroy()` while this waits, or the next source's request re-arming
+    // it with an initialization of its own, moves the generation on — and
+    // this one must not mistake that for itself and install a storage made
+    // for the previous source.
+    const generation = ++this.storageGeneration;
+    const init = this.createSegmentStorage(
+      () => this.storageGeneration === generation,
+    );
+    this.storageInitPromise = init;
 
     try {
-      await this.storageInitPromise;
+      await init;
     } finally {
-      this.storageInitPromise = undefined;
+      if (this.storageInitPromise === init) this.storageInitPromise = undefined;
     }
+  }
+
+  /**
+   * Builds and initializes the segment storage, and installs it if this
+   * initialization is still the current one when it is done.
+   */
+  private async createSegmentStorage(isCurrent: () => boolean) {
+    const { isLive } = this.streamDetails;
+    const createCustomStorage =
+      this.commonCoreConfig.customSegmentStorageFactory;
+
+    if (createCustomStorage && typeof createCustomStorage !== "function") {
+      throw new Error("Storage configuration is invalid");
+    }
+
+    const segmentStorage = createCustomStorage
+      ? createCustomStorage(isLive)
+      : new SegmentMemoryStorage();
+
+    try {
+      await segmentStorage.initialize(
+        this.commonCoreConfig,
+        this.mainStreamConfig,
+        this.secondaryStreamConfig,
+      );
+    } catch (error) {
+      segmentStorage.destroy();
+      throw error;
+    }
+
+    if (!isCurrent()) {
+      segmentStorage.setSegmentChangeCallback(undefined);
+      segmentStorage.destroy();
+      return;
+    }
+
+    segmentStorage.setSegmentChangeCallback((streamSwarmId: string) => {
+      (
+        this.eventTarget as unknown as EventTarget<
+          CoreEventMap & Record<`onStorageUpdated-${string}`, () => void>
+        >
+      ).dispatchEvent(`onStorageUpdated-${streamSwarmId}`);
+    });
+
+    this.segmentStorage = segmentStorage;
   }
 
   private identifySegment(key: string): SegmentWithStream {

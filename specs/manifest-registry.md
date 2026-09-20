@@ -71,16 +71,40 @@ single anonymous stream.
 A media playlist is matched to the stream its master declared by URL,
 tolerating a query string that differs (signed tokens rotate) and a redirect
 (the master named what was asked for, not where the response came from — which
-is why an adapter reports both). A playlist that matches nothing is known by
-what was asked for, so a CDN answering every request from somewhere else
-leaves one stream behind rather than one per refresh.
+is why an adapter reports both). A match with the query stripped counts only
+where one declared stream matches: a master that tells its variants apart by
+query string alone leaves every one of them matching, and attaching the
+playlist to whichever came first would register one rendition's segments under
+another's identity, so the playlist is an anonymous stream instead — and an
+anonymous stream already registered at the same stripped URL is that stream on
+its next load, whatever token it carries. A playlist that
+matches nothing is known by what was asked for, so a CDN answering every
+request from somewhere else leaves one stream behind rather than one per
+refresh.
 
-A stream's identity is decided by the first manifest that carries one and
-never changes afterwards, because that identity is its swarm: a live packager
-republishing its master with another `BANDWIDTH` would otherwise move a playing
-stream into a swarm with no peers in it. A master that arrives after a media
-playlist registered the stream anonymously does identify it, since nothing had
-identified it before.
+A stream's identity and type are decided by the first manifest that registers
+it, and never change afterwards: that identity is its swarm, and a live
+packager republishing its master with another `BANDWIDTH` would otherwise move
+a playing stream into a swarm with no peers in it. A media playlist processed
+before its master is not a supported order. No player produces it — the master
+is the first manifest a player fetches, and every adapter is in the loading
+path from the start — so it can only come from an integrator calling
+`processManifest` out of order, and it is handled the simple way: the playlist
+registers an anonymous stream, the master arriving later attaches its
+declaration to that stream but does not identify it, and the stream shares
+only while it is alone of its type (below). Supporting the order would mean
+changing a stream's identity, type and swarm under loaders, requests and
+stored segments that hold it, for a case nothing reaches.
+
+A master that declares, under another query string, the URL a registered
+stream already has declares that stream — a master re-fetched with its playlist
+tokens rotated. Only a sole such stream, and only where the master declares one
+stream at that URL: a master telling its variants apart by query alone cannot
+say which of them a stream was. Such a master re-fetched with rotated tokens
+therefore registers its variants again beside the old ones, which keep a stale
+segment set; the registry grows by one stream per variant per master refresh.
+That is accepted: telling a token apart from a variant parameter would need a
+list of token names, and players re-fetch an HLS master rarely or never.
 
 **An anonymous stream is shared only where it is the only stream of its type in
 its swarm.** It carries the identity every unidentified stream of its type

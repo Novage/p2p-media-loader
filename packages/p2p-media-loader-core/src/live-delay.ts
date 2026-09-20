@@ -24,19 +24,6 @@ export type LiveDelay = {
 };
 
 /**
- * The presentation delay a processed manifest calls for, or `undefined` when
- * it described no live stream with segments. Among the streams the manifest
- * listed, the widest live main stream decides; on an MPD every
- * Representation shares one window, and on HLS one media playlist arrives at
- * a time.
- *
- * A presentation with no main stream at all is placed by the widest live
- * stream it does have. An audio-only one is the case that matters: live radio
- * is an MPD of audio Representations, which the parsers type as secondary
- * because that is what an audio track is beside a video one, and without this
- * it would be the one live presentation nobody places.
- */
-/**
  * How far behind the live edge to place a player, given the window it has and
  * the length of a segment in it: as deep as the window allows, one segment
  * inside the tail, never more than a minute behind, and never less than a
@@ -51,6 +38,19 @@ export function liveDelayFromWindow(window: number, segment: number): number {
   );
 }
 
+/**
+ * The presentation delay a processed manifest calls for, or `undefined` when
+ * it described no live stream with segments. Among the streams the manifest
+ * listed, the widest live main stream decides; on an MPD every
+ * Representation shares one window, and on HLS one media playlist arrives at
+ * a time.
+ *
+ * A presentation with no main stream at all is placed by the widest live
+ * stream it does have. An audio-only one is the case that matters: live radio
+ * is an MPD of audio Representations, which the parsers type as secondary
+ * because that is what an audio track is beside a video one, and without this
+ * it would be the one live presentation nobody places.
+ */
 export function liveDelayFor(
   manifest: ProcessedManifest,
 ): LiveDelay | undefined {

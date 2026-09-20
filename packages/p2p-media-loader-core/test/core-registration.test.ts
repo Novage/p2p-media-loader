@@ -314,6 +314,34 @@ describe("segment lookup", () => {
     );
   });
 
+  it("keeps the anonymous identity of a stream whose master came after it", () => {
+    // A media playlist processed before its master: not an order any player
+    // produces, and not supported. The identity is the first registration's,
+    // and beside the master's other variants the stream stops sharing — the
+    // rule for every anonymous stream that is not alone of its type.
+    const core = new Core({ manifestParsers: [hlsManifestParser] });
+    core.processManifest({ url: VIDEO_1080, data: HLS_MEDIA_VOD_BYTERANGE });
+    const anonymous = core.getStreams()[0];
+    expect(
+      core.isSegmentLoadable("https://example.com/hls/video/1080p/media.mp4", {
+        start: 600,
+        end: 1599,
+      }),
+    ).toBe(true);
+
+    core.processManifest({ url: MANIFEST_URL, data: HLS_MASTER_WITH_AUDIO });
+
+    const stream = core.getStream(VIDEO_1080)!;
+    expect(stream.identityHash).toBe(anonymous.identityHash);
+    expect(stream.identityHash).not.toBe(IDENTITY_1080);
+    expect(
+      core.isSegmentLoadable("https://example.com/hls/video/1080p/media.mp4", {
+        start: 600,
+        end: 1599,
+      }),
+    ).toBe(false);
+  });
+
   it("refuses to share a stream no manifest identified beside ones it did", () => {
     // A rendition whose media playlist the registry could not match to the
     // master that named it — a CDN signing playlist URLs per response is

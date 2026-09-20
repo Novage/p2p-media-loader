@@ -24,6 +24,10 @@ const fakes = vi.hoisted(() => {
     httpAborted: [] as string[],
     p2pStarted: [] as string[],
     p2pAborted: [] as string[],
+    httpControls: new Map<
+      string,
+      { addLoadedChunk: (c: Uint8Array) => void; completeOnSuccess: () => void }
+    >(),
   };
   class FakeP2PLoader {
     get connectedPeerCount() {
@@ -75,10 +79,11 @@ const fakes = vi.hoisted(() => {
     execute() {
       const id = this.request.segment.runtimeId;
       state.httpStarted.push(id);
-      this.request.start(
+      const controls = this.request.start(
         { downloadSource: "http" },
         { onAbort: () => state.httpAborted.push(id) },
       );
+      state.httpControls.set(id, controls as never);
     }
   }
   return { state, FakeP2PLoadersContainer, FakeHttpRequestExecutor };
@@ -113,14 +118,17 @@ import { EventTarget } from "../src/utils/event-target.js";
 
 const SEGMENT_DURATION = 4;
 
-function createStream(segmentCount: number): StreamWithSegments {
+function createStream(
+  segmentCount: number,
+  rendition = "720p",
+): StreamWithSegments {
   const stream = {
-    runtimeId: "https://cdn.example/v/720p/index.m3u8",
+    runtimeId: `https://cdn.example/v/${rendition}/index.m3u8`,
     type: "main",
     properties: { bitrate: 1_000_000 },
     swarmId: "https://cdn.example/v/master.m3u8",
-    identityHash: "id",
-    streamSwarmId: "v3-swarm-main-id",
+    identityHash: `id-${rendition}`,
+    streamSwarmId: `v3-swarm-main-id-${rendition}`,
     infoHash: "hash",
     segments: new Map<string, SegmentWithStream>(),
   } as StreamWithSegments;
@@ -158,6 +166,10 @@ const storageHolding = (segmentId: number, data: ArrayBuffer) =>
 
 /** Lets the queued microtask run processQueue. */
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+/** The same, under fake timers, where a timeout would never fire. */
+const flushMicrotasks = async () => {
+  for (let i = 0; i < 8; i++) await Promise.resolve();
+};
 
 function setup(
   configOverrides: Partial<StreamConfig> = {},
@@ -322,6 +334,9 @@ describe("HybridLoader: a stored segment that reads back empty", () => {
     state.httpStarted.length = 0;
   });
   afterEach(() => {
+    // A test that timed out under fake timers never reaches its own cleanup.
+    vi.useRealTimers();
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
@@ -397,6 +412,166 @@ describe("HybridLoader: a stored segment that reads back empty", () => {
     );
     expect(state.p2pStarted.length).toBeGreaterThan(0);
     expect(both).toEqual([]);
+    loader.destroy();
+  });
+
+  it("stores a settled request under its own stream, not the one last requested", async () => {
+    // The player switched rendition while a request of the previous one was
+    // in flight. Filed under the new rendition's identity, its bytes would be
+    // served to the player, and to peers, as the new rendition's segment.
+    const storeSegment = vi.fn(() => Promise.resolve());
+    const { loader, segment, callbacks, state } = setup({}, {
+      ...emptyStorage,
+      storeSegment,
+    } as unknown as SegmentStorage);
+    const previous = segment(0).stream;
+    const controls = state.requests
+      .getOrCreateRequest(segment(1))
+      .start({ downloadSource: "http" }, { onAbort: () => undefined });
+
+    const next = createStream(30, "1080p");
+    await loader.loadSegment(next.segments.get("seg-0")!, callbacks);
+    controls.addLoadedChunk(new Uint8Array(16));
+    controls.completeOnSuccess();
+    await flush();
+
+    expect(storeSegment).toHaveBeenCalledTimes(1);
+    const [swarmId, streamSwarmId, externalId] = storeSegment.mock
+      .calls[0] as unknown as [string, string, number];
+    expect([swarmId, streamSwarmId, externalId]).toEqual([
+      previous.swarmId,
+      previous.streamSwarmId,
+      1,
+    ]);
+    loader.destroy();
+  });
+
+  it("measures storage capacity once per pass", async () => {
+    // Measuring walks the whole segment cache; a pass generates one queue
+    // and prefetches from it, and measures once for both.
+    const getUsage = vi.fn(() => ({ totalCapacity: 100, usedCapacity: 0 }));
+    const { loader, segment, callbacks, state } = setup({}, {
+      ...emptyStorage,
+      getUsage,
+    } as unknown as SegmentStorage);
+    state.peerCount = 3;
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+
+    expect(queueGenerations.count).toBeGreaterThan(0);
+    expect(getUsage).toHaveBeenCalledTimes(1);
+    loader.destroy();
+  });
+
+  it("does not run a pass queued before it was destroyed", async () => {
+    // A request settling schedules a pass; the adapter tears the core down
+    // in the same task. The pass would reach a storage already destroyed.
+    const getUsage = vi.fn(() => ({ totalCapacity: 100, usedCapacity: 0 }));
+    const { loader, segment, callbacks } = setup({}, {
+      ...emptyStorage,
+      getUsage,
+    } as unknown as SegmentStorage);
+
+    // No await in between: the pass is queued, the loader is gone.
+    void loader.loadSegment(segment(0), callbacks);
+    loader.destroy();
+    await flush();
+
+    expect(getUsage).not.toHaveBeenCalled();
+  });
+
+  it("re-checks backup deadlines within two seconds whatever the swarm size", async () => {
+    // A proxy never reports, so the timer is all that drives the election;
+    // the playhead estimate then decays with the clock. The deadlines are
+    // sub-second; a period that grew with the peer count would leave a
+    // segment to enter the high-demand window unfetched.
+    vi.useFakeTimers();
+    let clock = 0;
+    vi.spyOn(performance, "now").mockImplementation(() => clock);
+    vi.spyOn(Math, "random").mockReturnValue(0.999);
+    try {
+      const { state } = fakes;
+      state.peerCount = 50;
+      const { loader, segment, callbacks } = setup();
+      await loader.loadSegment(segment(0), callbacks);
+      loader.updatePlayback({ bufferAhead: 10, rate: 1 });
+      await flushMicrotasks();
+      queueGenerations.count = 0;
+
+      // Time passes; the estimate moves with the clock, and the election
+      // last judged from a playhead that has since moved.
+      clock += 5_000;
+      vi.advanceTimersByTime(2000);
+
+      expect(queueGenerations.count).toBeGreaterThan(0);
+      loader.destroy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps ticking after a tick threw", async () => {
+    // A custom storage that fails once from the timer's election. The timer
+    // is all that elects for a paused player or a proxy; a chain ended by
+    // one throw would end for the session.
+    let failNext = false;
+    const getUsage = vi.fn(() => {
+      if (failNext) {
+        failNext = false;
+        throw new Error("storage hiccup");
+      }
+      return { totalCapacity: 100, usedCapacity: 0 };
+    });
+    vi.useFakeTimers();
+    let clock = 0;
+    vi.spyOn(performance, "now").mockImplementation(() => clock);
+    try {
+      const { state } = fakes;
+      state.peerCount = 3;
+      const { loader, segment, callbacks } = setup({}, {
+        ...emptyStorage,
+        getUsage,
+      } as unknown as SegmentStorage);
+      await loader.loadSegment(segment(0), callbacks);
+      loader.updatePlayback({ bufferAhead: 10, rate: 1 });
+      await flushMicrotasks();
+
+      // The estimate has moved; this tick elects, and its measurement throws.
+      clock += 5_000;
+      failNext = true;
+      vi.advanceTimersByTime(2000);
+      expect(failNext).toBe(false);
+      queueGenerations.count = 0;
+
+      clock += 5_000;
+      vi.advanceTimersByTime(2000);
+      expect(queueGenerations.count).toBeGreaterThan(0);
+      loader.destroy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("measures the capacity again for the brake when the pass stored a segment", async () => {
+    // The measure taken to build the queue predates the stores the pass
+    // makes; the brake on prefetching must not read a value from before them.
+    const getUsage = vi.fn(() => ({ totalCapacity: 100, usedCapacity: 0 }));
+    const { loader, segment, callbacks, state } = setup({}, {
+      ...emptyStorage,
+      getUsage,
+    } as unknown as SegmentStorage);
+    state.peerCount = 3;
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+    const controls = state.httpControls.get("seg-0")!;
+    getUsage.mockClear();
+
+    controls.addLoadedChunk(new Uint8Array(16));
+    controls.completeOnSuccess();
+    await flush();
+
+    expect(getUsage).toHaveBeenCalledTimes(2);
     loader.destroy();
   });
 

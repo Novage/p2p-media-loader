@@ -48,6 +48,102 @@ describe("ManifestRegistry: HLS streams and segments", () => {
     expect(registry.getStream(MEDIA_1080)?.segments.size).toBe(3);
   });
 
+  it("leaves a playlist anonymous when its URL matches more than one variant", () => {
+    // A master that tells its variants apart by query string alone. With the
+    // token rotated, the playlist matches both once the query is stripped,
+    // and attaching it to whichever came first would register one
+    // rendition's segments under the other's identity.
+    const master = `#EXTM3U
+#EXT-X-STREAM-INF:BANDWIDTH=1000000,RESOLUTION=1280x720,CODECS="avc1.4d401f"
+index.m3u8?v=720p
+#EXT-X-STREAM-INF:BANDWIDTH=3000000,RESOLUTION=1920x1080,CODECS="avc1.64002a"
+index.m3u8?v=1080p
+`;
+    const registry = new ManifestRegistry();
+    registry.apply(hls(master, MASTER));
+    const playlist = "https://cdn.example/live/index.m3u8?v=rotated";
+    registry.apply(hls(HLS_MEDIA_VOD_BYTERANGE, playlist));
+
+    expect(registry.getStreams()).toHaveLength(3);
+    for (const variant of ["720p", "1080p"]) {
+      const stream = registry.getStream(
+        `https://cdn.example/live/index.m3u8?v=${variant}`,
+      );
+      expect(stream?.segments.size).toBe(0);
+    }
+    const anonymous = registry.getStream(playlist);
+    expect(anonymous?.identified).toBe(false);
+    expect(anonymous?.segments.size).toBe(3);
+
+    // The next load, under another token, is the same anonymous stream —
+    // not a new one on every rotation.
+    registry.apply(
+      hls(HLS_MEDIA_VOD_BYTERANGE, "https://cdn.example/live/index.m3u8?v=t2"),
+    );
+    expect(registry.getStreams()).toHaveLength(3);
+    expect(registry.getStream(playlist)?.segments.size).toBe(3);
+  });
+
+  it("attaches a master's declaration to an anonymous stream it names under another token", () => {
+    // Registered beside the anonymous stream, the master's would take the
+    // playlist's next refresh and leave the first behind with a stale segment
+    // set. The identity stays what the first registration made it.
+    const master = `#EXTM3U
+#EXT-X-STREAM-INF:BANDWIDTH=3000000,RESOLUTION=1920x1080,CODECS="avc1.64002a"
+video/1080p/index.m3u8?t=2
+`;
+    const registry = new ManifestRegistry();
+    registry.apply(hls(HLS_MEDIA_VOD_BYTERANGE, `${MEDIA_1080}?t=1`));
+    registry.apply(hls(master, MASTER));
+
+    expect(registry.getStreams()).toHaveLength(1);
+    const stream = registry.getStream(`${MEDIA_1080}?t=1`)!;
+    expect(stream.identified).toBe(false);
+    expect(stream.segments.size).toBe(3);
+
+    registry.apply(hls(HLS_MEDIA_VOD_BYTERANGE, `${MEDIA_1080}?t=3`));
+    expect(registry.getStreams()).toHaveLength(1);
+  });
+
+  it("keeps one stream when a re-fetched master rotates its playlist tokens", () => {
+    const master = (token: string) => `#EXTM3U
+#EXT-X-STREAM-INF:BANDWIDTH=3000000,RESOLUTION=1920x1080,CODECS="avc1.64002a"
+video/1080p/index.m3u8?t=${token}
+`;
+    const registry = new ManifestRegistry();
+    registry.apply(hls(master("1"), MASTER));
+    registry.apply(hls(HLS_MEDIA_VOD_BYTERANGE, `${MEDIA_1080}?t=1`));
+    const identity = registry.getStream(`${MEDIA_1080}?t=1`)!.identityHash;
+
+    registry.apply(hls(master("2"), MASTER));
+    registry.apply(hls(HLS_MEDIA_VOD_BYTERANGE, `${MEDIA_1080}?t=2`));
+
+    expect(registry.getStreams()).toHaveLength(1);
+    const stream = registry.getStream(`${MEDIA_1080}?t=1`)!;
+    expect(stream.identityHash).toBe(identity);
+    expect(stream.segments.size).toBe(3);
+  });
+
+  it("does not guess which query-only variant an anonymous stream was", () => {
+    const master = `#EXTM3U
+#EXT-X-STREAM-INF:BANDWIDTH=1000000,RESOLUTION=1280x720,CODECS="avc1.4d401f"
+index.m3u8?v=720p
+#EXT-X-STREAM-INF:BANDWIDTH=3000000,RESOLUTION=1920x1080,CODECS="avc1.64002a"
+index.m3u8?v=1080p
+`;
+    const registry = new ManifestRegistry();
+    registry.apply(
+      hls(HLS_MEDIA_VOD_BYTERANGE, "https://cdn.example/live/index.m3u8?v=t1"),
+    );
+    registry.apply(hls(master, MASTER));
+
+    expect(registry.getStreams()).toHaveLength(3);
+    expect(
+      registry.getStream("https://cdn.example/live/index.m3u8?v=t1")
+        ?.identified,
+    ).toBe(false);
+  });
+
   it("matches a media playlist the CDN redirected to another path", () => {
     const registry = new ManifestRegistry();
     registry.apply(hls(HLS_MASTER_WITH_AUDIO, MASTER));
@@ -93,16 +189,22 @@ describe("ManifestRegistry: HLS streams and segments", () => {
     expect(registry.getStream(MEDIA_1080)?.identified).toBe(false);
   });
 
-  it("lets a master identify a stream its media playlist registered first", () => {
+  it("keeps a stream anonymous when its media playlist came before its master", () => {
+    // Not an order any player produces — the master is the first manifest a
+    // player fetches — and not supported: the first manifest to register a
+    // stream decides its identity, and a master arriving after does not
+    // change it. The master's declaration attaches to the stream all the same.
     const registry = new ManifestRegistry();
     registry.apply(hls(HLS_MEDIA_VOD_BYTERANGE, MEDIA_1080));
     const anonymous = registry.getStream(MEDIA_1080)!.identityHash;
 
     registry.apply(hls(HLS_MASTER_WITH_AUDIO, MASTER));
     const stream = registry.getStream(MEDIA_1080)!;
-    expect(stream.identified).toBe(true);
-    expect(stream.identityHash).not.toBe(anonymous);
+    expect(stream.identified).toBe(false);
+    expect(stream.identityHash).toBe(anonymous);
+    expect(stream.type).toBe("main");
     expect(stream.segments.size).toBe(3);
+    expect(registry.getStreams()).toHaveLength(4);
   });
 
   it("keeps the identity the first master gave, whatever a later one says", () => {

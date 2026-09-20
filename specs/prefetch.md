@@ -61,6 +61,17 @@ and a half, towards once. Backups therefore act in order, each only when the
 one before it has not, and none of them fetches while there is still time for
 the owner or a relaying neighbour to deliver.
 
+A deadline passes with no queue event behind it — a paused player reports
+nothing, a proxy never does — so the election is re-checked on a timer as
+well, every one to two seconds whatever the swarm's size. The deadlines it
+judges are sub-second multiples of a fetch time; a period that grew with the
+peer count would let a segment enter the high-demand window unfetched. Every
+tick elects: the election reads the playhead estimate, the connected peers,
+the bandwidth samples behind the fetch-time estimate and the HTTP slots in
+use, and any of them can move with no pass to show for it. A queue is a walk
+over the stream's segment map, and a reporting player drives that walk once a
+second through its reports anyway.
+
 This is what happens when the owner is slow, has not yet seen the segment in
 its own playlist, or has left, and when a relay chain is too long for the
 segment to arrive in time. It is also the only path in the design that is

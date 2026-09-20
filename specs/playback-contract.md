@@ -143,9 +143,16 @@ time.** The position core passes is derived, not the player's clock:
 position = bufferEdge - bufferAhead
 ```
 
-The signature does not change and the comparison stays valid, because segment
-times moved to the same timeline. What changes is that the absolute values no
-longer coincide with `video.currentTime`.
+Each loader reports the playhead on its own stream's timeline, and the store
+keeps the latest report. On live HLS without programme dates the main and the
+secondary playlist are anchored at zero on their own first parse, so their
+timelines can differ by seconds; a segment of one judged against the other's
+position is then off by that much, inside the trailing window the store keeps
+on a live stream. A position kept per stream or per type would be exact while
+both report and would freeze the moment one stops, retaining its segments for
+ever, so the store does not. The signature does not change and the comparison
+stays valid, because segment times moved to the same timeline. What changes is
+that the absolute values no longer coincide with `video.currentTime`.
 
 A custom store that only ever compares the position it is given against the
 segment times it was given is unaffected. A custom store that mixes in a
