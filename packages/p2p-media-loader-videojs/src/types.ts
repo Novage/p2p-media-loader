@@ -113,6 +113,8 @@ export type VhsHandlerLike = {
   representations?(): VhsRepresentation[];
   /** VHS's own bandwidth estimate, in bits per second. */
   bandwidth?: number;
+  /** The options VHS was created with; `withCredentials` goes on its requests. */
+  options_?: { withCredentials?: boolean };
 };
 
 export type VideoJsTechLike = {

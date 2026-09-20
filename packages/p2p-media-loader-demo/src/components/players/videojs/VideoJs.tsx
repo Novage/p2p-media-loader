@@ -2,19 +2,15 @@ import "video.js/dist/video-js.css";
 import "../hlsjs/hlsjs.css";
 import { useEffect, useRef } from "react";
 import videojs from "video.js";
-import { VideoJsP2PEngine } from "p2p-media-loader-videojs";
+import {
+  VideoJsP2PEngine,
+  type VhsRepresentation,
+  type VideoJsTechLike,
+} from "p2p-media-loader-videojs";
 import { PlayerProps } from "../../../types";
 import { subscribeToUiEvents } from "../utils";
 
 const AUTO_QUALITY = "auto";
-
-export type VhsRepresentation = {
-  id: string;
-  height?: number;
-  bandwidth?: number;
-  enabled(enable?: boolean): unknown;
-};
-type TechWithVhs = { vhs?: { representations?(): VhsRepresentation[] } };
 
 export const VideoJs = ({
   streamUrl,
@@ -70,8 +66,9 @@ export const VideoJs = ({
 
     const qualityElement = qualityRef.current;
     const representations = () =>
-      (player.tech(true) as unknown as TechWithVhs).vhs?.representations?.() ??
-      [];
+      (
+        player.tech(true) as unknown as VideoJsTechLike
+      ).vhs?.representations?.() ?? [];
     // A rendition is named by what it is rather than by its VHS id, which
     // carries the playlist URL: a live stream whose CDN signs those per
     // response renames every rendition each time the manifest is refreshed.

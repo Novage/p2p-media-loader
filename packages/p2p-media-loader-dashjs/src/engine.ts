@@ -47,21 +47,28 @@ const FORWARD_BUFFER_KEYS = [
 ] as const;
 
 type ForwardBuffer = Record<(typeof FORWARD_BUFFER_KEYS)[number], number>;
+/** What the player holds under those keys: a length, or a value that is not one. */
+type HeldBuffer = Partial<Record<keyof ForwardBuffer, number | null>>;
 
 type Placement = {
   /** False where the integrator placed the player in the live window. */
   readonly managed: boolean;
   /**
    * What the player held before this engine wrote any of it, and what it is
-   * given back. The buffer part follows later writes from outside — the
-   * integrator's, and dash.js's own when a quota error makes it shrink the
-   * buffer it can afford — keeping the latest of them rather than the lowest,
-   * so the last word on a setting is the one honoured and the one restored.
+   * given back — every value under the buffer keys, a length or not, so that
+   * a key the integrator held as `null` is not left holding a ceiling. The
+   * buffer part is a ledger, kept by `noteOutsideBufferWrites`: it follows
+   * later writes from outside — the integrator's, and dash.js's own when a
+   * quota error makes it shrink the buffer it can afford — keeping the latest
+   * of them rather than the lowest, so the last word on a setting is the one
+   * honoured and the one restored. A later write to the delay is the
+   * integrator placing the player themselves, and hands the whole placement
+   * back.
    */
   readonly held: {
     readonly liveDelay?: number;
     readonly useSuggestedPresentationDelay?: boolean;
-    readonly buffer: Partial<ForwardBuffer>;
+    readonly buffer: HeldBuffer;
   };
 };
 
@@ -156,14 +163,11 @@ export class DashJsP2PEngine {
     ]);
     this.player = player;
 
-    this.placement = undefined;
-    this.appliedLiveDelay = undefined;
-    this.appliedBuffer = undefined;
-
     // The player's settings are read when the first live manifest of a source
     // arrives, not here: `bindPlayer` runs before `initialize`, so what the
     // integrator configures in between would otherwise be taken for dash.js's
-    // own defaults and overwritten.
+    // own defaults and overwritten. (The placement state is empty here: the
+    // release above cleared it, or there was never a player to fill it.)
     // An engine that had this player gives it back before this one reads it:
     // a delay left behind by another engine is indistinguishable from one the
     // integrator set, and would be read as a placement that is not ours.
@@ -259,47 +263,100 @@ export class DashJsP2PEngine {
     }
 
     if (!this.takeOver()) return;
+    const { streaming } = this.player.getSettings();
+
+    // A delay the player holds that this engine did not write is the
+    // integrator placing the player themselves, after the fact: the
+    // placement is theirs from here. What this engine wrote to the buffer
+    // is given back; the delay is left as they set it, and the next manifest
+    // reads it as theirs.
+    const delayNow = streaming?.delay?.liveDelay;
+    if (
+      this.appliedLiveDelay !== undefined &&
+      isConfigured(delayNow) &&
+      delayNow !== this.appliedLiveDelay
+    ) {
+      this.debug("liveDelay was set from outside; the placement is theirs");
+      this.restorePlacement();
+      return;
+    }
+
+    this.noteOutsideBufferWrites();
     const buffer = this.forwardBufferSettings(target);
 
-    // The delay is compared against what this engine placed, never against
-    // what the player holds: its own pre-manifest delay would otherwise read
-    // as a placement, and a first window landing within half a segment of it
-    // would be left with the forward buffer at dash.js's own minute.
+    // The two halves are compared and written independently. The delay is
+    // compared against what this engine placed, never against what the
+    // player holds: its own pre-manifest delay would otherwise read as a
+    // placement. A window that moved by less than half a segment is the same
+    // window — segment durations are not exact multiples — and rewriting the
+    // delay for it would move the target dash.js measures its catch-up
+    // against for nothing; so a change to the buffer alone writes the buffer
+    // alone. `useSuggestedPresentationDelay` is this engine's too: turned back
+    // on from outside, dash.js would park the player near the edge.
     //
     // The buffer is compared against what the player holds, because a ceiling
     // is only a ceiling while it is enforced: a setting raised from outside —
     // by the integrator, the only one who raises these — must be brought back
     // down, and comparing against what this engine last intended would leave
     // it raised for as long as the window holds steady.
-    const held = this.player.getSettings().streaming?.buffer;
-    const placed =
-      this.appliedLiveDelay !== undefined &&
-      Math.abs(this.appliedLiveDelay - target.delay) < target.segment / 2 &&
-      FORWARD_BUFFER_KEYS.every((key) => held?.[key] === buffer[key]);
-    if (placed) {
+    const delayMoved =
+      this.appliedLiveDelay === undefined ||
+      Math.abs(this.appliedLiveDelay - target.delay) >= target.segment / 2 ||
+      streaming?.delay?.useSuggestedPresentationDelay !== false;
+    const held = streaming?.buffer;
+    const bufferChanged = FORWARD_BUFFER_KEYS.some(
+      (key) => held?.[key] !== buffer[key],
+    );
+    if (!delayMoved && !bufferChanged) {
       // Nothing to write, but this is what the player holds and this engine
       // asked for, so it is this engine's — recording it keeps a later change
       // from outside recognisable as one.
       this.appliedBuffer = buffer;
       return;
     }
-    this.debug(
-      `Setting liveDelay to ${target.delay}, forward buffer to ${buffer.bufferTimeDefault}`,
-    );
-    this.player.updateSettings({
-      streaming: {
-        delay: {
-          liveDelay: target.delay,
-          // A server's suggestion places the player near the edge, where
-          // there is nothing to share.
-          useSuggestedPresentationDelay: false,
-        },
-        buffer,
-      },
-    });
-    this.appliedLiveDelay = target.delay;
+
+    const update: {
+      delay?: { liveDelay: number; useSuggestedPresentationDelay: boolean };
+      buffer?: ForwardBuffer;
+    } = {};
+    if (delayMoved) {
+      this.debug(`Setting liveDelay to ${target.delay}`);
+      update.delay = {
+        liveDelay: target.delay,
+        // A server's suggestion places the player near the edge, where
+        // there is nothing to share.
+        useSuggestedPresentationDelay: false,
+      };
+    }
+    if (bufferChanged) {
+      this.debug(`Setting forward buffer to ${buffer.bufferTimeDefault}`);
+      update.buffer = buffer;
+    }
+    this.player.updateSettings({ streaming: update });
+    if (delayMoved) this.appliedLiveDelay = target.delay;
     this.appliedBuffer = buffer;
   };
+
+  /**
+   * Keeps the ledger of what the player holds under the buffer keys that this
+   * engine did not write: somebody else's latest word on the setting — the
+   * integrator's, or dash.js's own when a quota error makes it shrink the two
+   * top-quality buffers it can no longer afford — which the next write would
+   * hide. Reading back what the engine wrote as theirs instead would let the
+   * ceiling only ever fall, and treating it as nobody's would raise a setting
+   * held below the ceiling, which is the one thing a ceiling must not do.
+   */
+  private noteOutsideBufferWrites() {
+    const current = this.player?.getSettings().streaming?.buffer;
+    const ceilings = this.placement?.held.buffer;
+    if (!ceilings) return;
+    for (const key of FORWARD_BUFFER_KEYS) {
+      const value = current?.[key];
+      if (isBufferTime(value) && value !== this.appliedBuffer?.[key]) {
+        ceilings[key] = value;
+      }
+    }
+  }
 
   /**
    * How far ahead of the playhead dash.js may fetch: the high-demand window,
@@ -333,26 +390,12 @@ export class DashJsP2PEngine {
       ),
     );
 
-    const current = this.player?.getSettings().streaming?.buffer;
-    const ceilings = this.placement?.held.buffer ?? {};
+    const ceilings: HeldBuffer = this.placement?.held.buffer ?? {};
     const settings = {} as ForwardBuffer;
     for (const key of FORWARD_BUFFER_KEYS) {
-      // Whatever the player holds that this engine did not write is somebody
-      // else's latest word on the setting — the integrator's, or dash.js's
-      // own when a quota error makes it shrink the two top-quality buffers it
-      // can no longer afford — and the next write hides it, so it is kept
-      // here. Reading back what the engine wrote as theirs instead would let
-      // the ceiling only ever fall, and treating it as nobody's would raise a
-      // setting held below the ceiling, which is the one thing a ceiling must
-      // not do.
-      const value = current?.[key];
-      if (isBufferTime(value) && value !== this.appliedBuffer?.[key]) {
-        ceilings[key] = value;
-      }
-
       const held = ceilings[key];
       settings[key] =
-        held !== undefined && held < bufferTime ? held : bufferTime;
+        isBufferTime(held) && held < bufferTime ? held : bufferTime;
     }
     return settings;
   }
@@ -464,11 +507,14 @@ export class DashJsP2PEngine {
     // back would revert whatever the integrator has set since.
     const streaming: {
       delay?: { liveDelay: number; useSuggestedPresentationDelay?: boolean };
-      buffer?: Partial<ForwardBuffer>;
+      buffer?: HeldBuffer;
     } = {};
     const { held } = placement;
 
-    if (appliedLiveDelay !== undefined) {
+    // The delay only while it is still this engine's: written over from
+    // outside since, it is the integrator's word, and stays.
+    const delayNow = this.player.getSettings().streaming?.delay?.liveDelay;
+    if (appliedLiveDelay !== undefined && delayNow === appliedLiveDelay) {
       streaming.delay = {
         // NaN is how dash.js says a delay was never configured.
         liveDelay: held.liveDelay ?? NaN,
@@ -481,17 +527,22 @@ export class DashJsP2PEngine {
     }
 
     if (appliedBuffer) {
-      const buffer: Partial<ForwardBuffer> = {};
+      // Every key that was held, whatever it held: a `null` given back is a
+      // `null`, not a ceiling left behind.
+      const buffer: HeldBuffer = {};
       for (const key of FORWARD_BUFFER_KEYS) {
-        const value = held.buffer[key];
-        if (value !== undefined) buffer[key] = value;
+        if (key in held.buffer) buffer[key] = held.buffer[key];
       }
       if (Object.keys(buffer).length > 0) streaming.buffer = buffer;
     }
 
     if (Object.keys(streaming).length === 0) return;
     this.debug("Restoring the placement the player came with");
-    this.player.updateSettings({ streaming });
+    this.player.updateSettings({
+      streaming: streaming as Parameters<
+        MediaPlayerClass["updateSettings"]
+      >[0]["streaming"],
+    });
   }
 
   private registerMediaElement() {
@@ -552,12 +603,12 @@ export class DashJsP2PEngine {
 }
 
 /** The forward buffer settings a player currently holds. */
-function readForwardBuffer(player: MediaPlayerClass): Partial<ForwardBuffer> {
+function readForwardBuffer(player: MediaPlayerClass): HeldBuffer {
   const buffer = player.getSettings().streaming?.buffer;
-  const held: Partial<ForwardBuffer> = {};
+  const held: HeldBuffer = {};
   for (const key of FORWARD_BUFFER_KEYS) {
     const value = buffer?.[key];
-    if (isBufferTime(value)) held[key] = value;
+    if (value !== undefined) held[key] = value;
   }
   return held;
 }

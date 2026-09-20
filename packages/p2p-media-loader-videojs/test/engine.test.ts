@@ -1,27 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { VideoJsP2PEngine } from "../src/engine.js";
-import type {
-  VhsRequestHook,
-  VhsResponseHook,
-  VhsXhr,
-  VideoJsLike,
-  VideoJsPlayerLike,
-} from "../src/types.js";
+import type { VhsXhr, VideoJsLike, VideoJsPlayerLike } from "../src/types.js";
+import { hookRegistry } from "./helpers.js";
 
 function fakeVideoJs() {
-  const original = Object.assign(vi.fn(), {
-    original: true,
-  }) as unknown as VhsXhr;
-  original.onRequest = (cb: VhsRequestHook) => {
-    (original._requestCallbackSet ??= new Set()).add(cb);
-  };
-  original.offRequest = (cb: VhsRequestHook) =>
-    original._requestCallbackSet?.delete(cb);
-  original.onResponse = (cb: VhsResponseHook) => {
-    (original._responseCallbackSet ??= new Set()).add(cb);
-  };
-  original.offResponse = (cb: VhsResponseHook) =>
-    original._responseCallbackSet?.delete(cb);
+  const original = hookRegistry(
+    Object.assign(vi.fn(), { original: true }) as unknown as VhsXhr,
+  );
   const plugins = new Map<string, unknown>();
   const videojs = {
     xhr: vi.fn(),
@@ -42,16 +27,7 @@ function fakeVideoJs() {
 
 /** A player whose VHS handler carries the hook registry VHS gives one. */
 function fakePlayer() {
-  const xhr = vi.fn() as unknown as VhsXhr;
-  xhr.onRequest = (cb: VhsRequestHook) => {
-    (xhr._requestCallbackSet ??= new Set()).add(cb);
-  };
-  xhr.offRequest = (cb: VhsRequestHook) => xhr._requestCallbackSet?.delete(cb);
-  xhr.onResponse = (cb: VhsResponseHook) => {
-    (xhr._responseCallbackSet ??= new Set()).add(cb);
-  };
-  xhr.offResponse = (cb: VhsResponseHook) =>
-    xhr._responseCallbackSet?.delete(cb);
+  const xhr = hookRegistry(vi.fn() as unknown as VhsXhr);
 
   const player = {
     tech: vi.fn(() => ({ el: () => null, vhs: { xhr } })),
@@ -69,16 +45,7 @@ function fakePlayer() {
  * VHS and Video.js fire on it.
  */
 function fakeLoadingPlayer() {
-  const xhr = vi.fn() as unknown as VhsXhr;
-  xhr.onRequest = (cb: VhsRequestHook) => {
-    (xhr._requestCallbackSet ??= new Set()).add(cb);
-  };
-  xhr.offRequest = (cb: VhsRequestHook) => xhr._requestCallbackSet?.delete(cb);
-  xhr.onResponse = (cb: VhsResponseHook) => {
-    (xhr._responseCallbackSet ??= new Set()).add(cb);
-  };
-  xhr.offResponse = (cb: VhsResponseHook) =>
-    xhr._responseCallbackSet?.delete(cb);
+  const xhr = hookRegistry(vi.fn() as unknown as VhsXhr);
 
   let vhs: { xhr: VhsXhr } | undefined;
   const listeners = new Map<string, Set<() => void>>();

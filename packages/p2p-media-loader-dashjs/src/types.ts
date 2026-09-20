@@ -28,6 +28,8 @@ type FragmentRequestLike = {
   url?: string | null;
   range?: string | null;
   mediaType?: string | null;
+  /** Presentation time of a media segment; `NaN` on an index probe. */
+  startTime?: number | null;
 };
 
 /** Callbacks and state dash.js's HTTPLoader hangs on a request. */
@@ -64,7 +66,8 @@ export type XhrLoaderLike = {
     request: CommonMediaRequestLike,
     response: CommonMediaResponseLike,
   ): boolean;
-  abort(): void;
+  /** dash.js names the request it abandons; its own loader ignores the name. */
+  abort(request?: CommonMediaRequestLike): void;
 };
 
 /**

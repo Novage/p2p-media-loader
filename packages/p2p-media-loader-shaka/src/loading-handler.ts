@@ -6,6 +6,7 @@ import {
   CoreRequestError,
   ProcessedManifest,
   byteRangeFromRangeHeader,
+  downloadTimeMs,
 } from "p2p-media-loader-core";
 import { stripPatchLocation } from "p2p-media-loader-core/dash";
 
@@ -151,10 +152,7 @@ export class Loader {
           originalRequest,
           uri: segmentUrl,
           originalUri: segmentUrl,
-          timeMs: getLoadingDurationBasedOnBandwidth(
-            bandwidth,
-            data.byteLength,
-          ),
+          timeMs: downloadTimeMs(bandwidth, data.byteLength),
         };
       } catch (error) {
         // Shaka's networking engine retries and reports only its own error
@@ -183,25 +181,6 @@ export class Loader {
       return Promise.resolve();
     });
   }
-}
-
-/**
- * The download time Shaka's bandwidth estimator is told, in milliseconds,
- * derived from the core's bandwidth hint: a segment may have come from a peer
- * or from storage, so wall-clock time says nothing useful about the network.
- *
- * Never 0. Shaka weights each sample by its duration and computes
- * `bytes / durationMs`; a 0 ms sample is `Infinity` at weight 0, which the
- * EWMA turns into `NaN`, after which every variant comparison is false and
- * the player lurches between renditions — on a TV decoder, into a decode
- * error at the switch.
- */
-function getLoadingDurationBasedOnBandwidth(
-  bandwidth: number,
-  bytesLoaded: number,
-) {
-  if (bandwidth <= 0) return 1;
-  return Math.max(1, Math.round((bytesLoaded * 8 * 1000) / bandwidth));
 }
 
 /**

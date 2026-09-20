@@ -87,13 +87,13 @@ type Settings = {
       liveDelayFragmentCount?: number | null;
       useSuggestedPresentationDelay?: boolean;
     };
-    buffer: Record<string, number | undefined>;
+    buffer: Record<string, number | null | undefined>;
   };
 };
 
 function setup(
   liveDelay: number | undefined = NaN,
-  buffer: Record<string, number | undefined> = {},
+  buffer: Record<string, number | null | undefined> = {},
   liveDelayFragmentCount: number | null = NaN,
 ) {
   const settings: Settings = {
@@ -250,17 +250,17 @@ describe("dash.js live window placement", () => {
     expect(player.updateSettings).not.toHaveBeenCalled();
   });
 
-  it("places a window whose delay lands on the one it was held at", () => {
+  it("sets the forward buffer for a window whose delay lands on the one it was held at", () => {
     const { settings, deliverMpd } = setup();
-    // Held at 25 while the window could not be sized, then sized at 24: the
-    // delay it is already at must not read as a placement, or the forward
-    // buffer would be left at dash.js's own minute — the half that decides
-    // whether anything is shared at all.
+    // Held at 25 while the window could not be sized, then sized at 24 —
+    // within half a segment, so the delay stays where it is. The forward
+    // buffer is the other half, decided on its own: left at dash.js's own
+    // minute, nothing would be shared at all.
     deliverMpd(segmentBaseMpd());
     expect(settings.streaming.delay.liveDelay).toBe(25);
 
     deliverMpd(mpd(5, 6));
-    expect(settings.streaming.delay.liveDelay).toBe(24);
+    expect(settings.streaming.delay.liveDelay).toBe(25);
     expect(settings.streaming.buffer).toEqual({
       bufferTimeDefault: 15,
       bufferTimeAtTopQuality: 15,
@@ -645,6 +645,79 @@ describe("dash.js live window placement", () => {
     land();
 
     expect(revived.length).toBe(0);
+  });
+
+  it("gives back a buffer key the integrator held as null", () => {
+    // Not a length, so not a ceiling — but theirs, and given back as theirs;
+    // left as the engine's number, the next source would buffer to it.
+    const { settings, deliverMpd } = setup(NaN, {
+      bufferTimeAtTopQualityLongForm: null,
+    });
+    deliverMpd(mpd(7, 8));
+    expect(settings.streaming.buffer.bufferTimeAtTopQualityLongForm).toBe(16);
+
+    deliverMpd(vodMpd());
+    expect(settings.streaming.buffer.bufferTimeAtTopQualityLongForm).toBeNull();
+  });
+
+  it("hands the placement back to an integrator who sets the delay while playing", () => {
+    // dash.js's own defaults under the buffer keys, as a real player holds.
+    const { settings, player, deliverMpd, fire } = setup(NaN, {
+      bufferTimeDefault: 30,
+      bufferTimeAtTopQuality: 30,
+      bufferTimeAtTopQualityLongForm: 60,
+    });
+    deliverMpd(mpd(7, 8));
+    expect(settings.streaming.delay.liveDelay).toBe(48);
+    expect(settings.streaming.buffer.bufferTimeDefault).toBe(16);
+
+    // Their word: closer to the edge than this engine would put them.
+    player.updateSettings({ streaming: { delay: { liveDelay: 20 } } });
+    deliverMpd(mpd(9, 8));
+
+    expect(settings.streaming.delay.liveDelay).toBe(20);
+    // The buffer this engine wrote is given back; the delay is left theirs.
+    expect(settings.streaming.buffer.bufferTimeDefault).toBe(30);
+    expect(settings.streaming.buffer.bufferTimeAtTopQualityLongForm).toBe(60);
+    fire("streamTeardownComplete");
+    expect(settings.streaming.delay.liveDelay).toBe(20);
+  });
+
+  it("writes the buffer alone when only the buffer changed", () => {
+    // A window that moved by less than half a segment is the same window;
+    // rewriting the delay for it would move the target dash.js measures its
+    // catch-up against, for a change that was only to a ceiling.
+    const { settings, player, deliverMpd, engine } = setup();
+    deliverMpd(mpd(7, 8));
+    expect(settings.streaming.delay.liveDelay).toBe(48);
+    player.updateSettings.mockClear();
+
+    engine.applyDynamicConfig({
+      core: { mainStream: { highDemandTimeWindow: 30 } },
+    });
+    deliverMpd(mpd(7, 8));
+
+    expect(settings.streaming.buffer.bufferTimeDefault).toBe(30);
+    const writes = player.updateSettings.mock.calls as [
+      { streaming?: { delay?: unknown } },
+    ][];
+    expect(writes.length).toBeGreaterThan(0);
+    expect(
+      writes.every(([update]) => update.streaming?.delay === undefined),
+    ).toBe(true);
+  });
+
+  it("turns a server's suggested delay back off when the integrator turns it on", () => {
+    const { settings, player, deliverMpd } = setup();
+    deliverMpd(mpd(7, 8));
+    expect(settings.streaming.delay.useSuggestedPresentationDelay).toBe(false);
+
+    player.updateSettings({
+      streaming: { delay: { useSuggestedPresentationDelay: true } },
+    });
+    deliverMpd(mpd(7, 8));
+
+    expect(settings.streaming.delay.useSuggestedPresentationDelay).toBe(false);
   });
 
   it("leaves a player placed by fragment count alone", () => {

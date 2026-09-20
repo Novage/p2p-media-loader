@@ -10,6 +10,7 @@ import type {
 
 const MPD_URL = "https://cdn.example/dash/manifest.mpd";
 const SEGMENT_URL = "https://cdn.example/dash/video/720p/5.m4s";
+const INIT_URL = "https://cdn.example/dash/video/720p/init.mp4";
 
 /** Builds the request/response pair dash.js's HTTPLoader hands a loader. */
 function makeRequest(
@@ -27,7 +28,8 @@ function makeRequest(
     method: "GET",
     headers,
     customData: {
-      request: { type, url },
+      // A media segment has a presentation time; an index probe has none.
+      request: { type, url, startTime: type === "MediaSegment" ? 0 : NaN },
       onloadend: () => void events.loadend++,
       onprogress: (event) => void events.progress.push(event),
       onabort: () => void events.abort++,
@@ -267,16 +269,51 @@ describe("dash.js XHRLoader extension", () => {
       () => ({ core: core as unknown as Core, onManifestProcessed: vi.fn() }),
       parent,
     );
-    const held = router as unknown as { abortCurrent?: () => void };
+    const held = router as unknown as { current?: unknown };
     const { request, response } = makeRequest("MediaSegment", SEGMENT_URL, {
       Range: "bytes=0-699",
     });
 
     router.load(request, response);
-    expect(held.abortCurrent).toBeDefined();
+    expect(held.current).toBeDefined();
     await flush();
 
-    expect(held.abortCurrent).toBeUndefined();
+    expect(held.current).toBeUndefined();
+  });
+
+  it("passes a SegmentBase index probe through without a registry lookup", () => {
+    // dash.js finds an index it was given no range for by probing the file
+    // with media-typed range requests that carry no start time. Not a
+    // segment, so not a registry miss either.
+    const { loader, core, parent } = setup({ loadable: true });
+    const { request, response } = makeRequest("MediaSegment", SEGMENT_URL, {
+      Range: "bytes=0-1500",
+    });
+    request.customData!.request!.startTime = NaN;
+
+    loader.load(request, response);
+
+    expect(core.isSegmentLoadable).not.toHaveBeenCalled();
+    expect(parent.load).toHaveBeenCalledTimes(1);
+  });
+
+  it("aborts the named request where it lives: the core's at the core, dash.js's at dash.js", async () => {
+    // dash.js's own XHRLoader ignores the name and aborts the XHR it made
+    // last — for a core-served request, some other request's.
+    const { loader, core, parent } = setup({ loadable: true });
+    core.loadSegment.mockImplementationOnce(() => new Promise(() => undefined));
+    const served = makeRequest("MediaSegment", SEGMENT_URL);
+    loader.load(served.request, served.response);
+    const other = makeRequest("InitializationSegment", INIT_URL);
+
+    loader.abort(served.request);
+    expect(core.abortSegmentLoading).toHaveBeenCalledTimes(1);
+    expect(parent.abort).not.toHaveBeenCalled();
+
+    loader.abort(other.request);
+    expect(parent.abort).toHaveBeenCalledTimes(1);
+    expect(core.abortSegmentLoading).toHaveBeenCalledTimes(1);
+    await flush();
   });
 
   it("passes segments the core does not serve, and every other request type, to dash.js untouched", () => {

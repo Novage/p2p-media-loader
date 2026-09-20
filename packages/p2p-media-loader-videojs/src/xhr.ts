@@ -3,6 +3,7 @@ import {
   CoreRequestError,
   byteRangeFromRangeHeader,
   debug,
+  runAll,
 } from "p2p-media-loader-core";
 import {
   REQUEST_TYPE,
@@ -184,13 +185,8 @@ export class RequestRouter {
     private readonly videojs: VideoJsLike,
   ) {}
 
-  /**
-   * Puts this player's hooks on the xhr function of its current VHS handler.
-   *
-   * @returns `true` when they were attached just now, which means the
-   * requests VHS has already sent for this source never passed through them.
-   */
-  attachHooks(): boolean {
+  /** Puts this player's hooks on the xhr function of its current VHS handler. */
+  attachHooks() {
     const xhr = this.player.tech(true)?.vhs?.xhr;
     // VHS builds a new xhr function for every source, and the hook methods it
     // puts on that function close over the handler behind it. Holding one
@@ -202,7 +198,7 @@ export class RequestRouter {
     for (const previous of this.hooked) {
       if (previous !== xhr) this.removeHooks(previous);
     }
-    if (!xhr || this.hooked.has(xhr)) return false;
+    if (!xhr || this.hooked.has(xhr)) return;
     // A VHS that offers neither the hook methods nor the sets behind them is
     // one this adapter cannot reach: say so rather than appear to work, since
     // every request would go on loading over HTTP with nothing to show why.
@@ -216,7 +212,6 @@ export class RequestRouter {
     if (xhr.onResponse) xhr.onResponse(this.handleResponse);
     else (xhr._responseCallbackSet ??= new Set()).add(this.handleResponse);
     this.hooked.add(xhr);
-    return true;
   }
 
   detachHooks() {
@@ -234,11 +229,7 @@ export class RequestRouter {
   }
 
   matchesSrc(uri: string): boolean {
-    try {
-      return this.player.currentSrc() === uri;
-    } catch {
-      return false;
-    }
+    return this.player.currentSrc() === uri;
   }
 
   /**
@@ -332,13 +323,7 @@ export class RequestRouter {
 
   /** Whether VHS sends this player's playlist requests with credentials. */
   private withCredentials(): boolean {
-    try {
-      const tech = this.player.tech(true) as unknown as
-        { vhs?: { options_?: { withCredentials?: boolean } } } | undefined;
-      return tech?.vhs?.options_?.withCredentials === true;
-    } catch {
-      return false;
-    }
+    return this.player.tech(true)?.vhs?.options_?.withCredentials === true;
   }
 
   /**
@@ -446,13 +431,8 @@ export class RequestRouter {
   };
 
   /** What VHS makes of the network now, for a segment that did not use it. */
-  private readonly bandwidth = (): number | undefined => {
-    try {
-      return this.player.tech(true)?.vhs?.bandwidth;
-    } catch {
-      return undefined;
-    }
-  };
+  private readonly bandwidth = (): number | undefined =>
+    this.player.tech(true)?.vhs?.bandwidth;
 
   /** Reads the bytes of everything VHS fetches that the core parses. */
   private readonly handleResponse: VhsResponseHook = (
@@ -515,9 +495,15 @@ export class RequestRouter {
     if (!this.source) return;
     // The source is left whatever the core makes of being torn down: holding
     // on to it would have `enter` treat a return to the same source as no
-    // change at all, and never start a context for it again.
+    // change at all, and never start a context for it again. What the core
+    // makes of it is logged, not raised: the caller here is VHS, running its
+    // request hooks inside the xhr call its playlist loader made — a throw
+    // would leave the new source's manifest request never sent, with no
+    // error from the player. The engine's own `destroy()` raises.
     this.source = undefined;
-    this.core.destroy();
+    for (const failure of runAll([() => this.core.destroy()])) {
+      this.logger("the core failed to be torn down: %O", failure);
+    }
   }
 
   /**
@@ -603,8 +589,16 @@ class ServedRequest implements VhsRequest {
     this.#estimate = estimate;
   }
 
+  /**
+   * `@videojs/xhr` retries by driving the same object again — `open()`, then
+   * `send()` — so opening is what starts an attempt, and a request already
+   * sent is sent again on the next one.
+   */
   open() {
     this.readyState = 1;
+    this.sent = false;
+    this.status = 0;
+    this.response = undefined;
   }
 
   setRequestHeader() {

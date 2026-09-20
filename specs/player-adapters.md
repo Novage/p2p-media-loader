@@ -463,10 +463,16 @@ player's own loading — the low-latency exclusion in
 [architecture.md](architecture.md) at no cost.
 
 Live streams: where the integrator left `streaming.delay.liveDelay` at dash.js's
-default, the adapter places the player in the window, re-applied when the
-window moves by half a segment or when anything else it writes would change —
-the ceiling follows the high demand window, which is configurable at runtime.
-Placement is two settings, not one.
+default, the adapter places the player in the window. Placement is two
+settings, not one, and the two are compared and written independently: the
+delay is re-applied when the window moves by half a segment or
+`useSuggestedPresentationDelay` is turned back on, the buffer ceiling when
+what the player holds differs from the ceiling — it follows the high demand
+window, which is configurable at runtime — and a change to one does not
+rewrite the other, since rewriting the delay moves the target dash.js measures
+its catch-up against. An integrator who sets `liveDelay` while the source plays
+has placed the player themselves: the buffer the adapter wrote is given back,
+the delay is left as they set it, and the source is theirs from there.
 
 **The player is read on the first live manifest of each source, not at bind.**
 `bindPlayer` has to run before `initialize()`, and dash.js's API invites
@@ -501,7 +507,17 @@ request misses the registry and goes to dash.js's own loader, so the stream
 plays perfectly and shares nothing — visible as a stream that stops sharing
 minutes in and resumes only when the player falls behind the edge again.
 Each of the three settings is a ceiling: one the integrator already holds
-lower is left alone.
+lower is left alone, and what they held is given back as it was — a `null` as
+a `null`, not as the ceiling's number.
+
+Two details of the request path. dash.js names the request it abandons on its
+progress timeout, and its own `XHRLoader` ignores the name and aborts the XHR
+it made last; for a request the core is serving that is some other request's,
+so the adapter aborts the named request where it lives — at the core, or at
+dash.js's loader. And dash.js's `SegmentBaseLoader`, given no index range,
+finds the index by probing the file with media-typed range requests; a probe
+has no start time where every media segment has one, and is passed through
+without a registry lookup or the miss it would report.
 
 ### Video.js
 

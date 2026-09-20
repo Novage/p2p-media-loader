@@ -3,6 +3,7 @@ import {
   ProcessedManifest,
   byteRangeFromRangeHeader,
   debug,
+  downloadTimeMs,
 } from "p2p-media-loader-core";
 import { stripPatchLocation } from "p2p-media-loader-core/dash";
 import {
@@ -63,7 +64,7 @@ export function createXhrLoaderExtension(
     const router = new RequestRouter(binding, original);
     return {
       load: (request, response) => router.load(request, response),
-      abort: () => router.abort(),
+      abort: (request) => router.abort(request),
     };
   };
 }
@@ -75,8 +76,8 @@ export function createXhrLoaderExtension(
  */
 export class RequestRouter {
   private readonly logger = debug("p2pml-dashjs:loader");
-  /** Aborts the request served by the core most recently, if still in flight. */
-  private abortCurrent?: () => void;
+  /** The request the core is serving through this loader, while it is. */
+  private current?: { request: CommonMediaRequestLike; abort: () => void };
 
   constructor(
     private readonly binding: () => LoaderBinding | undefined,
@@ -152,6 +153,18 @@ export class RequestRouter {
         );
       }
 
+      // dash.js's `SegmentBaseLoader`, given no index range, finds the index
+      // by probing the file with media-typed range requests. A probe has no
+      // start time, where every media segment has one: not a segment the
+      // registry could know, so it is passed through without the lookup —
+      // and without the registry miss the lookup would report.
+      if (
+        type === REQUEST_TYPE.MEDIA_SEGMENT &&
+        !Number.isFinite(request.customData?.request?.startTime ?? NaN)
+      ) {
+        return this.parent.load(request, response);
+      }
+
       // Whitelist by lookup: a segment the registry knows on a stream with
       // P2P enabled is served by the core; initialization segments and
       // anything the registry does not know load through dash.js itself.
@@ -168,9 +181,24 @@ export class RequestRouter {
     return this.parent.load(request, response);
   }
 
-  abort() {
-    this.abortCurrent?.();
-    this.parent.abort();
+  /**
+   * dash.js names the request it abandons; its own `XHRLoader` ignores the
+   * name and aborts the XHR it made last, which for a request the core is
+   * serving is some other request's. So the named request is aborted where it
+   * lives: at the core if it is the one being served, at dash.js's loader if
+   * not. Named nothing — a caller of the old shape — both are aborted.
+   */
+  abort(request?: CommonMediaRequestLike) {
+    if (request === undefined) {
+      this.current?.abort();
+      this.parent.abort();
+      return;
+    }
+    if (this.current?.request === request) {
+      this.current.abort();
+      return;
+    }
+    this.parent.abort(request);
   }
 
   private passThroughAndObserve(
@@ -223,7 +251,8 @@ export class RequestRouter {
       core.abortSegmentLoading(url, byteRange);
     };
     customData.abort = abort;
-    this.abortCurrent = abort;
+    const current = { request, abort };
+    this.current = current;
     // Once the request has settled there is nothing left to abort — and this
     // closure holds the scope the response lives in, so a `RequestRouter`
     // that kept it would keep the last segment's bytes for the life of the
@@ -231,7 +260,7 @@ export class RequestRouter {
     // media type and keeps it.
     const settle = () => {
       settled = true;
-      if (this.abortCurrent === abort) this.abortCurrent = undefined;
+      if (this.current === current) this.current = undefined;
     };
 
     // The two outcomes are handled by separate arguments to `then`, not by a
@@ -284,7 +313,7 @@ export class RequestRouter {
               lengthComputable: true,
               loaded: total,
               total,
-              time: loadingTimeMs(bandwidth, total),
+              time: downloadTimeMs(bandwidth, total),
             });
           } finally {
             customData.onloadend?.();
@@ -335,10 +364,4 @@ export class RequestRouter {
 
 function isBinary(data: unknown): data is ArrayBuffer | ArrayBufferView {
   return data instanceof ArrayBuffer || ArrayBuffer.isView(data);
-}
-
-/** Download time in ms for the core's bandwidth hint; see the Shaka adapter. */
-function loadingTimeMs(bandwidth: number, bytes: number): number {
-  if (bandwidth <= 0) return 1;
-  return Math.max(1, Math.round((bytes * 8 * 1000) / bandwidth));
 }

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { hookRegistry } from "./helpers.js";
 import { CoreRequestError, type Core } from "p2p-media-loader-core";
 import {
   FirstManifestHooks,
@@ -121,18 +122,6 @@ function pageHookRegistry(fn: VhsXhr, current: () => VhsXhr): VhsXhr {
   };
   fn.offResponse = (cb: VhsResponseHook) =>
     drop("_responseCallbackSet", cb as never);
-  return fn;
-}
-
-function hookRegistry(fn: VhsXhr): VhsXhr {
-  fn.onRequest = (cb: VhsRequestHook) => {
-    (fn._requestCallbackSet ??= new Set()).add(cb);
-  };
-  fn.offRequest = (cb: VhsRequestHook) => fn._requestCallbackSet?.delete(cb);
-  fn.onResponse = (cb: VhsResponseHook) => {
-    (fn._responseCallbackSet ??= new Set()).add(cb);
-  };
-  fn.offResponse = (cb: VhsResponseHook) => fn._responseCallbackSet?.delete(cb);
   return fn;
 }
 
@@ -920,9 +909,9 @@ describe("the page-wide hooks for a source's first manifest", () => {
 
     setSrc("");
     setHandler(false);
-    expect(() => router.ensureTopLevelManifest()).toThrow(
-      "storage teardown failed",
-    );
+    // Logged, not raised: the router's callers are VHS's hooks and the
+    // player's events, where a throw would abort the player's own work.
+    expect(() => router.ensureTopLevelManifest()).not.toThrow();
 
     // Coming back to it is a new context, and its manifest is read again —
     // rather than the router believing it never left.
@@ -931,6 +920,48 @@ describe("the page-wide hooks for a source's first manifest", () => {
     setHandler(true);
     router.ensureTopLevelManifest();
     expect(videojsXhr).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a source change going when the core fails to be torn down inside a request hook", () => {
+    // VHS runs the request hooks inside the xhr call its playlist loader
+    // made for the new source's manifest: a throw there would leave that
+    // request never sent, and the player showing no error for it.
+    const B = "https://cdn.example/hls/second.m3u8";
+    const { router, core, request, respond, setSrc } = setup();
+    router.ensureTopLevelManifest();
+    respond(200, "#EXTM3U");
+    core.destroy.mockImplementation(() => {
+      throw new Error("storage teardown failed");
+    });
+
+    setSrc(B);
+    expect(() =>
+      request({ uri: B, requestType: "hls-playlist" }),
+    ).not.toThrow();
+    expect(core.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it("serves a retried segment again when @videojs/xhr drives the same request a second time", async () => {
+    // The library's retry opens and sends the very object it was given the
+    // first time; a request that stayed 'sent' would never load, never
+    // error, and hold the segment until the library's own timeout.
+    const { router, core, request } = setup({ loadable: true });
+    router.attachHooks();
+    core.loadSegment.mockRejectedValueOnce(new Error("first attempt failed"));
+    const { request: served, callback } = request({
+      uri: SEGMENT,
+      requestType: "segment",
+    });
+    await flush();
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(core.loadSegment).toHaveBeenCalledTimes(1);
+
+    (served as unknown as { open(): void; send(): void }).open();
+    (served as unknown as { open(): void; send(): void }).send();
+    await flush();
+
+    expect(core.loadSegment).toHaveBeenCalledTimes(2);
+    expect(served.status).toBe(200);
   });
 
   it("hands a top-level refresh to the core exactly once", () => {
