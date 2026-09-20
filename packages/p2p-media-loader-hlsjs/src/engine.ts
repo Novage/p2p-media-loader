@@ -61,17 +61,6 @@ export type HlsWithP2PConfig<HlsType extends abstract new () => unknown> =
   };
 
 /**
- * Where the player sits in a live window. See specs/player-adapters.md,
- * "HLS.js".
- *
- * Every segment between the player's buffer and the live edge is one peers
- * can fetch for each other, so the player is placed as deep in the window as
- * it can go. Where exactly is the core's `liveDelayFromWindow` to say, the
- * same answer every adapter gets. Its own forward buffer keeps the fetch
- * positions inside the window even as the playhead drifts past the tail.
- */
-
-/**
  * How far beyond the target the re-sync threshold sits, so a viewer who pauses
  * or stalls is brought back to the target before the buffer starves.
  */
@@ -205,19 +194,25 @@ export class HlsJsP2PEngine {
   }
 
   /**
-   * Provides the HLS.js P2P specific configuration for HLS.js loaders.
+   * Provides the HLS.js configuration the P2P engine needs: its fragment and
+   * playlist loaders, and `lowLatencyMode: false` — in low-latency mode
+   * HLS.js requests partial segments, which the core does not register, so
+   * those requests would bypass P2P. An integration that constructs HLS.js
+   * itself spreads this into its config; one that wants low-latency mode
+   * regardless sets it after.
    *
-   * An integration that constructs HLS.js itself should also pass
-   * `lowLatencyMode: false` (the mixin does so unless the integrator sets it):
-   * in low-latency mode HLS.js requests partial segments, which the core does
-   * not register, so those requests bypass P2P.
-   *
-   * @returns An object containing the fragment loader (`fLoader`) and playlist loader (`pLoader`).
+   * @returns The fragment loader (`fLoader`), the playlist loader
+   * (`pLoader`) and `lowLatencyMode: false`.
    */
-  getConfigForHlsJs(): { fLoader: unknown; pLoader: unknown } {
+  getConfigForHlsJs(): {
+    fLoader: unknown;
+    pLoader: unknown;
+    lowLatencyMode: false;
+  } {
     return {
       fLoader: this.createFragmentLoaderClass(),
       pLoader: this.createPlaylistLoaderClass(),
+      lowLatencyMode: false,
     };
   }
 
@@ -277,10 +272,19 @@ export class HlsJsP2PEngine {
   private initHlsEvents() {
     const hlsInstance = this.hlsInstanceGetter?.();
     if (this.currentHlsInstance === hlsInstance) return;
-    if (this.currentHlsInstance) this.destroy();
+    // Letting the previous instance go may fail — the core destroys an
+    // integrator's own segment storage — and the new one is bound whatever
+    // that made of itself. This runs inside HLS.js's construction of the
+    // playlist loader, where a throw would abort the new source's manifest
+    // request, so the failure is logged here rather than raised; `destroy()`
+    // called by the integrator raises it as before.
+    const failures = this.currentHlsInstance ? runAll([this.destroy]) : [];
     this.currentHlsInstance = hlsInstance;
     this.updateHlsEventsHandlers("register");
-    this.updateMediaElementEventHandlers("register");
+    this.playback.watch(hlsInstance?.media ?? undefined);
+    for (const failure of failures) {
+      this.debug("letting the previous HLS.js instance go failed: %O", failure);
+    }
   }
 
   private updateHlsEventsHandlers(type: "register" | "unregister") {
@@ -314,16 +318,6 @@ export class HlsJsP2PEngine {
     );
   }
 
-  private updateMediaElementEventHandlers = (
-    type: "register" | "unregister",
-  ) => {
-    this.playback.watch(
-      type === "register"
-        ? (this.currentHlsInstance?.media ?? undefined)
-        : undefined,
-    );
-  };
-
   /**
    * Buffer tuning only. Streams and segments reach the core through the
    * playlist loader; live state is derived from the playlist by the core.
@@ -342,14 +336,18 @@ export class HlsJsP2PEngine {
       data.details.fragments.length > 4 &&
       data.details.fragments[0].type === ("main" as PlaylistLevelType)
     ) {
-      if (data.details.live) this.updateLiveSync(data.details);
+      // `EXT-X-TARGETDURATION` is an upper bound, on some streams several
+      // times the real segment; the playlist's average is the segment.
+      const segment =
+        data.details.averagetargetduration ?? data.details.targetduration;
+      if (data.details.live) this.updateLiveSync(data.details, segment);
 
       const { userConfig } = this.currentHlsInstance;
       if (
         userConfig.maxBufferLength === undefined &&
         userConfig.maxMaxBufferLength === undefined
       ) {
-        this.updateMaxBufferLength(data.details.targetduration);
+        this.updateMaxBufferLength(segment);
       }
     }
   };
@@ -357,19 +355,23 @@ export class HlsJsP2PEngine {
   /**
    * Places the player deep in the live window so that the segments between
    * its buffer and the live edge — the ones peers exchange — are as many as
-   * the window allows. Applied through HLS.js's own `targetLatency` API and
-   * only when the integrator has not configured the live sync settings
-   * themselves. Set once per value; HLS.js then re-syncs to it on start, on a
-   * stall, and when the max latency is exceeded.
+   * the window allows: where exactly is the core's `liveDelayFromWindow` to
+   * say, the same answer every adapter gets, and the player's own forward
+   * buffer keeps the fetch positions inside the window as the playhead drifts
+   * past the tail. Applied through HLS.js's own `targetLatency` API, with a
+   * re-sync threshold two segments beyond it. Set once per value; HLS.js then
+   * re-syncs to it on start, on a stall, and when the max latency is exceeded.
    *
-   * Segment length is the playlist's average: `EXT-X-TARGETDURATION` is an
-   * upper bound and can be several times the real segment.
+   * Both or neither: the threshold is derived from this target, and an
+   * integrator who set any of the four live sync settings has a target of
+   * their own — a threshold written against ours could sit below it, which
+   * HLS.js's own config validation forbids, and the count-based settings and
+   * the duration-based ones must not be mixed.
    */
-  private updateLiveSync(details: LevelDetails) {
+  private updateLiveSync(details: LevelDetails, segment: number) {
     const hls = this.currentHlsInstance;
     if (!hls) return;
 
-    const segment = details.averagetargetduration ?? details.targetduration;
     const window = details.totalduration;
     if (!(segment > 0) || !(window > 0)) return;
 
@@ -386,19 +388,19 @@ export class HlsJsP2PEngine {
 
     const { userConfig } = hls;
     if (
-      userConfig.liveSyncDuration === undefined &&
-      userConfig.liveSyncDurationCount === undefined &&
-      differs(hls.config.liveSyncDuration, targetLatency)
+      userConfig.liveSyncDuration !== undefined ||
+      userConfig.liveSyncDurationCount !== undefined ||
+      userConfig.liveMaxLatencyDuration !== undefined ||
+      userConfig.liveMaxLatencyDurationCount !== undefined
     ) {
+      return;
+    }
+
+    if (differs(hls.config.liveSyncDuration, targetLatency)) {
       this.debug(`Setting targetLatency to ${targetLatency}`);
       hls.targetLatency = targetLatency;
     }
-
-    if (
-      userConfig.liveMaxLatencyDuration === undefined &&
-      userConfig.liveMaxLatencyDurationCount === undefined &&
-      differs(hls.config.liveMaxLatencyDuration, maxLatency)
-    ) {
+    if (differs(hls.config.liveMaxLatencyDuration, maxLatency)) {
       this.debug(`Setting liveMaxLatencyDuration to ${maxLatency}`);
       hls.config.liveMaxLatencyDuration = maxLatency;
     }
@@ -438,11 +440,11 @@ export class HlsJsP2PEngine {
   }
 
   private handleMediaAttached = () => {
-    this.updateMediaElementEventHandlers("register");
+    this.playback.watch(this.currentHlsInstance?.media ?? undefined);
   };
 
   private handleMediaDetached = () => {
-    this.updateMediaElementEventHandlers("unregister");
+    this.playback.stop();
   };
 
   private destroyCore = () => this.core.destroy();
@@ -457,7 +459,7 @@ export class HlsJsP2PEngine {
     const failures = runAll([
       this.destroyCore,
       () => this.updateHlsEventsHandlers("unregister"),
-      () => this.updateMediaElementEventHandlers("unregister"),
+      () => this.playback.stop(),
     ]);
     this.currentHlsInstance = undefined;
     if (failures.length) throw failures[0];

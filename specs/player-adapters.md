@@ -156,7 +156,8 @@ loader is what should fetch ahead, not the player. Every setting below is
 applied only when the integrator has not configured it, and each is applied
 once per value when a playlist loads; between playlists HLS.js is left alone.
 
-- **Forward buffer.** `maxBufferLength` is held to the high-demand window. The
+- **Forward buffer.** `maxBufferLength` is held to the high-demand window, with
+  a floor of two segments — the playlist's average segment, as below. The
   segments beyond it are the core's to prefetch.
 - **Position in the live window.** Every segment between the player's buffer
   and the live edge is one peers can fetch for each other, so the player is
@@ -169,12 +170,17 @@ once per value when a playlist loads; between playlists HLS.js is left alone.
   target: a viewer who pauses or stalls that far is re-synced to the target
   before the buffer starves, a controlled skip in place of a stall and jump.
   Segment length is the playlist's average, not `EXT-X-TARGETDURATION`, which
-  is an upper bound and on some streams several times the real segment.
+  is an upper bound and on some streams several times the real segment. Target
+  and threshold are set both or neither: an integrator who configured any of
+  HLS.js's four live sync settings has a target of their own, and a threshold
+  written against ours could sit below it — a config HLS.js itself rejects —
+  or mix its count-based settings with a duration-based one.
 - **Low-latency mode off.** HLS.js enables it by default; on a low-latency
   playlist it then requests partial segments, which the core deliberately does
   not register ([architecture.md](architecture.md)), so those requests would
-  bypass P2P. The mixin passes `lowLatencyMode: false` unless the integrator
-  sets it; an integration that constructs HLS.js itself should do the same.
+  bypass P2P. `getConfigForHlsJs()` carries `lowLatencyMode: false` beside the
+  loaders, so every integration that spreads it gets the default; the mixin
+  lets the integrator's own config override it, and keeps the loaders last.
 
 **Hosted in Video.js 10.** v10 has no streaming layer of its own; its
 `HlsJsAdapter` constructs HLS.js from `source.engine.hlsJs`, handed to HLS.js
@@ -185,6 +191,20 @@ integration is two calls, with nothing added to this package:
 the playlist loader, by which time the adapter has its instance. Playback
 should be pinned to MSE (`preferPlayback`): native HLS on Safari would bypass
 HLS.js and with it the core. The demo's `videojs10_hls` player is this.
+
+Because the engine attaches inside HLS.js's construction of the playlist
+loader, a failure in letting the previous instance go — an integrator's
+segment storage throwing from its teardown — is logged there, not raised: a
+throw would abort the new source's manifest request. `destroy()` called by the
+integrator raises it as before.
+
+The adapter's preload handling captures HLS.js's `maxBufferLength` when it
+first sees the instance and writes it back when the element starts playing,
+which undoes the engine's forward-buffer tuning until the next level update —
+on VOD, for the rest of the level. With `preload="auto"`, as the demo sets, the
+limits are applied once up front and the tuning stands; an integration that
+keeps the adapter's default `preload="metadata"` should pass `maxBufferLength`
+in `source.engine.hlsJs` itself, which the engine then respects.
 
 These settings steer only where HLS.js starts and re-syncs; where the player
 then puts itself is its own business. An immediate quality switch

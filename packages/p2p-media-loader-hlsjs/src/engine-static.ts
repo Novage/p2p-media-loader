@@ -30,14 +30,11 @@ export function injectMixin<
 
       const p2pEngine = new HlsJsP2PEngine(p2p);
 
-      // Low-latency mode makes HLS.js request partial segments, which the
-      // core does not register, so they would bypass P2P. Off unless the
-      // integrator asks for it.
-      super({
-        lowLatencyMode: false,
-        ...hlsJsConfig,
-        ...p2pEngine.getConfigForHlsJs(),
-      });
+      // The engine's defaults first, the integrator's config over them —
+      // low-latency mode stays off unless they ask for it — and the loaders
+      // last: they are what makes this HLS.js a P2P one.
+      const { fLoader, pLoader, ...defaults } = p2pEngine.getConfigForHlsJs();
+      super({ ...defaults, ...hlsJsConfig, fLoader, pLoader });
 
       p2pEngine.bindHls(this);
 

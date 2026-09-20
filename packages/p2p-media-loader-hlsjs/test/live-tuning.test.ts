@@ -59,8 +59,8 @@ function levelUpdated(
   });
 }
 
-function setup() {
-  const engine = new HlsJsP2PEngine();
+function setup(config?: ConstructorParameters<typeof HlsJsP2PEngine>[0]) {
+  const engine = new HlsJsP2PEngine(config);
   const hls = createFakeHls();
   engine.bindHls(hls);
   // The playlist loader's construction is where the engine attaches to HLS.js.
@@ -174,6 +174,34 @@ describe("HLS.js live window placement", () => {
     expect(hls.targetLatencySets).toBe(0);
   });
 
+  it("leaves the re-sync threshold alone when the integrator set only the target", () => {
+    // HLS.js allows configuring the sync side alone. A threshold derived from
+    // our target could sit below theirs — a config HLS.js itself rejects —
+    // and would mix count-based settings with a duration-based one.
+    const { hls } = setup();
+    hls.userConfig.liveSyncDurationCount = 40;
+    levelUpdated(hls, {
+      live: true,
+      totalduration: 300,
+      averagetargetduration: 2,
+    });
+    expect(hls.config.liveMaxLatencyDuration).toBeUndefined();
+    expect(hls.targetLatencySets).toBe(0);
+  });
+
+  it("holds the forward buffer to the average segment, not EXT-X-TARGETDURATION", () => {
+    // 2 s segments under a 6 s target duration, and a high-demand window
+    // narrower than either floor would be: the floor is two real segments.
+    const { hls } = setup({ core: { highDemandTimeWindow: 3 } });
+    levelUpdated(hls, {
+      live: true,
+      totalduration: 28,
+      averagetargetduration: 2,
+      targetduration: 6,
+    });
+    expect(hls.config.maxBufferLength).toBe(4);
+  });
+
   it("respects a buffer length the integrator configured", () => {
     const { hls } = setup();
     hls.userConfig.maxBufferLength = 60;
@@ -261,5 +289,47 @@ describe("HLS.js construction through the mixin", () => {
 
     new HlsWithP2P({ lowLatencyMode: true } as never);
     expect(FakeHlsClass.received?.lowLatencyMode).toBe(true);
+  });
+});
+
+describe("HLS.js instance changes", () => {
+  it("binds the next instance although letting the previous one go threw", () => {
+    // The engine attaches inside HLS.js's construction of the playlist
+    // loader. A throw there would abort the new source's manifest request,
+    // so the previous instance's teardown failure — an integrator's segment
+    // storage — is logged, and the new instance is bound all the same.
+    const engine = new HlsJsP2PEngine();
+    const first = createFakeHls();
+    const second = createFakeHls();
+    let current: ReturnType<typeof createFakeHls> = first;
+    engine.bindHls(() => current);
+    const { pLoader } = engine.getConfigForHlsJs() as {
+      pLoader: new (config: HlsConfig) => unknown;
+    };
+    class FakeLoader {
+      stats = {};
+      context = {};
+      load() {}
+      abort() {}
+      destroy() {}
+    }
+    new pLoader({ loader: FakeLoader } as unknown as HlsConfig);
+    expect(first.handlers.size).toBeGreaterThan(0);
+    const core = (engine as unknown as { core: { segmentStorage?: unknown } })
+      .core;
+    core.segmentStorage = {
+      setSegmentChangeCallback: () => undefined,
+      destroy: () => {
+        throw new Error("storage teardown failed");
+      },
+    };
+
+    current = second;
+    expect(
+      () => new pLoader({ loader: FakeLoader } as unknown as HlsConfig),
+    ).not.toThrow();
+
+    expect(second.handlers.size).toBeGreaterThan(0);
+    expect(core.segmentStorage).toBeUndefined();
   });
 });
