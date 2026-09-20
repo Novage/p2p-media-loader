@@ -8,6 +8,7 @@ import {
   DynamicCoreConfig,
   ProcessedManifest,
   debug,
+  runAll,
   trackMediaElementPlayback,
   liveDelayFor,
   type LiveDelay,
@@ -147,7 +148,18 @@ export class DashJsP2PEngine {
    */
   bindPlayer(player: MediaPlayerClass) {
     if (this.player === player) return;
-    if (this.player) this.destroy();
+    // Whatever letting go of the last player, or taking this one off the
+    // engine that had it, makes of itself: this player is bound either way.
+    // A failure there raised from the middle of a bind would leave this
+    // engine holding the player with none of its handlers on it, and a second
+    // bind to the same player returns at the top — so it would stay that way,
+    // while the engine that was released keeps every request routed to a core
+    // it has already reset. What failed is raised once the bind is complete.
+    const failures = runAll([
+      () => {
+        if (this.player) this.destroy();
+      },
+    ]);
     this.player = player;
 
     this.placement = undefined;
@@ -161,7 +173,7 @@ export class DashJsP2PEngine {
     // An engine that had this player gives it back before this one reads it:
     // a delay left behind by another engine is indistinguishable from one the
     // integrator set, and would be read as a placement that is not ours.
-    bindings.get(player)?.release?.();
+    failures.push(...runAll([() => bindings.get(player)?.release?.()]));
     bindings.set(player, {
       core: this.core,
       onManifestProcessed: this.applyLivePlacement,
@@ -176,6 +188,7 @@ export class DashJsP2PEngine {
     player.on(STREAM_INITIALIZED, this.handleStreamInitialized);
     player.on(STREAM_TEARDOWN_COMPLETE, this.handleStreamTeardown);
     this.registerMediaElement();
+    if (failures.length) throw failures[0];
   }
 
   /**
@@ -354,12 +367,28 @@ export class DashJsP2PEngine {
     this.registerMediaElement();
   };
 
+  /**
+   * The player has finished tearing a stream down. dash.js calls this from
+   * its own event bus, which invokes handlers with no `try` of its own: a
+   * throw here aborts `StreamController`'s reset half way — leaving its
+   * streams, media-error and autoplay state stale, and the controllers after
+   * it never reset — and surfaces out of the integrator's `attachSource`.
+   * So each step runs on its own and what failed is logged, not raised.
+   *
+   * The core goes last, because it is the step that can fail: it destroys an
+   * integrator's own segment storage, which is free to throw.
+   */
   private handleStreamTeardown = () => {
-    this.core.destroy();
-    this.playback.stop();
-    // The next source starts from the player's own settings, and is placed on
-    // its own window rather than measured against this one's.
-    this.restorePlacement();
+    const failures = runAll([
+      () => this.playback.stop(),
+      // The next source starts from the player's own settings, and is placed
+      // on its own window rather than measured against this one's.
+      () => this.restorePlacement(),
+      () => this.core.destroy(),
+    ]);
+    for (const failure of failures) {
+      this.debug("tearing the stream down failed: %O", failure);
+    }
   };
 
   /**
@@ -501,16 +530,30 @@ export class DashJsP2PEngine {
    * and its playback tracker detached. Leaving them running would keep a
    * second core fetching and announcing in the swarm the engine that took the
    * player over is in, driven by the same media element.
+   *
+   * Every step runs whatever the ones before it made of themselves: the core
+   * destroys an integrator's own segment storage and is free to throw, and
+   * stopping there would leave the media element reporting playback into a
+   * destroyed core, this engine's handlers on the player, and the player
+   * carrying the live delay and buffer ceilings this engine wrote. What
+   * failed is raised once there is nothing left to let go of — to whoever
+   * asked, which on the takeover path is the engine binding this player next,
+   * and which is why that one collects it rather than letting it abort a bind
+   * already under way.
    */
   private releasePlayer = () => {
-    this.core.destroy();
-    this.playback.stop();
-    if (this.player) {
-      this.player.off(STREAM_INITIALIZED, this.handleStreamInitialized);
-      this.player.off(STREAM_TEARDOWN_COMPLETE, this.handleStreamTeardown);
-    }
-    this.restorePlacement();
+    const failures = runAll([
+      () => this.playback.stop(),
+      () => {
+        if (!this.player) return;
+        this.player.off(STREAM_INITIALIZED, this.handleStreamInitialized);
+        this.player.off(STREAM_TEARDOWN_COMPLETE, this.handleStreamTeardown);
+      },
+      () => this.restorePlacement(),
+      () => this.core.destroy(),
+    ]);
     this.player = undefined;
+    if (failures.length) throw failures[0];
   };
 }
 

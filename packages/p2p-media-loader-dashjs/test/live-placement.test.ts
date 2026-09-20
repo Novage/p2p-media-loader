@@ -315,6 +315,82 @@ describe("dash.js live window placement", () => {
     expect(settings.streaming.buffer).toEqual(held);
   });
 
+  it("gives it back on teardown even when the core fails to be destroyed", () => {
+    // An integrator's own segment storage is destroyed with the core and is
+    // free to throw. dash.js calls this handler from its event bus with no
+    // `try` of its own, so a throw escaping here would abort
+    // `StreamController`'s reset half way and surface out of `attachSource`.
+    const held = {
+      bufferTimeDefault: 18,
+      bufferTimeAtTopQuality: 30,
+      bufferTimeAtTopQualityLongForm: 60,
+    };
+    const { settings, deliverMpd, fire, engine } = setup(NaN, held);
+    deliverMpd(mpd(4, 4));
+    const core = (engine as unknown as { core: { destroy: () => void } }).core;
+    core.destroy = () => {
+      throw new Error("storage teardown failed");
+    };
+
+    expect(() => fire("streamTeardownComplete")).not.toThrow();
+
+    expect(settings.streaming.buffer).toEqual(held);
+  });
+
+  it("binds a player the engine before it failed to let go of", () => {
+    // Taking a player off another engine is part of binding it. A failure in
+    // that release raised early would leave this engine holding the player
+    // with none of its handlers on it — and a second bind to the same player
+    // returns at the top, so it would stay that way for the session, while
+    // the engine that was released keeps every request routed to a core it
+    // has already reset.
+    const held = {
+      bufferTimeDefault: 18,
+      bufferTimeAtTopQuality: 30,
+      bufferTimeAtTopQualityLongForm: 60,
+    };
+    const first = setup(NaN, held);
+    first.deliverMpd(mpd(4, 4));
+    const core = (first.engine as unknown as { core: { destroy: () => void } })
+      .core;
+    core.destroy = () => {
+      throw new Error("storage teardown failed");
+    };
+
+    const second = new DashJsP2PEngine();
+    expect(() =>
+      second.bindPlayer(first.player as unknown as MediaPlayerClass),
+    ).toThrow("storage teardown failed");
+
+    // Bound all the same: the release detached the last engine's playback
+    // tracker and this engine's bind got as far as attaching its own, which
+    // is the last thing `bindPlayer` does.
+    expect(first.listeners.size).toBeGreaterThan(0);
+    second.destroy();
+    expect(first.listeners.size).toBe(0);
+  });
+
+  it("lets the player go even when the core fails to be destroyed", () => {
+    // `destroy()` is the integrator's own call, so the failure is raised —
+    // but only once everything else has been given back.
+    const held = {
+      bufferTimeDefault: 18,
+      bufferTimeAtTopQuality: 30,
+      bufferTimeAtTopQualityLongForm: 60,
+    };
+    const { settings, deliverMpd, engine, listeners } = setup(NaN, held);
+    deliverMpd(mpd(4, 4));
+    const core = (engine as unknown as { core: { destroy: () => void } }).core;
+    core.destroy = () => {
+      throw new Error("storage teardown failed");
+    };
+
+    expect(() => engine.destroy()).toThrow("storage teardown failed");
+
+    expect(settings.streaming.buffer).toEqual(held);
+    expect(listeners.size).toBe(0);
+  });
+
   it("gives it back on stream teardown as well", () => {
     const held = {
       bufferTimeDefault: 18,

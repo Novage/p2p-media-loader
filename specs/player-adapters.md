@@ -225,6 +225,22 @@ the window it offers is the audio window. The fallback to the widest stream is
 for a presentation that has no main stream at all, and stops applying the
 moment one shows up.
 
+Every adapter's teardown runs each step whatever the ones before it made of
+themselves. The core destroys an integrator's own segment storage as part of
+it and is free to throw, and a teardown that stopped at the first failure
+would leave an adapter's loaders and listeners on a player it reports as
+released; running the steps independently is what prevents that, not the
+order they are written in.
+
+What failed is raised to whoever asked for the teardown, once there is
+nothing left to let go of — and by then, not from the middle of it: binding a
+player takes it off the engine that had it, and a failure in that release
+raised early would leave the new engine holding a player it never finished
+binding. Where the player itself is the caller it is logged instead of
+raised: dash.js invokes its event handlers with no `try` of its own, so a
+throw out of a stream teardown would abort `StreamController`'s own reset
+half way and surface from the integrator's `attachSource`.
+
 Destroying the engine runs every step of its teardown, whatever the ones
 before made of themselves: the core tears down an integrator's own segment
 storage there and is free to throw, and a teardown that stopped at the first
