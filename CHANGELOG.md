@@ -85,6 +85,18 @@ throughout.
   segment storage supplied through `customSegmentStorageFactory` that throws
   from its own teardown now surfaces from `destroy()` rather than being lost;
   a call that expected `destroy()` never to throw should be prepared for it.
+- Shaka's `player.preload()` is not supported. A preloaded manifest is fetched
+  under the source that is playing and read into that source's core, which the
+  `load()` of the preloaded source then tears down — and Shaka does not fetch
+  the manifest again, so the new source plays without P2P. Call `load(uri)`
+  directly.
+- A media playlist processed before its master is not supported. A stream's
+  identity and type are fixed by the first manifest that registers it; a
+  master arriving afterwards attaches its declaration to the anonymous stream
+  but does not identify it, and the stream shares only while it is alone of
+  its type. No player produces this order — the master is the first manifest a
+  player fetches — so it concerns only code calling `Core.processManifest`
+  directly. See [`specs/manifest-registry.md`](specs/manifest-registry.md).
 - `Stream.runtimeId` is the manifest-derived stream key: the media playlist URL
   for HLS, the Representation id for DASH.
 
