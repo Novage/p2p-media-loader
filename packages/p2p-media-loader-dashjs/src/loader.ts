@@ -68,7 +68,12 @@ export function createXhrLoaderExtension(
   };
 }
 
-class RequestRouter {
+/**
+ * One per dash.js XHRLoader, which dash.js builds once per media type and
+ * keeps for the life of the player. Exported for its tests; the package's own
+ * surface is the extension above.
+ */
+export class RequestRouter {
   private readonly logger = debug("p2pml-dashjs:loader");
   /** Aborts the request served by the core most recently, if still in flight. */
   private abortCurrent?: () => void;
@@ -219,69 +224,111 @@ class RequestRouter {
     };
     customData.abort = abort;
     this.abortCurrent = abort;
+    // Once the request has settled there is nothing left to abort — and this
+    // closure holds the scope the response lives in, so a `RequestRouter`
+    // that kept it would keep the last segment's bytes for the life of the
+    // player, one segment per media type. dash.js builds one XHRLoader per
+    // media type and keeps it.
+    const settle = () => {
+      settled = true;
+      if (this.abortCurrent === abort) this.abortCurrent = undefined;
+    };
 
+    // The two outcomes are handled by separate arguments to `then`, not by a
+    // `catch` chained after it: delivering a segment runs dash.js's own
+    // progress and loadend listeners synchronously, and its event bus catches
+    // nothing, so a listener that throws would otherwise land in the failure
+    // handler and be reported as the core failing to load a segment dash.js
+    // has already consumed — which dash.js then fetches again itself.
     core
       .loadSegment(url, { byteRange })
-      .then(({ data, bandwidth }) => {
-        // The core cannot always cancel in time — a request waiting for the
-        // segment storage has no loader yet — so what dash.js has abandoned
-        // is dropped here rather than reported as a download.
-        if (aborted) {
-          settled = true;
-          customData.onabort?.();
-          return;
-        }
-        settled = true;
-        response.url = url;
-        response.status = 200;
-        response.statusText = "OK";
-        response.headers = {};
-        response.data = data;
+      .then(
+        ({ data, bandwidth }) => {
+          // The core cannot always cancel in time — a request waiting for the
+          // segment storage has no loader yet — so what dash.js has abandoned
+          // is dropped here rather than reported as a download.
+          settle();
+          if (aborted) {
+            customData.onabort?.();
+            return;
+          }
+          response.url = url;
+          response.status = 200;
+          response.statusText = "OK";
+          response.headers = {};
+          response.data = data;
 
-        // dash.js measures throughput from progress traces, dropping the
-        // first (it carries the latency) and summing the rest. Two events
-        // give it one download trace whose duration is the core's bandwidth
-        // hint — wall-clock time says nothing about the network for a segment
-        // that came from a peer or from storage. Never 0 ms.
-        const total = data.byteLength;
-        customData.onprogress?.({
-          lengthComputable: true,
-          loaded: 0,
-          total,
-          time: 1,
-        });
-        customData.onprogress?.({
-          lengthComputable: true,
-          loaded: total,
-          total,
-          time: loadingTimeMs(bandwidth, total),
-        });
-        customData.onloadend?.();
-      })
+          // dash.js measures throughput from progress traces, dropping the
+          // first (it carries the latency) and summing the rest. Two events
+          // give it one download trace whose duration is the core's bandwidth
+          // hint — wall-clock time says nothing about the network for a segment
+          // that came from a peer or from storage. Never 0 ms.
+          const total = data.byteLength;
+          // Delivered in a `try`, ended in a `finally`. `onprogress` runs
+          // dash.js's LOADING_PROGRESS listeners synchronously — its event bus
+          // catches nothing, and its own ABR abandonment handler is one of
+          // them — so a listener that throws would otherwise skip `onloadend`,
+          // and `onloadend` is what takes this request off dash.js's list: a
+          // request never ended has no watchdog, the fragment promise never
+          // settles, and that media type's buffer never advances again. The
+          // segment stands as delivered; the throw is theirs, and is logged
+          // by the handler below.
+          try {
+            customData.onprogress?.({
+              lengthComputable: true,
+              loaded: 0,
+              total,
+              time: 1,
+            });
+            customData.onprogress?.({
+              lengthComputable: true,
+              loaded: total,
+              total,
+              time: loadingTimeMs(bandwidth, total),
+            });
+          } finally {
+            customData.onloadend?.();
+          }
+        },
+        (error: unknown) => {
+          settle();
+          // What dash.js abandoned is reported as the abort it asked for: it
+          // drops `onloadend` when it aborts and keeps `onabort`, so a failure
+          // reported here instead would tell it nothing and leave the segment
+          // waiting for the next schedule tick to be asked for again.
+          //
+          // An abort dash.js did not ask for is not one — the core gives up on
+          // a request superseded by the next one, or when the engine lets the
+          // player go — and is reported below as the failure it is, so dash.js
+          // fetches the segment itself.
+          if (aborted) {
+            customData.onabort?.();
+            return;
+          }
+          // A non-2xx status is what dash.js's HTTPLoader retries on; the
+          // failure is reported as one rather than thrown into dash.js.
+          response.url = url;
+          response.status = 0;
+          response.statusText =
+            error instanceof Error ? error.message : String(error);
+          response.data = undefined;
+          this.logger("core failed to load %s: %O", url, error);
+          customData.onloadend?.();
+        },
+      )
+      // Reached only by a throw out of one of the handlers above: a dash.js
+      // or integrator listener failing inside the terminal callback it was
+      // given — `onloadend` or `onabort`, on delivery or on failure alike.
+      // That callback was called exactly once and is not called again; what
+      // dash.js does inside it once a listener of its own has thrown is
+      // dash.js's to survive, and cannot be repaired from outside it. The
+      // throw is logged rather than lost to an unhandled rejection.
       .catch((error: unknown) => {
-        settled = true;
-        // What dash.js abandoned is reported as the abort it asked for: it
-        // drops `onloadend` when it aborts and keeps `onabort`, so a failure
-        // reported here instead would tell it nothing and leave the segment
-        // waiting for the next schedule tick to be asked for again.
-        //
-        // An abort dash.js did not ask for is not one — the core gives up on
-        // a request superseded by the next one, or when the engine lets the
-        // player go — and is reported below as the failure it is, so dash.js
-        // fetches the segment itself.
-        if (aborted) {
-          customData.onabort?.();
-          return;
-        }
-        // A non-2xx status is what dash.js's HTTPLoader retries on; the
-        // failure is reported as one rather than thrown into dash.js.
-        response.url = url;
-        response.status = 0;
-        response.statusText =
-          error instanceof Error ? error.message : String(error);
-        response.data = undefined;
-        this.logger("core failed to load %s: %O", url, error);
-        customData.onloadend?.();
+        this.logger(
+          "dash.js threw while the result for %s was reported to it: %O",
+          url,
+          error,
+        );
       });
   }
 }

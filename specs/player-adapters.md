@@ -371,6 +371,20 @@ segments, licences, certificates, steering, XLink — passes through untouched.
 A core failure is reported as a failed response so dash.js's own retry rules
 run; an abort from dash.js aborts the core request.
 
+Every core-served request ends with exactly one of dash.js's terminal
+callbacks, called once: `onloadend` for a result, `onabort` for an abort
+dash.js asked for. dash.js runs its progress and completion listeners
+synchronously from inside those callbacks — its own ABR abandonment handler
+among them — and its event bus catches nothing, so the adapter delivers a
+segment in a `try` and ends the request in a `finally`. A listener that
+throws during delivery neither turns a segment dash.js already holds into a
+core failure, which dash.js would fetch again, nor skips `onloadend`, which
+is what takes the request off dash.js's list — a request never ended has no
+watchdog, and that media type's buffer never advances again. The throw is
+logged. A throw from inside one of dash.js's own terminal callbacks is
+dash.js's to survive: the callback is not called a second time, and what
+dash.js does after its own listener threw cannot be repaired from outside it.
+
 **Hosted in Video.js 10.** v10's `DashAdapter` creates its dash.js player and
 calls `initialize()` in its constructor, and attaches a source only when one
 is set, so `bindPlayer(adapter.engine)` fits between the two with nothing

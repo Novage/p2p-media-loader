@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { CoreRequestError, type Core } from "p2p-media-loader-core";
-import { createXhrLoaderExtension } from "../src/loader.js";
+import { createXhrLoaderExtension, RequestRouter } from "../src/loader.js";
 import type {
   CommonMediaRequestLike,
   CommonMediaResponseLike,
@@ -230,6 +230,53 @@ describe("dash.js XHRLoader extension", () => {
       },
     ]);
     expect(events.loadend).toBe(1);
+  });
+
+  it("keeps a delivered segment delivered, and ended, when a progress listener throws", async () => {
+    // `onprogress` runs dash.js's LOADING_PROGRESS listeners synchronously —
+    // its own ABR abandonment handler among them — and its event bus catches
+    // nothing. A throw there must neither turn the segment dash.js already
+    // holds into a core failure, nor skip `onloadend`: that is what takes the
+    // request off dash.js's list, and a request never ended stalls its media
+    // type for good, with no watchdog to time it out.
+    const { loader, core, segmentData } = setup({ loadable: true });
+    const { request, response, events } = makeRequest(
+      "MediaSegment",
+      SEGMENT_URL,
+      { Range: "bytes=0-699" },
+    );
+    request.customData!.onprogress = () => {
+      throw new Error("an integrator's fragmentLoadingProgress listener");
+    };
+
+    loader.load(request, response);
+    await flush();
+
+    expect(response.status).toBe(200);
+    expect(response.data).toBe(segmentData);
+    expect(events.loadend).toBe(1);
+    expect(core.abortSegmentLoading).not.toHaveBeenCalled();
+  });
+
+  it("lets go of a served request once it has settled", async () => {
+    // The abort closure holds the scope the response lives in. dash.js keeps
+    // one XHRLoader per media type for the life of the player, so a router
+    // that kept the last one would keep the last segment's bytes with it.
+    const { core, parent } = setup({ loadable: true });
+    const router = new RequestRouter(
+      () => ({ core: core as unknown as Core, onManifestProcessed: vi.fn() }),
+      parent,
+    );
+    const held = router as unknown as { abortCurrent?: () => void };
+    const { request, response } = makeRequest("MediaSegment", SEGMENT_URL, {
+      Range: "bytes=0-699",
+    });
+
+    router.load(request, response);
+    expect(held.abortCurrent).toBeDefined();
+    await flush();
+
+    expect(held.abortCurrent).toBeUndefined();
   });
 
   it("passes segments the core does not serve, and every other request type, to dash.js untouched", () => {
