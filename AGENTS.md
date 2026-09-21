@@ -65,6 +65,12 @@ the wire format, not expectations to be refreshed when they fail. A change that
 breaks them is a protocol change: bump the version and add a new set, keeping
 the old ones. See [`specs/segment-identity.md`](specs/segment-identity.md).
 
+The version marks releases peers can meet across. Between the last release
+and the next, a derivation may still change under one version — new golden
+vectors are added, none are broken — because a pre-release is not a
+compatibility target; the changelog says what moved. Once a version has
+shipped in a release, that door is closed.
+
 ## Things that are deliberate, not oversights
 
 - **The segment registry is keyed by URL.** A parse disagreement must degrade to

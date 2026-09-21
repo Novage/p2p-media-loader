@@ -2,9 +2,14 @@
 // import them, so other packages compiling these sources see them too.
 // eslint-disable-next-line @typescript-eslint/triple-slash-reference
 /// <reference path="./vendor-types.d.ts" />
-import { Parser, type M3u8Manifest } from "m3u8-parser";
+import {
+  Parser,
+  type M3u8Manifest,
+  type M3u8PlaylistAttributes,
+} from "m3u8-parser";
 import type {
   ManifestParser,
+  ParsedManifest,
   ParsedSegment,
   ParsedStream,
   ParsedInitSegment,
@@ -12,7 +17,9 @@ import type {
 import {
   audioCodecs,
   audioStreamProperties,
+  videoRenditionProperties,
   videoStreamProperties,
+  type VideoAttributes,
 } from "./properties.js";
 import {
   byteRangeFromOffsetLength,
@@ -24,6 +31,12 @@ import {
  * HLS tokenizer over m3u8-parser. Produces `ParsedManifest`; interprets
  * nothing. The one thing added on top of the library is `CHANNELS` on
  * `EXT-X-MEDIA`, which m3u8-parser drops and which feeds audio identity.
+ *
+ * Only video and audio are streams. A master's subtitle renditions and
+ * I-frame playlists are not, and are reported by URL instead so that the
+ * registry knows their media playlists when they arrive; an I-frame media
+ * playlist says so itself. See specs/manifest-registry.md, "Segments core
+ * does not register".
  */
 export const hlsManifestParser: ManifestParser = {
   protocol: "hls",
@@ -38,56 +51,110 @@ export const hlsManifestParser: ManifestParser = {
     parser.end();
     const { manifest } = parser;
 
-    const streams = manifest.playlists?.length
-      ? masterStreams(manifest, text, url)
-      : [mediaStream(manifest, url)];
-
-    return { protocol: "hls", url, streams };
+    if (manifest.playlists?.length) {
+      return { protocol: "hls", url, ...masterStreams(manifest, text, url) };
+    }
+    // Trick play only, and declared as such: nothing here is a stream.
+    if (manifest.iFramesOnly) return { protocol: "hls", url, streams: [] };
+    return { protocol: "hls", url, streams: [mediaStream(manifest, url)] };
   },
 };
+
+/**
+ * Every playlist a master names with a URI that is not one of its streams:
+ * I-frame playlists, subtitle renditions, and the renditions of any group no
+ * variant references — nothing plays those, and declared they would carry an
+ * identity made of a name alone. One rule for all of them: a URI a declared
+ * stream already has is that stream's, however else the master labels it.
+ * Closed captions ride inside the variants and name no playlist.
+ */
+function excludedPlaylists(
+  manifest: M3u8Manifest,
+  url: string,
+  declared: ReadonlySet<string>,
+): string[] {
+  const named: string[] = [];
+  for (const { uri } of manifest.iFramePlaylists ?? []) {
+    if (uri) named.push(uri);
+  }
+  const mediaGroups = manifest.mediaGroups ?? {};
+  for (const type of ["SUBTITLES", "VIDEO", "AUDIO"] as const) {
+    const groups = mediaGroups[type] ?? {};
+    for (const groupId of Object.keys(groups)) {
+      const renditions = groups[groupId];
+      for (const name of Object.keys(renditions)) {
+        const { uri } = renditions[name];
+        if (uri) named.push(uri);
+      }
+    }
+  }
+  const urls = new Set<string>();
+  for (const uri of named) {
+    const key = resolveUrl(uri, url);
+    if (!declared.has(key)) urls.add(key);
+  }
+  return Array.from(urls);
+}
 
 function masterStreams(
   manifest: M3u8Manifest,
   text: string,
   url: string,
-): ParsedStream[] {
+): Pick<ParsedManifest, "streams" | "excludedPlaylists"> {
   const streams: ParsedStream[] = [];
   const channelsByGroupAndName = scanAudioChannels(text);
 
   // Alternate audio renditions inherit codecs from the variants that reference
-  // their group, the way HLS.js assigns `audioCodec` to an audio track.
+  // their group, the way HLS.js assigns `audioCodec` to an audio track. A
+  // group no variant references is no stream at all; see `excludedPlaylists`.
+  const audioGroups = new Set<string>();
   const audioCodecsByGroup = new Map<string, string>();
+  // Alternate video renditions inherit everything from the first variant that
+  // references their group. RFC 8216 requires every rendition to match the
+  // resolution of each variant referencing the group, so a master that reuses
+  // one group across tiers is malformed, and the first reading is taken.
+  const videoAttributesByGroup = new Map<string, VideoAttributes>();
+  const keys = new Set<string>();
 
   for (const playlist of manifest.playlists ?? []) {
     const a = playlist.attributes;
+    const key = resolveUrl(playlist.uri, url);
+    keys.add(key);
     streams.push({
-      key: resolveUrl(playlist.uri, url),
+      key,
       type: "main",
-      properties: videoStreamProperties({
-        bandwidth: a.BANDWIDTH,
-        codecs: a.CODECS,
-        width: a.RESOLUTION?.width,
-        height: a.RESOLUTION?.height,
-        frameRate: a["FRAME-RATE"],
-        videoRange: a["VIDEO-RANGE"],
-      }),
+      properties: videoStreamProperties(variantAttributes(a)),
       indexSource: { kind: "manifest" },
     });
     const audio = audioCodecs(a.CODECS);
+    if (a.AUDIO) audioGroups.add(a.AUDIO);
     if (a.AUDIO && audio && !audioCodecsByGroup.has(a.AUDIO)) {
       audioCodecsByGroup.set(a.AUDIO, audio);
     }
+    if (a.VIDEO && !videoAttributesByGroup.has(a.VIDEO)) {
+      videoAttributesByGroup.set(a.VIDEO, variantAttributes(a));
+    }
   }
+
+  streams.push(
+    ...videoRenditionStreams(manifest, url, videoAttributesByGroup, keys),
+  );
 
   const groups = manifest.mediaGroups?.AUDIO ?? {};
   for (const groupId of Object.keys(groups)) {
+    if (!audioGroups.has(groupId)) continue;
     const renditions = groups[groupId];
     for (const name of Object.keys(renditions)) {
       const rendition = renditions[name];
       // A rendition without a URI is muxed into the variants; nothing to load.
       if (!rendition.uri) continue;
+      const key = resolveUrl(rendition.uri, url);
+      // A URI a variant or a video rendition already has is malformed; the
+      // stream declared first keeps it.
+      if (keys.has(key)) continue;
+      keys.add(key);
       streams.push({
-        key: resolveUrl(rendition.uri, url),
+        key,
         type: "secondary",
         properties: audioStreamProperties({
           codecs: audioCodecsByGroup.get(groupId),
@@ -100,6 +167,57 @@ function masterStreams(
     }
   }
 
+  return { streams, excludedPlaylists: excludedPlaylists(manifest, url, keys) };
+}
+
+function variantAttributes(a: M3u8PlaylistAttributes): VideoAttributes {
+  return {
+    bandwidth: a.BANDWIDTH,
+    codecs: a.CODECS,
+    width: a.RESOLUTION?.width,
+    height: a.RESOLUTION?.height,
+    frameRate: a["FRAME-RATE"],
+    videoRange: a["VIDEO-RANGE"],
+  };
+}
+
+/**
+ * Alternate video renditions — camera angles — with a playlist of their own,
+ * one main stream each. RFC 8216 gives a rendition the characteristics of the
+ * variant that references its group, and Shaka, the one player here that
+ * plays them, builds its video stream from exactly those, so the variant's
+ * attributes are the rendition's identity, told from the variant by `NAME`.
+ * A rendition whose URI is a variant's own is that variant, and one without a
+ * URI is muxed into it: neither is a stream of its own. `keys` holds every
+ * stream declared so far, and every rendition declared here is added to it.
+ */
+function videoRenditionStreams(
+  manifest: M3u8Manifest,
+  url: string,
+  attributesByGroup: ReadonlyMap<string, VideoAttributes>,
+  keys: Set<string>,
+): ParsedStream[] {
+  const streams: ParsedStream[] = [];
+  const groups = manifest.mediaGroups?.VIDEO ?? {};
+  for (const [groupId, attributes] of attributesByGroup) {
+    const renditions = groups[groupId] ?? {};
+    for (const name of Object.keys(renditions)) {
+      const rendition = renditions[name];
+      if (!rendition.uri) continue;
+      const key = resolveUrl(rendition.uri, url);
+      if (keys.has(key)) continue;
+      keys.add(key);
+      streams.push({
+        key,
+        type: "main",
+        properties: videoRenditionProperties(attributes, {
+          name,
+          language: rendition.language,
+        }),
+        indexSource: { kind: "manifest" },
+      });
+    }
+  }
   return streams;
 }
 

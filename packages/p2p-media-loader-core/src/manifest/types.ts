@@ -82,6 +82,14 @@ export type ParsedManifest = {
    */
   readonly requestedUrl?: string;
   readonly streams: readonly ParsedStream[];
+  /**
+   * Playlists this manifest names that are not video or audio streams — an
+   * HLS master's subtitle renditions and I-frame playlists — as absolute
+   * URLs. Their media playlists reach the core like any other, and the
+   * registry ignores one that arrives at these rather than registering it as
+   * a stream of its own. An MPD names nothing that arrives later.
+   */
+  readonly excludedPlaylists?: readonly string[];
 };
 
 /**

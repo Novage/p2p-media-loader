@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { dashManifestParser } from "../src/manifest/dash.js";
 import { ManifestRegistry } from "../src/manifest/registry.js";
+import { computeStreamIdentityHash } from "../src/index.js";
 import {
+  ANGEL_ONE_MPD_URL,
   BBB_MPD_URL,
+  DASH_DYNAMIC_WITH_TRICK_MODE,
   DASH_MULTI_PERIOD,
   DASH_SEGMENT_BASE,
   DASH_SEGMENT_BASE_LIVE,
   DASH_SEGMENT_TEMPLATE,
   DASH_SEGMENT_TIMELINE_DYNAMIC,
+  DASH_WITH_TEXT_IMAGE_AND_TRICK_MODE,
   readFixture,
 } from "./fixtures/index.js";
 
@@ -133,6 +137,58 @@ describe("dashManifestParser", () => {
       byteRange: { start: 700, end: 1500 },
       periodStart: 30,
     });
+  });
+
+  it("emits video and audio streams only: no text, no thumbnails, no trick play", () => {
+    const parsed = dashManifestParser.parse(
+      DASH_WITH_TEXT_IMAGE_AND_TRICK_MODE,
+      URL,
+    );
+    expect(parsed.streams.map((s) => [s.key, s.type])).toEqual([
+      ["video-720p", "main"],
+      ["audio-en", "secondary"],
+    ]);
+    // An MPD is one document; nothing arrives later to be ignored.
+    expect(parsed.excludedPlaylists).toBeUndefined();
+  });
+
+  it("identifies a rung without bitrate once the trick-mode set that matched it is gone", () => {
+    // The trick-mode Representation shares codecs and resolution with the
+    // 720p rung. Counted as a stream it would have forced bitrate into the
+    // rung's identity; left out, the rung hashes without it — the derivation
+    // every 5.0.0 peer must make, whichever packager wrote the MPD.
+    const registry = new ManifestRegistry();
+    registry.apply(
+      dashManifestParser.parse(DASH_WITH_TEXT_IMAGE_AND_TRICK_MODE, URL),
+    );
+    const rung = registry.getStream("video-720p")!;
+    expect(rung.identityHash).toBe(
+      computeStreamIdentityHash({ ...rung.properties, bitrate: undefined }),
+    );
+  });
+
+  it("leaves a trick-mode set out of a live presentation too", () => {
+    const parsed = dashManifestParser.parse(DASH_DYNAMIC_WITH_TRICK_MODE, URL);
+    expect(parsed.streams.map((s) => s.key)).toEqual(["v"]);
+    expect(parsed.streams[0].isLive).toBe(true);
+  });
+
+  it("registers no text stream from a real MPD with subtitle sets", () => {
+    const text = readFixture("angel-one.mpd");
+    const parsed = dashManifestParser.parse(text, ANGEL_ONE_MPD_URL);
+    const textIds = Array.from(
+      text.matchAll(/contentType="text"[^]*?<Representation id="(\d+)"/g),
+      (m) => m[1],
+    );
+    expect(textIds).toHaveLength(4);
+
+    const keys = parsed.streams.map((s) => s.key);
+    for (const id of textIds) expect(keys).not.toContain(id);
+    // Every other Representation, and nothing else.
+    const representations = text.match(/<Representation /g)?.length ?? 0;
+    expect(parsed.streams).toHaveLength(representations - textIds.length);
+    expect(parsed.streams.some((s) => s.type === "main")).toBe(true);
+    expect(parsed.streams.some((s) => s.type === "secondary")).toBe(true);
   });
 
   it("reports SegmentBase as an external index and says nothing of segments", () => {

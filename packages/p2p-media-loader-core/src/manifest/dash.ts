@@ -23,6 +23,14 @@ ensureObjectValues();
  * DASH tokenizer over mpd-parser. Produces `ParsedManifest`; interprets
  * nothing. An MPD declares streams and segments in one document, so every
  * stream here may carry segments — or, for `SegmentBase`, an external index.
+ *
+ * Only video and audio are streams. mpd-parser sorts AdaptationSets by
+ * `mimeType` and `contentType`, and only its video playlists and audio
+ * groups are read: text — WebVTT, TTML, IMSC in MP4 — and image thumbnails
+ * never register. A trick-mode video set is the DASH form of an I-frame
+ * playlist and is left out for the same reason; mpd-parser does not report
+ * it, so `readMpd` does. See specs/manifest-registry.md, "Segments core does
+ * not register".
  */
 export const dashManifestParser: ManifestParser = {
   protocol: "dash",
@@ -35,13 +43,18 @@ export const dashManifestParser: ManifestParser = {
 
   parse(text, url) {
     const manifest = parse(text, { manifestUri: url });
-    // One pass over the MPD's own document for the two things the tokenizer
-    // does not report: whether the presentation is live, and the channel
-    // count of each audio Representation.
-    const { isLive, channelsByRepresentation } = readMpd(text);
+    // One pass over the MPD's own document for what the tokenizer does not
+    // report: whether the presentation is live, the channel count of each
+    // audio Representation, and which Representations are trick play.
+    const { isLive, channelsByRepresentation, trickModeRepresentations } =
+      readMpd(text);
+    const isTrickMode = (playlist: MpdPlaylist) =>
+      playlist.attributes.NAME !== undefined &&
+      trickModeRepresentations.has(playlist.attributes.NAME);
 
     const streams: ParsedStream[] = [];
     for (const playlist of manifest.playlists) {
+      if (isTrickMode(playlist)) continue;
       streams.push(toStream(playlist, "main", isLive, videoProperties));
     }
     const groups = manifest.mediaGroups.AUDIO ?? {};
@@ -50,6 +63,7 @@ export const dashManifestParser: ManifestParser = {
       for (const label of Object.keys(renditions)) {
         const rendition = renditions[label];
         for (const playlist of rendition.playlists) {
+          if (isTrickMode(playlist)) continue;
           streams.push(
             toStream(playlist, "secondary", isLive, (a) =>
               audioStreamProperties({
@@ -156,12 +170,21 @@ function toStream(
  * scheme (`urn:mpeg:dash:23003:3:audio_channel_configuration:2011`), whose
  * value is a plain count, is read; vendor schemes encode channel masks and are
  * left undefined rather than guessed.
+ *
+ * Trick-mode Representations are those carrying the DASH-IF trick-mode
+ * descriptor (`http://dashif.org/guidelines/trickmode`) as an
+ * `EssentialProperty` or a `SupplementalProperty`, on the Representation or
+ * on its AdaptationSet — a descriptor may sit at either level. The descriptor
+ * names the set it plays alongside; what carries it is never played at
+ * normal speed.
  */
 function readMpd(text: string): {
   isLive: boolean;
   channelsByRepresentation: Map<string, number>;
+  trickModeRepresentations: Set<string>;
 } {
   const result = new Map<string, number>();
+  const trickModeRepresentations = new Set<string>();
   // mpd-parser's own DOM step, so the core has no XML dependency of its own:
   // in Node it resolves xmldom transitively, in browser bundles the alias in
   // vite.common.config.ts hands it the platform DOMParser.
@@ -175,6 +198,7 @@ function readMpd(text: string): {
     return {
       isLive: /<MPD[^>]*\btype\s*=\s*["']dynamic["']/.test(text),
       channelsByRepresentation: result,
+      trickModeRepresentations,
     };
   }
 
@@ -186,18 +210,43 @@ function readMpd(text: string): {
   // Array.from: DOM collections are not iterable under the ES2015 lib target.
   for (const set of Array.from(mpd.getElementsByTagName("AdaptationSet"))) {
     const setChannels = channelCountOf(set);
+    const setTrickMode = hasTrickModeDescriptor(set);
     for (const representation of Array.from(
       set.getElementsByTagName("Representation"),
     )) {
       const id = representation.getAttribute("id");
+      if (!id) continue;
+      if (setTrickMode || hasTrickModeDescriptor(representation)) {
+        trickModeRepresentations.add(id);
+      }
       const channels = channelCountOf(representation) ?? setChannels;
-      if (id && channels !== undefined) result.set(id, channels);
+      if (channels !== undefined) result.set(id, channels);
     }
   }
-  return { isLive, channelsByRepresentation: result };
+  return {
+    isLive,
+    channelsByRepresentation: result,
+    trickModeRepresentations,
+  };
 }
 
 const MPEG_CHANNEL_SCHEME = "23003:3:audio_channel_configuration";
+const TRICK_MODE_SCHEME = "http://dashif.org/guidelines/trickmode";
+
+function hasTrickModeDescriptor(element: Element): boolean {
+  for (const descriptor of childElementsOf(element)) {
+    if (
+      descriptor.localName !== "EssentialProperty" &&
+      descriptor.localName !== "SupplementalProperty"
+    ) {
+      continue;
+    }
+    if (descriptor.getAttribute("schemeIdUri") === TRICK_MODE_SCHEME) {
+      return true;
+    }
+  }
+  return false;
+}
 
 function channelCountOf(element: Element): number | undefined {
   for (const config of childElementsOf(element)) {

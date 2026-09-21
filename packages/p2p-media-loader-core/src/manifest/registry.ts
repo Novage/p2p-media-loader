@@ -80,11 +80,31 @@ export type RegistryUpdate = {
   readonly removed: number;
 };
 
+/** What one manifest did to the registry. */
+export type RegistryApplyResult = {
+  readonly updates: RegistryUpdate[];
+  /**
+   * Media playlists this manifest carried that registered nothing, by key:
+   * a master named each as carrying no video or audio.
+   */
+  readonly ignored: string[];
+};
+
 export class ManifestRegistry {
   private readonly streams = new Map<string, MutableStream>();
+  /**
+   * Playlists a master named as carrying no video or audio — subtitle
+   * renditions, I-frame playlists — by URL with the query stripped. A media
+   * playlist arriving at one is not a stream; see `resolveStreamKey`.
+   */
+  private readonly excludedPlaylists = new Set<string>();
 
   getStreams(): readonly RegistryStream[] {
     return Array.from(this.streams.values());
+  }
+
+  hasStreams(): boolean {
+    return this.streams.size > 0;
   }
 
   getStream(key: string): RegistryStream | undefined {
@@ -100,14 +120,28 @@ export class ManifestRegistry {
    * Applies one parsed manifest. Idempotent: re-applying an unchanged
    * manifest changes nothing and reports no updates.
    */
-  apply(manifest: ParsedManifest): RegistryUpdate[] {
+  apply(manifest: ParsedManifest): RegistryApplyResult {
     const updates: RegistryUpdate[] = [];
+    const ignored: string[] = [];
+    // Every master's word is kept: a player that chose a subtitle track keeps
+    // refreshing its playlist under the name the master it read gave it,
+    // whatever a re-fetched master calls it now. The set grows by one name
+    // per excluded playlist per master refresh under rotated paths, which is
+    // the growth the registry already accepts for the streams themselves.
+    for (const url of manifest.excludedPlaylists ?? []) {
+      this.excludedPlaylists.add(stripQuery(url));
+    }
     // Bitrate enters a stream's identity only where this manifest needs it to
     // tell same-type streams apart; see specs/segment-identity.md.
     const identity = identityProperties(manifest.streams);
 
     for (const [i, parsed] of manifest.streams.entries()) {
-      const stream = this.upsertStream(parsed, manifest, identity[i]);
+      const key = this.resolveStreamKey(parsed, manifest);
+      if (key === undefined) {
+        ignored.push(parsed.key);
+        continue;
+      }
+      const stream = this.upsertStream(key, parsed, identity[i]);
       if (!parsed.segments) {
         // A stream whose segments live in an external index is still reported
         // — how live it is, and what it holds so far — so a caller learns of
@@ -126,7 +160,7 @@ export class ManifestRegistry {
       );
     }
 
-    return updates;
+    return { updates, ignored };
   }
 
   /**
@@ -216,11 +250,10 @@ export class ManifestRegistry {
   }
 
   private upsertStream(
+    key: string,
     parsed: ParsedStream,
-    manifest: ParsedManifest,
     identityInput: StreamProperties,
   ): MutableStream {
-    const key = this.resolveStreamKey(parsed, manifest);
     const existing = this.streams.get(key);
 
     // The first manifest to register a stream decides its identity and its
@@ -277,11 +310,22 @@ export class ManifestRegistry {
    * An unmatched playlist is known by what was asked for rather than by where
    * the response came from: a CDN that answers each request from somewhere
    * else would otherwise leave a new stream behind on every refresh.
+   *
+   * A media playlist a master named as a subtitle rendition or an I-frame
+   * playlist is not a stream of this presentation, and resolves to no key:
+   * registered anonymously, its WebVTT segments would answer segment lookups.
+   * Only a playlist no stream claims by its exact URL — a master naming one
+   * URL as both a variant and a subtitle is malformed, and the variant it
+   * declared keeps it. Query aside, though, an excluded name is never matched
+   * to a declared stream: the playlist could as well be the rendition's, and
+   * attaching it would put WebVTT segments under a video stream's identity.
+   * That ignores a variant's own refresh under a rotated token too, for the
+   * one master that tells its variant from its subtitles by query alone.
    */
   private resolveStreamKey(
     parsed: ParsedStream,
     manifest: ParsedManifest,
-  ): string {
+  ): string | undefined {
     if (this.streams.has(parsed.key)) return parsed.key;
     if (manifest.protocol !== "hls") return parsed.key;
     if (!parsed.segments) return this.resolveDeclaredKey(parsed, manifest);
@@ -294,18 +338,23 @@ export class ManifestRegistry {
       return requested;
     }
 
-    for (const candidate of [parsed.key, requested]) {
-      if (candidate === undefined) continue;
-      const wanted = stripQuery(normalizeUrl(candidate));
+    const names = [parsed.key, requested]
+      .filter((name): name is string => name !== undefined)
+      .map(stripQuery);
+    for (const wanted of names) {
+      if (this.excludedPlaylists.has(wanted)) continue;
       const declared: string[] = [];
       let anonymous: string | undefined;
       for (const [key, stream] of this.streams) {
-        if (stripQuery(normalizeUrl(key)) !== wanted) continue;
+        if (stripQuery(key) !== wanted) continue;
         if (stream.identified) declared.push(key);
         else anonymous ??= key;
       }
       if (declared.length === 1) return declared[0];
       if (anonymous !== undefined) return anonymous;
+    }
+    if (names.some((name) => this.excludedPlaylists.has(name))) {
+      return undefined;
     }
     return requested ?? parsed.key;
   }
@@ -325,15 +374,15 @@ export class ManifestRegistry {
     parsed: ParsedStream,
     manifest: ParsedManifest,
   ): string {
-    const wanted = stripQuery(normalizeUrl(parsed.key));
+    const wanted = stripQuery(parsed.key);
     const declaredHere = manifest.streams.filter(
-      (s) => stripQuery(normalizeUrl(s.key)) === wanted,
+      (s) => stripQuery(s.key) === wanted,
     );
     if (declaredHere.length !== 1) return parsed.key;
 
     let match: string | undefined;
     for (const key of this.streams.keys()) {
-      if (stripQuery(normalizeUrl(key)) !== wanted) continue;
+      if (stripQuery(key) !== wanted) continue;
       if (match !== undefined) return parsed.key;
       match = key;
     }

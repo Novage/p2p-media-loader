@@ -95,6 +95,15 @@ different answers:
   plain count; vendor schemes encode channel masks and are left unset rather than
   guessed.
 
+One needs stating for HLS. **An alternate video rendition** (`EXT-X-MEDIA
+TYPE=VIDEO` with a URI) is identified by the attributes of the variant that
+references its group — bitrate, codecs, resolution, frame rate, video range,
+exactly as the variant is — plus the rendition's own `NAME` and `LANGUAGE`.
+RFC 8216 makes the variant's characteristics the rendition's, and `NAME` is
+what tells the two apart, so neither ever forces `bitrate` into the other. The
+variant carries no name or language of its own, so its identity is the same
+whether or not a group refers to it.
+
 ## Segment identity
 
 `externalId` identifies a segment within its stream. It travels on the wire as

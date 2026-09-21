@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ManifestRegistry } from "../src/manifest/registry.js";
 import { hlsManifestParser } from "../src/manifest/hls.js";
 import { dashManifestParser } from "../src/manifest/dash.js";
@@ -8,7 +8,10 @@ import {
   HLS_LIVE_NO_PDT_REFRESH_1,
   HLS_LIVE_NO_PDT_REFRESH_2,
   HLS_MASTER_WITH_AUDIO,
+  HLS_MASTER_WITH_VIDEO_RENDITIONS,
+  HLS_MEDIA_IFRAMES_ONLY,
   HLS_MEDIA_VOD_BYTERANGE,
+  HLS_MEDIA_WEBVTT,
   IVS_MASTER_URL,
   MUX_720P_URL,
   MUX_MASTER_URL,
@@ -17,6 +20,8 @@ import {
 
 const MASTER = "https://cdn.example/live/master.m3u8";
 const MEDIA_1080 = "https://cdn.example/live/video/1080p/index.m3u8";
+const SUBS_EN = "https://cdn.example/live/subs/en/index.m3u8";
+const IFRAMES_1080 = "https://cdn.example/live/video/1080p/iframes.m3u8";
 
 const hls = (text: string, url: string) => hlsManifestParser.parse(text, url);
 
@@ -179,6 +184,144 @@ index.m3u8?v=1080p
     expect(registry.getStream(MEDIA_1080)).toBeDefined();
   });
 
+  it("ignores a subtitle playlist the master named, however it arrives", () => {
+    const registry = new ManifestRegistry();
+    registry.apply(hls(HLS_MASTER_WITH_AUDIO, MASTER));
+    const before = registry.getStreams().map((s) => s.key);
+
+    // As named, under a rotated token, and by redirect from what was asked.
+    const ignored = { updates: [], ignored: [SUBS_EN] };
+    expect(registry.apply(hls(HLS_MEDIA_WEBVTT, SUBS_EN))).toEqual(ignored);
+    expect(registry.apply(hls(HLS_MEDIA_WEBVTT, `${SUBS_EN}?t=2`))).toEqual({
+      updates: [],
+      ignored: [`${SUBS_EN}?t=2`],
+    });
+    const redirected = "https://edge.example/x/subs.m3u8";
+    expect(
+      registry.apply({
+        ...hls(HLS_MEDIA_WEBVTT, redirected),
+        requestedUrl: `${SUBS_EN}?t=3`,
+      }),
+    ).toEqual({ updates: [], ignored: [redirected] });
+
+    expect(registry.getStreams().map((s) => s.key)).toEqual(before);
+    expect(before).toHaveLength(4);
+  });
+
+  it("keeps every master's word on what is not a stream", () => {
+    // A master re-fetched under rotated paths renames its subtitle playlist,
+    // but the player that chose subtitles keeps refreshing the one the first
+    // master named. Both stay excluded.
+    const master = (path: string) => `#EXTM3U
+#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="English",URI="${path}/subs.m3u8"
+#EXT-X-STREAM-INF:BANDWIDTH=3000000,RESOLUTION=1920x1080,CODECS="avc1.64002a",SUBTITLES="subs"
+${path}/video.m3u8
+`;
+    const registry = new ManifestRegistry();
+    registry.apply(hls(master("tok1"), MASTER));
+    registry.apply(hls(master("tok2"), MASTER));
+
+    for (const path of ["tok1", "tok2"]) {
+      const subtitles = `https://cdn.example/live/${path}/subs.m3u8`;
+      expect(registry.apply(hls(HLS_MEDIA_WEBVTT, subtitles)).ignored).toEqual([
+        subtitles,
+      ]);
+    }
+    expect(registry.getStreams()).toHaveLength(2);
+  });
+
+  it("ignores an I-frame playlist, by the master's word or its own", () => {
+    const registry = new ManifestRegistry();
+    registry.apply(hls(HLS_MASTER_WITH_AUDIO, MASTER));
+    // The parser already left it out — nothing reaches the registry to
+    // ignore — and the same holds with no master at all: the playlist names
+    // itself as I-frames only.
+    const nothing = { updates: [], ignored: [] };
+    expect(registry.apply(hls(HLS_MEDIA_IFRAMES_ONLY, IFRAMES_1080))).toEqual(
+      nothing,
+    );
+    const alone = new ManifestRegistry();
+    expect(alone.apply(hls(HLS_MEDIA_IFRAMES_ONLY, IFRAMES_1080))).toEqual(
+      nothing,
+    );
+    expect(alone.getStreams()).toEqual([]);
+    expect(registry.getStreams()).toHaveLength(4);
+  });
+
+  it("never attaches a subtitle playlist to a variant it differs from by query alone", () => {
+    // Stripped of the query, the subtitle URL is the variant's. Matched the
+    // way a rotated token is, the WebVTT segments would replace the video
+    // stream's and be served to peers by sequence number as video.
+    const master = `#EXTM3U
+#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="English",URI="media.m3u8?t=subs"
+#EXT-X-STREAM-INF:BANDWIDTH=3000000,RESOLUTION=1920x1080,CODECS="avc1.64002a",SUBTITLES="subs"
+media.m3u8?t=video
+`;
+    const variant = "https://cdn.example/live/media.m3u8?t=video";
+    const registry = new ManifestRegistry();
+    registry.apply(hls(master, MASTER));
+
+    const subtitles = "https://cdn.example/live/media.m3u8?t=subs";
+    expect(registry.apply(hls(HLS_MEDIA_WEBVTT, subtitles))).toEqual({
+      updates: [],
+      ignored: [subtitles],
+    });
+    expect(registry.getStreams()).toHaveLength(1);
+    expect(registry.getStream(variant)?.segments.size).toBe(0);
+
+    // The variant's own playlist attaches by its exact URL; under a rotated
+    // token it could be either and is ignored — no P2P, never wrong bytes.
+    registry.apply(hls(HLS_MEDIA_VOD_BYTERANGE, variant));
+    expect(registry.getStream(variant)?.segments.size).toBe(3);
+    const rotated = "https://cdn.example/live/media.m3u8?t=video2";
+    expect(registry.apply(hls(HLS_MEDIA_VOD_BYTERANGE, rotated))).toEqual({
+      updates: [],
+      ignored: [rotated],
+    });
+    expect(registry.getStreams()).toHaveLength(1);
+  });
+
+  it("keeps a subtitle playlist that registered before its master, as any early playlist", () => {
+    // Not an order any player produces, and not supported: the first
+    // manifest to register a stream decides, and a master arriving after
+    // neither identifies nor evicts it. See specs/manifest-registry.md.
+    const registry = new ManifestRegistry();
+    registry.apply(hls(HLS_MEDIA_WEBVTT, SUBS_EN));
+    registry.apply(hls(HLS_MASTER_WITH_AUDIO, MASTER));
+    expect(registry.apply(hls(HLS_MEDIA_WEBVTT, SUBS_EN)).ignored).toEqual([]);
+    expect(registry.getStream(SUBS_EN)?.identified).toBe(false);
+    expect(registry.getStreams()).toHaveLength(5);
+  });
+
+  it("keeps a variant the master also names as a subtitle playlist", () => {
+    // Malformed, and resolved in favour of the stream the master declared:
+    // the exclusion only ever takes a playlist no stream claims.
+    const master = `#EXTM3U
+#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="English",URI="video/1080p/index.m3u8"
+#EXT-X-STREAM-INF:BANDWIDTH=3000000,RESOLUTION=1920x1080,CODECS="avc1.64002a",SUBTITLES="subs"
+video/1080p/index.m3u8
+`;
+    const registry = new ManifestRegistry();
+    registry.apply(hls(master, MASTER));
+    registry.apply(hls(HLS_MEDIA_VOD_BYTERANGE, MEDIA_1080));
+    expect(registry.getStream(MEDIA_1080)?.segments.size).toBe(3);
+  });
+
+  it("attaches an alternate video rendition's playlist to the stream its master declared", () => {
+    const wide = "https://cdn.example/live/video/1080p/wide.m3u8";
+    const registry = new ManifestRegistry();
+    registry.apply(hls(HLS_MASTER_WITH_VIDEO_RENDITIONS, MASTER));
+    registry.apply(hls(HLS_MEDIA_VOD_BYTERANGE, `${wide}?t=1`));
+
+    expect(registry.getStreams()).toHaveLength(4);
+    const stream = registry.getStream(wide)!;
+    expect(stream.type).toBe("main");
+    // Declared, so identified — not the anonymous stream it used to be.
+    expect(stream.identified).toBe(true);
+    expect(stream.properties).toMatchObject({ bitrate: 5000000, name: "Wide" });
+    expect(stream.segments.size).toBe(3);
+  });
+
   it("registers a media playlist loaded without a master as one anonymous stream", () => {
     const registry = new ManifestRegistry();
     registry.apply(hls(HLS_MEDIA_VOD_BYTERANGE, MEDIA_1080));
@@ -248,7 +391,9 @@ describe("ManifestRegistry: timeline stability without PDT", () => {
     expect(before.get(100)).toBe(0);
     expect(before.get(102)).toBe(12);
 
-    const updates = registry.apply(hls(HLS_LIVE_NO_PDT_REFRESH_2, MEDIA_1080));
+    const { updates } = registry.apply(
+      hls(HLS_LIVE_NO_PDT_REFRESH_2, MEDIA_1080),
+    );
     expect(updates).toHaveLength(1);
     expect(updates[0]).toMatchObject({
       streamKey: MEDIA_1080,
@@ -274,7 +419,9 @@ describe("ManifestRegistry: timeline stability without PDT", () => {
   it("is idempotent", () => {
     const registry = new ManifestRegistry();
     registry.apply(hls(HLS_LIVE_NO_PDT_REFRESH_1, MEDIA_1080));
-    const [update] = registry.apply(hls(HLS_LIVE_NO_PDT_REFRESH_1, MEDIA_1080));
+    const [update] = registry.apply(
+      hls(HLS_LIVE_NO_PDT_REFRESH_1, MEDIA_1080),
+    ).updates;
     expect(update).toMatchObject({ added: 0, removed: 0, segmentCount: 5 });
   });
 });
@@ -335,6 +482,37 @@ describe("Core.processManifest", () => {
       segmentCount: 64,
     });
     expect(processed?.streams[0].end).toBeCloseTo(634.57, 1);
+  });
+
+  it("registers nothing from a subtitle playlist, and does not know its segments", () => {
+    // Shaka and Video.js hand a subtitle rendition's playlist over like any
+    // other; the core, not the adapter, is what keeps it out of the registry.
+    const core = new Core({ manifestParsers: [hlsManifestParser] });
+    const onStreamAdded = vi.fn();
+    core.addEventListener("onStreamAdded", onStreamAdded);
+    core.processManifest({ url: MASTER, data: HLS_MASTER_WITH_AUDIO });
+    expect(onStreamAdded).toHaveBeenCalledTimes(4);
+
+    const processed = core.processManifest({
+      url: SUBS_EN,
+      data: HLS_MEDIA_WEBVTT,
+    });
+    expect(processed?.streams).toEqual([]);
+    expect(onStreamAdded).toHaveBeenCalledTimes(4);
+    expect(core.getStreams().map((s) => s.runtimeId)).not.toContain(SUBS_EN);
+    expect(core.hasSegment("https://cdn.example/live/subs/en/subs0.vtt")).toBe(
+      false,
+    );
+  });
+
+  it("does not let a playlist that registered nothing name the swarm", () => {
+    // Out of order — an I-frame playlist before its master — but the swarm
+    // must still be named after the master every viewer fetches.
+    const core = new Core({ manifestParsers: [hlsManifestParser] });
+    core.processManifest({ url: IFRAMES_1080, data: HLS_MEDIA_IFRAMES_ONLY });
+    expect(core.getStreams()).toEqual([]);
+    core.processManifest({ url: MASTER, data: HLS_MASTER_WITH_AUDIO });
+    expect(core.getStream(MEDIA_1080)?.swarmId).toBe(MASTER);
   });
 
   it("describes nothing for a master playlist and undefined for an unparsable one", () => {

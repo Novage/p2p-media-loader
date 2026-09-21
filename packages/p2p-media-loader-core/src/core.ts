@@ -382,10 +382,10 @@ export class Core {
     }
 
     const { requestedUrl } = manifest;
-    let updates;
+    let applied;
     try {
       const parsed = parser.parse(text, manifest.url);
-      updates = this.manifestRegistry.apply(
+      applied = this.manifestRegistry.apply(
         requestedUrl !== undefined && requestedUrl !== manifest.url
           ? { ...parsed, requestedUrl }
           : parsed,
@@ -395,15 +395,19 @@ export class Core {
       return undefined;
     }
 
-    // The first manifest names the swarm unless the integration already did.
-    // By what was asked for: every viewer asks for the same URL, and a CDN
-    // may answer each of them from a different one.
-    this.manifestResponseUrl ??= stripQuery(requestedUrl ?? manifest.url);
+    // The first manifest that registers a stream names the swarm unless the
+    // integration already did. By what was asked for: every viewer asks for
+    // the same URL, and a CDN may answer each of them from a different one.
+    // A manifest that registered nothing — an I-frame playlist handed over
+    // before its master — is not the presentation's name.
+    if (this.manifestRegistry.hasStreams()) {
+      this.manifestResponseUrl ??= stripQuery(requestedUrl ?? manifest.url);
+    }
 
     this.syncStreamsFromRegistry();
 
-    this.logRegistryUpdates(manifest.url, updates);
-    return summarize(updates);
+    this.logRegistryUpdates(manifest.url, applied.updates, applied.ignored);
+    return summarize(applied.updates);
   }
 
   /**
@@ -483,8 +487,22 @@ export class Core {
     );
   }
 
-  private logRegistryUpdates(url: string, updates: RegistryUpdate[]): void {
+  private logRegistryUpdates(
+    url: string,
+    updates: RegistryUpdate[],
+    ignored: string[] = [],
+  ): void {
     if (!this.manifestLogger.enabled) return;
+    if (ignored.length) {
+      // A media playlist is one manifest, so this is the whole story of it.
+      // Named by the master as no stream, or told from one by query string
+      // alone; the registry does not say which.
+      this.manifestLogger(
+        "%s — not a stream of this presentation by the master's word; ignored",
+        url,
+      );
+      return;
+    }
     const changed = updates.filter((u) => u.added || u.removed);
     this.manifestLogger(
       "%s — %d streams registered, %s",

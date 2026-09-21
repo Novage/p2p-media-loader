@@ -122,9 +122,11 @@ islands, and the final island may be nowhere near the playhead.
 - Parsers: HLS only.
 - Manifest: `pLoader`, for the playlists that name streams — the master, a
   variant's media playlist, an audio rendition's. A subtitle track's playlist
-  passes through it too and is not the core's to read: no master declares it
-  as a stream, so the core would register the WebVTT playlist as one of its
-  own.
+  passes through it too and is not handed over. The core would ignore it — the
+  master names the playlists that carry no video or audio, and a media playlist
+  arriving at one registers nothing
+  ([manifest-registry.md](manifest-registry.md)) — so handing it over would
+  only cost the parse.
 - Segments: `fLoader`, falling back to `config.loader`.
 - Playback: the media element.
 
@@ -217,7 +219,12 @@ cares about sharing on live streams should prefer the latter.
 ### Shaka Player
 
 - Parsers: HLS and DASH — Shaka plays both.
-- Manifest: a scheme plugin, filtering on `RequestType.MANIFEST`.
+- Manifest: a scheme plugin, filtering on `RequestType.MANIFEST`. That is
+  every manifest Shaka fetches, an HLS subtitle rendition's playlist included;
+  the core registers video and audio streams and ignores the rest
+  ([manifest-registry.md](manifest-registry.md)). Shaka is also the one player
+  here that plays HLS alternate video renditions; their playlists arrive like a
+  variant's and are declared main streams.
 - Segments: the same plugin, filtering on `RequestType.SEGMENT`. A segment
   request the core recognises as a stream's external index is let through to
   Shaka's own loader and its response handed to `processSegmentIndex`, whose
@@ -418,7 +425,8 @@ twice.
 - Playback: the media element, from `STREAM_INITIALIZED` on.
 
 An MPD request goes to dash.js's own loader with its completion wrapped, so the
-core reads the bytes before dash.js parses them. A media segment the registry
+core reads the bytes before dash.js parses them; its text and thumbnail
+`AdaptationSet`s register nothing ([manifest-registry.md](manifest-registry.md)). A media segment the registry
 knows, on a stream with P2P enabled, is served by the core: the adapter fills
 the response dash.js's `HTTPLoader` reads and emits two progress events, the
 first at zero bytes and the second at the full length with a `time` equal to
@@ -533,7 +541,9 @@ without a registry lookup or the miss it would report.
   nothing else on the page.
 - Playback: the media element behind `player.tech()`.
 
-Playlists and MPDs are read by the response hook, which sees the bytes VHS
+Playlists and MPDs — a subtitle track's playlist among them, which VHS fetches
+as an `hls-playlist` like any other and the core ignores
+([manifest-registry.md](manifest-registry.md)) — are read by the response hook, which sees the bytes VHS
 received, under the response URL, which follows redirects. A media segment the
 registry knows, on a stream with P2P enabled, is served by the core: the
 request hook puts an object of the adapter's own in `options.xhr`, which

@@ -5,7 +5,10 @@ import {
   HLS_LIVE_LL,
   HLS_LIVE_NO_PDT_REFRESH_1,
   HLS_MASTER_WITH_AUDIO,
+  HLS_MASTER_WITH_VIDEO_RENDITIONS,
+  HLS_MEDIA_IFRAMES_ONLY,
   HLS_MEDIA_VOD_BYTERANGE,
+  HLS_MEDIA_WEBVTT,
   IVS_MASTER_URL,
   MUX_720P_URL,
   MUX_MASTER_URL,
@@ -150,8 +153,182 @@ b1.mp4
     ]);
   });
 
-  it("ignores I-frame playlists", () => {
-    expect(parsed.streams.some((s) => s.key.includes("iframes"))).toBe(false);
+  it("declares no stream for subtitles, closed captions or I-frame playlists", () => {
+    expect(parsed.streams.map((s) => s.key)).toEqual([
+      "https://cdn.example/live/video/1080p/index.m3u8",
+      "https://cdn.example/live/video/360p/index.m3u8",
+      "https://cdn.example/live/audio/en/index.m3u8",
+      "https://cdn.example/live/audio/de/index.m3u8",
+    ]);
+  });
+
+  it("names the subtitle and I-frame playlists so the registry knows them on arrival", () => {
+    expect(parsed.excludedPlaylists).toEqual([
+      "https://cdn.example/live/video/1080p/iframes.m3u8",
+      "https://cdn.example/live/subs/en/index.m3u8",
+      "https://cdn.example/live/subs/de/index.m3u8",
+    ]);
+  });
+
+  it("names no playlist for an I-frame entry that has no URI", () => {
+    // m3u8-parser only warns about the missing attribute; resolving nothing
+    // against the master would exclude a real path ending in "undefined".
+    const master = `#EXTM3U
+#EXT-X-STREAM-INF:BANDWIDTH=1000000,CODECS="avc1.64002a",RESOLUTION=1920x1080
+hi.m3u8
+#EXT-X-I-FRAME-STREAM-INF:BANDWIDTH=100000,CODECS="avc1.64002a"
+`;
+    expect(hlsManifestParser.parse(master, BASE).excludedPlaylists).toEqual([]);
+  });
+
+  it("names nothing to exclude from a master without text or trick play", () => {
+    const master = `#EXTM3U
+#EXT-X-STREAM-INF:BANDWIDTH=1000000,CODECS="avc1.64002a",RESOLUTION=1920x1080
+hi.m3u8
+`;
+    expect(hlsManifestParser.parse(master, BASE).excludedPlaylists).toEqual([]);
+  });
+});
+
+describe("hlsManifestParser: alternate video renditions", () => {
+  const parsed = hlsManifestParser.parse(
+    HLS_MASTER_WITH_VIDEO_RENDITIONS,
+    BASE,
+  );
+
+  it("declares a main stream per rendition with a playlist of its own", () => {
+    // "Main" is the variant's playlist and "Muxed" has none: neither is a
+    // stream beside the variant. Variants first, then renditions.
+    expect(parsed.streams.map((s) => [s.key, s.type])).toEqual([
+      ["https://cdn.example/live/video/1080p/index.m3u8", "main"],
+      ["https://cdn.example/live/video/720p/index.m3u8", "main"],
+      ["https://cdn.example/live/video/1080p/wide.m3u8", "main"],
+      ["https://cdn.example/live/video/720p/wide.m3u8", "main"],
+    ]);
+    expect(parsed.excludedPlaylists).toEqual([]);
+  });
+
+  it("gives a rendition its variant's attributes and its own name and language", () => {
+    const [variant, , wide] = parsed.streams;
+    expect(wide.properties).toEqual({
+      bitrate: 5000000,
+      codecs: "avc1.64002a",
+      width: 1920,
+      height: 1080,
+      frameRate: 30,
+      videoRange: undefined,
+      language: "en",
+      name: "Wide",
+    });
+    // The variant is read as it always was; the group adds nothing to it.
+    expect(variant.properties).toEqual({
+      bitrate: 5000000,
+      codecs: "avc1.64002a",
+      width: 1920,
+      height: 1080,
+      frameRate: 30,
+      videoRange: undefined,
+    });
+    expect(parsed.streams[3].properties).toMatchObject({
+      bitrate: 2500000,
+      width: 1280,
+      name: "Wide",
+      language: undefined,
+    });
+  });
+
+  it("reads a group two variants share by the first of them, once", () => {
+    // Malformed by RFC 8216 — every rendition must match each referencing
+    // variant's resolution — so the first variant's reading is taken and the
+    // rendition is one stream, not one per variant.
+    const master = `#EXTM3U
+#EXT-X-MEDIA:TYPE=VIDEO,GROUP-ID="cam",NAME="Wide",URI="wide.m3u8"
+#EXT-X-STREAM-INF:BANDWIDTH=5000000,CODECS="avc1.64002a",RESOLUTION=1920x1080,VIDEO="cam"
+1080p.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=2500000,CODECS="avc1.4d401f",RESOLUTION=1280x720,VIDEO="cam"
+720p.m3u8
+`;
+    const renditions = hlsManifestParser
+      .parse(master, BASE)
+      .streams.filter((s) => s.properties.name !== undefined);
+    expect(renditions).toHaveLength(1);
+    expect(renditions[0]).toMatchObject({
+      key: "https://cdn.example/live/wide.m3u8",
+      properties: { bitrate: 5000000, height: 1080, name: "Wide" },
+    });
+  });
+
+  it("excludes the renditions of a group no variant references", () => {
+    // Nothing plays them, and declared they would be identified by a name
+    // alone; their playlists register nothing if they ever arrive.
+    const master = `#EXTM3U
+#EXT-X-MEDIA:TYPE=VIDEO,GROUP-ID="orphan",NAME="Wide",URI="orphan/wide.m3u8"
+#EXT-X-MEDIA:TYPE=VIDEO,GROUP-ID="cam",NAME="Wide",URI="cam/wide.m3u8"
+#EXT-X-STREAM-INF:BANDWIDTH=5000000,CODECS="avc1.64002a",RESOLUTION=1920x1080,VIDEO="cam"
+1080p.m3u8
+`;
+    const parsed = hlsManifestParser.parse(master, BASE);
+    expect(parsed.streams.map((s) => s.key)).toEqual([
+      "https://cdn.example/live/1080p.m3u8",
+      "https://cdn.example/live/cam/wide.m3u8",
+    ]);
+    expect(parsed.excludedPlaylists).toEqual([
+      "https://cdn.example/live/orphan/wide.m3u8",
+    ]);
+  });
+
+  it("excludes an audio group no variant references, like a video one", () => {
+    const master = `#EXTM3U
+#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="orphan",NAME="Commentary",URI="orphan/audio.m3u8"
+#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aud",NAME="English",URI="aud/en.m3u8"
+#EXT-X-STREAM-INF:BANDWIDTH=5000000,CODECS="avc1.64002a,mp4a.40.2",RESOLUTION=1920x1080,AUDIO="aud"
+1080p.m3u8
+`;
+    const parsed = hlsManifestParser.parse(master, BASE);
+    expect(parsed.streams.map((s) => s.key)).toEqual([
+      "https://cdn.example/live/1080p.m3u8",
+      "https://cdn.example/live/aud/en.m3u8",
+    ]);
+    expect(parsed.excludedPlaylists).toEqual([
+      "https://cdn.example/live/orphan/audio.m3u8",
+    ]);
+  });
+
+  it("never excludes a URI a declared stream has, whatever else names it", () => {
+    // Malformed: the I-frame playlist and a subtitle rendition both name the
+    // variant's playlist. The variant keeps it, on both sides of the list.
+    const master = `#EXTM3U
+#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="English",URI="1080p.m3u8"
+#EXT-X-STREAM-INF:BANDWIDTH=5000000,CODECS="avc1.64002a",RESOLUTION=1920x1080,SUBTITLES="subs"
+1080p.m3u8
+#EXT-X-I-FRAME-STREAM-INF:BANDWIDTH=100000,CODECS="avc1.64002a",URI="1080p.m3u8"
+`;
+    expect(hlsManifestParser.parse(master, BASE).excludedPlaylists).toEqual([]);
+  });
+
+  it("declares an audio rendition once, even at a URI a variant already has", () => {
+    const master = `#EXTM3U
+#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aud",NAME="English",URI="1080p.m3u8"
+#EXT-X-STREAM-INF:BANDWIDTH=5000000,CODECS="avc1.64002a,mp4a.40.2",RESOLUTION=1920x1080,AUDIO="aud"
+1080p.m3u8
+`;
+    const parsed = hlsManifestParser.parse(master, BASE);
+    expect(parsed.streams.map((s) => [s.key, s.type])).toEqual([
+      ["https://cdn.example/live/1080p.m3u8", "main"],
+    ]);
+  });
+
+  it("declares nothing from a group whose renditions have no playlist", () => {
+    // The common form — IVS names its groups this way — where each rendition
+    // is muxed into the variant that references it.
+    const parsed = hlsManifestParser.parse(
+      readFixture("ivs-master.m3u8"),
+      IVS_MASTER_URL,
+    );
+    expect(parsed.streams).toHaveLength(4);
+    expect(parsed.streams.every((s) => s.properties.name === undefined)).toBe(
+      true,
+    );
   });
 });
 
@@ -212,6 +389,22 @@ describe("hlsManifestParser: media playlist", () => {
     expect(stream.segments?.map((s) => s.url)).toEqual([
       "https://cdn.example/live/seg50.mp4",
       "https://cdn.example/live/seg51.mp4",
+    ]);
+  });
+
+  it("declares no stream from an I-frame playlist", () => {
+    // EXT-X-I-FRAMES-ONLY says what it is; no master is needed to know.
+    const parsed = hlsManifestParser.parse(HLS_MEDIA_IFRAMES_ONLY, BASE);
+    expect(parsed.streams).toEqual([]);
+  });
+
+  it("reads a WebVTT playlist like any other media playlist", () => {
+    // A subtitle playlist is not marked as one; it is the master that says
+    // so, and the registry that acts on it.
+    const [stream] = hlsManifestParser.parse(HLS_MEDIA_WEBVTT, BASE).streams;
+    expect(stream.segments?.map((s) => s.url)).toEqual([
+      "https://cdn.example/live/subs0.vtt",
+      "https://cdn.example/live/subs1.vtt",
     ]);
   });
 

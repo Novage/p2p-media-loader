@@ -66,6 +66,24 @@ export function videoStreamProperties(a: VideoAttributes): StreamProperties {
   };
 }
 
+/**
+ * An alternate video rendition — a camera angle with a playlist of its own.
+ * RFC 8216 gives it the characteristics of the variant that references its
+ * group, so the variant's attributes are its properties, and the rendition's
+ * own `NAME` and `LANGUAGE` are what tell it from the variant. The variant
+ * carries neither, so its identity is untouched by the group.
+ */
+export function videoRenditionProperties(
+  a: VideoAttributes,
+  rendition: { name: string; language?: string },
+): StreamProperties {
+  return {
+    ...videoStreamProperties(a),
+    language: rendition.language,
+    name: rendition.name,
+  };
+}
+
 /** An alternate audio rendition; bitrate is 0 by convention across players. */
 export function audioStreamProperties(a: AudioAttributes): StreamProperties {
   return {

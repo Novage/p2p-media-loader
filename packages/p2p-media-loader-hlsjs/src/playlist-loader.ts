@@ -12,7 +12,11 @@ import { isSecondaryPlayer } from "./secondary-player.js";
 
 /**
  * The playlists that name streams and segments: the master, a variant's media
- * playlist, and an audio rendition's. A subtitle track's names neither.
+ * playlist, and an audio rendition's. A subtitle track's names neither, and
+ * the core would ignore it — the master told it which playlists carry no
+ * video or audio — so this only spares a parse. The whitelist is the
+ * adapter's ordinary one, of the request types it handles; see
+ * specs/player-adapters.md.
  */
 const PLAYLISTS_THE_CORE_READS = new Set<string>([
   "manifest",
@@ -72,8 +76,8 @@ export class PlaylistLoaderBase implements Loader<PlaylistLoaderContext> {
   ) {
     const core = this.#core;
     // Every playlist HLS.js fetches comes through here, subtitle tracks
-    // included, and those no master declares as a stream: handing one to the
-    // core would register a WebVTT playlist as a stream of its own.
+    // included. The core keeps a WebVTT playlist out of its registry by
+    // itself; not handing one over only saves it the parse.
     const parsed =
       !this.#ofAnotherPlayer &&
       PLAYLISTS_THE_CORE_READS.has((context as PlaylistLoaderContext).type);

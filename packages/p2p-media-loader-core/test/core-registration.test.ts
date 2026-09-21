@@ -12,6 +12,7 @@ import {
   HLS_LIVE_NO_PDT_REFRESH_1,
   HLS_LIVE_NO_PDT_REFRESH_2,
   HLS_MASTER_WITH_AUDIO,
+  HLS_MASTER_WITH_VIDEO_RENDITIONS,
   HLS_MEDIA_VOD_BYTERANGE,
 } from "./fixtures/index.js";
 
@@ -67,6 +68,35 @@ describe("stream registration from manifests", () => {
       expect(s.identityHash).toBe(computeStreamIdentityHash(inputs[i]));
     });
     expect(inputs[0].bitrate).toBeUndefined();
+  });
+
+  it("identifies an alternate video rendition beside, and apart from, its variant", () => {
+    const core = new Core({ manifestParsers: [hlsManifestParser] });
+    core.processManifest({
+      url: MANIFEST_URL,
+      data: HLS_MASTER_WITH_VIDEO_RENDITIONS,
+    });
+    const variant = core.getStream(VIDEO_1080)!;
+    const wide = core.getStream(
+      "https://example.com/hls/video/1080p/wide.m3u8",
+    )!;
+    expect(wide.type).toBe("main");
+    expect(wide.identityHash).not.toBe(variant.identityHash);
+
+    // The group leaves the variant's identity exactly as it is without one.
+    const withoutGroup = HLS_MASTER_WITH_VIDEO_RENDITIONS.split("\n")
+      .filter((line) => !line.startsWith("#EXT-X-MEDIA:TYPE=VIDEO"))
+      .join("\n")
+      .replace(/,VIDEO="[^"]*"/g, "");
+    const plain = new Core({ manifestParsers: [hlsManifestParser] });
+    plain.processManifest({ url: MANIFEST_URL, data: withoutGroup });
+    expect(variant.identityHash).toBe(
+      plain.getStream(VIDEO_1080)!.identityHash,
+    );
+
+    // NAME tells the rendition from the variant, so neither needs bitrate.
+    const inputs = identityProperties(core.getStreams());
+    expect(inputs.every((p) => p.bitrate === undefined)).toBe(true);
   });
 
   it("names the swarm after the first manifest unless told otherwise", () => {

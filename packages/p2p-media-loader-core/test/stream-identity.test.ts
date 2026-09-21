@@ -55,6 +55,17 @@ const PROPS = {
     name: "English",
   },
   missing: { bitrate: 0 },
+  // An HLS alternate video rendition as the registry hashes it: the
+  // referencing variant's attributes, bitrate dropped, plus its own NAME and
+  // LANGUAGE (see specs/segment-identity.md).
+  hlsVideoRendition: {
+    codecs: "avc1.64002a",
+    width: 1920,
+    height: 1080,
+    frameRate: 30,
+    language: "en",
+    name: "Wide",
+  },
   dashHdr: {
     bitrate: 6000000,
     codecs: "hvc1.2.4.L153.B0",
@@ -90,6 +101,15 @@ const GOLDEN_VECTORS = [
     streamSwarmId:
       "v3-https://example.com/hls/master.m3u8-main-SwyTBJzxGFOXIbAZMJWKG3nnIwc=",
     infoHash: "CS1X23XIwC3hMelxmX8z",
+  },
+  {
+    name: "hls alternate video rendition: variant attributes plus NAME and LANGUAGE",
+    props: PROPS.hlsVideoRendition,
+    streamType: "main" as StreamType,
+    identityHash: "u00IaR0vBHu1FYRTY6ngVZcd/gg=",
+    streamSwarmId:
+      "v3-https://example.com/hls/master.m3u8-main-u00IaR0vBHu1FYRTY6ngVZcd/gg=",
+    infoHash: "joEux5p8lWAcP8C0ak25",
   },
   {
     name: "decimal RFC 4281 avc1 codec (hashed as written)",

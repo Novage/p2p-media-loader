@@ -99,6 +99,25 @@ throughout.
   directly. See [`specs/manifest-registry.md`](specs/manifest-registry.md).
 - `Stream.runtimeId` is the manifest-derived stream key: the media playlist URL
   for HLS, the Representation id for DASH.
+- **The core registers video and audio streams only**, by what the manifests
+  declare, so no adapter has to tell a track's kind. An HLS master's subtitle
+  renditions and I-frame playlists are remembered by URL and their media
+  playlists register nothing when they arrive — Shaka and Video.js hand them
+  over like any other — and a playlist declaring `EXT-X-I-FRAMES-ONLY` needs
+  no master to be ignored. An MPD's text, thumbnail and trick-mode
+  `AdaptationSet`s are left out where it is read. Leaving a trick-mode set out
+  also changes the identity of a video rung it matched in codecs and
+  resolution — `bitrate` no longer has to tell the two apart — so on such an
+  MPD, 5.0.0-alpha peers sit in a different swarm. The protocol stays `v3`: a
+  pre-release is not a compatibility target ([`AGENTS.md`](AGENTS.md), "The
+  peer protocol is a contract"). See
+  [`specs/manifest-registry.md`](specs/manifest-registry.md).
+- **HLS alternate video renditions are declared streams.** An
+  `EXT-X-MEDIA TYPE=VIDEO` rendition with a playlist of its own — a camera
+  angle, which Shaka plays — registers as a main stream identified by its
+  variant's attributes and its own `NAME`, and is shared. It used to register
+  anonymously when its playlist arrived, and never shared. Variants' identity
+  is unchanged. See [`specs/segment-identity.md`](specs/segment-identity.md).
 
 ### Removed
 

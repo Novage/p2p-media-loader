@@ -29,6 +29,7 @@ declare module "m3u8-parser" {
     "FRAME-RATE"?: number;
     "VIDEO-RANGE"?: string;
     AUDIO?: string;
+    VIDEO?: string;
     NAME?: string;
   };
 
@@ -46,13 +47,22 @@ declare module "m3u8-parser" {
 
   export type M3u8Manifest = {
     playlists?: M3u8Playlist[];
+    /**
+     * `EXT-X-I-FRAME-STREAM-INF` entries; kept apart from `playlists`. The
+     * parser only warns on a missing URI, so an entry may have none.
+     */
+    iFramePlaylists?: { uri?: string }[];
     mediaGroups?: {
       AUDIO?: Record<string, Record<string, M3u8MediaGroupItem>>;
+      VIDEO?: Record<string, Record<string, M3u8MediaGroupItem>>;
+      SUBTITLES?: Record<string, Record<string, M3u8MediaGroupItem>>;
     };
     segments?: M3u8Segment[];
     mediaSequence?: number;
     endList?: boolean;
     playlistType?: "VOD" | "EVENT";
+    /** Set by `EXT-X-I-FRAMES-ONLY` on a media playlist. */
+    iFramesOnly?: boolean;
   };
 
   export class Parser {

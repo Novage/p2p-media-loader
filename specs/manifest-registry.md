@@ -68,6 +68,40 @@ Core registers **streams** from the master manifest (or the MPD's
 playlist. A media playlist fetched directly, with no master above it, is a
 single anonymous stream.
 
+A master's streams are its variants, its audio renditions with a URI, and its
+alternate video renditions with a URI — camera angles, which Shaka plays. A
+video rendition takes the attributes of the first variant that references its
+group: RFC 8216 requires every rendition of the group to match each such
+variant's resolution, so a master that reuses one group across tiers is
+malformed and the first reading is taken. A rendition whose URI is a variant's
+own is that variant, and one without a URI names nothing — its media is the
+variant's playlist. See [segment-identity.md](segment-identity.md) for what
+identifies one.
+
+Only video and audio are streams. A master also names playlists that carry
+neither — subtitle renditions and I-frame playlists — and those URLs are
+recorded, so that a media playlist arriving at one registers nothing rather
+than an anonymous stream; it is matched with the same tolerance for a rotated
+query string or a redirect as a variant's playlist is. Every master's names
+are kept: a player that chose a subtitle track keeps refreshing its playlist
+under the name the master it read gave it, whatever a re-fetched master calls
+it now, and the list grows under rotated paths exactly as the streams do
+(below). The renditions of a group no variant references, audio or video, are
+on the list too: nothing plays them, and declared they would carry an identity
+made of a name alone. One rule covers the whole list: a URI a declared stream
+already has is that stream's, however else the master labels it, so a
+malformed master never puts one URL on both sides. A URL the master gives to
+both a variant and a subtitle rendition,
+query aside, matches a declared stream only by its exact URL: a playlist
+arriving there under any other query string could as well be the rendition's,
+and attaching it would put WebVTT segments under the variant's identity, so it
+is ignored — the variant loads without P2P under a rotated token, for the one
+master that tells the two apart by query string alone. An MPD's text and image
+`AdaptationSet`s are left out where the MPD is read, and nothing of theirs
+arrives later. No adapter has to know a track's kind: every manifest a player
+fetches may be handed over. See
+[Segments core does not register](#segments-core-does-not-register).
+
 A media playlist is matched to the stream its master declared by URL,
 tolerating a query string that differs (signed tokens rotate) and a redirect
 (the master named what was asked for, not where the response came from — which
@@ -370,8 +404,17 @@ next refresh. That is correct: it is no longer live.
   `EXT-X-PRELOAD-HINT`) — see the scope note in
   [architecture.md](architecture.md). Registering a preload hint would announce
   a URL to peers that does not yet resolve.
-- **I-frame playlists** (`EXT-X-I-FRAME-STREAM-INF`) — trick-play only, not
-  worth swarm capacity.
+- **Subtitles and captions** (`EXT-X-MEDIA:TYPE=SUBTITLES`; DASH text
+  `AdaptationSet`s, whether WebVTT, TTML or IMSC in MP4) and **image
+  thumbnails** (`image/jpeg` `AdaptationSet`s) — not video or audio. Closed
+  captions ride inside the variants and name nothing to register.
+- **I-frame playlists** (`EXT-X-I-FRAME-STREAM-INF`, and any media playlist
+  declaring `EXT-X-I-FRAMES-ONLY`) and **DASH trick-mode Representations**
+  (the DASH-IF `http://dashif.org/guidelines/trickmode` descriptor, on the
+  `AdaptationSet` or the `Representation`) — trick-play only, not worth swarm
+  capacity. Only the descriptor is recognised; a set signalled by
+  `maxPlayoutRate` alone is a video stream like any other, so every peer reads
+  it the same way whichever packager wrote it.
 - **Initialization segments** (`EXT-X-MAP`, DASH `Initialization`) — recognised
   and deliberately passed through. See below.
 - **Segments behind an external index that has not arrived** (DASH
