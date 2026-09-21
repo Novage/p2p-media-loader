@@ -328,3 +328,29 @@ describe("PlaybackTracker inference safety", () => {
     expect(t.getPlayback().bufferAhead).toBeCloseTo(15, 6);
   });
 });
+
+describe("PlaybackTracker: learning the buffer target", () => {
+  it("learns a target above the one it started with", () => {
+    // The player holds 60 s ahead; the tracker started assuming 10. Learning
+    // from an estimate clamped to the current target could only ever lower
+    // it, and the inferred buffer would collapse toward one segment.
+    let clock = 0;
+    const tracker = new PlaybackTracker(
+      segment(0),
+      { initialBufferTarget: 10 },
+      () => clock,
+    );
+    for (let i = 0; i < 10; i++) {
+      tracker.onSegmentRequested(segment(i));
+      clock += 100;
+      tracker.onSegmentDelivered(segment(i));
+    }
+    // Idle for far longer than half a segment: the buffer was at its target.
+    clock += SEG * 2 * 1000;
+    tracker.onSegmentRequested(segment(10));
+
+    const { bufferAhead, source } = tracker.getPlayback();
+    expect(source).toBe("inferred");
+    expect(bufferAhead).toBeGreaterThan(10 * 0.7);
+  });
+});

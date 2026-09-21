@@ -1,4 +1,5 @@
 import { HttpRequestExecutor } from "./http-loader.js";
+import { runAll } from "./run-all.js";
 import { CoreEventMap, DownloadSource, StreamConfig } from "./types.js";
 import {
   Playback,
@@ -48,6 +49,11 @@ export class HybridLoader {
   private initialHttpDelayTimeoutId?: number;
   private isProcessQueueMicrotaskCreated = false;
   private destroyed = false;
+  /**
+   * The engine request the storage is answering, while it is: this loader's
+   * to abort meanwhile, and not the queue's to start a download for.
+   */
+  private readingFromStorage?: EngineRequest;
   private readonly createdAt = performance.now();
 
   constructor(
@@ -82,6 +88,22 @@ export class HybridLoader {
 
     this.logger = debug(`p2pml-core:hybrid-loader-${activeStream.type}`);
     this.logger.color = "coral";
+
+    // The store is told where the playhead is from the start, and again on
+    // every change (see `syncPlayback`): a proxy that never reports would
+    // otherwise leave it with no playhead at all until the first delivery.
+    // A custom storage is the integrator's code and free to throw; a throw
+    // here would be a loader that never exists, and a stream that never
+    // plays through the core.
+    for (const failure of runAll([
+      () =>
+        this.segmentStorage.onPlaybackUpdated(
+          this.playback.bufferEdge - this.playback.bufferAhead,
+          this.playback.rate,
+        ),
+    ])) {
+      this.logger("the storage refused the playhead: %O", failure);
+    }
 
     this.setIntervalLoading();
   }
@@ -151,6 +173,12 @@ export class HybridLoader {
         // not wait for peers before starting this request.
         engineRequest.markAsShouldBeStartedImmediately();
       }
+      // This loader's request from here, before the storage is read: a
+      // custom storage answers asynchronously, and an abort arriving while
+      // it does must find the request to abort — or the bytes would be
+      // delivered to a player that has moved on, and counted as buffered.
+      this.engineRequest?.abort();
+      this.engineRequest = engineRequest;
 
       this.segmentStorage.onSegmentRequested(
         stream.swarmId,
@@ -169,11 +197,21 @@ export class HybridLoader {
       );
 
       if (hasSegment) {
-        const data = await this.segmentStorage.getSegmentData(
-          stream.swarmId,
-          stream.streamSwarmId,
-          segment.externalId,
-        );
+        this.readingFromStorage = engineRequest;
+        let data: ArrayBuffer | undefined;
+        try {
+          data = await this.segmentStorage.getSegmentData(
+            stream.swarmId,
+            stream.streamSwarmId,
+            segment.externalId,
+          );
+        } finally {
+          if (this.readingFromStorage === engineRequest) {
+            this.readingFromStorage = undefined;
+          }
+        }
+        // Aborted while the storage was read: settled, and let go of.
+        if (engineRequest.status !== "pending") return;
         // Byte length as well as presence: a stored segment that reads back
         // empty is a storage that let its buffer be detached, and serving it
         // would hand the player nothing while looking like a hit. Load it
@@ -190,14 +228,12 @@ export class HybridLoader {
         if (data && data.byteLength > 0) {
           const { queueDownloadRatio } = this.generateQueue();
           engineRequest.resolve(data, this.getBandwidth(queueDownloadRatio));
+          this.engineRequest = undefined;
           this.playbackTracker.onSegmentDelivered(segment);
           this.syncPlayback();
           return;
         }
       }
-
-      this.engineRequest?.abort();
-      this.engineRequest = engineRequest;
 
       // If the engine explicitly requests a segment that previously failed during
       // background pre-fetching, clear its error history so it can be retried.
@@ -211,6 +247,7 @@ export class HybridLoader {
         error,
       );
       engineRequest.reject();
+      if (this.engineRequest === engineRequest) this.engineRequest = undefined;
     } finally {
       this.requestProcessQueueMicrotask();
     }
@@ -388,9 +425,14 @@ export class HybridLoader {
       const { segment } = engineRequest;
       const request = this.requests.get(segment);
 
+      // Not while the storage is answering it: the request is this loader's
+      // from before the read so that an abort meanwhile finds it, and a
+      // download started for it here would run beside the bytes the storage
+      // is about to hand over.
       const shouldStartLoadImmediatelyEngineRequest =
         engineRequest.shouldBeStartedImmediately &&
         engineRequest.status === "pending" &&
+        engineRequest !== this.readingFromStorage &&
         (!request ||
           request.status === "not-started" ||
           request.status === "failed" ||
@@ -607,9 +649,11 @@ export class HybridLoader {
         peerIds,
         segment.externalId,
       );
-      const secondsToHighDemand =
-        getDistanceFromPlayhead(segment, this.playback).start -
-        highDemandTimeWindow * this.playback.rate;
+      const secondsToHighDemand = ElectionUtils.wallSecondsToHighDemand(
+        getDistanceFromPlayhead(segment, this.playback).start,
+        highDemandTimeWindow,
+        this.playback.rate,
+      );
       const estimatedFetchSeconds = this.estimateFetchSeconds(segment);
 
       if (
@@ -784,11 +828,6 @@ export class HybridLoader {
         `${this.lastRequestedSegment.stream.type} playhead≈${(bufferEdge - bufferAhead).toFixed(3)} (${source})`,
       );
     }
-
-    // The store compares this position against the segment times it was given,
-    // which are manifest time — so the position must be manifest time too.
-    const { bufferEdge, bufferAhead, rate } = this.playback;
-    this.segmentStorage.onPlaybackUpdated(bufferEdge - bufferAhead, rate);
     this.requestProcessQueueMicrotask(false);
   }
 
@@ -810,6 +849,17 @@ export class HybridLoader {
       playback.rate !== rate ||
       playback.source !== next.source;
     this.playback = { ...next, rate };
+    // The store compares this position against the segment times it was
+    // given, which are manifest time — so the position must be manifest time
+    // too. Told from here rather than from the player's reports alone: a
+    // proxy that never reports would otherwise leave the store with no
+    // playhead at all, evicting nothing for the whole session.
+    if (changed) {
+      this.segmentStorage.onPlaybackUpdated(
+        next.bufferEdge - next.bufferAhead,
+        rate,
+      );
+    }
     return changed;
   }
 

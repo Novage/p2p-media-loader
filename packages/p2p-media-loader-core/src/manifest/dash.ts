@@ -2,7 +2,13 @@
 // import them, so other packages compiling these sources see them too.
 // eslint-disable-next-line @typescript-eslint/triple-slash-reference
 /// <reference path="./vendor-types.d.ts" />
-import { parse, stringToMpdXml, type MpdPlaylist } from "mpd-parser";
+import {
+  inheritAttributes,
+  stringToMpdXml,
+  toM3u8,
+  toPlaylists,
+  type MpdPlaylist,
+} from "mpd-parser";
 import { ensureObjectValues } from "./shims/object-values.js";
 import type {
   ManifestParser,
@@ -42,12 +48,20 @@ export const dashManifestParser: ManifestParser = {
   parseSegmentIndex: parseSidx,
 
   parse(text, url) {
-    const manifest = parse(text, { manifestUri: url });
-    // One pass over the MPD's own document for what the tokenizer does not
-    // report: whether the presentation is live, the channel count of each
-    // audio Representation, and which Representations are trick play.
+    // mpd-parser's own pipeline, step by step, so its DOM parse runs once and
+    // the document it produces also answers what its summary does not report:
+    // whether the presentation is live, the channel count of each audio
+    // Representation, and which Representations are trick play.
+    const mpd = stringToMpdXml(text);
+    const inherited = inheritAttributes(mpd, { manifestUri: url });
+    const manifest = toM3u8({
+      dashPlaylists: toPlaylists(inherited.representationInfo),
+      locations: inherited.locations,
+      contentSteering: inherited.contentSteeringInfo,
+      eventStream: inherited.eventStream,
+    });
     const { isLive, channelsByRepresentation, trickModeRepresentations } =
-      readMpd(text);
+      readMpd(mpd);
     const isTrickMode = (playlist: MpdPlaylist) =>
       playlist.attributes.NAME !== undefined &&
       trickModeRepresentations.has(playlist.attributes.NAME);
@@ -177,30 +191,17 @@ function toStream(
  * on its AdaptationSet — a descriptor may sit at either level. The descriptor
  * names the set it plays alongside; what carries it is never played at
  * normal speed.
+ *
+ * Read off the `MPD` element mpd-parser's DOM step hands back — the element,
+ * not the document around it — for what the tokenizer's summary leaves out.
  */
-function readMpd(text: string): {
+function readMpd(mpd: Element): {
   isLive: boolean;
   channelsByRepresentation: Map<string, number>;
   trickModeRepresentations: Set<string>;
 } {
   const result = new Map<string, number>();
   const trickModeRepresentations = new Set<string>();
-  // mpd-parser's own DOM step, so the core has no XML dependency of its own:
-  // in Node it resolves xmldom transitively, in browser bundles the alias in
-  // vite.common.config.ts hands it the platform DOMParser.
-  // The DOM step hands back the `MPD` element, not the document around it.
-  let mpd: Element;
-  try {
-    mpd = stringToMpdXml(text);
-  } catch {
-    // Nothing to read the attribute off; the whole text is searched for it
-    // rather than assuming the presentation is static.
-    return {
-      isLive: /<MPD[^>]*\btype\s*=\s*["']dynamic["']/.test(text),
-      channelsByRepresentation: result,
-      trickModeRepresentations,
-    };
-  }
 
   // `type="dynamic"` is authoritative for live. Read off the element itself,
   // so neither the length of its opening tag nor a change in how the

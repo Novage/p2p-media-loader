@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   hash32,
-  isHttpOwner,
   rankForSegment,
   shouldFetchNow,
+  wallSecondsToHighDemand,
 } from "../src/utils/election.js";
 
 const PEERS = [
@@ -21,7 +21,9 @@ describe("HTTP owner election", () => {
 
   it("elects exactly one owner per segment among fully connected peers", () => {
     for (let externalId = 80000; externalId < 80200; externalId++) {
-      const owners = PEERS.filter((p) => isHttpOwner(p, others(p), externalId));
+      const owners = PEERS.filter(
+        (p) => rankForSegment(p, others(p), externalId) === 0,
+      );
       expect(owners).toHaveLength(1);
     }
   });
@@ -29,7 +31,9 @@ describe("HTTP owner election", () => {
   it("rotates ownership across segments", () => {
     const counts = new Map(PEERS.map((p) => [p, 0]));
     for (let externalId = 80000; externalId < 80600; externalId++) {
-      const owner = PEERS.find((p) => isHttpOwner(p, others(p), externalId));
+      const owner = PEERS.find(
+        (p) => rankForSegment(p, others(p), externalId) === 0,
+      );
       if (owner) counts.set(owner, (counts.get(owner) ?? 0) + 1);
     }
     // A third each, within a few standard deviations (σ ≈ 11.5 for 600
@@ -45,9 +49,9 @@ describe("HTTP owner election", () => {
     const [a, b, c] = PEERS;
     let relayed = 0;
     for (let externalId = 80000; externalId < 80300; externalId++) {
-      const aOwns = isHttpOwner(a, [b], externalId);
-      const bOwns = isHttpOwner(b, [a, c], externalId);
-      const cOwns = isHttpOwner(c, [b], externalId);
+      const aOwns = rankForSegment(a, [b], externalId) === 0;
+      const bOwns = rankForSegment(b, [a, c], externalId) === 0;
+      const cOwns = rankForSegment(c, [b], externalId) === 0;
       expect(aOwns && bOwns).toBe(false);
       expect(bOwns && cOwns).toBe(false);
       // The global minimum is always an owner, so the segment enters the swarm.
@@ -60,7 +64,7 @@ describe("HTTP owner election", () => {
   });
 
   it("makes a peer with no neighbours the owner of everything", () => {
-    expect(isHttpOwner(PEERS[0], [], 1)).toBe(true);
+    expect(rankForSegment(PEERS[0], [], 1) === 0).toBe(true);
   });
 });
 
@@ -129,5 +133,17 @@ describe("backup ranking and deadlines", () => {
         estimatedFetchSeconds: 4,
       }),
     ).toBe(true);
+  });
+});
+
+describe("wallSecondsToHighDemand", () => {
+  it("measures the distance in wall-clock seconds, as the fetch estimate is", () => {
+    // 8 media seconds beyond a 15 s window: 8 s away at rate 1, 4 s at 2x.
+    expect(wallSecondsToHighDemand(23, 15, 1)).toBe(8);
+    expect(wallSecondsToHighDemand(38, 15, 2)).toBe(4);
+  });
+
+  it("treats a paused player as playing at 1x", () => {
+    expect(wallSecondsToHighDemand(23, 15, 0)).toBe(8);
   });
 });

@@ -136,7 +136,9 @@ export class PlaybackTracker {
       duration > 0 &&
       idle > duration * this.config.idleFullBufferRatio
     ) {
-      this.learnBufferTarget(this.rawInferredBufferAhead(now));
+      // From the unclamped estimate: clamped to the current target, the
+      // observation could never exceed it and the target could only fall.
+      this.learnBufferTarget(this.unclampedInferredBufferAhead(now));
       this.reanchor(now, this.bufferTarget);
     }
     return false;
@@ -182,9 +184,13 @@ export class PlaybackTracker {
   }
 
   private rawInferredBufferAhead(now: number): number {
+    return clamp(this.unclampedInferredBufferAhead(now), 0, this.bufferTarget);
+  }
+
+  private unclampedInferredBufferAhead(now: number): number {
     const elapsed = (now - this.atMs) / 1000;
     const produced = this.delivered - this.atDelivered;
-    return clamp(this.atBuffer + produced - elapsed, 0, this.bufferTarget);
+    return this.atBuffer + produced - elapsed;
   }
 
   private reanchor(now: number, bufferAhead: number): void {

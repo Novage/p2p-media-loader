@@ -18,8 +18,11 @@ export interface SegmentStorage {
    * @param position The playhead on the manifest timeline — the same
    * timeline as the `startTime`/`endTime` passed to `onSegmentRequested`, so
    * the two are directly comparable. It is derived from the last requested
-   * segment and the player's reported buffer, never read from the player's
-   * clock (see specs/playback-contract.md).
+   * segment and the player's reported buffer — or, where the player reports
+   * nothing, from the core's own estimate of what it holds — never read from
+   * the player's clock (see specs/playback-contract.md). Told at the start
+   * and whenever the estimate moves, whether or not `updatePlayback` was
+   * called.
    * @param rate The current playback rate.
    */
   onPlaybackUpdated(position: number, rate: number): void;

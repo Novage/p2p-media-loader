@@ -151,6 +151,31 @@ declare module "mpd-parser" {
    */
   /** The `MPD` element itself, not the document around it. */
   export function stringToMpdXml(manifestString: string): Element;
+  /**
+   * The remaining steps of `parse`, exported by mpd-parser for custom
+   * pipelines: `parse` is `toM3u8` over `toPlaylists` over
+   * `inheritAttributes` over `stringToMpdXml`. Their intermediate values are
+   * opaque here; only what `toM3u8` returns is read.
+   */
+  export type MpdInheritedAttributes = {
+    representationInfo: unknown;
+    locations?: unknown;
+    contentSteeringInfo?: unknown;
+    eventStream?: unknown;
+  };
+  export function inheritAttributes(
+    mpd: Element,
+    options?: { manifestUri?: string },
+  ): MpdInheritedAttributes;
+  export function toPlaylists(representationInfo: unknown): unknown;
+  export function toM3u8(args: {
+    dashPlaylists: unknown;
+    locations?: unknown;
+    contentSteering?: unknown;
+    sidxMapping?: unknown;
+    previousManifest?: unknown;
+    eventStream?: unknown;
+  }): ReturnType<typeof parse>;
 }
 
 declare module "@videojs/vhs-utils/es/codecs.js" {

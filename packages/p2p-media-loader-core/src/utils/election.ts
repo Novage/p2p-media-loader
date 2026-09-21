@@ -57,21 +57,27 @@ export function rankForSegment(
   return rank;
 }
 
-/** True when `ownPeerId` has the lowest score for the segment. */
-export function isHttpOwner(
-  ownPeerId: string,
-  peerIds: Iterable<string>,
-  externalId: number,
-): boolean {
-  return rankForSegment(ownPeerId, peerIds, externalId) === 0;
-}
-
 /**
  * Time a backup allows for the owner's announcement to arrive before it
  * counts the owner as absent. Covers a playlist refresh's worth of skew
  * between peers seeing the segment plus the announcement's own latency.
  */
 const ANNOUNCEMENT_ALLOWANCE_SECONDS = 0.5;
+
+/**
+ * Wall-clock seconds until a segment enters the high-demand window, from its
+ * distance ahead of the playhead in media seconds: what the fetch-time
+ * estimate is measured in. At a rate other than 1 the two differ, and a
+ * paused player's rate is the last non-zero one it had.
+ */
+export function wallSecondsToHighDemand(
+  distanceStart: number,
+  highDemandTimeWindow: number,
+  rate: number,
+): number {
+  const playing = rate || 1;
+  return (distanceStart - highDemandTimeWindow * playing) / playing;
+}
 
 /**
  * Whether a peer should fetch a segment over HTTP now.

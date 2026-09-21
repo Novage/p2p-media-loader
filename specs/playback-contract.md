@@ -144,7 +144,10 @@ position = bufferEdge - bufferAhead
 ```
 
 Each loader reports the playhead on its own stream's timeline, and the store
-keeps the latest report. On live HLS without programme dates the main and the
+keeps the latest report. The store is told at the start of a stream and
+whenever the core's estimate moves — on a player's report, and on the core's
+own inference where the player reports nothing — so a store sees positions,
+and evicts, on a session where `updatePlayback` is never called. On live HLS without programme dates the main and the
 secondary playlist are anchored at zero on their own first parse, so their
 timelines can differ by seconds; a segment of one judged against the other's
 position is then off by that much, inside the trailing window the store keeps

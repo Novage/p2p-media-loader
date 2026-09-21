@@ -575,6 +575,106 @@ describe("HybridLoader: a stored segment that reads back empty", () => {
     loader.destroy();
   });
 
+  it("tells the storage where the playhead is although the player never reports", async () => {
+    // A proxy reports nothing; the estimate the loader infers is all the
+    // storage can judge retention by. Left untold, it would evict nothing.
+    const onPlaybackUpdated = vi.fn();
+    const { loader, segment, callbacks, state } = setup({}, {
+      ...emptyStorage,
+      onPlaybackUpdated,
+    } as unknown as SegmentStorage);
+    // Told from the start...
+    expect(onPlaybackUpdated).toHaveBeenCalledTimes(1);
+    const [position, rate] = onPlaybackUpdated.mock.calls[0] as [
+      number,
+      number,
+    ];
+    expect(Number.isFinite(position)).toBe(true);
+    expect(rate).toBe(1);
+
+    // ...and again as the estimate moves: a delivery extends the buffer edge.
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+    const controls = state.httpControls.get("seg-0")!;
+    controls.addLoadedChunk(new Uint8Array(16));
+    controls.completeOnSuccess();
+    await flush();
+
+    expect(onPlaybackUpdated.mock.calls.length).toBeGreaterThan(1);
+    loader.destroy();
+  });
+
+  it("starts no download for a segment the storage is answering", async () => {
+    // A seek to a segment the storage holds: the request is this loader's
+    // from before the read, so an abort meanwhile finds it — and a pass
+    // meanwhile must not start the immediate download a seek calls for.
+    let release!: (data: ArrayBuffer) => void;
+    const storage = {
+      ...emptyStorage,
+      hasSegment: (_swarmId: string, _streamSwarmId: string, id: number) =>
+        id === 5,
+      getSegmentData: () =>
+        new Promise<ArrayBuffer>((resolve) => (release = resolve)),
+    } as unknown as SegmentStorage;
+    const { loader, segment, callbacks, state } = setup({}, storage);
+
+    const loading = loader.loadSegment(segment(5), callbacks);
+    // A report lands while the storage answers, and runs a pass.
+    loader.updatePlayback({ bufferAhead: 1, rate: 1 });
+    await flush();
+    expect(state.httpStarted).not.toContain("seg-5");
+    expect(state.p2pStarted).not.toContain("seg-5");
+
+    release(new Uint8Array([1, 2, 3]).buffer);
+    await loading;
+    expect(callbacks.onSuccess).toHaveBeenCalledTimes(1);
+    loader.destroy();
+  });
+
+  it("survives a storage that refuses the playhead at construction", async () => {
+    const storage = {
+      ...emptyStorage,
+      onPlaybackUpdated: () => {
+        throw new Error("no segment requested yet");
+      },
+    } as unknown as SegmentStorage;
+    const { loader, segment, callbacks, state } = setup({}, storage);
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+
+    expect(state.httpStarted).toContain("seg-0");
+    loader.destroy();
+  });
+
+  it("aborts a request the storage was still answering", async () => {
+    // A custom storage answers asynchronously; the player moves on while it
+    // does. The bytes must not be delivered to a request the player aborted,
+    // nor counted as buffered.
+    let release!: (data: ArrayBuffer) => void;
+    const storage = {
+      ...emptyStorage,
+      hasSegment: (_swarmId: string, _streamSwarmId: string, id: number) =>
+        id === 0,
+      getSegmentData: () =>
+        new Promise<ArrayBuffer>((resolve) => (release = resolve)),
+    } as unknown as SegmentStorage;
+    const { loader, segment, callbacks } = setup({}, storage);
+
+    const loading = loader.loadSegment(segment(0), callbacks);
+    loader.abortSegmentRequest("seg-0");
+    release(new Uint8Array([1, 2, 3]).buffer);
+    await loading;
+    await flush();
+
+    expect(callbacks.onSuccess).not.toHaveBeenCalled();
+    expect(callbacks.onError).toHaveBeenCalledTimes(1);
+    expect(callbacks.onError.mock.calls[0][0]).toMatchObject({
+      type: "aborted",
+    });
+    loader.destroy();
+  });
+
   it("is delivered when the bytes are there", async () => {
     const { loader, segment, callbacks, state } = setup(
       {},

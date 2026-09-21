@@ -3,7 +3,9 @@ import { ManifestRegistry } from "../src/manifest/registry.js";
 import { hlsManifestParser } from "../src/manifest/hls.js";
 import { dashManifestParser } from "../src/manifest/dash.js";
 import { Core } from "../src/index.js";
+import type { SidxBox } from "../src/manifest/mp4-sidx.js";
 import {
+  DASH_SEGMENT_BASE,
   DASH_SEGMENT_TEMPLATE,
   HLS_LIVE_NO_PDT_REFRESH_1,
   HLS_LIVE_NO_PDT_REFRESH_2,
@@ -435,6 +437,116 @@ describe("ManifestRegistry: PDT and DASH timelines", () => {
 
     const pdt = /#EXT-X-PROGRAM-DATE-TIME:(\S+)/.exec(text)?.[1];
     expect(first.startTime).toBeCloseTo(Date.parse(pdt!) / 1000, 3);
+  });
+
+  it("steps over a reference to a subordinate index", () => {
+    // ISO 14496-12: a type-1 reference points at another sidx, and its
+    // referenced_size and duration span the bytes and time up to the next
+    // referenced item. Skipped without stepping, every segment after it
+    // would sit one sub-index too early, in bytes and in time.
+    const registry = new ManifestRegistry();
+    registry.apply(dashManifestParser.parse(DASH_SEGMENT_BASE, MASTER));
+    const sidx: SidxBox = {
+      boxOffset: 0,
+      boxSize: 100,
+      timescale: 1,
+      earliestPresentationTime: 0,
+      firstOffset: 0,
+      references: [
+        { referenceType: 1, referencedSize: 100, subsegmentDuration: 2 },
+        { referenceType: 0, referencedSize: 500, subsegmentDuration: 2 },
+        { referenceType: 0, referencedSize: 600, subsegmentDuration: 2 },
+      ],
+    };
+
+    registry.resolveExternalIndex(
+      "https://cdn.example/live/video.mp4",
+      { start: 700, end: 1500 },
+      sidx,
+    );
+
+    const segments = [...registry.getStream("v-sidx")!.segments.values()];
+    // The box ends at 800; the sub-index occupies 800–899.
+    expect(segments.map((s) => s.byteRange)).toEqual([
+      { start: 900, end: 1399 },
+      { start: 1400, end: 1999 },
+    ]);
+    expect(segments.map((s) => s.startTime)).toEqual([2, 4]);
+  });
+
+  it("keeps its anchor through a refresh that lists no segments", () => {
+    // A packager restarting, or an event boundary: the refresh says nothing
+    // about where the timeline sits, and must forget nothing.
+    const withSegments = `#EXTM3U
+#EXT-X-TARGETDURATION:2
+#EXT-X-MEDIA-SEQUENCE:100
+#EXTINF:2.0,
+s100.ts
+#EXTINF:2.0,
+s101.ts
+`;
+    const empty = `#EXTM3U
+#EXT-X-TARGETDURATION:2
+#EXT-X-MEDIA-SEQUENCE:102
+`;
+    const later = `#EXTM3U
+#EXT-X-TARGETDURATION:2
+#EXT-X-MEDIA-SEQUENCE:101
+#EXTINF:2.0,
+s101.ts
+#EXTINF:2.0,
+s102.ts
+`;
+    const registry = new ManifestRegistry();
+    registry.apply(hls(withSegments, MEDIA_1080));
+    registry.apply(hls(empty, MEDIA_1080));
+    registry.apply(hls(later, MEDIA_1080));
+
+    const times = [...registry.getStream(MEDIA_1080)!.segments.values()].map(
+      (s) => s.startTime,
+    );
+    expect(times).toEqual([2, 4]);
+  });
+
+  it("keeps the timeline when a refresh drops the programme dates", () => {
+    // A packager failing over to an origin without EXT-X-PROGRAM-DATE-TIME:
+    // the next refresh must anchor on the sequence numbers it shares with the
+    // last parse, not lay its segments out from zero beside ones at
+    // wall-clock time.
+    const at = (i: number) =>
+      new Date(Date.UTC(2026, 8, 12, 20, 0, i * 2)).toISOString();
+    const withDates = `#EXTM3U
+#EXT-X-TARGETDURATION:2
+#EXT-X-MEDIA-SEQUENCE:100
+#EXT-X-PROGRAM-DATE-TIME:${at(0)}
+#EXTINF:2.0,
+s100.ts
+#EXT-X-PROGRAM-DATE-TIME:${at(1)}
+#EXTINF:2.0,
+s101.ts
+#EXT-X-PROGRAM-DATE-TIME:${at(2)}
+#EXTINF:2.0,
+s102.ts
+`;
+    const withoutDates = `#EXTM3U
+#EXT-X-TARGETDURATION:2
+#EXT-X-MEDIA-SEQUENCE:101
+#EXTINF:2.0,
+s101.ts
+#EXTINF:2.0,
+s102.ts
+#EXTINF:2.0,
+s103.ts
+`;
+    const registry = new ManifestRegistry();
+    registry.apply(hls(withDates, MEDIA_1080));
+    const base = Date.UTC(2026, 8, 12, 20, 0, 0) / 1000;
+    registry.apply(hls(withoutDates, MEDIA_1080));
+
+    const times = [...registry.getStream(MEDIA_1080)!.segments.values()].map(
+      (s) => s.startTime,
+    );
+    expect(times).toEqual([base + 2, base + 4, base + 6]);
   });
 
   it("uses presentation time in 100 ms units as DASH externalId", () => {

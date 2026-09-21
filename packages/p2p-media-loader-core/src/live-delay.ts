@@ -24,14 +24,6 @@ export type LiveDelay = {
 };
 
 /**
- * How far behind the live edge to place a player, given the window it has and
- * the length of a segment in it: as deep as the window allows, one segment
- * inside the tail, never more than a minute behind, and never less than a
- * segment. Adapters that read the window from their player rather than from a
- * processed manifest — HLS.js reports it on every level update — size the
- * placement with this directly.
- */
-/**
  * Where a live source starts, before any manifest has said how wide its
  * window is: deep enough that a peer has something to fetch ahead of the
  * playhead, and shallow enough to sit inside any window worth sharing. The
@@ -39,6 +31,14 @@ export type LiveDelay = {
  */
 export const INITIAL_LIVE_DELAY = 25;
 
+/**
+ * How far behind the live edge to place a player, given the window it has and
+ * the length of a segment in it: as deep as the window allows, one segment
+ * inside the tail, never more than a minute behind, and never less than a
+ * segment. Adapters that read the window from their player rather than from a
+ * processed manifest — HLS.js reports it on every level update — size the
+ * placement with this directly.
+ */
 export function liveDelayFromWindow(window: number, segment: number): number {
   return Math.max(
     segment,

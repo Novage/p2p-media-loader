@@ -372,7 +372,11 @@ per stream. The first parse of a stream records its first media sequence number
 against an arbitrary base time (zero); every later parse derives `startTime` by
 accumulating durations from that base. Media sequence numbers are monotonic
 across refreshes by specification, so the anchor holds for the life of the
-stream. `EXT-X-DISCONTINUITY` does not disturb it: the manifest timeline is a
+stream. A stream whose earlier parses carried programme dates has those
+recorded by sequence too, so a packager that drops the tag mid-session — a
+failover to another origin — continues from the wall-clock times already laid
+out rather than starting again at zero beside them. A refresh with no segments
+records nothing and forgets nothing. `EXT-X-DISCONTINUITY` does not disturb it: the manifest timeline is a
 running sum of durations, and a discontinuity only matters to a clock this
 timeline is never compared against.
 

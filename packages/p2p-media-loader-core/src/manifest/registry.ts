@@ -132,8 +132,12 @@ export class ManifestRegistry {
       this.excludedPlaylists.add(stripQuery(url));
     }
     // Bitrate enters a stream's identity only where this manifest needs it to
-    // tell same-type streams apart; see specs/segment-identity.md.
-    const identity = identityProperties(manifest.streams);
+    // tell same-type streams apart; see specs/segment-identity.md. Hashing
+    // every stream is work a refresh that registers nothing new never needs,
+    // so it is done for the first stream this manifest registers, if any.
+    let identity: StreamProperties[] | undefined;
+    const identityOf = (i: number) =>
+      (identity ??= identityProperties(manifest.streams))[i];
 
     for (const [i, parsed] of manifest.streams.entries()) {
       const key = this.resolveStreamKey(parsed, manifest);
@@ -141,7 +145,7 @@ export class ManifestRegistry {
         ignored.push(parsed.key);
         continue;
       }
-      const stream = this.upsertStream(key, parsed, identity[i]);
+      const stream = this.upsertStream(key, parsed, () => identityOf(i));
       if (!parsed.segments) {
         // A stream whose segments live in an external index is still reported
         // — how live it is, and what it holds so far — so a caller learns of
@@ -229,8 +233,14 @@ export class ManifestRegistry {
       // specs/segment-identity.md, and changing it is a protocol bump.
       let presentationTime = source.periodStart;
       for (const reference of sidx.references) {
-        if (reference.referenceType === 1) continue;
         const duration = reference.subsegmentDuration / sidx.timescale;
+        // A reference to a subordinate index is not a segment, but its bytes
+        // and its span sit between the segments around it all the same.
+        if (reference.referenceType === 1) {
+          start += reference.referencedSize;
+          presentationTime += duration;
+          continue;
+        }
         segments.push({
           url: source.url,
           byteRange: { start, end: start + reference.referencedSize - 1 },
@@ -252,7 +262,7 @@ export class ManifestRegistry {
   private upsertStream(
     key: string,
     parsed: ParsedStream,
-    identityInput: StreamProperties,
+    identityInput: () => StreamProperties,
   ): MutableStream {
     const existing = this.streams.get(key);
 
@@ -272,10 +282,10 @@ export class ManifestRegistry {
       type: existing?.type ?? parsed.type,
       properties: carriesIdentity ? parsed.properties : existing.properties,
       identityHash: carriesIdentity
-        ? computeStreamIdentityHash(identityInput)
+        ? computeStreamIdentityHash(identityInput())
         : existing.identityHash,
       identified: carriesIdentity
-        ? identifies(identityInput)
+        ? identifies(identityInput())
         : existing.identified,
       indexSource: parsed.indexSource,
       initSegments: parsed.initSegments?.length
@@ -459,12 +469,18 @@ export class ManifestRegistry {
     if (protocol === "dash") {
       return segments.map((s) => s.presentationTime ?? 0);
     }
+    const { timeline } = stream;
     const dates = segments.map((s) => s.programDateTime);
     if (dates.every((date): date is number => date !== undefined)) {
-      return dates.map((date) => date / 1000);
+      // Remembered by sequence all the same: a packager that drops its
+      // programme dates mid-session — a failover to another origin — would
+      // otherwise have the next refresh anchor on nothing and lay its
+      // segments out from zero, beside the ones already at wall-clock time.
+      const times = dates.map((date) => date / 1000);
+      this.remember(stream, segments, times);
+      return times;
     }
 
-    const { timeline } = stream;
     const anchorIndex = segments.findIndex((s) => timeline.has(s.sequence));
     const times = new Array<number>(segments.length);
 
@@ -490,6 +506,21 @@ export class ManifestRegistry {
       }
     }
 
+    this.remember(stream, segments, times);
+    return times;
+  }
+
+  /** Records where each sequence number sits, for the next refresh to anchor on. */
+  private remember(
+    stream: MutableStream,
+    segments: readonly ParsedSegment[],
+    times: readonly number[],
+  ) {
+    // A refresh with no segments — a packager restarting, an event boundary
+    // — says nothing about where the timeline sits, and pruning against it
+    // would forget every anchor there is.
+    if (segments.length === 0) return;
+    const { timeline } = stream;
     segments.forEach((s, i) => timeline.set(s.sequence, times[i]));
     // Sequence numbers that slid out of the window are never revisited.
     if (timeline.size > segments.length * 4) {
@@ -498,7 +529,6 @@ export class ManifestRegistry {
         if (!keep.has(sequence)) timeline.delete(sequence);
       }
     }
-    return times;
   }
 
   private durationOf(
