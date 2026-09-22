@@ -20,11 +20,17 @@ throughout.
 
 ### Added
 
-- **Cross-player swarms.** Segment identity is derived from the manifest — the
-  HLS media sequence number, or the DASH presentation time in 100 ms units — so
-  an HLS.js peer, a Shaka peer and a Video.js peer on the same rendition of the
-  same stream exchange segments. A rendition is still a swarm: engines left on
-  their own adaptive logic may sit in different ones.
+- **Identity is computed in the core, from the manifest** — the HLS media
+  sequence number, or the DASH presentation time in 100 ms units — rather than
+  by each integration out of what its player exposes. Peers on different
+  players derive the same identity for the same segment, so a swarm shared
+  between players holds in practice. A rendition is still a swarm: engines left
+  on their own adaptive logic may sit in different ones.
+- **The HLS.js and Shaka integrations need much less of their players' APIs.**
+  Neither describes streams or segments any more, so neither decorates a
+  manifest parser nor reads its player's internal representation of the stream.
+  That reduction is what made the dash.js and Video.js adapters below
+  straightforward to write.
 - **`p2p-media-loader-dashjs`.** dash.js gets an adapter of its own.
   `bindPlayer(player)` before `player.initialize()`.
 - **`p2p-media-loader-videojs`.** Video.js 8 plays both protocols through VHS;
@@ -52,8 +58,6 @@ throughout.
   `p2p-media-loader-core/dash` subpaths, so a deployment carries only the
   parsers it uses. Prebuilt bundles follow: `p2p-media-loader-core.es.min.js`
   carries both, `-hls` and `-dash` carry one.
-- **Shaka Player 4.3 and later** as well as 5. The adapter uses only the
-  networking plugin API, which both share.
 
 ### Changed
 
