@@ -55,6 +55,14 @@ to its peers as it starts (the announcement carries segments in flight as
 well as segments held). Everyone else waits for that announcement and takes
 the segment over P2P once it is held.
 
+The scoring is rendezvous hashing, or highest random weight: weigh every
+candidate with a hash of the candidate and the key, take the extremum — the
+lowest score, here — and read the order of the rest as the fallbacks. Its classical
+form weighs one membership list every participant shares, and
+arrives at one winner; a peer here weighs only itself and its neighbours, so
+what it finds is a local minimum instead, which is what the third property
+below counts.
+
 The decision is local: a peer needs only its own connections, never the whole
 swarm. Yet it gives, in any topology:
 
