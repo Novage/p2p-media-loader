@@ -80,22 +80,13 @@ export const PlaybackOptions = ({
           defaultValue={currentPlayer}
           onChange={handlePlayerChange}
         >
-          <optgroup label="HLS.js P2P Engine (HLS Only)">
+          <optgroup label="HLS.js P2P Engine (HLS only)">
             {Object.entries(hlsPlayers).map(([key, name]) => (
               <option key={key} value={key}>
                 {name}
               </option>
             ))}
           </optgroup>
-          {Object.keys(shakaPlayers).length > 0 && (
-            <optgroup label="Shaka Player P2P Engine (HLS & DASH)">
-              {Object.entries(shakaPlayers).map(([key, name]) => (
-                <option key={key} value={key}>
-                  {name}
-                </option>
-              ))}
-            </optgroup>
-          )}
           {Object.keys(dashjsPlayers).length > 0 && (
             <optgroup label="dash.js P2P Engine (DASH only)">
               {Object.entries(dashjsPlayers).map(([key, name]) => (
@@ -105,8 +96,17 @@ export const PlaybackOptions = ({
               ))}
             </optgroup>
           )}
+          {Object.keys(shakaPlayers).length > 0 && (
+            <optgroup label="Shaka Player P2P Engine (HLS & DASH)">
+              {Object.entries(shakaPlayers).map(([key, name]) => (
+                <option key={key} value={key}>
+                  {name}
+                </option>
+              ))}
+            </optgroup>
+          )}
           {Object.keys(videojsPlayers).length > 0 && (
-            <optgroup label="Video.js 8 P2P Engine (HLS & DASH)">
+            <optgroup label="Video.js 8 VHS P2P Engine (HLS & DASH)">
               {Object.entries(videojsPlayers).map(([key, name]) => (
                 <option key={key} value={key}>
                   {name}

@@ -20,7 +20,7 @@ export const PLAYERS = {
   dplayer_dashjs: "DPlayer",
   plyr_dashjs: "Plyr",
   mediaElement_dashjs: "MediaElement",
-  videojs: "Video.js 8",
+  videojs: "Video.js 8 (raw)",
 } as const;
 // The live streams specs/verification.md lists. Every variant a master
 // advertises has to exist, or the player errors on startup.
@@ -31,15 +31,25 @@ const DEFAULT_DASH_STREAM =
   "https://livesim2.dashif.org/livesim2/testpic4_8s/Manifest.mpd";
 
 /**
- * The stream a player can actually play: dash.js players get the DASH default
- * in place of an HLS URL, HLS.js players the HLS default in place of an MPD.
- * Shaka plays both and keeps whatever was given, as does any URL whose
- * protocol the extension does not reveal.
+ * Players that take MPEG-DASH alone, though the engine behind them plays both.
+ * Clappr reaches Shaka through the `dash-shaka-playback` plugin, which claims
+ * an MPD and leaves an HLS URL to Clappr's own HTML5 playback — where the
+ * engine never sees a request.
+ */
+const DASH_ONLY_PLAYERS = new Set<string>(["clappr_shaka"]);
+
+/**
+ * The stream a player can actually play: dash.js players and the DASH-only
+ * ones above get the DASH default in place of an HLS URL, HLS.js players the
+ * HLS default in place of an MPD. Shaka otherwise plays both and keeps
+ * whatever was given, as does any URL whose protocol the extension does not
+ * reveal.
  */
 export function compatibleStreamUrl(player: string, streamUrl: string) {
   const isDash = /\.mpd(\?|#|$)/i.test(streamUrl);
   const isHls = /\.m3u8(\?|#|$)/i.test(streamUrl);
-  if (player.includes("dashjs") && isHls) return DEFAULT_DASH_STREAM;
+  const isDashOnly = player.includes("dashjs") || DASH_ONLY_PLAYERS.has(player);
+  if (isDashOnly && isHls) return DEFAULT_DASH_STREAM;
   if (player.includes("hls") && isDash) return DEFAULT_STREAM;
   return streamUrl;
 }
