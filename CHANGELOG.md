@@ -122,10 +122,7 @@ throughout.
   no master to be ignored. An MPD's text, thumbnail and trick-mode
   `AdaptationSet`s are left out where it is read. Leaving a trick-mode set out
   also changes the identity of a video rung it matched in codecs and
-  resolution — `bitrate` no longer has to tell the two apart — so on such an
-  MPD, 5.0.0-alpha peers sit in a different swarm. The protocol stays `v3`: a
-  pre-release is not a compatibility target ([`AGENTS.md`](AGENTS.md), "The
-  peer protocol is a contract"). See
+  resolution, since `bitrate` no longer has to tell the two apart. See
   [`specs/manifest-registry.md`](specs/manifest-registry.md).
 - **HLS alternate video renditions are declared streams.** An
   `EXT-X-MEDIA TYPE=VIDEO` rendition with a playlist of its own — a camera
