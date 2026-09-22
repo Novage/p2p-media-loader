@@ -1,3 +1,4 @@
+import debug from "debug";
 import {
   PeerError,
   TrackerError,
@@ -72,6 +73,18 @@ export class WebTorrentManager {
   readonly #connectingPeers = new Set<string>();
   readonly #connectedPeers = new Map<string, ConnectedPeer>();
 
+  /**
+   * Which peer ids this manager holds, and why it turns one away. A peer id
+   * kept here after its connection is gone can never be admitted again, so
+   * every admission and every close is logged with the sizes behind the
+   * decision. Enable with localStorage.debug = "p2pml-core:tracker".
+   */
+  readonly #logger = debug("p2pml-core:tracker");
+
+  #held(): string {
+    return `held ${this.#connectedPeers.size} connected, ${this.#connectingPeers.size} connecting`;
+  }
+
   readonly #clients = new Set<{
     client: WebTorrentClient;
     releaseSocket: () => void;
@@ -88,6 +101,10 @@ export class WebTorrentManager {
       this.#connectingPeers.has(remotePeerId) ||
       this.#connectedPeers.has(remotePeerId)
     ) {
+      this.#logger(
+        `turned away ${remotePeerId.slice(-6)}: already %s (${this.#held()})`,
+        this.#connectedPeers.has(remotePeerId) ? "connected" : "connecting",
+      );
       return false;
     }
 
@@ -99,6 +116,9 @@ export class WebTorrentManager {
         Math.max(1.0, this.#config.maxPeersMultiplier()),
     );
     if (this.#connectingPeers.size + this.#connectedPeers.size >= hardLimit) {
+      this.#logger(
+        `turned away ${remotePeerId.slice(-6)}: at the hard limit of ${hardLimit} (${this.#held()})`,
+      );
       return false;
     }
 
@@ -294,6 +314,9 @@ export class WebTorrentManager {
     // Synchronously extract from map first to prevent re-entrant double-fire
     // if close() synchronously triggers event listeners.
     this.#connectedPeers.delete(peerId);
+    this.#logger(
+      `released ${peerId.slice(-6)}: ${cause.error?.message ?? cause.disconnectReason} (${this.#held()})`,
+    );
 
     connected.cleanup();
     try {
@@ -320,6 +343,9 @@ export class WebTorrentManager {
     trackerUrl: string,
   ): void {
     if (isTerminalConnectionState(connection.iceConnectionState)) {
+      this.#logger(
+        `${peerId.slice(-6)} was already ${connection.iceConnectionState} when it reached the manager`,
+      );
       try {
         connection.close();
       } catch {
@@ -390,6 +416,7 @@ export class WebTorrentManager {
       trackerUrl,
       cleanup,
     });
+    this.#logger(`holding ${peerId.slice(-6)} (${this.#held()})`);
 
     connection.addEventListener(
       "iceconnectionstatechange",

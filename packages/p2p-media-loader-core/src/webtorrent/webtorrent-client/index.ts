@@ -1,3 +1,4 @@
+import debug from "debug";
 import { EventTarget } from "../../utils/event-target.js";
 import { getPromiseWithResolvers } from "../../utils/utils.js";
 import { isTerminalConnectionState } from "../utils.js";
@@ -114,6 +115,19 @@ export class WebTorrentClient {
   #nextAnnounceEvent: "started" | undefined = undefined;
   #trackerId: string | null = null;
   #started = false;
+  /**
+   * Signaling is where a peer that dropped either finds its way back into the
+   * swarm or silently fails to: an announce that carried no offers, an offer
+   * the manager refused, an answer for an offer that had already expired. None
+   * of it shows anywhere else, so each step logs. Enable with
+   * localStorage.debug = "p2pml-core:tracker".
+   */
+  readonly #logger = debug("p2pml-core:tracker");
+
+  /** The swarm and peer this client speaks for, short enough to read. */
+  get #who(): string {
+    return `${this.#config.infoHash.slice(0, 8)}/${this.#config.peerId.slice(-6)}`;
+  }
 
   #isDestroyed(): boolean {
     return this.#destroyAbortController.signal.aborted;
@@ -198,6 +212,7 @@ export class WebTorrentClient {
   }
 
   #onWsConnected = (): void => {
+    this.#logger(`${this.#who} tracker socket connected`);
     // Setup a fallback interval in case the tracker doesn't provide one
     this.#scheduleAnnounce(WebTorrentClient.#DEFAULT_ANNOUNCE_INTERVAL_SECONDS);
 
@@ -217,6 +232,9 @@ export class WebTorrentClient {
   };
 
   #onWsDisconnected = (): void => {
+    this.#logger(
+      `${this.#who} tracker socket lost; announces stop until it is back`,
+    );
     this.#clearAnnounceTimeout();
     this.#announceIntervalSeconds = null;
   };
@@ -276,6 +294,9 @@ export class WebTorrentClient {
         interval,
       );
       if (this.#announceIntervalSeconds !== safeInterval) {
+        this.#logger(
+          `${this.#who} tracker asks for an announce every ${safeInterval}s; nothing re-announces sooner, so a lost peer waits up to that long`,
+        );
         this.#scheduleAnnounce(safeInterval);
       }
     }
@@ -390,6 +411,14 @@ export class WebTorrentClient {
     const promise = (async () => {
       const shouldGenerateOffers = this.#config.shouldGenerateOffers();
       const offersCount = shouldGenerateOffers ? this.#config.offersCount() : 0;
+      if (!shouldGenerateOffers) {
+        // A peer at its own peer limit announces to keep its place in the
+        // swarm and can only be dialled, never dial: it will not reconnect to
+        // anyone by itself.
+        this.#logger(
+          `${this.#who} announce with no offers: the peer limit is reached, so this peer can only accept`,
+        );
+      }
 
       // Generate offers in parallel to avoid sequential ICE gathering latency.
       // Each #createOffer() internally catches its own errors and returns
@@ -434,6 +463,10 @@ export class WebTorrentClient {
         }
         return;
       }
+
+      this.#logger(
+        `${this.#who} announce${currentEvent ? ` "${currentEvent}"` : ""} with ${offers.length} of ${offersCount} offers`,
+      );
 
       try {
         this.#wsClient.send(JSON.stringify(payload));
@@ -579,8 +612,15 @@ export class WebTorrentClient {
     if (this.#isDestroyed()) return;
 
     if (!this.#config.claimPeer(remotePeerId)) {
-      return; // Reject offer silently
+      this.#logger(
+        `${this.#who} refused an offer from ${remotePeerId.slice(-6)}: the manager already holds that peer id`,
+      );
+      return;
     }
+
+    this.#logger(
+      `${this.#who} answering an offer from ${remotePeerId.slice(-6)}`,
+    );
 
     let pc: RTCPeerConnection | undefined;
     try {
@@ -618,6 +658,7 @@ export class WebTorrentClient {
       const channel = await this.#waitForConnection(pc);
       this.#throwIfDestroyed();
 
+      this.#logger(`${this.#who} connected to ${remotePeerId.slice(-6)}`);
       this.#eventTarget.dispatchEvent("peerConnected", {
         peerId: remotePeerId,
         connection: pc,
@@ -628,6 +669,9 @@ export class WebTorrentClient {
       // Always dispatch peerConnectFailed so the Manager can release the peer
       // from #connectingPeers. Safe to call after destroy: event target is
       // already cleared, making the dispatch a no-op.
+      this.#logger(
+        `${this.#who} failed to connect to ${remotePeerId.slice(-6)}: ${err instanceof Error ? err.message : String(err)}`,
+      );
       this.#eventTarget.dispatchEvent("peerConnectFailed", {
         peerId: remotePeerId,
         error: new PeerConnectError(
@@ -649,15 +693,23 @@ export class WebTorrentClient {
     if (this.#isDestroyed()) return;
 
     const pending = this.#pendingOffers.get(ourOfferId);
-    if (!pending) return; // Offer expired or invalid
+    if (!pending) {
+      this.#logger(
+        `${this.#who} dropped an answer from ${remotePeerId.slice(-6)}: offer ${ourOfferId.slice(-6)} had already expired or was never ours`,
+      );
+      return;
+    }
 
     // Stop tracking it as pending
     this.#pendingOffers.delete(ourOfferId);
     clearTimeout(pending.timeoutId);
 
     if (!this.#config.claimPeer(remotePeerId)) {
+      this.#logger(
+        `${this.#who} refused an answer from ${remotePeerId.slice(-6)}: the manager already holds that peer id`,
+      );
       pending.connection.close();
-      return; // Reject answer silently
+      return;
     }
 
     this.#negotiatingConnections.add(pending.connection);
@@ -675,6 +727,7 @@ export class WebTorrentClient {
       );
       this.#throwIfDestroyed();
 
+      this.#logger(`${this.#who} connected to ${remotePeerId.slice(-6)}`);
       this.#eventTarget.dispatchEvent("peerConnected", {
         peerId: remotePeerId,
         connection: pending.connection,
@@ -685,6 +738,9 @@ export class WebTorrentClient {
       // Always dispatch peerConnectFailed so the Manager can release the peer
       // from #connectingPeers. Safe to call after destroy: event target is
       // already cleared, making the dispatch a no-op.
+      this.#logger(
+        `${this.#who} failed to connect to ${remotePeerId.slice(-6)}: ${err instanceof Error ? err.message : String(err)}`,
+      );
       this.#eventTarget.dispatchEvent("peerConnectFailed", {
         peerId: remotePeerId,
         error: new PeerConnectError(
