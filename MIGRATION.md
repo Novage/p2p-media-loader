@@ -142,10 +142,43 @@ URL for HLS, the Representation id for DASH. The `onStreamRegistrationError`
 event keeps its shape; it fires once per failing stream, only for
 `streamSwarmIdBuilder` failures.
 
+### `highDemandTimeWindow`
+
+`StreamConfig.highDemandTimeWindow` is `number | undefined` and defaults to
+`undefined`, which derives the window: 15 s on VOD, and on live half of what
+the player buffers, from the live window (see
+`specs/playback-contract.md`, "The time windows"). Code that reads
+`getConfig().mainStream.highDemandTimeWindow` as a number must handle
+`undefined`.
+
+**Setting a number does not reproduce v4**, and on a live stream it should be
+left unset. In v4 the number sized both the core's urgent window and the
+player's forward buffer, which is why the two collided; in v5 the buffer
+follows the live window's geometry, so on live the configured number is only a
+ceiling — it narrows the derived window and is ignored where it would reach
+past half the player's buffer. Carrying v4's `highDemandTimeWindow: 15` onto a
+short live window therefore buys nothing, and leaving it unset is what gives
+the election room. Off live the number is still the window.
+
+A **custom `SegmentStorage`** is handed the same value: `initialize` receives
+the configured stream configurations, so `mainStreamConfig.highDemandTimeWindow`
+is `undefined` unless an integrator set one. This type-checks unchanged, and
+fails silently at runtime — `undefined + endTime` is `NaN`, and
+`position <= NaN` is false — so a storage that carried over the v4 retention
+rule `position <= highDemandTimeWindow + endTime` drops every segment the
+playhead has passed and stops seeding the trailing window. Measure retention in
+the segment's own length instead, as the bundled storage now does: it keeps
+three segment lengths behind the playhead, independent of any configured
+window. Where the effective window is genuinely wanted, `highDemandWindowFor`
+is exported.
+
 ### New APIs
 
 - `CoreConfig.manifestParsers` and the `p2p-media-loader-core/hls` and
   `p2p-media-loader-core/dash` subpaths.
+- `liveDelayForSegments`, `playerBufferFor`, `highDemandWindowFor` and
+  `DEFAULT_HIGH_DEMAND_TIME_WINDOW` — the live window geometry the core
+  schedules by and the adapters size the player's buffer with.
 - `Core.processManifest({ url, requestedUrl?, data, protocol? })`, returning what the
   manifest described per stream.
 - `Core.isSegmentIndex(url, byteRange?)` and

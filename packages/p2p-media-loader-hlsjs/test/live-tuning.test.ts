@@ -42,6 +42,8 @@ function levelUpdated(
     totalduration: number;
     averagetargetduration?: number;
     targetduration?: number;
+    /** How many fragments the playlist lists; by default, what fills the window. */
+    fragments?: number;
   },
 ) {
   const segment = details.averagetargetduration ?? 2;
@@ -52,7 +54,11 @@ function levelUpdated(
       targetduration: details.targetduration ?? 6,
       averagetargetduration: details.averagetargetduration,
       fragments: Array.from(
-        { length: Math.max(5, Math.round(details.totalduration / segment)) },
+        {
+          length:
+            details.fragments ??
+            Math.max(5, Math.round(details.totalduration / segment)),
+        },
         () => ({ type: "main" }),
       ),
     },
@@ -99,7 +105,8 @@ function setup(config?: ConstructorParameters<typeof HlsJsP2PEngine>[0]) {
 describe("HLS.js live window placement", () => {
   it("places the player one segment inside the tail, re-syncing two segments beyond", () => {
     const { hls } = setup();
-    // A 28 s window of 2 s segments: target 26, re-sync past 30.
+    // A 28 s window of 2 s segments: target 26, re-sync past 30, and the
+    // buffer a segment short of the target.
     levelUpdated(hls, {
       live: true,
       totalduration: 28,
@@ -107,7 +114,188 @@ describe("HLS.js live window placement", () => {
     });
     expect(hls.config.liveSyncDuration).toBe(26);
     expect(hls.config.liveMaxLatencyDuration).toBe(30);
+    expect(hls.config.maxBufferLength).toBe(24);
+    expect(hls.config.maxMaxBufferLength).toBe(24);
+  });
+
+  it("tunes a four-segment playlist, the narrowest window with room in it", () => {
+    const { hls } = setup();
+    // Four 5 s segments: the playhead 15 s behind the edge and the buffer
+    // 10 s ahead of it, so the core's window of half that leaves 5 s for
+    // peers.
+    levelUpdated(hls, {
+      live: true,
+      totalduration: 20,
+      averagetargetduration: 5,
+      fragments: 4,
+    });
+    expect(hls.config.liveSyncDuration).toBe(15);
+    expect(hls.config.maxBufferLength).toBe(10);
+  });
+
+  it("leaves a three-segment playlist alone", () => {
+    const { hls } = setup();
+    levelUpdated(hls, {
+      live: true,
+      totalduration: 15,
+      averagetargetduration: 5,
+      fragments: 3,
+    });
+    expect(hls.config.liveSyncDuration).toBeUndefined();
+    expect(hls.config.maxBufferLength).toBe(30);
+  });
+
+  it("sizes the live buffer from the window, not from a configured high-demand window", () => {
+    const { hls } = setup({ core: { highDemandTimeWindow: 3 } });
+    levelUpdated(hls, {
+      live: true,
+      totalduration: 28,
+      averagetargetduration: 2,
+    });
+    expect(hls.config.maxBufferLength).toBe(24);
+  });
+
+  it("gives the buffer back when the live window grows", () => {
+    // A channel whose DVR window is still filling: four 5 s segments now,
+    // five minutes of them later. Held at the narrow window's 10 s, the
+    // player would buffer less than the 15 s the core calls high-demand on
+    // the wide one, and every segment would be urgent on arrival.
+    const { hls } = setup();
+    levelUpdated(hls, {
+      live: true,
+      totalduration: 20,
+      averagetargetduration: 5,
+      fragments: 4,
+    });
+    expect(hls.config.maxBufferLength).toBe(10);
+
+    levelUpdated(hls, {
+      live: true,
+      totalduration: 300,
+      averagetargetduration: 5,
+    });
+    expect(hls.config.liveSyncDuration).toBe(60);
+    // The window asks for 55 s; HLS.js's own 30 s is the ceiling this engine
+    // never raises past, and it is well clear of the high-demand window.
+    expect(hls.config.maxBufferLength).toBe(30);
+    expect(hls.config.maxMaxBufferLength).toBe(55);
+  });
+
+  it("gives the buffer back when it lets the player go", () => {
+    // An integrator who turns P2P off keeps the player. A ceiling left
+    // behind would hold it to a live window it no longer has an engine for.
+    const { hls, engine } = setup();
+    levelUpdated(hls, {
+      live: true,
+      totalduration: 20,
+      averagetargetduration: 5,
+      fragments: 4,
+    });
+    expect(hls.config.maxBufferLength).toBe(10);
+    expect(hls.config.maxMaxBufferLength).toBe(10);
+
+    engine.destroy();
+
+    expect(hls.config.maxBufferLength).toBe(30);
+    expect(hls.config.maxMaxBufferLength).toBe(600);
+  });
+
+  it("leaves a buffer written from outside as it is when letting the player go", () => {
+    const { hls, engine } = setup();
+    levelUpdated(hls, {
+      live: true,
+      totalduration: 20,
+      averagetargetduration: 5,
+      fragments: 4,
+    });
+    // Their word, after this engine wrote its own.
+    hls.config.maxBufferLength = 12;
+
+    engine.destroy();
+
+    expect(hls.config.maxBufferLength).toBe(12);
+    expect(hls.config.maxMaxBufferLength).toBe(600);
+  });
+
+  it("brings a buffer raised from outside back down", () => {
+    const { hls } = setup();
+    levelUpdated(hls, {
+      live: true,
+      totalduration: 28,
+      averagetargetduration: 2,
+    });
+    expect(hls.config.maxBufferLength).toBe(24);
+
+    // Raised from outside while the window held still. A ceiling is only a
+    // ceiling while it is enforced.
+    hls.config.maxBufferLength = 40;
+    levelUpdated(hls, {
+      live: true,
+      totalduration: 28,
+      averagetargetduration: 2,
+    });
+    expect(hls.config.maxBufferLength).toBe(24);
+  });
+
+  it("keeps a buffer lowered from outside, and never raises past it", () => {
+    const { hls } = setup();
+    levelUpdated(hls, {
+      live: true,
+      totalduration: 28,
+      averagetargetduration: 2,
+    });
+
+    // Below every ceiling this stream calls for: theirs, and kept — on the
+    // window that prompted it and on the wider one after it.
+    hls.config.maxBufferLength = 6;
+    levelUpdated(hls, {
+      live: true,
+      totalduration: 28,
+      averagetargetduration: 2,
+    });
+    expect(hls.config.maxBufferLength).toBe(6);
+
+    levelUpdated(hls, {
+      live: true,
+      totalduration: 300,
+      averagetargetduration: 5,
+    });
+    expect(hls.config.maxBufferLength).toBe(6);
+  });
+
+  it("sizes the VOD buffer by the widest window either stream actually uses", () => {
+    // Only the main stream is configured; the secondary is left to derive,
+    // which off live is the 15 s default. A buffer sized by the configured
+    // number alone would leave every audio segment high-demand on arrival.
+    const { hls } = setup({
+      core: { mainStream: { highDemandTimeWindow: 3 } },
+    });
+    levelUpdated(hls, {
+      live: false,
+      totalduration: 600,
+      averagetargetduration: 2,
+    });
     expect(hls.config.maxBufferLength).toBe(15);
+  });
+
+  it("holds the buffer to the high-demand window off live", () => {
+    // VOD: the core prefetches ahead of the player however far it buffers,
+    // so the player is held to the window and the core does the rest.
+    const { hls } = setup();
+    levelUpdated(hls, {
+      live: false,
+      totalduration: 600,
+      averagetargetduration: 2,
+    });
+    expect(hls.config.maxBufferLength).toBe(15);
+
+    const configured = setup({ core: { highDemandTimeWindow: 20 } });
+    levelUpdated(configured.hls, {
+      live: false,
+      totalduration: 600,
+      averagetargetduration: 2,
+    });
+    expect(configured.hls.config.maxBufferLength).toBe(20);
   });
 
   it("never asks for more than a minute of latency", () => {
@@ -209,12 +397,13 @@ describe("HLS.js live window placement", () => {
   });
 
   it("holds the forward buffer to the average segment, not EXT-X-TARGETDURATION", () => {
-    // 2 s segments under a 6 s target duration, and a high-demand window
-    // narrower than either floor would be: the floor is two real segments.
-    const { hls } = setup({ core: { highDemandTimeWindow: 3 } });
+    // 2 s segments under a 6 s target duration, in a window so narrow that
+    // the floor of two segments decides: two real segments, not two target
+    // durations.
+    const { hls } = setup();
     levelUpdated(hls, {
       live: true,
-      totalduration: 28,
+      totalduration: 8,
       averagetargetduration: 2,
       targetduration: 6,
     });

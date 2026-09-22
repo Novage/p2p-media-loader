@@ -16,7 +16,15 @@ import * as QueueUtils from "./utils/queue.js";
 import * as LoggerUtils from "./utils/logger.js";
 import * as Utils from "./utils/utils.js";
 import * as ElectionUtils from "./utils/election.js";
-import { getDistanceFromPlayhead } from "./utils/stream.js";
+import {
+  getDistanceFromPlayhead,
+  PlaybackTimeWindowsConfig,
+} from "./utils/stream.js";
+import {
+  highDemandWindowFor,
+  playerBufferFor,
+  type LiveDelay,
+} from "./live-delay.js";
 import debug from "debug";
 import { QueueItem } from "./utils/queue.js";
 import { EventTarget } from "./utils/event-target.js";
@@ -49,6 +57,8 @@ export class HybridLoader {
   private readonly segmentBytesByStream = new Map<string, number>();
   private initialHttpDelayTimeoutId?: number;
   private isProcessQueueMicrotaskCreated = false;
+  /** The high-demand window last logged, so the log says when it moves. */
+  private loggedWindow?: { highDemand: number; source: string };
   private destroyed = false;
   /**
    * The engine request the storage is answering, while it is: this loader's
@@ -427,12 +437,19 @@ export class HybridLoader {
       const { segment } = engineRequest;
       const request = this.requests.get(segment);
 
+      // With no peer connected there is nobody to take the segment from and
+      // no election to fetch it over HTTP: the player's request beyond the
+      // high-demand window — the player buffers further than the window on
+      // live, so that peers have room — would otherwise wait for the window
+      // to reach it.
+      const noPeers = this.p2pLoaders.currentLoader.connectedPeerCount === 0;
+
       // Not while the storage is answering it: the request is this loader's
       // from before the read so that an abort meanwhile finds it, and a
       // download started for it here would run beside the bytes the storage
       // is about to hand over.
       const shouldStartLoadImmediatelyEngineRequest =
-        engineRequest.shouldBeStartedImmediately &&
+        (engineRequest.shouldBeStartedImmediately || noPeers) &&
         engineRequest.status === "pending" &&
         engineRequest !== this.readingFromStorage &&
         (!request ||
@@ -604,11 +621,9 @@ export class HybridLoader {
       capacityPercent ?? this.getAvailableStorageCapacityPercent();
     if (availableStorageCapacityPercent <= 10) return;
 
-    const {
-      simultaneousHttpDownloads,
-      httpErrorRetries,
-      highDemandTimeWindow,
-    } = this.config;
+    const { simultaneousHttpDownloads, httpErrorRetries } = this.config;
+    const timeWindows = this.timeWindows();
+    const { highDemandTimeWindow } = timeWindows;
     const peerIds = Array.from(p2pLoader.connectedPeerIds);
 
     const items =
@@ -616,7 +631,7 @@ export class HybridLoader {
       QueueUtils.generateQueue(
         this.lastRequestedSegment,
         this.playback,
-        this.config,
+        timeWindows,
         p2pLoader,
         availableStorageCapacityPercent,
       );
@@ -735,6 +750,81 @@ export class HybridLoader {
     return 100 - (usedCapacity / totalCapacity) * 100;
   }
 
+  /**
+   * The windows a pass schedules by. The high-demand window is derived from
+   * the live placement where none is configured — the nearer half of what the
+   * player buffers, see `highDemandWindowFor` — and the derivation is logged
+   * when it first resolves and whenever it moves, so a stream that shares
+   * little can be read against the geometry it was scheduled on.
+   */
+  private timeWindows(): PlaybackTimeWindowsConfig {
+    const {
+      highDemandTimeWindow: configured,
+      httpDownloadTimeWindow,
+      p2pDownloadTimeWindow,
+    } = this.config;
+    const target = this.streamDetails.isLive
+      ? this.streamDetails.liveTarget
+      : undefined;
+    const highDemandTimeWindow = highDemandWindowFor(configured, target);
+    this.logTimeWindow(highDemandTimeWindow, configured, target);
+    return {
+      highDemandTimeWindow,
+      httpDownloadTimeWindow,
+      p2pDownloadTimeWindow,
+    };
+  }
+
+  /**
+   * Says where the window came from, not merely whether a number was
+   * configured: on live the geometry caps what an integrator asks for, and
+   * this line is the only place that is visible. Reporting a capped window as
+   * theirs is what would send someone looking for the bug in their own
+   * configuration.
+   */
+  private logTimeWindow(
+    highDemand: number,
+    configured: number | undefined,
+    target: LiveDelay | undefined,
+  ) {
+    const seconds = (value: number) => Number(value.toFixed(2));
+    // `highDemandWindowFor` returns the configured number itself where it
+    // stands, so anything else is the geometry having capped it.
+    let source: string;
+    if (configured === undefined) source = target ? "derived" : "default";
+    else if (highDemand === configured) source = "configured";
+    else source = `configured ${seconds(configured)}s, capped by the window`;
+
+    const last = this.loggedWindow;
+    // Segment durations are not exact multiples, so a derived window drifts
+    // by fractions of a second between refreshes; only half a segment is a
+    // change of the window itself.
+    const tolerance = target ? target.segment / 2 : 0;
+    if (
+      last?.source === source &&
+      Math.abs(last.highDemand - highDemand) <= tolerance
+    ) {
+      return;
+    }
+    this.loggedWindow = { highDemand, source };
+    if (target) {
+      this.logger(
+        "high-demand window %ss (%s): live delay %ss, segment %ss, player buffer %ss",
+        seconds(highDemand),
+        source,
+        seconds(target.delay),
+        seconds(target.segment),
+        seconds(playerBufferFor(target)),
+      );
+    } else {
+      this.logger(
+        "high-demand window %ss (%s), no live window",
+        seconds(highDemand),
+        source,
+      );
+    }
+  }
+
   private generateQueue() {
     this.syncPlayback();
     const queue: QueueItem[] = [];
@@ -747,7 +837,7 @@ export class HybridLoader {
     for (const item of QueueUtils.generateQueue(
       this.lastRequestedSegment,
       this.playback,
-      this.config,
+      this.timeWindows(),
       this.p2pLoaders.currentLoader,
       availableStorageCapacityPercent,
     )) {

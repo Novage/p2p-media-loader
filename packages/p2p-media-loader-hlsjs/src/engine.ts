@@ -15,7 +15,9 @@ import {
   DynamicCoreConfig,
   debug,
   DefinedCoreConfig,
+  highDemandWindowFor,
   liveDelayFromWindow,
+  playerBufferFor,
   runAll,
   trackMediaElementPlayback,
 } from "p2p-media-loader-core";
@@ -65,6 +67,13 @@ export type HlsWithP2PConfig<HlsType extends abstract new () => unknown> =
  * or stalls is brought back to the target before the buffer starves.
  */
 const LIVE_RESYNC_MARGIN_SEGMENTS = 2;
+/** Fewest fragments a playlist needs before its window is worth tuning for. */
+const MIN_TUNABLE_FRAGMENTS = 4;
+
+/** The two HLS.js settings that bound how far ahead of the playhead it fetches. */
+const FORWARD_BUFFER_KEYS = ["maxBufferLength", "maxMaxBufferLength"] as const;
+
+type ForwardBufferKey = (typeof FORWARD_BUFFER_KEYS)[number];
 
 /**
  * Represents a Peer-to-Peer (P2P) engine for HLS (HTTP Live Streaming) to enhance media streaming efficiency.
@@ -109,6 +118,22 @@ export class HlsJsP2PEngine {
     }
     this.core.updatePlayback(state);
   });
+  /**
+   * What this engine last wrote under each forward-buffer key, and what the
+   * player holds that it did not write.
+   *
+   * The ceiling moves with the live window, which on a channel whose DVR
+   * window is still filling grows refresh by refresh. Writing only downwards
+   * would latch the buffer at the narrowest window ever seen, leaving the
+   * player buffering less than the core's high-demand window — the very
+   * failure the ceiling exists to prevent. So what this engine wrote is
+   * recognisable as its own and moves in either direction, while a value
+   * written from outside is somebody else's latest word and caps it.
+   */
+  private forwardBuffer?: {
+    held: Record<ForwardBufferKey, number>;
+    applied: Partial<Record<ForwardBufferKey, number>>;
+  };
   private readonly debug = debug("p2pml-hlsjs:engine");
   // See HybridLoader.oracleLogger: logs media.currentTime beside the core's
   // estimate, so the two can be compared when the playhead is in doubt.
@@ -278,6 +303,9 @@ export class HlsJsP2PEngine {
     // playlist loader, where a throw would abort the new source's manifest
     // request, so the failure is logged here rather than raised; `destroy()`
     // called by the integrator raises it.
+    // Letting the previous instance go gives back what was written to it,
+    // ledger and all; what the next one holds is read when its first playlist
+    // arrives.
     const failures = this.currentHlsInstance ? runAll([this.destroy]) : [];
     this.currentHlsInstance = hlsInstance;
     this.updateHlsEventsHandlers("register");
@@ -331,9 +359,12 @@ export class HlsJsP2PEngine {
    * redundant with the one on length beside it.
    */
   private handleLevelUpdated = (event: string, data: LevelUpdatedData) => {
+    // Four segments is the narrowest live window worth placing: the buffer
+    // sits a segment short of the delay, and the delay a segment inside the
+    // tail, so with three there is nothing left between them for peers.
     if (
       this.currentHlsInstance &&
-      data.details.fragments.length > 4 &&
+      data.details.fragments.length >= MIN_TUNABLE_FRAGMENTS &&
       data.details.fragments[0].type === ("main" as PlaylistLevelType)
     ) {
       // `EXT-X-TARGETDURATION` is an upper bound, on some streams several
@@ -347,7 +378,10 @@ export class HlsJsP2PEngine {
         userConfig.maxBufferLength === undefined &&
         userConfig.maxMaxBufferLength === undefined
       ) {
-        this.updateMaxBufferLength(segment);
+        this.updateMaxBufferLength(
+          segment,
+          data.details.live ? data.details.totalduration : undefined,
+        );
       }
     }
   };
@@ -406,36 +440,71 @@ export class HlsJsP2PEngine {
     }
   }
 
-  private updateMaxBufferLength(fragmentDuration: number) {
+  /**
+   * How far ahead of the playhead HLS.js may fetch — `maxBufferLength` is
+   * that, in seconds. On a live window it is held a segment short of the live
+   * delay, by the rule every adapter shares: the core calls the nearer half of
+   * that buffer high-demand and leaves the farther half for peers to fill
+   * before the player asks. On VOD it is held to the high-demand window, with
+   * a floor of two fragments for a player that could not otherwise keep
+   * going: the core's prefetch runs ahead of the player there whatever the
+   * player buffers, since nothing bounds the stream ahead.
+   *
+   * Each setting is a ceiling, not a target: what HLS.js or the integrator
+   * holds below it is left alone, and the ceiling itself is never raised
+   * above that. Because the window can grow, a ceiling this engine wrote is
+   * given back up to it as well as taken down.
+   *
+   * @param fragmentDuration - The playlist's average fragment length.
+   * @param liveWindow - The live window's length, or `undefined` off live.
+   */
+  private updateMaxBufferLength(
+    fragmentDuration: number,
+    liveWindow: number | undefined,
+  ) {
     if (!this.currentHlsInstance) return;
 
-    const config = this.core.getConfig();
-    const highDemandTimeWindow = Math.max(
-      config.mainStream.highDemandTimeWindow,
-      config.secondaryStream.highDemandTimeWindow,
-    );
-    // HLS.js's maxBufferLength is how many seconds AHEAD OF THE PLAYHEAD it
-    // buffers. Held to the high-demand window so the background loader does the
-    // advance fetching, with a floor of two fragments for a player that could
-    // not otherwise keep going.
-    const p2pOptimalBufferLength = Math.max(
-      fragmentDuration * 2,
-      highDemandTimeWindow,
-    );
-
-    if (
-      this.currentHlsInstance.config.maxBufferLength > p2pOptimalBufferLength
-    ) {
-      this.debug(`Setting maxBufferLength to ${p2pOptimalBufferLength}`);
-      this.currentHlsInstance.config.maxBufferLength = p2pOptimalBufferLength;
+    let p2pOptimalBufferLength: number;
+    if (liveWindow !== undefined && liveWindow > 0 && fragmentDuration > 0) {
+      p2pOptimalBufferLength = playerBufferFor({
+        delay: liveDelayFromWindow(liveWindow, fragmentDuration),
+        segment: fragmentDuration,
+      });
+    } else {
+      // What each stream's loader will actually schedule by, not what was
+      // configured: a stream left unconfigured derives the default off live,
+      // and a buffer sized under it would leave that stream's segments
+      // high-demand the moment the player asks for them.
+      const { mainStream, secondaryStream } = this.core.getConfig();
+      p2pOptimalBufferLength = Math.max(
+        fragmentDuration * 2,
+        highDemandWindowFor(mainStream.highDemandTimeWindow, undefined),
+        highDemandWindowFor(secondaryStream.highDemandTimeWindow, undefined),
+      );
     }
 
-    if (
-      this.currentHlsInstance.config.maxMaxBufferLength > p2pOptimalBufferLength
-    ) {
-      this.debug(`Setting maxMaxBufferLength to ${p2pOptimalBufferLength}`);
-      this.currentHlsInstance.config.maxMaxBufferLength =
-        p2pOptimalBufferLength;
+    const { config } = this.currentHlsInstance;
+    this.forwardBuffer ??= {
+      held: {
+        maxBufferLength: config.maxBufferLength,
+        maxMaxBufferLength: config.maxMaxBufferLength,
+      },
+      applied: {},
+    };
+    const ledger = this.forwardBuffer;
+
+    for (const key of FORWARD_BUFFER_KEYS) {
+      const current = config[key];
+      // Anything this engine did not write is somebody else's latest word on
+      // the setting — the integrator's, or HLS.js's own — which the next
+      // write would otherwise hide.
+      if (current !== ledger.applied[key]) ledger.held[key] = current;
+
+      const next = Math.min(ledger.held[key], p2pOptimalBufferLength);
+      ledger.applied[key] = next;
+      if (current === next) continue;
+      this.debug(`Setting ${key} to ${next}`);
+      config[key] = next;
     }
   }
 
@@ -449,6 +518,29 @@ export class HlsJsP2PEngine {
 
   private destroyCore = () => this.core.destroy();
 
+  /**
+   * Gives the instance back the forward buffer it came with, while it is
+   * still what this engine left there. An integrator who turns P2P off keeps
+   * the player, and a ceiling left behind would hold it to a live window it
+   * no longer has an engine for — on VOD, for the rest of the session.
+   *
+   * Only what this engine wrote, and only where nobody has written since: a
+   * value changed from outside is their word and stays.
+   */
+  private restoreForwardBuffer = () => {
+    const ledger = this.forwardBuffer;
+    this.forwardBuffer = undefined;
+    const hls = this.currentHlsInstance;
+    if (!ledger || !hls) return;
+
+    for (const key of FORWARD_BUFFER_KEYS) {
+      const applied = ledger.applied[key];
+      if (applied === undefined || hls.config[key] !== applied) continue;
+      this.debug(`Giving ${key} back as ${ledger.held[key]}`);
+      hls.config[key] = ledger.held[key];
+    }
+  };
+
   /** Cleans up and releases all resources, and unregisters all event handlers. */
   destroy = () => {
     // Each step runs whatever the ones before it made of themselves: the core
@@ -459,6 +551,7 @@ export class HlsJsP2PEngine {
     const failures = runAll([
       this.destroyCore,
       () => this.updateHlsEventsHandlers("unregister"),
+      this.restoreForwardBuffer,
       () => this.playback.stop(),
     ]);
     this.currentHlsInstance = undefined;

@@ -67,6 +67,21 @@ throughout.
 - **A live player is placed as deep in the live window as the window allows**,
   by one rule shared across the adapters, so the segments between a peer's
   buffer and the live edge are as many as possible for peers to exchange.
+- **`highDemandTimeWindow` is optional and derived on live.** Left unset, VOD
+  keeps 15 s and a live stream gets half of what the player buffers — at least
+  a segment, at most 15 s — from the live window's geometry, so the far half of
+  the buffer is room for the prefetch election. Off live a number is still the
+  window; on live it is a ceiling, since nothing configured here widens the
+  player's buffer and a window past half of it would leave the election
+  nothing. The adapters size the player's forward buffer one segment short of
+  the live delay rather than to the high-demand window, on hls.js, dash.js and
+  Shaka alike, and hls.js tunes a four-segment playlist, the narrowest with
+  room in it. On a four-segment live playlist, where the delay, the window and
+  the buffer all measured 15 s, two peers pulled 1.68 copies of each segment
+  from the origin and no election ever ran. The memory storage keeps three
+  trailing segments on live, under a floor of 15 s, instead of the window's
+  length. See [`specs/playback-contract.md`](specs/playback-contract.md), "The
+  time windows".
 - **`bitrate` enters a stream's identity only where a manifest needs it** to
   tell two same-type streams apart. An origin that recomputes `BANDWIDTH` per
   request no longer splits a rendition's swarm.

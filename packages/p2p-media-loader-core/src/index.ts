@@ -22,9 +22,13 @@ export type { SegmentStorage } from "./segment-storage/index.js";
 export { byteRangeFromRangeHeader } from "./manifest/url-key.js";
 export { downloadTimeMs } from "./download-time.js";
 export {
+  DEFAULT_HIGH_DEMAND_TIME_WINDOW,
   INITIAL_LIVE_DELAY,
+  highDemandWindowFor,
   liveDelayFor,
+  liveDelayForSegments,
   liveDelayFromWindow,
+  playerBufferFor,
   type LiveDelay,
 } from "./live-delay.js";
 export {

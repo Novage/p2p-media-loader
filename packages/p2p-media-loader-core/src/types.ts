@@ -312,10 +312,22 @@ export type StreamConfig = {
    *
    * @default
    * ```typescript
-   * highDemandTimeWindow: 15
+   * highDemandTimeWindow: undefined
    * ```
+   *
+   * - When `undefined`, the window is derived: 15 seconds on VOD, and on a
+   *   live stream half of what the player buffers ahead of the playhead —
+   *   at least one segment, at most 15 seconds — so that the rest of the
+   *   buffer is left for peers to fill before the player asks (see
+   *   specs/playback-contract.md, "The time windows").
+   * - A number is the window on VOD. On live it is a ceiling: it narrows the
+   *   derived window but never widens it past half the player's buffer, which
+   *   the live window's geometry sizes and no configuration here changes. A
+   *   window wider than that buffer would make every segment the player
+   *   fetches urgent, leaving nothing for peers; `isP2PDisabled` is how to
+   *   ask for that deliberately.
    */
-  highDemandTimeWindow: number;
+  highDemandTimeWindow: number | undefined;
 
   /**
    * Defines the time window (in seconds) for HTTP segment downloads. This property specifies the duration

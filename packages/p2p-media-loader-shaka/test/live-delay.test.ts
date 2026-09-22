@@ -23,14 +23,18 @@ function manifest(segmentCount: number, segmentSeconds: number) {
  * Enough of a Shaka player for the engine to bind to and configure. Its
  * configuration reflects what was configured, as the real one's does.
  */
-function setup() {
+function setup({ bufferingGoal = 10, defaultPresentationDelay = 0 } = {}) {
   const configuration = {
     manifest: {
-      defaultPresentationDelay: 0,
+      // Shaka's own default, unless a test says the integrator placed the
+      // playhead themselves.
+      defaultPresentationDelay,
       dash: { ignoreSuggestedPresentationDelay: false },
     },
     // The fake Shaka below reports 4.7.0, which takes the older setting.
-    streaming: { useNativeHlsOnSafari: true },
+    // Shaka's own buffering goal is 10 s, unless a test says the integrator
+    // set one.
+    streaming: { useNativeHlsOnSafari: true, bufferingGoal },
   };
   const filters: shaka.extern.RequestFilter[] = [];
   /** The player events the engine listens for, so a test can fire them. */
@@ -559,6 +563,164 @@ describe("shaka live window placement", () => {
     expect(configuration.manifest.defaultPresentationDelay).toBe(48);
   });
 
+  it("holds the buffering goal a segment short of the delay", () => {
+    const { configuration, deliver } = setup();
+    // 48 s behind the edge, the player may fetch 40 s ahead: Shaka's own
+    // 10 s goal would sit inside the core's high-demand window.
+    deliver(manifest(7, 8));
+    expect(configuration.streaming.bufferingGoal).toBe(40);
+  });
+
+  it("never lowers the buffering goal below two segments", () => {
+    const { configuration, deliver } = setup();
+    // Five 6 s segments of radio: 24 s behind the edge, 18 s of buffer.
+    deliver(manifest(5, 6));
+    expect(configuration.streaming.bufferingGoal).toBe(18);
+
+    const narrow = setup();
+    // Three 2 s segments: the delay is 4 s, and two segments are the floor.
+    narrow.deliver(manifest(3, 2));
+    expect(narrow.configuration.streaming.bufferingGoal).toBe(4);
+  });
+
+  it("leaves the buffering goal alone where the integrator placed the playhead", () => {
+    // The goal is measured from the delay this engine would have placed. A
+    // player held 20 s back buffering 40 s ahead fetches 20 s past the live
+    // edge, where the registry has nothing — worse than the default it
+    // would replace.
+    const { configuration, deliver } = setup({ defaultPresentationDelay: 20 });
+
+    deliver(manifest(7, 8));
+
+    expect(configuration.manifest.defaultPresentationDelay).toBe(20);
+    expect(configuration.streaming.bufferingGoal).toBe(10);
+  });
+
+  it("measures the buffering goal from where the player was placed", () => {
+    // The registry fills over the first few manifests, so the window grows
+    // and the delay written for it grows with it. Shaka reads the delay once,
+    // when it builds the timeline, so the source plays at the first one; a
+    // goal sized for the later window would reach the live edge, where the
+    // registry has nothing.
+    const { configuration, configure, deliver } = setup();
+
+    deliver(manifest(7, 8));
+    expect(configuration.manifest.defaultPresentationDelay).toBe(48);
+    expect(configuration.streaming.bufferingGoal).toBe(40);
+
+    deliver(manifest(8, 8));
+    // The delay written is for the next load; the goal stays with this one.
+    expect(configuration.manifest.defaultPresentationDelay).toBe(56);
+    expect(configuration.streaming.bufferingGoal).toBe(40);
+    expect(
+      configure.mock.calls.filter(
+        ([path]) => path === "streaming.bufferingGoal",
+      ).length,
+    ).toBe(1);
+  });
+
+  it("holds the buffering goal to the placement when the window grows", () => {
+    // A channel whose window is still filling: three 2 s segments now, a
+    // minute of them later. The player was placed 4 s behind the edge and
+    // stays there for this source, so 4 s is all it can buffer; the wider
+    // window's delay is for the next load, and a goal sized from it would
+    // fetch far past the edge.
+    const { configuration, deliver } = setup();
+    deliver(manifest(3, 2));
+    expect(configuration.streaming.bufferingGoal).toBe(4);
+
+    deliver(manifest(30, 2));
+    expect(configuration.manifest.defaultPresentationDelay).toBe(58);
+    expect(configuration.streaming.bufferingGoal).toBe(4);
+  });
+
+  it("brings the buffering goal down when the window turns out narrower", () => {
+    // A window that no longer reaches the placement is one Shaka seeks
+    // forward out of, leaving less room ahead of the playhead, so the goal
+    // follows it down.
+    const { configuration, deliver } = setup();
+    deliver(manifest(12, 8));
+    expect(configuration.streaming.bufferingGoal).toBe(52);
+
+    deliver(manifest(4, 8));
+    expect(configuration.streaming.bufferingGoal).toBe(16);
+  });
+
+  it("lets the buffering goal recover when the window does", () => {
+    // One narrow reading must not hold the goal down for the rest of the
+    // source: the placement is what was written once, not the least window
+    // ever seen.
+    const { configuration, deliver } = setup();
+    deliver(manifest(12, 8));
+    expect(configuration.streaming.bufferingGoal).toBe(52);
+
+    deliver(manifest(4, 8));
+    expect(configuration.streaming.bufferingGoal).toBe(16);
+
+    deliver(manifest(12, 8));
+    expect(configuration.streaming.bufferingGoal).toBe(52);
+  });
+
+  it("leaves a buffering goal the integrator configured alone", () => {
+    const { configuration, deliver, engine } = setup({ bufferingGoal: 30 });
+    deliver(manifest(7, 8));
+    expect(configuration.streaming.bufferingGoal).toBe(30);
+    // The delay is still placed: the two are taken separately.
+    expect(configuration.manifest.defaultPresentationDelay).toBe(48);
+
+    engine.destroy();
+    expect(configuration.streaming.bufferingGoal).toBe(30);
+  });
+
+  it("gives the buffering goal back with the rest", () => {
+    const { configuration, deliver, engine } = setup();
+    deliver(manifest(7, 8));
+    expect(configuration.streaming.bufferingGoal).toBe(40);
+
+    engine.destroy();
+    expect(configuration.streaming.bufferingGoal).toBe(10);
+  });
+
+  it("starts the next source from Shaka's own buffering goal", () => {
+    // The goal a live window set is that window's: a VOD loaded after it
+    // would otherwise buffer to a live window it never had.
+    const { configuration, deliver, loadAnotherSource } = setup();
+    deliver(manifest(7, 8));
+    expect(configuration.streaming.bufferingGoal).toBe(40);
+
+    loadAnotherSource();
+    expect(configuration.streaming.bufferingGoal).toBe(10);
+  });
+
+  it("re-applies the buffering goal only when the window itself changes", () => {
+    const { configure, deliver } = setup();
+    deliver(manifest(7, 8));
+    const goalWrites = () =>
+      configure.mock.calls.filter(
+        ([path]) => path === "streaming.bufferingGoal",
+      ).length;
+    expect(goalWrites()).toBe(1);
+
+    // The same window, a fraction of a second longer.
+    deliver({
+      streams: [
+        {
+          key: "v",
+          type: "main",
+          isLive: true,
+          start: 0,
+          end: 56.4,
+          segmentCount: 7,
+        },
+      ],
+    });
+    expect(goalWrites()).toBe(1);
+
+    // A narrower window moves the placement the goal is measured from.
+    deliver(manifest(4, 8));
+    expect(goalWrites()).toBe(2);
+  });
+
   it("places a window whose delay lands on the pre-manifest one", () => {
     const { configuration, deliver } = setup();
     // A 30 s window of 6 s segments asks for 24 s, within half a segment of
@@ -574,6 +736,8 @@ describe("shaka live window placement", () => {
     deliver(manifest(7, 8));
     expect(configure.mock.calls.length).toBe(afterFirst);
 
+    // A wider window moves the delay, for the next load; the goal stays with
+    // the placement this source is playing at.
     deliver(manifest(12, 8));
     expect(configure.mock.calls.length).toBe(afterFirst + 1);
   });

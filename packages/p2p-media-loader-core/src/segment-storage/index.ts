@@ -3,6 +3,16 @@ import { CommonCoreConfig, StreamConfig, StreamType } from "../types.js";
 export interface SegmentStorage {
   /**
    * Initializes the storage.
+   *
+   * The stream configurations are the configured values, not the effective
+   * ones: `highDemandTimeWindow` is `undefined` unless an integrator set a
+   * number, since the core derives it per stream from the live window (see
+   * specs/playback-contract.md, "The time windows"). A storage that sizes
+   * anything from it must handle `undefined` — arithmetic on it yields `NaN`,
+   * and every comparison against `NaN` is false. Retention behind the
+   * playhead is not the high-demand window's business in any case; the
+   * bundled storage measures it in the segment's own length.
+   *
    * @param coreConfig The core configuration containing storage options.
    * @param mainStreamConfig The configuration for the main stream.
    * @param secondaryStreamConfig The configuration for the secondary stream.

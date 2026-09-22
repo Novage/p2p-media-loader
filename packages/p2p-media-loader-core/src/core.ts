@@ -35,6 +35,11 @@ import {
 } from "./internal-types.js";
 import * as StreamUtils from "./utils/stream.js";
 import {
+  liveDelayForSegments,
+  pickLiveTarget,
+  type LiveDelay,
+} from "./live-delay.js";
+import {
   buildStreamSwarmId,
   computeInfoHash,
   PEER_PROTOCOL_VERSION,
@@ -67,7 +72,7 @@ export class Core {
     isP2PDisabled: false,
     simultaneousHttpDownloads: 2,
     simultaneousP2PDownloads: 3,
-    highDemandTimeWindow: 15,
+    highDemandTimeWindow: undefined,
     httpDownloadInitialTimeoutMs: 0,
     httpDownloadTimeWindow: 3000,
     p2pDownloadTimeWindow: 6000,
@@ -131,7 +136,10 @@ export class Core {
   private readonly peerId: string;
   private mainStreamLoader?: HybridLoader;
   private secondaryStreamLoader?: HybridLoader;
-  private streamDetails: StreamDetails = { isLive: false };
+  private streamDetails: StreamDetails = {
+    isLive: false,
+    liveTarget: undefined,
+  };
   private storageInitPromise?: Promise<void>;
   /** Bumped by every initialization and every `destroy()`; see below. */
   private storageGeneration = 0;
@@ -523,8 +531,18 @@ export class Core {
    */
   private syncStreamsFromRegistry(): void {
     let isLive = false;
+    const liveStreams: {
+      type: StreamType;
+      target: LiveDelay | undefined;
+    }[] = [];
     for (const registryStream of this.manifestRegistry.getStreams()) {
-      isLive ||= registryStream.isLive === true;
+      if (registryStream.isLive === true) {
+        isLive = true;
+        liveStreams.push({
+          type: registryStream.type,
+          target: liveDelayForSegments(registryStream.segments.values()),
+        });
+      }
 
       let stream = this.streams.get(registryStream.key);
       if (!stream) {
@@ -535,6 +553,7 @@ export class Core {
       this.syncSegments(stream, registryStream);
     }
     this.streamDetails.isLive = isLive;
+    this.streamDetails.liveTarget = pickLiveTarget(liveStreams);
   }
 
   private syncSegments(
@@ -951,7 +970,7 @@ export class Core {
     this.secondaryStreamLoader = undefined;
     this.segmentStorage = undefined;
     this.manifestResponseUrl = undefined;
-    this.streamDetails = { isLive: false };
+    this.streamDetails = { isLive: false, liveTarget: undefined };
     this.storageInitPromise = undefined;
     this.storageGeneration++;
     if (failures.length) throw failures[0];

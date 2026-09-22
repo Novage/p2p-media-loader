@@ -25,6 +25,26 @@ fills its share of the next fifty minutes and then holds. Whoever would rather
 not spend those bytes on a viewer who may leave lowers `httpDownloadTimeWindow`;
 the election needs no horizon of its own.
 
+## Room
+
+What the election does need is segments to run on: segments the player has
+not made high-demand yet. On VOD there is no shortage — the HTTP window reaches
+far past anything the player buffers. On live the playlist ends at the edge,
+and the room between the high-demand window and the edge is all there is. Every
+adapter holds the player's forward buffer one segment short of the live delay,
+and the core calls only the nearer half of that buffer high-demand
+([playback-contract.md](playback-contract.md), "The time windows"), so on a
+four-segment playlist of five-second segments the election has a segment of
+room: about five seconds, enough for a peer to fetch the segment and hand it
+over before the other's player asks. With the window as wide as the buffer,
+every segment is high-demand on arrival and every peer fetches it from the
+origin; no deadline policy can fit a handoff into no room.
+
+The segment the player asks for is often in that room rather than in the
+window, and it is a candidate like any other: the owner fetches it at once, a
+backup by its deadline. With no peer connected there is no election, and core
+fetches it over HTTP at once.
+
 ## The election
 
 For each segment, every peer scores itself and each peer it is connected to
@@ -119,6 +139,17 @@ justify it, in
 A peer far behind the live edge and one at the edge hold different segments in
 their windows; each elects owners only among the segments it wants. Nothing
 here makes the two exchange segments they do not both want.
+
+Neither does anything here hold two peers on one rendition. A rendition is a
+swarm ([segment-identity.md](segment-identity.md)), so a player whose adaptive
+logic moves it to another leaves the swarm it was in and is alone in the one it
+joins, and it and the peer it left fetch the same wall-clock media from the
+origin until they meet again. The election cannot reach across swarms and
+should not, since the two hold different bytes. Where a live stream's peers
+diverge across a ladder, that divergence and the interval before two peers
+connect are what the origin serves twice, not anything the deadlines decide. An
+integration that values sharing over adaptation pins the rendition or narrows
+the ladder.
 
 Nothing here is on the wire. The scores are computed from ids every peer
 already knows, and in-flight HTTP loads are part of the segments announcement

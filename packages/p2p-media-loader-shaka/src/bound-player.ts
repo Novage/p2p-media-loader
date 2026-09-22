@@ -2,12 +2,16 @@ import type shaka from "shaka-player/dist/shaka-player.compiled.d.ts";
 import {
   type ProcessedManifest,
   liveDelayFor,
+  playerBufferFor,
   INITIAL_LIVE_DELAY,
 } from "p2p-media-loader-core";
 import type { Shaka } from "./types.js";
 
 /** Shaka's own default: the integrator has set no presentation delay. */
 const SHAKA_DEFAULT_PRESENTATION_DELAY = 0;
+/** Shaka's own default buffering goal: the integrator has set none. */
+const SHAKA_DEFAULT_BUFFERING_GOAL = 10;
+const BUFFERING_GOAL_PATH = "streaming.bufferingGoal";
 
 /**
  * What the engine has done to the player it is bound to, and what it has
@@ -35,9 +39,32 @@ export class BoundPlayer {
    * integrator configured a presentation delay of their own, which is theirs.
    */
   #sizesLiveWindow = false;
+  /**
+   * Whether the forward buffer is this engine's to size. False when the
+   * integrator configured a buffering goal of their own, which is theirs.
+   */
+  #sizesBuffer = false;
   readonly #shaka: Shaka;
   /** The delay this engine applied for the current source, if any. */
   #applied?: number;
+  /** The buffering goal this engine applied for the current source, if any. */
+  #appliedBuffer?: number;
+  /**
+   * The delay the source playing was actually placed at, which is the first
+   * one applied for it: Shaka reads `defaultPresentationDelay` when it builds
+   * the timeline, and every later write is for the next load. The buffering
+   * goal it does read as it fetches, so the goal has to be measured from this
+   * rather than from the latest window — a goal sized for a 56 s placement
+   * over a player placed at 48 s reaches the live edge, where the registry
+   * has nothing and every fetch falls through to Shaka's own loader.
+   *
+   * Written once per source and never moved after. Where the window itself
+   * later narrows past it the goal follows the window down, but that is
+   * decided per manifest from the window in hand rather than kept here: kept,
+   * it would be a ratchet, and one narrow reading would hold the goal down
+   * for the rest of the source.
+   */
+  #placedDelay?: number;
   /**
    * Whether any manifest of the current source described a live main stream.
    * Kept here rather than had from the core: `processManifest` describes the
@@ -81,8 +108,11 @@ export class BoundPlayer {
    */
   takeOver(): unknown[] {
     const failures: unknown[] = [];
-    const take = (path: string, value: unknown, previous: unknown) => {
+    const record = (path: string, previous: unknown) => {
       if (!this.#taken.has(path)) this.#taken.set(path, previous);
+    };
+    const take = (path: string, value: unknown, previous: unknown) => {
+      record(path, previous);
       try {
         this.#player.configure(path, value);
       } catch (failure) {
@@ -115,6 +145,21 @@ export class BoundPlayer {
         manifest.dash.ignoreSuggestedPresentationDelay,
       );
     }
+    // The goal is measured from the delay this engine placed, so it is only
+    // this engine's to size where the placement is its own. Sized against an
+    // integrator's own delay it would reach past the live edge — a player
+    // placed 20 s back buffering 40 s ahead fetches 20 s of segments the
+    // registry has not seen — and every one of those falls through to
+    // Shaka's own loader, which is worse than the default it replaced.
+    //
+    // Shaka applies the buffering goal to the source playing, so nothing is
+    // written until a window says how far ahead the player may fetch; what to
+    // give back is recorded now, since a write that later fails must find it
+    // held already.
+    this.#sizesBuffer =
+      this.#sizesLiveWindow &&
+      streaming.bufferingGoal === SHAKA_DEFAULT_BUFFERING_GOAL;
+    if (this.#sizesBuffer) record(BUFFERING_GOAL_PATH, streaming.bufferingGoal);
 
     // Native HLS plays outside the networking engine, where nothing can be
     // served. Taken from every player, including one whose delay is the
@@ -148,30 +193,50 @@ export class BoundPlayer {
     if (this.#released) return;
     this.#source = {};
     this.#applied = undefined;
+    this.#placedDelay = undefined;
     this.#seenMainStream = false;
-    if (!this.#sizesLiveWindow) return;
     // As throwable as every other `configure` here: a player whose
     // configuration has already gone — `load()` racing `destroy()` — throws
     // from it, and the caller has a core to tear down after this.
-    try {
-      this.#player.configure(
-        "manifest.defaultPresentationDelay",
-        INITIAL_LIVE_DELAY,
-      );
-    } catch (failure) {
-      this.#debug(`could not reset the presentation delay: ${String(failure)}`);
+    if (this.#sizesLiveWindow) {
+      try {
+        this.#player.configure(
+          "manifest.defaultPresentationDelay",
+          INITIAL_LIVE_DELAY,
+        );
+      } catch (failure) {
+        this.#debug(
+          `could not reset the presentation delay: ${String(failure)}`,
+        );
+      }
+    }
+    // The goal a live window set is that window's; the next source starts
+    // from Shaka's own, a VOD for good and a live source until its window is
+    // known.
+    if (this.#sizesBuffer && this.#appliedBuffer !== undefined) {
+      this.#appliedBuffer = undefined;
+      try {
+        this.#player.configure(
+          BUFFERING_GOAL_PATH,
+          this.#taken.get(BUFFERING_GOAL_PATH),
+        );
+      } catch (failure) {
+        this.#debug(`could not reset the buffering goal: ${String(failure)}`);
+      }
     }
   }
 
   /**
-   * Sizes the presentation delay from the window the core just parsed. The
-   * manifest reaches the core before Shaka's parser sees the same bytes, so
-   * the value is in place when Shaka builds its timeline — which is the one
-   * moment it is read. A refresh reuses that timeline, so what is configured
-   * here after the first manifest of a source is what the next load starts
-   * from, not a change to the one playing. (The exception is a low-latency
-   * DASH stream: Shaka re-applies the delay on every parse there, unless the
-   * MPD suggests one of its own.)
+   * Sizes the presentation delay and the buffering goal from the window the
+   * core just parsed. The manifest reaches the core before Shaka's parser
+   * sees the same bytes, so the delay is in place when Shaka builds its
+   * timeline — which is the one moment it is read. A refresh reuses that
+   * timeline, so what is configured here after the first manifest of a
+   * source is what the next load starts from, not a change to the one
+   * playing. (The exception is a low-latency DASH stream: Shaka re-applies
+   * the delay on every parse there, unless the MPD suggests one of its own.)
+   * The buffering goal, by contrast, Shaka reads as it fetches, so the source
+   * playing buffers to it from the next segment on.
    */
   sizeFrom(manifest: ProcessedManifest) {
     if (this.#released || !this.#sizesLiveWindow) return;
@@ -193,26 +258,47 @@ export class BoundPlayer {
     const target = liveDelayFor(manifest);
     if (!target) return;
 
-    // Against the delay this applied, never against the one the player holds:
-    // until a window is known that is INITIAL_LIVE_DELAY, and a first
-    // window whose delay lands within half a segment of it would read as
-    // already applied. Only when the window has changed by at least half a
-    // segment: fractional drift is not a change worth carrying to the next
-    // load.
-    if (
-      this.#applied !== undefined &&
-      Math.abs(this.#applied - target.delay) < target.segment / 2
-    ) {
-      return;
-    }
+    // Against the values this applied, never against the ones the player
+    // holds: until a window is known the delay is INITIAL_LIVE_DELAY, and a
+    // first window whose delay lands within half a segment of it would read
+    // as already applied. Only when the window has changed by at least half
+    // a segment: fractional drift is not a change worth carrying to the next
+    // load. The two are judged apart — a capped delay holds still while the
+    // segment, and with it the buffer, moves.
+    const moved = (applied: number | undefined, next: number) =>
+      applied === undefined || Math.abs(applied - next) >= target.segment / 2;
 
-    this.#debug(`Setting defaultPresentationDelay to ${target.delay}`);
-    // Written straight through: what to give back for this path was taken
+    // Written straight through: what to give back for each path was taken
     // when this binding was made, and reading the player for it would both
     // find this engine's own last value and rebuild the whole configuration,
     // which `getConfiguration` clones.
-    this.#player.configure("manifest.defaultPresentationDelay", target.delay);
-    this.#applied = target.delay;
+    // Where this source was placed. The first window decides it, because that
+    // is the one Shaka built the timeline from.
+    this.#placedDelay ??= target.delay;
+
+    if (moved(this.#applied, target.delay)) {
+      this.#debug(`Setting defaultPresentationDelay to ${target.delay}`);
+      this.#player.configure("manifest.defaultPresentationDelay", target.delay);
+      this.#applied = target.delay;
+    }
+    // A segment short of the delay, never below two segments — the rule every
+    // adapter shares: the core calls the nearer half of that buffer
+    // high-demand and leaves the farther half for peers to fill before the
+    // player asks. Left at Shaka's default, the goal sits inside the core's
+    // window and the player fetches every segment itself. Measured from where
+    // the player was placed rather than from the window last parsed — and
+    // from the window where that has since narrowed past the placement, since
+    // a window that no longer reaches the playhead is one Shaka seeks forward
+    // out of, which leaves less room ahead of it, not more.
+    const buffer = playerBufferFor({
+      delay: Math.min(this.#placedDelay, target.delay),
+      segment: target.segment,
+    });
+    if (this.#sizesBuffer && moved(this.#appliedBuffer, buffer)) {
+      this.#debug(`Setting bufferingGoal to ${buffer}`);
+      this.#player.configure(BUFFERING_GOAL_PATH, buffer);
+      this.#appliedBuffer = buffer;
+    }
   }
 
   /**

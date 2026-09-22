@@ -203,25 +203,23 @@ function setup(
 }
 
 describe("dash.js live window placement", () => {
-  it("places the playhead one segment inside the tail and holds the forward buffer to the high-demand window", () => {
+  it("places the playhead one segment inside the tail and holds the forward buffer a segment short of it", () => {
     const { settings, deliverMpd } = setup();
     // A 56 s window of 8 s segments: the playhead 48 s behind the edge, and
-    // the buffer held to the high-demand window (15 s), floored at two
-    // segments.
+    // the buffer held to 40 s, a segment clear of the edge.
     deliverMpd(mpd(7, 8));
     expect(settings.streaming.delay.liveDelay).toBe(48);
     expect(settings.streaming.buffer).toEqual({
-      bufferTimeDefault: 16,
-      bufferTimeAtTopQuality: 16,
-      bufferTimeAtTopQualityLongForm: 16,
+      bufferTimeDefault: 40,
+      bufferTimeAtTopQuality: 40,
+      bufferTimeAtTopQualityLongForm: 40,
     });
   });
 
   it("keeps the buffer a segment clear of the live edge on a narrow window", () => {
     const { settings, deliverMpd } = setup();
     // A 16 s window of 4 s segments: 12 s behind the edge leaves room for 8 s
-    // of buffer, less than the high-demand window. The edge margin binds, not
-    // the window.
+    // of buffer, which is also the floor of two segments.
     deliverMpd(mpd(4, 4));
     expect(settings.streaming.delay.liveDelay).toBe(12);
     expect(settings.streaming.buffer.bufferTimeDefault).toBe(8);
@@ -238,7 +236,7 @@ describe("dash.js live window placement", () => {
       bufferTimeDefault: 8,
       bufferTimeAtTopQuality: 8,
       // A minute and a half of buffer is the whole window and more: capped.
-      bufferTimeAtTopQualityLongForm: 16,
+      bufferTimeAtTopQualityLongForm: 40,
     });
   });
 
@@ -262,9 +260,9 @@ describe("dash.js live window placement", () => {
     deliverMpd(mpd(5, 6));
     expect(settings.streaming.delay.liveDelay).toBe(25);
     expect(settings.streaming.buffer).toEqual({
-      bufferTimeDefault: 15,
-      bufferTimeAtTopQuality: 15,
-      bufferTimeAtTopQualityLongForm: 15,
+      bufferTimeDefault: 18,
+      bufferTimeAtTopQuality: 18,
+      bufferTimeAtTopQualityLongForm: 18,
     });
   });
 
@@ -281,9 +279,9 @@ describe("dash.js live window placement", () => {
     deliverMpd(mpd(30, 2));
     expect(settings.streaming.delay.liveDelay).toBe(58);
     expect(settings.streaming.buffer).toEqual({
-      bufferTimeDefault: 15,
-      bufferTimeAtTopQuality: 15,
-      bufferTimeAtTopQualityLongForm: 15,
+      bufferTimeDefault: 56,
+      bufferTimeAtTopQuality: 56,
+      bufferTimeAtTopQualityLongForm: 56,
     });
   });
 
@@ -295,7 +293,7 @@ describe("dash.js live window placement", () => {
 
     deliverMpd(mpd(30, 2));
     expect(settings.streaming.buffer.bufferTimeDefault).toBe(3);
-    expect(settings.streaming.buffer.bufferTimeAtTopQuality).toBe(15);
+    expect(settings.streaming.buffer.bufferTimeAtTopQuality).toBe(56);
   });
 
   it("gives the player its own buffer back when the next source is not live", () => {
@@ -405,8 +403,8 @@ describe("dash.js live window placement", () => {
 
   it("places the next live source on its own window", () => {
     const { settings, deliverMpd, fire } = setup(NaN, {
-      bufferTimeDefault: 18,
-      bufferTimeAtTopQuality: 30,
+      bufferTimeDefault: 50,
+      bufferTimeAtTopQuality: 50,
       bufferTimeAtTopQualityLongForm: 60,
     });
     deliverMpd(mpd(7, 8));
@@ -417,7 +415,7 @@ describe("dash.js live window placement", () => {
     // still this source's to place.
     deliverMpd(mpd(7, 8));
     expect(settings.streaming.delay.liveDelay).toBe(48);
-    expect(settings.streaming.buffer.bufferTimeDefault).toBe(16);
+    expect(settings.streaming.buffer.bufferTimeDefault).toBe(40);
   });
 
   it("stops routing through the core once the engine is destroyed", () => {
@@ -476,18 +474,18 @@ describe("dash.js live window placement", () => {
     // main stream were the only one that counted.
     deliverMpd(audioMpd(15, 4));
     expect(settings.streaming.delay.liveDelay).toBe(56);
-    expect(settings.streaming.buffer.bufferTimeDefault).toBe(15);
+    expect(settings.streaming.buffer.bufferTimeDefault).toBe(52);
   });
 
   it("places a live window again after a presentation that was not live", () => {
     const held = {
-      bufferTimeDefault: 18,
-      bufferTimeAtTopQuality: 30,
+      bufferTimeDefault: 50,
+      bufferTimeAtTopQuality: 50,
       bufferTimeAtTopQualityLongForm: 60,
     };
     const { settings, deliverMpd } = setup(NaN, held);
     deliverMpd(mpd(7, 8));
-    expect(settings.streaming.buffer.bufferTimeDefault).toBe(16);
+    expect(settings.streaming.buffer.bufferTimeDefault).toBe(40);
 
     // Giving the settings back gives up what was placed with them, or the
     // same window returning would read as already placed and the ceiling
@@ -497,7 +495,7 @@ describe("dash.js live window placement", () => {
 
     deliverMpd(mpd(7, 8));
     expect(settings.streaming.delay.liveDelay).toBe(48);
-    expect(settings.streaming.buffer.bufferTimeDefault).toBe(16);
+    expect(settings.streaming.buffer.bufferTimeDefault).toBe(40);
   });
 
   it("never raises a setting the integrator holds below the ceiling", () => {
@@ -513,14 +511,14 @@ describe("dash.js live window placement", () => {
 
   it("gives a capped setting back no further than the integrator had it", () => {
     // 8 s, capped to 4 by a window too narrow for it: when the window grows,
-    // the 8 s they asked for comes back, not the 15 s ceiling.
+    // the 8 s they asked for comes back, not the 56 s ceiling.
     const { settings, deliverMpd } = setup(NaN, { bufferTimeDefault: 8 });
     deliverMpd(mpd(3, 2));
     expect(settings.streaming.buffer.bufferTimeDefault).toBe(4);
 
     deliverMpd(mpd(30, 2));
     expect(settings.streaming.buffer.bufferTimeDefault).toBe(8);
-    expect(settings.streaming.buffer.bufferTimeAtTopQuality).toBe(15);
+    expect(settings.streaming.buffer.bufferTimeAtTopQuality).toBe(56);
   });
 
   it("gives the player its own placement back, delay and all", () => {
@@ -553,24 +551,20 @@ describe("dash.js live window placement", () => {
     expect(settings.streaming.delay.useSuggestedPresentationDelay).toBe(true);
   });
 
-  it("carries a high demand window changed at runtime to the player", () => {
+  it("sizes the buffer from the window, not from the high demand window", () => {
     const { settings, player, deliverMpd, engine } = setup();
     deliverMpd(mpd(7, 8));
-    expect(settings.streaming.buffer.bufferTimeDefault).toBe(16);
+    expect(settings.streaming.buffer.bufferTimeDefault).toBe(40);
     const afterFirst = player.updateSettings.mock.calls.length;
 
-    // The ceiling follows the high demand window, which is a dynamic setting,
-    // so a steady live window must not hide a change to it.
+    // The high demand window is the core's to size, from this same window;
+    // a number configured for it is the core's business, not the player's.
     engine.applyDynamicConfig({
-      core: { mainStream: { highDemandTimeWindow: 40 } },
+      core: { mainStream: { highDemandTimeWindow: 60 } },
     });
     deliverMpd(mpd(7, 8));
     expect(settings.streaming.buffer.bufferTimeDefault).toBe(40);
-    expect(player.updateSettings.mock.calls.length).toBe(afterFirst + 1);
-
-    // And an unchanged window with unchanged settings still writes nothing.
-    deliverMpd(mpd(7, 8));
-    expect(player.updateSettings.mock.calls.length).toBe(afterFirst + 1);
+    expect(player.updateSettings.mock.calls.length).toBe(afterFirst);
   });
 
   it("ignores a buffer setting that is not a length", () => {
@@ -583,7 +577,7 @@ describe("dash.js live window placement", () => {
     settings.streaming.buffer.bufferTimeDefault = null as unknown as number;
     deliverMpd(mpd(30, 2));
 
-    expect(settings.streaming.buffer.bufferTimeDefault).toBe(15);
+    expect(settings.streaming.buffer.bufferTimeDefault).toBe(56);
   });
 
   it("holds a live presentation it cannot size yet off the edge", () => {
@@ -654,22 +648,22 @@ describe("dash.js live window placement", () => {
       bufferTimeAtTopQualityLongForm: null,
     });
     deliverMpd(mpd(7, 8));
-    expect(settings.streaming.buffer.bufferTimeAtTopQualityLongForm).toBe(16);
+    expect(settings.streaming.buffer.bufferTimeAtTopQualityLongForm).toBe(40);
 
     deliverMpd(vodMpd());
     expect(settings.streaming.buffer.bufferTimeAtTopQualityLongForm).toBeNull();
   });
 
   it("hands the placement back to an integrator who sets the delay while playing", () => {
-    // dash.js's own defaults under the buffer keys, as a real player holds.
+    // Buffer settings above the ceiling, as a real player's long-form one is.
     const { settings, player, deliverMpd, fire } = setup(NaN, {
-      bufferTimeDefault: 30,
-      bufferTimeAtTopQuality: 30,
+      bufferTimeDefault: 50,
+      bufferTimeAtTopQuality: 50,
       bufferTimeAtTopQualityLongForm: 60,
     });
     deliverMpd(mpd(7, 8));
     expect(settings.streaming.delay.liveDelay).toBe(48);
-    expect(settings.streaming.buffer.bufferTimeDefault).toBe(16);
+    expect(settings.streaming.buffer.bufferTimeDefault).toBe(40);
 
     // Their word: closer to the edge than this engine would put them.
     player.updateSettings({ streaming: { delay: { liveDelay: 20 } } });
@@ -677,7 +671,7 @@ describe("dash.js live window placement", () => {
 
     expect(settings.streaming.delay.liveDelay).toBe(20);
     // The buffer this engine wrote is given back; the delay is left theirs.
-    expect(settings.streaming.buffer.bufferTimeDefault).toBe(30);
+    expect(settings.streaming.buffer.bufferTimeDefault).toBe(50);
     expect(settings.streaming.buffer.bufferTimeAtTopQualityLongForm).toBe(60);
     fire("streamTeardownComplete");
     expect(settings.streaming.delay.liveDelay).toBe(20);
@@ -687,17 +681,17 @@ describe("dash.js live window placement", () => {
     // A window that moved by less than half a segment is the same window;
     // rewriting the delay for it would move the target dash.js measures its
     // catch-up against, for a change that was only to a ceiling.
-    const { settings, player, deliverMpd, engine } = setup();
+    const { settings, player, deliverMpd } = setup();
     deliverMpd(mpd(7, 8));
     expect(settings.streaming.delay.liveDelay).toBe(48);
     player.updateSettings.mockClear();
 
-    engine.applyDynamicConfig({
-      core: { mainStream: { highDemandTimeWindow: 30 } },
-    });
+    // Raised from outside above the ceiling: brought back down, and that is
+    // the only thing to write.
+    settings.streaming.buffer.bufferTimeDefault = 50;
     deliverMpd(mpd(7, 8));
 
-    expect(settings.streaming.buffer.bufferTimeDefault).toBe(30);
+    expect(settings.streaming.buffer.bufferTimeDefault).toBe(40);
     const writes = player.updateSettings.mock.calls as [
       { streaming?: { delay?: unknown } },
     ][];
@@ -776,15 +770,15 @@ describe("dash.js live window placement", () => {
   it("brings a raised ceiling back down", () => {
     const { settings, deliverMpd } = setup();
     deliverMpd(mpd(7, 8));
-    expect(settings.streaming.buffer.bufferTimeDefault).toBe(16);
+    expect(settings.streaming.buffer.bufferTimeDefault).toBe(40);
 
     // Raised from outside — the integrator, or dash.js putting back what it
     // shrank for a quota error. A ceiling is only a ceiling while it is
     // enforced, and the window has not moved to prompt a placement.
-    settings.streaming.buffer.bufferTimeDefault = 40;
+    settings.streaming.buffer.bufferTimeDefault = 55;
     deliverMpd(mpd(7, 8));
 
-    expect(settings.streaming.buffer.bufferTimeDefault).toBe(16);
+    expect(settings.streaming.buffer.bufferTimeDefault).toBe(40);
   });
 
   it("stops working for a player it hands over", () => {
@@ -805,7 +799,7 @@ describe("dash.js live window placement", () => {
   it("does not push back a ceiling the integrator has since raised again", () => {
     const { settings, deliverMpd } = setup();
     deliverMpd(mpd(7, 8));
-    expect(settings.streaming.buffer.bufferTimeDefault).toBe(16);
+    expect(settings.streaming.buffer.bufferTimeDefault).toBe(40);
 
     // Lowered below the ceiling: kept, and nothing is written.
     settings.streaming.buffer.bufferTimeDefault = 10;
@@ -813,9 +807,9 @@ describe("dash.js live window placement", () => {
     expect(settings.streaming.buffer.bufferTimeDefault).toBe(10);
 
     // Raised back to the ceiling: their latest word, not a stale one.
-    settings.streaming.buffer.bufferTimeDefault = 16;
+    settings.streaming.buffer.bufferTimeDefault = 40;
     deliverMpd(mpd(7, 8));
-    expect(settings.streaming.buffer.bufferTimeDefault).toBe(16);
+    expect(settings.streaming.buffer.bufferTimeDefault).toBe(40);
   });
 
   it("re-applies only when the window itself changes", () => {

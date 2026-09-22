@@ -11,6 +11,7 @@ import {
   runAll,
   trackMediaElementPlayback,
   liveDelayFor,
+  playerBufferFor,
   type LiveDelay,
   INITIAL_LIVE_DELAY,
 } from "p2p-media-loader-core";
@@ -33,11 +34,6 @@ export type PartialDashJsP2PEngineConfig = {
   /** Partial core config */
   core?: Partial<CoreConfig>;
 };
-
-/** Least forward buffer to leave the player, whatever the windows work out to. */
-const MIN_BUFFER_SEGMENTS = 2;
-/** Segments left between the player's forward buffer and the live edge. */
-const LIVE_EDGE_MARGIN_SEGMENTS = 1;
 
 /** The three dash.js settings that bound how far ahead of the playhead it fetches. */
 const FORWARD_BUFFER_KEYS = [
@@ -359,10 +355,12 @@ export class DashJsP2PEngine {
   }
 
   /**
-   * How far ahead of the playhead dash.js may fetch: the high-demand window,
-   * never closer to the live edge than a segment, never less than a couple of
-   * segments. The segments beyond it are the core's to prefetch, and they are
-   * the ones peers exchange.
+   * How far ahead of the playhead dash.js may fetch: a segment short of the
+   * live delay, never less than a couple of segments — the rule every adapter
+   * shares. The core calls the nearer half of that buffer high-demand and
+   * leaves the farther half for peers to fill before the player asks; the
+   * segment between the buffer and the edge is the one the registry may not
+   * know yet.
    *
    * Left alone, dash.js buffers `bufferTimeAtTopQualityLongForm` — a minute,
    * since a dynamic stream is long-form by its duration — which on a live
@@ -377,18 +375,7 @@ export class DashJsP2PEngine {
    * is a ceiling, not a target.
    */
   private forwardBufferSettings(target: LiveDelay) {
-    const { mainStream, secondaryStream } = this.core.getConfig();
-    const highDemandTimeWindow = Math.max(
-      mainStream.highDemandTimeWindow,
-      secondaryStream.highDemandTimeWindow,
-    );
-    const bufferTime = Math.max(
-      target.segment * MIN_BUFFER_SEGMENTS,
-      Math.min(
-        highDemandTimeWindow,
-        target.delay - target.segment * LIVE_EDGE_MARGIN_SEGMENTS,
-      ),
-    );
+    const bufferTime = playerBufferFor(target);
 
     const ceilings: HeldBuffer = this.placement?.held.buffer ?? {};
     const settings = {} as ForwardBuffer;

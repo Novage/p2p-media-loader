@@ -128,6 +128,76 @@ function isSegmentInTimeWindow(segment, playback, timeWindowLength) {
 The same axis governs the high-demand, HTTP and P2P windows, and eviction from
 the segment store.
 
+## The time windows
+
+Three windows ahead of the playhead, each a length on the axis above, decide
+what a queue pass does with a segment:
+
+- **High-demand.** A segment inside it is one the player is about to play:
+  core fetches it over HTTP at once, and moves a P2P download of it to HTTP.
+- **HTTP.** A segment inside it may be prefetched over HTTP, by the peer the
+  election chooses ([prefetch.md](prefetch.md)).
+- **P2P.** A segment inside it is taken over P2P from any peer that has it.
+
+The HTTP and P2P windows are `httpDownloadTimeWindow` and
+`p2pDownloadTimeWindow`, and at their defaults they reach the whole stream; on
+live the playlist bounds them. The high-demand window is `highDemandTimeWindow`
+off live, or 15 seconds where that is unconfigured. On live it is derived from
+the geometry of the window itself, by the rule the core exports as
+`highDemandWindowFor`:
+
+```
+liveDelay    = liveDelayFromWindow(window, segment)   // one segment inside the tail, at most a minute
+playerBuffer = max(2 × segment, liveDelay − segment)   // one segment short of the edge
+highDemand   = min(configured ?? 15, playerBuffer / 2)   // and at least a segment where nothing is configured
+```
+
+On live the configured number is a ceiling rather than an override. Nothing
+configured here widens the player's buffer, which every adapter sizes from the
+geometry, so a window configured past half that buffer would cover everything
+the player fetches and leave the election nothing — the failure this rule
+exists to prevent. A number still narrows the window, which gives peers more
+room rather than less. An integration that wants the player to fetch over HTTP
+regardless asks for that with `isP2PDisabled`.
+
+The player's forward buffer is what every adapter sizes to `playerBuffer`
+([player-adapters.md](player-adapters.md)); the core calls the nearer half of
+it high-demand and leaves the farther half to the election. That order is the
+invariant this design rests on: **the player's buffer must reach further than
+the high-demand window, by more than a handoff costs** — one peer's playlist
+refresh ahead of another's, one HTTP fetch, one P2P transfer. A buffer at or
+inside the window makes every segment the player fetches high-demand on
+arrival, so each peer fetches the whole stream from the origin and the election
+never has a segment to run on. A four-segment playlist of five-second segments
+is the tight case: delay 15 s, buffer 10 s, window 5 s, and 5 s of room.
+
+A window narrower than that has no room to give, whatever an adapter does: a
+player needs two segments of buffer to keep going, and on a window of two or
+three segments that floor already reaches the live edge or just past it. The
+adapters differ there only in how they lose it — the HLS.js adapter leaves
+such a playlist to HLS.js's own defaults, while the dash.js and Shaka adapters
+apply the floor, which still sits nearer the edge than the default it
+replaces. Such a window is transient in practice, a channel whose playlist has
+only just started publishing.
+
+The window is derived from the presentation's placement, not from each
+stream's own playlist: the widest live main stream decides, and the widest live
+stream of any kind where there is no main one — the same stream the adapters
+size the player by. An audio playlist often carries a wider window than the
+video's, and a window derived from it would exceed the buffer the player
+actually holds.
+
+Because the player buffers further than the window on live, the segment the
+player asks for is often not high-demand when it asks. That request is a
+candidate like any other for the election, which the owner fetches at once and
+a backup by its deadline. With no peer connected there is no owner and nothing
+to take the segment from, so core fetches the player's request over HTTP at
+once rather than let it wait for the window to reach it.
+
+The windows scale with the playback rate: at twice normal speed the derived
+window covers twice the media. Live players hold the rate at one outside their
+own catch-up, so this rarely matters there.
+
 ## What the segment store receives
 
 `SegmentStorage` is public API — an integration may supply its own through
@@ -147,11 +217,19 @@ Each loader reports the playhead on its own stream's timeline, and the store
 keeps the latest report. The store is told at the start of a stream and
 whenever the core's estimate moves — on a player's report, and on the core's
 own inference where the player reports nothing — so a store sees positions,
-and evicts, on a session where `updatePlayback` is never called. On live HLS without programme dates the main and the
-secondary playlist are anchored at zero on their own first parse, so their
-timelines can differ by seconds; a segment of one judged against the other's
-position is then off by that much, inside the trailing window the store keeps
-on a live stream. A position kept per stream or per type would be exact while
+and evicts, on a session where `updatePlayback` is never called. On live HLS
+without programme dates the main and the secondary playlist are anchored at
+zero on their own first parse, so their timelines can differ by seconds; a
+segment of one judged against the other's position is then off by that much,
+inside the trailing window the store keeps on a live stream. That window is
+three segments, measured in the segment's own length, and never less than
+fifteen seconds. The segments are what peers need of each other: they sit
+within a second or two on one stream, and a peer a little behind another must
+still find what it wants held. The floor is for the skew above, which is a
+fixed offset rather than a count of segments, and on a stream of short segments
+would otherwise fall outside a window measured in them. Neither term follows a
+configured window — the high-demand window is sized for scheduling ahead of the
+playhead and can be as short as one segment. A position kept per stream or per type would be exact while
 both report and would freeze the moment one stops, retaining its segments for
 ever, so the store does not. Both values sit on the manifest timeline, which is
 what keeps the comparison valid, and is why neither of them is

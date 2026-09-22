@@ -12,10 +12,14 @@ export type SegmentPlaybackStatuses = {
   isP2PDownloadable: boolean;
 };
 
-export type PlaybackTimeWindowsConfig = Pick<
-  StreamConfig,
-  "highDemandTimeWindow" | "httpDownloadTimeWindow" | "p2pDownloadTimeWindow"
->;
+/**
+ * The three windows a queue pass schedules by, resolved to seconds: the
+ * high-demand window is derived on live where none is configured (see
+ * `highDemandWindowFor`), the other two are the configured values.
+ */
+export type PlaybackTimeWindowsConfig = {
+  highDemandTimeWindow: number;
+} & Pick<StreamConfig, "httpDownloadTimeWindow" | "p2pDownloadTimeWindow">;
 
 export function getSegmentFromStreamsMap(
   streams: Map<string, StreamWithSegments>,

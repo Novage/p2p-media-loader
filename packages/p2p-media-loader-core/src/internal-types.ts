@@ -1,4 +1,5 @@
 import { BandwidthCalculator } from "./bandwidth-calculator.js";
+import type { LiveDelay } from "./live-delay.js";
 import { CoreRequestError, Segment, SegmentResponse, Stream } from "./types.js";
 
 /** Where the core's current playback estimate came from. */
@@ -41,6 +42,13 @@ export type BandwidthCalculators = Readonly<{
 /** Derived from the manifests, never reported by an adapter. */
 export type StreamDetails = {
   isLive: boolean;
+  /**
+   * Where a live player is placed, from the widest live main stream the
+   * registry holds — the stream every adapter sizes the player's buffer by —
+   * so both loaders derive their high-demand window from one geometry.
+   * `undefined` off live, and on live until a stream has segments.
+   */
+  liveTarget: LiveDelay | undefined;
 };
 
 /** How a hybrid loader answers a segment request from `Core.loadSegment`. */

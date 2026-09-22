@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RequestsContainer } from "../src/requests/request-container.js";
 import type {
   SegmentWithStream,
+  StreamDetails,
   StreamWithSegments,
 } from "../src/internal-types.js";
 import type { CoreEventMap, StreamConfig } from "../src/types.js";
@@ -174,9 +175,16 @@ const flushMicrotasks = async () => {
 function setup(
   configOverrides: Partial<StreamConfig> = {},
   storage: SegmentStorage = emptyStorage,
+  streamDetails: StreamDetails = { isLive: false, liveTarget: undefined },
+  /** The segment the loader is created for; the first request of it is no seek. */
+  anchor = 0,
 ) {
   const stream = createStream(30);
   const segment = (i: number) => stream.segments.get(`seg-${i}`)!;
+  const bandwidth = {
+    all: new BandwidthCalculator(),
+    http: new BandwidthCalculator(),
+  };
   const config: StreamConfig = {
     ...Core.DEFAULT_STREAM_CONFIG,
     simultaneousHttpDownloads: 1,
@@ -190,10 +198,10 @@ function setup(
     ...configOverrides,
   };
   const loader = new HybridLoader(
-    segment(0),
-    { isLive: false },
+    segment(anchor),
+    streamDetails,
     config,
-    { all: new BandwidthCalculator(), http: new BandwidthCalculator() },
+    bandwidth,
     storage,
     {} as never,
     new EventTarget<CoreEventMap>(),
@@ -217,7 +225,7 @@ function setup(
         },
       );
   const status = (i: number) => state.requests.get(segment(i))?.status;
-  return { loader, segment, callbacks, startLoading, status, state };
+  return { loader, segment, callbacks, startLoading, status, state, bandwidth };
 }
 
 describe("HybridLoader: making room for a high-demand segment", () => {
@@ -321,6 +329,129 @@ describe("HybridLoader: making room for a high-demand segment", () => {
     expect(state.httpAborted).toEqual([]);
     expect(status(8)).toBe("loading");
     expect(state.httpStarted).toEqual(["seg-0"]);
+    loader.destroy();
+  });
+});
+
+describe("HybridLoader: the high-demand window", () => {
+  beforeEach(() => {
+    vi.stubGlobal("window", globalThis);
+    const { state } = fakes;
+    state.peerCount = 0;
+    state.loadedBySomeone.clear();
+    state.httpStarted.length = 0;
+    state.p2pStarted.length = 0;
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /** Three HTTP slots, and no window configured: what the loader derives decides. */
+  const derived = {
+    simultaneousHttpDownloads: 3,
+    highDemandTimeWindow: undefined,
+  };
+  /** A four-segment window of five second segments: the delay is 15 s. */
+  const liveTarget = { delay: 15, segment: 5 };
+
+  it("is the default off live", async () => {
+    // 15 s reaches segments 0 to 3 of 4 s each; three slots fill.
+    const { loader, segment, callbacks, state } = setup(derived);
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+
+    expect(state.httpStarted).toEqual(["seg-0", "seg-1", "seg-2"]);
+    loader.destroy();
+  });
+
+  it("is half the player's buffer on live, derived from the live window", async () => {
+    // Delay 15 less a segment is a 10 s buffer; half of it reaches segments
+    // 0 and 1 only, and a slot stays free.
+    const { loader, segment, callbacks, state } = setup(derived, emptyStorage, {
+      isLive: true,
+      liveTarget,
+    });
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+
+    expect(state.httpStarted).toEqual(["seg-0", "seg-1"]);
+    loader.destroy();
+  });
+
+  it("is narrowed by a configured number on live, and never widened by one", async () => {
+    // 30 s of urgency over a player that buffers 10 s would cover everything
+    // it fetches, leaving the election nothing: the geometry wins, and the
+    // window is the same 5 s it derives.
+    const wide = setup({ ...derived, highDemandTimeWindow: 30 }, emptyStorage, {
+      isLive: true,
+      liveTarget,
+    });
+    await wide.loader.loadSegment(wide.segment(0), wide.callbacks);
+    await flush();
+    expect(wide.state.httpStarted).toEqual(["seg-0", "seg-1"]);
+    wide.loader.destroy();
+
+    fakes.state.httpStarted.length = 0;
+
+    // Narrower than the derived window is the integrator's to ask for: it
+    // leaves peers more room, not less.
+    const narrow = setup(
+      { ...derived, highDemandTimeWindow: 3 },
+      emptyStorage,
+      {
+        isLive: true,
+        liveTarget,
+      },
+    );
+    await narrow.loader.loadSegment(narrow.segment(0), narrow.callbacks);
+    await flush();
+    expect(narrow.state.httpStarted).toEqual(["seg-0"]);
+    narrow.loader.destroy();
+  });
+
+  it("fetches the player's request beyond the window at once when no peer is connected", async () => {
+    // The player buffers 10 s ahead and asks for the segment at the end of
+    // its buffer, outside the 5 s window. Nobody to take it from, nobody to
+    // elect: it goes over HTTP now rather than when the window reaches it.
+    const { loader, segment, callbacks, state } = setup(derived, emptyStorage, {
+      isLive: true,
+      liveTarget,
+    });
+    loader.updatePlayback({ bufferAhead: 10, rate: 1 });
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+
+    expect(state.httpStarted).toEqual(["seg-0"]);
+    loader.destroy();
+  });
+
+  it("leaves the same request to the election while a peer is connected", async () => {
+    // Segment 2 ranks this peer as the backup of `peer-0`, and a fast link
+    // puts its deadline well after the 5 s the segment has before the
+    // window: the owner's turn first.
+    const { loader, segment, callbacks, state, bandwidth } = setup(
+      derived,
+      emptyStorage,
+      { isLive: true, liveTarget },
+      2,
+    );
+    fakes.state.peerCount = 1;
+    const now = performance.now();
+    bandwidth.http.startLoading(now - 1000);
+    bandwidth.http.addBytes(10_000_000, now - 1000);
+    bandwidth.http.addBytes(10_000_000, now);
+    bandwidth.http.stopLoading(now);
+    loader.updatePlayback({ bufferAhead: 10, rate: 1 });
+
+    await loader.loadSegment(segment(2), callbacks);
+    await flush();
+
+    // The pass still prefetches what this peer owns further ahead.
+    expect(state.httpStarted).not.toContain("seg-2");
+    expect(state.p2pStarted).toEqual([]);
     loader.destroy();
   });
 });

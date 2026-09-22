@@ -115,6 +115,44 @@ islands, and the final island may be nowhere near the playhead.
 - Tell core which variant is active — it follows from the requested segment.
 - Tell core whether the stream is live — it follows from the manifest.
 
+## Settings an adapter writes
+
+Placing a player in a live window means writing settings that are the player's:
+how far behind the edge the playhead sits, and how far ahead of it the player
+fetches. Both are derived from the live window, and the window moves — a
+channel's DVR window fills out after it starts publishing, and each refresh can
+change both numbers. Every adapter that writes such a setting follows the same
+three rules.
+
+1. **Ownership is decided from the engine's own default, and once.** A setting
+   the integrator configured is theirs and is never written. A setting derived
+   from another — the forward buffer is measured from the live delay — is the
+   adapter's to write only where the setting it derives from is the adapter's
+   too. Sized against a delay somebody else chose, a buffer aims at a live edge
+   that is not where the adapter thinks it is.
+2. **What the adapter wrote is remembered**, so that its own last word is
+   distinguishable from anybody else's. This is not the hysteresis that decides
+   whether a window moved; it is who wrote the value now in the player.
+3. **A value the adapter wrote moves in either direction. A value written from
+   outside becomes the ceiling.** What the player holds that the adapter did not
+   write is the integrator's latest word, or the engine's own, and the adapter
+   never raises past it. What the adapter wrote is its own, and is given back up
+   as well as taken down: a ceiling that only ever fell would latch at the
+   narrowest window ever seen, leaving the player buffering less than the core's
+   high-demand window, which is the failure the ceiling exists to prevent
+   ([playback-contract.md](playback-contract.md), "The time windows").
+4. **What the adapter wrote is given back when it lets the player go**, and
+   only while it is still what the player holds. A player outlives the engine
+   bound to it — an integrator turns P2P off, or binds a second engine — and a
+   setting left behind holds it to a live window nothing manages any more. A
+   value written from outside since is the integrator's word and stays as they
+   left it.
+
+The effective high-demand window is `highDemandWindowFor`, and an adapter that
+needs it calls that rather than reading `highDemandTimeWindow` from the config:
+the configured value is `undefined` wherever the window is derived, and an
+unset stream is not one to be skipped over but one using the default.
+
 ## Supported players
 
 ### HLS.js
@@ -156,11 +194,26 @@ them again, so every fragment after it would load over HTTP in silence.
 The adapter also tunes HLS.js's own buffering, because the core's background
 loader is what should fetch ahead, not the player. Every setting below is
 applied only when the integrator has not configured it, and each is applied
-once per value when a playlist loads; between playlists HLS.js is left alone.
+once per value when a playlist of at least four segments loads — a narrower
+window has no room in it to place anything — and between playlists HLS.js is
+left alone.
 
-- **Forward buffer.** `maxBufferLength` is held to the high-demand window, with
-  a floor of two segments — the playlist's average segment, as below. The
-  segments beyond it are the core's to prefetch.
+- **Forward buffer.** On a live playlist `maxBufferLength` and
+  `maxMaxBufferLength` are held one segment short of the live delay, and never
+  below two segments — the playlist's average segment, as below — by the
+  `playerBufferFor` rule the core exports and every adapter applies. The core
+  calls the nearer half of that buffer high-demand and leaves the farther half
+  for peers to fill before the player asks
+  ([playback-contract.md](playback-contract.md), "The time windows"). On VOD
+  they are held to the high-demand window instead: nothing bounds the stream
+  ahead of the player there, so the core prefetches beyond the player's buffer
+  whatever its length, and the player is held to the window so that the core
+  does the rest. Both keys are ceilings kept by the rules above: HLS.js's own
+  defaults, or a lower value the integrator set, are never raised past, what
+  the adapter itself wrote is given back up when the window grows, and both are
+  put back as the instance held them when the engine lets it go. The VOD
+  ceiling is the wider of the two streams' effective windows, since either
+  stream's loader schedules by its own.
 - **Position in the live window.** Every segment between the player's buffer
   and the live edge is one peers can fetch for each other, so the player is
   placed as deep in the window as it can go: the target latency, set through
@@ -394,12 +447,30 @@ low-latency DASH stream, where Shaka applies the configured delay on every
 parse unless the MPD suggests one of its own. A window that changes mid-stream
 therefore does not move a playing viewer.
 
-Shaka's buffering goal leaves the rest of the window ahead of the buffer for
-peers, and its own out-of-window handling — a seek to the window start plus its
-safe seek offset — covers a playhead that drifts past the tail, so no re-sync
-setting is needed. The MPD's suggested delay is
-ignored for the same reason HLS.js's hold-back is overridden: a server's
-suggestion places the player near the edge, where there is nothing to share.
+Where the integrator left `streaming.bufferingGoal` at Shaka's default **and**
+the placement above is the adapter's, the adapter sizes the goal from the same
+window: one segment short of the delay, never below two segments, by the
+`playerBufferFor` rule every adapter shares. Both conditions, because the goal
+is measured from the delay: applied over an integrator's own placement it would
+reach past the live edge by however far the two delays differ, and every fetch
+beyond the edge misses the registry. Shaka's
+own goal sits inside the core's high-demand window, so left alone the player
+would fetch every segment itself and nothing would be left for peers. Unlike
+the delay, Shaka reads the goal as it fetches, so the source playing buffers to
+it from the next segment on. It is measured from the delay the source was
+actually placed at — the first one applied to it, since a later write is for
+the next load — rather than from the window last parsed: a registry that fills
+over the first few refreshes widens the window, and a goal sized for a
+placement the player never took would reach past the live edge. A window that
+turns out narrower moves it down, since the playhead is then nearer the edge
+than the placement assumed. It is given back on release like every other
+setting, and each new source starts from Shaka's own value until its first live
+window is sized. Its
+own out-of-window handling — a seek to the window start plus its safe seek
+offset — covers a playhead that drifts past the tail, so no re-sync setting is
+needed. The MPD's suggested delay is ignored for the same reason HLS.js's
+hold-back is overridden: a server's suggestion places the player near the
+edge, where there is nothing to share.
 
 One Shaka feature is outside what the adapter supports. `player.preload()`
 fetches a manifest through the networking engine without a `loading` event, so
@@ -474,10 +545,9 @@ default, the adapter places the player in the window. Placement is two
 settings, not one, and the two are compared and written independently: the
 delay is re-applied when the window moves by half a segment or
 `useSuggestedPresentationDelay` is turned back on, the buffer ceiling when
-what the player holds differs from the ceiling — it follows the high demand
-window, which is configurable at runtime — and a change to one does not
-rewrite the other, since rewriting the delay moves the target dash.js measures
-its catch-up against. An integrator who sets `liveDelay` while the source plays
+what the player holds differs from the ceiling — a setting raised from outside
+is brought back down — and a change to one does not rewrite the other, since
+rewriting the delay moves the target dash.js measures its catch-up against. An integrator who sets `liveDelay` while the source plays
 has placed the player themselves: the buffer the adapter wrote is given back,
 the delay is left as they set it, and the source is theirs from there.
 
@@ -498,9 +568,10 @@ than left wherever dash.js puts it, which is at the edge.
   `useSuggestedPresentationDelay` is turned off, because a server's suggestion
   places the player near the edge where there is nothing to share.
 - **Forward buffer.** `bufferTimeDefault`, `bufferTimeAtTopQuality` and
-  `bufferTimeAtTopQualityLongForm` are held to the high-demand window, never
-  closer to the live edge than one segment and never below two segments. The
-  segments beyond it are the core's to prefetch.
+  `bufferTimeAtTopQualityLongForm` are held one segment short of the live
+  delay and never below two segments, by the `playerBufferFor` rule every
+  adapter shares. The core calls the nearer half of that buffer high-demand and
+  leaves the farther half for peers to fill before the player asks.
 
 The second is not a refinement of the first. A live delay places the
 **playhead**; what the player fetches is a forward buffer ahead of it, and
