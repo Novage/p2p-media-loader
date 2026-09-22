@@ -9,9 +9,10 @@ tool-specific file point here; this is the source of truth.
 `specs/` documents the system as designed — the shape the code is meant to have
 and the reasoning behind it. It is design documentation, not a roadmap: it
 describes the end state, never development phases or a narrative of how the code
-got here. Contrasting a decision with the design it replaced is welcome when it
-explains _why_ — that is reasoning, not history — and must not be stripped as
-such.
+got here. Contrasting a decision with an alternative is welcome when it explains
+_why_, but the alternative is put as a hypothetical — "a position per stream
+would freeze the moment one stops" — never as something this repository once
+did.
 
 **Read before changing.** Before modifying anything that crosses a package
 boundary, changes identity derivation, alters the peer protocol, or adds a

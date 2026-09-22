@@ -197,8 +197,9 @@ HLS.js and with it the core. The demo's `videojs10_hls` player is this.
 Because the engine attaches inside HLS.js's construction of the playlist
 loader, a failure in letting the previous instance go — an integrator's
 segment storage throwing from its teardown — is logged there, not raised: a
-throw would abort the new source's manifest request. `destroy()` called by the
-integrator raises it as before.
+throw would abort the new source's manifest request. A `destroy()` the
+integrator calls raises it, since no manifest request of the player's waits on
+that call.
 
 The adapter's preload handling captures HLS.js's `maxBufferLength` when it
 first sees the instance and writes it back when the element starts playing,
@@ -314,8 +315,9 @@ segment that came from a peer or from storage — and never less than 1 ms.
 Shaka weights each sample by its duration and divides bytes by it; a 0 ms
 sample is infinity at zero weight, which its moving average turns into `NaN`,
 after which every variant comparison is false and the player lurches between
-renditions. A decoder that cannot switch mid-stream then fails with a decode
-error, which is how the defect surfaced on a Smart TV.
+renditions. A decoder that cannot switch mid-stream then fails outright with a
+decode error, which is how it shows on a Smart TV, where the switching is least
+forgiving.
 
 Whatever the plugin does not serve itself goes to the plugin Shaka would have
 chosen for that request: `HttpFetchPlugin` where
@@ -369,8 +371,8 @@ type the adapter passes through, and a request of a player with no engine
 bound, which reaches the adapter because it registers at Shaka's APPLICATION
 priority, above the PREFERRED and FALLBACK at which Shaka registers its own.
 
-No manifest-parser decoration and no `segmentIndex` hooking. Shaka's internal
-representation of the stream is not consulted.
+Shaka's own representation of the stream is never consulted: every stream
+property and every identity comes from the manifest core parsed.
 
 The adapter places the player in a live window by the same rule as the HLS.js
 adapter — as deep as the window allows, one segment inside the tail, never more
@@ -399,15 +401,12 @@ setting is needed. The MPD's suggested delay is
 ignored for the same reason HLS.js's hold-back is overridden: a server's
 suggestion places the player near the edge, where there is nothing to share.
 
-Two Shaka features are outside what the adapter supports. `player.preload()`
+One Shaka feature is outside what the adapter supports. `player.preload()`
 fetches a manifest through the networking engine without a `loading` event, so
 the adapter processes it under the source that is playing, into that source's
 core — which the `load()` of the preloaded source then tears down, and Shaka
 does not fetch the manifest again; the new source plays without P2P. Call
-`load(uri)` directly. And a registry the adapter never took over is not its to
-hand back: `unregisterPlugins` with no registration in effect leaves the
-schemes alone, so an integrator's own plugin survives a cleanup that runs
-twice.
+`load(uri)` directly.
 
 ### dash.js
 

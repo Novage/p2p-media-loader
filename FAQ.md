@@ -4,8 +4,6 @@ Table of contents:
 
 - [What is tracker?](#what-is-tracker)
 - [Don't use public trackers in production](#dont-use-public-trackers-in-production)
-- [How to achieve better P2P ratio for live streams?](#how-to-achieve-better-p2p-ratio-for-live-streams)
-- [How to achieve better P2P ratio for VOD streams?](#how-to-achieve-better-p2p-ratio-for-vod-streams)
 - [What are the requirements to share a stream over P2P?](#what-are-the-requirements-to-share-a-stream-over-p2p)
 - [Is it possible to have 100% P2P ratio?](#is-it-possible-to-have-100-p2p-ratio)
 - [What happens if there are no peers on a stream?](#what-happens-if-there-are-no-peers-on-a-stream)
@@ -38,8 +36,8 @@ That is why they can't be used in production environments. Consider running your
 The requirements to share a stream over P2P are:
 
 - The stream should have the same swarm ID on all the peers. Swarm ID is equal to the stream manifest URL without query parameters by default. If a stream URL is not the same for different peers you can set the swarm ID manually [using configuration](#how-to-manually-set-swarm-id).
-- The manifest should have the same number of variants (i.e. qualities) in the same order on all the peers. URLs of the variant playlists don't matter.
-- Variants should consist of the same segments under the same sequence numbers (see #EXT-X-MEDIA-SEQUENCE for HLS) on all the peers. URLs of the segments don't matter.
+- Every peer's manifest should describe each quality with the same properties: codecs, resolution, frame rate, video range, language, channels and name. Those are what a stream's swarm is derived from. Neither the order of the variants nor the URLs of the variant playlists matter.
+- Variants should consist of the same segments at the same positions on all the peers - the same media sequence numbers for HLS (see #EXT-X-MEDIA-SEQUENCE), the same presentation times for MPEG-DASH. URLs of the segments don't matter.
 
 ## Is it possible to have 100% P2P ratio?
 

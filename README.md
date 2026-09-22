@@ -65,7 +65,7 @@ This library makes it possible to build large-scale P2P mesh networks — often 
 
 - **Chrome** on desktops and Android
 - **Firefox** on desktops and Android
-- **Sarafi** on macOS
+- **Safari** on macOS
 - **Safari** on iPadOS (iPad)
 - **Safari** on iOS (iPhone, iOS version 17.1+ required)
 - **Edge** on Windows
@@ -117,4 +117,4 @@ Subsequently, **P2P Media Loader** transmits media stream details and connection
 
 **P2P Media Loader** then connects with these peers to download additional media segments and simultaneously shares segments that it has already downloaded.
 
-Periodically, random peers in the P2P swarm download new segments over HTTP(S) and distribute them to others via P2P.
+Periodically, peers in the P2P swarm download segments the swarm does not hold yet over HTTP(S) and distribute them to others via P2P. Each such segment has one elected owner among the connected peers: every peer scores itself and its neighbours for that segment, and the lowest score fetches. Ownership rotates from segment to segment, so no peer is the swarm's permanent origin.

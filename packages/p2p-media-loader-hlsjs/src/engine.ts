@@ -111,7 +111,7 @@ export class HlsJsP2PEngine {
   });
   private readonly debug = debug("p2pml-hlsjs:engine");
   // See HybridLoader.oracleLogger: logs media.currentTime beside the core's
-  // estimate so the two can be compared while the playback contract beds in.
+  // estimate, so the two can be compared when the playhead is in doubt.
   private readonly oracle = debug("p2pml:playback-oracle");
 
   /**
@@ -277,7 +277,7 @@ export class HlsJsP2PEngine {
     // that made of itself. This runs inside HLS.js's construction of the
     // playlist loader, where a throw would abort the new source's manifest
     // request, so the failure is logged here rather than raised; `destroy()`
-    // called by the integrator raises it as before.
+    // called by the integrator raises it.
     const failures = this.currentHlsInstance ? runAll([this.destroy]) : [];
     this.currentHlsInstance = hlsInstance;
     this.updateHlsEventsHandlers("register");
@@ -414,10 +414,10 @@ export class HlsJsP2PEngine {
       config.mainStream.highDemandTimeWindow,
       config.secondaryStream.highDemandTimeWindow,
     );
-    // HLS.js maxBufferLength dictates how many seconds AHEAD OF THE PLAYHEAD it buffers.
-    // To ensure HLS.js only buffers up to the highDemandTimeWindow and lets the
-    // background loader do all the advance fetching, we set p2pOptimalBufferLength
-    // directly equal to highDemandTimeWindow, but with a lower bound based on fragment duration.
+    // HLS.js's maxBufferLength is how many seconds AHEAD OF THE PLAYHEAD it
+    // buffers. Held to the high-demand window so the background loader does the
+    // advance fetching, with a floor of two fragments for a player that could
+    // not otherwise keep going.
     const p2pOptimalBufferLength = Math.max(
       fragmentDuration * 2,
       highDemandTimeWindow,

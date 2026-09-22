@@ -14,6 +14,17 @@ that there is something for the swarm to share. The second kind of load is the
 one that needs coordination — every peer fetching the same new segment over
 HTTP is the failure this section prevents.
 
+How far ahead that reaches is the HTTP window's business, not the election's.
+A live window holds less than the window config asks for, so the candidate set
+is whatever the playlist carries. A long VOD truncates nothing: the default
+window reaches 3000 seconds ahead, an owner fetches what it owns across all of
+it as soon as it is elected, and what stops the peer is the storage brake —
+prefetching halts below ten percent free, and a VOD retains everything ahead of
+the playhead ([playback-contract.md](playback-contract.md)). A peer therefore
+fills its share of the next fifty minutes and then holds. Whoever would rather
+not spend those bytes on a viewer who may leave lowers `httpDownloadTimeWindow`;
+the election needs no horizon of its own.
+
 ## The election
 
 For each segment, every peer scores itself and each peer it is connected to
@@ -59,7 +70,8 @@ plus a small allowance for the owner's announcement to arrive. The multiple
 shrinks with rank: the first backup at twice the fetch time, the second at one
 and a half, towards once. Backups therefore act in order, each only when the
 one before it has not, and none of them fetches while there is still time for
-the owner or a relaying neighbour to deliver.
+the owner or a relaying neighbour to deliver. That order is as local as the
+scores behind it; how local is below.
 
 A deadline passes with no queue event behind it — a paused player reports
 nothing, a proxy never does — so the election is re-checked on a timer as
@@ -85,6 +97,17 @@ In that moment both may compute themselves the owner and both fetch. It is the
 same duplicate an uncoordinated scheme produces all the time, confined to
 churn.
 
+Rank is counted among a peer's connections, so the order it imposes is only as
+wide as they are. Dense connectivity represents every rank from zero upwards
+among a peer's neighbours and the deadlines stagger as described. Sparse
+connectivity collapses them: along a chain of peers connected only to their
+neighbours in it, each has exactly one neighbour scoring lower, so every peer
+but the owner is the first backup and all of them carry the same deadline. If
+it arrives they fetch together rather than in turn, one duplicate per link in
+the chain. Density is what makes the staggering work, and `p2pMaxPeers` at its
+default of 50 gives a peer a spread of ranks in any swarm large enough to need
+one.
+
 A relay chain is invisible while it moves: a peer pulling a segment over P2P
 announces it only once it holds it, so a peer further down the chain sees
 silence and, if the chain is slower than its deadline, fetches over HTTP a
@@ -98,6 +121,6 @@ their windows; each elects owners only among the segments it wants. Nothing
 here makes the two exchange segments they do not both want.
 
 Nothing here is on the wire. The scores are computed from ids every peer
-already knows, and the announcement of in-flight HTTP loads existed before the
-election. A change to the hash changes who fetches, not what is exchanged, so
+already knows, and in-flight HTTP loads are part of the segments announcement
+independently of the election. A change to the hash changes who fetches, not what is exchanged, so
 it is not a protocol change ([segment-identity.md](segment-identity.md)).

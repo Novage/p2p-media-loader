@@ -186,7 +186,8 @@ export class RequestRouter {
    * name and aborts the XHR it made last, which for a request the core is
    * serving is some other request's. So the named request is aborted where it
    * lives: at the core if it is the one being served, at dash.js's loader if
-   * not. Named nothing — a caller of the old shape — both are aborted.
+   * not. Named nothing — an older dash.js, whose `abort()` takes no request —
+   * both are aborted.
    */
   abort(request?: CommonMediaRequestLike) {
     if (request === undefined) {

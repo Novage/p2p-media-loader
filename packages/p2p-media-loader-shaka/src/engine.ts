@@ -94,7 +94,7 @@ export class ShakaP2PEngine {
   private bound?: BoundPlayer;
   private readonly debug = debug("p2pml-shaka:engine");
   // See HybridLoader.oracleLogger: logs media.currentTime beside the core's
-  // estimate so the two can be compared while the playback contract beds in.
+  // estimate, so the two can be compared when the playhead is in doubt.
   private readonly oracle = debug("p2pml:playback-oracle");
 
   /**

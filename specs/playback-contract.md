@@ -131,8 +131,8 @@ the segment store.
 ## What the segment store receives
 
 `SegmentStorage` is public API — an integration may supply its own through
-`customSegmentStorageFactory` — so it is worth being explicit about what changes
-for one.
+`customSegmentStorageFactory` — so it is worth being explicit about what one is
+given.
 
 The store is told the playhead through `onPlaybackUpdated(position, rate)`, and
 it compares that position against the `startTime` and `endTime` it was given
@@ -153,9 +153,9 @@ timelines can differ by seconds; a segment of one judged against the other's
 position is then off by that much, inside the trailing window the store keeps
 on a live stream. A position kept per stream or per type would be exact while
 both report and would freeze the moment one stops, retaining its segments for
-ever, so the store does not. The signature does not change and the comparison
-stays valid, because segment times moved to the same timeline. What changes is
-that the absolute values no longer coincide with `video.currentTime`.
+ever, so the store does not. Both values sit on the manifest timeline, which is
+what keeps the comparison valid, and is why neither of them is
+`video.currentTime`.
 
 A custom store that only ever compares the position it is given against the
 segment times it was given is unaffected. A custom store that mixes in a

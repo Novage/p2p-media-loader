@@ -14,7 +14,8 @@ import { subscribeToUiEvents } from "../utils";
  * initializes its dash.js player up front and attaches a source only when
  * one is set, so the window the engine needs — `bindPlayer` before dash.js
  * makes its first request — is any moment before the source goes in.
- * Nothing in the packages changes for this.
+ * Video.js 10 needs no integration package of its own: the dash.js engine
+ * drives the adapter's dash.js player directly.
  *
  * Quality selection is the skin's own, from the representations dash.js
  * reports; the other demo players carry a `<select>` because their skins

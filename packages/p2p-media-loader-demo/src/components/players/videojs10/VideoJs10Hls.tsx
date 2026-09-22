@@ -21,8 +21,9 @@ type P2PLoaders = NonNullable<HlsEngineConfig["hlsJs"]>;
  * own to hook: its `HlsJsAdapter` constructs HLS.js from the config in
  * `source.engine.hlsJs`, handed over untouched, so the engine's loaders go in
  * there; and it exposes the instance as `engine`, which `bindHls` takes as a
- * getter and resolves at the first playlist load. Nothing in the packages
- * changes for this — the two calls in `P2PHlsVideo` are the whole integration.
+ * getter and resolves at the first playlist load. Video.js 10 needs no
+ * integration package of its own — the two calls in `P2PHlsVideo` are the
+ * whole integration.
  *
  * Quality selection is the skin's own, from the renditions HLS.js reports;
  * the other demo players carry a `<select>` because their skins have none.

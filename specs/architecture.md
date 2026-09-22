@@ -9,11 +9,11 @@ from that parse: which streams exist, which segments they contain, what each
 segment's identity is, and where each segment sits on the stream's timeline. A
 player adapter never describes the stream to core.
 
-This inverts the earlier design, in which every adapter translated its player's
-internal model into core's `Stream` and `Segment` types. That translation was
-the source of the system's hardest problems: each player exposes a different
-model, so each adapter derived segment identity differently, and peers running
-different players could not reliably recognise the same segment.
+Were an adapter to translate its player's internal model into core's `Stream`
+and `Segment` types instead, that translation would be the system's hardest
+problem: each player exposes a different model, so each adapter would derive
+segment identity differently, and peers running different players could not
+reliably recognise the same segment.
 
 ## Division of responsibility
 
@@ -52,8 +52,8 @@ derive it the same way. One parser, running everywhere, guarantees that by
 construction. Per-player derivation cannot.
 
 **Player internals are not a stable interface.** Reconstructing HLS media
-sequence numbers from Shaka required hooking `segmentIndex` and maintaining a
-parallel `mediaSequenceTimeMap` — private behaviour that breaks on upgrade.
+sequence numbers from Shaka means hooking `segmentIndex` and keeping a parallel
+map of sequence numbers to times — private behaviour that breaks on upgrade.
 
 **New players become cheap.** Adding a player means implementing the three
 responsibilities above, not modelling its manifest representation.

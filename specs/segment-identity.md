@@ -49,10 +49,9 @@ The value is read once, when a stream is registered, and never re-read.
 Because core parses the manifest itself, the properties feeding `identityHash`
 are read from the manifest rather than from a player's representation of it.
 Every peer hashes the same input, so nothing is normalized: a codec string, a
-frame rate, a language tag is hashed as the manifest wrote it. The
-normalization the previous protocol carried existed to reconcile what
-different players reported for one rendition; with one parser there is nothing
-to reconcile.
+frame rate, a language tag is hashed as the manifest wrote it. Normalization
+would exist only to reconcile what different players report for one rendition,
+and with one parser there is nothing to reconcile.
 
 **Bitrate is part of a stream's identity only where the manifest needs it.**
 Bandwidth is the one attribute an origin may recompute on every request: some
@@ -119,11 +118,10 @@ Neither depends on when a peer joined, what its player buffered, or how far into
 the stream it started — two peers watching the same live stream from different
 points derive the same `externalId` for the same segment.
 
-This is the single most important consequence of core parsing manifests itself.
-The previous design derived `externalId` three different ways depending on the
-player and protocol, one of which reconstructed media sequence numbers from
-player internals. Cross-player swarms depended on that reconstruction being
-exactly right.
+This follows from core parsing the manifest itself. Taken from each player's
+own model, the derivation would be a different one per player and protocol —
+one of them reconstructing media sequence numbers from player internals — and
+every cross-player swarm would rest on that reconstruction being exactly right.
 
 ### Why DASH uses presentation time rather than a segment number
 
@@ -141,8 +139,9 @@ is not available in a form that survives every DASH addressing mode:
 
 Presentation time is the one property every DASH addressing mode agrees on, so a
 segment identifies the same way whether its index came from a `SegmentTemplate`,
-a `SegmentTimeline`, or a `sidx` box. That is what allows indexed-segment support
-to be added without a protocol change.
+a `SegmentTimeline`, or a `sidx` box. That is what lets an externally indexed
+stream share a swarm with a templated one, with no derivation of its own on the
+wire.
 
 Presentation time is computed from integer `timescale` arithmetic in the
 manifest, so every peer parsing the same manifest arrives at the same value,
@@ -195,13 +194,11 @@ request queue stay consistent. **Changing it shifts every `SegmentBase`
 `PEER_PROTOCOL_VERSION` is part of every stream swarm ID, so peers with
 incompatible derivations never meet in the same swarm.
 
-**This design is itself a protocol version.** Both derivations above differ from
-the previous version's — HLS moved from a per-player sequence number or index to
-the manifest's media sequence, DASH from a truncated half-second bucket to
-rounded 100 ms presentation time — so the manifest-driven core carries its own
-`PEER_PROTOCOL_VERSION`, and peers running the previous version form separate
-swarms from it. That is the intended outcome, not a defect: the two derive
-identity differently and must not be allowed to meet.
+**The derivations above are themselves a protocol version.** A peer deriving
+identity any other way — a per-player sequence number, a truncated half-second
+DASH bucket — is in a swarm of its own by construction, since the version sits
+in every stream swarm ID. That is the intended outcome and not a defect: two
+derivations that disagree must not be allowed to meet.
 
 **Any change to how `identityHash` or `externalId` is derived requires bumping
 it.** This includes changes that look cosmetic: a different normalization of a

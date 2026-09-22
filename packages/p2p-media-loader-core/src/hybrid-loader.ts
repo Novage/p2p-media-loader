@@ -37,9 +37,10 @@ export class HybridLoader {
   private playback: Playback;
   private readonly playbackTracker: PlaybackTracker;
   private readonly logger: debug.Debugger;
-  // Diagnostic only. While segment times still come from the player, the
-  // estimate below must match media.currentTime; the engines log that value in
-  // the same namespace. Enable with localStorage.debug = "p2pml:playback-oracle".
+  // Diagnostic only. Logs the core's own playhead estimate — buffer edge less
+  // buffer ahead, in manifest time — in the namespace the engines log
+  // media.currentTime in, so the two can be read side by side. Enable with
+  // localStorage.debug = "p2pml:playback-oracle".
   private readonly oracleLogger = debug("p2pml:playback-oracle");
   private levelChangedTimestamp?: number;
   private lastQueueProcessingTimeStamp?: number;
@@ -113,15 +114,16 @@ export class HybridLoader {
    * player reports nothing, a proxy never does — so the election is
    * re-checked on a timer as well. Its period is one to two seconds whatever
    * the swarm's size: the deadlines it judges are sub-second multiples of a
-   * fetch time, and a period that grew with the peer count, as the random
-   * scheme before the election had, would let a segment enter the
-   * high-demand window unfetched with the timer still tens of seconds off.
+   * fetch time, and a period that grew with the peer count would let a
+   * segment enter the high-demand window unfetched with the timer still tens
+   * of seconds off.
    * The jitter spreads the passes of peers that started together.
    *
    * Every tick elects. The election reads the playhead estimate, the
    * connected peers, the bandwidth samples behind the fetch-time estimate
    * and the HTTP slots in use, and any of them can move with no pass to show
-   * for it; tracking which one did proved more code than the work it saved.
+   * for it; tracking which one did would cost more bookkeeping than the
+   * passes it saves.
    * A queue is a walk over the stream's segment map up to the segment last
    * requested — sub-millisecond at any length a stream has — and a reporting
    * player already drives that walk once a second through its reports.
@@ -473,8 +475,8 @@ export class HybridLoader {
           (request?.failedAttempts.httpAttemptsCount ?? 0) < httpErrorRetries;
 
         if (request?.status === "loading") {
-          // High-demand request is loading
-
+          // A high-demand segment already coming over P2P is worth moving to
+          // HTTP: the window it is in is the one the player is about to play.
           const shouldSwitchFromP2PToHttp =
             canLoadThroughHttp &&
             request.downloadSource === "p2p" &&
@@ -488,8 +490,6 @@ export class HybridLoader {
 
           continue;
         }
-
-        // High-demand request is not loading
 
         const shouldLoadThroughHttp =
           canLoadThroughHttp &&
@@ -836,8 +836,9 @@ export class HybridLoader {
    * whether anything changed.
    *
    * A paused player reports rate 0. Window sizing keeps the last non-zero
-   * rate instead, so prefetching continues while paused and the buffer is
-   * ready on resume — the behaviour the absolute-position code had.
+   * rate instead, so prefetching continues while paused: a viewer who pauses
+   * and resumes finds the buffer ready, where a rate of nothing would
+   * collapse every window to the segment at the playhead.
    */
   private syncPlayback(): boolean {
     const next = this.playbackTracker.getPlayback();

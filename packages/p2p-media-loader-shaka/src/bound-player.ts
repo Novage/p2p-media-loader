@@ -13,8 +13,8 @@ const SHAKA_DEFAULT_PRESENTATION_DELAY = 0;
  * What the engine has done to the player it is bound to, and what it has
  * learned about the source playing on it.
  *
- * Two lifetimes, owned here together because every defect in this area has
- * been one of them getting out of step with the other:
+ * Two lifetimes, owned here together because the two must move in step:
+ * neither is meaningful while the other is stale.
  *
  * - **The binding.** Every setting taken from the player is given back when
  *   the engine lets it go — all of them, or a player outlives its engine
@@ -41,9 +41,9 @@ export class BoundPlayer {
   /**
    * Whether any manifest of the current source described a live main stream.
    * Kept here rather than had from the core: `processManifest` describes the
-   * streams the manifest listed, and making it describe the whole
-   * presentation instead was tried and pinned the delay to streams the
-   * presentation no longer had.
+   * streams the manifest listed, not the whole presentation — a
+   * presentation-wide view would pin the delay to streams the presentation no
+   * longer has.
    */
   #seenMainStream = false;
 

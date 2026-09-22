@@ -45,7 +45,7 @@ function levelUpdated(
   },
 ) {
   const segment = details.averagetargetduration ?? 2;
-  hls.handlers.get("hlsLevelUpdated")?.("hlsLevelUpdated", {
+  fire(hls, "hlsLevelUpdated", {
     details: {
       live: details.live,
       totalduration: details.totalduration,
@@ -57,6 +57,24 @@ function levelUpdated(
       ),
     },
   });
+}
+
+/**
+ * Dispatches one HLS.js event to the handler the engine registered for it.
+ * Looking the handler up and calling it optionally would pass silently for an
+ * event the engine never registers, which is worth a failure: a test that
+ * asserts nothing happened proves nothing if nothing was dispatched.
+ */
+function fire(
+  hls: ReturnType<typeof createFakeHls>,
+  event: string,
+  data: unknown = {},
+) {
+  const handler = hls.handlers.get(event);
+  if (!handler) {
+    throw new Error(`the engine registered no handler for ${event}`);
+  }
+  handler(event, data);
 }
 
 function setup(config?: ConstructorParameters<typeof HlsJsP2PEngine>[0]) {
@@ -105,8 +123,9 @@ describe("HLS.js live window placement", () => {
 
   it("uses the average segment length, not EXT-X-TARGETDURATION", () => {
     const { hls } = setup();
-    // The fixture's targetduration is 6 while segments average 2 s. With the
-    // count-based tuning this stream asked for 78 s of latency in a 28 s window.
+    // The fixture's targetduration is 6 while segments average 2 s. Placing the
+    // player by EXT-X-TARGETDURATION would ask for 78 s of latency in a 28 s
+    // window.
     levelUpdated(hls, {
       live: true,
       totalduration: 28,
@@ -241,11 +260,12 @@ describe("HLS.js engine event wiring", () => {
     const destroy = vi.fn();
     core.destroy = destroy;
 
-    hls.handlers.get("hlsMediaAttaching")?.("hlsMediaAttaching", {});
+    fire(hls, "hlsMediaDetached");
+    fire(hls, "hlsMediaAttached");
     expect(destroy).not.toHaveBeenCalled();
 
     // Loading a source is a new stream, and does let the core go.
-    hls.handlers.get("hlsManifestLoading")?.("hlsManifestLoading", {});
+    fire(hls, "hlsManifestLoading");
     expect(destroy).toHaveBeenCalledTimes(1);
   });
 
@@ -257,7 +277,7 @@ describe("HLS.js engine event wiring", () => {
     const { hls } = setup();
     expect(hls.handlers.has("hlsLevelUpdated")).toBe(true);
     expect(() =>
-      hls.handlers.get("hlsLevelUpdated")?.("hlsLevelUpdated", {
+      fire(hls, "hlsLevelUpdated", {
         details: { live: false, totalduration: 0, fragments: [] },
       }),
     ).not.toThrow();

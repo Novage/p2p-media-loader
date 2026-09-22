@@ -43,8 +43,9 @@ DASH parser rather than in core: only DASH deployments carry it. A parser
 therefore offers an optional second tokenizer, `parseSegmentIndex`, which the
 DASH parser supplies and the HLS parser does not; core asks the parsers it was
 given rather than reading the box itself, so nothing links the reader into a
-bundle built for a protocol that lists its segments in the manifest. The
-selection mechanism is unchanged — it is still one static import.
+bundle built for a protocol that lists its segments in the manifest. It
+arrives by the same route the parser does: one static import, nothing resolved
+at runtime.
 
 ### What may be swapped, and what may not
 

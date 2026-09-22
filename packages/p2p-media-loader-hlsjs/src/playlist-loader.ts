@@ -75,9 +75,7 @@ export class PlaylistLoaderBase implements Loader<PlaylistLoaderContext> {
     callbacks: LoaderCallbacks<LoaderContext>,
   ) {
     const core = this.#core;
-    // Every playlist HLS.js fetches comes through here, subtitle tracks
-    // included. The core keeps a WebVTT playlist out of its registry by
-    // itself; not handing one over only saves it the parse.
+    // Subtitle tracks come through here too; see PLAYLISTS_THE_CORE_READS.
     const parsed =
       !this.#ofAnotherPlayer &&
       PLAYLISTS_THE_CORE_READS.has((context as PlaylistLoaderContext).type);

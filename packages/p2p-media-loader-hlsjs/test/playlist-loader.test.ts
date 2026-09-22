@@ -120,9 +120,9 @@ describe("HLS.js playlist loader", () => {
   });
 
   it("gives the core the playlists that name streams, and no others", () => {
-    // HLS.js routes every playlist through this loader. A subtitle track is
-    // one no master declares as a stream, so the core would register the
-    // WebVTT playlist as a stream of its own.
+    // HLS.js routes every playlist through this loader. A subtitle track names
+    // no streams, and the core would ignore it — handing one over only costs a
+    // parse.
     const { load, processManifest } = playlistLoader();
 
     for (const type of ["manifest", "level", "audioTrack"]) {

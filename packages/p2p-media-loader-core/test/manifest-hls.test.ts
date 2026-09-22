@@ -220,7 +220,8 @@ describe("hlsManifestParser: alternate video renditions", () => {
       language: "en",
       name: "Wide",
     });
-    // The variant is read as it always was; the group adds nothing to it.
+    // The group leaves the variant exactly as it would be read without one: a
+    // rendition's NAME and LANGUAGE are the rendition's, never the variant's.
     expect(variant.properties).toEqual({
       bitrate: 5000000,
       codecs: "avc1.64002a",
