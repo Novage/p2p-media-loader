@@ -130,6 +130,11 @@ export const PlaybackOptions = ({
           Create new peer
         </button>
       </div>
+      <p className="peer-hint">
+        P2P sharing starts when at least two peers watch the same stream. If no
+        one else is watching, click <strong>Create new peer</strong> to open
+        another peer in a new tab, or open this page on another device.
+      </p>
     </div>
   );
 };
