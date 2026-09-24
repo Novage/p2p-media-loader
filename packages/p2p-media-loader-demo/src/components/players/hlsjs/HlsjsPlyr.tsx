@@ -58,7 +58,9 @@ export const HlsjsPlyr = ({
           onChange: (newQuality: number) => {
             levels.forEach((level, levelIndex) => {
               if (level.height === newQuality) {
-                hls.currentLevel = levelIndex;
+                // Switch at the next fragment; an immediate switch flushes
+                // the buffer and lands the player on the live edge.
+                hls.nextLevel = levelIndex;
               }
             });
           },
@@ -83,7 +85,6 @@ export const HlsjsPlyr = ({
     onPeerConnect,
     onPeerClose,
     streamUrl,
-    
   ]);
 
   return Hls.isSupported() ? (

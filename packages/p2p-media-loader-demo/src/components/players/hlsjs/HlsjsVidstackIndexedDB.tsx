@@ -3,6 +3,7 @@ import "@vidstack/react/player/styles/default/theme.css";
 import "@vidstack/react/player/styles/default/layouts/video.css";
 import {
   MediaPlayer,
+  type MediaPlayerInstance,
   MediaProvider,
   isHLSProvider,
   type MediaProviderAdapter,
@@ -14,7 +15,7 @@ import {
 import { PlayerProps } from "../../../types";
 import { HlsJsP2PEngine, HlsWithP2PConfig } from "p2p-media-loader-hlsjs";
 import { subscribeToUiEvents } from "../utils";
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import Hls from "hls.js";
 import { IndexedDbStorage } from "../../../custom-segment-storage-example/indexed-db-storage";
 
@@ -58,16 +59,27 @@ export const HlsjsVidstackIndexedDB = ({
     },
     [
       coreOptions,
-    onChunkDownloaded,
+      onChunkDownloaded,
       onChunkUploaded,
       onPeerConnect,
       onPeerClose,
     ],
   );
 
+  const playerRef = useRef<MediaPlayerInstance>(null);
+  useEffect(() => {
+    // Switch quality at the next fragment. Vidstack's default, "current",
+    // flushes the buffer and resumes at the live edge, which leaves no window
+    // ahead of the playhead for peers to fill.
+    if (playerRef.current) playerRef.current.qualities.switch = "next";
+    // Once: the player keeps one quality list for its lifetime, and a new
+    // source empties that list without touching this setting.
+  }, []);
+
   return (
     <div className="video-container">
       <MediaPlayer
+        ref={playerRef}
         autoPlay
         muted
         onProviderChange={onProviderChange}

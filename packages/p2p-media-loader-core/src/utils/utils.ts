@@ -34,10 +34,6 @@ export function joinChunks(chunks: Uint8Array[], totalBytes?: number) {
   return buffer;
 }
 
-export function getPercent(numerator: number, denominator: number): number {
-  return (numerator / denominator) * 100;
-}
-
 export function getRandomItem<T>(items: T[]): T {
   return items[Math.floor(Math.random() * items.length)];
 }
@@ -67,16 +63,6 @@ export function getWeightedRandomItem<T>(
 
 export function utf8ToUintArray(utf8String: string): Uint8Array {
   return new TextEncoder().encode(utf8String);
-}
-
-export function hexToUtf8(hexString: string) {
-  const bytes = new Uint8Array(hexString.length / 2);
-
-  for (let i = 0; i < hexString.length; i += 2) {
-    bytes[i / 2] = parseInt(hexString.slice(i, i + 2), 16);
-  }
-  const decoder = new TextDecoder();
-  return decoder.decode(bytes);
 }
 
 export function* arrayBackwards<T>(arr: T[]) {
@@ -126,14 +112,6 @@ export function deepCopy<T>(item: T): T {
   } else {
     return item;
   }
-}
-
-export function shuffleArray<T>(array: T[]): T[] {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-  return array;
 }
 
 type RecursivePartial<T> = {

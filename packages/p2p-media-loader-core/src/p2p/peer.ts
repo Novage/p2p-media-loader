@@ -111,7 +111,8 @@ export class Peer {
     const now = performance.now();
     // Cache the array iteration math for 1000ms to preserve O(1) hot path efficiency during rapid queue segment evaluations
     if (now - this.#cachedDownloadBandwidth.timestamp > 1000) {
-      // Uses a 15-second tracking window to calculate a moving average of the peer's throughput speed
+      // A window wide enough to span several segments, so one slow chunk does
+      // not make a good peer look unusable.
       this.#cachedDownloadBandwidth.value =
         this.#bandwidthCalculator.getBandwidthLoadingOnly(15);
       this.#cachedDownloadBandwidth.timestamp = now;
@@ -151,7 +152,7 @@ export class Peer {
           if (!this.#downloadingContext) break;
           if (this.#downloadingContext.isSegmentDataCommandReceived) break;
 
-          const { request, controls, requestId } = this.#downloadingContext;
+          const { request, requestId } = this.#downloadingContext;
           if (
             request.segment.externalId !== command.i ||
             requestId !== command.r
@@ -159,8 +160,20 @@ export class Peer {
             break;
           }
 
+          // A peer answering with a segment of no bytes at all. Accepting it
+          // would store an empty segment, announce it, and pass it on: one
+          // peer's defect becomes the swarm's. A peer that has nothing to
+          // send says so with SegmentAbsent. Zero is only meaningful as the
+          // remainder of a resumed transfer, where the bytes are already here.
+          if (command.s === 0 && request.loadedBytes === 0) {
+            this.#destroyOnPeerError(
+              "bytes-length-mismatch",
+              "Peer sent a segment of zero length",
+            );
+            break;
+          }
+
           this.#downloadingContext.isSegmentDataCommandReceived = true;
-          controls.firstBytesReceived();
 
           if (request.totalBytes === undefined) {
             request.setTotalBytes(request.loadedBytes + command.s);

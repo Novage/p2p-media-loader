@@ -1,8 +1,10 @@
 import { HttpRequestExecutor } from "./http-loader.js";
-import { CoreEventMap, EngineCallbacks, StreamConfig } from "./types.js";
+import { runAll } from "./run-all.js";
+import { CoreEventMap, DownloadSource, StreamConfig } from "./types.js";
 import {
   Playback,
   BandwidthCalculators,
+  EngineCallbacks,
   StreamDetails,
   SegmentWithStream,
   StreamWithSegments,
@@ -12,29 +14,57 @@ import { RequestsContainer } from "./requests/request-container.js";
 import { EngineRequest } from "./requests/engine-request.js";
 import * as QueueUtils from "./utils/queue.js";
 import * as LoggerUtils from "./utils/logger.js";
-import * as StreamUtils from "./utils/stream.js";
 import * as Utils from "./utils/utils.js";
+import * as ElectionUtils from "./utils/election.js";
+import {
+  getDistanceFromPlayhead,
+  PlaybackTimeWindowsConfig,
+} from "./utils/stream.js";
+import {
+  highDemandWindowFor,
+  playerBufferFor,
+  type LiveDelay,
+} from "./live-delay.js";
 import debug from "debug";
 import { QueueItem } from "./utils/queue.js";
 import { EventTarget } from "./utils/event-target.js";
 import { SegmentStorage } from "./segment-storage/index.js";
 import { WebTorrentSocketPool } from "./webtorrent/webtorrent-socket-pool/index.js";
+import { PlaybackTracker } from "./playback-tracker.js";
+import type { PlaybackState } from "./playback.js";
 
 const FAILED_ATTEMPTS_CLEAR_INTERVAL = 60000;
 const PEER_UPDATE_LATENCY = 1000;
+/** Weight of the newest sample in the running estimate of a stream's segment size. */
+const SEGMENT_BYTES_EWMA_ALPHA = 0.3;
 
 export class HybridLoader {
   private readonly requests: RequestsContainer;
   private engineRequest?: EngineRequest;
   private readonly p2pLoaders: P2PLoadersContainer;
-  private readonly playback: Playback;
-  private readonly segmentAvgDuration: number;
+  private playback: Playback;
+  private readonly playbackTracker: PlaybackTracker;
   private readonly logger: debug.Debugger;
+  // Diagnostic only. Logs the core's own playhead estimate — buffer edge less
+  // buffer ahead, in manifest time — in the namespace the engines log
+  // media.currentTime in, so the two can be read side by side. Enable with
+  // localStorage.debug = "p2pml:playback-oracle".
+  private readonly oracleLogger = debug("p2pml:playback-oracle");
   private levelChangedTimestamp?: number;
   private lastQueueProcessingTimeStamp?: number;
-  private randomHttpDownloadTimeout?: number;
+  private prefetchTimerId?: number;
+  /** Running estimate of segment size per stream, from segments already loaded. */
+  private readonly segmentBytesByStream = new Map<string, number>();
   private initialHttpDelayTimeoutId?: number;
   private isProcessQueueMicrotaskCreated = false;
+  /** The high-demand window last logged, so the log says when it moves. */
+  private loggedWindow?: { highDemand: number; source: string };
+  private destroyed = false;
+  /**
+   * The engine request the storage is answering, while it is: this loader's
+   * to abort meanwhile, and not the queue's to start a download for.
+   */
+  private readingFromStorage?: EngineRequest;
   private readonly createdAt = performance.now();
 
   constructor(
@@ -48,13 +78,11 @@ export class HybridLoader {
     private readonly peerId: string,
   ) {
     const activeStream = this.lastRequestedSegment.stream;
-    this.playback = { position: this.lastRequestedSegment.startTime, rate: 1 };
-    this.segmentAvgDuration = StreamUtils.getSegmentAvgDuration(activeStream);
+    this.playbackTracker = new PlaybackTracker(this.lastRequestedSegment);
+    this.playback = this.playbackTracker.getPlayback();
     this.requests = new RequestsContainer(
       this.requestProcessQueueMicrotask,
       this.bandwidthCalculators,
-      this.playback,
-      this.config,
       this.eventTarget,
     );
 
@@ -72,17 +100,59 @@ export class HybridLoader {
     this.logger = debug(`p2pml-core:hybrid-loader-${activeStream.type}`);
     this.logger.color = "coral";
 
+    // The store is told where the playhead is from the start, and again on
+    // every change (see `syncPlayback`): a proxy that never reports would
+    // otherwise leave it with no playhead at all until the first delivery.
+    // A custom storage is the integrator's code and free to throw; a throw
+    // here would be a loader that never exists, and a stream that never
+    // plays through the core.
+    for (const failure of runAll([
+      () =>
+        this.segmentStorage.onPlaybackUpdated(
+          this.playback.bufferEdge - this.playback.bufferAhead,
+          this.playback.rate,
+        ),
+    ])) {
+      this.logger("the storage refused the playhead: %O", failure);
+    }
+
     this.setIntervalLoading();
   }
 
+  /**
+   * A backup's deadline passes with no queue event behind it — a paused
+   * player reports nothing, a proxy never does — so the election is
+   * re-checked on a timer as well. Its period is one to two seconds whatever
+   * the swarm's size: the deadlines it judges are sub-second multiples of a
+   * fetch time, and a period that grew with the peer count would let a
+   * segment enter the high-demand window unfetched with the timer still tens
+   * of seconds off.
+   * The jitter spreads the passes of peers that started together.
+   *
+   * Every tick elects. The election reads the playhead estimate, the
+   * connected peers, the bandwidth samples behind the fetch-time estimate
+   * and the HTTP slots in use, and any of them can move with no pass to show
+   * for it; tracking which one did would cost more bookkeeping than the
+   * passes it saves.
+   * A queue is a walk over the stream's segment map up to the segment last
+   * requested — sub-millisecond at any length a stream has — and a reporting
+   * player already drives that walk once a second through its reports.
+   */
   private setIntervalLoading() {
-    const peersCount = this.p2pLoaders.currentLoader.connectedPeerCount;
-    const randomTimeout =
-      Math.random() * PEER_UPDATE_LATENCY * peersCount + PEER_UPDATE_LATENCY;
-    this.randomHttpDownloadTimeout = window.setTimeout(() => {
-      this.loadRandomThroughHttp();
-      this.setIntervalLoading();
-    }, randomTimeout);
+    const period = PEER_UPDATE_LATENCY * (1 + Math.random());
+    this.prefetchTimerId = window.setTimeout(() => {
+      try {
+        this.syncPlayback();
+        this.prefetchThroughHttp();
+      } catch (error) {
+        // A custom segment storage is the integrator's code and may throw
+        // once; the timer outlives it — for a paused player or a proxy it is
+        // all that elects, and a chain ended here would end for the session.
+        this.logger("prefetch tick failed: %O", error);
+      } finally {
+        if (!this.destroyed) this.setIntervalLoading();
+      }
+    }, period);
   }
 
   // api method for engines
@@ -92,24 +162,46 @@ export class HybridLoader {
   ) {
     this.logger(`requests: ${LoggerUtils.getSegmentString(segment)}`);
     const { stream } = segment;
-    if (stream !== this.lastRequestedSegment.stream) {
-      this.logger(`stream changed to ${LoggerUtils.getStreamString(stream)}`);
-      this.p2pLoaders.changeCurrentLoader(stream);
-    }
-    this.lastRequestedSegment = segment;
-
-    this.segmentStorage.onSegmentRequested(
-      stream.swarmId,
-      stream.streamSwarmId,
-      segment.externalId,
-      segment.startTime,
-      segment.endTime,
-      stream.type,
-      this.streamDetails.isLive,
-    );
+    // Created first, and everything else done inside the try: the request has
+    // to be able to fail. A throw from here on — a custom segment storage is
+    // the integrator's own code — would otherwise settle nothing, and the
+    // player would wait on that promise for ever.
     const engineRequest = new EngineRequest(segment, callbacks);
 
     try {
+      if (stream !== this.lastRequestedSegment.stream) {
+        this.logger(`stream changed to ${LoggerUtils.getStreamString(stream)}`);
+        this.p2pLoaders.changeCurrentLoader(stream);
+        // The active rendition follows from the requested segment; bandwidth
+        // measured before the switch says nothing about the new one.
+        this.levelChangedTimestamp = performance.now();
+      }
+      this.lastRequestedSegment = segment;
+      const isSeek = this.playbackTracker.onSegmentRequested(segment);
+      this.syncPlayback();
+      if (isSeek) {
+        this.logger("seek detected: buffer edge re-anchored");
+        // After a seek the player has nothing buffered at the new position; do
+        // not wait for peers before starting this request.
+        engineRequest.markAsShouldBeStartedImmediately();
+      }
+      // This loader's request from here, before the storage is read: a
+      // custom storage answers asynchronously, and an abort arriving while
+      // it does must find the request to abort — or the bytes would be
+      // delivered to a player that has moved on, and counted as buffered.
+      this.engineRequest?.abort();
+      this.engineRequest = engineRequest;
+
+      this.segmentStorage.onSegmentRequested(
+        stream.swarmId,
+        stream.streamSwarmId,
+        segment.externalId,
+        segment.startTime,
+        segment.endTime,
+        stream.type,
+        this.streamDetails.isLive,
+      );
+
       const hasSegment = this.segmentStorage.hasSegment(
         stream.swarmId,
         stream.streamSwarmId,
@@ -117,20 +209,43 @@ export class HybridLoader {
       );
 
       if (hasSegment) {
-        const data = await this.segmentStorage.getSegmentData(
-          stream.swarmId,
-          stream.streamSwarmId,
-          segment.externalId,
-        );
-        if (data) {
+        this.readingFromStorage = engineRequest;
+        let data: ArrayBuffer | undefined;
+        try {
+          data = await this.segmentStorage.getSegmentData(
+            stream.swarmId,
+            stream.streamSwarmId,
+            segment.externalId,
+          );
+        } finally {
+          if (this.readingFromStorage === engineRequest) {
+            this.readingFromStorage = undefined;
+          }
+        }
+        // Aborted while the storage was read: settled, and let go of.
+        if (engineRequest.status !== "pending") return;
+        // Byte length as well as presence: a stored segment that reads back
+        // empty is a storage that let its buffer be detached, and serving it
+        // would hand the player nothing while looking like a hit. Load it
+        // again instead — at once, because the queue still counts the segment
+        // as held and would leave this request waiting on nothing — and say so
+        // loudly enough to be found.
+        if (data?.byteLength === 0) {
+          this.logger(
+            `storage returned an empty segment for ${LoggerUtils.getSegmentString(segment)}; loading it again`,
+          );
+          engineRequest.markAsShouldBeStartedImmediately();
+        }
+
+        if (data && data.byteLength > 0) {
           const { queueDownloadRatio } = this.generateQueue();
           engineRequest.resolve(data, this.getBandwidth(queueDownloadRatio));
+          this.engineRequest = undefined;
+          this.playbackTracker.onSegmentDelivered(segment);
+          this.syncPlayback();
           return;
         }
       }
-
-      this.engineRequest?.abort();
-      this.engineRequest = engineRequest;
 
       // If the engine explicitly requests a segment that previously failed during
       // background pre-fetching, clear its error history so it can be retried.
@@ -144,12 +259,14 @@ export class HybridLoader {
         error,
       );
       engineRequest.reject();
+      if (this.engineRequest === engineRequest) this.engineRequest = undefined;
     } finally {
       this.requestProcessQueueMicrotask();
     }
   }
 
   private requestProcessQueueMicrotask = (force = true) => {
+    if (this.destroyed) return;
     const now = performance.now();
     if (
       (!force &&
@@ -163,6 +280,11 @@ export class HybridLoader {
     this.isProcessQueueMicrotaskCreated = true;
     Utils.queueMicrotask(() => {
       try {
+        // A request settling schedules a pass; an adapter tearing the core
+        // down in the same task destroys this loader before it runs. The
+        // pass would otherwise reach a storage and P2P loaders already torn
+        // down — an integrator's storage that released its backend throws.
+        if (this.destroyed) return;
         this.processQueue();
         this.lastQueueProcessingTimeStamp = now;
       } finally {
@@ -171,13 +293,15 @@ export class HybridLoader {
     });
   };
 
+  /** @returns Whether a segment was stored, which moves the storage usage. */
   private processRequests(
     queueSegmentIds: Set<string>,
     queueDownloadRatio: number,
-  ) {
+  ): boolean {
     const { stream } = this.lastRequestedSegment;
     const { httpErrorRetries } = this.config;
     const now = performance.now();
+    let stored = false;
     for (const request of this.requests.items()) {
       const {
         downloadSource: type,
@@ -209,16 +333,26 @@ export class HybridLoader {
               this.getBandwidth(queueDownloadRatio),
             );
             this.engineRequest = undefined;
+            // The buffer edge tracks what the player holds. Only an engine
+            // request delivers to the player; a background prefetch fills the
+            // store and leaves the player's buffer where it was.
+            this.playbackTracker.onSegmentDelivered(segment);
+            this.syncPlayback();
           }
           this.requests.remove(request);
+          this.noteSegmentBytes(segment, request.data.byteLength);
 
           this.logger(
             `succeed: ${LoggerUtils.getSegmentString(segment)} (byteLength: ${request.data.byteLength})`,
           );
 
+          // Under the stream the request was made for, which is not always
+          // the one last requested: a request of the previous rendition that
+          // settles after a switch would otherwise be filed under the new
+          // one's identity, and served to the player and to peers as it.
           void this.segmentStorage.storeSegment(
-            stream.swarmId,
-            stream.streamSwarmId,
+            segment.stream.swarmId,
+            segment.stream.streamSwarmId,
             segment.externalId,
             request.data,
             segment.startTime,
@@ -226,6 +360,7 @@ export class HybridLoader {
             segment.stream.type,
             this.streamDetails.isLive,
           );
+          stored = true;
           break;
         }
 
@@ -266,11 +401,17 @@ export class HybridLoader {
         request.failedAttempts.clear();
       }
     }
+    return stored;
   }
 
   private processQueue() {
-    const { queue, queueSegmentIds, queueDownloadRatio } = this.generateQueue();
-    this.processRequests(queueSegmentIds, queueDownloadRatio);
+    const {
+      queue,
+      queueSegmentIds,
+      queueDownloadRatio,
+      availableStorageCapacityPercent,
+    } = this.generateQueue();
+    const stored = this.processRequests(queueSegmentIds, queueDownloadRatio);
 
     const {
       simultaneousHttpDownloads,
@@ -296,9 +437,21 @@ export class HybridLoader {
       const { segment } = engineRequest;
       const request = this.requests.get(segment);
 
+      // With no peer connected there is nobody to take the segment from and
+      // no election to fetch it over HTTP: the player's request beyond the
+      // high-demand window — the player buffers further than the window on
+      // live, so that peers have room — would otherwise wait for the window
+      // to reach it.
+      const noPeers = this.p2pLoaders.currentLoader.connectedPeerCount === 0;
+
+      // Not while the storage is answering it: the request is this loader's
+      // from before the read so that an abort meanwhile finds it, and a
+      // download started for it here would run beside the bytes the storage
+      // is about to hand over.
       const shouldStartLoadImmediatelyEngineRequest =
-        engineRequest.shouldBeStartedImmediately &&
+        (engineRequest.shouldBeStartedImmediately || noPeers) &&
         engineRequest.status === "pending" &&
+        engineRequest !== this.readingFromStorage &&
         (!request ||
           request.status === "not-started" ||
           request.status === "failed" ||
@@ -339,13 +492,13 @@ export class HybridLoader {
           (request?.failedAttempts.httpAttemptsCount ?? 0) < httpErrorRetries;
 
         if (request?.status === "loading") {
-          // High-demand request is loading
-
+          // A high-demand segment already coming over P2P is worth moving to
+          // HTTP: the window it is in is the one the player is about to play.
           const shouldSwitchFromP2PToHttp =
             canLoadThroughHttp &&
             request.downloadSource === "p2p" &&
             (this.requests.executingHttpCount < simultaneousHttpDownloads ||
-              this.abortLastHttpLoadingInQueueAfterItem(queue, segment));
+              this.abortLastLoadingInQueueAfterItem(queue, segment, "http"));
 
           if (shouldSwitchFromP2PToHttp) {
             request.cancel();
@@ -355,12 +508,10 @@ export class HybridLoader {
           continue;
         }
 
-        // High-demand request is not loading
-
         const shouldLoadThroughHttp =
           canLoadThroughHttp &&
           (this.requests.executingHttpCount < simultaneousHttpDownloads ||
-            this.abortLastHttpLoadingInQueueAfterItem(queue, segment));
+            this.abortLastLoadingInQueueAfterItem(queue, segment, "http"));
 
         if (shouldLoadThroughHttp) {
           this.loadThroughHttp(segment);
@@ -370,13 +521,14 @@ export class HybridLoader {
         const canLoadThroughP2P =
           this.p2pLoaders.currentLoader.isSegmentLoadedBySomeone(segment) &&
           (this.requests.executingP2PCount < simultaneousP2PDownloads ||
-            this.abortLastP2PLoadingInQueueAfterItem(queue, segment));
+            this.abortLastLoadingInQueueAfterItem(queue, segment, "p2p"));
 
         if (canLoadThroughP2P) {
           this.loadThroughP2P(segment);
         }
       } else {
-        // Regular requests load via P2P only (random HTTP loading also runs by interval)
+        // Regular requests load via P2P; HTTP prefetching is the owner's job,
+        // decided below.
 
         const canLoadThroughP2P =
           statuses.isP2PDownloadable &&
@@ -387,6 +539,20 @@ export class HybridLoader {
           this.loadThroughP2P(segment);
         }
       }
+    }
+
+    // A queue pass runs on every playlist refresh, so the owner of a segment
+    // that just appeared fetches it now rather than on the next timer tick.
+    // The capacity was measured before the requests that settled this pass
+    // were stored; where any was, the brake on prefetching reads it afresh.
+    // Exact for the memory storage, which stores synchronously; a custom
+    // storage that writes asynchronously may not have landed the bytes yet,
+    // and the brake then reads what it would have read anyway.
+    if (!isInitialHttpWait) {
+      this.prefetchThroughHttp(
+        queue,
+        stored ? undefined : availableStorageCapacityPercent,
+      );
     }
   }
 
@@ -417,7 +583,28 @@ export class HybridLoader {
     this.p2pLoaders.currentLoader.downloadSegment(segment);
   }
 
-  private loadRandomThroughHttp() {
+  /**
+   * HTTP prefetching of segments nobody has yet: fetches the ones this peer
+   * owns before they reach high demand. Each candidate has one elected owner
+   * among the connected peers (see specs/prefetch.md); the owner fetches at
+   * once, everyone else waits for its announcement and takes the segment
+   * over P2P. The others are ranked as backups by the same scores, and a
+   * backup steps in only when waiting any longer would risk the fetch
+   * landing inside the player's high-demand window — judged from the time
+   * left until then and the fetch time this peer expects.
+   *
+   * @param queue - The queue of the pass this runs at the end of. Generating
+   * one walks the stream's segments from the first to the one last requested,
+   * which is the length of the stream on a long VOD, so a pass generates one
+   * queue and uses it twice. The prefetch timer has no pass behind it and
+   * passes nothing; it has synced the playback itself.
+   * @param capacityPercent - The storage capacity the pass measured for that
+   * queue; measuring walks the whole segment cache, so a pass measures once.
+   */
+  private prefetchThroughHttp(
+    queue?: readonly QueueItem[],
+    capacityPercent?: number,
+  ) {
     const { httpDownloadInitialTimeoutMs } = this.config;
     const isInitialHttpWait =
       httpDownloadInitialTimeoutMs > 0 &&
@@ -425,28 +612,32 @@ export class HybridLoader {
 
     if (isInitialHttpWait) return;
 
+    // Nothing to elect without peers — checked before measuring the storage,
+    // which walks the whole segment cache.
+    const p2pLoader = this.p2pLoaders.currentLoader;
+    if (!p2pLoader.connectedPeerCount) return;
+
     const availableStorageCapacityPercent =
-      this.getAvailableStorageCapacityPercent();
+      capacityPercent ?? this.getAvailableStorageCapacityPercent();
     if (availableStorageCapacityPercent <= 10) return;
 
     const { simultaneousHttpDownloads, httpErrorRetries } = this.config;
-    const p2pLoader = this.p2pLoaders.currentLoader;
+    const timeWindows = this.timeWindows();
+    const { highDemandTimeWindow } = timeWindows;
+    const peerIds = Array.from(p2pLoader.connectedPeerIds);
 
-    if (
-      this.requests.executingHttpCount >= simultaneousHttpDownloads ||
-      !p2pLoader.connectedPeerCount
-    ) {
-      return;
-    }
+    const items =
+      queue ??
+      QueueUtils.generateQueue(
+        this.lastRequestedSegment,
+        this.playback,
+        timeWindows,
+        p2pLoader,
+        availableStorageCapacityPercent,
+      );
 
-    const segmentsToLoad: SegmentWithStream[] = [];
-    for (const { segment, statuses } of QueueUtils.generateQueue(
-      this.lastRequestedSegment,
-      this.playback,
-      this.config,
-      this.p2pLoaders.currentLoader,
-      availableStorageCapacityPercent,
-    )) {
+    for (const { segment, statuses } of items) {
+      if (this.requests.executingHttpCount >= simultaneousHttpDownloads) break;
       if (
         !statuses.isHttpDownloadable ||
         statuses.isP2PDownloadable ||
@@ -467,66 +658,86 @@ export class HybridLoader {
       ) {
         continue;
       }
-      segmentsToLoad.push(segment);
-    }
 
-    if (!segmentsToLoad.length) return;
+      const rank = ElectionUtils.rankForSegment(
+        this.peerId,
+        peerIds,
+        segment.externalId,
+      );
+      const secondsToHighDemand = ElectionUtils.wallSecondsToHighDemand(
+        getDistanceFromPlayhead(segment, this.playback).start,
+        highDemandTimeWindow,
+        this.playback.rate,
+      );
+      const estimatedFetchSeconds = this.estimateFetchSeconds(segment);
 
-    const availableHttpDownloads =
-      simultaneousHttpDownloads - this.requests.executingHttpCount;
-
-    if (availableHttpDownloads === 0) return;
-
-    const peersCount = p2pLoader.connectedPeerCount + 1;
-    const safeRandomSegmentsCount = Math.min(
-      segmentsToLoad.length,
-      simultaneousHttpDownloads * peersCount,
-    );
-
-    const randomIndices = Utils.shuffleArray(
-      Array.from({ length: safeRandomSegmentsCount }, (_, i) => i),
-    );
-
-    let probability = safeRandomSegmentsCount / peersCount;
-
-    for (const randomIndex of randomIndices) {
-      if (this.requests.executingHttpCount >= simultaneousHttpDownloads) {
-        break;
-      }
-
-      if (probability >= 1 || Math.random() <= probability) {
-        const segment = segmentsToLoad[randomIndex];
+      if (
+        ElectionUtils.shouldFetchNow({
+          rank,
+          secondsToHighDemand,
+          estimatedFetchSeconds,
+        })
+      ) {
+        this.logger(
+          `prefetch ${LoggerUtils.getSegmentString(segment)} as ${rank === 0 ? "owner" : `backup #${rank}`}`,
+        );
         this.loadThroughHttp(segment);
       }
-
-      probability--;
-      if (probability <= 0) break;
     }
   }
 
-  private abortLastHttpLoadingInQueueAfterItem(
+  /**
+   * Expected wall-clock seconds to fetch the segment over HTTP: its size,
+   * estimated from segments of the same stream already loaded or else from
+   * the stream's bitrate, over the throughput HTTP transfers have achieved.
+   * With no transfer measured yet the link is assumed to run at the stream's
+   * bitrate, which errs on the side of stepping in early.
+   */
+  private estimateFetchSeconds(segment: SegmentWithStream): number {
+    const { stream } = segment;
+    const duration = Math.max(0, segment.endTime - segment.startTime);
+    const bitrate = stream.properties.bitrate ?? 0;
+
+    const bytes =
+      this.segmentBytesByStream.get(stream.runtimeId) ??
+      (bitrate * duration) / 8;
+    if (bytes <= 0) return duration;
+
+    const { http } = this.bandwidthCalculators;
+    const measured = Math.max(
+      http.getBandwidthLoadingOnly(10),
+      http.getBandwidthLoadingOnly(30),
+    );
+    const bandwidth = measured > 0 ? measured : bitrate;
+    if (bandwidth <= 0) return duration;
+
+    return (bytes * 8) / bandwidth;
+  }
+
+  private noteSegmentBytes(segment: SegmentWithStream, bytes: number) {
+    if (bytes <= 0) return;
+    const key = segment.stream.runtimeId;
+    const previous = this.segmentBytesByStream.get(key);
+    this.segmentBytesByStream.set(
+      key,
+      previous === undefined
+        ? bytes
+        : previous + SEGMENT_BYTES_EWMA_ALPHA * (bytes - previous),
+    );
+  }
+
+  private abortLastLoadingInQueueAfterItem(
     queue: QueueUtils.QueueItem[],
     segment: SegmentWithStream,
+    downloadSource: DownloadSource,
   ): boolean {
     for (const { segment: itemSegment } of Utils.arrayBackwards(queue)) {
       if (itemSegment === segment) break;
       const request = this.requests.get(itemSegment);
-      if (request?.downloadSource === "http" && request.status === "loading") {
-        request.cancel();
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private abortLastP2PLoadingInQueueAfterItem(
-    queue: QueueUtils.QueueItem[],
-    segment: SegmentWithStream,
-  ): boolean {
-    for (const { segment: itemSegment } of Utils.arrayBackwards(queue)) {
-      if (itemSegment === segment) break;
-      const request = this.requests.get(itemSegment);
-      if (request?.downloadSource === "p2p" && request.status === "loading") {
+      if (
+        request?.downloadSource === downloadSource &&
+        request.status === "loading"
+      ) {
         request.cancel();
         return true;
       }
@@ -539,7 +750,83 @@ export class HybridLoader {
     return 100 - (usedCapacity / totalCapacity) * 100;
   }
 
+  /**
+   * The windows a pass schedules by. The high-demand window is derived from
+   * the live placement where none is configured — the nearer half of what the
+   * player buffers, see `highDemandWindowFor` — and the derivation is logged
+   * when it first resolves and whenever it moves, so a stream that shares
+   * little can be read against the geometry it was scheduled on.
+   */
+  private timeWindows(): PlaybackTimeWindowsConfig {
+    const {
+      highDemandTimeWindow: configured,
+      httpDownloadTimeWindow,
+      p2pDownloadTimeWindow,
+    } = this.config;
+    const target = this.streamDetails.isLive
+      ? this.streamDetails.liveTarget
+      : undefined;
+    const highDemandTimeWindow = highDemandWindowFor(configured, target);
+    this.logTimeWindow(highDemandTimeWindow, configured, target);
+    return {
+      highDemandTimeWindow,
+      httpDownloadTimeWindow,
+      p2pDownloadTimeWindow,
+    };
+  }
+
+  /**
+   * Says where the window came from, not merely whether a number was
+   * configured: on live the geometry caps what an integrator asks for, and
+   * this line is the only place that is visible. Reporting a capped window as
+   * theirs is what would send someone looking for the bug in their own
+   * configuration.
+   */
+  private logTimeWindow(
+    highDemand: number,
+    configured: number | undefined,
+    target: LiveDelay | undefined,
+  ) {
+    const seconds = (value: number) => Number(value.toFixed(2));
+    // `highDemandWindowFor` returns the configured number itself where it
+    // stands, so anything else is the geometry having capped it.
+    let source: string;
+    if (configured === undefined) source = target ? "derived" : "default";
+    else if (highDemand === configured) source = "configured";
+    else source = `configured ${seconds(configured)}s, capped by the window`;
+
+    const last = this.loggedWindow;
+    // Segment durations are not exact multiples, so a derived window drifts
+    // by fractions of a second between refreshes; only half a segment is a
+    // change of the window itself.
+    const tolerance = target ? target.segment / 2 : 0;
+    if (
+      last?.source === source &&
+      Math.abs(last.highDemand - highDemand) <= tolerance
+    ) {
+      return;
+    }
+    this.loggedWindow = { highDemand, source };
+    if (target) {
+      this.logger(
+        "high-demand window %ss (%s): live delay %ss, segment %ss, player buffer %ss",
+        seconds(highDemand),
+        source,
+        seconds(target.delay),
+        seconds(target.segment),
+        seconds(playerBufferFor(target)),
+      );
+    } else {
+      this.logger(
+        "high-demand window %ss (%s), no live window",
+        seconds(highDemand),
+        source,
+      );
+    }
+  }
+
   private generateQueue() {
+    this.syncPlayback();
     const queue: QueueItem[] = [];
     const queueSegmentIds = new Set<string>();
     let maxPossibleLength = 0;
@@ -550,7 +837,7 @@ export class HybridLoader {
     for (const item of QueueUtils.generateQueue(
       this.lastRequestedSegment,
       this.playback,
-      this.config,
+      this.timeWindows(),
       this.p2pLoaders.currentLoader,
       availableStorageCapacityPercent,
     )) {
@@ -579,12 +866,14 @@ export class HybridLoader {
       alreadyLoadedCount,
       queueDownloadRatio:
         maxPossibleLength !== 0 ? alreadyLoadedCount / maxPossibleLength : 0,
+      availableStorageCapacityPercent,
     };
   }
 
   private getBandwidth(queueDownloadRatio: number) {
     const { http, all } = this.bandwidthCalculators;
-    const { activeLevelBitrate } = this.streamDetails;
+    const activeLevelBitrate =
+      this.lastRequestedSegment.stream.properties.bitrate ?? 0;
     if (activeLevelBitrate === 0) {
       return all.getBandwidthLoadingOnly(3);
     }
@@ -612,34 +901,57 @@ export class HybridLoader {
     return Math.max(bandwidth, httpRealBandwidth);
   }
 
-  notifyLevelChanged() {
-    this.levelChangedTimestamp = performance.now();
-  }
-
   sendBroadcastAnnouncement(sendEmptySegmentsAnnouncement = false) {
     this.p2pLoaders.currentLoader.broadcastAnnouncement(
       sendEmptySegmentsAnnouncement,
     );
   }
 
-  updatePlayback(position: number, rate: number) {
-    const isRateChanged = this.playback.rate !== rate;
-    const isPositionChanged = this.playback.position !== position;
+  updatePlayback(state: PlaybackState) {
+    this.playbackTracker.report(state);
+    const changed = this.syncPlayback();
+    if (!changed) return;
 
-    if (!isRateChanged && !isPositionChanged) return;
-
-    const isPositionSignificantlyChanged =
-      Math.abs(position - this.playback.position) / this.segmentAvgDuration >
-      0.5;
-
-    if (isPositionChanged) this.playback.position = position;
-    if (isRateChanged && rate !== 0) this.playback.rate = rate;
-    if (isPositionSignificantlyChanged) {
-      this.logger("position significantly changed");
-      this.engineRequest?.markAsShouldBeStartedImmediately();
+    if (this.oracleLogger.enabled) {
+      const { bufferEdge, bufferAhead, source } = this.playback;
+      this.oracleLogger(
+        `${this.lastRequestedSegment.stream.type} playhead≈${(bufferEdge - bufferAhead).toFixed(3)} (${source})`,
+      );
     }
-    this.segmentStorage.onPlaybackUpdated(position, rate);
-    this.requestProcessQueueMicrotask(isPositionSignificantlyChanged);
+    this.requestProcessQueueMicrotask(false);
+  }
+
+  /**
+   * Takes the tracker's current view as this loader's `playback`. Returns
+   * whether anything changed.
+   *
+   * A paused player reports rate 0. Window sizing keeps the last non-zero
+   * rate instead, so prefetching continues while paused: a viewer who pauses
+   * and resumes finds the buffer ready, where a rate of nothing would
+   * collapse every window to the segment at the playhead.
+   */
+  private syncPlayback(): boolean {
+    const next = this.playbackTracker.getPlayback();
+    const rate = next.rate === 0 ? this.playback.rate : next.rate;
+    const { playback } = this;
+    const changed =
+      playback.bufferEdge !== next.bufferEdge ||
+      playback.bufferAhead !== next.bufferAhead ||
+      playback.rate !== rate ||
+      playback.source !== next.source;
+    this.playback = { ...next, rate };
+    // The store compares this position against the segment times it was
+    // given, which are manifest time — so the position must be manifest time
+    // too. Told from here rather than from the player's reports alone: a
+    // proxy that never reports would otherwise leave the store with no
+    // playhead at all, evicting nothing for the whole session.
+    if (changed) {
+      this.segmentStorage.onPlaybackUpdated(
+        next.bufferEdge - next.bufferAhead,
+        rate,
+      );
+    }
+    return changed;
   }
 
   updateStream(stream: StreamWithSegments) {
@@ -649,7 +961,8 @@ export class HybridLoader {
   }
 
   destroy() {
-    clearTimeout(this.randomHttpDownloadTimeout);
+    this.destroyed = true;
+    clearTimeout(this.prefetchTimerId);
     clearTimeout(this.initialHttpDelayTimeoutId);
     this.engineRequest?.abort();
     this.requests.destroy();

@@ -1,8 +1,10 @@
 - [GitHub](https://github.com/Novage/p2p-media-loader)
 - NPM Packages
   - [Core](https://npmjs.com/package/p2p-media-loader-core)
-  - [Hls.js integration](https://npmjs.com/package/p2p-media-loader-hlsjs)
+  - [HLS.js integration](https://npmjs.com/package/p2p-media-loader-hlsjs)
   - [Shaka Player integration](https://npmjs.com/package/p2p-media-loader-shaka)
+  - [dash.js integration](https://npmjs.com/package/p2p-media-loader-dashjs)
+  - [Video.js 8 integration](https://npmjs.com/package/p2p-media-loader-videojs)
 
 **P2P Media Loader** is an open-source JavaScript library that leverages modern web browser features, such as HTML5 video and WebRTC, to enable media delivery over peer-to-peer (P2P) networks. It integrates smoothly with many popular HTML5 video players and works entirely without browser plugins or add-ons. Experience it in action with our [demo](http://novage.com.ua/p2p-media-loader/demo.html).
 
@@ -13,57 +15,312 @@
 To include **P2P Media Loader** in your project using npm, follow these steps:
 
 1. Install the package via npm:
-   - For Hls.js integration:
+   - For HLS.js integration:
 
      ```bash
      npm install p2p-media-loader-hlsjs
      ```
 
    - For Shaka Player integration:
+
      ```bash
      npm install p2p-media-loader-shaka
      ```
 
+   - For dash.js integration:
+
+     ```bash
+     npm install p2p-media-loader-dashjs
+     ```
+
+   - For Video.js 8 integration:
+
+     ```bash
+     npm install p2p-media-loader-videojs
+     ```
+
+   - Video.js 10 needs no package of ours: it plays HLS and MPEG-DASH through
+     media adapters powered by HLS.js and dash.js, so it uses the HLS.js and
+     dash.js integrations above.
+
 1. Import and use it in your project:
-   - Hls.js integration:
+   - HLS.js integration — the engine is mixed into the `Hls` class, so the
+     player is created and used exactly as without P2P:
 
      ```typescript
      import Hls from "hls.js";
      import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 
      const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
+
+     const hls = new HlsWithP2P({
+       // Any HLS.js option goes here as usual, plus:
+       p2p: {
+         core: {
+           swarmId: "Optional custom swarm ID for stream",
+           // Other P2P engine configuration parameters go here
+         },
+         onHlsJsCreated: (hls) => {
+           // The engine lives on the HLS.js instance
+           hls.p2pEngine.addEventListener("onPeerConnect", (params) => {
+             console.log("Peer connected:", params.peerId);
+           });
+           // Subscribe to other P2P engine and HLS.js events here
+         },
+       },
+     });
+
+     hls.attachMedia(videoElement);
+     hls.loadSource(streamUrl);
      ```
 
-   - Shaka Player integration:
+   - Shaka Player integration — the engine registers Shaka's networking
+     scheme plugins once per page, then binds to each player before it loads:
 
      ```typescript
      import shaka from "shaka-player/dist/shaka-player.ui";
      import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 
+     // Once per page, before any player is created
      ShakaP2PEngine.registerPlugins(shaka);
+
+     const engine = new ShakaP2PEngine(
+       {
+         core: {
+           swarmId: "Optional custom swarm ID for stream",
+           // Other P2P engine configuration parameters go here
+         },
+       },
+       shaka,
+     );
+     engine.addEventListener("onPeerConnect", (params) => {
+       console.log("Peer connected:", params.peerId);
+     });
+
+     const player = new shaka.Player();
+     await player.attach(videoElement);
+     engine.bindShakaPlayer(player); // before load()
+     await player.load(streamUrl);
      ```
+
+   - dash.js integration — the engine replaces the player's loader through
+     `player.extend`, so it binds before `initialize()`:
+
+     ```typescript
+     import { MediaPlayer } from "dashjs";
+     import { DashJsP2PEngine } from "p2p-media-loader-dashjs";
+
+     const engine = new DashJsP2PEngine({
+       core: {
+         swarmId: "Optional custom swarm ID for stream",
+         // Other P2P engine configuration parameters go here
+       },
+     });
+     engine.addEventListener("onPeerConnect", (params) => {
+       console.log("Peer connected:", params.peerId);
+     });
+
+     const player = MediaPlayer().create();
+     engine.bindPlayer(player); // before initialize()
+     player.initialize(videoElement, manifestUrl, true);
+     ```
+
+   - Video.js 8 integration — the engine serves the player, through the
+     request and response hooks VHS gives that player; HLS and MPEG-DASH both
+     play through VHS:
+
+     ```typescript
+     import videojs from "video.js";
+     import "video.js/dist/video-js.css";
+     import { VideoJsP2PEngine } from "p2p-media-loader-videojs";
+
+     const player = videojs(videoElement, {
+       // VHS stands aside for native HLS on Safari and iOS unless told otherwise
+       html5: {
+         vhs: { overrideNative: true },
+         nativeAudioTracks: false,
+         nativeVideoTracks: false,
+       },
+     });
+
+     const engine = new VideoJsP2PEngine({
+       core: {
+         swarmId: "Optional custom swarm ID for stream",
+         // Other P2P engine configuration parameters go here
+       },
+     });
+     engine.addEventListener("onPeerConnect", (params) => {
+       console.log("Peer connected:", params.peerId);
+     });
+     engine.bindPlayer(player);
+
+     // or "application/dash+xml" for an MPD
+     player.src({ src: streamUrl, type: "application/x-mpegURL" });
+     ```
+
+     Bind the engine before the player loads a source, and several players can
+     run side by side, each with its own engine and its own swarm. The same
+     integration is available as a Video.js plugin:
+
+     ```typescript
+     // Once per page, before any player loads a source
+     VideoJsP2PEngine.registerPlugins(videojs);
+
+     const player = videojs(videoElement, {
+       html5: {
+         vhs: { overrideNative: true },
+         nativeAudioTracks: false,
+         nativeVideoTracks: false,
+       },
+     });
+     const engine = player.p2pMediaLoader({
+       core: { swarmId: "Optional custom swarm ID for stream" },
+     });
+     player.src({ src: streamUrl, type: "application/x-mpegURL" });
+     ```
+
+     Note that VHS caps the rendition it plays by the size the player is
+     rendered at, which no other engine does, and that a rendition is a swarm:
+     a page mixing Video.js with other players usually wants
+     `vhs: { limitRenditionByPlayerDimensions: false }` so that its viewers
+     can share.
+
+   - Video.js 10 — there is no Video.js engine to hook here. v10 dropped VHS
+     and plays through media adapters powered by HLS.js
+     (`@videojs/hlsjs-video`) and dash.js (`@videojs/dash-video`), so the
+     HLS.js and dash.js integrations drive it directly and no
+     `p2p-media-loader-videojs` is involved.
+
+     With HLS.js, the adapter hands `source.engine.hlsJs` to HLS.js untouched
+     — that is where the engine's loaders go — and exposes the instance it
+     built as `engine`:
+
+     ```tsx
+     import "@videojs/react/video/skin.css";
+     import { useState } from "react";
+     import {
+       useAttachMedia,
+       useDestroy,
+       useMediaInstance,
+     } from "@videojs/react";
+     import { VideoPlayer, VideoSkin } from "@videojs/react/video";
+     import {
+       HlsJsAdapter,
+       PlaybackTypes,
+       type HlsEngineConfig,
+     } from "@videojs/hlsjs-video";
+     import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
+
+     function P2PHlsVideo({ streamUrl }: { streamUrl: string }) {
+       // Destroyed with the media instance. `useDestroy` is what Video.js
+       // uses for its own adapters and survives StrictMode's remount, so
+       // there is only ever one engine per player.
+       const [engine] = useState(
+         () =>
+           new HlsJsP2PEngine({
+             core: {
+               swarmId: "Optional custom swarm ID for stream",
+               // Other P2P engine configuration parameters go here
+             },
+           }),
+       );
+       useDestroy(engine);
+
+       // `setup` runs once, before the adapter is attached.
+       const media = useMediaInstance(HlsJsAdapter, (media) => {
+         engine.addEventListener("onPeerConnect", (params) => {
+           console.log("Peer connected:", params.peerId);
+         });
+         // A getter: resolved when HLS.js builds its playlist loader, by
+         // which time the adapter has its instance.
+         engine.bindHls(() => media.engine);
+         media.source = {
+           src: streamUrl,
+           // Native HLS on Safari would bypass HLS.js, and with it P2P
+           preferPlayback: PlaybackTypes.MSE,
+           // The engine supplies HLS.js's own `fLoader` and `pLoader`
+           engine: {
+             hlsJs: engine.getConfigForHlsJs() as HlsEngineConfig["hlsJs"],
+           },
+         };
+       });
+       const attachRef = useAttachMedia(media);
+
+       return <video ref={attachRef} autoPlay muted playsInline />;
+     }
+
+     export const Player = ({ streamUrl }: { streamUrl: string }) => (
+       <VideoPlayer>
+         <VideoSkin>
+           <P2PHlsVideo streamUrl={streamUrl} />
+         </VideoSkin>
+       </VideoPlayer>
+     );
+     ```
+
+     With dash.js, the adapter creates its player up front and attaches a
+     source only when one is set, so the engine binds in between:
+
+     ```tsx
+     import { DashAdapter } from "@videojs/dash-video";
+     import { DashJsP2PEngine } from "p2p-media-loader-dashjs";
+
+     function P2PDashVideo({ streamUrl }: { streamUrl: string }) {
+       const [engine] = useState(
+         () =>
+           new DashJsP2PEngine({
+             core: {
+               swarmId: "Optional custom swarm ID for stream",
+               // Other P2P engine configuration parameters go here
+             },
+           }),
+       );
+       useDestroy(engine);
+
+       const media = useMediaInstance(DashAdapter, (media) => {
+         // Before the source, so before dash.js's first request. Bind once
+         // per player: dash.js keeps the loader it first resolved.
+         engine.bindPlayer(media.engine);
+         media.source = { src: streamUrl };
+       });
+       const attachRef = useAttachMedia(media);
+
+       return <video ref={attachRef} autoPlay muted playsInline />;
+     }
+     ```
+
+     If TypeScript rejects `media.engine` there, your project has two copies
+     of dash.js — Video.js bundles its own — and the two declarations are
+     nominally different; cast it to your `MediaPlayerClass`. It is the same
+     player either way.
+
+     Quality selection, captions and the rest stay Video.js's own; the engine
+     only supplies the bytes.
 
 For additional examples using npm packages, please refer to our [React demo](https://github.com/Novage/p2p-media-loader/tree/main/packages/p2p-media-loader-demo/src/components/players).
 
 ## Using P2P Media Loader from a CDN via JavaScript Modules
 
-**P2P Media Loader** supports a wide variety of players that use Hls.js as their underlying media engine. Let's use the [Vidstack](https://www.vidstack.io/) player for a comprehensive Hls.js example:
+**P2P Media Loader** supports a wide variety of players that use HLS.js as their underlying media engine. Let's use the [Vidstack](https://www.vidstack.io/) player for a comprehensive HLS.js example:
 
-### Integrating P2P with Vidstack and Hls.js
+### Integrating P2P with Vidstack and HLS.js
 
 ```html
 <!doctype html>
 <html>
   <head>
-    <!-- Include the Hls.js library from a CDN -->
+    <!-- Include the HLS.js library from a CDN -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@~1/dist/hls.min.js"></script>
 
-    <!-- Import map for the P2P Media Loader modules -->
+    <!-- Import map for the P2P Media Loader modules. The engine imports the
+         core and its HLS manifest parser by bare specifier; both must resolve
+         to the same core bundle, here the one carrying only the HLS parser. -->
     <script type="importmap">
       {
         "imports": {
-          "p2p-media-loader-core": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^4/dist/p2p-media-loader-core.es.min.js",
-          "p2p-media-loader-hlsjs": "https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@^4/dist/p2p-media-loader-hlsjs.es.min.js"
+          "p2p-media-loader-core": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core-hls.es.min.js",
+          "p2p-media-loader-core/hls": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core-hls.es.min.js",
+          "p2p-media-loader-hlsjs": "https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@^5/dist/p2p-media-loader-hlsjs.es.min.js"
         }
       }
     </script>
@@ -80,7 +337,7 @@ For additional examples using npm packages, please refer to our [React demo](htt
       import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 
       const player = document.querySelector("media-player");
-      // Inject P2P capabilities into Hls.js
+      // Inject P2P capabilities into HLS.js
       const HlsWithP2P = HlsJsP2PEngine.injectMixin(window.Hls);
 
       player.addEventListener("provider-change", (event) => {
@@ -100,7 +357,7 @@ For additional examples using npm packages, please refer to our [React demo](htt
                 hls.p2pEngine.addEventListener("onPeerConnect", (params) => {
                   console.log("Peer connected:", params.peerId);
                 });
-                // Subscribe to P2P engine and Hls.js events here
+                // Subscribe to P2P engine and HLS.js events here
               },
             },
           };
@@ -121,7 +378,7 @@ For additional examples using npm packages, please refer to our [React demo](htt
 </html>
 ```
 
-### **Integrating P2P with a standalone Hls.js player**
+### **Integrating P2P with a standalone HLS.js player**
 
 ```html
 <script type="module">
@@ -141,7 +398,7 @@ For additional examples using npm packages, please refer to our [React demo](htt
         hls.p2pEngine.addEventListener("onPeerConnect", (params) => {
           console.log("Peer connected:", params.peerId);
         });
-        // Subscribe to P2P engine and Hls.js events here
+        // Subscribe to P2P engine and HLS.js events here
       },
     },
   });
@@ -151,7 +408,7 @@ For additional examples using npm packages, please refer to our [React demo](htt
 </script>
 ```
 
-### **Integrating P2P with PlayerJS and Hls.js**
+### **Integrating P2P with PlayerJS and HLS.js**
 
 ```html
 <script type="module">
@@ -168,7 +425,7 @@ For additional examples using npm packages, please refer to our [React demo](htt
           // Other P2P engine configuration parameters go here
         },
         onHlsJsCreated: (hls) => {
-          // Subscribe to P2P engine and Hls.js events here
+          // Subscribe to P2P engine and HLS.js events here
           hls.p2pEngine.addEventListener("onPeerConnect", (details) => {
             console.log(`Connected to peer ${details.peerId})`);
           });
@@ -179,7 +436,7 @@ For additional examples using npm packages, please refer to our [React demo](htt
 </script>
 ```
 
-### **Integrating P2P with DPlayer and Hls.js**
+### **Integrating P2P with DPlayer and HLS.js**
 
 ```html
 <script type="module">
@@ -216,7 +473,7 @@ For additional examples using npm packages, please refer to our [React demo](htt
 </script>
 ```
 
-### **Integrating P2P with Clappr and Hls.js**
+### **Integrating P2P with Clappr and HLS.js**
 
 ```html
 <script type="module">
@@ -246,7 +503,7 @@ For additional examples using npm packages, please refer to our [React demo](htt
 </script>
 ```
 
-### **Integrating P2P with MediaElement and Hls.js**
+### **Integrating P2P with MediaElement and HLS.js**
 
 ```html
 <script type="module">
@@ -265,7 +522,7 @@ For additional examples using npm packages, please refer to our [React demo](htt
           // Other P2P engine configuration parameters go here
         },
         onHlsJsCreated: (hls) => {
-          // Subscribe to P2P engine and Hls.js events here
+          // Subscribe to P2P engine and HLS.js events here
         },
       },
     },
@@ -276,7 +533,7 @@ For additional examples using npm packages, please refer to our [React demo](htt
 </script>
 ```
 
-### **Integrating P2P with Plyr and Hls.js**
+### **Integrating P2P with Plyr and HLS.js**
 
 ```html
 <script type="module">
@@ -293,7 +550,7 @@ For additional examples using npm packages, please refer to our [React demo](htt
         // Other P2P engine configuration parameters go here
       },
       onHlsJsCreated(hls) {
-        // Subscribe to P2P engine and Hls.js events here
+        // Subscribe to P2P engine and HLS.js events here
       },
     },
   });
@@ -326,7 +583,7 @@ For additional examples using npm packages, please refer to our [React demo](htt
 </script>
 ```
 
-### **Integrating P2P with OpenPlayerJS and Hls.js**
+### **Integrating P2P with OpenPlayerJS and HLS.js**
 
 ```html
 <script type="module">
@@ -343,7 +600,7 @@ For additional examples using npm packages, please refer to our [React demo](htt
           // Other P2P engine configuration parameters go here
         },
         onHlsJsCreated: (hls) => {
-          // Subscribe to P2P engine and Hls.js events here
+          // Subscribe to P2P engine and HLS.js events here
         },
       },
     },
@@ -385,12 +642,16 @@ For additional examples using npm packages, please refer to our [React demo](htt
     <!-- Link to Shaka Player's compiled UI script -->
     <script src="https://unpkg.com/shaka-player/dist/shaka-player.ui.js"></script>
 
-    <!-- Import map for the P2P Media Loader modules -->
+    <!-- Import map for the P2P Media Loader modules. The engine imports the
+         core and both manifest parsers by bare specifier; all three must
+         resolve to the same core bundle, here the one carrying both parsers. -->
     <script type="importmap">
       {
         "imports": {
-          "p2p-media-loader-core": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^4/dist/p2p-media-loader-core.es.min.js",
-          "p2p-media-loader-shaka": "https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@^4/dist/p2p-media-loader-shaka.es.min.js"
+          "p2p-media-loader-core": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core.es.min.js",
+          "p2p-media-loader-core/hls": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core.es.min.js",
+          "p2p-media-loader-core/dash": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core.es.min.js",
+          "p2p-media-loader-shaka": "https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@^5/dist/p2p-media-loader-shaka.es.min.js"
         }
       }
     </script>
@@ -554,17 +815,434 @@ For additional examples using npm packages, please refer to our [React demo](htt
 </script>
 ```
 
+### Integrating P2P with dash.js
+
+```html
+<!doctype html>
+<html>
+  <head>
+    <!-- Import map for the P2P Media Loader modules. The engine imports the
+         core and the DASH manifest parser by bare specifier; both must resolve
+         to the same core bundle, here the one carrying only the DASH parser. -->
+    <script type="importmap">
+      {
+        "imports": {
+          "p2p-media-loader-core": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core-dash.es.min.js",
+          "p2p-media-loader-core/dash": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core-dash.es.min.js",
+          "p2p-media-loader-dashjs": "https://cdn.jsdelivr.net/npm/p2p-media-loader-dashjs@^5/dist/p2p-media-loader-dashjs.es.min.js",
+          "dashjs": "https://cdn.jsdelivr.net/npm/dashjs@^5/dist/modern/esm/dash.all.min.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <video id="video" controls autoplay muted></video>
+
+    <script type="module">
+      import { MediaPlayer } from "dashjs";
+      import { DashJsP2PEngine } from "p2p-media-loader-dashjs";
+
+      const video = document.getElementById("video");
+      const player = MediaPlayer().create();
+      const engine = new DashJsP2PEngine({
+        core: {
+          swarmId: "Optional custom swarm ID for stream",
+          // Other P2P engine configuration parameters go here
+        },
+      });
+
+      // Bind before initialize(): the engine replaces the player's loader
+      // through player.extend, which dash.js resolves when it first loads.
+      engine.bindPlayer(player);
+      player.initialize(video, "https://example.com/stream.mpd", true);
+    </script>
+  </body>
+</html>
+```
+
+The examples below assume the same import map and reference the dash.js and
+P2P Media Loader modules by those specifiers.
+
+### **Integrating P2P with Vidstack and dash.js**
+
+```html
+<!doctype html>
+<html>
+  <head>
+    <!-- Import map: the core with the DASH parser, the engine, and dash.js -->
+    <script type="importmap">
+      {
+        "imports": {
+          "p2p-media-loader-core": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core-dash.es.min.js",
+          "p2p-media-loader-core/dash": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core-dash.es.min.js",
+          "p2p-media-loader-dashjs": "https://cdn.jsdelivr.net/npm/p2p-media-loader-dashjs@^5/dist/p2p-media-loader-dashjs.es.min.js",
+          "dashjs": "https://cdn.jsdelivr.net/npm/dashjs@^5/dist/modern/esm/dash.all.min.js"
+        }
+      }
+    </script>
+
+    <!-- Include Vidstack player stylesheets -->
+    <link rel="stylesheet" href="https://cdn.vidstack.io/player/theme.css" />
+    <link rel="stylesheet" href="https://cdn.vidstack.io/player/video.css" />
+
+    <!-- Include the Vidstack player library from a CDN -->
+    <script src="https://cdn.vidstack.io/player" type="module"></script>
+
+    <script type="module">
+      import { MediaPlayer } from "dashjs";
+      import { DashJsP2PEngine } from "p2p-media-loader-dashjs";
+
+      const engine = new DashJsP2PEngine({
+        core: {
+          swarmId: "Optional custom swarm ID for stream",
+          // Other P2P engine configuration parameters go here
+        },
+      });
+      engine.addEventListener("onPeerConnect", (params) => {
+        console.log("Peer connected:", params.peerId);
+      });
+
+      const player = document.querySelector("media-player");
+      player.addEventListener("provider-change", (event) => {
+        const provider = event.detail;
+        if (provider?.type !== "dash") return;
+
+        // Use the dash.js from the import map rather than Vidstack's CDN default
+        provider.library = MediaPlayer;
+
+        // Vidstack invokes this with each new dash.js instance right before
+        // attaching it to the media — the point at which the engine must bind.
+        provider.onInstance((instance) => {
+          engine.bindPlayer(instance);
+        });
+      });
+    </script>
+  </head>
+
+  <body>
+    <div style="width: 800px">
+      <!-- Vidstack media player with an MPEG-DASH stream -->
+      <media-player src="https://example.com/stream.mpd" autoplay muted>
+        <media-provider></media-provider>
+        <media-video-layout></media-video-layout>
+      </media-player>
+    </div>
+  </body>
+</html>
+```
+
+### **Integrating P2P with DPlayer and dash.js**
+
+```html
+<script type="module">
+  import { MediaPlayer } from "dashjs";
+  import { DashJsP2PEngine } from "p2p-media-loader-dashjs";
+
+  const container = document.getElementById("container");
+
+  const engine = new DashJsP2PEngine({
+    core: {
+      swarmId: "Optional custom swarm ID for stream",
+      // Other P2P engine configuration parameters go here
+    },
+  });
+
+  const player = new DPlayer({
+    container,
+    video: {
+      url: "",
+      type: "customDash",
+      customType: {
+        customDash: (video) => {
+          const dashPlayer = MediaPlayer().create();
+          engine.bindPlayer(dashPlayer); // before initialize()
+          dashPlayer.initialize(video, streamUrl, true);
+        },
+      },
+    },
+  });
+</script>
+```
+
+### **Integrating P2P with Plyr and dash.js**
+
+```html
+<script type="module">
+  import { MediaPlayer } from "dashjs";
+  import { DashJsP2PEngine } from "p2p-media-loader-dashjs";
+
+  const videoElement = document.getElementById("video");
+
+  const engine = new DashJsP2PEngine({
+    core: {
+      swarmId: "Optional custom swarm ID for stream",
+      // Other P2P engine configuration parameters go here
+    },
+  });
+
+  const dashPlayer = MediaPlayer().create();
+  engine.bindPlayer(dashPlayer); // before initialize()
+
+  // Build Plyr's quality menu once dash.js knows the renditions
+  dashPlayer.on("streamInitialized", () => {
+    const representations = dashPlayer.getRepresentationsByType("video");
+    const heights = [...new Set(representations.map((r) => r.height))].sort(
+      (a, b) => a - b,
+    );
+
+    const quality = {
+      default: heights[heights.length - 1],
+      options: heights,
+      forced: true,
+      onChange: (newQuality) => {
+        const target = representations.find((r) => r.height === newQuality);
+        if (!target) return;
+        dashPlayer.updateSettings({
+          streaming: { abr: { autoSwitchBitrate: { video: false } } },
+        });
+        // Keep the buffer: replacing it lands the player on the live edge
+        // with nothing ahead for peers to fill
+        dashPlayer.setRepresentationForTypeById("video", target.id, false);
+      },
+    };
+
+    const plyrPlayer = new Plyr(videoElement, {
+      quality,
+      autoplay: true,
+      muted: true,
+    });
+  });
+
+  dashPlayer.initialize(videoElement, streamUrl, true);
+</script>
+```
+
+### **Integrating P2P with MediaElement and dash.js**
+
+MediaElement's DASH renderer creates its own dash.js player from the global
+`dashjs` and gives no hook between `create()` and `initialize()`, so the
+integration wraps that global: every player it creates is bound to the engine
+first.
+
+```html
+<script type="module">
+  import * as dashjs from "dashjs";
+  import { DashJsP2PEngine } from "p2p-media-loader-dashjs";
+
+  const videoElement = document.getElementById("video");
+
+  const engine = new DashJsP2PEngine({
+    core: {
+      swarmId: "Optional custom swarm ID for stream",
+      // Other P2P engine configuration parameters go here
+    },
+  });
+
+  // A dashjs global whose MediaPlayer().create() binds the engine. MediaElement
+  // also reads MediaPlayer.events and MediaPlayer.errors from it.
+  const MediaPlayer = Object.assign(
+    () => ({
+      create: () => {
+        const player = dashjs.MediaPlayer().create();
+        engine.bindPlayer(player);
+        return player;
+      },
+    }),
+    { events: dashjs.MediaPlayer.events, errors: dashjs.MediaPlayer.errors },
+  );
+  window.dashjs = { ...dashjs, MediaPlayer };
+
+  const player = new MediaElementPlayer(videoElement.id, {
+    videoHeight: "100%",
+  });
+
+  player.setSrc(streamUrl); // an .mpd URL selects the DASH renderer
+  player.load();
+</script>
+```
+
+### Integrating P2P with Video.js 8 (VHS)
+
+Video.js 8 plays HLS and MPEG-DASH through VHS (`@videojs/http-streaming`), so
+one import map serves both; it maps the core and both parsers to the core
+bundle that carries them. One engine serves one player, through that player's
+own VHS hooks; the `p2pMediaLoader` plugin covered in the npm section above is
+another way to attach one. For Video.js 10, see the next section.
+
+```html
+<!doctype html>
+<html>
+  <head>
+    <link
+      href="https://cdn.jsdelivr.net/npm/video.js@^8/dist/video-js.min.css"
+      rel="stylesheet"
+    />
+    <!-- Video.js as a global; its ESM build is not needed here -->
+    <script src="https://cdn.jsdelivr.net/npm/video.js@^8/dist/video.min.js"></script>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "p2p-media-loader-core": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core.es.min.js",
+          "p2p-media-loader-core/hls": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core.es.min.js",
+          "p2p-media-loader-core/dash": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core.es.min.js",
+          "p2p-media-loader-videojs": "https://cdn.jsdelivr.net/npm/p2p-media-loader-videojs@^5/dist/p2p-media-loader-videojs.es.min.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <video
+      id="video"
+      class="video-js"
+      controls
+      autoplay
+      muted
+      playsinline
+      style="width: 800px"
+    ></video>
+
+    <script type="module">
+      import { VideoJsP2PEngine } from "p2p-media-loader-videojs";
+
+      const player = videojs("video", {
+        html5: {
+          // VHS stands aside for native HLS on Safari and iOS unless told otherwise
+          vhs: { overrideNative: true },
+          nativeAudioTracks: false,
+          nativeVideoTracks: false,
+        },
+      });
+
+      const engine = new VideoJsP2PEngine({
+        core: {
+          swarmId: "Optional custom swarm ID for stream",
+          // Other P2P engine configuration parameters go here
+        },
+      });
+      engine.addEventListener("onPeerConnect", (params) => {
+        console.log("Peer connected:", params.peerId);
+      });
+      engine.bindPlayer(player);
+
+      player.src({
+        src: "https://example.com/stream.m3u8",
+        type: "application/x-mpegURL", // "application/dash+xml" for an MPD
+      });
+    </script>
+  </body>
+</html>
+```
+
+### Integrating P2P with Video.js 10
+
+Video.js 10 has no streaming engine of its own: `<hlsjs-video>` is HLS.js and
+`<dash-video>` is dash.js, each exposing the instance it built as `engine`.
+The HLS.js and dash.js integrations therefore drive it directly, with no
+`p2p-media-loader-videojs` in sight.
+
+```html
+<!doctype html>
+<html>
+  <head>
+    <script type="importmap">
+      {
+        "imports": {
+          "p2p-media-loader-core": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core.es.min.js",
+          "p2p-media-loader-core/hls": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core.es.min.js",
+          "p2p-media-loader-core/dash": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core.es.min.js",
+          "p2p-media-loader-hlsjs": "https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@^5/dist/p2p-media-loader-hlsjs.es.min.js",
+          "p2p-media-loader-dashjs": "https://cdn.jsdelivr.net/npm/p2p-media-loader-dashjs@^5/dist/p2p-media-loader-dashjs.es.min.js"
+        }
+      }
+    </script>
+
+    <!-- Video.js 10's media elements; pin the version you use -->
+    <script
+      type="module"
+      src="https://cdn.jsdelivr.net/npm/@videojs/cdn@10.0.0-rc.2/media/hlsjs-video.js"
+    ></script>
+    <script
+      type="module"
+      src="https://cdn.jsdelivr.net/npm/@videojs/cdn@10.0.0-rc.2/media/dash-video.js"
+    ></script>
+  </head>
+  <body>
+    <hlsjs-video
+      id="hls"
+      controls
+      autoplay
+      muted
+      playsinline
+      style="width: 800px"
+    ></hlsjs-video>
+
+    <dash-video
+      id="dash"
+      controls
+      autoplay
+      muted
+      playsinline
+      style="width: 800px"
+    ></dash-video>
+
+    <script type="module">
+      import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
+      import { DashJsP2PEngine } from "p2p-media-loader-dashjs";
+
+      // HLS — the loaders go into the config the element hands to HLS.js
+      const hlsVideo = document.getElementById("hls");
+      await customElements.whenDefined("hlsjs-video");
+
+      const hlsEngine = new HlsJsP2PEngine({
+        core: {
+          swarmId: "Optional custom swarm ID for stream",
+          // Other P2P engine configuration parameters go here
+        },
+      });
+      hlsEngine.addEventListener("onPeerConnect", (params) => {
+        console.log("Peer connected:", params.peerId);
+      });
+      // A getter: HLS.js is constructed when the source is set below
+      hlsEngine.bindHls(() => hlsVideo.engine);
+
+      hlsVideo.source = {
+        src: "https://example.com/stream.m3u8",
+        // Native HLS on Safari would bypass HLS.js, and with it P2P
+        preferPlayback: "mse",
+        engine: { hlsJs: hlsEngine.getConfigForHlsJs() },
+      };
+
+      // MPEG-DASH — the element's dash.js player exists before any request
+      const dashVideo = document.getElementById("dash");
+      await customElements.whenDefined("dash-video");
+
+      const dashEngine = new DashJsP2PEngine({
+        core: {
+          swarmId: "Optional custom swarm ID for stream",
+          // Other P2P engine configuration parameters go here
+        },
+      });
+      dashEngine.bindPlayer(dashVideo.engine);
+
+      dashVideo.src = "https://example.com/manifest.mpd";
+    </script>
+  </body>
+</html>
+```
+
 ## Using P2P Media Loader in older browsers and Smart TVs (IIFE)
 
 For legacy environments that lack ES module support (such as older Smart TVs and deprecated browsers), you can utilize our IIFE builds. In these builds, the library components are exposed via global variables instead of ES module imports.
 
-The global namespaces are `window.p2pml.hlsjs` and `window.p2pml.shaka`.
+The global namespaces are `window.p2pml.hlsjs`, `window.p2pml.shaka`,
+`window.p2pml.dashjs` and `window.p2pml.videojs`.
 
-### Integrating P2P with a standalone Hls.js player (IIFE)
+### Integrating P2P with a standalone HLS.js player (IIFE)
 
 ```html
 <script src="https://cdn.jsdelivr.net/npm/hls.js@~1/dist/hls.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/dist/p2p-media-loader-hlsjs.iife.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@^5/dist/p2p-media-loader-hlsjs.iife.min.js"></script>
 
 <script>
   // Wait for the DOM and scripts to load
@@ -597,11 +1275,18 @@ The global namespaces are `window.p2pml.hlsjs` and `window.p2pml.shaka`.
 
 ```html
 <script src="https://unpkg.com/shaka-player/dist/shaka-player.compiled.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@latest/dist/p2p-media-loader-shaka.iife.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@^5/dist/p2p-media-loader-shaka.iife.min.js"></script>
 
 <script>
-  // Wait for the DOM and scripts to load
-  document.addEventListener("DOMContentLoaded", async function () {
+  // Wait for the DOM and scripts to load. The IIFE bundle targets ES2015 for
+  // old Smart TV browsers; keep the page's own script at that level too —
+  // promise chains, not async/await, which such browsers fail to parse.
+  document.addEventListener("DOMContentLoaded", function () {
+    // Install Shaka's polyfills first: old browsers lack MediaCapabilities,
+    // which Shaka's variant filtering relies on, and report error 4032
+    // (no playable variant) without them.
+    shaka.polyfill.installAll();
+
     if (shaka.Player.isBrowserSupported()) {
       var videoElement = document.getElementById("video");
       var streamUrl = "https://example.com/stream.mpd";
@@ -611,47 +1296,133 @@ The global namespaces are `window.p2pml.hlsjs` and `window.p2pml.shaka`.
 
       ShakaP2PEngine.registerPlugins();
       var shakaP2PEngine = new ShakaP2PEngine({
-        p2p: {
-          core: {
-            swarmId: "Optional custom swarm ID for stream",
-            // Other P2P engine configuration parameters go here
-          },
+        core: {
+          swarmId: "Optional custom swarm ID for stream",
+          // Other P2P engine configuration parameters go here
         },
       });
 
       var player = new shaka.Player();
-      await player.attach(videoElement);
-
-      shakaP2PEngine.bindShakaPlayer(player);
-      await player.load(streamUrl);
+      player
+        .attach(videoElement)
+        .then(function () {
+          shakaP2PEngine.bindShakaPlayer(player);
+          return player.load(streamUrl);
+        })
+        .catch(function (error) {
+          console.error("Shaka error", error);
+        });
     }
+  });
+</script>
+```
+
+### Integrating P2P with dash.js (IIFE)
+
+dash.js ships a `legacy` build for browsers without modern JavaScript support;
+pair it with the P2P Media Loader IIFE bundle, which targets ES2015.
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/dashjs@^5/dist/legacy/umd/dash.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p2p-media-loader-dashjs@^5/dist/p2p-media-loader-dashjs.iife.min.js"></script>
+
+<script>
+  // Keep the page's own script at ES2015 too: no async/await and no trailing
+  // commas in argument lists, which old Smart TV browsers fail to parse.
+  document.addEventListener("DOMContentLoaded", function () {
+    var videoElement = document.getElementById("video");
+    var streamUrl = "https://example.com/stream.mpd";
+
+    // Access the engine from the global p2pml object
+    var DashJsP2PEngine = window.p2pml.dashjs.DashJsP2PEngine;
+
+    var engine = new DashJsP2PEngine({
+      core: {
+        swarmId: "Optional custom swarm ID for stream",
+        // Other P2P engine configuration parameters go here
+      },
+    });
+
+    var player = dashjs.MediaPlayer().create();
+    engine.bindPlayer(player); // before initialize(): it replaces the player's loader
+    player.initialize(videoElement, streamUrl, true);
+  });
+</script>
+```
+
+### Integrating P2P with Video.js 8 (IIFE)
+
+```html
+<link
+  href="https://cdn.jsdelivr.net/npm/video.js@^8/dist/video-js.min.css"
+  rel="stylesheet"
+/>
+<script src="https://cdn.jsdelivr.net/npm/video.js@^8/dist/video.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p2p-media-loader-videojs@^5/dist/p2p-media-loader-videojs.iife.min.js"></script>
+
+<script>
+  // Keep the page's own script at ES2015: no async/await and no trailing
+  // commas in argument lists, which old Smart TV browsers fail to parse.
+  document.addEventListener("DOMContentLoaded", function () {
+    var VideoJsP2PEngine = window.p2pml.videojs.VideoJsP2PEngine;
+
+    var player = videojs("video", {
+      html5: {
+        vhs: { overrideNative: true },
+        nativeAudioTracks: false,
+        nativeVideoTracks: false,
+      },
+    });
+
+    var engine = new VideoJsP2PEngine({
+      core: {
+        swarmId: "Optional custom swarm ID for stream",
+        // Other P2P engine configuration parameters go here
+      },
+    });
+    engine.bindPlayer(player);
+
+    player.src({
+      src: "https://example.com/stream.m3u8",
+      type: "application/x-mpegURL", // "application/dash+xml" for an MPD
+    });
   });
 </script>
 ```
 
 ## Predicting swarm infohashes on a server
 
-Each stream (media quality) is downloaded through its own P2P swarm, identified on trackers by an **infohash**. The infohash is the hash of the **stream swarm ID** — a string derived from the swarm ID, the stream type, and the stream's identity hash (a stable hash of its manifest properties such as bitrate, codecs, and resolution).
+Each stream (media quality) is downloaded through its own P2P swarm, identified on trackers by an **infohash**. The infohash is the hash of the **stream swarm ID** — a string derived from the swarm ID, the stream type, and the stream's identity hash (a hash of its manifest properties — codecs, resolution, frame rate, video range, language, channels, name — with bitrate included only where the manifest needs it to tell two streams of the same type apart).
 
 A server can compute the exact infohashes clients will announce — for example, to allowlist them on a private tracker. The Node-safe helpers are exported from the `p2p-media-loader-core/server` subpath (Node.js 16+). The package is published as ESM only — from a CommonJS project, load it with a dynamic `import()` (or `require()` on Node.js 20.17+):
 
 ```typescript
 import {
+  identityProperties,
   computeStreamSwarmId,
   computeInfoHash,
 } from "p2p-media-loader-core/server";
 
-// With the default client configuration:
-const infoHash = computeInfoHash(
-  computeStreamSwarmId({
-    swarmId, // the configured swarmId or the manifest URL without query parameters
-    streamType: "main",
-    properties: { bitrate, codecs, width, height },
-  }),
+// With the default client configuration. `streams` lists every variant and
+// rendition of the master manifest, with the properties exactly as the
+// manifest states them (see specs/segment-identity.md for which those are per
+// protocol) — the client does not normalize them. `identityProperties` applies
+// the client's rule for bitrate: it is dropped unless another stream of the
+// same type would otherwise be indistinguishable, so an origin that recomputes
+// BANDWIDTH per request does not split a swarm.
+const inputs = identityProperties(streams); // streams: { type, properties }[]
+const infoHashes = streams.map((stream, i) =>
+  computeInfoHash(
+    computeStreamSwarmId({
+      swarmId, // the configured swarmId, or the master manifest's URL without its query string
+      streamType: stream.type,
+      properties: inputs[i],
+    }),
+  ),
 );
 
-// The tracker allowlist entry (hex of the announced 20-byte ASCII string):
-const allowlistEntry = Buffer.from(infoHash, "utf8").toString("hex");
+// The tracker allowlist entries (hex of the announced 20-byte ASCII string):
+const allowlist = infoHashes.map((h) => Buffer.from(h, "utf8").toString("hex"));
 ```
 
 For full control, configure a custom `streamSwarmIdBuilder` on the client and apply `computeInfoHash` to the same string on the server. This way the infohash depends only on values the server authors itself:
@@ -670,6 +1441,6 @@ const infoHash = computeInfoHash(
 );
 ```
 
-The stream swarm ID must be deterministic and identical across all peers of a swarm, and **every distinct stream must map to a distinct ID**. Include enough properties to guarantee that: resolution alone collides on ladders with several bitrates at the same resolution, so the example above adds `bitrate`. If your ladder can have several renditions sharing those fields (e.g. different codecs at the same resolution and bitrate), add the distinguishing property too, or incorporate the stream's `identityHash` (reproduce it server-side with `computeStreamIdentityHash(properties)`). Registering two different streams with the same ID throws. The builder cannot be changed at runtime. Clients can also observe each registered stream's computed identity through the `onStreamAdded` core event.
+The stream swarm ID must be deterministic and identical across all peers of a swarm, and **every distinct stream must map to a distinct ID**. Include enough properties to guarantee that: resolution alone collides on ladders with several bitrates at the same resolution, so the example above adds `bitrate`. If your ladder can have several renditions sharing those fields (e.g. different codecs at the same resolution and bitrate), add the distinguishing property too, or incorporate the stream's `identityHash` (reproduce it server-side with `computeStreamIdentityHash` over the input `identityProperties` yields for that stream). Two different streams resolving to the same ID fail to register (reported through the `onStreamRegistrationError` core event) and play without P2P. The builder cannot be changed at runtime. Clients can also observe each registered stream's computed identity through the `onStreamAdded` core event.
 
 The builder context also provides `defaultStreamSwarmId` — the ID the default derivation would produce — which is guaranteed unique per stream and convenient as a base for custom IDs (e.g. `` `${tenant}-${defaultStreamSwarmId}` ``; reproduce it server-side with `computeStreamSwarmId` or compose it with `buildStreamSwarmId(swarmId, streamType, identityHash)`).

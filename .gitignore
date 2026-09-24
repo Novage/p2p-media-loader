@@ -23,6 +23,9 @@ node_modules
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
+# Agent tooling; share the checked-in settings, keep everything else local
+.claude/*
+!.claude/settings.json
 .idea
 .DS_Store
 *.suo

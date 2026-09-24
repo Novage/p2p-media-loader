@@ -1,7 +1,6 @@
 import debug from "debug";
 import {
   BandwidthCalculators,
-  Playback,
   SegmentWithStream,
 } from "../internal-types.js";
 import {
@@ -11,7 +10,6 @@ import {
   RequestErrorType,
   Segment,
 } from "../types.js";
-import * as StreamUtils from "../utils/stream.js";
 import * as Utils from "../utils/utils.js";
 import { EventTarget } from "../utils/event-target.js";
 
@@ -36,7 +34,6 @@ type P2PRequestAttempt = {
 export type RequestAttempt = HttpRequestAttempt | P2PRequestAttempt;
 
 export type RequestControls = Readonly<{
-  firstBytesReceived: Request["firstBytesReceived"];
   addLoadedChunk: Request["addLoadedChunk"];
   completeOnSuccess: Request["completeOnSuccess"];
   failWithError: Request["failWithError"];
@@ -88,8 +85,6 @@ export class Request {
     readonly segment: SegmentWithStream,
     private readonly requestProcessQueueCallback: () => void,
     private readonly bandwidthCalculators: BandwidthCalculators,
-    private readonly playback: Playback,
-    private readonly playbackConfig: StreamUtils.PlaybackTimeWindowsConfig,
     eventTarget: EventTarget<CoreEventMap>,
     readonly infoHash: string,
   ) {
@@ -323,7 +318,6 @@ export class Request {
     });
 
     return {
-      firstBytesReceived: this.firstBytesReceived,
       addLoadedChunk: this.addLoadedChunk,
       completeOnSuccess: this.completeOnSuccess,
       failWithError: this.failWithError,
@@ -455,10 +449,6 @@ export class Request {
     this.progress.lastLoadedChunkTimestamp = performance.now();
     this.progress.loadedBytes += byteLength;
     this._loadedBytes += byteLength;
-  };
-
-  private firstBytesReceived = () => {
-    this.throwErrorIfNotLoadingStatus();
   };
 
   private throwErrorIfNotLoadingStatus() {

@@ -1,9 +1,8 @@
 import {
-  Playback,
   BandwidthCalculators,
   SegmentWithStream,
 } from "../internal-types.js";
-import { CoreEventMap, StreamConfig } from "../types.js";
+import { CoreEventMap } from "../types.js";
 import { EventTarget } from "../utils/event-target.js";
 import { Request } from "./request.js";
 
@@ -13,8 +12,6 @@ export class RequestsContainer {
   constructor(
     private readonly requestProcessQueueCallback: () => void,
     private readonly bandwidthCalculators: BandwidthCalculators,
-    private readonly playback: Playback,
-    private readonly config: StreamConfig,
     private readonly eventTarget: EventTarget<CoreEventMap>,
   ) {}
 
@@ -45,8 +42,6 @@ export class RequestsContainer {
         segment,
         this.requestProcessQueueCallback,
         this.bandwidthCalculators,
-        this.playback,
-        this.config,
         this.eventTarget,
         segment.stream.infoHash,
       );

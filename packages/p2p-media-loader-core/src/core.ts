@@ -1,31 +1,47 @@
 import { HybridLoader } from "./hybrid-loader.js";
+import { runAll } from "./run-all.js";
+import type { PlaybackState } from "./playback.js";
+import type { ManifestParser, ManifestProtocol } from "./manifest/types.js";
+import type { SidxBox } from "./manifest/mp4-sidx.js";
+import {
+  ManifestRegistry,
+  type RegistryStream,
+  type RegistryUpdate,
+} from "./manifest/registry.js";
+import { segmentKey, stripQuery } from "./manifest/url-key.js";
 import debug from "debug";
 import {
   Stream,
+  ByteRange,
   CoreConfig,
-  Segment,
   CoreEventMap,
+  CoreRequestError,
   DynamicCoreConfig,
-  EngineCallbacks,
   CommonCoreConfig,
   StreamConfig,
   DefinedCoreConfig,
-  StreamRegistration,
+  SegmentResponse,
   StreamProperties,
   StreamType,
   DynamicStreamConfig,
+  ProcessedManifest,
 } from "./types.js";
 import {
   BandwidthCalculators,
+  EngineCallbacks,
   StreamDetails,
   StreamWithSegments,
   SegmentWithStream,
 } from "./internal-types.js";
 import * as StreamUtils from "./utils/stream.js";
 import {
+  liveDelayForSegments,
+  pickLiveTarget,
+  type LiveDelay,
+} from "./live-delay.js";
+import {
   buildStreamSwarmId,
   computeInfoHash,
-  computeStreamIdentityHash,
   PEER_PROTOCOL_VERSION,
 } from "./stream-identity.js";
 import { BandwidthCalculator } from "./bandwidth-calculator.js";
@@ -42,7 +58,7 @@ import { SegmentStorage } from "./segment-storage/index.js";
 import { WebTorrentSocketPool } from "./webtorrent/webtorrent-socket-pool/index.js";
 
 /** Core class for managing media streams loading via P2P. */
-export class Core<TStream extends Stream = Stream> {
+export class Core {
   /** Default configuration for common core settings. */
   static readonly DEFAULT_COMMON_CORE_CONFIG: CommonCoreConfig = {
     segmentMemoryStorageLimit: undefined,
@@ -56,7 +72,7 @@ export class Core<TStream extends Stream = Stream> {
     isP2PDisabled: false,
     simultaneousHttpDownloads: 2,
     simultaneousP2PDownloads: 3,
-    highDemandTimeWindow: 15,
+    highDemandTimeWindow: undefined,
     httpDownloadInitialTimeoutMs: 0,
     httpDownloadTimeWindow: 3000,
     p2pDownloadTimeWindow: 6000,
@@ -67,7 +83,6 @@ export class Core<TStream extends Stream = Stream> {
     httpErrorRetries: 3,
     p2pErrorRetries: 3,
     announceTrackers: [
-      "wss://tracker.novage.com.ua",
       "wss://tracker.webtorrent.dev",
       "wss://tracker.openwebtorrent.com",
     ],
@@ -94,7 +109,17 @@ export class Core<TStream extends Stream = Stream> {
 
   private readonly eventTarget = new EventTarget<CoreEventMap>();
   private manifestResponseUrl?: string;
-  private readonly streams = new Map<string, StreamWithSegments<TStream>>();
+  /** Registered streams, keyed by the manifest-derived stream key. */
+  private readonly streams = new Map<string, StreamWithSegments>();
+  /**
+   * Streams no manifest ever identified. Each computes the same identity as
+   * every other unidentified stream of its type, so one may be shared only
+   * where it is alone; see `isShareable`.
+   */
+  private readonly unidentifiedStreamKeys = new Set<string>();
+  /** Stream keys whose registration failed; reported once, then left alone. */
+  private readonly failedStreamKeys = new Set<string>();
+  private readonly unshareableLogged = new Set<string>();
   private mainStreamConfig: StreamConfig;
   private secondaryStreamConfig: StreamConfig;
   private commonCoreConfig: CommonCoreConfig;
@@ -113,9 +138,25 @@ export class Core<TStream extends Stream = Stream> {
   private secondaryStreamLoader?: HybridLoader;
   private streamDetails: StreamDetails = {
     isLive: false,
-    activeLevelBitrate: 0,
+    liveTarget: undefined,
   };
   private storageInitPromise?: Promise<void>;
+  /** Bumped by every initialization and every `destroy()`; see below. */
+  private storageGeneration = 0;
+  /**
+   * Requests that have entered `loadSegment` but have no stream loader yet,
+   * because the segment storage is still being initialized. There is nothing
+   * for `abortSegmentLoading` to cancel in that window, so it marks them here
+   * instead. See specs/player-adapters.md.
+   */
+  private readonly startingRequests = new Set<{
+    key: string;
+    aborted: boolean;
+  }>();
+  private readonly manifestParsers: readonly ManifestParser[];
+  private manifestRegistry = new ManifestRegistry();
+  private readonly manifestLogger = debug("p2pml-core:manifest");
+  private readonly registryMissLogger = debug("p2pml-core:registry-miss");
 
   /**
    * Constructs a new Core instance with optional initial configuration.
@@ -158,6 +199,10 @@ export class Core<TStream extends Stream = Stream> {
     this.peerId = generatePeerId(
       this.commonCoreConfig.trackerClientVersionPrefix,
     );
+
+    // Parsers are capabilities, not tunables: kept as given, outside the
+    // merged config, so they are never deep-copied or surfaced by getConfig().
+    this.manifestParsers = config?.manifestParsers ?? [];
 
     this.webTorrentSocketPool.addEventListener("error", (error, url) => {
       this.socketPoolLogger(`WebSocket error for tracker url ${url}:`, error);
@@ -286,55 +331,286 @@ export class Core<TStream extends Stream = Stream> {
   }
 
   /**
-   * Sets the response URL for the manifest, stripping any query parameters.
+   * Names the swarm explicitly, in place of the first manifest's response URL.
+   *
+   * By default the swarm ID is the URL of the first manifest handed to
+   * `processManifest`, with its entire query string discarded. An integration
+   * that knows a better name — one shared by every viewer regardless of CDN
+   * or redirect — may set it here before the first manifest arrives, or
+   * configure `swarmId` instead. See specs/segment-identity.md.
    *
    * @param url - The full URL to the manifest response.
    */
   setManifestResponseUrl(url: string): void {
-    this.manifestResponseUrl = url.split("?")[0];
+    this.manifestResponseUrl = stripQuery(url);
   }
 
   /**
-   * Checks if a segment is already stored within the core.
+   * Parses a manifest the player has fetched and brings the registry up to
+   * date: streams are registered with their identity, their segments are
+   * added and removed by URL key, and the live state is derived. This is the
+   * only way streams and segments enter the core. See
+   * specs/manifest-registry.md.
    *
-   * @param segmentRuntimeId - The runtime identifier of the segment to check.
-   * @returns `true` if the segment is present, otherwise `false`.
+   * Never throws. A manifest with no matching parser is ignored, and a parse
+   * failure leaves the registry as it was — a transient bad response must not
+   * empty a working segment list. Idempotent: re-processing an unchanged
+   * manifest changes nothing and emits no events.
+   *
+   * @returns What the manifest described — each stream it listed segments
+   * for, with the bounds of those segments on the manifest timeline — so an
+   * adapter can size its player's live window from the same parse; or
+   * `undefined` when the manifest was ignored or failed to parse.
    */
-  hasSegment(segmentRuntimeId: string): boolean {
-    return !!StreamUtils.getSegmentFromStreamsMap(
-      this.streams,
-      segmentRuntimeId,
+  processManifest(manifest: {
+    /** Where the response came from, which is what its URIs resolve against. */
+    url: string;
+    /**
+     * What the player asked for, where a redirect made it differ from `url`.
+     * A master names the URL of each of its media playlists, so that is the
+     * one the core knows a stream by, and the one every viewer of the stream
+     * agrees on when nothing else names the swarm.
+     */
+    requestedUrl?: string;
+    /** Text, or the raw bytes a player's networking layer delivers. */
+    data: string | ArrayBuffer | ArrayBufferView;
+    protocol?: ManifestProtocol;
+  }): ProcessedManifest | undefined {
+    const text =
+      typeof manifest.data === "string"
+        ? manifest.data
+        : new TextDecoder().decode(manifest.data);
+
+    const parser = manifest.protocol
+      ? this.manifestParsers.find((p) => p.protocol === manifest.protocol)
+      : this.manifestParsers.find((p) => p.canParse(text));
+    if (!parser) {
+      this.manifestLogger("no parser for manifest %s", manifest.url);
+      return undefined;
+    }
+
+    const { requestedUrl } = manifest;
+    let applied;
+    try {
+      const parsed = parser.parse(text, manifest.url);
+      applied = this.manifestRegistry.apply(
+        requestedUrl !== undefined && requestedUrl !== manifest.url
+          ? { ...parsed, requestedUrl }
+          : parsed,
+      );
+    } catch (error) {
+      this.manifestLogger("failed to parse %s: %O", manifest.url, error);
+      return undefined;
+    }
+
+    // The first manifest that registers a stream names the swarm unless the
+    // integration already did. By what was asked for: every viewer asks for
+    // the same URL, and a CDN may answer each of them from a different one.
+    // A manifest that registered nothing — an I-frame playlist handed over
+    // before its master — is not the presentation's name.
+    if (this.manifestRegistry.hasStreams()) {
+      this.manifestResponseUrl ??= stripQuery(requestedUrl ?? manifest.url);
+    }
+
+    this.syncStreamsFromRegistry();
+
+    this.logRegistryUpdates(manifest.url, applied.updates, applied.ignored);
+    return summarize(applied.updates);
+  }
+
+  /**
+   * Resolves a stream's external segment index — the `sidx` box of a DASH
+   * `SegmentBase` representation — from the bytes the player fetched for it.
+   * The stream, registered from the MPD without segments, gains them here.
+   * See specs/manifest-registry.md, "Resolving an external index".
+   *
+   * Never throws. Data with no parsable `sidx` box, or for which no stream is
+   * waiting, changes nothing.
+   *
+   * @param index.url - The media file the index was read from.
+   * @param index.byteRange - The range that was fetched, if the request had one.
+   * @param index.data - The response body, which may be wider than the index.
+   * @returns How the presentation stands once the index is read — every
+   * stream of it, not only the one the index resolved, since a presentation
+   * whose streams each carry their own index would otherwise be described one
+   * stream at a time. `undefined` when no stream awaited an index here.
+   */
+  processSegmentIndex(index: {
+    url: string;
+    byteRange?: ByteRange;
+    data: ArrayBuffer | ArrayBufferView;
+  }): ProcessedManifest | undefined {
+    // Reading the index is the protocol tokenizer's job, as reading the
+    // manifest is; where the subsegments it describes sit is decided below.
+    // Only a protocol with an external index supplies a reader, and only such
+    // a protocol leaves a stream awaiting one, so the parser that registered
+    // the stream is the parser that reads this.
+    let sidx: SidxBox | undefined;
+    for (const parser of this.manifestParsers) {
+      if (parser.parseSegmentIndex) {
+        sidx = parser.parseSegmentIndex(index.data);
+        break;
+      }
+    }
+
+    if (!sidx) {
+      this.manifestLogger(
+        "no sidx box in the index fetched from %s",
+        index.url,
+      );
+      return undefined;
+    }
+
+    const updates = this.manifestRegistry.resolveExternalIndex(
+      index.url,
+      index.byteRange,
+      sidx,
+    );
+    if (!updates.length) {
+      this.manifestLogger("no stream awaits an index at %s", index.url);
+      return undefined;
+    }
+
+    this.syncStreamsFromRegistry();
+    this.logRegistryUpdates(index.url, updates);
+    // Every stream, not only the one this index resolved: a presentation whose
+    // streams each carry their own index would otherwise be described one
+    // stream at a time, and a caller sizing a live window from it would size
+    // it from whichever index arrived last.
+    return summarize(this.manifestRegistry.describeAll());
+  }
+
+  /**
+   * Whether a request is for a registered stream's external segment index —
+   * the `sidx` range of a DASH `SegmentBase` representation. Such a request
+   * is not a media segment: the adapter lets the player load it and hands the
+   * response to `processSegmentIndex`.
+   *
+   * @param url - The URL the player is about to request.
+   * @param byteRange - Its byte range, if any; a range covering the index counts.
+   */
+  isSegmentIndex(url: string, byteRange?: ByteRange): boolean {
+    return (
+      this.manifestRegistry.streamsAwaitingIndex(url, byteRange).length > 0
+    );
+  }
+
+  private logRegistryUpdates(
+    url: string,
+    updates: RegistryUpdate[],
+    ignored: string[] = [],
+  ): void {
+    if (!this.manifestLogger.enabled) return;
+    if (ignored.length) {
+      // A media playlist is one manifest, so this is the whole story of it.
+      // Named by the master as no stream, or told from one by query string
+      // alone; the registry does not say which.
+      this.manifestLogger(
+        "%s — not a stream of this presentation by the master's word; ignored",
+        url,
+      );
+      return;
+    }
+    const changed = updates.filter((u) => u.added || u.removed);
+    this.manifestLogger(
+      "%s — %d streams registered, %s",
+      url,
+      this.streams.size,
+      changed.length
+        ? changed
+            .map((u) => `${u.streamKey}: +${u.added} -${u.removed}`)
+            .join(", ")
+        : "no segment changes",
     );
   }
 
   /**
-   * Retrieves a specific stream by its runtime identifier, if it exists.
+   * Makes the registered streams mirror the manifest registry: registers
+   * streams the registry has and the core does not, and diffs every stream's
+   * segments by URL key. A stream whose registration failed is skipped.
+   */
+  private syncStreamsFromRegistry(): void {
+    let isLive = false;
+    const liveStreams: {
+      type: StreamType;
+      target: LiveDelay | undefined;
+    }[] = [];
+    for (const registryStream of this.manifestRegistry.getStreams()) {
+      if (registryStream.isLive === true) {
+        isLive = true;
+        liveStreams.push({
+          type: registryStream.type,
+          target: liveDelayForSegments(registryStream.segments.values()),
+        });
+      }
+
+      let stream = this.streams.get(registryStream.key);
+      if (!stream) {
+        if (this.failedStreamKeys.has(registryStream.key)) continue;
+        stream = this.registerStream(registryStream);
+        if (!stream) continue;
+      }
+      this.syncSegments(stream, registryStream);
+    }
+    this.streamDetails.isLive = isLive;
+    this.streamDetails.liveTarget = pickLiveTarget(liveStreams);
+  }
+
+  private syncSegments(
+    stream: StreamWithSegments,
+    registryStream: RegistryStream,
+  ): void {
+    let changed = false;
+    for (const key of stream.segments.keys()) {
+      if (!registryStream.segments.has(key)) {
+        stream.segments.delete(key);
+        changed = true;
+      }
+    }
+    for (const [key, segment] of registryStream.segments) {
+      if (stream.segments.has(key)) continue;
+      stream.segments.set(key, {
+        runtimeId: key,
+        externalId: segment.externalId,
+        url: segment.url,
+        byteRange: segment.byteRange,
+        startTime: segment.startTime,
+        endTime: segment.endTime,
+        stream,
+      });
+      changed = true;
+    }
+    if (!changed) return;
+    this.mainStreamLoader?.updateStream(stream);
+    this.secondaryStreamLoader?.updateStream(stream);
+  }
+
+  /**
+   * Whether a segment request resolves against the registry.
    *
-   * @param streamRuntimeId - The runtime identifier of the stream to retrieve.
+   * @param url - The URL the player is about to request.
+   * @param byteRange - Its byte range, when the segment is a range of a file.
+   * @returns `true` if the registry knows the segment, otherwise `false`.
+   */
+  hasSegment(url: string, byteRange?: ByteRange): boolean {
+    return !!StreamUtils.getSegmentFromStreamsMap(
+      this.streams,
+      segmentKey(url, byteRange),
+    );
+  }
+
+  /**
+   * Retrieves a registered stream by its key, if it exists.
+   *
+   * @param streamRuntimeId - The stream key: the media playlist URL for HLS,
+   * the Representation id for DASH.
    * @returns A detached snapshot of the registered stream with its computed
    * identity, or `undefined` if not found. The identity fields never change
    * after registration, so the snapshot stays accurate for the stream's lifetime.
    */
-  getStream(streamRuntimeId: string): TStream | undefined {
+  getStream(streamRuntimeId: string): Stream | undefined {
     const stream = this.streams.get(streamRuntimeId);
     return stream && this.toStreamSnapshot(stream);
-  }
-
-  /**
-   * Retrieves the runtime identifiers of the segments currently registered
-   * for a stream. Player integrations use this to diff a refreshed manifest
-   * against the core's registry before calling `updateStream`.
-   *
-   * @param streamRuntimeId - The runtime identifier of the stream.
-   * @returns A snapshot set of the registered segment runtime IDs, or
-   * `undefined` if the stream is not registered.
-   */
-  getStreamSegmentRuntimeIds(
-    streamRuntimeId: string,
-  ): ReadonlySet<string> | undefined {
-    const stream = this.streams.get(streamRuntimeId);
-    if (!stream) return undefined;
-    return new Set(stream.segments.keys());
   }
 
   /**
@@ -345,7 +621,7 @@ export class Core<TStream extends Stream = Stream> {
    *
    * @returns Detached snapshots of the registered streams, in registration order.
    */
-  getStreams(): TStream[] {
+  getStreams(): Stream[] {
     return Array.from(this.streams.values(), (stream) =>
       this.toStreamSnapshot(stream),
     );
@@ -357,50 +633,48 @@ export class Core<TStream extends Stream = Stream> {
    * Everything the core hands out — event payloads and getters — is a
    * snapshot, so consumers can never reach or retain core state.
    */
-  private toStreamSnapshot(stream: StreamWithSegments<TStream>): TStream {
+  private toStreamSnapshot(stream: StreamWithSegments): Stream {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { segments, ...snapshot } = stream;
-    // TypeScript cannot prove that removing the segments registry from
-    // StreamWithSegments<TStream> reconstructs TStream for an arbitrary subtype.
-    return snapshot as unknown as TStream;
+    return snapshot;
   }
 
   /**
-   * Ensures a stream exists in the map; adds it if it does not.
+   * Registers a stream the manifest registry produced, computing its identity
+   * (`swarmId`, `identityHash`, `streamSwarmId`, `infoHash`) exactly once.
    *
-   * Computes the stream's identity (`swarmId`, `identityHash`, `streamSwarmId`,
-   * `infoHash`) exactly once at registration and freezes it on the stream.
-   * Requires the swarm ID to be resolvable: either a `swarmId` is configured
-   * or `setManifestResponseUrl()` has been called.
-   *
-   * Never throws: a stream that fails to register (unresolvable swarm ID, or
-   * an invalid or colliding custom stream swarm ID) stays unknown to the core —
-   * its segments load through the player's default path without P2P — and the
-   * failure is reported via the `onStreamRegistrationError` event.
-   *
-   * @param stream - The stream to potentially add to the map.
+   * Never throws: a stream that fails to register (an invalid or colliding
+   * custom stream swarm ID) stays unknown to the core — its segments load
+   * through the player's default path without P2P — and the failure is
+   * reported once via the `onStreamRegistrationError` event.
    */
-  addStreamIfNoneExists(stream: StreamRegistration<TStream>): void {
-    if (this.streams.has(stream.runtimeId)) return;
-
-    const properties = Object.freeze({ ...stream.properties });
+  private registerStream(
+    registryStream: RegistryStream,
+  ): StreamWithSegments | undefined {
+    const properties = Object.freeze({ ...registryStream.properties });
     try {
-      this.registerStream(stream, properties);
+      return this.addStream(registryStream, properties);
     } catch (error) {
-      this.logger("failed to register stream %s: %O", stream.runtimeId, error);
+      this.failedStreamKeys.add(registryStream.key);
+      this.logger(
+        "failed to register stream %s: %O",
+        registryStream.key,
+        error,
+      );
       this.eventTarget.dispatchEvent("onStreamRegistrationError", {
-        runtimeId: stream.runtimeId,
-        streamType: stream.type,
+        runtimeId: registryStream.key,
+        streamType: registryStream.type,
         properties,
         error: error instanceof Error ? error : new Error(String(error)),
       });
+      return undefined;
     }
   }
 
-  private registerStream(
-    stream: StreamRegistration<TStream>,
+  private addStream(
+    stream: RegistryStream,
     properties: Readonly<StreamProperties>,
-  ): void {
+  ): StreamWithSegments {
     const config =
       stream.type === "main"
         ? this.mainStreamConfig
@@ -409,17 +683,19 @@ export class Core<TStream extends Stream = Stream> {
     const swarmId = config.swarmId ?? this.manifestResponseUrl;
     if (swarmId === undefined) {
       throw new Error(
-        "Failed to register stream: no swarmId is configured and the manifest response URL is not set. Call setManifestResponseUrl() before adding streams.",
+        "Failed to register stream: no swarmId is configured and no manifest has named the swarm.",
       );
     }
 
-    const identityHash = computeStreamIdentityHash(properties);
+    // Computed by the registry from the whole manifest: bitrate is part of it
+    // only where the manifest needs it to tell same-type streams apart.
+    const { identityHash } = stream;
 
     let streamSwarmId = buildStreamSwarmId(swarmId, stream.type, identityHash);
     if (config.streamSwarmIdBuilder) {
       const customStreamSwarmId = config.streamSwarmIdBuilder({
         swarmId,
-        runtimeId: stream.runtimeId,
+        runtimeId: stream.key,
         streamType: stream.type,
         properties,
         identityHash,
@@ -459,145 +735,201 @@ export class Core<TStream extends Stream = Stream> {
       }
     }
 
-    const registeredStream = {
-      ...stream,
+    if (!stream.identified) this.unidentifiedStreamKeys.add(stream.key);
+
+    const registeredStream: StreamWithSegments = {
+      runtimeId: stream.key,
+      type: stream.type,
       properties,
       swarmId,
       identityHash,
       streamSwarmId,
       infoHash: computeInfoHash(streamSwarmId),
-      segments: new Map<string, SegmentWithStream<TStream>>(),
-      // TypeScript cannot prove that StreamRegistration<TStream> plus the
-      // computed identity fields reconstructs TStream for an arbitrary subtype.
-    } as unknown as StreamWithSegments<TStream>;
+      segments: new Map<string, SegmentWithStream>(),
+    };
 
-    this.streams.set(stream.runtimeId, registeredStream);
+    this.streams.set(stream.key, registeredStream);
 
     this.eventTarget.dispatchEvent("onStreamAdded", {
       stream: this.toStreamSnapshot(registeredStream),
     });
+    return registeredStream;
   }
 
   /**
-   * Updates the segments associated with a specific stream.
+   * Loads a segment the player requested, from a peer, from the segment
+   * store, or over HTTP. Initializes segment storage if it has not been
+   * initialized yet.
    *
-   * @param streamRuntimeId - The runtime identifier of the stream to update.
-   * @param addSegments - Optional segments to add to the stream.
-   * @param removeSegmentIds - Optional segment IDs to remove from the stream.
+   * @param url - The URL the player is requesting.
+   * @param options.byteRange - Its byte range, when the segment is a range of a file.
+   * @param options.signal - Aborts the request. Environments without
+   * `AbortController` may call `abortSegmentLoading` instead.
+   * @returns The segment bytes and the bandwidth they were fetched at.
+   * @throws {CoreRequestError} `"aborted"` when cancelled, `"failed"` when
+   * every source failed.
+   * @throws {Error} If the segment is not in the registry; check
+   * `isSegmentLoadable` first.
    */
-  updateStream(
-    streamRuntimeId: string,
-    addSegments?: Iterable<Segment>,
-    removeSegmentIds?: Iterable<string>,
-  ): void {
-    const stream = this.streams.get(streamRuntimeId);
-    if (!stream) return;
+  async loadSegment(
+    url: string,
+    options: { byteRange?: ByteRange; signal?: AbortSignal } = {},
+  ): Promise<SegmentResponse> {
+    const key = segmentKey(url, options.byteRange);
+    const { signal } = options;
+    if (signal?.aborted) throw new CoreRequestError("aborted");
 
-    if (addSegments) {
-      for (const segment of addSegments) {
-        if (stream.segments.has(segment.runtimeId)) continue; // should not happen
-        stream.segments.set(segment.runtimeId, { ...segment, stream });
-      }
-    }
-
-    if (removeSegmentIds) {
-      for (const id of removeSegmentIds) {
-        stream.segments.delete(id);
-      }
-    }
-
-    this.mainStreamLoader?.updateStream(stream);
-    this.secondaryStreamLoader?.updateStream(stream);
-  }
-
-  /**
-   * Loads a segment given its runtime identifier and invokes the provided callbacks during the process.
-   * Initializes segment storage if it has not been initialized yet.
-   *
-   * @param segmentRuntimeId - The runtime identifier of the segment to load.
-   * @param callbacks - The callbacks to be invoked during segment loading.
-   * @throws {Error} - Throws if the segment is not registered in any stream.
-   */
-  async loadSegment(segmentRuntimeId: string, callbacks: EngineCallbacks) {
-    await this.initializeSegmentStorage();
-
-    const segment = this.identifySegment(segmentRuntimeId);
-
-    const loader = this.getStreamHybridLoader(segment);
-    void loader.loadSegment(segment, callbacks);
-  }
-
-  /**
-   * Aborts the loading of a segment specified by its runtime identifier.
-   *
-   * @param segmentRuntimeId - The runtime identifier of the segment whose loading is to be aborted.
-   */
-  abortSegmentLoading(segmentRuntimeId: string): void {
-    this.mainStreamLoader?.abortSegmentRequest(segmentRuntimeId);
-    this.secondaryStreamLoader?.abortSegmentRequest(segmentRuntimeId);
-  }
-
-  /**
-   * Updates the playback parameters while play head moves, specifically position and playback rate, for stream loaders.
-   *
-   * @param position - The new position in the stream, in seconds.
-   * @param rate - The new playback rate.
-   */
-  updatePlayback(position: number, rate: number): void {
-    this.mainStreamLoader?.updatePlayback(position, rate);
-    this.secondaryStreamLoader?.updatePlayback(position, rate);
-  }
-
-  /**
-   * Sets the active level bitrate, used for adjusting quality levels in adaptive streaming.
-   * Notifies the stream loaders if a change occurs.
-   *
-   * @param bitrate - The new bitrate to set as active.
-   */
-  setActiveLevelBitrate(bitrate: number) {
-    if (bitrate !== this.streamDetails.activeLevelBitrate) {
-      this.streamDetails.activeLevelBitrate = bitrate;
-      this.mainStreamLoader?.notifyLevelChanged();
-      this.secondaryStreamLoader?.notifyLevelChanged();
-    }
-  }
-
-  /**
-   * Updates the 'isLive' status of the stream
-   *
-   * @param isLive - Boolean indicating whether the stream is live.
-   */
-  setIsLive(isLive: boolean) {
-    this.streamDetails.isLive = isLive;
-  }
-
-  /**
-   * Identify if a segment is loadable by the P2P core based on the segment's stream type and configuration.
-   * @param segmentRuntimeId Segment runtime identifier to check.
-   * @returns `true` if the segment is loadable by the P2P core, otherwise `false`.
-   */
-  isSegmentLoadable(segmentRuntimeId: string): boolean {
+    const starting = { key, aborted: false };
+    this.startingRequests.add(starting);
     try {
-      const segment = this.identifySegment(segmentRuntimeId);
-
-      if (
-        segment.stream.type === "main" &&
-        this.mainStreamConfig.isP2PDisabled
-      ) {
-        return false;
+      await this.initializeSegmentStorage();
+    } catch (error) {
+      // A storage torn down by the `destroy()` that aborted this request may
+      // reject its initialization; the request was aborted, and says so.
+      if (starting.aborted || signal?.aborted) {
+        throw new CoreRequestError("aborted");
       }
+      throw error;
+    } finally {
+      this.startingRequests.delete(starting);
+    }
+    if (starting.aborted || signal?.aborted) {
+      throw new CoreRequestError("aborted");
+    }
 
+    const segment = this.identifySegment(key);
+    const loader = this.getStreamHybridLoader(segment);
+
+    return new Promise<SegmentResponse>((resolve, reject) => {
+      const callbacks: EngineCallbacks = {
+        onSuccess: (response) => {
+          signal?.removeEventListener("abort", onAbort);
+          resolve(response);
+        },
+        onError: (error) => {
+          signal?.removeEventListener("abort", onAbort);
+          reject(error);
+        },
+      };
+      const onAbort = () => loader.abortSegmentRequest(key);
+      signal?.addEventListener("abort", onAbort);
+      // The loader reports its own failures through the callbacks; this is
+      // the backstop for a throw it never saw, which would otherwise leave
+      // this promise pending and the abort listener attached for ever.
+      loader.loadSegment(segment, callbacks).catch((error: unknown) => {
+        this.logger("loader failed to start %s: %O", key, error);
+        callbacks.onError(new CoreRequestError("failed", String(error)));
+      });
+    });
+  }
+
+  /**
+   * Aborts a pending `loadSegment` request. The request's promise rejects
+   * with a `CoreRequestError` of type `"aborted"`.
+   *
+   * @param url - The URL the request was made with.
+   * @param byteRange - The byte range the request was made with, if any.
+   */
+  abortSegmentLoading(url: string, byteRange?: ByteRange): void {
+    const key = segmentKey(url, byteRange);
+    // A request still waiting for the segment storage has no loader to carry
+    // the abort; it is told here and gives up as soon as it has one.
+    for (const starting of this.startingRequests) {
+      if (starting.key === key) starting.aborted = true;
+    }
+    this.mainStreamLoader?.abortSegmentRequest(key);
+    this.secondaryStreamLoader?.abortSegmentRequest(key);
+  }
+
+  /**
+   * Reports the player's playback state to the stream loaders.
+   *
+   * Only the buffer ahead of the playhead and the rate are needed — never the
+   * absolute position. See `getPlaybackStateFromMediaElement` for the browser
+   * case, and specs/playback-contract.md for why.
+   *
+   * @param state - The current playback state.
+   */
+  updatePlayback(state: PlaybackState): void {
+    this.mainStreamLoader?.updatePlayback(state);
+    this.secondaryStreamLoader?.updatePlayback(state);
+  }
+
+  /**
+   * Whether the core will serve a request for this segment: it is in the
+   * registry and P2P is enabled for its stream type. This is the check an
+   * adapter makes before routing a request through `loadSegment`; a `false`
+   * means "use the player's own loader".
+   *
+   * A request for a URL the registry does not know is reported through the
+   * `onSegmentRegistryMiss` event, so a disagreement between the core's parse
+   * and the player's is observable. Initialization segments are recognised
+   * and passed through without a report; they are never shared.
+   *
+   * @param url - The URL the player is about to request.
+   * @param byteRange - Its byte range, when the segment is a range of a file.
+   */
+  isSegmentLoadable(url: string, byteRange?: ByteRange): boolean {
+    const key = segmentKey(url, byteRange);
+    const segment = StreamUtils.getSegmentFromStreamsMap(this.streams, key);
+    if (!segment) {
+      // Initialization segments and external indexes are recognised and
+      // passed through knowingly; only an unknown URL is a miss.
       if (
-        segment.stream.type === "secondary" &&
-        this.secondaryStreamConfig.isP2PDisabled
+        !this.manifestRegistry.isInitSegment(key) &&
+        !this.isSegmentIndex(url, byteRange)
       ) {
-        return false;
+        // Logged as well as dispatched: a miss makes the segment load without
+        // P2P and leaves no other trace, so without this a stream that stops
+        // sharing looks the same as one with no peers.
+        this.registryMissLogger("%s", key);
+        this.eventTarget.dispatchEvent("onSegmentRegistryMiss", {
+          url,
+          byteRange,
+        });
       }
-
-      return true;
-    } catch {
       return false;
     }
+
+    const config =
+      segment.stream.type === "main"
+        ? this.mainStreamConfig
+        : this.secondaryStreamConfig;
+    if (config.isP2PDisabled) return false;
+
+    return this.isShareable(segment.stream);
+  }
+
+  /**
+   * A stream no manifest identified carries the identity every unidentified
+   * stream of its type carries — the hash of nothing — so it is the same
+   * swarm for all of them. That is right for a media playlist loaded on its
+   * own, which is the whole stream: every viewer of that URL plays the same
+   * bytes. It is wrong as soon as another stream of that type is registered
+   * in the same swarm, which means a rendition whose media playlist the
+   * registry could not match to the master that named it — a CDN that signs
+   * its playlist URLs per response is enough. Peers would then exchange
+   * segments of different renditions by number, so it is not shared.
+   */
+  private isShareable(stream: StreamWithSegments): boolean {
+    if (!this.unidentifiedStreamKeys.has(stream.runtimeId)) return true;
+
+    for (const other of this.streams.values()) {
+      if (other === stream) continue;
+      if (other.type !== stream.type || other.swarmId !== stream.swarmId) {
+        continue;
+      }
+      if (!this.unshareableLogged.has(stream.runtimeId)) {
+        this.unshareableLogged.add(stream.runtimeId);
+        this.logger(
+          "no manifest identified %s and it is not the only %s stream of its swarm; it loads without P2P",
+          stream.runtimeId,
+          stream.type,
+        );
+      }
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -611,81 +943,111 @@ export class Core<TStream extends Stream = Stream> {
    * unsubscribe explicitly.
    */
   destroy(): void {
+    // Nothing that was waiting for the old segment storage may go on to load
+    // against the new one.
+    for (const starting of this.startingRequests) starting.aborted = true;
+    this.manifestRegistry = new ManifestRegistry();
     this.streams.clear();
-    this.mainStreamLoader?.destroy();
-    this.secondaryStreamLoader?.destroy();
-    this.segmentStorage?.setSegmentChangeCallback(undefined);
-    this.segmentStorage?.destroy();
+    this.unidentifiedStreamKeys.clear();
+    this.failedStreamKeys.clear();
+    this.unshareableLogged.clear();
+    // Each part is torn down whatever the ones before it made of themselves,
+    // and this core is left empty either way. An integrator's own segment
+    // storage is destroyed here and is free to throw; stopping at it would
+    // leave destroyed loaders still referenced and the failed storage still
+    // set, so the next stream to use this core would take both back and run
+    // with P2P silently dead. The first failure is raised once there is
+    // nothing left to reset.
+    const failures = runAll([
+      () => this.mainStreamLoader?.destroy(),
+      () => this.secondaryStreamLoader?.destroy(),
+      () => this.segmentStorage?.setSegmentChangeCallback(undefined),
+      () => this.segmentStorage?.destroy(),
+      () => this.webTorrentSocketPool.destroy(),
+    ]);
+
     this.mainStreamLoader = undefined;
     this.secondaryStreamLoader = undefined;
     this.segmentStorage = undefined;
     this.manifestResponseUrl = undefined;
-    this.streamDetails = { isLive: false, activeLevelBitrate: 0 };
+    this.streamDetails = { isLive: false, liveTarget: undefined };
     this.storageInitPromise = undefined;
-    this.webTorrentSocketPool.destroy();
+    this.storageGeneration++;
+    if (failures.length) throw failures[0];
   }
 
   private async initializeSegmentStorage() {
     if (this.segmentStorage) return;
     if (this.storageInitPromise) return this.storageInitPromise;
 
-    this.storageInitPromise = (async () => {
-      const { isLive } = this.streamDetails;
-      const createCustomStorage =
-        this.commonCoreConfig.customSegmentStorageFactory;
-
-      if (createCustomStorage && typeof createCustomStorage !== "function") {
-        throw new Error("Storage configuration is invalid");
-      }
-
-      const segmentStorage = createCustomStorage
-        ? createCustomStorage(isLive)
-        : new SegmentMemoryStorage();
-
-      try {
-        await segmentStorage.initialize(
-          this.commonCoreConfig,
-          this.mainStreamConfig,
-          this.secondaryStreamConfig,
-        );
-      } catch (error) {
-        segmentStorage.destroy();
-        throw error;
-      }
-
-      if (!this.storageInitPromise) {
-        segmentStorage.setSegmentChangeCallback(undefined);
-        segmentStorage.destroy();
-        return;
-      }
-
-      segmentStorage.setSegmentChangeCallback((streamSwarmId: string) => {
-        (
-          this.eventTarget as unknown as EventTarget<
-            CoreEventMap & Record<`onStorageUpdated-${string}`, () => void>
-          >
-        ).dispatchEvent(`onStorageUpdated-${streamSwarmId}`);
-      });
-
-      this.segmentStorage = segmentStorage;
-    })();
+    // Known by its generation, not by there being an initialization: a
+    // `destroy()` while this waits, or the next source's request re-arming
+    // it with an initialization of its own, moves the generation on — and
+    // this one must not mistake that for itself and install a storage made
+    // for the previous source.
+    const generation = ++this.storageGeneration;
+    const init = this.createSegmentStorage(
+      () => this.storageGeneration === generation,
+    );
+    this.storageInitPromise = init;
 
     try {
-      await this.storageInitPromise;
+      await init;
     } finally {
-      this.storageInitPromise = undefined;
+      if (this.storageInitPromise === init) this.storageInitPromise = undefined;
     }
   }
 
-  private identifySegment(segmentRuntimeId: string): SegmentWithStream {
-    const segment = StreamUtils.getSegmentFromStreamsMap(
-      this.streams,
-      segmentRuntimeId,
-    );
-    if (!segment) {
-      throw new Error(`Not found segment with id: ${segmentRuntimeId}`);
+  /**
+   * Builds and initializes the segment storage, and installs it if this
+   * initialization is still the current one when it is done.
+   */
+  private async createSegmentStorage(isCurrent: () => boolean) {
+    const { isLive } = this.streamDetails;
+    const createCustomStorage =
+      this.commonCoreConfig.customSegmentStorageFactory;
+
+    if (createCustomStorage && typeof createCustomStorage !== "function") {
+      throw new Error("Storage configuration is invalid");
     }
 
+    const segmentStorage = createCustomStorage
+      ? createCustomStorage(isLive)
+      : new SegmentMemoryStorage();
+
+    try {
+      await segmentStorage.initialize(
+        this.commonCoreConfig,
+        this.mainStreamConfig,
+        this.secondaryStreamConfig,
+      );
+    } catch (error) {
+      segmentStorage.destroy();
+      throw error;
+    }
+
+    if (!isCurrent()) {
+      segmentStorage.setSegmentChangeCallback(undefined);
+      segmentStorage.destroy();
+      return;
+    }
+
+    segmentStorage.setSegmentChangeCallback((streamSwarmId: string) => {
+      (
+        this.eventTarget as unknown as EventTarget<
+          CoreEventMap & Record<`onStorageUpdated-${string}`, () => void>
+        >
+      ).dispatchEvent(`onStorageUpdated-${streamSwarmId}`);
+    });
+
+    this.segmentStorage = segmentStorage;
+  }
+
+  private identifySegment(key: string): SegmentWithStream {
+    const segment = StreamUtils.getSegmentFromStreamsMap(this.streams, key);
+    if (!segment) {
+      throw new Error(`Segment is not in the registry: ${key}`);
+    }
     return segment;
   }
 
@@ -780,4 +1142,17 @@ export class Core<TStream extends Stream = Stream> {
       this.peerId,
     );
   }
+}
+
+function summarize(updates: readonly RegistryUpdate[]): ProcessedManifest {
+  return {
+    streams: updates.map((u) => ({
+      key: u.streamKey,
+      type: u.type,
+      isLive: u.isLive,
+      start: u.start,
+      end: u.end,
+      segmentCount: u.segmentCount,
+    })),
+  };
 }

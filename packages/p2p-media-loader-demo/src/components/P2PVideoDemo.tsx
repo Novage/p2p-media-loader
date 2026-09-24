@@ -1,7 +1,11 @@
 import type shakaType from "shaka-player/dist/shaka-player.compiled";
 import "./demo.css";
 import { PlaybackOptions } from "./PlaybackOptions";
-import { DEBUG_COMPONENT_ENABLED, PLAYERS } from "../constants";
+import {
+  compatibleStreamUrl,
+  DEBUG_COMPONENT_ENABLED,
+  PLAYERS,
+} from "../constants";
 import { useQueryParams } from "../hooks/useQueryParams";
 import { HlsjsPlayer } from "./players/hlsjs/Hlsjs";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -22,6 +26,14 @@ import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 import { HlsjsVidstack } from "./players/hlsjs/HlsjsVidstack";
 import { PeerDetails } from "p2p-media-loader-core";
 import { HlsjsVidstackIndexedDB } from "./players/hlsjs/HlsjsVidstackIndexedDB";
+import { DashJs } from "./players/dashjs/DashJs";
+import { DashJsVidstack } from "./players/dashjs/DashJsVidstack";
+import { DashJsDPlayer } from "./players/dashjs/DashJsDPlayer";
+import { DashJsPlyr } from "./players/dashjs/DashJsPlyr";
+import { DashJsMediaElement } from "./players/dashjs/DashJsMediaElement";
+import { VideoJs } from "./players/videojs/VideoJs";
+import { VideoJs10Hls } from "./players/videojs10/VideoJs10Hls";
+import { VideoJs10DashJs } from "./players/videojs10/VideoJs10DashJs";
 
 type DemoProps = {
   streamUrl?: string;
@@ -55,6 +67,14 @@ const playerComponents = {
   mediaElement_hls: HlsjsMediaElement,
   plyr_shaka: ShakaPlyr,
   vidstack_hls: HlsjsVidstack,
+  vidstack_dashjs: DashJsVidstack,
+  dashjs: DashJs,
+  dplayer_dashjs: DashJsDPlayer,
+  plyr_dashjs: DashJsPlyr,
+  mediaElement_dashjs: DashJsMediaElement,
+  videojs: VideoJs,
+  videojs10_hls: VideoJs10Hls,
+  videojs10_dashjs: VideoJs10DashJs,
 } as const;
 
 type PeerState = {
@@ -106,17 +126,16 @@ export const P2PVideoDemo = ({
     data.current.p2pUploaded += bytesLength;
   }, []);
 
+  // Peers are drawn whichever swarm they share — a stream where only the
+  // audio is sharable (a SegmentBase video with a WebM index, say) still
+  // has peers. The graph dedupes by peer id, so a peer on both swarms shows once.
   const onPeerConnect = useCallback((params: PeerDetails) => {
-    if (params.streamType !== "main") return;
-
     setPeers((peers) => {
       return [...peers, { peerId: params.peerId, infoHash: params.infoHash }];
     });
   }, []);
 
   const onPeerClose = useCallback((params: PeerDetails) => {
-    if (params.streamType !== "main") return;
-
     setPeers((peers) => {
       return peers.filter(
         (peer) =>
@@ -127,8 +146,15 @@ export const P2PVideoDemo = ({
 
   const handlePlaybackOptionsUpdate = (url: string, player: string) => {
     if (!(player in PLAYERS)) return;
-    setURLQueryParams({ streamUrl: url, player });
+    setURLQueryParams({ streamUrl: compatibleStreamUrl(player, url), player });
   };
+
+  // A player selected through the URL, or persisted from a previous visit,
+  // may not play the persisted stream: a dash.js player with the HLS default.
+  const streamUrlForPlayer = compatibleStreamUrl(
+    queryParams.player,
+    queryParams.streamUrl,
+  );
 
   const coreOptions = useMemo(
     () => ({
@@ -146,7 +172,7 @@ export const P2PVideoDemo = ({
 
     return PlayerComponent ? (
       <PlayerComponent
-        streamUrl={queryParams.streamUrl}
+        streamUrl={streamUrlForPlayer}
         coreOptions={coreOptions}
         onPeerConnect={onPeerConnect}
         onPeerClose={onPeerClose}
@@ -172,7 +198,7 @@ export const P2PVideoDemo = ({
             <PlaybackOptions
               updatePlaybackOptions={handlePlaybackOptionsUpdate}
               currentPlayer={queryParams.player}
-              streamUrl={queryParams.streamUrl}
+              streamUrl={streamUrlForPlayer}
             />
           </div>
 
