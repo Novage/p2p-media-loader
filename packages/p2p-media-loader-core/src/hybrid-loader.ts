@@ -46,9 +46,9 @@ export class HybridLoader {
   private readonly playbackTracker: PlaybackTracker;
   private readonly logger: debug.Debugger;
   // Diagnostic only. Logs the core's own playhead estimate — buffer edge less
-  // buffer ahead, in manifest time — in the namespace the engines log
-  // media.currentTime in, so the two can be read side by side. Enable with
-  // localStorage.debug = "p2pml:playback-oracle".
+  // buffer ahead, in manifest time — in the namespace the media-element
+  // tracker logs media.currentTime in, so the two can be read side by side.
+  // Enable with localStorage.debug = "p2pml:playback-oracle".
   private readonly oracleLogger = debug("p2pml:playback-oracle");
   private levelChangedTimestamp?: number;
   private lastQueueProcessingTimeStamp?: number;
@@ -625,6 +625,11 @@ export class HybridLoader {
     const timeWindows = this.timeWindows();
     const { highDemandTimeWindow } = timeWindows;
     const peerIds = Array.from(p2pLoader.connectedPeerIds);
+    const { http } = this.bandwidthCalculators;
+    const measuredBandwidth = Math.max(
+      http.getBandwidthLoadingOnly(10),
+      http.getBandwidthLoadingOnly(30),
+    );
 
     const items =
       queue ??
@@ -669,7 +674,10 @@ export class HybridLoader {
         highDemandTimeWindow,
         this.playback.rate,
       );
-      const estimatedFetchSeconds = this.estimateFetchSeconds(segment);
+      const estimatedFetchSeconds = this.estimateFetchSeconds(
+        segment,
+        measuredBandwidth,
+      );
 
       if (
         ElectionUtils.shouldFetchNow({
@@ -692,8 +700,14 @@ export class HybridLoader {
    * the stream's bitrate, over the throughput HTTP transfers have achieved.
    * With no transfer measured yet the link is assumed to run at the stream's
    * bitrate, which errs on the side of stepping in early.
+   *
+   * @param measured - HTTP throughput measured for the pass, the same for
+   * every segment it elects.
    */
-  private estimateFetchSeconds(segment: SegmentWithStream): number {
+  private estimateFetchSeconds(
+    segment: SegmentWithStream,
+    measured: number,
+  ): number {
     const { stream } = segment;
     const duration = Math.max(0, segment.endTime - segment.startTime);
     const bitrate = stream.properties.bitrate ?? 0;
@@ -703,11 +717,6 @@ export class HybridLoader {
       (bitrate * duration) / 8;
     if (bytes <= 0) return duration;
 
-    const { http } = this.bandwidthCalculators;
-    const measured = Math.max(
-      http.getBandwidthLoadingOnly(10),
-      http.getBandwidthLoadingOnly(30),
-    );
     const bandwidth = measured > 0 ? measured : bitrate;
     if (bandwidth <= 0) return duration;
 

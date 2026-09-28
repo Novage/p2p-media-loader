@@ -147,9 +147,14 @@ function toStream(
   // A SegmentBase representation lists no segments; its init segment hangs
   // off the index reference instead. A representation spanning periods lists
   // one per period.
-  const refs = playlist.segments.length
-    ? playlist.segments.map((s) => s.map)
-    : [sidx?.map];
+  // A SegmentTemplate hands every segment of a period the same map object, so
+  // the Set leaves one per period; a SegmentList builds one per segment, which
+  // the key-level dedup below still collapses.
+  const refs = new Set(
+    playlist.segments.length
+      ? playlist.segments.map((s) => s.map)
+      : [sidx?.map],
+  );
   const initSegments: ParsedInitSegment[] = [];
   for (const map of refs) {
     if (!map) continue;

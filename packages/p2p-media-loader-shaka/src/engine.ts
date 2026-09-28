@@ -81,21 +81,15 @@ const registrations = new WeakMap<Shaka, number>();
  * });
  */
 export class ShakaP2PEngine {
-  private readonly playback = trackMediaElementPlayback((state, media) => {
-    if (this.oracle.enabled) {
-      this.oracle(`media.currentTime=${media.currentTime.toFixed(3)}`);
-    }
-    this.core.updatePlayback(state);
-  });
+  private readonly playback = trackMediaElementPlayback((state) =>
+    this.core.updatePlayback(state),
+  );
   private readonly shaka: Shaka;
   private readonly core: Core;
   private requestFilter?: shaka.extern.RequestFilter;
   /** The player this engine is bound to, and what it has done to it. */
   private bound?: BoundPlayer;
   private readonly debug = debug("p2pml-shaka:engine");
-  // See HybridLoader.oracleLogger: logs media.currentTime beside the core's
-  // estimate, so the two can be compared when the playhead is in doubt.
-  private readonly oracle = debug("p2pml:playback-oracle");
 
   /**
    * Constructs an instance of `ShakaP2PEngine`.

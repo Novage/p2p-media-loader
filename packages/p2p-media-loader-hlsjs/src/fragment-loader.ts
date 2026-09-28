@@ -12,6 +12,7 @@ import {
   SegmentResponse,
   CoreRequestError,
   ByteRange,
+  byteRangeFromHalfOpen,
 } from "p2p-media-loader-core";
 import { isSecondaryPlayer } from "./secondary-player.js";
 
@@ -60,7 +61,10 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
 
     // HLS.js carries a half-open [rangeStart, rangeEnd); the core keys
     // segments by the inclusive range the playlist declared.
-    const byteRange = inclusiveByteRange(context.rangeStart, context.rangeEnd);
+    const byteRange = byteRangeFromHalfOpen(
+      context.rangeStart,
+      context.rangeEnd,
+    );
     this.#request = { url: context.url, byteRange };
 
     // Whitelist by lookup: a fragment the core's registry does not know, or
@@ -166,15 +170,6 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       this.config = null;
     }
   }
-}
-
-function inclusiveByteRange(
-  rangeStart: number | undefined,
-  rangeEnd: number | undefined,
-): ByteRange | undefined {
-  if (rangeStart === undefined || rangeEnd === undefined) return undefined;
-  if (rangeEnd <= rangeStart) return undefined;
-  return { start: rangeStart, end: rangeEnd - 1 };
 }
 
 function getLoadingStat(

@@ -111,12 +111,6 @@ export class Core {
   private manifestResponseUrl?: string;
   /** Registered streams, keyed by the manifest-derived stream key. */
   private readonly streams = new Map<string, StreamWithSegments>();
-  /**
-   * Streams no manifest ever identified. Each computes the same identity as
-   * every other unidentified stream of its type, so one may be shared only
-   * where it is alone; see `isShareable`.
-   */
-  private readonly unidentifiedStreamKeys = new Set<string>();
   /** Stream keys whose registration failed; reported once, then left alone. */
   private readonly failedStreamKeys = new Set<string>();
   private readonly unshareableLogged = new Set<string>();
@@ -735,8 +729,6 @@ export class Core {
       }
     }
 
-    if (!stream.identified) this.unidentifiedStreamKeys.add(stream.key);
-
     const registeredStream: StreamWithSegments = {
       runtimeId: stream.key,
       type: stream.type,
@@ -912,7 +904,11 @@ export class Core {
    * segments of different renditions by number, so it is not shared.
    */
   private isShareable(stream: StreamWithSegments): boolean {
-    if (!this.unidentifiedStreamKeys.has(stream.runtimeId)) return true;
+    if (
+      this.manifestRegistry.getStream(stream.runtimeId)?.identified !== false
+    ) {
+      return true;
+    }
 
     for (const other of this.streams.values()) {
       if (other === stream) continue;
@@ -948,7 +944,6 @@ export class Core {
     for (const starting of this.startingRequests) starting.aborted = true;
     this.manifestRegistry = new ManifestRegistry();
     this.streams.clear();
-    this.unidentifiedStreamKeys.clear();
     this.failedStreamKeys.clear();
     this.unshareableLogged.clear();
     // Each part is torn down whatever the ones before it made of themselves,

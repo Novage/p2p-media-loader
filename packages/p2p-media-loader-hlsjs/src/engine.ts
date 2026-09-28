@@ -112,12 +112,9 @@ export class HlsJsP2PEngine {
   private readonly core: Core;
   private hlsInstanceGetter?: () => Hls | undefined;
   private currentHlsInstance?: Hls;
-  private readonly playback = trackMediaElementPlayback((state, media) => {
-    if (this.oracle.enabled) {
-      this.oracle(`media.currentTime=${media.currentTime.toFixed(3)}`);
-    }
-    this.core.updatePlayback(state);
-  });
+  private readonly playback = trackMediaElementPlayback((state) =>
+    this.core.updatePlayback(state),
+  );
   /**
    * What this engine last wrote under each forward-buffer key, and what the
    * player holds that it did not write.
@@ -135,9 +132,6 @@ export class HlsJsP2PEngine {
     applied: Partial<Record<ForwardBufferKey, number>>;
   };
   private readonly debug = debug("p2pml-hlsjs:engine");
-  // See HybridLoader.oracleLogger: logs media.currentTime beside the core's
-  // estimate, so the two can be compared when the playhead is in doubt.
-  private readonly oracle = debug("p2pml:playback-oracle");
 
   /**
    * Enhances a given HLS.js class by injecting additional Peer-to-Peer (P2P) functionalities.

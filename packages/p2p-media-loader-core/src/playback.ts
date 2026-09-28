@@ -7,6 +7,8 @@
  * means widening it. See specs/playback-contract.md.
  */
 
+import debug from "debug";
+
 /** A buffered interval, in seconds on the player's own timeline. */
 export type TimeRange = {
   readonly start: number;
@@ -101,23 +103,29 @@ export type MediaElementPlaybackTracker = {
   stop(): void;
 };
 
+// See HybridLoader.oracleLogger: logs media.currentTime beside the core's
+// estimate, so the two can be compared when the playhead is in doubt.
+const oracle = debug("p2pml:playback-oracle");
+
 /**
  * Reports a media element's playback to a receiver. Every adapter whose
  * player plays through a media element uses this, so the events the core
  * learns from are one list rather than one per adapter, and so is the
  * bookkeeping of which element is being watched.
  *
- * @param report - Called with the state after every event that can change it,
- * and with the element it was read from, for an adapter's own diagnostics.
+ * @param report - Called with the state after every event that can change it.
  */
 export function trackMediaElementPlayback(
-  report: (state: PlaybackState, media: HTMLMediaElement) => void,
+  report: (state: PlaybackState) => void,
 ): MediaElementPlaybackTracker {
   let watched: HTMLMediaElement | undefined;
 
   const handle = (event: Event) => {
     const target = event.target as HTMLMediaElement;
-    report(getPlaybackStateFromMediaElement(target), target);
+    if (oracle.enabled) {
+      oracle(`media.currentTime=${target.currentTime.toFixed(3)}`);
+    }
+    report(getPlaybackStateFromMediaElement(target));
   };
 
   const watch = (media: HTMLMediaElement | undefined) => {

@@ -390,15 +390,7 @@ export class RequestRouter {
       this.source.claimed = false;
       return;
     }
-    this.process(() =>
-      this.core.processManifest({
-        // A request's URI is what VHS asked for; its response URL follows
-        // redirects, and the manifest's own URIs resolve against that.
-        url: urlOf(request, uri),
-        requestedUrl: uri,
-        data: bodyOf(response, request),
-      }),
-    );
+    this.processManifestResponse(request, response, uri);
   }
 
   /**
@@ -450,13 +442,7 @@ export class RequestRouter {
       // response either arrived already or never will, and a URL left waiting
       // would admit the next request some other player makes for it.
       this.pageWideRequest = undefined;
-      this.process(() =>
-        this.core.processManifest({
-          url: urlOf(request, uri),
-          requestedUrl: uri,
-          data: bodyOf(response, request),
-        }),
-      );
+      this.processManifestResponse(request, response, uri);
       return;
     }
 
@@ -514,6 +500,23 @@ export class RequestRouter {
   private claim(src: string) {
     this.enter(src);
     if (this.source) this.source.claimed = true;
+  }
+
+  /** Hands the core a manifest VHS fetched with `request`. */
+  private processManifestResponse(
+    request: VhsRequest,
+    response: VhsResponse,
+    uri: string,
+  ) {
+    this.process(() =>
+      this.core.processManifest({
+        // A request's URI is what VHS asked for; its response URL follows
+        // redirects, and the manifest's own URIs resolve against that.
+        url: urlOf(request, uri),
+        requestedUrl: uri,
+        data: bodyOf(response, request),
+      }),
+    );
   }
 
   /** Nothing the core does with what it is handed may break playback. */

@@ -118,12 +118,13 @@ function masterStreams(
 
   for (const playlist of manifest.playlists ?? []) {
     const a = playlist.attributes;
+    const attributes = variantAttributes(a);
     const key = resolveUrl(playlist.uri, url);
     keys.add(key);
     streams.push({
       key,
       type: "main",
-      properties: videoStreamProperties(variantAttributes(a)),
+      properties: videoStreamProperties(attributes),
       indexSource: { kind: "manifest" },
     });
     const audio = audioCodecs(a.CODECS);
@@ -132,7 +133,7 @@ function masterStreams(
       audioCodecsByGroup.set(a.AUDIO, audio);
     }
     if (a.VIDEO && !videoAttributesByGroup.has(a.VIDEO)) {
-      videoAttributesByGroup.set(a.VIDEO, variantAttributes(a));
+      videoAttributesByGroup.set(a.VIDEO, attributes);
     }
   }
 
@@ -236,8 +237,11 @@ function mediaStream(manifest: M3u8Manifest, url: string): ParsedStream {
     }),
   );
 
+  // The parser hands every segment a map applies to the same object, so each
+  // is resolved once rather than once per segment.
+  const maps = new Set((manifest.segments ?? []).map((s) => s.map));
   const initSegments: ParsedInitSegment[] = [];
-  for (const { map } of manifest.segments ?? []) {
+  for (const map of maps) {
     if (!map) continue;
     initSegments.push({
       url: resolveUrl(map.uri, url),

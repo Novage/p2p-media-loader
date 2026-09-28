@@ -33,6 +33,7 @@ rejected it is deleted.
 | ------------------------------------------------------------------------ | --------------------------------------------------------- |
 | [p2p-inflight-announcements.md](proposals/p2p-inflight-announcements.md) | Duplicate HTTP fetches by backups on slow relay chains    |
 | [cmcd-playback-source.md](proposals/cmcd-playback-source.md)             | Inferred playback state where a proxied player emits CMCD |
+| [webm-cues-index.md](proposals/webm-cues-index.md)                       | No P2P for WebM `SegmentBase` representations             |
 
 ## Keeping these current
 

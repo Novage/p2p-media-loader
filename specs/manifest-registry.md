@@ -270,8 +270,10 @@ at further `sidx` boxes rather than at media — are not followed. **64-bit
 offsets or times** beyond the safe integer range are rejected. And the index
 must be an ISO BMFF `sidx` box: a **WebM** representation's `indexRange` points
 at an EBML `Cues` element, which is not read, so such streams keep playing
-through the player's own loader. None of the three is silently wrong: an index
-that cannot be resolved leaves its stream without P2P, as above.
+through the player's own loader; reading it is recorded as a proposal, in
+[proposals/webm-cues-index.md](proposals/webm-cues-index.md). None of the three
+is silently wrong: an index that cannot be resolved leaves its stream without
+P2P, as above.
 
 ## URL normalization
 

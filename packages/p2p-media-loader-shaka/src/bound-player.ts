@@ -4,6 +4,7 @@ import {
   liveDelayFor,
   playerBufferFor,
   INITIAL_LIVE_DELAY,
+  runAll,
 } from "p2p-media-loader-core";
 import type { Shaka } from "./types.js";
 
@@ -320,14 +321,13 @@ export class BoundPlayer {
     // them back by halves is what leaves a player carrying this engine's
     // delay with nothing managing it, and a later binding reading that as the
     // integrator's own choice.
-    const failures: unknown[] = [];
-    for (const [path, value] of taken) {
-      try {
-        this.#player.configure(path, value);
-      } catch (failure) {
-        failures.push(failure);
-      }
-    }
+    const failures = runAll(
+      taken.map(
+        ([path, value]) =>
+          () =>
+            this.#player.configure(path, value),
+      ),
+    );
     if (failures.length) throw failures[0];
   }
 }

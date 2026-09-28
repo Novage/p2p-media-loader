@@ -433,22 +433,7 @@ export class ManifestRegistry {
       stream.segments.set(key, segment);
     }
 
-    let start = Infinity;
-    let end = -Infinity;
-    for (const segment of next.values()) {
-      start = Math.min(start, segment.startTime);
-      end = Math.max(end, segment.endTime);
-    }
-    return {
-      streamKey: stream.key,
-      type: stream.type,
-      isLive: stream.isLive === true,
-      start: next.size ? start : 0,
-      end: next.size ? end : 0,
-      segmentCount: next.size,
-      added,
-      removed,
-    };
+    return { ...describe(stream), added, removed };
   }
 
   /**
@@ -569,7 +554,7 @@ function identifies(properties: StreamProperties): boolean {
   );
 }
 
-/** A stream's current state, for a manifest that listed no segments of it. */
+/** A stream's current state, with nothing added or removed. */
 function describe(stream: RegistryStream): RegistryUpdate {
   let start = Infinity;
   let end = -Infinity;

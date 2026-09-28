@@ -156,14 +156,4 @@ describe("trackMediaElementPlayback", () => {
     second.fire("timeupdate");
     expect(report).toHaveBeenCalledTimes(1);
   });
-
-  it("hands the element over with the state, for an adapter's own logging", () => {
-    const { media, fire } = fakeMedia();
-    const seen: unknown[] = [];
-    trackMediaElementPlayback((_state, element) => seen.push(element)).watch(
-      media,
-    );
-    fire("timeupdate");
-    expect(seen).toEqual([media]);
-  });
 });
