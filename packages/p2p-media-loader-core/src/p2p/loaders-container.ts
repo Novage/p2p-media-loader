@@ -95,16 +95,31 @@ export class P2PLoadersContainer {
     }
   }
 
+  /**
+   * Makes `stream`'s loader the current one, and lets the previous one go: at
+   * once when nothing of its stream is stored, after a grace period otherwise.
+   *
+   * The next loader is in place before the previous one is let go. Loaders
+   * share tracker sockets through the pool, which closes a socket the moment
+   * its last holder releases it, so letting go first would close and reopen
+   * the connection — a TLS handshake per tracker, and no announce for the new
+   * swarm until it completes — on every switch made before anything was
+   * stored, which is a player settling on a rendition at startup. And a
+   * loader that fails to build leaves the previous one current and intact,
+   * rather than current and destroyed.
+   */
   changeCurrentLoader(stream: StreamWithSegments) {
-    const currentStream = this.#currentLoaderItem.stream;
-    const ids = this.#segmentStorage.getStoredSegmentIds(
-      currentStream.swarmId,
-      currentStream.streamSwarmId,
-    );
-    if (!ids.length) this.#destroyAndRemoveLoader(this.#currentLoaderItem);
-    else this.#setLoaderDestroyTimeout(this.#currentLoaderItem);
+    const previous = this.#currentLoaderItem;
+    const next = this.#findOrCreateLoaderForStream(stream);
+    if (next === previous) return;
+    this.#currentLoaderItem = next;
 
-    this.#currentLoaderItem = this.#findOrCreateLoaderForStream(stream);
+    const ids = this.#segmentStorage.getStoredSegmentIds(
+      previous.stream.swarmId,
+      previous.stream.streamSwarmId,
+    );
+    if (!ids.length) this.#destroyAndRemoveLoader(previous);
+    else this.#setLoaderDestroyTimeout(previous);
 
     this.#logger(
       `change current p2p loader: ${LoggerUtils.getStreamString(stream)}`,

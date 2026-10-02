@@ -169,6 +169,14 @@ These predate 5.0.0 and affect 4.x deployments as well.
 - Segment storage measured occupancy by a different rule than the one that
   frees it, so the brake on prefetching engaged late on live streams; and a
   re-stored segment was counted twice, which evicted while capacity was free.
+- A quality switch made before anything was stored closed the tracker
+  connection and opened a new one: the outgoing stream's loader was let go
+  before the incoming one held the shared socket, so on a stream with no
+  separate audio the socket's last holder released it. That is a player
+  settling on a rendition at startup, and each such switch cost a TLS handshake
+  per tracker before the new swarm could be announced. The next loader now
+  takes the socket first, and one that fails to build leaves the previous loader
+  current rather than destroyed.
 
 ## 4.0.0
 
