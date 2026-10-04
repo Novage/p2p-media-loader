@@ -145,8 +145,6 @@ throughout.
 - The `p2pml:core-as-bundle` export condition, which existed to spare consumers
   a `bittorrent-tracker` dependency and Node polyfills that the core no longer
   has.
-- A deprecated tracker from the default announce list. The defaults are
-  `wss://tracker.webtorrent.dev` and `wss://tracker.openwebtorrent.com`.
 
 ### Fixed
 
