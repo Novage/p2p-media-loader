@@ -27,6 +27,7 @@ This library makes it possible to build large-scale P2P mesh networks — often 
 
 ## Related Software
 
+- [wt-tracker-rust](https://github.com/Novage/wt-tracker-rust) (recommended): a multi-core WebTorrent tracker in Rust, a port of wt-tracker that runs `wss://tracker.novage.com.ua`. A 2-core Oracle Cloud **Free** Tier Ampere A1 instance can serve ~100k peers (one WebSocket connection per peer; estimated).
 - [wt-tracker](https://github.com/Novage/wt-tracker): a high-performance WebTorrent tracker for Node.js using [µWebSockets.js](https://github.com/uNetworking/uWebSockets.js).
 - [Aquatic](https://github.com/greatest-ape/aquatic): a high-performance WebTorrent and BitTorrent tracker written in Rust.
 - [bittorrent-tracker](https://github.com/webtorrent/bittorrent-tracker): official WebTorrent tracker implementation for Node.js.
@@ -103,7 +104,7 @@ There are many running public servers available on [Public STUN server list](htt
 A compatible [**WebTorrent**](https://webtorrent.io/) tracker is required for WebRTC signaling and to create swarms of peers downloading the same media stream.
 A few running public trackers are available: [wss://tracker.novage.com.ua](https://novage.com.ua/), [wss://tracker.webtorrent.dev](https://webtorrent.dev/), [wss://tracker.openwebtorrent.com](https://openwebtorrent.com/).
 
-It is possible to run personal WebTorrent tracker using open-source implementations: [wt-tracker](https://github.com/Novage/wt-tracker), [Aquatic](https://github.com/greatest-ape/aquatic), [OpenWebtorrent Tracker](https://github.com/OpenWebTorrent/openwebtorrent-tracker), [bittorrent-tracker](https://github.com/webtorrent/bittorrent-tracker).
+It is possible to run personal WebTorrent tracker using open-source implementations: [wt-tracker-rust](https://github.com/Novage/wt-tracker-rust) (recommended), [wt-tracker](https://github.com/Novage/wt-tracker), [Aquatic](https://github.com/greatest-ape/aquatic), [OpenWebtorrent Tracker](https://github.com/OpenWebTorrent/openwebtorrent-tracker), [bittorrent-tracker](https://github.com/webtorrent/bittorrent-tracker).
 
 **P2P Media Loader** is configured to use public **STUN** and **WebTorrent** servers by default. It means that it is not required to run any server-side software for the P2P network to function for simple use cases.
 

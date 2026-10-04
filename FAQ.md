@@ -20,6 +20,7 @@ Few [public trackers](https://openwebtorrent.com/) are configured in the library
 
 Any compatible WebTorrent tracker works for `P2P Media Loader`:
 
+- [wt-tracker-rust](https://github.com/Novage/wt-tracker-rust) (recommended) - multi-core WebTorrent tracker by Novage written in Rust, a port of wt-tracker that runs `wss://tracker.novage.com.ua`. A 2-core Oracle Cloud **Free** Tier Ampere A1 instance can serve ~100k peers (one WebSocket connection per peer; estimated).
 - [Aquatic](https://github.com/greatest-ape/aquatic) - A high-performance BitTorrent tracker written in Rust.
 - [wt-tracker](https://github.com/Novage/wt-tracker) - high-performance WebTorrent tracker by Novage that uses [uWebSockets.js](https://github.com/uNetworking/uWebSockets.js) for I/O.
 - [bittorrent-tracker](https://github.com/webtorrent/bittorrent-tracker) - tracker from WebTorrent project that uses Node.js I/O
