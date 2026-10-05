@@ -7,6 +7,11 @@
  * at the first failure leaves an adapter's loaders and listeners attached to
  * a player it reports as released. The caller raises what came back once
  * there is nothing left to let go of.
+ *
+ * Shared by the engine packages and exported for them alone: not part of
+ * the public API, and free to change in any release.
+ *
+ * @internal
  */
 export function runAll(steps: (() => void)[]): unknown[] {
   const failures: unknown[] = [];

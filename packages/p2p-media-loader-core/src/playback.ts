@@ -90,7 +90,11 @@ const PLAYBACK_EVENTS = [
   "waiting",
 ] as const;
 
-/** Watches one media element at a time; see `trackMediaElementPlayback`. */
+/**
+ * Watches one media element at a time; see `trackMediaElementPlayback`.
+ *
+ * @category Integration
+ */
 export type MediaElementPlaybackTracker = {
   /**
    * Starts reporting the playback of `media`, or stops reporting when it is
@@ -114,6 +118,8 @@ const oracle = debug("p2pml:playback-oracle");
  * bookkeeping of which element is being watched.
  *
  * @param report - Called with the state after every event that can change it.
+ *
+ * @category Integration
  */
 export function trackMediaElementPlayback(
   report: (state: PlaybackState) => void,

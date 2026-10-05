@@ -5,6 +5,11 @@
  * own bandwidth estimate reads the core's hint rather than the wall clock —
  * which says nothing about the network for a segment that came from a peer
  * or from storage. A bandwidth of nothing is reported as one millisecond.
+ *
+ * Shared by the engine packages and exported for them alone: not part of
+ * the public API, and free to change in any release.
+ *
+ * @internal
  */
 export function downloadTimeMs(bandwidth: number, bytes: number): number {
   if (bandwidth <= 0) return 1;

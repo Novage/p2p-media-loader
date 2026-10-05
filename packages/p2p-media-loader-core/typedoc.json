@@ -10,5 +10,6 @@
   "readme": "none",
   "sort": [
     "source-order"
-  ]
+  ],
+  "defaultCategory": "API"
 }

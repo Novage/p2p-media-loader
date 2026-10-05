@@ -30,9 +30,17 @@ const MIN_BUFFER_SEGMENTS = 2;
  * The high-demand window when none is configured: what a VOD player gets, and
  * the most a live one gets — a live window narrower than twice this derives a
  * smaller one, so that half of what the player buffers is left to peers.
+ *
+ * @category Integration
  */
 export const DEFAULT_HIGH_DEMAND_TIME_WINDOW = 15;
 
+/**
+ * Where a live player is placed, and the segment length the placement was
+ * derived from: what every adapter sizes the player's buffer by.
+ *
+ * @category Integration
+ */
 export type LiveDelay = {
   /** Seconds behind the live edge to place the playhead. */
   readonly delay: number;
@@ -45,6 +53,8 @@ export type LiveDelay = {
  * window is: deep enough that a peer has something to fetch ahead of the
  * playhead, and shallow enough to sit inside any window worth sharing. The
  * adapters that place a player before its first manifest hold it here.
+ *
+ * @category Integration
  */
 export const INITIAL_LIVE_DELAY = 25;
 
@@ -55,6 +65,8 @@ export const INITIAL_LIVE_DELAY = 25;
  * segment. Adapters that read the window from their player rather than from a
  * processed manifest — HLS.js reports it on every level update — size the
  * placement with this directly.
+ *
+ * @category Integration
  */
 export function liveDelayFromWindow(window: number, segment: number): number {
   return Math.max(
@@ -69,6 +81,8 @@ export function liveDelayFromWindow(window: number, segment: number): number {
  * registry knows, and never less than two segments, so a player on a narrow
  * window can still keep going. The segments between this and the edge are
  * the ones peers fetch for each other.
+ *
+ * @category Integration
  */
 export function playerBufferFor(target: LiveDelay): number {
   return Math.max(
@@ -97,6 +111,8 @@ export function playerBufferFor(target: LiveDelay): number {
  *
  * @param configured - `StreamConfig.highDemandTimeWindow`.
  * @param target - The live window's placement, or `undefined` off live.
+ *
+ * @category Integration
  */
 export function highDemandWindowFor(
   configured: number | undefined,
@@ -122,6 +138,8 @@ function liveDelayOf(window: number, count: number): LiveDelay | undefined {
  * The placement a live stream's segments call for, or `undefined` for a stream
  * with none: the window is the span from the earliest start to the latest end,
  * and the segment its average length.
+ *
+ * @category Integration
  */
 export function liveDelayForSegments(
   segments: Iterable<{ readonly startTime: number; readonly endTime: number }>,
@@ -168,6 +186,8 @@ export function pickLiveTarget(
  * The presentation delay a processed manifest calls for, or `undefined` when
  * it described no live stream with segments. Decided among the streams the
  * manifest listed by the rule of `pickLiveTarget`.
+ *
+ * @category Integration
  */
 export function liveDelayFor(
   manifest: ProcessedManifest,
