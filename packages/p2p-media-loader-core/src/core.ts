@@ -959,7 +959,7 @@ export class Core {
       () => this.secondaryStreamLoader?.destroy(),
       () => this.segmentStorage?.setSegmentChangeCallback(undefined),
       () => this.segmentStorage?.destroy(),
-      () => this.webTorrentSocketPool.destroy(),
+      () => this.webTorrentSocketPool.closeAllSockets(),
     ]);
 
     this.mainStreamLoader = undefined;

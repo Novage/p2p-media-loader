@@ -1176,7 +1176,7 @@ export type SegmentResponse = {
    */
   data: ArrayBuffer;
 
-  /** Measured bandwidth for the segment download, in bytes per second. */
+  /** Measured bandwidth for the segment download, in bits per second. */
   bandwidth: number;
 };
 
