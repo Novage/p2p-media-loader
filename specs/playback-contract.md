@@ -235,6 +235,24 @@ ever, so the store does not. Both values sit on the manifest timeline, which is
 what keeps the comparison valid, and is why neither of them is
 `video.currentTime`.
 
+The store is also told, through `onSegmentsRemoved`, when a refreshed manifest
+no longer lists segments of a stream: a live window has moved past them.
+Nothing can request such a segment again. The core matches every request
+through the segments the manifests list, and a peer asks only for what its own
+manifest lists, so a stored copy can never be served. The store may drop it at
+once, wherever the playhead is, and the bundled one does. The trailing window
+alone is not enough for a paused player: its playhead does not move, so every
+segment ends after it, and on a live stream with peers the core goes on
+fetching this peer's share of each new one — a paused peer still owns segments
+in the election, and its neighbours would otherwise wait for a backup. Each
+such segment would be kept until the storage brake stopped it. Dropping what
+leaves the window bounds the store by the window instead, while the peer goes
+on seeding. For a playing peer the rule changes nothing, since everything it
+keeps is inside the window. The core reports a segment by identity, not by URL:
+a CDN that signs every refresh's URLs anew changes a segment's key and nothing
+else, and that segment has not left. The method is optional, so a custom store
+without it keeps such segments until its own rules let them go.
+
 A custom store that only ever compares the position it is given against the
 segment times it was given is unaffected. A custom store that mixes in a
 player-sourced time — reading `currentTime` itself, or persisting positions

@@ -86,6 +86,15 @@ throughout.
   trailing segments on live, under a floor of 15 s, instead of the window's
   length. See [`specs/playback-contract.md`](specs/playback-contract.md), "The
   time windows".
+- **Segment storage is told when a live window moves past segments**, through
+  the optional `SegmentStorage.onSegmentsRemoved`, and the memory storage drops
+  them at once. Nothing can request such a segment again. A paused live player
+  keeps fetching its share for its peers, as the election needs, and its
+  storage kept every segment after its frozen playhead: on one stream with one
+  peer, 9.5 MiB in a 45 s pause, bounded only by the storage brake. It is now
+  bounded by the live window. See
+  [`specs/playback-contract.md`](specs/playback-contract.md), "What the segment
+  store receives".
 - **`bitrate` enters a stream's identity only where a manifest needs it** to
   tell two same-type streams apart. An origin that recomputes `BANDWIDTH` per
   request no longer splits a rendition's swarm.

@@ -333,6 +333,12 @@ signatures, including `setSegmentChangeCallback`. The value passed is
 storage implementations keep working — only parameter names and documentation
 changed.
 
+A new optional method, `onSegmentsRemoved(swarmId, streamSwarmId, segmentIds)`,
+tells a storage which segments a live window has moved past. Nothing can
+request them again, so a storage may drop them at once. Without it, a storage
+keeps them until its own rules let them go — which, behind a paused player's
+frozen playhead, can be indefinitely.
+
 ### Runtime configuration
 
 `swarmId` and `streamSwarmIdBuilder` cannot be changed via `applyDynamicConfig`.

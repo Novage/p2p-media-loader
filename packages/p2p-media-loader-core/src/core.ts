@@ -556,13 +556,20 @@ export class Core {
     registryStream: RegistryStream,
   ): void {
     let changed = false;
-    for (const key of stream.segments.keys()) {
+    // What the manifest stopped listing, by identity rather than by key: a key
+    // can change under a segment that stays, as when a CDN signs the URLs of
+    // every refresh anew, and only a segment gone from the stream has left
+    // its window.
+    const left = new Set<number>();
+    for (const [key, segment] of stream.segments) {
       if (!registryStream.segments.has(key)) {
         stream.segments.delete(key);
+        left.add(segment.externalId);
         changed = true;
       }
     }
     for (const [key, segment] of registryStream.segments) {
+      left.delete(segment.externalId);
       if (stream.segments.has(key)) continue;
       stream.segments.set(key, {
         runtimeId: key,
@@ -575,9 +582,30 @@ export class Core {
       });
       changed = true;
     }
+    if (left.size) this.releaseFromStorage(stream, [...left]);
     if (!changed) return;
     this.mainStreamLoader?.updateStream(stream);
     this.secondaryStreamLoader?.updateStream(stream);
+  }
+
+  /**
+   * Tells the segment storage which of a stream's segments its manifest no
+   * longer lists, so that it can drop them; see
+   * `SegmentStorage.onSegmentsRemoved`. The storage may be an integrator's
+   * own and free to throw, and processing a manifest must not.
+   */
+  private releaseFromStorage(stream: StreamWithSegments, segmentIds: number[]) {
+    const storage = this.segmentStorage;
+    if (!storage?.onSegmentsRemoved) return;
+    try {
+      storage.onSegmentsRemoved(
+        stream.swarmId,
+        stream.streamSwarmId,
+        segmentIds,
+      );
+    } catch (error) {
+      this.logger("the segment storage refused segments that left: %O", error);
+    }
   }
 
   /**

@@ -163,3 +163,39 @@ describe("SegmentMemoryStorage usage reporting", () => {
     expect(storage.getUsage().usedCapacity).toBe(SEGMENT_BYTES / MiB);
   });
 });
+
+describe("SegmentMemoryStorage dropping what a manifest stopped listing", () => {
+  it("drops those segments, and only those, wherever the playhead is", async () => {
+    // A paused live player: the playhead is behind all three, so the
+    // trailing window would keep every one of them.
+    const storage = await createStorage(true);
+    storage.onPlaybackUpdated(0, 1);
+    const changed: string[] = [];
+    storage.setSegmentChangeCallback((streamSwarmId) =>
+      changed.push(streamSwarmId),
+    );
+
+    storage.onSegmentsRemoved(SWARM_ID, STREAM_SWARM_ID, [0, 1]);
+
+    expect(storage.getStoredSegmentIds(SWARM_ID, STREAM_SWARM_ID)).toEqual([2]);
+    expect(storage.getUsage().usedCapacity).toBe(SEGMENT_BYTES / MiB);
+    // Peers are told, so the next announcement no longer offers them.
+    expect(changed).toEqual([STREAM_SWARM_ID]);
+  });
+
+  it("says nothing when it held none of them", async () => {
+    const storage = await createStorage(true);
+    const changed: string[] = [];
+    storage.setSegmentChangeCallback((streamSwarmId) =>
+      changed.push(streamSwarmId),
+    );
+
+    storage.onSegmentsRemoved(SWARM_ID, STREAM_SWARM_ID, [99]);
+    storage.onSegmentsRemoved(SWARM_ID, "another-stream", [0]);
+
+    expect(storage.getStoredSegmentIds(SWARM_ID, STREAM_SWARM_ID)).toEqual([
+      0, 1, 2,
+    ]);
+    expect(changed).toEqual([]);
+  });
+});

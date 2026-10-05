@@ -185,6 +185,32 @@ export class SegmentMemoryStorage implements SegmentStorage {
     };
   }
 
+  /**
+   * Drops segments their manifest stopped listing, whatever the playhead: no
+   * request can reach them again. Without this, a paused live player's
+   * storage would keep every segment that ends after its frozen playhead —
+   * each new one its peers fetch with it — until the storage brake stopped it.
+   */
+  onSegmentsRemoved(
+    _swarmId: string,
+    streamSwarmId: string,
+    segmentIds: readonly number[],
+  ) {
+    let removed = false;
+    for (const segmentId of segmentIds) {
+      const storageId = getStorageItemId(streamSwarmId, segmentId);
+      const item = this.cache.get(storageId);
+      if (!item) continue;
+      this.cache.delete(storageId);
+      this.decreaseStorageUsage(item.data.byteLength);
+      this.logger(
+        `Removed segment ${segmentId} from stream ${streamSwarmId}: no longer in its manifest`,
+      );
+      removed = true;
+    }
+    if (removed) this.sendUpdatesToAffectedStreams(new Set([streamSwarmId]));
+  }
+
   hasSegment(_swarmId: string, streamSwarmId: string, externalId: number) {
     const segmentStorageId = getStorageItemId(streamSwarmId, externalId);
     const segment = this.cache.get(segmentStorageId);

@@ -82,6 +82,28 @@ export interface SegmentStorage {
   ): Promise<void>;
 
   /**
+   * Tells the storage that segments of a stream are no longer listed by the
+   * stream's manifest: a live window has moved past them. Nothing can request
+   * such a segment again — the core matches every request through the
+   * segments the manifests list, and a peer asks only for what its own
+   * manifest lists — so a storage may drop it at once, wherever the playhead
+   * is. That is what keeps the storage of a paused live player bounded by the
+   * window while the player goes on fetching its share for its peers.
+   *
+   * Optional. A storage without it keeps such segments until its own rules
+   * let them go.
+   *
+   * @param swarmId The swarm identifier.
+   * @param streamSwarmId The stream's stream swarm ID (`Stream.streamSwarmId`), unique per stream identity.
+   * @param segmentIds The segments that left, by `Segment.externalId`.
+   */
+  onSegmentsRemoved?(
+    swarmId: string,
+    streamSwarmId: string,
+    segmentIds: readonly number[],
+  ): void;
+
+  /**
    * Retrieves the data for a specific segment.
    * @param swarmId The swarm identifier.
    * @param streamSwarmId The stream's stream swarm ID (`Stream.streamSwarmId`), unique per stream identity.
