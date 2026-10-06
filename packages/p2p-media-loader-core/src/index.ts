@@ -40,6 +40,7 @@ export {
   liveDelayFor,
   liveDelayForSegments,
   liveDelayFromWindow,
+  maxLiveLatencyFor,
   playerBufferFor,
   type LiveDelay,
 } from "./live-delay.js";

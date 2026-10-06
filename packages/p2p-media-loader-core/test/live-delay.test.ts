@@ -4,6 +4,7 @@ import {
   highDemandWindowFor,
   liveDelayFor,
   liveDelayForSegments,
+  maxLiveLatencyFor,
   playerBufferFor,
 } from "../src/live-delay.js";
 
@@ -88,6 +89,28 @@ describe("live window geometry", () => {
           buffer / 2,
         );
       }
+    }
+  });
+
+  it("re-syncs two segments past the delay", () => {
+    expect(maxLiveLatencyFor({ delay: 15, segment: 5 })).toBe(25);
+    expect(maxLiveLatencyFor({ delay: 60, segment: 4 })).toBe(68);
+  });
+
+  it("re-syncs while the player's buffer still ends inside the window", () => {
+    // A paused player's buffer ends a buffer length ahead of its playhead.
+    // At the re-sync threshold that end must still be in the window, or the
+    // player's next request is for a segment the registry no longer lists.
+    for (const [count, seconds] of [
+      [4, 5],
+      [6, 2],
+      [75, 4],
+      [3, 2],
+      [2, 2],
+    ]) {
+      const target = liveDelayForSegments(segments(count, seconds))!;
+      const bufferEnd = maxLiveLatencyFor(target) - playerBufferFor(target);
+      expect(bufferEnd).toBeLessThanOrEqual(count * seconds);
     }
   });
 });

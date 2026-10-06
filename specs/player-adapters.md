@@ -588,6 +588,22 @@ Each of the three settings is a ceiling: one the integrator already holds
 lower is left alone, and what they held is given back as it was — a `null` as
 a `null`, not as the ceiling's number.
 
+**A player a pause left behind is re-synced.** dash.js has no latency limit
+outside its low-latency catch-up, and that one also steers the playback rate.
+It plays on from wherever a pause left it, as far behind the edge as the pause
+was long, and moves the playhead only when the buffer runs dry — to the start
+of the DVR window, where the next pause carries it out again. Before then its
+fetch position has already reached back past what the registry lists: on a
+60 s window of 8 s segments, a pause of about 45 s is enough for every request
+after it to go over HTTP and be shared with nobody, and a little longer stops
+dash.js fetching altogether. So when playback starts or resumes, a placed
+player more than `maxLiveLatencyFor` behind the edge — two segments past its
+delay — is sent back with `seekToOriginalLive()`, which seeks to the delay the
+adapter wrote. A DVR window wider than that threshold raises it to the window:
+a viewer who rewound into the window is left where they chose to be, and
+brought back only once a pause has carried them out of it. A player the
+integrator placed is theirs, and is not re-synced.
+
 Two details of the request path. dash.js names the request it abandons on its
 progress timeout, and its own `XHRLoader` ignores the name and aborts the XHR
 it made last; for a request the core is serving that is some other request's,

@@ -17,6 +17,7 @@ import {
   DefinedCoreConfig,
   highDemandWindowFor,
   liveDelayFromWindow,
+  maxLiveLatencyFor,
   playerBufferFor,
   runAll,
   trackMediaElementPlayback,
@@ -62,11 +63,6 @@ export type HlsWithP2PConfig<HlsType extends abstract new () => unknown> =
     };
   };
 
-/**
- * How far beyond the target the re-sync threshold sits, so a viewer who pauses
- * or stalls is brought back to the target before the buffer starves.
- */
-const LIVE_RESYNC_MARGIN_SEGMENTS = 2;
 /** Fewest fragments a playlist needs before its window is worth tuning for. */
 const MIN_TUNABLE_FRAGMENTS = 4;
 
@@ -387,8 +383,9 @@ export class HlsJsP2PEngine {
    * say, the same answer every adapter gets, and the player's own forward
    * buffer keeps the fetch positions inside the window as the playhead drifts
    * past the tail. Applied through HLS.js's own `targetLatency` API, with a
-   * re-sync threshold two segments beyond it. Set once per value; HLS.js then
-   * re-syncs to it on start, on a stall, and when the max latency is exceeded.
+   * re-sync threshold at the core's `maxLiveLatencyFor`, two segments beyond
+   * it. Set once per value; HLS.js then re-syncs to it on start, on a stall,
+   * and when the max latency is exceeded.
    *
    * Both or neither: the threshold is derived from this target, and an
    * integrator who set any of the four live sync settings has a target of
@@ -404,7 +401,7 @@ export class HlsJsP2PEngine {
     if (!(segment > 0) || !(window > 0)) return;
 
     const targetLatency = liveDelayFromWindow(window, segment);
-    const maxLatency = targetLatency + LIVE_RESYNC_MARGIN_SEGMENTS * segment;
+    const maxLatency = maxLiveLatencyFor({ delay: targetLatency, segment });
 
     // Segment durations are not exact multiples, so the window length drifts
     // by fractions of a second between refreshes. Only a change of at least

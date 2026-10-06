@@ -178,10 +178,11 @@ is exported.
   `p2p-media-loader-core/dash` subpaths.
 - An **integration** toolkit for whoever writes a player adapter:
   `liveDelayFor`, `liveDelayForSegments`, `liveDelayFromWindow`,
-  `playerBufferFor`, `highDemandWindowFor`, `INITIAL_LIVE_DELAY`,
-  `DEFAULT_HIGH_DEMAND_TIME_WINDOW` and `trackMediaElementPlayback` — the live
-  window geometry the core schedules by, which every adapter sizes the
-  player's buffer with, and the media-element tracking they share. An
+  `playerBufferFor`, `maxLiveLatencyFor`, `highDemandWindowFor`,
+  `INITIAL_LIVE_DELAY`, `DEFAULT_HIGH_DEMAND_TIME_WINDOW` and
+  `trackMediaElementPlayback` — the live window geometry the core schedules
+  by, which every adapter sizes the player's buffer with, and the
+  media-element tracking they share. An
   integrator using one of the bundled adapters needs none of it.
 - `Core.processManifest({ url, requestedUrl?, data, protocol? })`, returning what the
   manifest described per stream.

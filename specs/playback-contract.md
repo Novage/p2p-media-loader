@@ -150,7 +150,17 @@ the geometry of the window itself, by the rule the core exports as
 liveDelay    = liveDelayFromWindow(window, segment)   // one segment inside the tail, at most a minute
 playerBuffer = max(2 × segment, liveDelay − segment)   // one segment short of the edge
 highDemand   = min(configured ?? 15, playerBuffer / 2)   // and at least a segment where nothing is configured
+maxLatency   = liveDelay + 2 × segment                  // re-synced to liveDelay past this
 ```
+
+A pause or a stall leaves the playhead where it was while the window moves on,
+and the player's buffer, which ends a fixed distance ahead of the playhead,
+reaches back toward the tail with it. Past `maxLatency`, the core's
+`maxLiveLatencyFor`, the player is brought back to its delay: at that distance
+the buffer still ends inside the window, so its next request is still for a
+segment the registry lists. A player left further behind fetches every segment
+over HTTP and shares none of them, and once its next segment has left the
+window it has nothing left to fetch at all.
 
 On live the configured number is a ceiling rather than an override. Nothing
 configured here widens the player's buffer, which every adapter sizes from the

@@ -10,8 +10,8 @@ import type { ProcessedManifest } from "./types.js";
  * "The time windows", and specs/player-adapters.md.
  *
  * The playhead goes as deep as the window allows, one segment inside the
- * tail, never more than a minute behind the edge. The player's own
- * out-of-window handling covers a playhead that drifts past the tail.
+ * tail, never more than a minute behind the edge. A playhead that a pause or
+ * a stall carries past `maxLiveLatencyFor` is brought back to the delay.
  *
  * A delay alone does not leave the window ahead of the buffer free for peers
  * to exchange: what the player fetches is a forward buffer ahead of the
@@ -25,6 +25,8 @@ const LIVE_TAIL_MARGIN_SEGMENTS = 1;
 const LIVE_EDGE_MARGIN_SEGMENTS = 1;
 /** Least forward buffer to leave the player, whatever the window works out to. */
 const MIN_BUFFER_SEGMENTS = 2;
+/** How far past the live delay a player may fall before it is re-synced. */
+const LIVE_RESYNC_MARGIN_SEGMENTS = 2;
 
 /**
  * The high-demand window when none is configured: what a VOD player gets, and
@@ -89,6 +91,21 @@ export function playerBufferFor(target: LiveDelay): number {
     MIN_BUFFER_SEGMENTS * target.segment,
     target.delay - LIVE_EDGE_MARGIN_SEGMENTS * target.segment,
   );
+}
+
+/**
+ * How far behind the live edge a placed player may fall before it is brought
+ * back to its live delay: two segments past the delay. A pause or a stall
+ * leaves the playhead where it was while the window moves on, and the forward
+ * buffer ahead of it then reaches back toward the tail. At this distance the
+ * buffer still ends inside the window — the delay is a segment inside the
+ * tail and the buffer at least two segments long — so the player is re-synced
+ * while its next request is still for a segment the registry lists.
+ *
+ * @category Integration
+ */
+export function maxLiveLatencyFor(target: LiveDelay): number {
+  return target.delay + LIVE_RESYNC_MARGIN_SEGMENTS * target.segment;
 }
 
 /**

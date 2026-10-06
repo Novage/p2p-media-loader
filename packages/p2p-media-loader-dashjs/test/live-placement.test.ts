@@ -130,6 +130,10 @@ function setup(
     on: vi.fn(),
     off: vi.fn(),
     getVideoElement: vi.fn(() => media as unknown as HTMLMediaElement),
+    isSeeking: vi.fn(() => false),
+    getDvrWindow: vi.fn(() => ({ size: 0 })),
+    getCurrentLiveLatency: vi.fn(() => NaN),
+    seekToOriginalLive: vi.fn(),
   };
   const engine = new DashJsP2PEngine();
   engine.bindPlayer(player as unknown as MediaPlayerClass);
@@ -822,6 +826,70 @@ describe("dash.js live window placement", () => {
     deliverMpd(mpd(12, 8));
     expect(settings.streaming.delay.liveDelay).toBe(60);
     expect(player.updateSettings.mock.calls.length).toBe(afterFirst + 1);
+  });
+
+  describe("re-sync after a pause", () => {
+    // A 56 s window of 8 s segments places the player 48 s behind the edge,
+    // and re-syncs it past 64 s.
+    const paused = (latency: number, dvrWindow = 56) => {
+      const placed = setup();
+      placed.deliverMpd(mpd(7, 8));
+      placed.player.getDvrWindow.mockReturnValue({ size: dvrWindow });
+      placed.player.getCurrentLiveLatency.mockReturnValue(latency);
+      placed.fire("playbackPlaying");
+      return placed;
+    };
+
+    it("brings a player a pause left two segments past its delay back to it", () => {
+      const { player } = paused(70);
+      expect(player.seekToOriginalLive).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves a player still within two segments of its delay where it is", () => {
+      const { player } = paused(64);
+      expect(player.seekToOriginalLive).not.toHaveBeenCalled();
+    });
+
+    it("leaves a viewer who rewound into a wide DVR window where they chose to be", () => {
+      expect(paused(300, 600).player.seekToOriginalLive).not.toHaveBeenCalled();
+      // Until a pause carries them out of the window.
+      expect(paused(610, 600).player.seekToOriginalLive).toHaveBeenCalled();
+    });
+
+    it("waits for a seek in progress to land", () => {
+      const { player, deliverMpd, fire } = setup();
+      deliverMpd(mpd(7, 8));
+      player.getCurrentLiveLatency.mockReturnValue(70);
+      player.isSeeking.mockReturnValue(true);
+      fire("playbackPlaying");
+      expect(player.seekToOriginalLive).not.toHaveBeenCalled();
+    });
+
+    it("leaves a player the integrator placed to dash.js", () => {
+      const { player, deliverMpd, fire } = setup(30);
+      deliverMpd(mpd(7, 8));
+      player.getCurrentLiveLatency.mockReturnValue(200);
+      fire("playbackPlaying");
+      expect(player.seekToOriginalLive).not.toHaveBeenCalled();
+    });
+
+    it("leaves a source it no longer places to dash.js", () => {
+      const { player, deliverMpd, fire } = setup();
+      deliverMpd(mpd(7, 8));
+      fire("streamTeardownComplete");
+      player.getCurrentLiveLatency.mockReturnValue(200);
+      fire("playbackPlaying");
+      expect(player.seekToOriginalLive).not.toHaveBeenCalled();
+    });
+
+    it("logs a player that fails to answer rather than raising into dash.js", () => {
+      const { player, deliverMpd, fire } = setup();
+      deliverMpd(mpd(7, 8));
+      player.getCurrentLiveLatency.mockImplementation(() => {
+        throw new Error("playback not initialized");
+      });
+      expect(() => fire("playbackPlaying")).not.toThrow();
+    });
   });
 
   it("does not place a static stream", () => {

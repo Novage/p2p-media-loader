@@ -50,18 +50,20 @@ describe("DashJsP2PEngine.bindPlayer", () => {
     expect(spies.updateSettings).not.toHaveBeenCalled();
   });
 
-  it("subscribes to stream lifecycle events and unsubscribes on destroy", () => {
+  it("subscribes to stream lifecycle and playback events and unsubscribes on destroy", () => {
     const { player, spies } = fakePlayer(NaN);
     const engine = new DashJsP2PEngine();
     engine.bindPlayer(player);
     expect(spies.on.mock.calls.map((c) => c[0])).toEqual([
       "streamInitialized",
       "streamTeardownComplete",
+      "playbackPlaying",
     ]);
     engine.destroy();
     expect(spies.off.mock.calls.map((c) => c[0])).toEqual([
       "streamInitialized",
       "streamTeardownComplete",
+      "playbackPlaying",
     ]);
   });
 });

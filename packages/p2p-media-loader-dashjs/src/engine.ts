@@ -11,6 +11,7 @@ import {
   runAll,
   trackMediaElementPlayback,
   liveDelayFor,
+  maxLiveLatencyFor,
   playerBufferFor,
   type LiveDelay,
   INITIAL_LIVE_DELAY,
@@ -81,6 +82,8 @@ const STREAM_INITIALIZED: MediaPlayerEvents["STREAM_INITIALIZED"] =
   "streamInitialized";
 const STREAM_TEARDOWN_COMPLETE: MediaPlayerEvents["STREAM_TEARDOWN_COMPLETE"] =
   "streamTeardownComplete";
+const PLAYBACK_PLAYING: MediaPlayerEvents["PLAYBACK_PLAYING"] =
+  "playbackPlaying";
 
 /**
  * Represents a Peer-to-Peer (P2P) engine designed to enhance media streaming efficiency.
@@ -121,6 +124,11 @@ export class DashJsP2PEngine {
   private appliedLiveDelay?: number;
   /** The forward buffer this engine wrote, if any; see `forwardBufferSettings`. */
   private appliedBuffer?: ForwardBuffer;
+  /**
+   * The placement the current source is held to, while this engine places
+   * it; see `resyncIfBehind`.
+   */
+  private liveTarget?: LiveDelay;
   private readonly debug = debug("p2pml-dashjs:engine");
 
   /**
@@ -181,6 +189,7 @@ export class DashJsP2PEngine {
 
     player.on(STREAM_INITIALIZED, this.handleStreamInitialized);
     player.on(STREAM_TEARDOWN_COMPLETE, this.handleStreamTeardown);
+    player.on(PLAYBACK_PLAYING, this.resyncIfBehind);
     this.registerMediaElement();
     if (failures.length) throw failures[0];
   }
@@ -277,6 +286,7 @@ export class DashJsP2PEngine {
       return;
     }
 
+    this.liveTarget = target;
     this.noteOutsideBufferWrites();
     const buffer = this.forwardBufferSettings(target);
 
@@ -387,6 +397,43 @@ export class DashJsP2PEngine {
     return settings;
   }
 
+  /**
+   * Brings the player back to its live delay once a pause or a stall has
+   * left it more than `maxLiveLatencyFor` behind the edge. dash.js has no
+   * such threshold of its own. It plays on from wherever a pause left it, and
+   * its buffer, which ends a fixed distance ahead of the playhead, reaches
+   * back past the window the registry lists: every request from there is
+   * fetched over HTTP and shared with nobody. Once the next segment is out of
+   * the window it stops fetching, plays out the buffer and stalls, and only
+   * then moves the playhead — to the tail of the window, from where the next
+   * pause carries it out again.
+   *
+   * Checked when playback starts or resumes, which is when a pause or a stall
+   * ends. A DVR window wider than the threshold raises the threshold to the
+   * window: a viewer who rewound into it is left where they chose to be, and
+   * brought back only once a pause has carried them out of it.
+   *
+   * dash.js calls its event handlers with no `try` of its own, so what fails
+   * here is logged rather than raised.
+   */
+  private resyncIfBehind = () => {
+    const { player, liveTarget } = this;
+    if (!player || !liveTarget) return;
+    try {
+      if (player.isSeeking()) return;
+      const limit = Math.max(
+        maxLiveLatencyFor(liveTarget),
+        player.getDvrWindow().size,
+      );
+      const latency = player.getCurrentLiveLatency();
+      if (!(latency > limit)) return;
+      this.debug(`${latency} s behind the edge, past ${limit} s: re-syncing`);
+      player.seekToOriginalLive();
+    } catch (error) {
+      this.debug("re-syncing to the live delay failed: %O", error);
+    }
+  };
+
   private handleStreamInitialized = () => {
     this.registerMediaElement();
   };
@@ -487,6 +534,7 @@ export class DashJsP2PEngine {
     this.placement = undefined;
     this.appliedLiveDelay = undefined;
     this.appliedBuffer = undefined;
+    this.liveTarget = undefined;
     if (!this.player || !placement) return;
 
     // Each half is given back only if this engine wrote it. A live window it
@@ -580,6 +628,7 @@ export class DashJsP2PEngine {
         if (!this.player) return;
         this.player.off(STREAM_INITIALIZED, this.handleStreamInitialized);
         this.player.off(STREAM_TEARDOWN_COMPLETE, this.handleStreamTeardown);
+        this.player.off(PLAYBACK_PLAYING, this.resyncIfBehind);
       },
       () => this.restorePlacement(),
       () => this.core.destroy(),
