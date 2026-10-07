@@ -585,16 +585,15 @@ dynamic stream is long-form by its duration — which on a typical window is the
 whole of it. The playhead then sits a delay behind the edge while the fetch
 position rides the edge itself. dash.js asks for each segment the moment its
 clock, synced to the MPD's `UTCTiming`, says the segment exists — before any
-peer can have it — so the stream plays perfectly and shares nothing. On an MPD
-that lists its segments in an explicit (closed) `SegmentTimeline` it is worse:
-core learns of a segment only when dash.js refreshes the MPD, so every such
-request misses the registry and goes to dash.js's own loader — visible as a
-stream that stops sharing minutes in and resumes only when the player falls
-behind the edge again. A template numbered from the clock, and a
-`SegmentTimeline` that repeats its last entry until the present (`S@r` < 0
-under `$Number$`), are listed as each segment becomes available
+peer can have it — so the stream plays perfectly and shares nothing. The core
+knows every segment dash.js can ask for: it reads each MPD before dash.js does,
+so an explicit `SegmentTimeline` holds nothing dash.js knows and the core does
+not, and a template numbered from the clock, or a `SegmentTimeline` that
+repeats its last entry until the present (`S@r` < 0 under `$Number$`), it lists
+as each segment becomes available
 ([manifest-registry.md](manifest-registry.md), "Segments computed from the
-clock").
+clock"). What the edge costs is time for a peer to supply the segment, not a
+registry miss.
 Each of the three settings is a ceiling: one the integrator already holds
 lower is left alone, and what they held is given back as it was — a `null` as
 a `null`, not as the ceiling's number.
