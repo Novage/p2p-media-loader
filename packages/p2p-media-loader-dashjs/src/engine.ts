@@ -375,11 +375,14 @@ export class DashJsP2PEngine {
    * Left alone, dash.js buffers `bufferTimeAtTopQualityLongForm` — a minute,
    * since a dynamic stream is long-form by its duration — which on a live
    * stream is the whole window. Its playhead then sits a live delay behind the
-   * edge while its *fetch* position rides the edge itself, where the registry
-   * cannot yet know the segment: core learns of one only when dash.js refreshes
-   * the MPD, and dash.js derives availability from its own synced clock. Every
-   * such request misses the registry and falls through to dash.js's own loader,
-   * so the stream plays perfectly with no P2P at all.
+   * edge while its *fetch* position rides the edge itself. It asks for each
+   * segment the moment it exists, before any peer can have it, so the stream
+   * plays perfectly with no P2P at all. On an MPD that lists its segments in an
+   * explicit (closed) `SegmentTimeline` it is worse: the core learns of a
+   * segment only when dash.js refreshes the MPD, so each such request misses
+   * the registry and falls through to dash.js's own loader. A template
+   * numbered from the clock, and a timeline that repeats its last entry until
+   * the present, the core lists as each segment becomes available.
    *
    * Settings the integrator already holds below this are left alone; the value
    * is a ceiling, not a target.

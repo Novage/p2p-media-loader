@@ -311,3 +311,87 @@ export const DASH_SEGMENT_BASE = MPD(
     </AdaptationSet>
   </Period>`,
 );
+
+/** `availabilityStartTime` of the clock-based live fixtures below, in epoch ms. */
+export const DASH_LIVE_START = Date.parse("2026-01-01T00:00:00Z");
+
+/**
+ * A live MPD whose segments a `SegmentTemplate@duration` numbers from the
+ * clock: 8 s segments in a 60 s window, video and audio. It names four time
+ * sources, in order: an NTP server, which a browser cannot use; an
+ * `http-xsdate` server by relative URL; two `http-head` servers in one value;
+ * and the time itself.
+ */
+export const DASH_TEMPLATE_DURATION_DYNAMIC = `<?xml version="1.0" encoding="UTF-8"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" profiles="urn:mpeg:dash:profile:isoff-live:2011" type="dynamic" availabilityStartTime="2026-01-01T00:00:00Z" minimumUpdatePeriod="PT8S" timeShiftBufferDepth="PT60S" minBufferTime="PT2S">
+  <Period id="0" start="PT0S">
+    <AdaptationSet mimeType="video/mp4">
+      <SegmentTemplate media="$RepresentationID$/$Number$.m4s" initialization="$RepresentationID$/init.mp4" duration="122880" timescale="15360" startNumber="0"/>
+      <Representation id="V1200" bandwidth="1200000" codecs="avc1.64001f" width="960" height="540"/>
+    </AdaptationSet>
+    <AdaptationSet mimeType="audio/mp4" lang="en">
+      <SegmentTemplate media="$RepresentationID$/$Number$.m4s" initialization="$RepresentationID$/init.mp4" duration="384000" timescale="48000" startNumber="0"/>
+      <Representation id="A48" bandwidth="48000" codecs="mp4a.40.2"/>
+    </AdaptationSet>
+  </Period>
+  <UTCTiming schemeIdUri="urn:mpeg:dash:utc:ntp:2014" value="time.example"/>
+  <UTCTiming schemeIdUri="urn:mpeg:dash:utc:http-xsdate:2014" value="../time?iso"/>
+  <UTCTiming schemeIdUri="urn:mpeg:dash:utc:http-head:2014" value="https://a.example/t https://b.example/t"/>
+  <UTCTiming schemeIdUri="urn:mpeg:dash:utc:direct:2014" value="2026-01-01T00:10:00Z"/>
+</MPD>`;
+
+/**
+ * A live MPD whose `SegmentTimeline` repeats one 4 s entry until the present
+ * (`r="-1"`) under a `$Number$` template, which also leaves the list to the
+ * clock.
+ */
+export const DASH_SEGMENT_TIMELINE_OPEN = `<?xml version="1.0" encoding="UTF-8"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="dynamic" availabilityStartTime="2026-01-01T00:00:00Z" minimumUpdatePeriod="PT4S" minBufferTime="PT2S">
+  <Period id="0" start="PT0S">
+    <AdaptationSet mimeType="video/mp4">
+      <Representation id="v" bandwidth="2000000" codecs="avc1.64001f" width="1920" height="1080">
+        <SegmentTemplate media="v-$Number$.m4s" initialization="v-init.mp4" timescale="1000" startNumber="1">
+          <SegmentTimeline>
+            <S t="0" d="4000" r="-1"/>
+          </SegmentTimeline>
+        </SegmentTemplate>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>`;
+
+/**
+ * A live MPD with one open timeline beside two other kinds of list, all with
+ * 4 s segments: video `vo` repeats its entry until the present under a
+ * `$Number$` template; audio `a` has an explicit timeline whose origin has
+ * published one segment ahead, to 64 s; video `vd` is numbered by a
+ * `SegmentTemplate@duration`.
+ */
+export const DASH_OPEN_TIMELINE_MIXED = `<?xml version="1.0" encoding="UTF-8"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="dynamic" availabilityStartTime="2026-01-01T00:00:00Z" minimumUpdatePeriod="PT4S" timeShiftBufferDepth="PT60S" minBufferTime="PT2S">
+  <Period id="0" start="PT0S">
+    <AdaptationSet mimeType="video/mp4">
+      <Representation id="vo" bandwidth="2000000" codecs="avc1.64001f" width="1920" height="1080">
+        <SegmentTemplate media="vo-$Number$.m4s" initialization="vo-init.mp4" timescale="1000" startNumber="1">
+          <SegmentTimeline>
+            <S t="0" d="4000" r="-1"/>
+          </SegmentTimeline>
+        </SegmentTemplate>
+      </Representation>
+    </AdaptationSet>
+    <AdaptationSet mimeType="audio/mp4" lang="en">
+      <Representation id="a" bandwidth="128000" codecs="mp4a.40.2">
+        <SegmentTemplate media="a-$Time$.m4s" initialization="a-init.mp4" timescale="1000">
+          <SegmentTimeline>
+            <S t="0" d="4000" r="15"/>
+          </SegmentTimeline>
+        </SegmentTemplate>
+      </Representation>
+    </AdaptationSet>
+    <AdaptationSet mimeType="video/mp4">
+      <Representation id="vd" bandwidth="1000000" codecs="avc1.4d401f" width="1280" height="720">
+        <SegmentTemplate media="vd-$Number$.m4s" initialization="vd-init.mp4" duration="4" timescale="1" startNumber="0"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>`;

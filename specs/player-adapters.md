@@ -575,15 +575,21 @@ than left wherever dash.js puts it, which is at the edge.
 
 The second is not a refinement of the first. A live delay places the
 **playhead**; what the player fetches is a forward buffer ahead of it, and
-dash.js left alone buffers `bufferTimeAtTopQualityLongForm` — a minute, since
-a dynamic stream is long-form by its duration — which on a typical window is
-the whole of it. The playhead then sits a delay behind the edge while the fetch
-position rides the edge itself, where the registry cannot yet know the segment:
-core learns of a segment when dash.js refreshes the MPD, while dash.js derives
-availability from its own clock, synced to the MPD's `UTCTiming`. Every such
-request misses the registry and goes to dash.js's own loader, so the stream
-plays perfectly and shares nothing — visible as a stream that stops sharing
-minutes in and resumes only when the player falls behind the edge again.
+dash.js left alone buffers `bufferTimeAtTopQualityLongForm` — a minute, since a
+dynamic stream is long-form by its duration — which on a typical window is the
+whole of it. The playhead then sits a delay behind the edge while the fetch
+position rides the edge itself. dash.js asks for each segment the moment its
+clock, synced to the MPD's `UTCTiming`, says the segment exists — before any
+peer can have it — so the stream plays perfectly and shares nothing. On an MPD
+that lists its segments in an explicit (closed) `SegmentTimeline` it is worse:
+core learns of a segment only when dash.js refreshes the MPD, so every such
+request misses the registry and goes to dash.js's own loader — visible as a
+stream that stops sharing minutes in and resumes only when the player falls
+behind the edge again. A template numbered from the clock, and a
+`SegmentTimeline` that repeats its last entry until the present (`S@r` < 0
+under `$Number$`), are listed as each segment becomes available
+([manifest-registry.md](manifest-registry.md), "Segments computed from the
+clock").
 Each of the three settings is a ceiling: one the integrator already holds
 lower is left alone, and what they held is given back as it was — a `null` as
 a `null`, not as the ceiling's number.

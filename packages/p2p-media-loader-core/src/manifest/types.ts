@@ -90,6 +90,59 @@ export type ParsedManifest = {
    * a stream of its own. An MPD names nothing that arrives later.
    */
   readonly excludedPlaylists?: readonly string[];
+  /**
+   * Present when the manifest's segment list follows from the wall clock
+   * rather than from the manifest alone: a dynamic MPD whose segments a
+   * `SegmentTemplate@duration` numbers, or whose `SegmentTimeline` repeats an
+   * entry until the present (`S@r` < 0). Such a list is only as right as the
+   * clock it was computed with, and it grows between refreshes. See
+   * specs/manifest-registry.md, "Segments computed from the clock".
+   */
+  readonly clock?: ManifestClock;
+};
+
+/**
+ * A time source a manifest names to synchronize with: a DASH `UTCTiming`
+ * element of a scheme a browser can use.
+ */
+export type UtcTimingSource =
+  | {
+      /**
+       * `get`: the response body is the time (`http-xsdate`, `http-iso`).
+       * `head`: the response's `Date` header is (`http-head`).
+       */
+      readonly method: "get" | "head";
+      /** Absolute URL of the time server. */
+      readonly url: string;
+    }
+  | {
+      /** The manifest carries the time itself (`direct`). */
+      readonly method: "direct";
+      /** Epoch milliseconds. */
+      readonly time: number;
+    };
+
+/** How a manifest's segment list depends on the wall clock. */
+export type ManifestClock = {
+  /** The time sources the manifest names, in the order it names them. */
+  readonly utcTiming: readonly UtcTimingSource[];
+  /**
+   * When a parse of the same manifest next gives a different segment list —
+   * a segment becomes available, or one leaves the window — in epoch
+   * milliseconds on the clock the parse was given. Absent when nothing more
+   * changes.
+   */
+  readonly nextChangeAt?: number;
+};
+
+/** What the core tells a parser beyond the manifest's bytes. */
+export type ManifestParseContext = {
+  /**
+   * The present, in epoch milliseconds, on the clock the manifest's time
+   * sources keep. A parser whose segment list depends on the clock computes
+   * it for this moment; the local clock is used where no context is given.
+   */
+  readonly now: number;
 };
 
 /**
@@ -105,8 +158,16 @@ export type ManifestParser = {
   readonly protocol: ManifestProtocol;
   /** Cheap sniff of the payload; used when the caller does not state the protocol. */
   canParse(text: string): boolean;
-  /** May throw on malformed input; the core treats that as "no change". */
-  parse(text: string, url: string): ParsedManifest;
+  /**
+   * May throw on malformed input; the core treats that as "no change". The
+   * core parses a manifest that reports a `clock` again as time passes, with
+   * the same text and a later `context.now`.
+   */
+  parse(
+    text: string,
+    url: string,
+    context?: ManifestParseContext,
+  ): ParsedManifest;
   /**
    * Reads the segment index a manifest pointed at instead of listing, where
    * the protocol has one: a DASH `SegmentBase` stream's `sidx` box. Bytes in,

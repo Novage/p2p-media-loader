@@ -155,17 +155,47 @@ declare module "mpd-parser" {
    * The remaining steps of `parse`, exported by mpd-parser for custom
    * pipelines: `parse` is `toM3u8` over `toPlaylists` over
    * `inheritAttributes` over `stringToMpdXml`. Their intermediate values are
-   * opaque here; only what `toM3u8` returns is read.
+   * opaque here except for what a Representation inherits about time, which
+   * is read to tell when its segment list follows from the clock.
    */
+  export type MpdRepresentationInfo = {
+    /** MPD, Period, AdaptationSet and Representation attributes, merged. */
+    attributes: {
+      /** Epoch seconds. */
+      availabilityStartTime?: number;
+      /** Seconds from the availability start. */
+      periodStart?: number;
+      /** Seconds. */
+      timeShiftBufferDepth?: number;
+      /** Seconds. */
+      minimumUpdatePeriod?: number;
+    };
+    segmentInfo: {
+      template?: {
+        /** In `timescale` units. */
+        duration?: number;
+        timescale?: number;
+        /** Kept as written. */
+        endNumber?: string;
+        /** The media URL template. */
+        media?: string;
+      };
+      segmentTimeline?: { d?: number; r?: number }[];
+    };
+  };
   export type MpdInheritedAttributes = {
-    representationInfo: unknown;
+    representationInfo: MpdRepresentationInfo[];
     locations?: unknown;
     contentSteeringInfo?: unknown;
     eventStream?: unknown;
   };
   export function inheritAttributes(
     mpd: Element,
-    options?: { manifestUri?: string },
+    options?: {
+      manifestUri?: string;
+      /** The present, in epoch milliseconds; `Date.now()` by default. */
+      NOW?: number;
+    },
   ): MpdInheritedAttributes;
   export function toPlaylists(representationInfo: unknown): unknown;
   export function toM3u8(args: {

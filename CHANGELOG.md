@@ -43,6 +43,21 @@ throughout.
   the response the player already fetched, so these streams share like any
   other. WebM representations index with an EBML `Cues` element, which the core
   does not read; they play without P2P.
+- **DASH live streams numbered from the clock share up to the live edge.** For
+  an MPD whose `SegmentTemplate@duration` numbers segments from the wall clock,
+  the core synchronizes with the MPD's `UTCTiming` server, as the players do,
+  and lists each new segment when it becomes available rather than at the next
+  MPD refresh. A player that asks for the newest segment the moment it exists —
+  dash.js does for audio — gets it through the core, and the list holds on a
+  device whose clock is wrong. The same applies to a `SegmentTimeline` that
+  repeats its last entry until the present (`S@r` < 0) under a `$Number$`
+  template; its list now ends at the last segment that has ended, where it
+  reached up to one `minimumUpdatePeriod` ahead, so the live window that
+  `processManifest` reports is shorter by as much. The core asks the MPD's time
+  servers in order until one answers, once for each source it plays. When none
+  answers, it keeps the local clock and asks again at most once a minute. See
+  [`specs/manifest-registry.md`](specs/manifest-registry.md), "Segments computed
+  from the clock".
 - **One peer is elected to fetch each new live segment over HTTP** and the rest
   take it from that peer. Each scores itself and its neighbours with a hash of
   peer id and segment id, so the choice needs nothing on the wire; the ranked

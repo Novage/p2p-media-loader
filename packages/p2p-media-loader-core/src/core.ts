@@ -1,7 +1,15 @@
 import { HybridLoader } from "./hybrid-loader.js";
 import { runAll } from "./run-all.js";
 import type { PlaybackState } from "./playback.js";
-import type { ManifestParser, ManifestProtocol } from "./manifest/types.js";
+import type {
+  ManifestParser,
+  ManifestProtocol,
+  ParsedManifest,
+} from "./manifest/types.js";
+import {
+  ClockedManifest,
+  type ManifestSource,
+} from "./manifest/clocked-manifest.js";
 import type { SidxBox } from "./manifest/mp4-sidx.js";
 import {
   ManifestRegistry,
@@ -152,6 +160,13 @@ export class Core {
   private manifestRegistry = new ManifestRegistry();
   private readonly manifestLogger = debug("p2pml-core:manifest");
   private readonly registryMissLogger = debug("p2pml-core:registry-miss");
+  /**
+   * The presentation's manifest when its segment list follows from the
+   * clock, parsed again as time passes. It decides when; the core parses.
+   */
+  private readonly clockedManifest = new ClockedManifest((source, now) =>
+    this.reapplyManifest(source, now),
+  );
 
   /**
    * Constructs a new Core instance with optional initial configuration.
@@ -385,18 +400,14 @@ export class Core {
     }
 
     const { requestedUrl } = manifest;
-    let applied;
-    try {
-      const parsed = parser.parse(text, manifest.url);
-      applied = this.manifestRegistry.apply(
-        requestedUrl !== undefined && requestedUrl !== manifest.url
-          ? { ...parsed, requestedUrl }
-          : parsed,
-      );
-    } catch (error) {
-      this.manifestLogger("failed to parse %s: %O", manifest.url, error);
-      return undefined;
-    }
+    const applied = this.applyManifest({
+      parser,
+      text,
+      url: manifest.url,
+      requestedUrl,
+      receivedAt: Date.now(),
+    });
+    if (!applied) return undefined;
 
     // The first manifest that registers a stream names the swarm unless the
     // integration already did. By what was asked for: every viewer asks for
@@ -488,6 +499,68 @@ export class Core {
     return (
       this.manifestRegistry.streamsAwaitingIndex(url, byteRange).length > 0
     );
+  }
+
+  /**
+   * Parses a manifest on the synchronized clock and applies it to the
+   * registry. A manifest whose segment list follows from the clock is kept, to
+   * be parsed again as time passes; see `ClockedManifest`.
+   *
+   * @param now - The moment a clock-based segment list is computed for.
+   * @returns The registry's account of the change, or `undefined` when the
+   * manifest failed to parse, which leaves the registry as it was.
+   */
+  private applyManifest(
+    source: ManifestSource,
+    now = this.clockedManifest.listingTime(),
+  ) {
+    const { parser, text, url, requestedUrl } = source;
+    let parsed: ParsedManifest;
+    let applied;
+    try {
+      parsed = parser.parse(text, url, { now });
+      applied = this.manifestRegistry.apply(
+        requestedUrl !== undefined && requestedUrl !== url
+          ? { ...parsed, requestedUrl }
+          : parsed,
+      );
+    } catch (error) {
+      this.manifestLogger("failed to parse %s: %O", url, error);
+      return undefined;
+    }
+    this.clockedManifest.track(source, parsed.clock);
+    return applied;
+  }
+
+  /**
+   * Parses a kept clock-based manifest again for `now`, as though the player
+   * had fetched it again, and brings the streams up to date with it.
+   *
+   * @returns Whether the parse succeeded.
+   */
+  private reapplyManifest(source: ManifestSource, now: number): boolean {
+    const applied = this.applyManifest(source, now);
+    if (!applied) return false;
+    this.syncStreamsFromRegistry();
+    this.logRegistryUpdates(source.url, applied.updates, applied.ignored);
+    return true;
+  }
+
+  /**
+   * The segment a player's request is for. A miss under a clock-based list is
+   * answered with a parse for the present before it counts, where one can list
+   * something new; see `ClockedManifest.reparseForMiss`.
+   */
+  private findSegment(key: string): SegmentWithStream | undefined {
+    const segment = StreamUtils.getSegmentFromStreamsMap(this.streams, key);
+    if (
+      segment ||
+      this.manifestRegistry.isInitSegment(key) ||
+      !this.clockedManifest.reparseForMiss()
+    ) {
+      return segment;
+    }
+    return StreamUtils.getSegmentFromStreamsMap(this.streams, key);
   }
 
   private logRegistryUpdates(
@@ -892,7 +965,7 @@ export class Core {
    */
   isSegmentLoadable(url: string, byteRange?: ByteRange): boolean {
     const key = segmentKey(url, byteRange);
-    const segment = StreamUtils.getSegmentFromStreamsMap(this.streams, key);
+    const segment = this.findSegment(key);
     if (!segment) {
       // Initialization segments and external indexes are recognised and
       // passed through knowingly; only an unknown URL is a miss.
@@ -972,6 +1045,8 @@ export class Core {
     // against the new one.
     for (const starting of this.startingRequests) starting.aborted = true;
     this.manifestRegistry = new ManifestRegistry();
+    // The next source names its own time sources and keeps its own list.
+    this.clockedManifest.reset();
     this.streams.clear();
     this.failedStreamKeys.clear();
     this.unshareableLogged.clear();
@@ -1068,7 +1143,7 @@ export class Core {
   }
 
   private identifySegment(key: string): SegmentWithStream {
-    const segment = StreamUtils.getSegmentFromStreamsMap(this.streams, key);
+    const segment = this.findSegment(key);
     if (!segment) {
       throw new Error(`Segment is not in the registry: ${key}`);
     }

@@ -6,11 +6,15 @@ import {
   ANGEL_ONE_MPD_URL,
   BBB_MPD_URL,
   DASH_DYNAMIC_WITH_TRICK_MODE,
+  DASH_LIVE_START,
+  DASH_OPEN_TIMELINE_MIXED,
   DASH_MULTI_PERIOD,
   DASH_SEGMENT_BASE,
   DASH_SEGMENT_BASE_LIVE,
   DASH_SEGMENT_TEMPLATE,
   DASH_SEGMENT_TIMELINE_DYNAMIC,
+  DASH_SEGMENT_TIMELINE_OPEN,
+  DASH_TEMPLATE_DURATION_DYNAMIC,
   DASH_WITH_TEXT_IMAGE_AND_TRICK_MODE,
   readFixture,
 } from "./fixtures/index.js";
@@ -288,5 +292,152 @@ describe("dashManifestParser: real manifests", () => {
     expect(audio.map((s) => s.externalId).slice(0, 3)).toEqual([0, 40, 80]);
     expect(audio[10].externalId).toBe(401);
     expect(audio[158].externalId).toBe(6337);
+  });
+});
+
+describe("dashManifestParser: segment lists computed from the clock", () => {
+  /** The template fixture parsed `seconds` after its availability start. */
+  const at = (seconds: number) =>
+    dashManifestParser.parse(DASH_TEMPLATE_DURATION_DYNAMIC, URL, {
+      now: DASH_LIVE_START + seconds * 1000,
+    });
+  const numbers = (parsed: ReturnType<typeof at>) =>
+    parsed.streams.map((stream) =>
+      stream.segments?.map((s) => /(\d+)\.m4s$/.exec(s.url)?.[1]),
+    );
+
+  it("lists the window for the moment it is given", () => {
+    // 100 s in, the window of 60 s holds the segments that ended after 40 s:
+    // numbers 5 to 11, from 40 s to 96 s.
+    const parsed = at(100);
+    expect(numbers(parsed)).toEqual([
+      ["5", "6", "7", "8", "9", "10", "11"],
+      ["5", "6", "7", "8", "9", "10", "11"],
+    ]);
+    expect(parsed.streams[0].segments?.[0].presentationTime).toBe(40);
+  });
+
+  it("lists one segment more once the next has ended", () => {
+    expect(numbers(at(104))[0]).toEqual([
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "10",
+      "11",
+      "12",
+    ]);
+  });
+
+  it("says when the list next changes", () => {
+    // Segment 12 ends at 104 s; 5 leaves when 108 s less the window passes 48 s.
+    expect(at(100).clock?.nextChangeAt).toBe(DASH_LIVE_START + 104_000);
+    expect(at(104).clock?.nextChangeAt).toBe(DASH_LIVE_START + 108_000);
+  });
+
+  it("names the time sources a browser can use, in the MPD's order", () => {
+    expect(at(100).clock?.utcTiming).toEqual([
+      // The NTP source before it is left out; a relative URL resolves
+      // against the MPD's.
+      { method: "get", url: "https://cdn.example/time?iso" },
+      // One value naming two servers is two sources.
+      { method: "head", url: "https://a.example/t" },
+      { method: "head", url: "https://b.example/t" },
+      { method: "direct", time: Date.parse("2026-01-01T00:10:00Z") },
+    ]);
+  });
+
+  it("reads a direct time with no time zone as UTC", () => {
+    const parsed = dashManifestParser.parse(
+      DASH_TEMPLATE_DURATION_DYNAMIC.replace(
+        'value="2026-01-01T00:10:00Z"',
+        'value="2026-01-01T00:10:00"',
+      ),
+      URL,
+      { now: DASH_LIVE_START + 100_000 },
+    );
+    expect(parsed.clock?.utcTiming).toContainEqual({
+      method: "direct",
+      time: Date.parse("2026-01-01T00:10:00Z"),
+    });
+  });
+
+  it("reports the clock of a timeline that repeats until the present", () => {
+    const parsed = dashManifestParser.parse(DASH_SEGMENT_TIMELINE_OPEN, URL, {
+      now: DASH_LIVE_START + 60_000,
+    });
+    expect(parsed.clock).toEqual({
+      utcTiming: [],
+      nextChangeAt: DASH_LIVE_START + 64_000,
+    });
+  });
+
+  it("lists an open timeline up to the present, not up to the next refresh", () => {
+    // mpd-parser repeats the open 4 s entry to 61 s + 10 s, starting
+    // segments up to 68 s. Those that have not ended by 61 s are not
+    // available yet: the list ends with the one from 56 s to 60 s, and the
+    // next one becomes available at 64 s.
+    const parsed = dashManifestParser.parse(
+      DASH_SEGMENT_TIMELINE_OPEN.replace(
+        'minimumUpdatePeriod="PT4S"',
+        'minimumUpdatePeriod="PT10S"',
+      ),
+      URL,
+      { now: DASH_LIVE_START + 61_000 },
+    );
+    const segments = parsed.streams[0].segments ?? [];
+    expect(segments).toHaveLength(15);
+    expect(segments[segments.length - 1].presentationTime).toBe(56);
+    expect(parsed.clock?.nextChangeAt).toBe(DASH_LIVE_START + 64_000);
+  });
+
+  it("trims every stream of an MPD with an open timeline to the segments that have ended", () => {
+    const now = DASH_LIVE_START + 61_000;
+    const parsed = dashManifestParser.parse(DASH_OPEN_TIMELINE_MIXED, URL, {
+      now,
+    });
+    const byKey = new Map(parsed.streams.map((s) => [s.key, s.segments ?? []]));
+    const ends = (key: string) =>
+      (byKey.get(key) ?? []).map((s) => (s.presentationTime ?? 0) + s.duration);
+
+    // The open timeline, listed by mpd-parser to 61 s + 4 s, ends with the
+    // segment that ended at 60 s.
+    expect(ends("vo")).toHaveLength(15);
+    expect(Math.max(...ends("vo"))).toBe(60);
+
+    // The explicit timeline loses only the segment the origin published
+    // ahead, which ends at 64 s.
+    expect(ends("a")).toHaveLength(15);
+    expect(Math.max(...ends("a"))).toBe(60);
+
+    // The duration template loses nothing: it is what mpd-parser lists for it
+    // in an MPD with no open timeline, which is not trimmed.
+    const alone = dashManifestParser.parse(
+      DASH_OPEN_TIMELINE_MIXED.replace(
+        /<AdaptationSet mimeType="video\/mp4">\s*<Representation id="vo"[\s\S]*?<\/AdaptationSet>/,
+        "",
+      ),
+      URL,
+      { now },
+    );
+    expect(alone.streams.map((s) => s.key)).toEqual(["vd", "a"]);
+    expect(ends("vd")).toHaveLength(15);
+    expect(byKey.get("vd")).toEqual(
+      alone.streams.find((s) => s.key === "vd")?.segments,
+    );
+
+    // All three lists next change at 64 s.
+    expect(parsed.clock?.nextChangeAt).toBe(DASH_LIVE_START + 64_000);
+  });
+
+  it("reports no clock where the list does not depend on it", () => {
+    for (const mpd of [
+      DASH_SEGMENT_TEMPLATE,
+      DASH_SEGMENT_TIMELINE_DYNAMIC,
+      DASH_SEGMENT_BASE_LIVE,
+    ]) {
+      expect(dashManifestParser.parse(mpd, URL).clock).toBeUndefined();
+    }
   });
 });

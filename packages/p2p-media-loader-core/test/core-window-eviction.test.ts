@@ -3,6 +3,10 @@ import { Core } from "../src/core.js";
 import { hlsManifestParser } from "../src/manifest/hls.js";
 import type { SegmentStorage } from "../src/segment-storage/index.js";
 import {
+  initializeSegmentStorage,
+  recordingStorage,
+} from "./recording-storage.js";
+import {
   HLS_LIVE_NO_PDT_REFRESH_1,
   HLS_LIVE_NO_PDT_REFRESH_2,
 } from "./fixtures/index.js";
@@ -11,38 +15,18 @@ const MEDIA_URL = "https://cdn.example/live/index.m3u8";
 
 /**
  * A core on one live media playlist, with a storage that records what it is
- * told has left. The core makes its storage on the first segment request;
- * these tests make it directly, which is all that request would do here.
+ * told has left.
  */
 async function liveCore(
   onSegmentsRemoved?: SegmentStorage["onSegmentsRemoved"],
 ) {
-  const removed: number[][] = [];
-  const storage = {
-    initialize: () => Promise.resolve(),
-    onPlaybackUpdated: () => undefined,
-    onSegmentRequested: () => undefined,
-    storeSegment: () => Promise.resolve(),
-    getSegmentData: () => Promise.resolve(undefined),
-    getUsage: () => ({ totalCapacity: 1, usedCapacity: 0 }),
-    hasSegment: () => false,
-    getStoredSegmentIds: () => [],
-    setSegmentChangeCallback: () => undefined,
-    destroy: () => undefined,
-    onSegmentsRemoved:
-      onSegmentsRemoved ??
-      ((_swarmId: string, _streamSwarmId: string, ids: readonly number[]) => {
-        removed.push([...ids]);
-      }),
-  } satisfies SegmentStorage;
+  const { storage, removed } = recordingStorage(onSegmentsRemoved);
   const core = new Core({
     manifestParsers: [hlsManifestParser],
     customSegmentStorageFactory: () => storage,
   });
   core.processManifest({ url: MEDIA_URL, data: HLS_LIVE_NO_PDT_REFRESH_1 });
-  await (
-    core as unknown as { initializeSegmentStorage(): Promise<void> }
-  ).initializeSegmentStorage();
+  await initializeSegmentStorage(core);
   return { core, removed };
 }
 

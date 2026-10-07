@@ -350,6 +350,81 @@ even while its own player is not asking for anything. Where the player actually
 is stays unknown until it requests again, so the resume point is the earliest
 position it can possibly have, never the live edge.
 
+## Segments computed from the clock
+
+Some live MPDs do not list their segments. A `SegmentTemplate@duration` numbers
+them from the wall clock: the window holds every segment that has ended, back
+to `timeShiftBufferDepth` ago. A `SegmentTimeline` whose last `S` has a
+negative `@r` repeats that entry, and by the DASH rules its list also holds the
+segments that have ended. mpd-parser computes such an entry from the clock only
+under a `$Number$` template with a `minimumUpdatePeriod`, and so does the core.
+mpd-parser repeats it past the present, up to the present plus
+`minimumUpdatePeriod`, to cover the MPD until its next refresh. The parser then
+keeps only the segments that have ended, because an elected peer fetches a
+listed segment at once, and the origin does not have a later one yet. It trims
+every stream of such an MPD, not only the open timeline: the availability start
+is the MPD's own attribute, so one value serves them all. A duration template
+has nothing to trim, and an explicit timeline beside the open one loses only
+segments that have not ended on the synchronized clock, less the margin below;
+the origin may have published them already, and a later parse lists them. An
+MPD with no open timeline is not trimmed, because nothing in it lists ahead of
+the present: a duration template lists only segments that have ended, and an
+explicit timeline lists what the origin published. For these MPDs the parser
+reports a `clock` on the `ParsedManifest`: the time sources the MPD names, and
+when the list next changes. Two things follow, and the core handles both.
+
+**The list is only as correct as the clock.** A player synchronizes its clock
+with the MPD's `UTCTiming` server before it computes which segments exist. The
+core does the same, once for each source it plays. It tries the time sources in
+the MPD's order and takes the first that answers: `http-xsdate` and `http-iso`
+(the time is the response body), `http-head` (the `Date` header, which a
+cross-origin server must expose), and `direct` (the time is in the MPD). A body
+or `direct` time that names no time zone is UTC, as the DASH guidelines
+require, not the local time that `Date.parse` would make of it. The NTP schemes
+need a socket that a page does not have, and are skipped. An HTTP answer counts
+as the time halfway through the request. Each request has 5 s to answer,
+carries no credentials, and does not go through `httpRequestSetup`, which is
+for segment requests. With no usable source, or when every source fails, the
+core keeps the local clock, and it tries a failed synchronization again at most
+once a minute. It names no time server of its own. On a wrong clock without
+synchronization, a slow device misses every request at the live edge, and a
+fast one lists segments the origin does not have yet, which an elected peer
+then fetches.
+
+**The list changes with no new MPD.** A new segment becomes available every
+segment duration, and the player asks for it on its own clock, which can be
+long before the next refresh — and an MPD with a long `minimumUpdatePeriod`, or
+none, is refreshed seldom or never. The core keeps the latest such MPD and
+parses it again when the list next changes. The result goes through the same
+diff as a refresh: new segments are added, segments that left the window are
+removed, and the segment storage is told which left. A parse that fails is
+tried again a second later, so one failure does not stop the list for an MPD
+that is never refreshed. Each failure after that doubles the wait, up to a
+minute, and while a retry waits a registry miss makes no parse of its own, so a
+failure that repeats costs a parse a minute rather than a parse a second or one
+for each request. An MPD without a clock ends this, from whatever URL it comes:
+a live event that ended serves a static MPD, often through a redirect or a
+`Location` to another URL, and the live MPD kept would go on listing segments
+that never come.
+
+The core computes the lists it makes by itself for a moment 500 ms in the past.
+Time servers disagree by tens of milliseconds and more, a synchronization over
+a new connection overestimates the offset by part of the handshake, and an
+origin refuses a request for a segment that is not yet available on its own
+clock: livesim2 answers 425 Too Early, others 404. A segment the core lists, an
+elected peer fetches at once, so the margin keeps that fetch after the origin's
+clock. A player's request is not held to the margin. A request that misses
+under a clock-based list prompts a parse for the present before it counts as a
+miss, because the player asks for a segment only when its own synchronized
+clock says it exists. Such a parse is made only once the present has reached
+the list's next change, as the parser reports it; before that it lists nothing
+new. So a request just before a boundary does not keep one just after it from
+being answered, and a run of misses for URLs no manifest lists costs at most a
+parse per boundary. The moment a list is computed for never goes back, so no
+parse takes back a segment that an earlier one listed. Only a clock correction
+starts it again, because a clock that moved back must remove the segments it
+listed too early.
+
 ## Timeline stability
 
 `startTime` and `endTime` must mean the same thing across playlist refreshes.
@@ -468,7 +543,9 @@ initialization segment rather than colliding with media.
 Core's parse and the player's may disagree — on malformed manifests, on tags one
 supports and the other does not, or on unusual structures. The URL-keyed
 registry makes this safe: an unrecognised URL is a lookup miss, the adapter
-falls back to its own loader, and the segment loads without P2P.
+falls back to its own loader, and the segment loads without P2P. Core does not
+try to share the segments of a malformed stream; see
+[architecture.md](architecture.md), "Malformed streams".
 
 Core emits a diagnostic event on a segment request that misses the registry and
 logs the key it looked up under `p2pml-core:registry-miss`, so divergence is

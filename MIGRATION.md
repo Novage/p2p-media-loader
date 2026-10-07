@@ -176,6 +176,11 @@ is exported.
 
 - `CoreConfig.manifestParsers` and the `p2p-media-loader-core/hls` and
   `p2p-media-loader-core/dash` subpaths.
+- For a custom manifest parser: `ManifestParser.parse(text, url, context?)`
+  receives the synchronized time as `context.now`, and a parser whose segment
+  list follows from the clock reports it as `ParsedManifest.clock`
+  (`ManifestClock`, `UtcTimingSource`). A parser that ignores both keeps
+  working.
 - An **integration** toolkit for whoever writes a player adapter:
   `liveDelayFor`, `liveDelayForSegments`, `liveDelayFromWindow`,
   `playerBufferFor`, `maxLiveLatencyFor`, `highDemandWindowFor`,

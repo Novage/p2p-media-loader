@@ -18,6 +18,8 @@ export { runAll } from "./run-all.js";
 export * from "./types.js";
 export * from "./playback.js";
 export type {
+  ManifestClock,
+  ManifestParseContext,
   ManifestParser,
   ManifestProtocol,
   ParsedManifest,
@@ -25,6 +27,7 @@ export type {
   ParsedSegment,
   ParsedInitSegment,
   SegmentIndexSource,
+  UtcTimingSource,
 } from "./manifest/types.js";
 export type { SegmentStorage } from "./segment-storage/index.js";
 export {
