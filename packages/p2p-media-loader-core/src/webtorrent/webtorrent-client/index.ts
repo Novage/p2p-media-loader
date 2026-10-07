@@ -15,15 +15,36 @@ import {
   safeSetRemoteDescription,
 } from "./webrtc-utils.js";
 
+/**
+ * One signaling exchange with a remote peer, as the client puts it to
+ * `claimPeer`: which side of it this peer is, and how to give it up. The
+ * same object comes back with the exchange's `peerConnected` or
+ * `peerConnectFailed`, so a claimant can tell which exchange ended.
+ */
+export type PeerHandshake = {
+  /** `offerer`: the peer answered our offer. `answerer`: we answer theirs. */
+  readonly role: "offerer" | "answerer";
+  /** Abandons the exchange; it then ends with `peerConnectFailed`. */
+  readonly cancel: () => void;
+};
+
+type HandshakeSignal = InstanceType<typeof SafeAbortController>["signal"];
+
+function throwIfAborted(signal: HandshakeSignal): void {
+  if (signal.aborted) throw new Error("Handshake abandoned");
+}
+
 export type WebTorrentClientEventMap = {
   peerConnected: (event: {
     peerId: string;
     connection: RTCPeerConnection;
     channel: RTCDataChannel;
+    handshake: PeerHandshake;
   }) => void;
   peerConnectFailed: (event: {
     peerId: string;
     error: PeerConnectError;
+    handshake: PeerHandshake;
   }) => void;
   warning: (warning: TrackerWarning) => void;
   error: (error: TrackerError) => void;
@@ -44,7 +65,7 @@ export interface WebTorrentClientConfig {
   offersCount?: () => number;
   iceGatheringTimeout?: () => number;
   connectionTimeout?: () => number;
-  claimPeer?: (peerId: string) => boolean;
+  claimPeer?: (peerId: string, handshake: PeerHandshake) => boolean;
   shouldGenerateOffers?: () => boolean;
 }
 
@@ -611,7 +632,9 @@ export class WebTorrentClient {
   }: IncomingOffer): Promise<void> {
     if (this.#isDestroyed()) return;
 
-    if (!this.#config.claimPeer(remotePeerId)) {
+    const { handshake, signal, end } = this.#startHandshake("answerer");
+    if (!this.#config.claimPeer(remotePeerId, handshake)) {
+      end();
       this.#logger(
         `${this.#who} refused an offer from ${remotePeerId.slice(-6)}: the manager already holds that peer id`,
       );
@@ -628,16 +651,16 @@ export class WebTorrentClient {
       this.#negotiatingConnections.add(pc);
 
       await safeSetRemoteDescription(pc, new SessionDescription(offerSdp));
-      this.#throwIfDestroyed();
+      throwIfAborted(signal);
 
       const answer = await safeCreateAnswer(pc);
-      this.#throwIfDestroyed();
+      throwIfAborted(signal);
 
       await safeSetLocalDescription(pc, answer);
-      this.#throwIfDestroyed();
+      throwIfAborted(signal);
 
-      await this.#waitForIceGathering(pc);
-      this.#throwIfDestroyed();
+      await this.#waitForIceGathering(pc, signal);
+      throwIfAborted(signal);
 
       const sdp = pc.localDescription;
       if (!sdp) {
@@ -655,32 +678,21 @@ export class WebTorrentClient {
 
       this.#wsClient.send(JSON.stringify(payload));
 
-      const channel = await this.#waitForConnection(pc);
-      this.#throwIfDestroyed();
+      const channel = await this.#waitForConnection(pc, undefined, signal);
+      throwIfAborted(signal);
 
       this.#logger(`${this.#who} connected to ${remotePeerId.slice(-6)}`);
       this.#eventTarget.dispatchEvent("peerConnected", {
         peerId: remotePeerId,
         connection: pc,
         channel,
+        handshake,
       });
     } catch (err: unknown) {
       pc?.close();
-      // Always dispatch peerConnectFailed so the Manager can release the peer
-      // from #connectingPeers. Safe to call after destroy: event target is
-      // already cleared, making the dispatch a no-op.
-      this.#logger(
-        `${this.#who} failed to connect to ${remotePeerId.slice(-6)}: ${err instanceof Error ? err.message : String(err)}`,
-      );
-      this.#eventTarget.dispatchEvent("peerConnectFailed", {
-        peerId: remotePeerId,
-        error: new PeerConnectError(
-          "connection-failed",
-          err instanceof Error ? err.message : String(err),
-          err,
-        ),
-      });
+      this.#onHandshakeFailed(remotePeerId, handshake, signal, err);
     } finally {
+      end();
       if (pc) this.#negotiatingConnections.delete(pc);
     }
   }
@@ -704,7 +716,9 @@ export class WebTorrentClient {
     this.#pendingOffers.delete(ourOfferId);
     clearTimeout(pending.timeoutId);
 
-    if (!this.#config.claimPeer(remotePeerId)) {
+    const { handshake, signal, end } = this.#startHandshake("offerer");
+    if (!this.#config.claimPeer(remotePeerId, handshake)) {
+      end();
       this.#logger(
         `${this.#who} refused an answer from ${remotePeerId.slice(-6)}: the manager already holds that peer id`,
       );
@@ -719,42 +733,79 @@ export class WebTorrentClient {
         pending.connection,
         new SessionDescription(answerSdp),
       );
-      this.#throwIfDestroyed();
+      throwIfAborted(signal);
 
       const channel = await this.#waitForConnection(
         pending.connection,
         pending.channel,
+        signal,
       );
-      this.#throwIfDestroyed();
+      throwIfAborted(signal);
 
       this.#logger(`${this.#who} connected to ${remotePeerId.slice(-6)}`);
       this.#eventTarget.dispatchEvent("peerConnected", {
         peerId: remotePeerId,
         connection: pending.connection,
         channel,
+        handshake,
       });
     } catch (err: unknown) {
       pending.connection.close();
-      // Always dispatch peerConnectFailed so the Manager can release the peer
-      // from #connectingPeers. Safe to call after destroy: event target is
-      // already cleared, making the dispatch a no-op.
-      this.#logger(
-        `${this.#who} failed to connect to ${remotePeerId.slice(-6)}: ${err instanceof Error ? err.message : String(err)}`,
-      );
-      this.#eventTarget.dispatchEvent("peerConnectFailed", {
-        peerId: remotePeerId,
-        error: new PeerConnectError(
-          "connection-failed",
-          err instanceof Error ? err.message : String(err),
-          err,
-        ),
-      });
+      this.#onHandshakeFailed(remotePeerId, handshake, signal, err);
     } finally {
+      end();
       this.#negotiatingConnections.delete(pending.connection);
     }
   }
 
-  #waitForIceGathering(pc: RTCPeerConnection): Promise<void> {
+  /**
+   * A handshake with a remote peer, as `claimPeer` is told of it, and the
+   * signal that ends it: when its claimant cancels it, or when this client is
+   * destroyed. `end` detaches it from the client once it is over.
+   */
+  #startHandshake(role: PeerHandshake["role"]): {
+    handshake: PeerHandshake;
+    signal: HandshakeSignal;
+    end: () => void;
+  } {
+    const controller = new SafeAbortController();
+    const destroySignal = this.#destroyAbortController.signal;
+    const abort = () => controller.abort();
+    if (destroySignal.aborted) abort();
+    else destroySignal.addEventListener("abort", abort);
+    return {
+      handshake: { role, cancel: abort },
+      signal: controller.signal,
+      end: () => destroySignal.removeEventListener("abort", abort),
+    };
+  }
+
+  #onHandshakeFailed(
+    remotePeerId: string,
+    handshake: PeerHandshake,
+    signal: HandshakeSignal,
+    err: unknown,
+  ): void {
+    const message = err instanceof Error ? err.message : String(err);
+    this.#logger(
+      signal.aborted && !this.#isDestroyed()
+        ? `${this.#who} gave up the handshake with ${remotePeerId.slice(-6)} as ${handshake.role}: the manager kept another`
+        : `${this.#who} failed to connect to ${remotePeerId.slice(-6)}: ${message}`,
+    );
+    // Always dispatched, so the manager can release its claim. Safe after
+    // destroy: the event target is already cleared, so the dispatch does
+    // nothing.
+    this.#eventTarget.dispatchEvent("peerConnectFailed", {
+      peerId: remotePeerId,
+      error: new PeerConnectError("connection-failed", message, err),
+      handshake,
+    });
+  }
+
+  #waitForIceGathering(
+    pc: RTCPeerConnection,
+    signal: HandshakeSignal = this.#destroyAbortController.signal,
+  ): Promise<void> {
     return new Promise((resolve, reject) => {
       if (pc.iceGatheringState === "complete") {
         resolve();
@@ -772,10 +823,7 @@ export class WebTorrentClient {
         pc.removeEventListener("icegatheringstatechange", onGatheringChange);
         pc.removeEventListener("icecandidate", onIceCandidate);
         pc.removeEventListener("signalingstatechange", onSignalingChange);
-        this.#destroyAbortController.signal.removeEventListener(
-          "abort",
-          onAbort,
-        );
+        signal.removeEventListener("abort", onAbort);
       };
 
       const onGatheringChange = () => {
@@ -803,10 +851,10 @@ export class WebTorrentClient {
 
       const onAbort = () => {
         cleanup();
-        reject(new Error("ICE gathering aborted due to teardown"));
+        reject(new Error("ICE gathering aborted"));
       };
 
-      if (this.#destroyAbortController.signal.aborted) {
+      if (signal.aborted) {
         onAbort();
         return;
       }
@@ -819,13 +867,14 @@ export class WebTorrentClient {
       pc.addEventListener("icegatheringstatechange", onGatheringChange);
       pc.addEventListener("icecandidate", onIceCandidate);
       pc.addEventListener("signalingstatechange", onSignalingChange);
-      this.#destroyAbortController.signal.addEventListener("abort", onAbort);
+      signal.addEventListener("abort", onAbort);
     });
   }
 
   #waitForConnection(
     pc: RTCPeerConnection,
-    channel?: RTCDataChannel,
+    channel: RTCDataChannel | undefined,
+    signal: HandshakeSignal,
   ): Promise<RTCDataChannel> {
     const { promise, resolve, reject } =
       getPromiseWithResolvers<RTCDataChannel>();
@@ -883,7 +932,7 @@ export class WebTorrentClient {
 
     const onAbort = () => {
       cleanup();
-      reject(new Error("Connection aborted due to teardown"));
+      reject(new Error("Connection aborted"));
     };
 
     const cleanup = () => {
@@ -897,10 +946,10 @@ export class WebTorrentClient {
         boundChannel.removeEventListener("close", onChannelClose);
         boundChannel.removeEventListener("closing", onChannelClose);
       }
-      this.#destroyAbortController.signal.removeEventListener("abort", onAbort);
+      signal.removeEventListener("abort", onAbort);
     };
 
-    if (this.#destroyAbortController.signal.aborted) {
+    if (signal.aborted) {
       onAbort();
       return promise;
     }
@@ -913,7 +962,7 @@ export class WebTorrentClient {
     }, this.#config.connectionTimeout());
 
     pc.addEventListener("iceconnectionstatechange", rejectIfTerminalState);
-    this.#destroyAbortController.signal.addEventListener("abort", onAbort);
+    signal.addEventListener("abort", onAbort);
 
     if (boundChannel) {
       bindDataChannel(boundChannel);

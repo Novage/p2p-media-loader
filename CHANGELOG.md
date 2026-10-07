@@ -206,6 +206,12 @@ These predate 5.0.0 and affect 4.x deployments as well.
   per tracker before the new swarm could be announced. The next loader now
   takes the socket first, and one that fails to build leaves the previous loader
   current rather than destroyed.
+- Two peers that joined a swarm at the same moment — two viewers starting
+  together, or settling on the same rendition after a quality switch — could
+  each answer the other's offer and then refuse the answer to its own, so
+  neither connection completed and the peers stayed apart until the tracker's
+  next announce, minutes later. Both now keep the handshake offered by the
+  peer with the lower peer id.
 
 ## 4.0.0
 

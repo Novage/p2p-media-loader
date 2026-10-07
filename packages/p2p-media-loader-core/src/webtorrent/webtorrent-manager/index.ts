@@ -7,7 +7,10 @@ import {
 } from "../../types.js";
 import { EventTarget } from "../../utils/event-target.js";
 import { getRTCErrorMessage, isTerminalConnectionState } from "../utils.js";
-import { WebTorrentClient } from "../webtorrent-client/index.js";
+import {
+  WebTorrentClient,
+  type PeerHandshake,
+} from "../webtorrent-client/index.js";
 import { WebTorrentSocketPool } from "../webtorrent-socket-pool/index.js";
 
 export interface WebTorrentManagerConfig {
@@ -70,7 +73,8 @@ export class WebTorrentManager {
   readonly #config: ResolvedConfig;
   readonly #eventTarget = new EventTarget<WebTorrentManagerEventMap>();
 
-  readonly #connectingPeers = new Set<string>();
+  /** Peers a handshake is under way with, by the handshake that claimed each. */
+  readonly #connectingPeers = new Map<string, PeerHandshake>();
   readonly #connectedPeers = new Map<string, ConnectedPeer>();
 
   /**
@@ -94,16 +98,23 @@ export class WebTorrentManager {
   #destroyed = false;
   #started = false;
 
-  #claimPeer = (remotePeerId: string): boolean => {
+  #claimPeer = (remotePeerId: string, handshake: PeerHandshake): boolean => {
     if (this.#destroyed) return false;
 
-    if (
-      this.#connectingPeers.has(remotePeerId) ||
-      this.#connectedPeers.has(remotePeerId)
-    ) {
+    const current = this.#connectingPeers.get(remotePeerId);
+    if (current && this.#settlesGlare(current, handshake, remotePeerId)) {
+      this.#connectingPeers.set(remotePeerId, handshake);
+      current.cancel();
+      this.#logger(
+        `glare with ${remotePeerId.slice(-6)}: took the answer to our offer and gave up answering theirs (${this.#held()})`,
+      );
+      return true;
+    }
+
+    if (current || this.#connectedPeers.has(remotePeerId)) {
       this.#logger(
         `turned away ${remotePeerId.slice(-6)}: already %s (${this.#held()})`,
-        this.#connectedPeers.has(remotePeerId) ? "connected" : "connecting",
+        current ? "connecting" : "connected",
       );
       return false;
     }
@@ -122,9 +133,36 @@ export class WebTorrentManager {
       return false;
     }
 
-    this.#connectingPeers.add(remotePeerId);
+    this.#connectingPeers.set(remotePeerId, handshake);
     return true;
   };
+
+  /**
+   * Whether a second handshake with a peer replaces the one under way.
+   *
+   * Two peers that offer to each other at once — over different trackers, or
+   * the same one — can each answer the other's offer, and each then holds the
+   * other as answerer when the answer to its own offer arrives. Were both to
+   * refuse that answer, each would wait on the handshake the other refused,
+   * and neither would connect until a later announce. Both keep the handshake
+   * whose offerer has the lower peer id instead: the lower peer takes the
+   * answer to its offer and gives up answering, the higher refuses that
+   * answer and goes on answering — the same handshake on both sides.
+   *
+   * Every other duplicate is turned away. A refused offer costs nothing: its
+   * sender only waits on an answer that never comes, and the offer expires.
+   */
+  #settlesGlare(
+    current: PeerHandshake,
+    next: PeerHandshake,
+    remotePeerId: string,
+  ): boolean {
+    return (
+      current.role === "answerer" &&
+      next.role === "offerer" &&
+      this.#config.peerId < remotePeerId
+    );
+  }
 
   constructor(config: WebTorrentManagerConfig) {
     this.#config = {
@@ -185,7 +223,13 @@ export class WebTorrentManager {
             peerId: string;
             connection: RTCPeerConnection;
             channel: RTCDataChannel;
+            handshake: PeerHandshake;
           }) => {
+            if (this.#connectingPeers.get(event.peerId) !== event.handshake) {
+              // A handshake given up for another that connected regardless.
+              event.connection.close();
+              return;
+            }
             this.#connectingPeers.delete(event.peerId);
             this.#addConnectedPeer(
               event.peerId,
@@ -198,8 +242,11 @@ export class WebTorrentManager {
           const onPeerConnectFailed = (event: {
             peerId: string;
             error: PeerConnectError;
+            handshake: PeerHandshake;
           }) => {
-            if (this.#connectingPeers.has(event.peerId)) {
+            // A handshake given up for another is not a failure, and the claim
+            // is the other's to release.
+            if (this.#connectingPeers.get(event.peerId) === event.handshake) {
               this.#connectingPeers.delete(event.peerId);
               this.#eventTarget.dispatchEvent("peerConnectFailed", {
                 peerId: event.peerId,
