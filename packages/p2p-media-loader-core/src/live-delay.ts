@@ -147,10 +147,19 @@ export function highDemandWindowFor(
   );
 }
 
-/** The placement a window of `count` segments spanning `window` seconds calls for. */
-function liveDelayOf(window: number, count: number): LiveDelay | undefined {
-  if (count === 0 || !(window > 0)) return;
-  const segment = window / count;
+/**
+ * The placement `count` segments spanning `span` seconds call for: the segment
+ * is their average length, and the window the span — or the window the
+ * manifest declares, where the span is not a stable measure of it.
+ */
+function liveDelayOf(
+  span: number,
+  count: number,
+  declaredWindow?: number,
+): LiveDelay | undefined {
+  if (count === 0 || !(span > 0)) return;
+  const segment = span / count;
+  const window = declaredWindow ?? span;
   return { delay: liveDelayFromWindow(window, segment), segment };
 }
 
@@ -159,10 +168,15 @@ function liveDelayOf(window: number, count: number): LiveDelay | undefined {
  * with none: the window is the span from the earliest start to the latest end,
  * and the segment its average length.
  *
+ * @param declaredWindow - The window the stream's manifest declares, where the
+ * span is not a stable measure of it; it is the window then. See
+ * `ProcessedStream.declaredWindow`.
+ *
  * @category Integration
  */
 export function liveDelayForSegments(
   segments: Iterable<{ readonly startTime: number; readonly endTime: number }>,
+  declaredWindow?: number,
 ): LiveDelay | undefined {
   let start = Infinity;
   let end = -Infinity;
@@ -172,7 +186,7 @@ export function liveDelayForSegments(
     end = Math.max(end, segment.endTime);
     count++;
   }
-  return liveDelayOf(end - start, count);
+  return liveDelayOf(end - start, count, declaredWindow);
 }
 
 /**
@@ -216,7 +230,11 @@ export function liveDelayFor(
     manifest.streams.map((stream) => ({
       type: stream.type,
       target: stream.isLive
-        ? liveDelayOf(stream.end - stream.start, stream.segmentCount)
+        ? liveDelayOf(
+            stream.end - stream.start,
+            stream.segmentCount,
+            stream.declaredWindow,
+          )
         : undefined,
     })),
   );

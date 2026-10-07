@@ -110,7 +110,10 @@ export const dashManifestParser: ManifestParser = {
 
     if (!isLive) return { protocol: "dash", url, streams, clock: undefined };
     const available = availableSegments(
-      streams,
+      withDeclaredWindows(
+        streams,
+        declaredWindows(inherited.representationInfo, now),
+      ),
       openTimelineStart(inherited.representationInfo),
       now,
     );
@@ -124,6 +127,55 @@ export const dashManifestParser: ManifestParser = {
     return { protocol: "dash", url, streams: available.streams, clock };
   },
 };
+
+/**
+ * The live window each Representation numbered by a `SegmentTemplate@duration`
+ * declares, by Representation id: `timeShiftBufferDepth`, or the time since
+ * its period began where that is shorter — a channel that started less than a
+ * window ago — in seconds. With no `timeShiftBufferDepth` the window is the
+ * whole period so far, as mpd-parser lists it. Where a Representation spans
+ * periods, the latest period's start is the one the window runs from.
+ */
+function declaredWindows(
+  representations: readonly MpdRepresentationInfo[],
+  now: number,
+): Map<string, number> {
+  const windows = new Map<string, number>();
+  for (const { attributes, segmentInfo } of representations) {
+    const { id, availabilityStartTime, periodStart = 0 } = attributes;
+    if (
+      id === undefined ||
+      availabilityStartTime === undefined ||
+      !segmentInfo.template?.duration ||
+      segmentInfo.segmentTimeline
+    ) {
+      continue;
+    }
+    const sincePeriodStart = now / 1000 - (availabilityStartTime + periodStart);
+    const window = Math.min(
+      attributes.timeShiftBufferDepth ?? Infinity,
+      sincePeriodStart,
+    );
+    if (!(window > 0)) continue;
+    const latest = windows.get(id);
+    windows.set(id, latest === undefined ? window : Math.min(latest, window));
+  }
+  return windows;
+}
+
+/** The streams, each with the window its Representation declares, if any. */
+function withDeclaredWindows(
+  streams: ParsedStream[],
+  windows: ReadonlyMap<string, number>,
+): ParsedStream[] {
+  if (!windows.size) return streams;
+  return streams.map((stream) => {
+    const declaredWindow = windows.get(stream.key);
+    return declaredWindow === undefined
+      ? stream
+      : { ...stream, declaredWindow };
+  });
+}
 
 /**
  * The open `S` entry that ends a Representation's `SegmentTimeline`, where

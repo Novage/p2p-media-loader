@@ -951,6 +951,13 @@ export type ProcessedStream = {
   /** End of the latest listed segment on the same timeline. */
   readonly end: number;
   readonly segmentCount: number;
+  /**
+   * The live window the manifest declares, in seconds, where the span from
+   * `start` to `end` is not a stable measure of it — a DASH
+   * `SegmentTemplate@duration`, whose span changes by a segment with the
+   * moment of the parse. `liveDelayFor` sizes a placement from it.
+   */
+  readonly declaredWindow?: number;
 };
 
 /** The outcome of `Core.processManifest` for a manifest a parser accepted. */

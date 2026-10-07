@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Core } from "../src/core.js";
+import { liveDelayFor } from "../src/live-delay.js";
 import { dashManifestParser } from "../src/manifest/dash.js";
 import { hlsManifestParser } from "../src/manifest/hls.js";
 import {
@@ -308,6 +309,22 @@ describe("Core on a segment list computed from the clock", () => {
     expect(parse.mock.calls.length).toBe(parses + 1);
     expect(core.hasSegment(video(12))).toBe(true);
     core.destroy();
+  });
+
+  it("reports one live placement, whatever the moment the MPD was processed", () => {
+    // Processed at 100 s the fixture lists 7 segments, at 104.5 s 8; a peer's
+    // placement must not depend on which.
+    const delays = [100_000, 104_500].map((ms) => {
+      vi.setSystemTime(DASH_LIVE_START + ms + MARGIN);
+      const core = new Core({ manifestParsers: [dashManifestParser] });
+      const processed = core.processManifest({
+        url: MPD_URL,
+        data: DASH_TEMPLATE_DURATION_DYNAMIC,
+      });
+      core.destroy();
+      return liveDelayFor(processed!)?.delay;
+    });
+    expect(delays).toEqual([52, 52]);
   });
 
   it("stops parsing once destroyed", async () => {

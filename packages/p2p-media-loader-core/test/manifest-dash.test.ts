@@ -431,6 +431,23 @@ describe("dashManifestParser: segment lists computed from the clock", () => {
     expect(parsed.clock?.nextChangeAt).toBe(DASH_LIVE_START + 64_000);
   });
 
+  it("declares the window of a numbered template, which its span does not measure", () => {
+    // At 100 s the list spans 56 s, at 104.5 s 64 s; the window is 60 s.
+    for (const seconds of [100, 104.5]) {
+      for (const stream of at(seconds).streams) {
+        expect(stream.declaredWindow).toBe(60);
+      }
+    }
+    // Less than a window after the period began, the window is that time.
+    expect(at(30).streams[0].declaredWindow).toBe(30);
+    // A list the MPD spells out has a span that is its window.
+    const timeline = dashManifestParser.parse(
+      DASH_SEGMENT_TIMELINE_DYNAMIC,
+      URL,
+    );
+    expect(timeline.streams[0].declaredWindow).toBeUndefined();
+  });
+
   it("reports no clock where the list does not depend on it", () => {
     for (const mpd of [
       DASH_SEGMENT_TEMPLATE,

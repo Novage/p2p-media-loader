@@ -68,6 +68,16 @@ export type ParsedStream = {
   readonly indexSource: SegmentIndexSource;
   /** Known only from a manifest that carries segments. */
   readonly isLive?: boolean;
+  /**
+   * The live window the manifest declares, in seconds, where the span of the
+   * listed segments is not a stable measure of it: a DASH
+   * `SegmentTemplate@duration` lists every segment that has ended since
+   * `timeShiftBufferDepth` ago, and whether the first of them started inside
+   * that window or a segment before it depends on the moment of the parse.
+   * The span then changes by a segment from one parse to the next, and a
+   * placement sized from it with it. Absent where the span is the window.
+   */
+  readonly declaredWindow?: number;
 };
 
 export type ParsedManifest = {

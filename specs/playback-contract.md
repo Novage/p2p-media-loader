@@ -153,6 +153,18 @@ highDemand   = min(configured ?? 15, playerBuffer / 2)   // and at least a segme
 maxLatency   = liveDelay + 2 × segment                  // re-synced to liveDelay past this
 ```
 
+`window` is the span of the listed segments, from the earliest start to the
+latest end, and `segment` their average length. A DASH
+`SegmentTemplate@duration` is the exception. It lists every segment that has
+ended since `timeShiftBufferDepth` ago, and whether the first of them started
+inside that window or a segment before it depends on the moment of the parse:
+on a 60 s window of 8 s segments the span is 56 s at one moment and 64 s at
+another, and the placement sized from it 48 s or 56 s — different on two peers,
+and different on one peer after a pause. Its `window` is the one the MPD
+declares, `timeShiftBufferDepth`, or the time since its period began where that
+is shorter; the parser reports it as `declaredWindow`, and `liveDelayFor` uses
+it.
+
 A pause or a stall leaves the playhead where it was while the window moves on,
 and the player's buffer, which ends a fixed distance ahead of the playhead,
 reaches back toward the tail with it. Past `maxLatency`, the core's

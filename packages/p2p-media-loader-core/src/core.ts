@@ -608,7 +608,10 @@ export class Core {
         isLive = true;
         liveStreams.push({
           type: registryStream.type,
-          target: liveDelayForSegments(registryStream.segments.values()),
+          target: liveDelayForSegments(
+            registryStream.segments.values(),
+            registryStream.declaredWindow,
+          ),
         });
       }
 
@@ -1252,6 +1255,9 @@ function summarize(updates: readonly RegistryUpdate[]): ProcessedManifest {
       start: u.start,
       end: u.end,
       segmentCount: u.segmentCount,
+      ...(u.declaredWindow === undefined
+        ? {}
+        : { declaredWindow: u.declaredWindow }),
     })),
   };
 }

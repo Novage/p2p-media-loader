@@ -58,6 +58,8 @@ export type RegistryStream = {
    */
   readonly initSegments: readonly { url: string; byteRange?: ByteRange }[];
   readonly isLive?: boolean;
+  /** The live window the stream's manifest declares; see `ParsedStream`. */
+  readonly declaredWindow?: number;
   readonly segments: ReadonlyMap<string, RegistrySegment>;
 };
 
@@ -76,6 +78,8 @@ export type RegistryUpdate = {
   readonly start: number;
   readonly end: number;
   readonly segmentCount: number;
+  /** The live window the stream's manifest declares; see `ParsedStream`. */
+  readonly declaredWindow?: number;
   readonly added: number;
   readonly removed: number;
 };
@@ -292,6 +296,11 @@ export class ManifestRegistry {
         ? parsed.initSegments
         : (existing?.initSegments ?? []),
       isLive: parsed.isLive ?? existing?.isLive,
+      // Each parse that lists segments says it afresh; one that lists none —
+      // a master, or a `SegmentBase` stream before its index — leaves it.
+      declaredWindow: parsed.segments
+        ? parsed.declaredWindow
+        : existing?.declaredWindow,
       segments: existing?.segments ?? new Map<string, RegistrySegment>(),
       timeline: existing?.timeline ?? new Map<number, number>(),
     };
@@ -570,6 +579,7 @@ function describe(stream: RegistryStream): RegistryUpdate {
     start: segmentCount ? start : 0,
     end: segmentCount ? end : 0,
     segmentCount,
+    declaredWindow: stream.declaredWindow,
     added: 0,
     removed: 0,
   };

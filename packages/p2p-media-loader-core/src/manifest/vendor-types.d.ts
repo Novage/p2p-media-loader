@@ -161,6 +161,8 @@ declare module "mpd-parser" {
   export type MpdRepresentationInfo = {
     /** MPD, Period, AdaptationSet and Representation attributes, merged. */
     attributes: {
+      /** The Representation id. */
+      id?: string;
       /** Epoch seconds. */
       availabilityStartTime?: number;
       /** Seconds from the availability start. */

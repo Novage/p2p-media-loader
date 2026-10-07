@@ -135,6 +135,25 @@ describe("Shaka live presentation delay", () => {
     expect(target?.segment).toBe(2);
   });
 
+  it("places by the window the manifest declares, whatever the span of the moment", () => {
+    // A 60 s DASH window of 8 s segments lists 7 or 8 of them, a 56 s or a
+    // 64 s span, by the moment of the parse. The declared window gives one
+    // placement for both, a segment inside it.
+    for (const [end, segmentCount] of [
+      [1056, 7],
+      [1064, 8],
+    ]) {
+      const target = liveDelayFor({
+        streams: [stream({ end, segmentCount, declaredWindow: 60 })],
+      });
+      expect(target).toEqual({ delay: 52, segment: 8 });
+    }
+    expect(liveDelayForSegments(segments(7, 8), 60)).toEqual({
+      delay: 52,
+      segment: 8,
+    });
+  });
+
   it("caps the delay at a minute on a wide window", () => {
     const target = liveDelayFor({
       streams: [stream({ start: 0, end: 600, segmentCount: 100 })],
