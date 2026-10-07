@@ -387,6 +387,13 @@ export class HlsJsP2PEngine {
    * it. Set once per value; HLS.js then re-syncs to it on start, on a stall,
    * and when the max latency is exceeded.
    *
+   * A window wider than that threshold raises it to the window. HLS.js checks
+   * the threshold on every playlist refresh, whatever put the playhead there,
+   * so on a DVR window a threshold at the target would pull a viewer who
+   * rewound back to it within a refresh. Raised to the window, it leaves them
+   * where they chose to be, and brings them back only once a pause has
+   * carried them out of the window — the dash.js adapter's rule as well.
+   *
    * Both or neither: the threshold is derived from this target, and an
    * integrator who set any of the four live sync settings has a target of
    * their own — a threshold written against ours could sit below it, which
@@ -401,7 +408,10 @@ export class HlsJsP2PEngine {
     if (!(segment > 0) || !(window > 0)) return;
 
     const targetLatency = liveDelayFromWindow(window, segment);
-    const maxLatency = maxLiveLatencyFor({ delay: targetLatency, segment });
+    const maxLatency = Math.max(
+      maxLiveLatencyFor({ delay: targetLatency, segment }),
+      window,
+    );
 
     // Segment durations are not exact multiples, so the window length drifts
     // by fractions of a second between refreshes. Only a change of at least

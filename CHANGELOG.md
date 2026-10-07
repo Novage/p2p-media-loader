@@ -87,10 +87,12 @@ throughout.
   by one rule shared across the adapters, so the segments between a peer's
   buffer and the live edge are as many as possible for peers to exchange. On
   HLS.js and dash.js, a viewer that a pause or a stall leaves more than two
-  segments past that placement is brought back to it — through the latency
-  limit the adapter sets on HLS.js, and when playback resumes on dash.js — so
-  the player keeps fetching segments its peers still hold, rather than playing
-  on behind the window over HTTP alone until it stalls.
+  segments past that placement is brought back to it — through the latency limit
+  the adapter sets on HLS.js, and when playback resumes on dash.js — so the
+  player keeps fetching segments its peers still hold, rather than playing on
+  behind the window over HTTP alone until it stalls. On a DVR window wider than
+  that, a viewer who rewound into the window stays where they chose, and is
+  brought back only once a pause carries them out of it.
 - **`highDemandTimeWindow` is optional and derived on live.** Left unset, VOD
   keeps 15 s and a live stream gets half of what the player buffers — at least
   a segment, at most 15 s — from the live window's geometry, so the far half of

@@ -102,6 +102,9 @@ export function playerBufferFor(target: LiveDelay): number {
  * tail and the buffer at least two segments long — so the player is re-synced
  * while its next request is still for a segment the registry lists.
  *
+ * An adapter raises the threshold to the window where the window is wider —
+ * a DVR window — so that a viewer who rewound into it is not pulled back.
+ *
  * @category Integration
  */
 export function maxLiveLatencyFor(target: LiveDelay): number {

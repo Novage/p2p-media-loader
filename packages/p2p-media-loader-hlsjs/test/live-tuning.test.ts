@@ -298,7 +298,7 @@ describe("HLS.js live window placement", () => {
     expect(configured.hls.config.maxBufferLength).toBe(20);
   });
 
-  it("never asks for more than a minute of latency", () => {
+  it("never asks for more than a minute of latency, and leaves a DVR window to the viewer", () => {
     const { hls } = setup();
     levelUpdated(hls, {
       live: true,
@@ -306,7 +306,10 @@ describe("HLS.js live window placement", () => {
       averagetargetduration: 6,
     });
     expect(hls.config.liveSyncDuration).toBe(60);
-    expect(hls.config.liveMaxLatencyDuration).toBe(72);
+    // Two segments past the target would be 72 s, and HLS.js would pull a
+    // viewer who rewound further back to the target on the next refresh. The
+    // threshold is the window instead.
+    expect(hls.config.liveMaxLatencyDuration).toBe(600);
   });
 
   it("uses the average segment length, not EXT-X-TARGETDURATION", () => {

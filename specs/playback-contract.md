@@ -160,7 +160,12 @@ reaches back toward the tail with it. Past `maxLatency`, the core's
 the buffer still ends inside the window, so its next request is still for a
 segment the registry lists. A player left further behind fetches every segment
 over HTTP and shares none of them, and once its next segment has left the
-window it has nothing left to fetch at all.
+window it has nothing left to fetch at all. On a DVR window wider than
+`maxLatency` the adapters raise the threshold to the window: a viewer who
+rewound into the window chose that position, and is left there until a pause
+carries them out of the window. HLS.js checks its threshold on every playlist
+refresh, whatever put the playhead there, so a threshold at `maxLatency` would
+pull such a viewer back within a refresh.
 
 On live the configured number is a ceiling rather than an override. Nothing
 configured here widens the player's buffer, which every adapter sizes from the

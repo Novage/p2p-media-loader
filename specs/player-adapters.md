@@ -223,13 +223,18 @@ left alone.
   well inside the window, even as jitter carries the playhead a few seconds
   past the tail. `liveMaxLatencyDuration` is set two segments beyond the
   target: a viewer who pauses or stalls that far is re-synced to the target
-  before the buffer starves, a controlled skip in place of a stall and jump.
-  Segment length is the playlist's average, not `EXT-X-TARGETDURATION`, which
-  is an upper bound and on some streams several times the real segment. Target
-  and threshold are set both or neither: an integrator who configured any of
-  HLS.js's four live sync settings has a target of their own, and a threshold
-  written against ours could sit below it — a config HLS.js itself rejects —
-  or mix its count-based settings with a duration-based one.
+  before the buffer starves, a controlled skip in place of a stall and jump. On
+  a DVR window wider than that, the threshold is the window instead. HLS.js
+  checks it on every playlist refresh, whatever put the playhead there, so a
+  threshold two segments past the target would pull a viewer who rewound into
+  the window back to the live delay within a refresh; at the window, they stay
+  where they chose until a pause carries them out of it. Segment length is the
+  playlist's average, not `EXT-X-TARGETDURATION`, which is an upper bound and
+  on some streams several times the real segment. Target and threshold are set
+  both or neither: an integrator who configured any of HLS.js's four live sync
+  settings has a target of their own, and a threshold written against ours
+  could sit below it — a config HLS.js itself rejects — or mix its count-based
+  settings with a duration-based one.
 - **Low-latency mode off.** HLS.js enables it by default; on a low-latency
   playlist it then requests partial segments, which the core deliberately does
   not register ([architecture.md](architecture.md)), so those requests would
