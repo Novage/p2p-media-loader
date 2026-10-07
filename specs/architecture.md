@@ -160,3 +160,19 @@ segment index lives outside the manifest (DASH `SegmentBase`): such streams are
 shared like any other once their index has arrived, which the player fetches
 before it can request any media. See
 [manifest-registry.md](manifest-registry.md).
+
+**Malformed streams.** The library is not intended to play a stream that breaks
+the HLS or DASH specification. The use case it is designed for is a streamer
+who publishes a correct stream and sets up P2P-assisted delivery for it. Core
+reads a manifest as the specification defines it. It does not repair a
+manifest that breaks the specification, and it adds no code path to share the
+segments of such a stream — for example, a DASH `Representation` with no `@id`.
+Where the specification says how to read an error, or where one reading is
+clearly the intended one, core takes it; otherwise it does not try.
+
+One requirement stays for a malformed stream: it must degrade to "no P2P for
+this segment", never to wrong bytes. The URL-keyed registry gives this. A
+request that core does not recognise is a registry miss, and the segment loads
+through the player's own loader. See
+[manifest-registry.md](manifest-registry.md), "Divergence between core and the
+player".
