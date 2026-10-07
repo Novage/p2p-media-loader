@@ -29,6 +29,7 @@ export type {
   SegmentIndexSource,
   UtcTimingSource,
 } from "./manifest/types.js";
+export type { SidxBox, SidxReference } from "./manifest/mp4-sidx.js";
 export type { SegmentStorage } from "./segment-storage/index.js";
 export {
   byteRangeFromHalfOpen,
