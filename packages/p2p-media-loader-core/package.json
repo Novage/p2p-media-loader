@@ -36,7 +36,8 @@
     ".": "./src/index.ts",
     "./hls": "./src/hls.ts",
     "./dash": "./src/dash.ts",
-    "./server": "./src/server.ts"
+    "./server": "./src/server.ts",
+    "./shims/xmldom": "./src/manifest/shims/dom-parser.ts"
   },
   "types": "./src/index.ts",
   "publishConfig": {
@@ -56,6 +57,11 @@
       "./server": {
         "types": "./lib/server.d.ts",
         "import": "./lib/server.js"
+      },
+      "./shims/xmldom": {
+        "types": "./lib/manifest/shims/dom-parser.d.ts",
+        "import": "./lib/manifest/shims/dom-parser.js",
+        "default": "./lib/manifest/shims/dom-parser.js"
       }
     },
     "types": "./lib/index.d.ts"

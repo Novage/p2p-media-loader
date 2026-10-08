@@ -67,6 +67,11 @@ build defines `__P2PML_DIAGNOSTICS__` as `false`, which makes `diagnostics`
 its arguments ([packaging.md](packaging.md)). A page that loads a `dist/`
 bundle cannot turn diagnostics on.
 
+The name `__P2PML_DIAGNOSTICS__` is public, although the ledger is not: the
+README tells integrators who bundle `lib/` to define it as `false`, which
+removes the ledger from their build in the same way. Renaming it is a breaking
+change.
+
 The records stay in the page. Diagnostics never send data anywhere. The details
 can contain stream URLs and peer ids, as the `debug` logs do.
 

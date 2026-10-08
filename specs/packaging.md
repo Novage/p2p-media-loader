@@ -125,9 +125,19 @@ both protocols keep the same runtime floor.
 The substitution reaches every bundle this repository produces: the core `dist/`
 variants and the engine packages' bundles. It cannot reach an integrator who
 consumes `lib/` through their own bundler, because the offending import lives
-inside `mpd-parser`, not in this code; such an integrator playing DASH should
-alias `@xmldom/xmldom` to a module exporting the platform `DOMParser`, exactly
-as the shim in `src/manifest/shims/` does, or carry the 25 KB.
+inside `mpd-parser`, not in this code. For such an integrator playing DASH the
+core exports the same replacement as `p2p-media-loader-core/shims/xmldom`, to
+alias `@xmldom/xmldom` to; the README's "Reduce the Bundle Size" shows the
+alias for Vite and webpack. Its export has a `default` condition beside
+`import`: an alias applies to every module in the build, and some packages
+load `@xmldom/xmldom` with `require()`, which finds `DOMParser` on the module
+just as on the original.
+
+The Babel helper has no such export. Other packages in a typical build — Video.js's
+`@videojs/xhr`, for one — `require()` the CommonJS helper, which is the
+function itself, while a module's default export arrives as an object. An
+alias that sent them to a replacement would break them, to save a few hundred
+bytes.
 
 The unprefixed name is the batteries-included build, for a page whose import
 map names one file for every specifier.

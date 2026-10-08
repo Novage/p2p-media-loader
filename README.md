@@ -87,6 +87,46 @@ This library makes it possible to build large-scale P2P mesh networks — often 
   - WebTorrent trackers - [wss://tracker.novage.com.ua](https://novage.com.ua/), [wss://tracker.webtorrent.dev](https://webtorrent.dev/), [wss://tracker.openwebtorrent.com](https://openwebtorrent.com/)
   - STUN servers - [Public STUN server list](https://gist.github.com/mondain/b0ec1cf5f60ae726202e)
 
+## Reduce the Bundle Size
+
+These steps apply when you bundle the npm packages yourself, with Vite, webpack, Rollup or esbuild. The prebuilt bundles in each package's `dist/` folder already include them.
+
+- **Use the browser's XML parser (MPEG-DASH only).** The MPEG-DASH manifest parser is published for Node and browsers alike, so it imports a complete XML parser, `@xmldom/xmldom`. Every browser already has one. Point that import at `p2p-media-loader-core/shims/xmldom`, which exports the browser's `DOMParser`. This removes about 25 KB, gzipped.
+- **Leave out the diagnostics ledger.** The packages contain a ledger of open resources that is used in testing, and it is off unless you turn it on. Define `__P2PML_DIAGNOSTICS__` as `false` to remove it. This removes about 1.4 KB, gzipped.
+
+Vite:
+
+```js
+// vite.config.js
+export default {
+  resolve: {
+    alias: { "@xmldom/xmldom": "p2p-media-loader-core/shims/xmldom" },
+  },
+  define: { __P2PML_DIAGNOSTICS__: "false" },
+};
+```
+
+webpack:
+
+```js
+// webpack.config.js
+const webpack = require("webpack");
+
+module.exports = {
+  resolve: {
+    alias: { "@xmldom/xmldom$": "p2p-media-loader-core/shims/xmldom" },
+  },
+  plugins: [new webpack.DefinePlugin({ __P2PML_DIAGNOSTICS__: "false" })],
+};
+```
+
+Things to know:
+
+- Use the alias in browser builds only. The replacement reads `window.DOMParser` when it loads, so keep the real package for code that runs in Node, for example in server-side rendering.
+- The alias applies to every package in your build that imports `@xmldom/xmldom`. Each of them then gets the browser's parser, which has the same `parseFromString` method.
+- Do not alias the Babel helper `@babel/runtime/helpers/extends` that the HLS parser imports. Other packages load it with `require()`, which needs the original module, and it is only a few hundred bytes.
+- You do not need to choose a protocol. The HLS.js integration includes only the HLS parser, and the dash.js integration only the MPEG-DASH parser. The Shaka and Video.js integrations include both, because those players play both.
+
 ## Key Components of the P2P Network
 
 All the components of the P2P network are free and open-source.

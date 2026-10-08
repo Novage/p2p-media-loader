@@ -20,6 +20,12 @@ throughout.
 
 ### Added
 
+- **Smaller bundles for integrators who bundle the npm packages.** The core
+  exports `p2p-media-loader-core/shims/xmldom`, the browser's `DOMParser`, to
+  alias `@xmldom/xmldom` to in a browser build: about 25 KB gzipped less for
+  MPEG-DASH. Defining `__P2PML_DIAGNOSTICS__` as `false` removes the
+  diagnostics ledger, about 1.4 KB more. The README's "Reduce the Bundle Size"
+  shows both for Vite and webpack; the prebuilt bundles already include them.
 - **Identity is computed in the core, from the manifest** — the HLS media
   sequence number, or the DASH presentation time in 100 ms units — rather than
   by each integration out of what its player exposes. Peers on different
