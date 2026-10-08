@@ -41,7 +41,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "rimraf lib build && pnpm build:es && pnpm build:esm && pnpm build:esm-min && pnpm build:iife && pnpm build:iife-min",
+    "build": "rimraf lib dist build && pnpm build:es && pnpm build:esm && pnpm build:esm-min && pnpm build:iife && pnpm build:iife-min",
     "build:esm": "vite build --mode esm",
     "build:esm-min": "vite build --mode esm-min",
     "build:iife": "vite build --mode iife",
