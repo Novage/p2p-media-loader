@@ -1,15 +1,8 @@
 {
-  "entryPoints": [
-    "src/index.ts",
-    "src/hls.ts",
-    "src/dash.ts",
-    "src/server.ts"
-  ],
+  "entryPoints": ["src/index.ts", "src/hls.ts", "src/dash.ts", "src/server.ts"],
   "excludeExternals": true,
   "excludePrivate": true,
   "readme": "none",
-  "sort": [
-    "source-order"
-  ],
+  "sort": ["source-order"],
   "defaultCategory": "API"
 }

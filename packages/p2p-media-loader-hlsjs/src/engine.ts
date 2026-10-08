@@ -64,6 +64,22 @@ export type HlsWithP2PConfig<HlsType extends abstract new () => unknown> =
     };
   };
 
+/**
+ * The HLS.js enum values the engine uses. HLS.js is imported for its types
+ * only, so that an integrator's copy is the one that runs; its enums are not
+ * there at run time, and their values are written out here.
+ */
+/* eslint-disable @typescript-eslint/no-unsafe-enum-assignment */
+const HLS_EVENTS = {
+  LEVEL_UPDATED: "hlsLevelUpdated" as Events.LEVEL_UPDATED,
+  DESTROYING: "hlsDestroying" as Events.DESTROYING,
+  MANIFEST_LOADING: "hlsManifestLoading" as Events.MANIFEST_LOADING,
+  MEDIA_DETACHED: "hlsMediaDetached" as Events.MEDIA_DETACHED,
+  MEDIA_ATTACHED: "hlsMediaAttached" as Events.MEDIA_ATTACHED,
+} as const;
+const MAIN_LEVEL_TYPE = "main" as PlaylistLevelType.MAIN;
+/* eslint-enable @typescript-eslint/no-unsafe-enum-assignment */
+
 /** Fewest fragments a playlist needs before its window is worth tuning for. */
 const MIN_TUNABLE_FRAGMENTS = 4;
 
@@ -319,11 +335,8 @@ export class HlsJsP2PEngine {
       this.eventsToken = undefined;
     }
 
-    hls[method](
-      "hlsLevelUpdated" as Events.LEVEL_UPDATED,
-      this.handleLevelUpdated,
-    );
-    hls[method]("hlsDestroying" as Events.DESTROYING, this.destroy);
+    hls[method](HLS_EVENTS.LEVEL_UPDATED, this.handleLevelUpdated);
+    hls[method](HLS_EVENTS.DESTROYING, this.destroy);
     // Loading a source starts a new stream; attaching a media element does
     // not. HLS.js fetches the playlists as soon as the master is parsed,
     // whether or not an element is attached, and re-attaches one mid-playback
@@ -331,18 +344,9 @@ export class HlsJsP2PEngine {
     // past a media error. Letting the core go there would drop the registry
     // the playlists filled, and a VOD stream never fetches them again, so
     // every fragment after it would miss and load over HTTP in silence.
-    hls[method](
-      "hlsManifestLoading" as Events.MANIFEST_LOADING,
-      this.destroyCore,
-    );
-    hls[method](
-      "hlsMediaDetached" as Events.MEDIA_DETACHED,
-      this.handleMediaDetached,
-    );
-    hls[method](
-      "hlsMediaAttached" as Events.MEDIA_ATTACHED,
-      this.handleMediaAttached,
-    );
+    hls[method](HLS_EVENTS.MANIFEST_LOADING, this.destroyCore);
+    hls[method](HLS_EVENTS.MEDIA_DETACHED, this.handleMediaDetached);
+    hls[method](HLS_EVENTS.MEDIA_ATTACHED, this.handleMediaAttached);
   }
 
   /**
@@ -364,7 +368,7 @@ export class HlsJsP2PEngine {
     if (
       this.currentHlsInstance &&
       data.details.fragments.length >= MIN_TUNABLE_FRAGMENTS &&
-      data.details.fragments[0].type === ("main" as PlaylistLevelType)
+      data.details.fragments[0].type === MAIN_LEVEL_TYPE
     ) {
       // `EXT-X-TARGETDURATION` is an upper bound, on some streams several
       // times the real segment; the playlist's average is the segment.

@@ -1,7 +1,4 @@
-import {
-  BandwidthCalculators,
-  SegmentWithStream,
-} from "../internal-types.js";
+import { BandwidthCalculators, SegmentWithStream } from "../internal-types.js";
 import { CoreEventMap } from "../types.js";
 import { EventTarget } from "../utils/event-target.js";
 import { Request } from "./request.js";

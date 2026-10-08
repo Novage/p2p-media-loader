@@ -215,15 +215,16 @@ export function deserializeCommand(bytes: Uint8Array): PeerCommand {
 }
 
 function getDataTypeFromByte(byte: number): Serialization.SerializedItem {
-  const typeCode: Serialization.SerializedItem = byte >> 4;
-  if (
-    typeCode <= Serialization.SerializedItem.Min ||
-    typeCode >= Serialization.SerializedItem.Max
-  ) {
-    throw new Error("Not existing type");
-  }
-
+  const typeCode = byte >> 4;
+  if (!isSerializedItem(typeCode)) throw new Error("Not existing type");
   return typeCode;
+}
+
+function isSerializedItem(code: number): code is Serialization.SerializedItem {
+  return (
+    code > Serialization.SerializedItem.Min &&
+    code < Serialization.SerializedItem.Max
+  );
 }
 
 function stringToUtf8CodesBuffer(string: string, length?: number): Uint8Array {
