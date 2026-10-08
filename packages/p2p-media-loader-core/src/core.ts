@@ -418,14 +418,18 @@ export class Core {
     }
 
     const { requestedUrl } = manifest;
-    const applied = this.applyManifest({
+    const source = {
       parser,
       text,
       url: manifest.url,
       requestedUrl,
       receivedAt: Date.now(),
-    });
-    if (!applied) return undefined;
+    };
+    const applied = this.applyManifest(source);
+    if (!applied) {
+      this.clockedManifest.failed(source);
+      return undefined;
+    }
 
     // The first manifest that registers a stream names the swarm unless the
     // integration already did. By what was asked for: every viewer asks for

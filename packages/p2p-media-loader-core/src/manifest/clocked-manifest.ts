@@ -115,12 +115,7 @@ export class ClockedManifest {
       // live event that ended, for one. Known by its parser, not its URL — a
       // redirect or an MPD `Location` brings the last one from another URL,
       // and the live one kept would go on listing segments that never come.
-      if (this.kept?.parser === source.parser) {
-        this.kept = undefined;
-        diagnostics?.close(this.keptToken, "ended");
-        this.keptToken = undefined;
-        this.schedule();
-      }
+      this.release(source, "ended");
       return;
     }
     this.kept = { ...source, nextChangeAt: clock.nextChangeAt };
@@ -146,6 +141,29 @@ export class ClockedManifest {
       .catch((error: unknown) => {
         this.logger("clock synchronization failed: %O", error);
       });
+  }
+
+  /**
+   * Takes in a manifest the player fetched that failed to parse. The kept one
+   * is let go, as for one with no clock: the player has replaced it with a
+   * manifest the core cannot read, and the kept one would go on listing
+   * segments the player may no longer ask for. A live event that ended can
+   * serve a static MPD too large to parse — livesim2's lists every segment
+   * since 1970. The registry keeps what it listed, and the next manifest that
+   * parses is kept again, so one bad response stops the list only until the
+   * player's next refresh.
+   */
+  failed(source: ManifestSource): void {
+    this.release(source, "failed");
+  }
+
+  /** Lets go of the kept manifest, where `source` is from its parser. */
+  private release(source: ManifestSource, cause: string): void {
+    if (this.kept?.parser !== source.parser) return;
+    this.kept = undefined;
+    diagnostics?.close(this.keptToken, cause);
+    this.keptToken = undefined;
+    this.schedule();
   }
 
   /**

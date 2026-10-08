@@ -225,6 +225,42 @@ describe("Core on a segment list computed from the clock", () => {
     core.destroy();
   });
 
+  it("lets go of the live MPD once the player's next one fails to parse, until one parses", async () => {
+    const { core, parse } = await clockCore();
+
+    // The player's refresh fails to parse: livesim2 ends a stream with a
+    // static MPD that lists every segment since 1970.
+    parse.mockImplementationOnce(() => {
+      throw new RangeError("Invalid array length");
+    });
+    expect(
+      core.processManifest({
+        url: MPD_URL,
+        data: DASH_TEMPLATE_DURATION_DYNAMIC,
+      }),
+    ).toBeUndefined();
+    const parses = parse.mock.calls.length;
+
+    await vi.advanceTimersByTimeAsync(20_000);
+
+    // No parse of the live MPD lists segments past the end, and the
+    // registry keeps what it listed.
+    expect(parse.mock.calls.length).toBe(parses);
+    expect(core.hasSegment(video(14))).toBe(false);
+    expect(core.hasSegment(video(11))).toBe(true);
+
+    // A refresh that parses lists up to 120 s, and is kept again: segment
+    // 15 is listed once it ends at 128 s.
+    core.processManifest({
+      url: MPD_URL,
+      data: DASH_TEMPLATE_DURATION_DYNAMIC,
+    });
+    expect(core.hasSegment(video(14))).toBe(true);
+    await vi.advanceTimersByTimeAsync(8100);
+    expect(core.hasSegment(video(15))).toBe(true);
+    core.destroy();
+  });
+
   it("compares a direct time with when its MPD arrived, when a later parse makes the sync", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("network")));
     const core = new Core({ manifestParsers: [dashManifestParser] });

@@ -405,7 +405,12 @@ failure that repeats costs a parse a minute rather than a parse a second or one
 for each request. An MPD without a clock ends this, from whatever URL it comes:
 a live event that ended serves a static MPD, often through a redirect or a
 `Location` to another URL, and the live MPD kept would go on listing segments
-that never come.
+that never come. An MPD the player fetched that fails to parse ends it too: the
+player has replaced the kept one with an MPD the core cannot read. livesim2
+ends a stream with a static MPD that lists every segment since 1970, which no
+parser can hold. The registry keeps the segments it listed, and the next MPD
+that parses is kept again, so one bad response stops the list only until the
+player's next refresh.
 
 The core computes the lists it makes by itself for a moment 500 ms in the past.
 Time servers disagree by tens of milliseconds and more, a synchronization over
