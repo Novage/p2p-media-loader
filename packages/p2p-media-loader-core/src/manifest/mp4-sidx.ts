@@ -2,6 +2,7 @@
 export type SidxReference = {
   /** 0 references media; 1 references another `sidx` box (not followed). */
   readonly referenceType: 0 | 1;
+  /** Size of the referenced subsegment or box, in bytes. The next reference starts right after it. */
   readonly referencedSize: number;
   /** In the box's timescale. */
   readonly subsegmentDuration: number;
@@ -13,9 +14,11 @@ export type SidxReference = {
  * specs/manifest-registry.md, "Resolving an external index".
  */
 export type SidxBox = {
-  /** Where the box starts in the parsed data, and its size in bytes. */
+  /** Where the box starts in the parsed data, in bytes. */
   readonly boxOffset: number;
+  /** Size of the whole box in bytes, header included. The first subsegment is placed from its end. */
   readonly boxSize: number;
+  /** Units per second of `subsegmentDuration` and `earliestPresentationTime`. Never 0. */
   readonly timescale: number;
   /**
    * Read because the cursor must step over it — its width depends on the box
@@ -27,6 +30,7 @@ export type SidxBox = {
   readonly earliestPresentationTime: number;
   /** Bytes from the end of the box to the first referenced subsegment. */
   readonly firstOffset: number;
+  /** The box's entries, in file order: each follows the one before it with no gap. */
   readonly references: readonly SidxReference[];
 };
 

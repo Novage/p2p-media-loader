@@ -39,6 +39,18 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
      npm install p2p-media-loader-videojs
      ```
 
+   Install `p2p-media-loader-core` as well, at the same version, when your
+   code imports from it: its types (`CoreConfig`, `CoreEventMap` and others),
+   the `p2p-media-loader-core/shims/xmldom` alias in
+   [Reduce the Bundle Size](README.md#reduce-the-bundle-size), or a custom
+   integration as [MIGRATION.md](MIGRATION.md) shows one. The engine packages
+   depend on it, but a package manager that does not hoist dependencies, such
+   as pnpm, lets your code import only what you installed yourself:
+
+   ```bash
+   npm install p2p-media-loader-hlsjs p2p-media-loader-core
+   ```
+
    - Video.js 10 needs no package of ours: it plays HLS and MPEG-DASH through
      media adapters powered by HLS.js and dash.js, so it uses the HLS.js and
      dash.js integrations above.
@@ -78,7 +90,7 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
      scheme plugins once per page, then binds to each player before it loads:
 
      ```typescript
-     import shaka from "shaka-player/dist/shaka-player.ui";
+     import shaka from "shaka-player";
      import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 
      // Once per page, before any player is created
@@ -103,6 +115,18 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
      await player.load(streamUrl);
      ```
 
+     The engine's types are those of Shaka's compiled build, which
+     `"shaka-player"` resolves to. Shaka's types are nominal, so its UI build,
+     `shaka-player/dist/shaka-player.ui`, does not type-check against them,
+     although it is the same library with the UI added. Pass it with a cast:
+
+     ```typescript
+     import shakaUI from "shaka-player/dist/shaka-player.ui";
+     import type shakaCompiled from "shaka-player";
+
+     const shaka = shakaUI as unknown as typeof shakaCompiled;
+     ```
+
    - dash.js integration — the engine replaces the player's loader through
      `player.extend`, so it binds before `initialize()`:
 
@@ -122,7 +146,7 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
 
      const player = MediaPlayer().create();
      engine.bindPlayer(player); // before initialize()
-     player.initialize(videoElement, manifestUrl, true);
+     player.initialize(videoElement, streamUrl, true);
      ```
 
    - Video.js 8 integration — the engine serves the player, through the
@@ -160,9 +184,20 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
 
      Bind the engine before the player loads a source, and several players can
      run side by side, each with its own engine and its own swarm. The same
-     integration is available as a Video.js plugin:
+     integration is available as a Video.js plugin. Video.js's types do not
+     know the plugin, so TypeScript code names the player type it adds:
 
      ```typescript
+     import videojs from "video.js";
+     import {
+       VideoJsP2PEngine,
+       type PartialVideoJsP2PEngineConfig,
+     } from "p2p-media-loader-videojs";
+
+     type PlayerWithP2P = ReturnType<typeof videojs> & {
+       p2pMediaLoader(config?: PartialVideoJsP2PEngineConfig): VideoJsP2PEngine;
+     };
+
      // Once per page, before any player loads a source
      VideoJsP2PEngine.registerPlugins(videojs);
 
@@ -172,7 +207,7 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
          nativeAudioTracks: false,
          nativeVideoTracks: false,
        },
-     });
+     }) as PlayerWithP2P;
      const engine = player.p2pMediaLoader({
        core: { swarmId: "Optional custom swarm ID for stream" },
      });
@@ -301,7 +336,23 @@ For additional examples using npm packages, please refer to our [React demo](htt
 
 ## Using P2P Media Loader from a CDN via JavaScript Modules
 
-**P2P Media Loader** supports a wide variety of players that use HLS.js as their underlying media engine. The examples start with a standalone HLS.js player:
+**P2P Media Loader** supports a wide variety of players that use HLS.js as their underlying media engine. The examples start with a standalone HLS.js player.
+
+Each engine bundle imports the core, and the core's manifest parsers, by bare specifier. So the page needs an import map with an entry for each of them, all mapped to the one core bundle that carries the parsers the engine needs. For HLS.js:
+
+```html
+<script type="importmap">
+  {
+    "imports": {
+      "p2p-media-loader-core": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core-hls.es.min.js",
+      "p2p-media-loader-core/hls": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core-hls.es.min.js",
+      "p2p-media-loader-hlsjs": "https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@^5/dist/p2p-media-loader-hlsjs.es.min.js"
+    }
+  }
+</script>
+```
+
+The dash.js engine maps `p2p-media-loader-core` and `p2p-media-loader-core/dash` to `p2p-media-loader-core-dash.es.min.js` instead; Shaka and Video.js 8 play both protocols and map all three to `p2p-media-loader-core.es.min.js`. See [MIGRATION.md](MIGRATION.md) for the details. The examples below assume such a map, a player loaded by its own `<script>` tag, and a `streamUrl` with the address of the stream.
 
 ### **Integrating P2P with a standalone HLS.js player**
 
@@ -309,6 +360,7 @@ For additional examples using npm packages, please refer to our [React demo](htt
 <script type="module">
   import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 
+  const streamUrl = "https://example.com/stream/master.m3u8";
   const videoElement = document.querySelector("#video");
 
   const HlsWithP2P = HlsJsP2PEngine.injectMixin(window.Hls);
@@ -424,7 +476,7 @@ For additional examples using npm packages, please refer to our [React demo](htt
     },
   });
 
-  engine.bindHls(() => clapprPlayer.core.getCurrentPlayback()?._hls);
+  engine.bindHls(() => player.core.getCurrentPlayback()?._hls);
 </script>
 ```
 
@@ -440,6 +492,9 @@ For additional examples using npm packages, please refer to our [React demo](htt
 
   const player = new MediaElementPlayer(videoElement.id, {
     videoHeight: "100%",
+    // HLS.js first: MediaElement prefers the browser's own HLS playback
+    // where it is offered, and that bypasses P2P
+    renderers: ["native_hls", "html5"],
     hls: {
       p2p: {
         core: {
@@ -465,7 +520,9 @@ For additional examples using npm packages, please refer to our [React demo](htt
   import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 
   const videoElement = document.querySelector("#video");
-  const HlsWithP2P = HlsJsP2PEngine.injectMixin(window.Hls);
+
+  // OpenPlayerJS creates its HLS.js from window.Hls
+  window.Hls = HlsJsP2PEngine.injectMixin(window.Hls);
 
   const player = new OpenPlayerJS(videoElement, {
     hls: {
@@ -602,20 +659,15 @@ For additional examples using npm packages, please refer to our [React demo](htt
       // Other P2P Media Loader Core options
     },
   });
+  shakaP2PEngine.addEventListener("onPeerConnect", (params) => {
+    console.log("Peer connected:", params.peerId);
+  });
 
   const player = new Clappr.Player({
     parentId: `#${container.id}`,
     source: streamUrl,
     plugins: [window.DashShakaPlayback, window.LevelSelector],
     shakaOnBeforeLoad: (shakaPlayerInstance) => {
-      subscribeToUiEvents({
-        engine: shakaP2PEngine,
-        onPeerConnect,
-        onPeerDisconnect,
-        onChunkDownloaded,
-        onChunkUploaded,
-      });
-
       shakaP2PEngine.bindShakaPlayer(shakaPlayerInstance);
     },
   });
@@ -882,11 +934,11 @@ The HLS.js and dash.js integrations therefore drive it directly, with no
     <!-- Video.js 10's media elements; pin the version you use -->
     <script
       type="module"
-      src="https://cdn.jsdelivr.net/npm/@videojs/cdn@10.0.0-rc.2/media/hlsjs-video.js"
+      src="https://cdn.jsdelivr.net/npm/@videojs/cdn@10.0.1/media/hlsjs-video.js"
     ></script>
     <script
       type="module"
-      src="https://cdn.jsdelivr.net/npm/@videojs/cdn@10.0.0-rc.2/media/dash-video.js"
+      src="https://cdn.jsdelivr.net/npm/@videojs/cdn@10.0.1/media/dash-video.js"
     ></script>
   </head>
   <body>

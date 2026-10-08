@@ -11,10 +11,20 @@ export type ManifestProtocol = "hls" | "dash";
  * See specs/manifest-registry.md.
  */
 export type SegmentIndexSource =
-  | { readonly kind: "manifest" }
   | {
+      /** The manifest lists the stream's segments itself. */
+      readonly kind: "manifest";
+    }
+  | {
+      /** The segments are listed in an index box in a media file. */
       readonly kind: "external";
+      /** Absolute URL of the file that holds the index. */
       readonly url: string;
+      /**
+       * Where the index is in that file (DASH `SegmentBase@indexRange`). A
+       * player request for this URL whose range covers it is the request
+       * that fetches the index.
+       */
       readonly byteRange: ByteRange;
       /** Where the stream's presentation timeline starts; the index's durations lay out from here. */
       readonly periodStart: number;
@@ -24,7 +34,9 @@ export type SegmentIndexSource =
 export type ParsedSegment = {
   /** Absolute URL the player will request. */
   readonly url: string;
+  /** The segment's bytes within `url`, where it is part of a larger file. */
   readonly byteRange?: ByteRange;
+  /** Duration in seconds. The core lays the segments out on the timeline from it. */
   readonly duration: number;
   /**
    * HLS: media sequence number of this segment. DASH: zero-based index in the
@@ -40,12 +52,21 @@ export type ParsedSegment = {
 
 /** Where a segment is: its URL, and its byte range where it is part of a file. */
 export type SegmentLocation = {
+  /** Absolute URL the player will request. */
   readonly url: string;
+  /** The segment's bytes within `url`. Absent: the whole file, or any range of it. */
   readonly byteRange?: ByteRange;
 };
 
+/**
+ * An initialization segment (HLS `EXT-X-MAP`, DASH `Initialization`). The
+ * core recognises a player's request for one and passes it through; it is
+ * never part of a stream's segment list.
+ */
 export type ParsedInitSegment = {
+  /** Absolute URL the player will request. */
   readonly url: string;
+  /** The initialization segment's bytes within `url`, where it is part of a larger file. */
   readonly byteRange?: ByteRange;
 };
 
@@ -57,7 +78,12 @@ export type ParsedStream = {
    * representation id.
    */
   readonly key: string;
+  /** Stream type. Alternate audio renditions are `"secondary"`; every other stream is `"main"`. */
   readonly type: StreamType;
+  /**
+   * The stream's properties, read from the manifest and not normalized. The
+   * core derives the stream's identity from them; see `StreamProperties`.
+   */
   readonly properties: StreamProperties;
   /**
    * Segments, when this manifest carries them. An HLS master declares
@@ -71,6 +97,7 @@ export type ParsedStream = {
    * HLS discontinuity with a new `EXT-X-MAP`, or a period boundary in DASH.
    */
   readonly initSegments?: readonly ParsedInitSegment[];
+  /** Where the stream's segment list comes from: this manifest, or an index the core must read first. */
   readonly indexSource: SegmentIndexSource;
   /** Known only from a manifest that carries segments. */
   readonly isLive?: boolean;
@@ -86,7 +113,13 @@ export type ParsedStream = {
   readonly declaredWindow?: number;
 };
 
+/**
+ * What a `ManifestParser` read from one manifest: the streams it declares or
+ * describes, and what else the core must know to recognise the player's
+ * requests. Structure only; the core does the interpretation.
+ */
 export type ParsedManifest = {
+  /** The manifest's protocol. The core derives segment identity and lays out the timeline by it. */
   readonly protocol: ManifestProtocol;
   /** The URL the manifest was fetched from, after redirects. */
   readonly url: string;
@@ -97,6 +130,7 @@ export type ParsedManifest = {
    * copy came from, and a CDN may answer every request from somewhere else.
    */
   readonly requestedUrl?: string;
+  /** Every video and audio stream the manifest declares or describes. */
   readonly streams: readonly ParsedStream[];
   /**
    * Playlists this manifest names that are not video or audio streams — an
@@ -183,6 +217,10 @@ export type ManifestParseContext = {
  * copies own properties only.
  */
 export type ManifestParser = {
+  /**
+   * The protocol this parser reads. The core picks the parser by it when
+   * `processManifest` is given a `protocol`, and calls `canParse` otherwise.
+   */
   readonly protocol: ManifestProtocol;
   /** Cheap sniff of the payload; used when the caller does not state the protocol. */
   canParse(text: string): boolean;

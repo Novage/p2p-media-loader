@@ -61,7 +61,15 @@ export type HlsWithP2PInstance<HlsType> = HlsType & {
  */
 export type HlsWithP2PConfig<HlsType extends abstract new () => unknown> =
   ConstructorParameters<HlsType>[0] & {
+    /**
+     * P2P engine configuration. The mixin takes it out before it passes the
+     * rest of the config to HLS.js.
+     */
     p2p?: PartialHlsJsP2PEngineConfig & {
+      /**
+       * Called once at the end of the constructor, when the HLS.js instance
+       * and its `p2pEngine` exist, for example to add event listeners.
+       */
       onHlsJsCreated?: (hls: HlsWithP2PInstance<HlsType>) => void;
     };
   };
@@ -106,7 +114,6 @@ type ForwardBufferKey = (typeof FORWARD_BUFFER_KEYS)[number];
  * // Creating an instance of HlsJsP2PEngine with custom configuration
  * const hlsP2PEngine = new HlsJsP2PEngine({
  *   core: {
- *     highDemandTimeWindow: 30, // 30 seconds
  *     simultaneousHttpDownloads: 3,
  *     webRtcMaxMessageSize: 64 * 1024, // 64 KB
  *     p2pNotReceivingBytesTimeoutMs: 10000, // 10 seconds
@@ -241,8 +248,21 @@ export class HlsJsP2PEngine {
    * (`pLoader`) and `lowLatencyMode: false`.
    */
   getConfigForHlsJs(): {
+    /**
+     * Fragment loader class for HLS.js's `fLoader`. It loads the segments the
+     * core knows through the core (P2P or HTTP), and passes every other
+     * fragment to HLS.js's own loader.
+     */
     fLoader: unknown;
+    /**
+     * Playlist loader class for HLS.js's `pLoader`. It loads through HLS.js's
+     * own loader, and hands the master and media playlists it gets to the core.
+     */
     pLoader: unknown;
+    /**
+     * Always `false`: in low-latency mode HLS.js requests partial segments,
+     * which the core does not register.
+     */
     lowLatencyMode: false;
   } {
     return {

@@ -93,7 +93,7 @@ This library makes it possible to build large-scale P2P mesh networks — often 
 These steps apply when you bundle the npm packages yourself, with Vite, webpack, Rollup or esbuild. The prebuilt bundles in each package's `dist/` folder already include them.
 
 - **Use the browser's XML parser (MPEG-DASH only).** The MPEG-DASH manifest parser is published for Node and browsers alike, so it imports a complete XML parser, `@xmldom/xmldom`. Every browser already has one. Point that import at `p2p-media-loader-core/shims/xmldom`, which exports the browser's `DOMParser`. This removes about 25 KB, gzipped.
-- **Leave out the diagnostics ledger.** The packages contain a ledger of open resources that is used in testing, and it is off unless you turn it on. Define `__P2PML_DIAGNOSTICS__` as `false` to remove it. This removes about 1.4 KB, gzipped.
+- **Leave out the diagnostics ledger.** The packages contain a ledger of open resources that is used in testing, and it is off unless you turn it on (see [Diagnostics](#diagnostics) below). Define `__P2PML_DIAGNOSTICS__` as `false` to remove it. This removes about 1.4 KB, gzipped.
 
 Vite:
 
@@ -107,7 +107,7 @@ export default {
 };
 ```
 
-webpack:
+webpack, in a CommonJS config — name the file `webpack.config.cjs` in a project with `"type": "module"`:
 
 ```js
 // webpack.config.js
@@ -127,6 +127,27 @@ Things to know:
 - The alias applies to every package in your build that imports `@xmldom/xmldom`. Each of them then gets the browser's parser, which has the same `parseFromString` method.
 - Do not alias the Babel helper `@babel/runtime/helpers/extends` that the HLS parser imports. Other packages load it with `require()`, which needs the original module, and it is only a few hundred bytes.
 - You do not need to choose a protocol. The HLS.js integration includes only the HLS parser, and the dash.js integration only the MPEG-DASH parser. The Shaka and Video.js integrations include both, because those players play both.
+
+## Diagnostics
+
+The ledger records each resource the library opens and closes — loaders, peers, tracker sockets, timers, storage and player hooks — with counters of results, and anomalies such as a timer that fires after its owner was destroyed. It is off by default, and costs almost nothing while off.
+
+To turn it on, set the `debug` namespace before the page loads, then reload. The decision is made once, at the ledger's first record, so turning it on later in the same page has no effect:
+
+```js
+localStorage.debug = "p2pml:diagnostics";
+```
+
+The ledger appears on `globalThis` at that first record, so read it once a player has started:
+
+```js
+const snapshot = globalThis.__p2pmlDiagnostics.snapshot();
+// snapshot.live: open resources by kind; snapshot.counters: results;
+// snapshot.anomalies: states that must not occur
+globalThis.__p2pmlDiagnostics.clearAnomalies();
+```
+
+The ledger is in the npm packages unless your build defines `__P2PML_DIAGNOSTICS__` as `false`. The prebuilt bundles in `dist/` leave it out.
 
 ## Key Components of the P2P Network
 

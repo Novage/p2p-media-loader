@@ -228,6 +228,11 @@ Pass: no errors, no knip findings, jscpd within its budget, typedoc with no
 warnings, and each package tarball holds the files its `package.json`
 exports.
 
+A tarball packed here has no `README.md`, and that is expected, not a finding.
+Each package's README is a symlink to the root one, which `pnpm pack` skips;
+the publish workflow (`.github/workflows/npm-publish.yml`, "Override
+symlinks") copies the root README into each package before it publishes.
+
 ### 2. Stream matrix
 
 Play every stream in the matrix in [verification.md](verification.md) on every
@@ -496,14 +501,52 @@ demo's player components show it. Build it, type-check it with library
 checking on, and play a stream with it in two tabs, with the diagnostics
 ledger enabled.
 
-Write the integrations by following `README.md` and `MIGRATION.md` as an
-integrator would, not from the repository's code. Then read the API
-documentation that typedoc builds for each public class and option.
+Write the integrations by following `README.md`, `MIGRATION.md` and
+`api_documentation.md` as an integrator would, not from the repository's code.
+Test 18 then checks the documents themselves, with these projects.
 
 Pass: the projects build and type-check with no error; both tabs play and
 share with each player; the ledger works in the packed build and records no
-anomaly. Each step the documents leave out, each example that does not compile
-or run, and each public option with no description is a finding.
+anomaly. Each step the documents leave out is a finding.
+
+### 18. Documentation
+
+An assistant reads the documents as an integrator would, and checks each claim
+they make against the code and each example against a compiler. Run it after
+test 17, in the same consumer projects.
+
+- **Every public item has a description.** In each package directory run
+  `npx typedoc --validation.notDocumented true --emit none`. The root
+  `typedoc.json` builds the packages together, and in that mode the check
+  reports nothing, so run it per package. Then read the built pages of each
+  public class and option: a description that says less than the code does,
+  or something else, is a finding.
+- **Every TypeScript example compiles as written.** Copy each `typescript`
+  and `tsx` example of `README.md`, `MIGRATION.md`, `api_documentation.md`,
+  `FAQ.md` and the `@example` blocks of the public classes into the Vite
+  project, one file each. Declare only what an example takes for granted: the
+  page values every example uses, `videoElement` and `streamUrl`, and what its
+  text or comments name as given, such as the response a loader received or a
+  server's own list of streams. Type-check with
+  `strict` and `skipLibCheck: false`. An example that needs any other change
+  to compile is a finding. So is one that compiles only against a different
+  build of a player than the one it imports, as Shaka's UI build against the
+  engine's types did.
+- **Every HTML and CDN example would run.** Each variable it uses is defined
+  in it, or the text says it is assumed. The page's import map has an entry
+  for every bare specifier the engine's `dist/*.es.js` imports — read them
+  from the bundle. Each CDN URL answers 200, and each pinned version is the
+  version the demo uses.
+- **Every player example matches the demo.** The demo's component for the
+  same player is the tested integration. A setting the demo needs and the
+  example lacks — MediaElement's `renderers`, the mixin on `window.Hls` for a
+  player that creates HLS.js from it — is a finding, and so is a helper the
+  example calls that only the demo defines.
+- **Every stated fact is true.** Defaults, logger namespaces, supported
+  versions, bundle sizes, and how to turn diagnostics on: check each against
+  the code, or measure it.
+
+Pass: no findings. List each one with the document, the section and the fix.
 
 ## Part 2: tests for a person
 

@@ -119,7 +119,16 @@ export interface SegmentStorage {
    * Retrieves information about the current memory usage of the storage.
    */
   getUsage(): {
+    /**
+     * How much the storage can hold. Any unit works if `usedCapacity` uses
+     * the same one: the core reads only the ratio of the two. The built-in
+     * memory storage reports MiB.
+     */
     totalCapacity: number;
+    /**
+     * How much of `totalCapacity` the kept segments take, in the same unit.
+     * As the storage fills, the core loads less far ahead of the playhead.
+     */
     usedCapacity: number;
   };
 

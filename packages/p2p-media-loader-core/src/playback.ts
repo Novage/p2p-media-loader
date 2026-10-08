@@ -12,7 +12,9 @@ import debug from "debug";
 
 /** A buffered interval, in seconds on the player's own timeline. */
 export type TimeRange = {
+  /** Where the interval starts, in seconds. */
   readonly start: number;
+  /** Where the interval ends, in seconds. */
   readonly end: number;
 };
 

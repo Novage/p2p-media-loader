@@ -59,14 +59,42 @@ export type Segment = {
  * specs/segment-identity.md).
  */
 export type StreamProperties = {
+  /**
+   * Bits per second: the HLS variant's `BANDWIDTH`, or the DASH
+   * Representation's `@bandwidth`. An audio rendition has 0. Hashed only
+   * where the manifest needs it to tell two same-type streams apart (see
+   * `identityProperties`).
+   */
   bitrate?: number | null;
+  /**
+   * The codec string from the manifest, not normalized. A video stream keeps
+   * only its video codecs from a mixed `CODECS` list. An HLS audio rendition
+   * takes the audio codecs of the first variant that refers to its group.
+   */
   codecs?: string | null;
+  /** Video width in pixels: HLS `RESOLUTION`, or DASH `@width`. */
   width?: number | null;
+  /** Video height in pixels: HLS `RESOLUTION`, or DASH `@height`. */
   height?: number | null;
+  /**
+   * The language tag as the manifest writes it: an HLS rendition's
+   * `LANGUAGE`, or the DASH `@lang` of an audio stream.
+   */
   language?: string | null;
+  /**
+   * The audio channels: an HLS rendition's `CHANNELS`, or the DASH
+   * `AudioChannelConfiguration` value under the MPEG scheme. Not set for a
+   * vendor scheme, because its value is not a plain count.
+   */
   channels?: string | number | null;
+  /**
+   * An HLS rendition's `NAME`, or a DASH audio Representation's `@id`. It is
+   * what tells an alternate rendition apart from the variant it copies.
+   */
   name?: string | null;
+  /** Video frame rate as the manifest states it: HLS `FRAME-RATE`, or DASH `@frameRate`. */
   frameRate?: number | string | null;
+  /** HLS `VIDEO-RANGE` (for example `SDR` or `PQ`). The DASH parser does not set it. */
   videoRange?: string | null;
 };
 
@@ -834,9 +862,18 @@ export type PeerErrorType =
  * any library error regardless of its specific class.
  */
 export abstract class TypedError<T extends string> extends Error {
+  /**
+   * The error that caused this one, if any — for example the `PeerError`
+   * behind a `"peer-closed"` `RequestError`. Set by the constructor, because
+   * `ErrorOptions.cause` is not available before ES2022.
+   */
   readonly cause?: unknown;
 
   constructor(
+    /**
+     * Machine-readable kind of the error. Switch on it to handle each case;
+     * the `message` is for people, not for code.
+     */
     readonly type: T,
     message?: string,
     cause?: unknown,
@@ -849,6 +886,7 @@ export abstract class TypedError<T extends string> extends Error {
 
 /** Represents an error that occurred during a peer connection. */
 export class PeerError extends TypedError<PeerErrorType> {
+  /** Always `"PeerError"`; logs and stack traces show it in place of the generic `"Error"`. */
   readonly name = "PeerError";
 }
 
@@ -863,6 +901,7 @@ export type PeerWarningType = "timeout-strike";
 
 /** Represents a warning that occurred during a peer connection. */
 export class PeerWarning extends TypedError<PeerWarningType> {
+  /** Always `"PeerWarning"`; logs and stack traces show it in place of the generic `"Error"`. */
   readonly name = "PeerWarning";
 }
 
@@ -900,6 +939,7 @@ export type TrackerErrorType =
 
 /** Represents an error that occurred during a tracker request. */
 export class TrackerError extends TypedError<TrackerErrorType> {
+  /** Always `"TrackerError"`; logs and stack traces show it in place of the generic `"Error"`. */
   readonly name = "TrackerError";
 }
 
@@ -908,6 +948,7 @@ export type TrackerWarningType = "tracker-response" | "offer-failed";
 
 /** Represents a warning that occurred during a tracker request. */
 export class TrackerWarning extends TypedError<TrackerWarningType> {
+  /** Always `"TrackerWarning"`; logs and stack traces show it in place of the generic `"Error"`. */
   readonly name = "TrackerWarning";
 }
 
@@ -916,6 +957,7 @@ export type PeerConnectErrorType = "connection-failed";
 
 /** Represents an error that occurred while establishing a peer connection. */
 export class PeerConnectError extends TypedError<PeerConnectErrorType> {
+  /** Always `"PeerConnectError"`; logs and stack traces show it in place of the generic `"Error"`. */
   readonly name = "PeerConnectError";
 }
 
@@ -960,12 +1002,19 @@ export type StreamAddedDetails = {
 export type ProcessedStream = {
   /** The stream key (see `Stream.runtimeId`). */
   readonly key: string;
+  /** Stream type. */
   readonly type: StreamType;
+  /**
+   * Whether the stream is live. The built-in parsers say so for an HLS
+   * playlist with no `EXT-X-ENDLIST` and no `EXT-X-PLAYLIST-TYPE:VOD`, and
+   * for a dynamic MPD.
+   */
   readonly isLive: boolean;
   /** Start of the earliest listed segment on the stream's manifest timeline. */
   readonly start: number;
   /** End of the latest listed segment on the same timeline. */
   readonly end: number;
+  /** How many segments the core now holds for the stream. `start` and `end` are 0 when this is 0. */
   readonly segmentCount: number;
   /**
    * The live window the manifest declares, in seconds, where the span from
@@ -978,6 +1027,7 @@ export type ProcessedStream = {
 
 /** The outcome of `Core.processManifest` for a manifest a parser accepted. */
 export type ProcessedManifest = {
+  /** One entry for each stream described; see `ProcessedStream` for which streams appear. */
   readonly streams: readonly ProcessedStream[];
 };
 
@@ -1171,6 +1221,7 @@ export type RequestErrorType =
 export class RequestError<
   T extends RequestErrorType = RequestErrorType,
 > extends TypedError<T> {
+  /** Always `"RequestError"`; logs and stack traces show it in place of the generic `"Error"`. */
   readonly name = "RequestError";
 
   /** Error timestamp. */
@@ -1206,5 +1257,6 @@ export type SegmentResponse = {
 
 /** Custom error class for errors that occur during core network requests. */
 export class CoreRequestError extends TypedError<"failed" | "aborted"> {
+  /** Always `"CoreRequestError"`; logs and stack traces show it in place of the generic `"Error"`. */
   readonly name = "CoreRequestError";
 }

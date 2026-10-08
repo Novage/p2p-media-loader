@@ -67,7 +67,6 @@ const registrationTokens: (string | undefined)[] = [];
  * // Initializing the ShakaP2PEngine with custom configuration
  * const shakaP2PEngine = new ShakaP2PEngine({
  *   core: {
- *     highDemandTimeWindow: 30, // 30 seconds
  *     simultaneousHttpDownloads: 3,
  *     webRtcMaxMessageSize: 64 * 1024, // 64 KB
  *     p2pNotReceivingBytesTimeoutMs: 10000, // 10 seconds
