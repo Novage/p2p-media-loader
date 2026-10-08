@@ -1,6 +1,7 @@
 import { diagnostics, type DiagnosticsToken } from "../diagnostics.js";
 import debug from "debug";
 import { BandwidthCalculators, SegmentWithStream } from "../internal-types.js";
+import type { BandwidthDownload } from "../bandwidth-calculator.js";
 import {
   CoreEventMap,
   RequestError,
@@ -70,6 +71,11 @@ export class Request {
   private _totalBytes?: number;
   private _status: RequestStatus = "not-started";
   private progress?: LoadProgress;
+  /** The attempt under way, as the shared bandwidth calculators measure it. */
+  private bandwidthDownloads?: {
+    all: BandwidthDownload;
+    http?: BandwidthDownload;
+  };
   private notReceivingBytesTimeout: Timeout;
   private _onAbortCallback?: (
     error: RequestError<RequestAbortErrorType>,
@@ -486,10 +492,11 @@ export class Request {
     if (!this.currentAttempt || !this.progress) return;
 
     const { byteLength } = chunk;
-    const { all: allBC, http: httpBC } = this.bandwidthCalculators;
-    allBC.addBytes(byteLength);
-    if (this.currentAttempt.downloadSource === "http") {
-      httpBC.addBytes(byteLength);
+    const downloads = this.bandwidthDownloads;
+    if (downloads) {
+      const { all: allBC, http: httpBC } = this.bandwidthCalculators;
+      allBC.addBytes(downloads.all, byteLength);
+      if (downloads.http) httpBC.addBytes(downloads.http, byteLength);
     }
 
     this.bytes.push(chunk);
@@ -513,9 +520,21 @@ export class Request {
 
   private manageBandwidthCalculatorsState(state: "start" | "stop") {
     const { all, http } = this.bandwidthCalculators;
-    const method = state === "start" ? "startLoading" : "stopLoading";
-    if (this.currentAttempt?.downloadSource === "http") http[method]();
-    all[method]();
+    if (state === "start") {
+      this.bandwidthDownloads = {
+        all: all.startLoading(),
+        http:
+          this.currentAttempt?.downloadSource === "http"
+            ? http.startLoading()
+            : undefined,
+      };
+      return;
+    }
+    const downloads = this.bandwidthDownloads;
+    this.bandwidthDownloads = undefined;
+    if (!downloads) return;
+    all.stopLoading(downloads.all);
+    if (downloads.http) http.stopLoading(downloads.http);
   }
 }
 

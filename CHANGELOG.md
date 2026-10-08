@@ -202,6 +202,13 @@ These predate 5.0.0 and affect 4.x deployments as well.
   or a CDN filling its cache can take that long, and the aborts could keep a
   player from starting. That timeout now runs from the headers, and the wait
   for them has a limit of its own, `httpFirstByteTimeoutMs`, 10 s by default.
+- The bandwidth reported to the player was measured between the chunks of a
+  download, which left out the wait for each response, and read a segment
+  that arrived in one burst as gigabits per second. The player's adaptive
+  bitrate logic then took a rendition the network could not carry: dash.js
+  asked for 4K after its first segment and stalled on it. Bandwidth is now
+  measured per download, from the request to the last byte, and downloads
+  that run side by side are counted by their total.
 - A tracker that accepted a connection and closed it at once was answered with
   a reconnect every second indefinitely, each carrying an announce and a batch
   of offers. The backoff is now cleared by a connection that lasted.

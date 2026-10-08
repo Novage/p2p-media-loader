@@ -440,10 +440,9 @@ describe("HybridLoader: the high-demand window", () => {
     );
     fakes.state.peerCount = 1;
     const now = performance.now();
-    bandwidth.http.startLoading(now - 1000);
-    bandwidth.http.addBytes(10_000_000, now - 1000);
-    bandwidth.http.addBytes(10_000_000, now);
-    bandwidth.http.stopLoading(now);
+    const download = bandwidth.http.startLoading(now - 1000);
+    bandwidth.http.addBytes(download, 20_000_000);
+    bandwidth.http.stopLoading(download, now);
     loader.updatePlayback({ bufferAhead: 10, rate: 1 });
 
     await loader.loadSegment(segment(2), callbacks);

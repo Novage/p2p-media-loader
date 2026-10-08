@@ -205,9 +205,20 @@ the groups and the cases a reader of a snapshot must know.
   cannot place (`VhsPlacement:unavailable`).
 - **Probes:** each segment storage's size; the peers that each swarm's
   connection manager holds (`PeersHeld`) and its P2P loader wraps
-  (`PeersWrapped`), which must be equal.
-- **Anomalies:** a close of a token that is not open or of no token, and the
-  timers under rule 2.
+  (`PeersWrapped`), which must be equal; and, for one source, the downloads
+  each core's shared bandwidth calculators measure as loading
+  (`BandwidthLoading#n`, with `all` and `http`). Summed over the page's
+  cores, `all` equals the open `Download:http` and `Download:p2p` records, and
+  `http` the open `Download:http` ones; a calculator ahead of them missed a
+  stop.
+- **Anomalies:** a close of a token that is not open or of no token, the
+  timers under rule 2, bytes or a stop for a download a bandwidth calculator
+  does not measure as loading, and a download a core's calculator still
+  measures as loading after `destroy()` settled them all
+  (`BandwidthCalculator:<name> loading after destroy`). Either is a download
+  its owner lost track of: its bytes go uncounted, or the calculator counts it
+  as loading for ever and every estimate after it runs slow. A download
+  `clear()` removed is not reported.
 
 A record is only kept where the owner's release is certain. An object that
 its player can drop without a release — an HLS.js playlist loader whose load

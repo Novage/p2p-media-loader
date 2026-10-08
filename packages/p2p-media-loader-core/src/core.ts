@@ -149,6 +149,9 @@ export class Core {
    * The core outlives it: `destroy()` readies it for the next source.
    */
   private sourceDiagnosticsToken?: DiagnosticsToken;
+  /** Tells the bandwidth probes of two cores on one page apart. */
+  private static bandwidthProbeSequence = 0;
+  private unprobeBandwidth?: () => void;
   private readonly webTorrentSocketPool = new WebTorrentSocketPool();
   private readonly logger = debug("p2pml-core:core");
   private readonly socketPoolLogger = debug(
@@ -404,7 +407,10 @@ export class Core {
     data: string | ArrayBuffer | ArrayBufferView;
     protocol?: ManifestProtocol;
   }): ProcessedManifest | undefined {
-    this.sourceDiagnosticsToken ??= diagnostics?.open("CoreSource");
+    if (!this.sourceDiagnosticsToken) {
+      this.sourceDiagnosticsToken = diagnostics?.open("CoreSource");
+      if (this.sourceDiagnosticsToken) this.probeBandwidth();
+    }
     const text =
       typeof manifest.data === "string"
         ? manifest.data
@@ -1097,6 +1103,20 @@ export class Core {
       () => this.segmentStorage?.destroy(),
       () => this.webTorrentSocketPool.closeAllSockets(),
     ]);
+    // Tearing the loaders down settled every download. One still measured as
+    // loading is a stop some path missed: the calculator would count it as
+    // loading for ever, and every estimate after it would run slow.
+    const { all, http } = this.bandwidthCalculators;
+    for (const [name, calculator] of [
+      ["all", all],
+      ["http", http],
+    ] as const) {
+      if (calculator.loadingCount > 0) {
+        diagnostics?.anomaly(
+          `BandwidthCalculator:${name} loading after destroy`,
+        );
+      }
+    }
 
     this.mainStreamLoader = undefined;
     this.secondaryStreamLoader = undefined;
@@ -1108,12 +1128,30 @@ export class Core {
       diagnostics?.close(this.sourceDiagnosticsToken, "destroyed");
       this.sourceDiagnosticsToken = undefined;
     }
+    this.unprobeBandwidth?.();
+    this.unprobeBandwidth = undefined;
     this.segmentStorage = undefined;
     this.manifestResponseUrl = undefined;
     this.streamDetails = { isLive: false, liveTarget: undefined };
     this.storageInitPromise = undefined;
     this.storageGeneration++;
     if (failures.length) throw failures[0];
+  }
+
+  /**
+   * The downloads each shared bandwidth calculator measures as loading. They
+   * are the downloads under way: summed over the page's cores, `all` equals
+   * the open `Download:http` and `Download:p2p` records, and `http` the open
+   * `Download:http` ones. A calculator ahead of them missed a stop, and its
+   * loading-only clock runs for ever. Kept for one source, as `CoreSource` is,
+   * so it never holds on to a core the page has let go.
+   */
+  private probeBandwidth() {
+    const { all, http } = this.bandwidthCalculators;
+    this.unprobeBandwidth = diagnostics?.probe(
+      `BandwidthLoading#${++Core.bandwidthProbeSequence}`,
+      () => ({ all: all.loadingCount, http: http.loadingCount }),
+    );
   }
 
   private async initializeSegmentStorage() {

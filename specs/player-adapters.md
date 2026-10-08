@@ -97,6 +97,20 @@ Two details adapters routinely get wrong:
   ([architecture.md](architecture.md)). Do not clone again — the copy is
   already made, and a second one is pure cost on every segment played.
 
+**The response's `bandwidth` is what the player's adaptive bitrate logic is
+told.** Each adapter turns it into the download time its player expects, as
+`bytes × 8000 / bandwidth` milliseconds, in place of the wall clock, which
+says nothing about the network for a segment from a peer or from storage. The
+core measures it from its recent downloads, HTTP and P2P together, and the
+unit is the download, not the chunk. A chunk is stamped when it arrives, which
+says nothing of how long its bytes took: the wait for a response ends in one
+burst, and downloads that run side by side deliver their chunks interleaved.
+So each download spreads its bytes evenly over its own time, from its request
+to its last byte, and a window takes the share of each that falls inside it.
+Measured by chunks, a segment that came in one burst after a three-second wait
+read as gigabits per second, and dash.js, told its first segment took 49 ms,
+asked for 4K next and stalled on it.
+
 ## 3. Report playback state
 
 Push `{ bufferAhead, rate }` whenever it changes. Core exports
