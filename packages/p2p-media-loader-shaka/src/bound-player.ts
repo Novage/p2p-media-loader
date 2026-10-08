@@ -1,6 +1,5 @@
 import type shaka from "shaka-player/dist/shaka-player.compiled.d.ts";
 import {
-  Core,
   type ProcessedManifest,
   liveDelayFor,
   playerBufferFor,
@@ -8,6 +7,7 @@ import {
   runAll,
 } from "p2p-media-loader-core";
 import type { Shaka } from "./types.js";
+import { diagnostics } from "./diagnostics.js";
 
 /** Shaka's own default: the integrator has set no presentation delay. */
 const SHAKA_DEFAULT_PRESENTATION_DELAY = 0;
@@ -99,7 +99,7 @@ export class BoundPlayer {
     this.#debug = debug;
   }
 
-  readonly #diagnosticsToken = Core.diagnostics?.open("ShakaBoundPlayer");
+  readonly #diagnosticsToken = diagnostics?.open("ShakaBoundPlayer");
 
   /**
    * Takes the settings this engine needs from the player, keeping what it
@@ -313,7 +313,7 @@ export class BoundPlayer {
    * configuration by as long as the requests in flight take to settle.
    */
   release() {
-    Core.diagnostics?.close(this.#diagnosticsToken, "released");
+    diagnostics?.close(this.#diagnosticsToken, "released");
     this.#released = true;
     const taken = [...this.#taken].reverse();
     this.#taken.clear();

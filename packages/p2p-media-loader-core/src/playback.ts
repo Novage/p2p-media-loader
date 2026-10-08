@@ -143,7 +143,7 @@ export function trackMediaElementPlayback(
       for (const event of PLAYBACK_EVENTS) {
         watched.removeEventListener(event, handle);
       }
-      diagnostics.close(watchToken, media ? "replaced" : "stopped");
+      diagnostics?.close(watchToken, media ? "replaced" : "stopped");
       watchToken = undefined;
     }
     watched = media;
@@ -151,7 +151,7 @@ export function trackMediaElementPlayback(
     for (const event of PLAYBACK_EVENTS) {
       media.addEventListener(event, handle);
     }
-    watchToken = diagnostics.open("MediaElementWatch");
+    watchToken = diagnostics?.open("MediaElementWatch");
   };
 
   return { watch, stop: () => watch(undefined) };

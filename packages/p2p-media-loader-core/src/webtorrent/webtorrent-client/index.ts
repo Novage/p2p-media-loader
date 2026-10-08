@@ -203,7 +203,7 @@ export class WebTorrentClient {
   public start(): void {
     if (this.#isDestroyed() || this.#started) return;
     this.#started = true;
-    this.#diagnosticsToken = diagnostics.open("TrackerClient");
+    this.#diagnosticsToken = diagnostics?.open("TrackerClient");
 
     this.#wsClient.addEventListener("connected", this.#onWsConnected);
     this.#wsClient.addEventListener("disconnected", this.#onWsDisconnected);
@@ -218,7 +218,7 @@ export class WebTorrentClient {
     if (this.#isDestroyed()) return;
     // Opened by `start()`: a client destroyed before it started holds none.
     if (this.#diagnosticsToken) {
-      diagnostics.close(this.#diagnosticsToken, "destroyed");
+      diagnostics?.close(this.#diagnosticsToken, "destroyed");
     }
     this.#destroyAbortController.abort();
     this.#clearAnnounceTimeout();
@@ -392,7 +392,7 @@ export class WebTorrentClient {
     const run = async () => {
       // `destroy()` clears this timer; a run after it is one it missed.
       if (this.#isDestroyed()) {
-        diagnostics.anomaly("TrackerClient announce timer after destroy");
+        diagnostics?.anomaly("TrackerClient announce timer after destroy");
       }
       try {
         await this.#announce();

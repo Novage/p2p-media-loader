@@ -63,7 +63,7 @@ export class Peer {
     readonly eventTarget: EventTarget<CoreEventMap>,
   ) {
     this.#closeConnection = closeConnection;
-    this.#diagnosticsToken = diagnostics.open("Peer", id.slice(-6));
+    this.#diagnosticsToken = diagnostics?.open("Peer", id.slice(-6));
     this.#eventHandlers = eventHandlers;
     this.#peerConfig = peerConfig;
 
@@ -484,8 +484,8 @@ export class Peer {
   destroy(isConnectionClosed = false, error?: PeerError) {
     if (this.#isDestroyed) return;
     this.#isDestroyed = true;
-    diagnostics.close(this.#diagnosticsToken, "closed");
-    diagnostics.count(
+    diagnostics?.close(this.#diagnosticsToken, "closed");
+    diagnostics?.count(
       `PeerClosed:${isConnectionClosed ? "remote" : (error?.type ?? "local")}`,
     );
 

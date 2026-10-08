@@ -169,10 +169,10 @@ export class WebTorrentManager {
    * Must equal the P2P loader's PeersWrapped: a peer held here and not
    * wrapped there is connected and never used.
    */
-  readonly #unprobe: () => void;
+  readonly #unprobe: (() => void) | undefined;
 
   constructor(config: WebTorrentManagerConfig) {
-    this.#unprobe = diagnostics.probe(
+    this.#unprobe = diagnostics?.probe(
       `PeersHeld:${config.infoHash.slice(0, 8)}`,
       () => this.#connectedPeers.size,
     );
@@ -320,7 +320,7 @@ export class WebTorrentManager {
   public destroy(): void {
     if (this.#destroyed) return;
     this.#destroyed = true;
-    this.#unprobe();
+    this.#unprobe?.();
 
     // Remove our listeners BEFORE destroying the client. This ensures that
     // if client.destroy() synchronously dispatches events,

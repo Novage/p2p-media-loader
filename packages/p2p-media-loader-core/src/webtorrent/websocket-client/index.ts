@@ -183,7 +183,7 @@ export class WebSocketClient {
         this.connect();
       } else {
         // `dispose()` clears this timer; firing after it is a timer it missed.
-        diagnostics.anomaly("WebSocketClient reconnect timer after dispose");
+        diagnostics?.anomaly("WebSocketClient reconnect timer after dispose");
       }
     }, delay);
 

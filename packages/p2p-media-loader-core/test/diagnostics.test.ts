@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import debug from "debug";
-import { diagnostics, type DiagnosticsSnapshot } from "../src/diagnostics.js";
+import {
+  diagnostics as compiledLedger,
+  type DiagnosticsSnapshot,
+} from "../src/diagnostics.js";
+
+// Absent only in a prebuilt bundle; the tests run on the source.
+if (!compiledLedger) throw new Error("diagnostics are compiled out");
+const diagnostics = compiledLedger;
 
 // The ledger decides once, at its first record. Turning the namespace off
 // again after that keeps the ledger on and its log quiet.

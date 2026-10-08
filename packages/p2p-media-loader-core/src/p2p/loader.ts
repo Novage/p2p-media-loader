@@ -31,7 +31,7 @@ export class P2PLoader {
   readonly #eventTarget: EventTarget<EventTargetMap>;
   readonly #onSegmentAnnouncement: () => void;
   readonly #diagnosticsToken: DiagnosticsToken | undefined;
-  readonly #unprobePeers: () => void;
+  readonly #unprobePeers: (() => void) | undefined;
   #churnCleanupTimeoutId?: ReturnType<typeof setTimeout>;
 
   readonly #onPeerConnect: CoreEventMap["onPeerConnect"];
@@ -141,11 +141,11 @@ export class P2PLoader {
     this.#webtorrentManager.start();
     // Must equal the manager's PeersHeld: a peer held there and not wrapped
     // here is connected and never used.
-    this.#unprobePeers = diagnostics.probe(
+    this.#unprobePeers = diagnostics?.probe(
       `PeersWrapped:${this.#stream.infoHash.slice(0, 8)}`,
       () => this.#peersMap.size,
     );
-    this.#diagnosticsToken = diagnostics.open(
+    this.#diagnosticsToken = diagnostics?.open(
       "P2PLoader",
       this.#stream.streamSwarmId.slice(-12),
     );
@@ -467,8 +467,8 @@ export class P2PLoader {
   };
 
   destroy() {
-    diagnostics.close(this.#diagnosticsToken, "destroyed");
-    this.#unprobePeers();
+    diagnostics?.close(this.#diagnosticsToken, "destroyed");
+    this.#unprobePeers?.();
     clearTimeout(this.#churnCleanupTimeoutId);
     this.#churnCleanupTimeoutId = undefined;
 

@@ -17,6 +17,7 @@ import {
   INITIAL_LIVE_DELAY,
 } from "p2p-media-loader-core";
 import { createXhrLoaderExtension, type LoaderBinding } from "./loader.js";
+import { diagnostics } from "./diagnostics.js";
 
 /** A type for specifying dynamic configuration options that can be changed at runtime for the P2P engine's core. */
 export type DynamicDashJsP2PEngineConfig = {
@@ -192,7 +193,7 @@ export class DashJsP2PEngine {
     player.on(STREAM_INITIALIZED, this.handleStreamInitialized);
     player.on(STREAM_TEARDOWN_COMPLETE, this.handleStreamTeardown);
     player.on(PLAYBACK_PLAYING, this.resyncIfBehind);
-    this.listenersToken = Core.diagnostics?.open("DashjsPlayerListeners");
+    this.listenersToken = diagnostics?.open("DashjsPlayerListeners");
     this.registerMediaElement();
     if (failures.length) throw failures[0];
   }
@@ -633,7 +634,7 @@ export class DashJsP2PEngine {
         this.player.off(STREAM_INITIALIZED, this.handleStreamInitialized);
         this.player.off(STREAM_TEARDOWN_COMPLETE, this.handleStreamTeardown);
         this.player.off(PLAYBACK_PLAYING, this.resyncIfBehind);
-        Core.diagnostics?.close(this.listenersToken, "released");
+        diagnostics?.close(this.listenersToken, "released");
         this.listenersToken = undefined;
       },
       () => this.restorePlacement(),

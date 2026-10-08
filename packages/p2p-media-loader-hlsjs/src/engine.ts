@@ -24,6 +24,7 @@ import {
 } from "p2p-media-loader-core";
 import { injectMixin } from "./engine-static.js";
 import { hlsManifestParser } from "p2p-media-loader-core/hls";
+import { diagnostics } from "./diagnostics.js";
 
 /** Represents the complete configuration for the `HlsJsP2PEngine`. */
 export type HlsJsP2PEngineConfig = {
@@ -312,9 +313,9 @@ export class HlsJsP2PEngine {
     if (!hls) return;
     const method = type === "register" ? "on" : "off";
     if (type === "register") {
-      this.eventsToken = Core.diagnostics?.open("HlsEventHandlers");
+      this.eventsToken = diagnostics?.open("HlsEventHandlers");
     } else {
-      Core.diagnostics?.close(this.eventsToken, "unregistered");
+      diagnostics?.close(this.eventsToken, "unregistered");
       this.eventsToken = undefined;
     }
 

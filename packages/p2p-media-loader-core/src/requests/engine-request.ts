@@ -13,7 +13,7 @@ export class EngineRequest {
     readonly segment: SegmentWithStream,
     readonly engineCallbacks: EngineCallbacks,
   ) {
-    this.diagnosticsToken = diagnostics.open(
+    this.diagnosticsToken = diagnostics?.open(
       "PlayerRequest",
       String(segment.externalId),
     );
@@ -45,24 +45,24 @@ export class EngineRequest {
   resolve(data: ArrayBuffer, bandwidth: number) {
     if (this._status !== "pending") return;
     this._status = "succeed";
-    diagnostics.close(this.diagnosticsToken, "succeed");
-    diagnostics.count("PlayerRequest:succeed");
+    diagnostics?.close(this.diagnosticsToken, "succeed");
+    diagnostics?.count("PlayerRequest:succeed");
     this.engineCallbacks.onSuccess({ data: data.slice(0), bandwidth });
   }
 
   reject() {
     if (this._status !== "pending") return;
     this._status = "failed";
-    diagnostics.close(this.diagnosticsToken, "failed");
-    diagnostics.count("PlayerRequest:failed");
+    diagnostics?.close(this.diagnosticsToken, "failed");
+    diagnostics?.count("PlayerRequest:failed");
     this.engineCallbacks.onError(new CoreRequestError("failed"));
   }
 
   abort() {
     if (this._status !== "pending") return;
     this._status = "aborted";
-    diagnostics.close(this.diagnosticsToken, "aborted");
-    diagnostics.count("PlayerRequest:aborted");
+    diagnostics?.close(this.diagnosticsToken, "aborted");
+    diagnostics?.count("PlayerRequest:aborted");
     this.engineCallbacks.onError(new CoreRequestError("aborted"));
   }
 

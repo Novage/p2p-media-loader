@@ -403,7 +403,7 @@ export class Core {
     data: string | ArrayBuffer | ArrayBufferView;
     protocol?: ManifestProtocol;
   }): ProcessedManifest | undefined {
-    this.sourceDiagnosticsToken ??= diagnostics.open("CoreSource");
+    this.sourceDiagnosticsToken ??= diagnostics?.open("CoreSource");
     const text =
       typeof manifest.data === "string"
         ? manifest.data
@@ -998,7 +998,7 @@ export class Core {
         // P2P and leaves no other trace, so without this a stream that stops
         // sharing looks the same as one with no peers.
         this.registryMissLogger("%s", key);
-        diagnostics.count("RegistryMiss");
+        diagnostics?.count("RegistryMiss");
         this.eventTarget.dispatchEvent("onSegmentRegistryMiss", {
           url,
           byteRange,
@@ -1090,11 +1090,11 @@ export class Core {
     this.mainStreamLoader = undefined;
     this.secondaryStreamLoader = undefined;
     if (this.storageDiagnosticsToken) {
-      diagnostics.close(this.storageDiagnosticsToken, "destroyed");
+      diagnostics?.close(this.storageDiagnosticsToken, "destroyed");
       this.storageDiagnosticsToken = undefined;
     }
     if (this.sourceDiagnosticsToken) {
-      diagnostics.close(this.sourceDiagnosticsToken, "destroyed");
+      diagnostics?.close(this.sourceDiagnosticsToken, "destroyed");
       this.sourceDiagnosticsToken = undefined;
     }
     this.segmentStorage = undefined;
@@ -1170,7 +1170,7 @@ export class Core {
     });
 
     this.segmentStorage = segmentStorage;
-    this.storageDiagnosticsToken = diagnostics.open("SegmentStorage");
+    this.storageDiagnosticsToken = diagnostics?.open("SegmentStorage");
   }
 
   private identifySegment(key: string): SegmentWithStream {

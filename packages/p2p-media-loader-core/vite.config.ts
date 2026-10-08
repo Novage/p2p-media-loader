@@ -1,6 +1,9 @@
 import { defineConfig } from "vite";
 import type { UserConfig } from "vite";
-import { browserBundleAliases } from "../../vite.common.config.ts";
+import {
+  browserBundleAliases,
+  bundleDefines,
+} from "../../vite.common.config.ts";
 
 type Variant = "all" | "hls" | "dash";
 
@@ -22,6 +25,7 @@ const getESMConfig = ({
   return {
     // Build only: tests run in Node and need the real packages.
     resolve: { alias: isBuild ? browserBundleAliases : undefined },
+    define: isBuild ? bundleDefines : undefined,
     build: {
       emptyOutDir: false,
       minify,

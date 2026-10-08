@@ -88,6 +88,13 @@ exports map, so the protocol combination is chosen by filename:
 Measured from the build. Core alone is 30 KB; each parser adds about 10 KB,
 and the two share their small common dependencies.
 
+None of these bundles, nor the engine packages' bundles, carries the
+diagnostics ledger ([diagnostics.md](diagnostics.md)). Every Vite build here
+defines `__P2PML_DIAGNOSTICS__` as `false` (`bundleDefines` in
+`vite.common.config.ts`), and the minifier removes the ledger and every call
+into it: about 1.4 KB gzipped of the core, and up to 0.15 KB of each engine
+bundle. `lib/` keeps the ledger, so a bundler consumer can turn it on.
+
 ### What the parsers drag in, and what is left behind
 
 Both parsers are published as Babel builds for Node and browser alike, so their

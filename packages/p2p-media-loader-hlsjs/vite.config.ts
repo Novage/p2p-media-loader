@@ -1,6 +1,9 @@
 import { defineConfig } from "vite";
 import type { UserConfig } from "vite";
-import { browserBundleAliases } from "../../vite.common.config.ts";
+import {
+  browserBundleAliases,
+  bundleDefines,
+} from "../../vite.common.config.ts";
 
 const getESMConfig = ({
   minify,
@@ -11,6 +14,7 @@ const getESMConfig = ({
 }): UserConfig => {
   return {
     resolve: { alias: isBuild ? browserBundleAliases : undefined },
+    define: isBuild ? bundleDefines : undefined,
     build: {
       emptyOutDir: false,
       minify,
@@ -41,6 +45,7 @@ const getIIFEConfig = ({
 }): UserConfig => {
   return {
     resolve: { alias: isBuild ? browserBundleAliases : undefined },
+    define: isBuild ? bundleDefines : undefined,
     build: {
       emptyOutDir: false,
       minify,

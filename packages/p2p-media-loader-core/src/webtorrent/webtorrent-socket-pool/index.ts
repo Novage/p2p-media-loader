@@ -46,7 +46,7 @@ export class WebTorrentSocketPool {
       entry = {
         client,
         refCount: 0,
-        token: diagnostics.open("TrackerSocket", url),
+        token: diagnostics?.open("TrackerSocket", url),
       };
       this.#sockets.set(url, entry);
     }
@@ -74,7 +74,7 @@ export class WebTorrentSocketPool {
           if (currentEntry === entry) {
             this.#sockets.delete(url);
           }
-          diagnostics.close(entry.token, "released");
+          diagnostics?.close(entry.token, "released");
           entry.client.dispose();
         }
       },
@@ -93,7 +93,7 @@ export class WebTorrentSocketPool {
     const entries = Array.from(this.#sockets.values());
     this.#sockets.clear();
     for (const entry of entries) {
-      diagnostics.close(entry.token, "pool closed");
+      diagnostics?.close(entry.token, "pool closed");
       try {
         entry.client.dispose();
       } catch (error) {

@@ -54,7 +54,7 @@ export class HybridLoader {
   private levelChangedTimestamp?: number;
   private lastQueueProcessingTimeStamp?: number;
   private prefetchTimerId?: number;
-  private readonly diagnosticsToken = diagnostics.open("HybridLoader");
+  private readonly diagnosticsToken = diagnostics?.open("HybridLoader");
   /** Running estimate of segment size per stream, from segments already loaded. */
   private readonly segmentBytesByStream = new Map<string, number>();
   private initialHttpDelayTimeoutId?: number;
@@ -145,7 +145,7 @@ export class HybridLoader {
     this.prefetchTimerId = window.setTimeout(() => {
       // `destroy()` clears this timer; a tick after it is one it missed.
       if (this.destroyed) {
-        diagnostics.anomaly("HybridLoader prefetch tick after destroy");
+        diagnostics?.anomaly("HybridLoader prefetch tick after destroy");
       }
       try {
         this.syncPlayback();
@@ -434,7 +434,7 @@ export class HybridLoader {
     if (isInitialHttpWait) {
       this.initialHttpDelayTimeoutId ??= window.setTimeout(() => {
         if (this.destroyed) {
-          diagnostics.anomaly("HybridLoader initial HTTP delay after destroy");
+          diagnostics?.anomaly("HybridLoader initial HTTP delay after destroy");
         }
         this.initialHttpDelayTimeoutId = undefined;
         this.requestProcessQueueMicrotask();
@@ -979,7 +979,7 @@ export class HybridLoader {
   }
 
   destroy() {
-    diagnostics.close(this.diagnosticsToken, "destroyed");
+    diagnostics?.close(this.diagnosticsToken, "destroyed");
     this.destroyed = true;
     clearTimeout(this.prefetchTimerId);
     clearTimeout(this.initialHttpDelayTimeoutId);

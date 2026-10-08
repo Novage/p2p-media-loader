@@ -122,8 +122,8 @@ export class Request {
       status !== "loading" &&
       this.downloadToken
     ) {
-      diagnostics.close(this.downloadToken, status);
-      diagnostics.count(
+      diagnostics?.close(this.downloadToken, status);
+      diagnostics?.count(
         `Download:${this.currentAttempt?.downloadSource ?? "?"}:${status}`,
       );
       this.downloadToken = undefined;
@@ -301,7 +301,7 @@ export class Request {
 
     this.setStatus("loading");
     this.currentAttempt = { ...requestData };
-    this.downloadToken = diagnostics.open(
+    this.downloadToken = diagnostics?.open(
       `Download:${requestData.downloadSource}`,
       String(this.segment.externalId),
     );

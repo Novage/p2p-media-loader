@@ -21,6 +21,7 @@ import type {
   VideoJsNamespace,
   VideoJsPlayerLike,
 } from "./types.js";
+import { diagnostics } from "./diagnostics.js";
 
 /** Either the real `video.js` namespace or anything shaped like it. */
 export type VideoJsInput = VideoJsLike | VideoJsNamespace;
@@ -212,8 +213,8 @@ export class VideoJsP2PEngine {
     player.on("xhr-hooks-ready", this.handleXhrHooksReady);
     player.on("loadstart", this.handleLoadStart);
     player.on("dispose", this.handleDispose);
-    this.routerToken = Core.diagnostics?.open("VhsRouter");
-    this.listenersToken = Core.diagnostics?.open("VhsPlayerListeners");
+    this.routerToken = diagnostics?.open("VhsRouter");
+    this.listenersToken = diagnostics?.open("VhsPlayerListeners");
     this.router.ensureTopLevelManifest();
     this.registerMediaElement();
   }
@@ -310,7 +311,7 @@ export class VideoJsP2PEngine {
         registry.remove(this.router);
         this.router.detachHooks();
         this.router = undefined;
-        Core.diagnostics?.close(this.routerToken, "destroyed");
+        diagnostics?.close(this.routerToken, "destroyed");
         this.routerToken = undefined;
       },
       () => {
@@ -323,7 +324,7 @@ export class VideoJsP2PEngine {
         this.player.off("xhr-hooks-ready", this.handleXhrHooksReady);
         this.player.off("loadstart", this.handleLoadStart);
         this.player.off("dispose", this.handleDispose);
-        Core.diagnostics?.close(this.listenersToken, "destroyed");
+        diagnostics?.close(this.listenersToken, "destroyed");
         this.listenersToken = undefined;
         // Only if it is still ours: another engine may have taken it on since.
         if (bound.get(this.player) === this) bound.delete(this.player);

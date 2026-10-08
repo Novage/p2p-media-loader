@@ -15,6 +15,7 @@ import {
   byteRangeFromHalfOpen,
 } from "p2p-media-loader-core";
 import { isSecondaryPlayer } from "./secondary-player.js";
+import { diagnostics } from "./diagnostics.js";
 
 const DEFAULT_DOWNLOAD_LATENCY = 10;
 
@@ -30,7 +31,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   #request?: { url: string; byteRange?: ByteRange };
   readonly #ofAnotherPlayer: boolean;
 
-  readonly #diagnosticsToken = Core.diagnostics?.open("HlsFragmentLoader");
+  readonly #diagnosticsToken = diagnostics?.open("HlsFragmentLoader");
 
   constructor(config: HlsConfig, core: Core) {
     this.#core = core;
@@ -164,7 +165,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   }
 
   destroy() {
-    Core.diagnostics?.close(this.#diagnosticsToken, "destroyed");
+    diagnostics?.close(this.#diagnosticsToken, "destroyed");
     if (this.#defaultLoader) {
       this.#defaultLoader.destroy();
     } else {

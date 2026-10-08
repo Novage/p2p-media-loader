@@ -15,6 +15,7 @@ import {
   VideoJsLike,
   VideoJsPlayerLike,
 } from "./types.js";
+import { diagnostics } from "./diagnostics.js";
 
 type ByteRange = ReturnType<typeof byteRangeFromRangeHeader>;
 
@@ -108,7 +109,7 @@ export class FirstManifestHooks {
     xhr.onResponse(this.handleResponse);
     this.held.set(xhr, {
       engines: 1,
-      diagnosticsToken: Core.diagnostics?.open("VhsPageHooks"),
+      diagnosticsToken: diagnostics?.open("VhsPageHooks"),
     });
     return xhr;
   }
@@ -122,7 +123,7 @@ export class FirstManifestHooks {
       return;
     }
     this.held.delete(xhr);
-    Core.diagnostics?.close(holding.diagnosticsToken, "released");
+    diagnostics?.close(holding.diagnosticsToken, "released");
     // Taken off the sets rather than through `offRequest`: VHS's page-wide
     // hook methods close over its own namespace and resolve `Vhs.xhr` when
     // they are called, not the function they were put on. Asking a function
@@ -223,7 +224,7 @@ export class RequestRouter {
     else (xhr._requestCallbackSet ??= new Set()).add(this.handleRequest);
     if (xhr.onResponse) xhr.onResponse(this.handleResponse);
     else (xhr._responseCallbackSet ??= new Set()).add(this.handleResponse);
-    this.hooked.set(xhr, Core.diagnostics?.open("VhsXhrHooks"));
+    this.hooked.set(xhr, diagnostics?.open("VhsXhrHooks"));
   }
 
   detachHooks() {
@@ -237,7 +238,7 @@ export class RequestRouter {
     else xhr._requestCallbackSet?.delete(this.handleRequest);
     if (xhr.offResponse) xhr.offResponse(this.handleResponse);
     else xhr._responseCallbackSet?.delete(this.handleResponse);
-    Core.diagnostics?.close(this.hooked.get(xhr), "detached");
+    diagnostics?.close(this.hooked.get(xhr), "detached");
     this.hooked.delete(xhr);
   }
 

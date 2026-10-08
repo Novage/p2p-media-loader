@@ -80,12 +80,12 @@ export class SegmentMemoryStorage implements SegmentStorage {
 
   /** Tells the probes of two storages on one page apart. */
   private static probeSequence = 0;
-  private readonly unprobe: () => void;
+  private readonly unprobe: (() => void) | undefined;
 
   constructor() {
     this.logger = debug("p2pml-core:segment-memory-storage");
     this.logger.color = "RebeccaPurple";
-    this.unprobe = diagnostics.probe(
+    this.unprobe = diagnostics?.probe(
       `Storage#${++SegmentMemoryStorage.probeSequence}`,
       () => ({
         segments: this.cache.size,
@@ -218,7 +218,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
       this.logger(
         `Removed segment ${segmentId} from stream ${streamSwarmId}: no longer in its manifest`,
       );
-      diagnostics.count("Evicted:left-window");
+      diagnostics?.count("Evicted:left-window");
       removed = true;
     }
     if (removed) this.sendUpdatesToAffectedStreams(new Set([streamSwarmId]));
@@ -273,7 +273,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
       this.decreaseStorageUsage(data.byteLength);
 
       this.logger(`Removed segment ${segmentId} from stream ${streamSwarmId}`);
-      diagnostics.count("Evicted:trailing-or-limit");
+      diagnostics?.count("Evicted:trailing-or-limit");
 
       if (!this.isMemoryLimitReached(newSegmentSize) && !isLiveStream) break;
     }
@@ -361,7 +361,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
   }
 
   public destroy() {
-    this.unprobe();
+    this.unprobe?.();
     this.cache.clear();
     this.segmentChangeCallback = undefined;
   }

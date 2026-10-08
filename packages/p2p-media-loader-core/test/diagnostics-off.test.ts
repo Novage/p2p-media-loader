@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { diagnostics } from "../src/diagnostics.js";
+import { diagnostics as compiledLedger } from "../src/diagnostics.js";
+
+// Absent only in a prebuilt bundle; the tests run on the source.
+if (!compiledLedger) throw new Error("diagnostics are compiled out");
+const diagnostics = compiledLedger;
 
 describe("diagnostics, when off", () => {
   it("keeps nothing and installs nothing", () => {

@@ -71,7 +71,7 @@ export class ManifestClockSync {
       if (offset === undefined) continue;
       this.offset = offset;
       this.synced = true;
-      diagnostics.count("ClockSync:synced");
+      diagnostics?.count("ClockSync:synced");
       this.logger(
         "synchronized with %s: %d ms from the local clock",
         source.method === "direct" ? "the manifest" : source.url,
@@ -80,7 +80,7 @@ export class ManifestClockSync {
       return offset !== 0;
     }
     this.logger("no time source answered; local clock");
-    diagnostics.count("ClockSync:failed");
+    diagnostics?.count("ClockSync:failed");
     return false;
   }
 
@@ -113,7 +113,7 @@ export class ManifestClockSync {
       : undefined;
     this.controller = controller;
     let timeout: ReturnType<typeof setTimeout> | undefined;
-    const requestToken = diagnostics.open("ClockSyncRequest", source.url);
+    const requestToken = diagnostics?.open("ClockSyncRequest", source.url);
     try {
       const sent = Date.now();
       const time = await Promise.race([
@@ -137,7 +137,7 @@ export class ManifestClockSync {
     } finally {
       clearTimeout(timeout);
       if (this.controller === controller) this.controller = undefined;
-      diagnostics.close(requestToken, "settled");
+      diagnostics?.close(requestToken, "settled");
     }
   }
 

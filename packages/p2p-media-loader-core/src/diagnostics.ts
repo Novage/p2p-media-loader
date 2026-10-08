@@ -8,6 +8,15 @@ import debug from "debug";
  */
 const NAMESPACE = "p2pml:diagnostics";
 
+/**
+ * Replaced with `false` in the prebuilt bundles (`vite.common.config.ts`),
+ * which then carry no ledger at all; absent everywhere else, the `tsc` output
+ * in `lib/` included, where the ledger stays. See specs/diagnostics.md.
+ */
+declare const __P2PML_DIAGNOSTICS__: boolean | undefined;
+const COMPILED_IN =
+  typeof __P2PML_DIAGNOSTICS__ === "undefined" || __P2PML_DIAGNOSTICS__;
+
 /** Identifies one open resource; the owner gives it back to `close`. */
 export type DiagnosticsToken = string;
 
@@ -49,8 +58,8 @@ function active(): Ledger | null {
     log: debug(NAMESPACE),
   };
   (globalThis as { __p2pmlDiagnostics?: unknown }).__p2pmlDiagnostics = {
-    snapshot: () => diagnostics.snapshot(),
-    clearAnomalies: () => diagnostics.clearAnomalies(),
+    snapshot: () => ledgerApi.snapshot(),
+    clearAnomalies: () => ledgerApi.clearAnomalies(),
   };
   return ledger;
 }
@@ -60,11 +69,7 @@ function recordAnomaly(state: Ledger, message: string): void {
   state.log("ANOMALY %s", message);
 }
 
-/**
- * @internal Not part of the public API: its kinds and names change with the
- * code they describe. Exported for the player adapters.
- */
-export const diagnostics = {
+const ledgerApi = {
   /**
    * Records a resource its owner now holds. Returns the token to close it
    * with, or `undefined` when diagnostics are off.
@@ -163,6 +168,21 @@ export const diagnostics = {
     if (state) state.anomalies.length = 0;
   },
 };
+
+/** The ledger's calls; see `diagnostics`. */
+export type Diagnostics = typeof ledgerApi;
+
+/**
+ * The ledger, or `undefined` in a prebuilt bundle, which carries none. Every
+ * call is `diagnostics?.open(…)`, so that where it is compiled out the
+ * minifier removes the call and its arguments along with it.
+ *
+ * @internal Not part of the public API: its kinds and names change with the
+ * code they describe.
+ */
+export const diagnostics: Diagnostics | undefined = COMPILED_IN
+  ? ledgerApi
+  : undefined;
 
 function toRecord(map: ReadonlyMap<string, number>): Record<string, number> {
   const record: Record<string, number> = {};

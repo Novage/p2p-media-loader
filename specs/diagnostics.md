@@ -58,22 +58,29 @@ enables both.
 When they are off, each call returns at once. The ledger keeps no record,
 installs no global, and holds no reference.
 
-The published packages contain the ledger. A compile-time switch cannot remove
-it: each package also publishes the plain `tsc` output, and `tsc` replaces no
-constants. The cost when off is one check per call. A call occurs once per
-resource, request or result, never per byte or per data-channel chunk.
+The `tsc` output in `lib/`, which bundler consumers use, contains the ledger:
+`tsc` replaces no constants. There the cost when off is one check per call, and
+a call occurs once per resource, request or result, never per byte or per
+data-channel chunk. The prebuilt `dist/` bundles contain none of it. Each Vite
+build defines `__P2PML_DIAGNOSTICS__` as `false`, which makes `diagnostics`
+`undefined`, and the minifier then removes every `diagnostics?.…` call with
+its arguments ([packaging.md](packaging.md)). A page that loads a `dist/`
+bundle cannot turn diagnostics on.
 
 The records stay in the page. Diagnostics never send data anywhere. The details
 can contain stream URLs and peer ids, as the `debug` logs do.
 
-The ledger is not a public API. The core's own code imports it. The adapters
-reach it as `Core.diagnostics`, a static property marked `@internal`, so it is
-in neither the API documentation nor the published type declarations. An
-adapter can meet a core of another version, and a named import that the core
-does not export fails the adapter's module when it loads. A property of `Core`,
-the class every adapter imports already, is typed as possibly absent instead:
-each adapter call is `Core.diagnostics?.open(…)`, and a core without the ledger
-costs the adapter its records, not its load. The kinds and names can change in
+The ledger is not a public API. The core imports it, as `diagnostics`, which is
+`undefined` in a bundle; every call is therefore `diagnostics?.open(…)`. The
+adapters reach it through `Core.diagnostics`, a static property marked
+`@internal`, so it is in neither the API documentation nor the published type
+declarations. An adapter can meet a core of another version, and a named
+import that the core does not export fails the adapter's module when it loads.
+A property of `Core`, the class every adapter imports already, is typed as
+possibly absent instead, and a core without the ledger costs the adapter its
+records, not its load. Each adapter reads it once, in its own
+`src/diagnostics.ts`, which also honours `__P2PML_DIAGNOSTICS__`, so that its
+calls are removed from its own bundles too. The kinds and names can change in
 any release; [release-testing.md](release-testing.md) is the document that
 depends on them.
 
@@ -146,8 +153,8 @@ becomes a permanent record under these rules.
 
 ## What is recorded
 
-The code is the full list: each call to `diagnostics.open`, `count` and
-`probe`, and each `Core.diagnostics?.open` in the adapters. This spec names
+The code is the full list: each call to `diagnostics?.open`, `count` and
+`probe`, in the core and in the adapters. This spec names
 the groups and the cases a reader of a snapshot must know.
 
 - **Resources:** in the core, the work on one source (`CoreSource`), each
