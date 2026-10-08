@@ -80,8 +80,23 @@ does this with the standard library of any language.
 - The test driver's `BroadcastChannel` does not reach another browser. Drive
   the Safari session and the Chrome tabs separately, and compare their
   snapshots.
-- A Safari session and a Chrome tab in one swarm are two peers of different
-  browsers: the test of P2P between Safari's and Chrome's WebRTC.
+- **A Safari session does not stand for Safari on the network.** In an
+  automation session, Safari's WebRTC networking stops for about 10 seconds
+  at a time: it answers no ICE check and sends no data, and then sends the
+  delayed answers together. Chrome then reports the connection
+  `disconnected` about every 15 seconds, and the core drops the peer. A
+  normal Safari window with the same page and the same Chrome peer answered
+  every check for minutes, and never went `disconnected`. So a Safari
+  session tests playback, the player's use of MSE, and the registry, but not
+  how long a peer connection holds, how much P2P Safari shares, or a stall
+  of playback that comes with it. Those are tested by a person in a normal
+  Safari window (Part 2, test 1). Use a `swarmId` of the test's own: a public
+  stream's default swarm can hold other viewers, whose connections mix with
+  the test's.
+- To see whether a connection really goes silent, read Chrome's side:
+  `getStats()` on the peer's `RTCPeerConnection` gives the selected
+  candidate pair, its `requestsSent` and `responsesReceived`, and
+  `lastPacketReceivedTimestamp`.
 
 **Every tab with the driver follows every command.** A tab left over from an
 earlier test silently joins the next one. Before each test, close every driven
@@ -180,9 +195,11 @@ runs add about an hour.
 Each test lists what to do and what must be true. "No leak" means: after each
 step, nothing that the previous step opened is still open.
 
-**Run in Safari too.** Tests 2, 3, 4, 5, 13 and 14 run again with one Safari
-session and one Chrome tab as the two peers of a swarm. The pass rules are the
-same, and both browsers must get segments over P2P from each other.
+**Run in Safari too.** Tests 2, 3, 4, 5, 13 and 14 run again in a Safari
+session, with a Chrome tab as the second peer of the swarm. The pass rules on
+playback, MSE use and the registry are the same. The rules on P2P are not
+judged in the Safari session: see "Drive Safari through `safaridriver`"
+above.
 
 ### 1. Automated checks
 
@@ -476,10 +493,14 @@ or run, and each public option with no description is a finding.
 
 These need what the assistant does not have, or a judgement it cannot make.
 
-1. **Other browsers.** Safari on iOS and iPadOS, Chrome on Android, Firefox,
-   and Edge. Run the stream matrix, the pause test and the playback rate test
-   in each. Include Safari's native HLS where a player uses it. Desktop Safari
-   and Chrome are in Part 1. Firefox moves there once a run through
+1. **Other browsers.** Safari on macOS, iOS and iPadOS, Chrome on Android,
+   Firefox, and Edge. Run the stream matrix, the pause test and the playback
+   rate test in each. Include Safari's native HLS where a player uses it. On
+   macOS, play in a normal Safari window beside a Chrome tab of the
+   assistant's in one swarm of the test's own, for at least three minutes:
+   the peer connection must hold, and both must get segments over P2P from
+   each other. The assistant reads Chrome's side. Part 1 covers desktop
+   Safari's playback only. Firefox moves to Part 1 once a run through
    `geckodriver` has been done.
 2. **Real networks.** Two devices on different networks, for example home
    Wi-Fi and mobile data, so that connections go through STUN and NAT. Also a
