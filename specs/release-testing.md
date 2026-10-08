@@ -29,6 +29,20 @@ about P2P. Use more than two tabs where a test says so.
 `player`, `streamUrl`, `swarmId` and `trackers` as query parameters. The
 player keys are in `packages/p2p-media-loader-demo/src/constants.ts`.
 
+**Ask the person to show the browser before the tests start**, and to keep it
+on screen while they run. In the Claude desktop app this is the built-in
+browser pane, which is hidden unless the person opens it. A hidden page gives
+false results: Chrome pauses its muted video, and a play after such a pause
+can move the playhead to the live edge, which reads as a player that plays too
+near the edge; Vidstack loads nothing until its player can be seen; and the
+timers run slower. Open the page with `preview_start` and its URL, which also
+brings the pane up, and then confirm in the page itself:
+`document.visibilityState` is `visible` and `innerWidth` is not 0. A pane the
+person sees can still hold no page of this session, which then reports
+`hidden` at 0×0; the browser tools' own "displayed" or "hidden" line says the
+same. If the page is hidden, stop and ask again: a run in a hidden page is not
+counted.
+
 **Move the tabs together.** Most tests need two or more tabs to change stream
 or player at the same moment. Open each tab with `driver=1` in the demo's
 query: the dev server then loads a test driver (`demo/src/test-driver.ts`),
@@ -108,12 +122,15 @@ and keeps its log and result in `window.__R[name]`; read it in later calls.
 When `all` expects more tabs than answer, it waits for its timeout, so a test
 that names a wrong tab count is slow, not wrong.
 
-**Keep the hidden tab playing.** Only one tab is visible, and it can be one that
-is not in the test, so all the test tabs can be hidden. Chrome slows the timers
-of a hidden tab and pauses video-only background media. Unmute the video, set a
-low volume, and call `play()` in each tab. Allow for slower timers: a step that
-takes 20 seconds in a visible tab can take 30 in a hidden one, and a slow start
-is not a stall until the test has waited for it.
+**Keep the hidden tabs playing.** Even with the browser on screen, only its
+front tab is visible, so the other test tabs are hidden. Chrome slows the
+timers of a hidden tab and pauses video-only background media. Unmute the
+video, set a low volume, and call `play()` in each tab. Allow for slower
+timers: a step that takes 20 seconds in a visible tab can take 30 in a hidden
+one, and a slow start is not a stall until the test has waited for it.
+Measure live latency, startup placement, and anything that depends on the
+player's own controls in the front tab only, and bring each tab to the front
+in turn where a test measures more than one.
 
 **What to observe:**
 
