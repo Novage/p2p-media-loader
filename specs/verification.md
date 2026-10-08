@@ -18,6 +18,7 @@ are run against this matrix in the demo before they are considered done.
 | DASH     | live | `SegmentTemplate` `$Number$`      | `https://livesim2.dashif.org/livesim2/testpic4_8s/Manifest.mpd`                                                        | three video renditions (two at one resolution, told apart by bitrate) plus audio, 8 s segments, one-minute window; the demo's default for dash.js players                                                             |
 | DASH     | live | `SegmentTemplate` `$Number$`      | `https://livesim2.dashif.org/livesim2/testpic_2s/Manifest.mpd`                                                         | `type="dynamic"`, MPD refresh, availability window                                                                                                                                                                    |
 | DASH     | live | `SegmentTimeline`                 | `https://livesim2.dashif.org/livesim2/segtimeline_1/testpic_2s/Manifest.mpd`                                           | explicit `S` timeline, `$Time$` addressing                                                                                                                                                                            |
+| HLS      | live | media playlist, DVR window        | `https://demo.unified-streaming.com/k8s/live/scte35.isml/.m3u8`                                                        | a window of about ten minutes: a viewer who rewinds into it stays where they chose                                                                                                                                    |
 
 Video.js plays every stream in the table except the two `SegmentBase` ones,
 neither of which VHS plays with P2P or without it. On the Netflix stream VHS
@@ -44,6 +45,25 @@ dash.js is still attaching its MediaSource; attaching it replaces the source
 on the media element and aborts that play request, leaving the player paused
 on a ready stream. The demo's Vidstack dash.js player plays once more when the
 media is ready. It reproduces with P2P switched off.
+
+## Streams for special cases
+
+The release tests ([release-testing.md](release-testing.md)) also need streams
+for cases the matrix does not cover. They are not part of the matrix: each
+exercises one behaviour, on the engines that support it.
+
+| Case                            | Stream                                                                                                 | Notes                                                                       |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
+| Long run                        | `https://hls-harbor-livepush.akamaized.net/live_cdn/nsqIStpj8PaG-Ev/emcQJ0pGpremocy/index.m3u8`        | HLS live; no daily request limit, unlike `livesim2`                         |
+| Several periods                 | `https://livesim2.dashif.org/livesim2/periods_60/testpic_2s/Manifest.mpd`                              | a new period every 60 s                                                     |
+| A live stream that ends         | `https://livesim2.dashif.org/livesim2/stop_<epoch seconds>/testpic_2s/Manifest.mpd`                    | the MPD becomes static at the stop time, with a duration counted from 1970  |
+| Low-latency DASH                | `https://livesim2.dashif.org/livesim2/chunkdur_1/ato_7/testpic4_8s/Manifest300.mpd`                    | chunked segments and `availabilityTimeOffset`                               |
+| Audio only, live                | `https://livesim2.dashif.org/livesim2/testpic_2s/audio.mpd`                                            | an MPD of audio representations only                                        |
+| Several audio tracks, subtitles | `https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_fmp4/master.m3u8` | HLS with alternative audio renditions, closed captions and WebVTT subtitles |
+| HLS AES-128                     | `https://playertest.longtailvideo.com/adaptive/oceans_aes/oceans_aes.m3u8`                             | `EXT-X-KEY:METHOD=AES-128`                                                  |
+
+No low-latency HLS stream is listed. A stream named as one may not carry
+`EXT-X-PART` tags: check its media playlist before using it.
 
 ## Isolating a test swarm
 

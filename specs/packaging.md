@@ -81,11 +81,12 @@ exports map, so the protocol combination is chosen by filename:
 
 | Bundle                                 | Contents             | gzip  |
 | -------------------------------------- | -------------------- | ----- |
-| `p2p-media-loader-core.es.min.js`      | core + both parsers  | 48 KB |
-| `p2p-media-loader-core-hls.es.min.js`  | core + `m3u8-parser` | 40 KB |
-| `p2p-media-loader-core-dash.es.min.js` | core + `mpd-parser`  | 41 KB |
+| `p2p-media-loader-core.es.min.js`      | core + both parsers  | 56 KB |
+| `p2p-media-loader-core-hls.es.min.js`  | core + `m3u8-parser` | 46 KB |
+| `p2p-media-loader-core-dash.es.min.js` | core + `mpd-parser`  | 49 KB |
 
-Measured from the build. Core alone is 30 KB; each parser adds about 10 KB,
+Measured from the build, as Vite reports it. By difference, core alone is
+about 38 KB; the HLS parser adds about 8 KB and the DASH parser about 10 KB,
 and the two share their small common dependencies.
 
 None of these bundles, nor the engine packages' bundles, carries the
@@ -105,9 +106,9 @@ has no `DOMParser`; `m3u8-parser` imports one `@babel/runtime` helper,
 
 Bundles built in this repository substitute the platform implementations for
 both, through `resolve.alias` in `vite.common.config.ts`, applied to **builds
-only** — tests run in Node and resolve the real packages. This is what brings
-the DASH bundle from 66 KB to 41 KB gzipped, and it is why no bundle here
-contains xmldom or a parser's Babel helper.
+only** — tests run in Node and resolve the real packages. This removes about
+25 KB gzipped from every bundle that carries the DASH parser, and it is why no
+bundle here contains xmldom or a parser's Babel helper.
 
 The IIFE bundles do carry one helper of their own: downlevelling to ES2015
 emits a `typeof` helper, which the toolchain labels the way Babel labels its

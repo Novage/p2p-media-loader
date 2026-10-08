@@ -156,10 +156,9 @@ exports.
 
 ### 2. Stream matrix
 
-Play every stream in [verification.md](verification.md) on every engine that
-supports its protocol, in two tabs in one swarm. Add one HLS live stream with
-a DVR window wider than two minutes. Let each step play for at least 15
-seconds.
+Play every stream in the matrix in [verification.md](verification.md) on every
+engine that supports its protocol, in two tabs in one swarm. Let each step
+play for at least 15 seconds.
 
 Pass:
 
@@ -287,6 +286,9 @@ its reconnect delay grows rather than looping. The browser logs each failed
 
 ### 10. Live edge cases
 
+The streams are in [verification.md](verification.md), "Streams for special
+cases".
+
 - **Wrong device clock.** Before the players start, shift the whole page
   clock 30 seconds fast, then 30 seconds slow: replace `Date` itself — `new
 Date()` as well as `Date.now` — and restore it afterwards. A player that
@@ -364,9 +366,9 @@ Peers with different versions never meet, and neither shows an error
 
 ### 15. Long run
 
-Play one HLS live stream in two tabs of their own for 60 minutes, beside the
-other tests. Each tab samples itself every 5 minutes with a timer of its own,
-and takes no driver commands.
+Play the long-run stream in [verification.md](verification.md) in two tabs of
+their own for 60 minutes, beside the other tests. Each tab samples itself
+every 5 minutes with a timer of its own, and takes no driver commands.
 
 Pass: after the first minutes, the JS heap (`performance.memory`), the stored
 segment count, and the count of open resources stay flat; the live latency
