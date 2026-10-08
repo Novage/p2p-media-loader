@@ -1,3 +1,4 @@
+import { diagnostics } from "../../diagnostics.js";
 import { EventTarget } from "../../utils/event-target.js";
 
 export type WebSocketClientEventMap = {
@@ -180,6 +181,9 @@ export class WebSocketClient {
     this.#reconnectTimeoutId = setTimeout(() => {
       if (this.#state !== "disposed") {
         this.connect();
+      } else {
+        // `dispose()` clears this timer; firing after it is a timer it missed.
+        diagnostics.anomaly("WebSocketClient reconnect timer after dispose");
       }
     }, delay);
 

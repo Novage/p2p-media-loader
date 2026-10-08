@@ -1,5 +1,6 @@
 import type shaka from "shaka-player/dist/shaka-player.compiled.d.ts";
 import {
+  Core,
   type ProcessedManifest,
   liveDelayFor,
   playerBufferFor,
@@ -97,6 +98,8 @@ export class BoundPlayer {
     this.#shaka = shakaLib;
     this.#debug = debug;
   }
+
+  readonly #diagnosticsToken = Core.diagnostics?.open("ShakaBoundPlayer");
 
   /**
    * Takes the settings this engine needs from the player, keeping what it
@@ -310,6 +313,7 @@ export class BoundPlayer {
    * configuration by as long as the requests in flight take to settle.
    */
   release() {
+    Core.diagnostics?.close(this.#diagnosticsToken, "released");
     this.#released = true;
     const taken = [...this.#taken].reverse();
     this.#taken.clear();

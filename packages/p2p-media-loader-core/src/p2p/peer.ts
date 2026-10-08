@@ -1,3 +1,4 @@
+import { diagnostics, type DiagnosticsToken } from "../diagnostics.js";
 import debug from "debug";
 import { Request, RequestControls } from "../requests/request.js";
 import {
@@ -45,6 +46,7 @@ export class Peer {
   readonly connectedAt = performance.now();
 
   readonly #closeConnection: (error?: PeerError) => void;
+  readonly #diagnosticsToken: DiagnosticsToken | undefined;
   readonly #eventHandlers: PeerEventHandlers;
   readonly #peerConfig: PeerConfig;
 
@@ -61,6 +63,7 @@ export class Peer {
     readonly eventTarget: EventTarget<CoreEventMap>,
   ) {
     this.#closeConnection = closeConnection;
+    this.#diagnosticsToken = diagnostics.open("Peer", id.slice(-6));
     this.#eventHandlers = eventHandlers;
     this.#peerConfig = peerConfig;
 
@@ -481,6 +484,10 @@ export class Peer {
   destroy(isConnectionClosed = false, error?: PeerError) {
     if (this.#isDestroyed) return;
     this.#isDestroyed = true;
+    diagnostics.close(this.#diagnosticsToken, "closed");
+    diagnostics.count(
+      `PeerClosed:${isConnectionClosed ? "remote" : (error?.type ?? "local")}`,
+    );
 
     this.#cancelSegmentDownloading("peer-closed", error);
     this.#peerProtocol.destroy();

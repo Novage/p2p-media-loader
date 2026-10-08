@@ -1,6 +1,7 @@
 import debug from "debug";
 import type { ManifestClock, ManifestParser } from "./types.js";
 import { ManifestClockSync } from "./clock-sync.js";
+import { diagnostics, type DiagnosticsToken } from "../diagnostics.js";
 
 /**
  * How far in the past the core computes a clock-based segment list by itself.
@@ -72,6 +73,8 @@ export class ClockedManifest {
   /** How long the next try of a failed parse waits; see `CLOCK_RETRY_MS`. */
   private retryDelay = CLOCK_RETRY_MS;
   private readonly logger = debug("p2pml-core:clock");
+  private timerToken?: DiagnosticsToken;
+  private keptToken?: DiagnosticsToken;
 
   /**
    * @param reparse - Parses a kept manifest for `now` and applies it, as the
@@ -114,11 +117,14 @@ export class ClockedManifest {
       // and the live one kept would go on listing segments that never come.
       if (this.kept?.parser === source.parser) {
         this.kept = undefined;
+        diagnostics.close(this.keptToken, "ended");
+        this.keptToken = undefined;
         this.schedule();
       }
       return;
     }
     this.kept = { ...source, nextChangeAt: clock.nextChangeAt };
+    this.keptToken ??= diagnostics.open("ClockedManifestKept", source.url);
     this.schedule();
     this.clockSync
       .sync(clock.utcTiming, source.receivedAt)
@@ -172,6 +178,7 @@ export class ClockedManifest {
     ) {
       return false;
     }
+    diagnostics.count("ClockReparse:prompted");
     this.reevaluate(true);
     return true;
   }
@@ -180,6 +187,8 @@ export class ClockedManifest {
   reset(): void {
     this.clockSync.reset();
     this.kept = undefined;
+    if (this.keptToken) diagnostics.close(this.keptToken, "reset");
+    this.keptToken = undefined;
     // With no manifest kept, this only disarms the timer.
     this.schedule();
     this.listedUntil = -Infinity;
@@ -199,6 +208,8 @@ export class ClockedManifest {
   private schedule(retryDelay?: number): void {
     clearTimeout(this.timer);
     this.timer = undefined;
+    if (this.timerToken) diagnostics.close(this.timerToken, "cleared");
+    this.timerToken = undefined;
     const nextChangeAt = this.kept?.nextChangeAt;
     if (nextChangeAt === undefined) return;
     const delay =
@@ -209,8 +220,16 @@ export class ClockedManifest {
           (this.clockSync.now() - AVAILABILITY_MARGIN_MS) +
           CLOCK_CHANGE_MARGIN_MS,
       );
+    this.timerToken = diagnostics.open("ClockTimer", String(delay));
     this.timer = setTimeout(() => {
       this.timer = undefined;
+      diagnostics.close(this.timerToken, "fired");
+      this.timerToken = undefined;
+      diagnostics.count(
+        retryDelay === undefined
+          ? "ClockReparse:scheduled"
+          : "ClockReparse:retry",
+      );
       this.reevaluate();
     }, delay);
   }
@@ -225,6 +244,7 @@ export class ClockedManifest {
     const manifest = this.kept;
     if (!manifest) return;
     if (this.reparse(manifest, this.listingTime(promptedByPlayer))) return;
+    diagnostics.count("ClockReparse:failed");
     // A failed parse leaves the kept list as it was, and arms nothing; an MPD
     // the player never refreshes would otherwise stop here for good.
     this.schedule(this.retryDelay);

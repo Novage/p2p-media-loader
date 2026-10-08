@@ -11,6 +11,14 @@ import type {
   StreamConfig,
 } from "../src/index.js";
 import type { StreamWithSegments } from "../src/internal-types.js";
+import debug from "debug";
+import { diagnostics } from "../src/diagnostics.js";
+
+// The ledger decides once, at its first record. Turning the namespace off
+// again after that keeps the ledger on and its log quiet.
+debug.enable("p2pml:diagnostics");
+diagnostics.snapshot();
+debug.disable();
 
 const TRACKER = "wss://tracker.example/announce";
 
@@ -155,5 +163,21 @@ describe("P2PLoadersContainer switching streams", () => {
     expect(container.currentLoader).toBe(first);
     expect(sockets).toHaveLength(1);
     expect(sockets[0].closed).toBe(false);
+  });
+
+  it("leaves no loader, tracker client or socket open once destroyed", () => {
+    // Other tests here leave their containers alive, so this compares the
+    // ledger with itself rather than with zero.
+    diagnostics.clearAnomalies();
+    const before = diagnostics.snapshot()?.live;
+    const { container } = setup();
+
+    container.changeCurrentLoader(stream("b"));
+    container.changeCurrentLoader(stream("c"));
+    container.destroy();
+
+    const after = diagnostics.snapshot();
+    expect(after?.live).toEqual(before);
+    expect(after?.anomalies).toEqual([]);
   });
 });

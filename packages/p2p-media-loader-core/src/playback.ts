@@ -7,6 +7,7 @@
  * means widening it. See specs/playback-contract.md.
  */
 
+import { diagnostics, type DiagnosticsToken } from "./diagnostics.js";
 import debug from "debug";
 
 /** A buffered interval, in seconds on the player's own timeline. */
@@ -134,18 +135,23 @@ export function trackMediaElementPlayback(
     report(getPlaybackStateFromMediaElement(target));
   };
 
+  let watchToken: DiagnosticsToken | undefined;
+
   const watch = (media: HTMLMediaElement | undefined) => {
     if (media === watched) return;
     if (watched) {
       for (const event of PLAYBACK_EVENTS) {
         watched.removeEventListener(event, handle);
       }
+      diagnostics.close(watchToken, media ? "replaced" : "stopped");
+      watchToken = undefined;
     }
     watched = media;
     if (!media) return;
     for (const event of PLAYBACK_EVENTS) {
       media.addEventListener(event, handle);
     }
+    watchToken = diagnostics.open("MediaElementWatch");
   };
 
   return { watch, stop: () => watch(undefined) };

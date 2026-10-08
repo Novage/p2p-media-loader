@@ -30,6 +30,8 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   #request?: { url: string; byteRange?: ByteRange };
   readonly #ofAnotherPlayer: boolean;
 
+  readonly #diagnosticsToken = Core.diagnostics?.open("HlsFragmentLoader");
+
   constructor(config: HlsConfig, core: Core) {
     this.#core = core;
     this.#ofAnotherPlayer = isSecondaryPlayer(config);
@@ -162,6 +164,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   }
 
   destroy() {
+    Core.diagnostics?.close(this.#diagnosticsToken, "destroyed");
     if (this.#defaultLoader) {
       this.#defaultLoader.destroy();
     } else {

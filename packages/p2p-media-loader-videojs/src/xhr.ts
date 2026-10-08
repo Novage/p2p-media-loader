@@ -79,9 +79,13 @@ export class FirstManifestHooks {
    * per function rather than once overall: `videojs.Vhs.xhr` is built once
    * per Video.js namespace, but an integrator may replace it and a page may
    * carry two namespaces, and hooks left on a function no engine holds any
-   * more would stay there for good.
+   * more would stay there for good. Each also keeps its diagnostics record;
+   * see specs/diagnostics.md.
    */
-  private readonly held = new Map<VhsXhr, number>();
+  private readonly held = new Map<
+    VhsXhr,
+    { engines: number; readonly diagnosticsToken: string | undefined }
+  >();
 
   constructor(private readonly registry: RouterRegistry) {}
 
@@ -94,27 +98,31 @@ export class FirstManifestHooks {
    */
   retain(videojs: VideoJsLike): VhsXhr | undefined {
     const { xhr } = videojs.Vhs;
-    const engines = this.held.get(xhr);
-    if (engines !== undefined) {
-      this.held.set(xhr, engines + 1);
+    const holding = this.held.get(xhr);
+    if (holding) {
+      holding.engines++;
       return xhr;
     }
     if (!xhr.onRequest || !xhr.onResponse) return undefined;
     xhr.onRequest(this.handleRequest);
     xhr.onResponse(this.handleResponse);
-    this.held.set(xhr, 1);
+    this.held.set(xhr, {
+      engines: 1,
+      diagnosticsToken: Core.diagnostics?.open("VhsPageHooks"),
+    });
     return xhr;
   }
 
   /** Takes them off again once the last engine holding that one is gone. */
   release(xhr: VhsXhr) {
-    const engines = this.held.get(xhr);
-    if (engines === undefined) return;
-    if (engines > 1) {
-      this.held.set(xhr, engines - 1);
+    const holding = this.held.get(xhr);
+    if (!holding) return;
+    if (holding.engines > 1) {
+      holding.engines--;
       return;
     }
     this.held.delete(xhr);
+    Core.diagnostics?.close(holding.diagnosticsToken, "released");
     // Taken off the sets rather than through `offRequest`: VHS's page-wide
     // hook methods close over its own namespace and resolve `Vhs.xhr` when
     // they are called, not the function they were put on. Asking a function
@@ -162,7 +170,11 @@ export class FirstManifestHooks {
  */
 export class RequestRouter {
   private readonly logger = debug("p2pml-videojs:loader");
-  private readonly hooked = new Set<VhsXhr>();
+  /**
+   * The xhr functions this router's hooks are on, each with its diagnostics
+   * record; see specs/diagnostics.md.
+   */
+  private readonly hooked = new Map<VhsXhr, string | undefined>();
   /**
    * The source the player is on, and whether its top-level manifest has been
    * taken care of — read already, or VHS's to read through these hooks.
@@ -195,7 +207,7 @@ export class RequestRouter {
     // every function that is no longer this player's. That includes the case
     // of no function at all, as after `player.reset()`, where the handler is
     // disposed and nothing replaces it.
-    for (const previous of this.hooked) {
+    for (const previous of this.hooked.keys()) {
       if (previous !== xhr) this.removeHooks(previous);
     }
     if (!xhr || this.hooked.has(xhr)) return;
@@ -211,12 +223,12 @@ export class RequestRouter {
     else (xhr._requestCallbackSet ??= new Set()).add(this.handleRequest);
     if (xhr.onResponse) xhr.onResponse(this.handleResponse);
     else (xhr._responseCallbackSet ??= new Set()).add(this.handleResponse);
-    this.hooked.add(xhr);
+    this.hooked.set(xhr, Core.diagnostics?.open("VhsXhrHooks"));
   }
 
   detachHooks() {
     this.released = true;
-    for (const xhr of this.hooked) this.removeHooks(xhr);
+    for (const xhr of this.hooked.keys()) this.removeHooks(xhr);
   }
 
   /** Takes this router's hooks off one xhr function and forgets it. */
@@ -225,6 +237,7 @@ export class RequestRouter {
     else xhr._requestCallbackSet?.delete(this.handleRequest);
     if (xhr.offResponse) xhr.offResponse(this.handleResponse);
     else xhr._responseCallbackSet?.delete(this.handleResponse);
+    Core.diagnostics?.close(this.hooked.get(xhr), "detached");
     this.hooked.delete(xhr);
   }
 

@@ -1,3 +1,4 @@
+import { diagnostics, type DiagnosticsToken } from "../../diagnostics.js";
 import debug from "debug";
 import { EventTarget } from "../../utils/event-target.js";
 import { getPromiseWithResolvers } from "../../utils/utils.js";
@@ -197,9 +198,12 @@ export class WebTorrentClient {
     this.#eventTarget.removeEventListener(eventName, listener);
   }
 
+  #diagnosticsToken?: DiagnosticsToken;
+
   public start(): void {
     if (this.#isDestroyed() || this.#started) return;
     this.#started = true;
+    this.#diagnosticsToken = diagnostics.open("TrackerClient");
 
     this.#wsClient.addEventListener("connected", this.#onWsConnected);
     this.#wsClient.addEventListener("disconnected", this.#onWsDisconnected);
@@ -212,6 +216,10 @@ export class WebTorrentClient {
 
   public destroy(): void {
     if (this.#isDestroyed()) return;
+    // Opened by `start()`: a client destroyed before it started holds none.
+    if (this.#diagnosticsToken) {
+      diagnostics.close(this.#diagnosticsToken, "destroyed");
+    }
     this.#destroyAbortController.abort();
     this.#clearAnnounceTimeout();
 
@@ -382,6 +390,10 @@ export class WebTorrentClient {
     const runId = ++this.#scheduleAnnounceRunId;
 
     const run = async () => {
+      // `destroy()` clears this timer; a run after it is one it missed.
+      if (this.#isDestroyed()) {
+        diagnostics.anomaly("TrackerClient announce timer after destroy");
+      }
       try {
         await this.#announce();
       } catch (err: unknown) {

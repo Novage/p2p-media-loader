@@ -128,6 +128,8 @@ export class HlsJsP2PEngine {
     applied: Partial<Record<ForwardBufferKey, number>>;
   };
   private readonly debug = debug("p2pml-hlsjs:engine");
+  /** This engine's handlers on the HLS.js instance; see specs/diagnostics.md. */
+  private eventsToken?: string;
 
   /**
    * Enhances a given HLS.js class by injecting additional Peer-to-Peer (P2P) functionalities.
@@ -309,6 +311,12 @@ export class HlsJsP2PEngine {
     const hls = this.currentHlsInstance;
     if (!hls) return;
     const method = type === "register" ? "on" : "off";
+    if (type === "register") {
+      this.eventsToken = Core.diagnostics?.open("HlsEventHandlers");
+    } else {
+      Core.diagnostics?.close(this.eventsToken, "unregistered");
+      this.eventsToken = undefined;
+    }
 
     hls[method](
       "hlsLevelUpdated" as Events.LEVEL_UPDATED,

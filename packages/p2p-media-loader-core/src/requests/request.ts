@@ -1,8 +1,6 @@
+import { diagnostics, type DiagnosticsToken } from "../diagnostics.js";
 import debug from "debug";
-import {
-  BandwidthCalculators,
-  SegmentWithStream,
-} from "../internal-types.js";
+import { BandwidthCalculators, SegmentWithStream } from "../internal-types.js";
 import {
   CoreEventMap,
   RequestError,
@@ -115,7 +113,21 @@ export class Request {
     return this._status;
   }
 
+  /** The download attempt under way: open from `loading` until it settles. */
+  private downloadToken?: DiagnosticsToken;
+
   private setStatus(status: RequestStatus) {
+    if (
+      this._status === "loading" &&
+      status !== "loading" &&
+      this.downloadToken
+    ) {
+      diagnostics.close(this.downloadToken, status);
+      diagnostics.count(
+        `Download:${this.currentAttempt?.downloadSource ?? "?"}:${status}`,
+      );
+      this.downloadToken = undefined;
+    }
     this._status = status;
     this._isHandledByProcessQueue = false;
   }
@@ -289,6 +301,10 @@ export class Request {
 
     this.setStatus("loading");
     this.currentAttempt = { ...requestData };
+    this.downloadToken = diagnostics.open(
+      `Download:${requestData.downloadSource}`,
+      String(this.segment.externalId),
+    );
     this.progress = {
       startFromByte: this._loadedBytes,
       loadedBytes: 0,

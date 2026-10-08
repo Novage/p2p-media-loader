@@ -49,7 +49,13 @@ delete it; when rejected, delete it.
 - **Verify before reporting done:** `pnpm type-check`, `pnpm lint`, `pnpm test`,
   and `npx prettier --check "specs/**/*.md" AGENTS.md` when specs changed.
 - **Before a release:** `pnpm knip` as well, with no findings, and `pnpm jscpd`
-  within its budget. See [`specs/packaging.md`](specs/packaging.md).
+  within its budget. See [`specs/packaging.md`](specs/packaging.md). Then run
+  the tests in [`specs/release-testing.md`](specs/release-testing.md): Part 1
+  is for an AI assistant, Part 2 lists what a person must test.
+- **Diagnostics records change with the code.** A change that adds, changes or
+  removes something that must be released — a connection, a timer, a listener,
+  a registration, a storage — opens and closes its record in the diagnostics
+  ledger in the same change. See [`specs/diagnostics.md`](specs/diagnostics.md).
 - Match the surrounding code's style, comment density and naming. The codebase
   favours comments that explain _why_ over comments that restate the code.
 

@@ -48,6 +48,8 @@ const boundEngines = new WeakMap<shaka.Player, ShakaP2PEngine>();
  * dropped without `destroy()` stays collectable along with its player.
  */
 const registrations = new WeakMap<Shaka, number>();
+/** One for each registration `registrations` counts; see specs/diagnostics.md. */
+const registrationTokens: (string | undefined)[] = [];
 
 /**
  * Represents a Peer-to-Peer (P2P) engine designed to enhance media streaming efficiency.
@@ -90,6 +92,9 @@ export class ShakaP2PEngine {
   /** The player this engine is bound to, and what it has done to it. */
   private bound?: BoundPlayer;
   private readonly debug = debug("p2pml-shaka:engine");
+  /** The request filter and the player handlers; see specs/diagnostics.md. */
+  private filterToken?: string;
+  private listenersToken?: string;
 
   /**
    * Constructs an instance of `ShakaP2PEngine`.
@@ -270,9 +275,12 @@ export class ShakaP2PEngine {
           (request as HookedRequest).p2pml = p2pml;
         };
         networkingEngine.registerRequestFilter(this.requestFilter);
+        this.filterToken = Core.diagnostics?.open("ShakaRequestFilter");
       } else {
         if (this.requestFilter) {
           networkingEngine.unregisterRequestFilter(this.requestFilter);
+          Core.diagnostics?.close(this.filterToken, "unregistered");
+          this.filterToken = undefined;
         }
       }
     }
@@ -281,6 +289,12 @@ export class ShakaP2PEngine {
     player[method]("loaded", this.handlePlayerLoaded);
     player[method]("loading", this.endSource);
     player[method]("unloading", this.endSource);
+    if (type === "register") {
+      this.listenersToken = Core.diagnostics?.open("ShakaPlayerListeners");
+    } else {
+      Core.diagnostics?.close(this.listenersToken, "unregistered");
+      this.listenersToken = undefined;
+    }
   };
 
   private handlePlayerLoaded = () => {
@@ -465,6 +479,7 @@ export class ShakaP2PEngine {
     ShakaP2PEngine.registerNetworkingEngineSchemes(shaka);
     // Counted once installed: a registration that threw is not one.
     registrations.set(shaka, (registrations.get(shaka) ?? 0) + 1);
+    registrationTokens.push(Core.diagnostics?.open("ShakaSchemeRegistration"));
   }
 
   /**
@@ -489,6 +504,7 @@ export class ShakaP2PEngine {
     // Nothing registered, nothing to hand back: the registry is not this
     // adapter's to touch, and may hold a plugin the integrator registered.
     if (outstanding === 0) return;
+    Core.diagnostics?.close(registrationTokens.pop(), "unregistered");
     if (outstanding > 1) {
       registrations.set(shaka, outstanding - 1);
       return;

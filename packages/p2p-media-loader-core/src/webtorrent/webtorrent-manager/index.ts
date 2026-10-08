@@ -1,3 +1,4 @@
+import { diagnostics } from "../../diagnostics.js";
 import debug from "debug";
 import {
   PeerError,
@@ -164,7 +165,17 @@ export class WebTorrentManager {
     );
   }
 
+  /**
+   * Must equal the P2P loader's PeersWrapped: a peer held here and not
+   * wrapped there is connected and never used.
+   */
+  readonly #unprobe: () => void;
+
   constructor(config: WebTorrentManagerConfig) {
+    this.#unprobe = diagnostics.probe(
+      `PeersHeld:${config.infoHash.slice(0, 8)}`,
+      () => this.#connectedPeers.size,
+    );
     this.#config = {
       ...config,
       maxPeers: config.maxPeers ?? (() => WEBTORRENT_DEFAULT_MAX_PEERS),
@@ -309,6 +320,7 @@ export class WebTorrentManager {
   public destroy(): void {
     if (this.#destroyed) return;
     this.#destroyed = true;
+    this.#unprobe();
 
     // Remove our listeners BEFORE destroying the client. This ensures that
     // if client.destroy() synchronously dispatches events,

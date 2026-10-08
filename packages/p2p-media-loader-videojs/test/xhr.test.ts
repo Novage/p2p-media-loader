@@ -766,8 +766,8 @@ describe("the page-wide hooks for a source's first manifest", () => {
     // over that source's handler, so one kept here keeps a disposed handler.
     const { router, newHandler } = setup();
     router.attachHooks();
-    const attached = router as unknown as { hooked: Set<VhsXhr> };
-    const [firstXhr] = attached.hooked;
+    const attached = router as unknown as { hooked: Map<VhsXhr, unknown> };
+    const [firstXhr] = attached.hooked.keys();
     expect(firstXhr._requestCallbackSet?.size).toBe(1);
 
     const secondXhr = newHandler("https://cdn.example/hls/next.m3u8");
@@ -839,8 +839,9 @@ describe("the page-wide hooks for a source's first manifest", () => {
     // the hook methods bound to it.
     const { router, setHandler } = setup();
     router.attachHooks();
-    const hooked = (router as unknown as { hooked: Set<VhsXhr> }).hooked;
-    const [xhr] = hooked;
+    const hooked = (router as unknown as { hooked: Map<VhsXhr, unknown> })
+      .hooked;
+    const [xhr] = hooked.keys();
     expect(xhr._requestCallbackSet?.size).toBe(1);
 
     setHandler(false);

@@ -1,3 +1,4 @@
+import { diagnostics, type DiagnosticsToken } from "./diagnostics.js";
 import { HybridLoader } from "./hybrid-loader.js";
 import { runAll } from "./run-all.js";
 import type { PlaybackState } from "./playback.js";
@@ -67,6 +68,16 @@ import { WebTorrentSocketPool } from "./webtorrent/webtorrent-socket-pool/index.
 
 /** Core class for managing media streams loading via P2P. */
 export class Core {
+  /**
+   * @internal The diagnostics ledger, for the player adapters; see
+   * specs/diagnostics.md. Reached through `Core`, which every adapter imports
+   * already, rather than through an import of its own: an adapter can meet a
+   * core of another version, and a core without the ledger must cost the
+   * adapter its records, never its load. Typed as possibly absent for that
+   * reason.
+   */
+  static readonly diagnostics: typeof diagnostics | undefined = diagnostics;
+
   /** Default configuration for common core settings. */
   static readonly DEFAULT_COMMON_CORE_CONFIG: CommonCoreConfig = {
     segmentMemoryStorageLimit: undefined,
@@ -131,6 +142,12 @@ export class Core {
     http: new BandwidthCalculator(),
   };
   private segmentStorage?: SegmentStorage;
+  private storageDiagnosticsToken?: DiagnosticsToken;
+  /**
+   * The core's work on one source, from its first manifest to `destroy()`.
+   * The core outlives it: `destroy()` readies it for the next source.
+   */
+  private sourceDiagnosticsToken?: DiagnosticsToken;
   private readonly webTorrentSocketPool = new WebTorrentSocketPool();
   private readonly logger = debug("p2pml-core:core");
   private readonly socketPoolLogger = debug(
@@ -386,6 +403,7 @@ export class Core {
     data: string | ArrayBuffer | ArrayBufferView;
     protocol?: ManifestProtocol;
   }): ProcessedManifest | undefined {
+    this.sourceDiagnosticsToken ??= diagnostics.open("CoreSource");
     const text =
       typeof manifest.data === "string"
         ? manifest.data
@@ -980,6 +998,7 @@ export class Core {
         // P2P and leaves no other trace, so without this a stream that stops
         // sharing looks the same as one with no peers.
         this.registryMissLogger("%s", key);
+        diagnostics.count("RegistryMiss");
         this.eventTarget.dispatchEvent("onSegmentRegistryMiss", {
           url,
           byteRange,
@@ -1070,6 +1089,14 @@ export class Core {
 
     this.mainStreamLoader = undefined;
     this.secondaryStreamLoader = undefined;
+    if (this.storageDiagnosticsToken) {
+      diagnostics.close(this.storageDiagnosticsToken, "destroyed");
+      this.storageDiagnosticsToken = undefined;
+    }
+    if (this.sourceDiagnosticsToken) {
+      diagnostics.close(this.sourceDiagnosticsToken, "destroyed");
+      this.sourceDiagnosticsToken = undefined;
+    }
     this.segmentStorage = undefined;
     this.manifestResponseUrl = undefined;
     this.streamDetails = { isLive: false, liveTarget: undefined };
@@ -1143,6 +1170,7 @@ export class Core {
     });
 
     this.segmentStorage = segmentStorage;
+    this.storageDiagnosticsToken = diagnostics.open("SegmentStorage");
   }
 
   private identifySegment(key: string): SegmentWithStream {

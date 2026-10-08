@@ -19,6 +19,8 @@ before changing anything that crosses a package boundary.
 | [mobile-proxy.md](mobile-proxy.md)           | Native players via a local HTTP proxy and a WebView-hosted core              |
 | [packaging.md](packaging.md)                 | How parsers are selected, and what each consumer downloads                   |
 | [verification.md](verification.md)           | The real streams the design is verified against, and what is checked on them |
+| [diagnostics.md](diagnostics.md)             | The ledger of open resources, counters and anomalies that tests read         |
+| [release-testing.md](release-testing.md)     | What an AI assistant and a person test before a release                      |
 
 ## Proposals
 

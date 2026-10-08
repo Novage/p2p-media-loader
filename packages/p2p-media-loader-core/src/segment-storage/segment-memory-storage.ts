@@ -1,3 +1,4 @@
+import { diagnostics } from "../diagnostics.js";
 import { CommonCoreConfig, StreamConfig, StreamType } from "../types.js";
 import debug from "debug";
 import { SegmentStorage } from "./index.js";
@@ -77,9 +78,20 @@ export class SegmentMemoryStorage implements SegmentStorage {
   private lastRequestedIsLive?: boolean;
   private segmentChangeCallback?: (streamSwarmId: string) => void;
 
+  /** Tells the probes of two storages on one page apart. */
+  private static probeSequence = 0;
+  private readonly unprobe: () => void;
+
   constructor() {
     this.logger = debug("p2pml-core:segment-memory-storage");
     this.logger.color = "RebeccaPurple";
+    this.unprobe = diagnostics.probe(
+      `Storage#${++SegmentMemoryStorage.probeSequence}`,
+      () => ({
+        segments: this.cache.size,
+        MiB: +this.currentStorageUsage.toFixed(1),
+      }),
+    );
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
@@ -206,6 +218,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
       this.logger(
         `Removed segment ${segmentId} from stream ${streamSwarmId}: no longer in its manifest`,
       );
+      diagnostics.count("Evicted:left-window");
       removed = true;
     }
     if (removed) this.sendUpdatesToAffectedStreams(new Set([streamSwarmId]));
@@ -260,6 +273,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
       this.decreaseStorageUsage(data.byteLength);
 
       this.logger(`Removed segment ${segmentId} from stream ${streamSwarmId}`);
+      diagnostics.count("Evicted:trailing-or-limit");
 
       if (!this.isMemoryLimitReached(newSegmentSize) && !isLiveStream) break;
     }
@@ -347,6 +361,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
   }
 
   public destroy() {
+    this.unprobe();
     this.cache.clear();
     this.segmentChangeCallback = undefined;
   }

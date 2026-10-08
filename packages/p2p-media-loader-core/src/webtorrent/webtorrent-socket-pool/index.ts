@@ -1,3 +1,4 @@
+import { diagnostics, type DiagnosticsToken } from "../../diagnostics.js";
 import { WebSocketClient } from "../websocket-client/index.js";
 import { EventTarget } from "../../utils/event-target.js";
 
@@ -8,6 +9,8 @@ export type WebTorrentSocketPoolEventMap = {
 type PoolEntry = {
   client: WebSocketClient;
   refCount: number;
+  /** The socket's record; see specs/diagnostics.md. */
+  token: DiagnosticsToken | undefined;
 };
 
 export class WebTorrentSocketPool {
@@ -40,7 +43,11 @@ export class WebTorrentSocketPool {
         this.#eventTarget.dispatchEvent("error", error, url);
       });
       client.connect();
-      entry = { client, refCount: 0 };
+      entry = {
+        client,
+        refCount: 0,
+        token: diagnostics.open("TrackerSocket", url),
+      };
       this.#sockets.set(url, entry);
     }
 
@@ -67,6 +74,7 @@ export class WebTorrentSocketPool {
           if (currentEntry === entry) {
             this.#sockets.delete(url);
           }
+          diagnostics.close(entry.token, "released");
           entry.client.dispose();
         }
       },
@@ -85,6 +93,7 @@ export class WebTorrentSocketPool {
     const entries = Array.from(this.#sockets.values());
     this.#sockets.clear();
     for (const entry of entries) {
+      diagnostics.close(entry.token, "pool closed");
       try {
         entry.client.dispose();
       } catch (error) {

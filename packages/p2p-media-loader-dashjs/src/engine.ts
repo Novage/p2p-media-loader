@@ -130,6 +130,8 @@ export class DashJsP2PEngine {
    */
   private liveTarget?: LiveDelay;
   private readonly debug = debug("p2pml-dashjs:engine");
+  /** This engine's handlers on the bound player; see specs/diagnostics.md. */
+  private listenersToken?: string;
 
   /**
    * Constructs an instance of `DashJsP2PEngine`.
@@ -190,6 +192,7 @@ export class DashJsP2PEngine {
     player.on(STREAM_INITIALIZED, this.handleStreamInitialized);
     player.on(STREAM_TEARDOWN_COMPLETE, this.handleStreamTeardown);
     player.on(PLAYBACK_PLAYING, this.resyncIfBehind);
+    this.listenersToken = Core.diagnostics?.open("DashjsPlayerListeners");
     this.registerMediaElement();
     if (failures.length) throw failures[0];
   }
@@ -630,6 +633,8 @@ export class DashJsP2PEngine {
         this.player.off(STREAM_INITIALIZED, this.handleStreamInitialized);
         this.player.off(STREAM_TEARDOWN_COMPLETE, this.handleStreamTeardown);
         this.player.off(PLAYBACK_PLAYING, this.resyncIfBehind);
+        Core.diagnostics?.close(this.listenersToken, "released");
+        this.listenersToken = undefined;
       },
       () => this.restorePlacement(),
       () => this.core.destroy(),
