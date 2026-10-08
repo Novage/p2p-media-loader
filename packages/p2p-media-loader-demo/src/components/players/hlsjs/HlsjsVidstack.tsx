@@ -34,6 +34,9 @@ export const HlsjsVidstack = ({
 
         const config: HlsWithP2PConfig<typeof Hls> = {
           p2p: {
+            // Vidstack sometimes seeks a live stream to two seconds from the
+            // edge as it starts, which leaves no time for peers.
+            restoreLiveDelayOnStart: true,
             core: coreOptions,
             onHlsJsCreated: (hls) => {
               subscribeToUiEvents({

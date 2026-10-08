@@ -170,7 +170,9 @@ the groups and the cases a reader of a snapshot must know.
   player.
 - **Counters:** downloads by source and result, player requests by result,
   registry misses, evictions by reason, closed peers by cause, and clock
-  synchronizations and re-parses by result.
+  synchronizations and re-parses by result. The HLS.js adapter counts each
+  check of a start placement by result (`HlsStartPlacement:corrected`,
+  `:kept`, and `:chosen` for a start the integrator or the playlist chose).
 - **Probes:** each segment storage's size; the peers that each swarm's
   connection manager holds (`PeersHeld`) and its P2P loader wraps
   (`PeersWrapped`), which must be equal.

@@ -235,6 +235,29 @@ left alone.
   settings has a target of their own, and a threshold written against ours
   could sit below it — a config HLS.js itself rejects — or mix its count-based
   settings with a duration-based one.
+- **The start placement can be restored, on request.** HLS.js moves the
+  playhead only when it falls too far behind the delay, never when it is ahead
+  of it, and a player built on HLS.js can seek on its own as playback starts.
+  Vidstack seeks a live stream to HLS.js's `liveSyncPosition`, which it reads
+  once a frame, and to two seconds from the edge where it has not read it yet;
+  at the very first play it sometimes has not, and the player then plays 2 to
+  6 seconds behind the edge for the whole session, with no time for peers. With
+  `restoreLiveDelayOnStart`, the engine checks the start once per source: when
+  playback starts in a window it placed, it waits one task — the wrapper's
+  handler for the same event runs first — and where the playhead is more than
+  a segment nearer the edge than `liveSyncPosition`, it seeks there. It decides
+  only once the element has data to play (`HAVE_FUTURE_DATA`): a player calls
+  `play()` before HLS.js moves the playhead to its start, and a decision at 0
+  would end the check before the seek it exists for. The first decision is the
+  last for the source: a viewer who seeks to the edge later stays there.
+
+  It is off by default, because it cannot tell a wrapper's wrong seek from a
+  start at the edge that a page or a viewer chose; turned on, it adds no
+  listener until then. It leaves alone every start that was chosen and that it
+  can see: HLS.js's `startPosition`, an `EXT-X-START` in the multivariant or
+  the media playlist — HLS.js starts there rather than at `liveSyncPosition` —
+  and live sync settings of the integrator's own.
+
 - **Low-latency mode off.** HLS.js enables it by default; on a low-latency
   playlist it then requests partial segments, which the core deliberately does
   not register ([architecture.md](architecture.md)), so those requests would
@@ -264,6 +287,9 @@ player on HLS.js; the adapter cannot, since it is not asked:
   first: `renderers: ["native_hls", "html5"]` — MediaElement names the HLS.js
   renderer `native_hls`.
 - Vidstack tries HLS.js first unless `preferNativeHLS` is set; leave it unset.
+  Turn on `restoreLiveDelayOnStart` in the `p2p` config as well: Vidstack
+  sometimes starts a live stream two seconds from the edge (see "The start
+  placement can be restored, on request" above).
 - Clappr and OpenPlayer, as the demo sets them up, play through HLS.js in both
   browsers.
 - DPlayer and Plyr have no HLS playback of their own: the page creates HLS.js

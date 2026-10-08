@@ -2,6 +2,7 @@ import type Hls from "hls.js";
 import type {
   LevelDetails,
   LevelUpdatedData,
+  ManifestLoadedData,
   PlaylistLevelType,
   HlsConfig,
   Events,
@@ -30,12 +31,36 @@ import { diagnostics } from "./diagnostics.js";
 export type HlsJsP2PEngineConfig = {
   /** Complete core configuration settings. */
   core: DefinedCoreConfig;
+  /**
+   * Moves a live player back to the delay the engine set, once per source,
+   * where something moved it toward the live edge as playback started.
+   *
+   * For players built on HLS.js that seek on their own as they start.
+   * Vidstack seeks a live stream to HLS.js's `liveSyncPosition`, and to two
+   * seconds from the edge when it has not read that position yet, which at
+   * the first play it sometimes has not: the player then plays a few seconds
+   * behind the edge, with no time for peers to deliver segments, and nothing
+   * brings it back.
+   *
+   * Only a start this engine placed is checked, and only once: a viewer who
+   * seeks to the edge later stays there. The check does nothing where the
+   * start was chosen — HLS.js's `startPosition`, the playlist's
+   * `EXT-X-START`, or live sync settings of the integrator's own.
+   *
+   * @default
+   * ```typescript
+   * restoreLiveDelayOnStart: false
+   * ```
+   */
+  restoreLiveDelayOnStart: boolean;
 };
 
 /** Allows for partial configuration of the `HlsJsP2PEngine`, useful for providing overrides or partial updates. */
 export type PartialHlsJsP2PEngineConfig = {
   /** Partial core config */
   core?: Partial<CoreConfig>;
+  /** See {@link HlsJsP2PEngineConfig.restoreLiveDelayOnStart}. */
+  restoreLiveDelayOnStart?: boolean;
 };
 
 /** A type for specifying dynamic configuration options that can be changed at runtime for the P2P engine's core. */
@@ -69,6 +94,8 @@ const MIN_TUNABLE_FRAGMENTS = 4;
 
 /** The two HLS.js settings that bound how far ahead of the playhead it fetches. */
 const FORWARD_BUFFER_KEYS = ["maxBufferLength", "maxMaxBufferLength"] as const;
+/** `HTMLMediaElement.HAVE_FUTURE_DATA`, which is not defined outside a browser. */
+const HAVE_FUTURE_DATA = 3;
 
 type ForwardBufferKey = (typeof FORWARD_BUFFER_KEYS)[number];
 
@@ -129,6 +156,26 @@ export class HlsJsP2PEngine {
     applied: Partial<Record<ForwardBufferKey, number>>;
   };
   private readonly debug = debug("p2pml-hlsjs:engine");
+  /**
+   * Whether the current source's first placement is still to be checked;
+   * see `checkStartPlacement`. Set for each new source.
+   */
+  private startPlacementPending = false;
+  /**
+   * The segment length of a live window this engine placed the player in,
+   * which is the tolerance of `checkStartPlacement`; `undefined` where it
+   * placed nothing — VOD, or live sync settings the integrator configured.
+   */
+  private placedSegment?: number;
+  /** Whether the integrator turned the start check on. */
+  private readonly restoreLiveDelayOnStart: boolean;
+  /** The media element `checkStartPlacement` listens on. */
+  private placementMedia?: HTMLMediaElement;
+  /** The listeners on `placementMedia`; see specs/diagnostics.md. */
+  private placementListenersToken?: string;
+  /** The check scheduled for the next task, one at a time. */
+  private placementTimer?: ReturnType<typeof setTimeout>;
+  private placementTimerToken?: string;
   /** This engine's handlers on the HLS.js instance; see specs/diagnostics.md. */
   private eventsToken?: string;
 
@@ -162,6 +209,7 @@ export class HlsJsP2PEngine {
    * @param config An optional configuration for the P2P engine setup.
    */
   constructor(config?: PartialHlsJsP2PEngineConfig) {
+    this.restoreLiveDelayOnStart = config?.restoreLiveDelayOnStart ?? false;
     this.core = new Core({
       ...config?.core,
       // HLS.js plays HLS only; a bundle of this engine carries no DASH parser.
@@ -239,7 +287,10 @@ export class HlsJsP2PEngine {
    * @returns A readonly version of the `HlsJsP2PEngineConfig`.
    */
   getConfig(): HlsJsP2PEngineConfig {
-    return { core: this.core.getConfig() };
+    return {
+      core: this.core.getConfig(),
+      restoreLiveDelayOnStart: this.restoreLiveDelayOnStart,
+    };
   }
 
   /**
@@ -303,6 +354,9 @@ export class HlsJsP2PEngine {
     this.currentHlsInstance = hlsInstance;
     this.updateHlsEventsHandlers("register");
     this.playback.watch(hlsInstance?.media ?? undefined);
+    this.startPlacementPending = this.restoreLiveDelayOnStart;
+    this.placedSegment = undefined;
+    this.watchStartPlacement(hlsInstance?.media ?? undefined);
     for (const failure of failures) {
       this.debug("letting the previous HLS.js instance go failed: %O", failure);
     }
@@ -333,7 +387,7 @@ export class HlsJsP2PEngine {
     // every fragment after it would miss and load over HTTP in silence.
     hls[method](
       "hlsManifestLoading" as Events.MANIFEST_LOADING,
-      this.destroyCore,
+      this.handleManifestLoading,
     );
     hls[method](
       "hlsMediaDetached" as Events.MEDIA_DETACHED,
@@ -342,6 +396,10 @@ export class HlsJsP2PEngine {
     hls[method](
       "hlsMediaAttached" as Events.MEDIA_ATTACHED,
       this.handleMediaAttached,
+    );
+    hls[method](
+      "hlsManifestLoaded" as Events.MANIFEST_LOADED,
+      this.handleManifestLoaded,
     );
   }
 
@@ -370,7 +428,16 @@ export class HlsJsP2PEngine {
       // times the real segment; the playlist's average is the segment.
       const segment =
         data.details.averagetargetduration ?? data.details.targetduration;
-      if (data.details.live) this.updateLiveSync(data.details, segment);
+      if (!data.details.live) {
+        this.startPlacementPending = false;
+      } else if (typeof data.details.startTimeOffset === "number") {
+        // The media playlist's `EXT-X-START`: HLS.js starts there.
+        this.skipStartPlacement();
+      }
+      if (data.details.live) {
+        this.updateLiveSync(data.details, segment);
+        this.scheduleStartPlacementCheck();
+      }
 
       const { userConfig } = this.currentHlsInstance;
       if (
@@ -437,8 +504,11 @@ export class HlsJsP2PEngine {
       userConfig.liveMaxLatencyDuration !== undefined ||
       userConfig.liveMaxLatencyDurationCount !== undefined
     ) {
+      // Their placement, which the start check leaves alone as well.
+      this.skipStartPlacement();
       return;
     }
+    this.placedSegment = segment;
 
     if (differs(hls.config.liveSyncDuration, targetLatency)) {
       this.debug(`Setting targetLatency to ${targetLatency}`);
@@ -519,14 +589,136 @@ export class HlsJsP2PEngine {
   }
 
   private handleMediaAttached = () => {
-    this.playback.watch(this.currentHlsInstance?.media ?? undefined);
+    const media = this.currentHlsInstance?.media ?? undefined;
+    this.playback.watch(media);
+    this.watchStartPlacement(media);
   };
 
   private handleMediaDetached = () => {
     this.playback.stop();
+    this.watchStartPlacement(undefined, "detached");
   };
 
+  private handleManifestLoading = () => {
+    this.destroyCore();
+    this.startPlacementPending = this.restoreLiveDelayOnStart;
+    this.placedSegment = undefined;
+  };
+
+  /** The multivariant playlist's `EXT-X-START`: HLS.js starts there. */
+  private handleManifestLoaded = (event: string, data: ManifestLoadedData) => {
+    if (typeof data.startTimeOffset === "number") this.skipStartPlacement();
+  };
+
+  /** A start somebody chose — the integrator or the stream — is theirs. */
+  private skipStartPlacement() {
+    if (!this.startPlacementPending) return;
+    this.startPlacementPending = false;
+    diagnostics?.count("HlsStartPlacement:chosen");
+  }
+
   private destroyCore = () => this.core.destroy();
+
+  private watchStartPlacement(
+    element: HTMLMediaElement | undefined,
+    cause = "replaced",
+  ) {
+    // Off unless the integrator asked for it: no listener at all.
+    const media = this.restoreLiveDelayOnStart ? element : undefined;
+    if (this.placementMedia === media) return;
+    for (const type of ["playing", "seeked"]) {
+      this.placementMedia?.removeEventListener(
+        type,
+        this.scheduleStartPlacementCheck,
+      );
+      media?.addEventListener(type, this.scheduleStartPlacementCheck);
+    }
+    if (this.placementListenersToken) {
+      diagnostics?.close(this.placementListenersToken, cause);
+      this.placementListenersToken = undefined;
+    }
+    if (media) {
+      this.placementListenersToken = diagnostics?.open(
+        "HlsStartPlacementListeners",
+      );
+    }
+    this.placementMedia = media;
+  }
+
+  /**
+   * One task later, so that a player's own handler for the same event — a
+   * wrapper that seeks as playback starts — has run before the check.
+   */
+  private scheduleStartPlacementCheck = () => {
+    if (!this.startPlacementPending || this.placementTimer !== undefined) {
+      return;
+    }
+    this.placementTimerToken = diagnostics?.open("HlsStartPlacementTimer");
+    this.placementTimer = setTimeout(() => {
+      this.placementTimer = undefined;
+      diagnostics?.close(this.placementTimerToken, "fired");
+      this.placementTimerToken = undefined;
+      if (!this.currentHlsInstance) {
+        diagnostics?.anomaly("HlsStartPlacementTimer after destroy");
+      }
+      this.checkStartPlacement();
+    }, 0);
+  };
+
+  private clearStartPlacementTimer() {
+    clearTimeout(this.placementTimer);
+    this.placementTimer = undefined;
+    if (this.placementTimerToken) {
+      diagnostics?.close(this.placementTimerToken, "cleared");
+      this.placementTimerToken = undefined;
+    }
+  }
+
+  /**
+   * Puts the player back at its live delay, once per source, where
+   * something moved it toward the live edge as playback started. A player
+   * built on HLS.js can seek on its own at start: Vidstack seeks a live
+   * stream to `liveSyncPosition`, read from HLS.js once a frame, and falls
+   * back to two seconds from the edge where it has not read it yet — which
+   * at the very first play it may not have. HLS.js itself moves a playhead
+   * only when it falls too far behind, so one left near the edge stays
+   * there, with no time for peers to deliver anything.
+   *
+   * Only where this engine placed the player, and only at start: the first
+   * check made with the player playing in a placed live window is the last
+   * one, so a viewer who seeks to the edge later stays there. A playhead
+   * within a segment of the delay is left where it is.
+   */
+  private checkStartPlacement = () => {
+    const hls = this.currentHlsInstance;
+    const media = this.placementMedia;
+    const segment = this.placedSegment;
+    if (!this.startPlacementPending || !hls || !media || media.paused) return;
+    // A seek under way ends in `seeked`, which checks again. An element with
+    // no data yet has not been placed by anyone: a player calls `play()`
+    // before HLS.js moves `currentTime` to its start, and a decision made at
+    // 0 would end the check before the seek it exists for.
+    if (media.seeking || media.readyState < HAVE_FUTURE_DATA) return;
+    const { startPosition } = hls.userConfig;
+    if (startPosition !== undefined && startPosition !== -1) {
+      this.skipStartPlacement();
+      return;
+    }
+    const target = hls.liveSyncPosition;
+    if (segment === undefined || target === null || !Number.isFinite(target)) {
+      return;
+    }
+    this.startPlacementPending = false;
+    if (media.currentTime - target <= segment) {
+      diagnostics?.count("HlsStartPlacement:kept");
+      return;
+    }
+    this.debug(
+      `started ${(media.currentTime - target).toFixed(1)} s nearer the live edge than its delay; moving back to ${target.toFixed(1)}`,
+    );
+    diagnostics?.count("HlsStartPlacement:corrected");
+    media.currentTime = target;
+  };
 
   /**
    * Gives the instance back the forward buffer it came with, while it is
@@ -563,7 +755,10 @@ export class HlsJsP2PEngine {
       () => this.updateHlsEventsHandlers("unregister"),
       this.restoreForwardBuffer,
       () => this.playback.stop(),
+      () => this.watchStartPlacement(undefined, "destroyed"),
+      () => this.clearStartPlacementTimer(),
     ]);
+    this.startPlacementPending = false;
     this.currentHlsInstance = undefined;
     if (failures.length) throw failures[0];
   };
