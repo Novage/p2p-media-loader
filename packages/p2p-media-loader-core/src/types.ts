@@ -1008,8 +1008,9 @@ export type CoreEventMap = {
    * Invoked when the player requests a segment the registry does not know.
    * The request falls back to the player's own loader and plays without P2P;
    * this event makes the disagreement between the core's manifest parse and
-   * the player's observable rather than silent. Initialization segments are
-   * recognised and never reported.
+   * the player's observable rather than silent. Initialization segments, and
+   * the segments of subtitles and trick play, are recognised and never
+   * reported.
    *
    * @param params - The URL and byte range that missed.
    */

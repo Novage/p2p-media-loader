@@ -156,6 +156,37 @@ describe("dashManifestParser", () => {
     expect(parsed.excludedPlaylists).toBeUndefined();
   });
 
+  it("reports the segments of text and trick-mode sets as no stream's", () => {
+    const parsed = dashManifestParser.parse(
+      DASH_WITH_TEXT_IMAGE_AND_TRICK_MODE,
+      URL,
+    );
+    const urls = parsed.nonStreamSegments?.map((s) => s.url) ?? [];
+    for (const name of [
+      // A WebVTT file given as the set's BaseURL alone is one segment.
+      "subs-en.vtt",
+      "fr-init.mp4",
+      "fr-1.m4s",
+      "trick-init.mp4",
+      "trick-1.m4s",
+      "trick2-1.m4s",
+      "trick3-1.m4s",
+    ]) {
+      expect(urls).toContain(`https://cdn.example/dash/${name}`);
+    }
+    expect(urls).not.toContain("https://cdn.example/dash/v720-1.m4s");
+    expect(urls).not.toContain("https://cdn.example/dash/aen-1.m4s");
+    // mpd-parser reads neither thumbnails nor a text set it can tell only by
+    // its TTML mimeType.
+    expect(urls).not.toContain("https://cdn.example/dash/thumb-1.jpg");
+    expect(urls).not.toContain("https://cdn.example/dash/subs-de.ttml");
+
+    // Present on an MPD that lists none, so it replaces the last one's.
+    expect(
+      dashManifestParser.parse(DASH_SEGMENT_TEMPLATE, URL).nonStreamSegments,
+    ).toEqual([]);
+  });
+
   it("identifies a rung without bitrate once the trick-mode set that matched it is gone", () => {
     // The trick-mode Representation shares codecs and resolution with the
     // 720p rung. Counted as a stream it would have forced bitrate into the

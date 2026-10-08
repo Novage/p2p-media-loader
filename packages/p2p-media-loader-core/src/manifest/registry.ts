@@ -4,12 +4,14 @@ import type {
   ParsedSegment,
   ParsedStream,
   SegmentIndexSource,
+  SegmentLocation,
 } from "./types.js";
 import {
   computeStreamIdentityHash,
   identityProperties,
 } from "../stream-identity.js";
 import {
+  fileOfSegmentKey,
   normalizeUrl,
   rangeCovers,
   segmentKey,
@@ -94,6 +96,32 @@ export type RegistryApplyResult = {
   readonly ignored: string[];
 };
 
+/** The name the MPD's segments outside any stream are kept under. */
+const MPD_KEY = "MPD";
+
+/**
+ * Segments outside any stream, as one manifest lists them: ranges of a file
+ * by segment key, and whole files by normalized URL. A whole file stands for
+ * every range of it, which is how a request for a range of a `SegmentBase`
+ * file is known though the core never reads that file's index.
+ */
+type NonStreamSegments = {
+  readonly ranges: ReadonlySet<string>;
+  readonly files: ReadonlySet<string>;
+};
+
+function nonStreamSegmentsOf(
+  locations: readonly SegmentLocation[],
+): NonStreamSegments {
+  const ranges = new Set<string>();
+  const files = new Set<string>();
+  for (const { url, byteRange } of locations) {
+    if (byteRange) ranges.add(segmentKey(url, byteRange));
+    else files.add(normalizeUrl(url));
+  }
+  return { ranges, files };
+}
+
 export class ManifestRegistry {
   private readonly streams = new Map<string, MutableStream>();
   /**
@@ -102,6 +130,14 @@ export class ManifestRegistry {
    * playlist arriving at one is not a stream; see `resolveStreamKey`.
    */
   private readonly excludedPlaylists = new Set<string>();
+  /**
+   * The segments the manifests list outside any stream, by segment key, for
+   * each manifest that lists them: an HLS playlist that is no stream under
+   * its URL with the query stripped, and the MPD under `MPD_KEY`, since a
+   * core plays one presentation. Each parse replaces its manifest's set, so
+   * a live list keeps to its window.
+   */
+  private readonly nonStreamSegments = new Map<string, NonStreamSegments>();
 
   getStreams(): readonly RegistryStream[] {
     return Array.from(this.streams.values());
@@ -135,6 +171,12 @@ export class ManifestRegistry {
     for (const url of manifest.excludedPlaylists ?? []) {
       this.excludedPlaylists.add(stripQuery(url));
     }
+    if (manifest.nonStreamSegments) {
+      this.nonStreamSegments.set(
+        MPD_KEY,
+        nonStreamSegmentsOf(manifest.nonStreamSegments),
+      );
+    }
     // Bitrate enters a stream's identity only where this manifest needs it to
     // tell same-type streams apart; see specs/segment-identity.md. Hashing
     // every stream is work a refresh that registers nothing new never needs,
@@ -147,6 +189,13 @@ export class ManifestRegistry {
       const key = this.resolveStreamKey(parsed, manifest);
       if (key === undefined) {
         ignored.push(parsed.key);
+        this.nonStreamSegments.set(
+          stripQuery(parsed.key),
+          nonStreamSegmentsOf([
+            ...(parsed.segments ?? []),
+            ...(parsed.initSegments ?? []),
+          ]),
+        );
         continue;
       }
       const stream = this.upsertStream(key, parsed, () => identityOf(i));
@@ -187,6 +236,20 @@ export class ManifestRegistry {
           return true;
         }
       }
+    }
+    return false;
+  }
+
+  /**
+   * Whether this key is a segment a manifest lists outside any stream: one
+   * of a subtitle or I-frame playlist, or of a DASH text AdaptationSet or
+   * trick-mode Representation. Like an initialization segment, it is
+   * recognised and passed through; see specs/manifest-registry.md.
+   */
+  isNonStreamSegment(key: string): boolean {
+    const file = fileOfSegmentKey(key);
+    for (const { ranges, files } of this.nonStreamSegments.values()) {
+      if (ranges.has(key) || files.has(file)) return true;
     }
     return false;
   }

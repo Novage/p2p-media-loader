@@ -7,6 +7,8 @@ import type { SidxBox } from "../src/manifest/mp4-sidx.js";
 import {
   DASH_SEGMENT_BASE,
   DASH_SEGMENT_TEMPLATE,
+  DASH_WITH_TEXT_IMAGE_AND_TRICK_MODE,
+  ANGEL_ONE_MPD_URL,
   HLS_LIVE_NO_PDT_REFRESH_1,
   HLS_LIVE_NO_PDT_REFRESH_2,
   HLS_MASTER_WITH_AUDIO,
@@ -615,6 +617,63 @@ describe("Core.processManifest", () => {
     expect(core.hasSegment("https://cdn.example/live/subs/en/subs0.vtt")).toBe(
       false,
     );
+  });
+
+  it("passes a subtitle playlist's segments through without a registry miss", () => {
+    const core = new Core({ manifestParsers: [hlsManifestParser] });
+    const onMiss = vi.fn();
+    core.addEventListener("onSegmentRegistryMiss", onMiss);
+    core.processManifest({ url: MASTER, data: HLS_MASTER_WITH_AUDIO });
+    core.processManifest({ url: SUBS_EN, data: HLS_MEDIA_WEBVTT });
+
+    // Known, as an initialization segment is, and never shared.
+    expect(
+      core.isSegmentLoadable("https://cdn.example/live/subs/en/subs1.vtt"),
+    ).toBe(false);
+    expect(onMiss).not.toHaveBeenCalled();
+
+    // A URL no manifest names is still a miss.
+    core.isSegmentLoadable("https://cdn.example/live/subs/en/subs2.vtt");
+    expect(onMiss).toHaveBeenCalledTimes(1);
+  });
+
+  it("passes an MPD's text and trick-mode segments through until an MPD stops listing them", () => {
+    const url = "https://cdn.example/dash/manifest.mpd";
+    const core = new Core({ manifestParsers: [dashManifestParser] });
+    const onMiss = vi.fn();
+    core.addEventListener("onSegmentRegistryMiss", onMiss);
+    core.processManifest({ url, data: DASH_WITH_TEXT_IMAGE_AND_TRICK_MODE });
+
+    for (const name of [
+      "subs-en.vtt",
+      "fr-init.mp4",
+      "fr-1.m4s",
+      "trick-1.m4s",
+    ]) {
+      expect(core.isSegmentLoadable(`https://cdn.example/dash/${name}`)).toBe(
+        false,
+      );
+    }
+    expect(onMiss).not.toHaveBeenCalled();
+
+    // A SegmentBase text file lists nothing until its index is read, which
+    // the core never reads for text: every range of the file is known.
+    core.processManifest({
+      url: ANGEL_ONE_MPD_URL,
+      data: readFixture("angel-one.mpd"),
+    });
+    expect(
+      core.isSegmentLoadable(
+        "https://storage.googleapis.com/shaka-demo-assets/angel-one/text_el.mp4",
+        { start: 951, end: 1184 },
+      ),
+    ).toBe(false);
+    expect(onMiss).not.toHaveBeenCalled();
+
+    // Each MPD replaces the last: one without text names those no more.
+    core.processManifest({ url, data: DASH_SEGMENT_TEMPLATE });
+    core.isSegmentLoadable("https://cdn.example/dash/fr-1.m4s");
+    expect(onMiss).toHaveBeenCalledTimes(1);
   });
 
   it("does not let a playlist that registered nothing name the swarm", () => {

@@ -18,6 +18,7 @@ import type {
   ParsedStream,
   SegmentIndexSource,
   ParsedInitSegment,
+  SegmentLocation,
   UtcTimingSource,
 } from "./types.js";
 import { audioStreamProperties, videoStreamProperties } from "./properties.js";
@@ -44,7 +45,8 @@ ensureObjectValues();
  * never register. A trick-mode video set is the DASH form of an I-frame
  * playlist and is left out for the same reason; mpd-parser does not report
  * it, so `readMpd` does. See specs/manifest-registry.md, "Segments core does
- * not register".
+ * not register". The segments of both are still reported, as
+ * `nonStreamSegments`, so the core recognises a player's request for one.
  */
 export const dashManifestParser: ManifestParser = {
   protocol: "dash",
@@ -78,8 +80,12 @@ export const dashManifestParser: ManifestParser = {
       trickModeRepresentations.has(playlist.attributes.NAME);
 
     const streams: ParsedStream[] = [];
+    const nonStream: MpdPlaylist[] = [];
     for (const playlist of manifest.playlists) {
-      if (isTrickMode(playlist)) continue;
+      if (isTrickMode(playlist)) {
+        nonStream.push(playlist);
+        continue;
+      }
       streams.push(toStream(playlist, "main", isLive, videoProperties));
     }
     const groups = manifest.mediaGroups.AUDIO ?? {};
@@ -88,7 +94,10 @@ export const dashManifestParser: ManifestParser = {
       for (const label of Object.keys(renditions)) {
         const rendition = renditions[label];
         for (const playlist of rendition.playlists) {
-          if (isTrickMode(playlist)) continue;
+          if (isTrickMode(playlist)) {
+            nonStream.push(playlist);
+            continue;
+          }
           streams.push(
             toStream(playlist, "secondary", isLive, (a) =>
               audioStreamProperties({
@@ -108,7 +117,24 @@ export const dashManifestParser: ManifestParser = {
       }
     }
 
-    if (!isLive) return { protocol: "dash", url, streams, clock: undefined };
+    const subtitles = manifest.mediaGroups.SUBTITLES ?? {};
+    for (const groupId of Object.keys(subtitles)) {
+      const renditions = subtitles[groupId];
+      for (const label of Object.keys(renditions)) {
+        nonStream.push(...renditions[label].playlists);
+      }
+    }
+    const nonStreamSegments = segmentLocations(nonStream);
+
+    if (!isLive) {
+      return {
+        protocol: "dash",
+        url,
+        streams,
+        nonStreamSegments,
+        clock: undefined,
+      };
+    }
     const available = availableSegments(
       withDeclaredWindows(
         streams,
@@ -124,9 +150,45 @@ export const dashManifestParser: ManifestParser = {
       now,
       available.nextAvailableAt,
     );
-    return { protocol: "dash", url, streams: available.streams, clock };
+    return {
+      protocol: "dash",
+      url,
+      streams: available.streams,
+      nonStreamSegments,
+      clock,
+    };
   },
 };
+
+/**
+ * Every segment and initialization segment the playlists list, by location.
+ * A WebVTT file given as the AdaptationSet's `BaseURL` alone is one segment.
+ * A `SegmentBase` playlist lists none until its index is read, which the core
+ * does only for a stream, so its file is given whole: the `BaseURL`
+ * mpd-parser resolves for the playlist.
+ */
+function segmentLocations(playlists: MpdPlaylist[]): SegmentLocation[] {
+  const locations: SegmentLocation[] = [];
+  for (const playlist of playlists) {
+    if (!playlist.segments.length) {
+      if (playlist.resolvedUri) locations.push({ url: playlist.resolvedUri });
+      continue;
+    }
+    for (const segment of playlist.segments) {
+      locations.push({
+        url: segment.resolvedUri,
+        byteRange: byteRangeFromOffsetLength(segment.byterange),
+      });
+      if (segment.map) {
+        locations.push({
+          url: segment.map.resolvedUri,
+          byteRange: byteRangeFromOffsetLength(segment.map.byterange),
+        });
+      }
+    }
+  }
+  return locations;
+}
 
 /**
  * The live window each Representation numbered by a `SegmentTemplate@duration`

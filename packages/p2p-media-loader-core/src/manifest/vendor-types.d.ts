@@ -128,6 +128,7 @@ declare module "mpd-parser" {
     playlists: MpdPlaylist[];
     mediaGroups: {
       AUDIO?: Record<string, Record<string, MpdMediaGroupItem>>;
+      SUBTITLES?: Record<string, Record<string, MpdMediaGroupItem>>;
     };
     endList?: boolean;
     duration?: number;

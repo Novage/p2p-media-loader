@@ -38,6 +38,12 @@ export type ParsedSegment = {
   readonly presentationTime?: number;
 };
 
+/** Where a segment is: its URL, and its byte range where it is part of a file. */
+export type SegmentLocation = {
+  readonly url: string;
+  readonly byteRange?: ByteRange;
+};
+
 export type ParsedInitSegment = {
   readonly url: string;
   readonly byteRange?: ByteRange;
@@ -100,6 +106,18 @@ export type ParsedManifest = {
    * a stream of its own. An MPD names nothing that arrives later.
    */
   readonly excludedPlaylists?: readonly string[];
+  /**
+   * The segments and initialization segments an MPD lists outside any
+   * stream: those of its text AdaptationSets and trick-mode Representations.
+   * A player fetches them, so the core recognises them and passes them
+   * through rather than counting each a registry miss. A location without
+   * a byte range stands for the whole file, any range of it: a WebVTT file
+   * given as a `BaseURL`, or a `SegmentBase` file, whose index the core does
+   * not read. Present on every MPD, empty where it lists none, since each
+   * MPD replaces the last. An HLS playlist that is no stream arrives on its
+   * own and carries its segments as a stream the registry ignores.
+   */
+  readonly nonStreamSegments?: readonly SegmentLocation[];
   /**
    * Present when the manifest's segment list follows from the wall clock
    * rather than from the manifest alone: a dynamic MPD whose segments a

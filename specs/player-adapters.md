@@ -158,13 +158,13 @@ unset stream is not one to be skipped over but one using the default.
 ### HLS.js
 
 - Parsers: HLS only.
-- Manifest: `pLoader`, for the playlists that name streams — the master, a
-  variant's media playlist, an audio rendition's. A subtitle track's playlist
-  passes through it too and is not handed over. The core would ignore it — the
-  master names the playlists that carry no video or audio, and a media playlist
-  arriving at one registers nothing
-  ([manifest-registry.md](manifest-registry.md)) — so handing it over would
-  only cost the parse.
+- Manifest: `pLoader`, for the master and every media playlist: a variant's,
+  an audio rendition's, and a subtitle track's. A subtitle track's playlist
+  registers no stream — the master names the playlists that carry no video or
+  audio — but it names the fragments HLS.js then asks for through `fLoader`,
+  which the core recognises rather than counting each as a registry miss
+  ([manifest-registry.md](manifest-registry.md), "Segments of subtitles and
+  trick play").
 - Segments: `fLoader`, falling back to `config.loader`.
 - Playback: the media element.
 

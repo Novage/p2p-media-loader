@@ -158,10 +158,12 @@ throughout.
 - **The core registers video and audio streams only**, by what the manifests
   declare, so no adapter has to tell a track's kind. An HLS master's subtitle
   renditions and I-frame playlists are remembered by URL and their media
-  playlists register nothing when they arrive — Shaka and Video.js hand them
-  over like any other — and a playlist declaring `EXT-X-I-FRAMES-ONLY` needs
-  no master to be ignored. An MPD's text, thumbnail and trick-mode
-  `AdaptationSet`s are left out where it is read. Leaving a trick-mode set out
+  playlists register nothing when they arrive — every adapter hands them over
+  like any other — and a playlist declaring `EXT-X-I-FRAMES-ONLY` needs no
+  master to be ignored. An MPD's text, thumbnail and trick-mode
+  `AdaptationSet`s are left out where it is read. The segments of subtitles
+  and trick play are still recognised, so a player's request for one loads
+  over HTTP without counting as a registry miss. Leaving a trick-mode set out
   also changes the identity of a video rung it matched in codecs and
   resolution, since `bitrate` no longer has to tell the two apart. See
   [`specs/manifest-registry.md`](specs/manifest-registry.md).

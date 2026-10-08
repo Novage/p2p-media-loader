@@ -69,6 +69,11 @@ export function segmentKey(url: string, byteRange?: ByteRange): string {
   return `${normalized}|${byteRange.start}-${byteRange.end}`;
 }
 
+/** The normalized URL of the file a segment key names: the key less its range. */
+export function fileOfSegmentKey(key: string): string {
+  return key.replace(/\|\d+-\d+$/, "");
+}
+
 /**
  * m3u8 `{ offset, length }` → inclusive `[start, end]`.
  *

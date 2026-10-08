@@ -11,25 +11,26 @@ import { Core } from "p2p-media-loader-core";
 import { isSecondaryPlayer } from "./secondary-player.js";
 
 /**
- * The playlists that name streams and segments: the master, a variant's media
- * playlist, and an audio rendition's. A subtitle track's names neither, and
- * the core would ignore it — the master told it which playlists carry no
- * video or audio — so this only spares a parse. The whitelist is the
- * adapter's ordinary one, of the request types it handles; see
+ * The playlists the core reads: the master, a variant's media playlist, an
+ * audio rendition's, and a subtitle track's. The last registers no stream —
+ * the master told the core which playlists carry no video or audio — but
+ * names the fragments HLS.js then asks for, which the core recognises rather
+ * than counting each a registry miss. The whitelist is the adapter's
+ * ordinary one, of the request types it handles; see
  * specs/player-adapters.md.
  */
 const PLAYLISTS_THE_CORE_READS = new Set<string>([
   "manifest",
   "level",
   "audioTrack",
+  "subtitleTrack",
 ]);
 
 /**
  * Wraps HLS.js's own playlist loader so the manifests that describe this
- * presentation are also handed to the core: the master, a variant's media
- * playlist and an audio rendition's, fetched by the primary player. A
- * subtitle track's playlist, and anything a player HLS.js built beside the
- * primary fetches, pass through untouched — see `load` for both.
+ * presentation are also handed to the core: the master and every media
+ * playlist, fetched by the primary player. What a player HLS.js built beside
+ * the primary fetches passes through untouched — see `load`.
  *
  * Loading itself is untouched either way: the core observes the response the
  * player already made rather than fetching its own. See
@@ -75,7 +76,6 @@ export class PlaylistLoaderBase implements Loader<PlaylistLoaderContext> {
     callbacks: LoaderCallbacks<LoaderContext>,
   ) {
     const core = this.#core;
-    // Subtitle tracks come through here too; see PLAYLISTS_THE_CORE_READS.
     const parsed =
       !this.#ofAnotherPlayer &&
       PLAYLISTS_THE_CORE_READS.has((context as PlaylistLoaderContext).type);

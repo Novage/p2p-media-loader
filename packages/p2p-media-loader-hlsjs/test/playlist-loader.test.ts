@@ -119,20 +119,16 @@ describe("HLS.js playlist loader", () => {
     expect(processManifest).not.toHaveBeenCalled();
   });
 
-  it("gives the core the playlists that name streams, and no others", () => {
-    // HLS.js routes every playlist through this loader. A subtitle track names
-    // no streams, and the core would ignore it — handing one over only costs a
-    // parse.
+  it("gives the core every playlist, a subtitle track's included", () => {
+    // A subtitle track registers no stream, but names the fragments HLS.js
+    // then asks for, which the core recognises rather than counting each a
+    // registry miss.
     const { load, processManifest } = playlistLoader();
 
-    for (const type of ["manifest", "level", "audioTrack"]) {
+    for (const type of ["manifest", "level", "audioTrack", "subtitleTrack"]) {
       load(type);
       FakeLoader.respond("#EXTM3U");
     }
-    expect(processManifest).toHaveBeenCalledTimes(3);
-
-    load("subtitleTrack", "https://cdn.example/hls/subs-en.m3u8");
-    FakeLoader.respond("#EXTM3U\n#EXT-X-TARGETDURATION:6");
-    expect(processManifest).toHaveBeenCalledTimes(3);
+    expect(processManifest).toHaveBeenCalledTimes(4);
   });
 });

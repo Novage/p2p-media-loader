@@ -100,7 +100,9 @@ master that tells the two apart by query string alone. An MPD's text and image
 `AdaptationSet`s are left out where the MPD is read, and nothing of theirs
 arrives later. No adapter has to know a track's kind: every manifest a player
 fetches may be handed over. See
-[Segments core does not register](#segments-core-does-not-register).
+[Segments core does not register](#segments-core-does-not-register), and
+[Segments of subtitles and trick play](#segments-of-subtitles-and-trick-play)
+for why a request for one of their segments is still no miss.
 
 A media playlist is matched to the stream its master declared by URL,
 tolerating a query string that differs (signed tokens rotate) and a redirect
@@ -493,14 +495,16 @@ next refresh. That is correct: it is no longer live.
 - **Subtitles and captions** (`EXT-X-MEDIA:TYPE=SUBTITLES`; DASH text
   `AdaptationSet`s, whether WebVTT, TTML or IMSC in MP4) and **image
   thumbnails** (`image/jpeg` `AdaptationSet`s) — not video or audio. Closed
-  captions ride inside the variants and name nothing to register.
+  captions ride inside the variants and name nothing to register. The segments
+  of subtitles are recognised and passed through. See below.
 - **I-frame playlists** (`EXT-X-I-FRAME-STREAM-INF`, and any media playlist
   declaring `EXT-X-I-FRAMES-ONLY`) and **DASH trick-mode Representations**
   (the DASH-IF `http://dashif.org/guidelines/trickmode` descriptor, on the
   `AdaptationSet` or the `Representation`) — trick-play only, not worth swarm
   capacity. Only the descriptor is recognised; a set signalled by
   `maxPlayoutRate` alone is a video stream like any other, so every peer reads
-  it the same way whichever packager wrote it.
+  it the same way whichever packager wrote it. Their segments are recognised
+  and passed through. See below.
 - **Initialization segments** (`EXT-X-MAP`, DASH `Initialization`) — recognised
   and deliberately passed through. See below.
 - **Segments behind an external index that has not arrived** (DASH
@@ -542,6 +546,32 @@ near total. It is outweighed:
 An `EXT-X-MAP` that names a byte range of the same file as its media segments
 resolves naturally: its key differs by range, so it is recognised as the
 initialization segment rather than colliding with media.
+
+### Segments of subtitles and trick play
+
+A player fetches the segments of a subtitle track, and of trick play where it
+has it, through the same path as its media. They belong to no stream, so the
+registry does not hold them, and each request would count as a registry miss —
+a miss that means nothing, and that hides the misses that do. So they are
+recognised and passed through, as initialization segments are: always loaded
+over HTTP, never stored, announced, or requested from a peer, and never counted
+as a miss.
+
+The registry keeps their keys for each manifest that lists them. A subtitle or
+I-frame playlist reaches the core as a media playlist the master named as no
+stream. It registers nothing, and its segments, initialization segments
+included, become that playlist's set. An MPD lists the segments of its text
+`AdaptationSet`s and trick-mode Representations itself, and they become the
+MPD's set. Where one lists no segments — a WebVTT file given as a `BaseURL`, or
+a `SegmentBase` file, whose index the core reads only for a stream — the file
+is recognised whole, any range of it. Each parse replaces its manifest's set, so a live list keeps to its
+window, and a segment that left it is a miss again, as an initialization
+segment is.
+
+Two kinds stay unrecognised, because mpd-parser does not read them: the
+thumbnails of an image `AdaptationSet`, and a text `AdaptationSet` that has
+neither `contentType="text"` nor `mimeType="text/vtt"`, such as a TTML file
+marked by its `mimeType` alone. A request for one counts as a miss.
 
 ## Divergence between core and the player
 
