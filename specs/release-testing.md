@@ -536,7 +536,9 @@ test 17, in the same consumer projects.
   in it, or the text says it is assumed. The page's import map has an entry
   for every bare specifier the engine's `dist/*.es.js` imports — read them
   from the bundle. Each CDN URL answers 200, and each pinned version is the
-  version the demo uses.
+  version the demo uses. The URLs of this project's own packages resolve only
+  once the release is on npm — a range such as `^5` matches no pre-release —
+  so check those right after publishing.
 - **Every player example matches the demo.** The demo's component for the
   same player is the tested integration. A setting the demo needs and the
   example lacks — MediaElement's `renderers`, the mixin on `window.Hls` for a

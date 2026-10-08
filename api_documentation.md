@@ -452,7 +452,11 @@ The dash.js engine maps `p2p-media-loader-core` and `p2p-media-loader-core/dash`
 
 ### **Integrating P2P with Clappr and HLS.js**
 
+Clappr plays HLS through HLS.js, built into `@clappr/player`; the quality menu is the separate `@clappr/level-selector` package of the Clappr monorepo:
+
 ```html
+<script src="https://cdn.jsdelivr.net/npm/@clappr/player@~0.14/dist/clappr.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@clappr/level-selector@~1/dist/level-selector.min.js"></script>
 <script type="module">
   import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 
@@ -465,7 +469,7 @@ The dash.js engine maps `p2p-media-loader-core` and `p2p-media-loader-core/dash`
 
   const player = new Clappr.Player({
     source: streamUrl,
-    plugins: [LevelSelector], // https://cdn.jsdelivr.net/gh/clappr/clappr-level-selector-plugin@~0/dist/level-selector.min.js
+    plugins: [LevelSelector],
     height: "100%",
     width: "100%",
     parentId: `#player`,
@@ -645,7 +649,13 @@ The dash.js engine maps `p2p-media-loader-core` and `p2p-media-loader-core/dash`
 
 ### **Integrating P2P with Clappr and Shaka Player**
 
+Clappr plays MPEG-DASH through the `dash-shaka-playback` package of the Clappr monorepo, which works with Shaka Player 3 and 4 only:
+
 ```html
+<script src="https://cdn.jsdelivr.net/npm/shaka-player@~4/dist/shaka-player.compiled.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@clappr/player@~0.14/dist/clappr.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@clappr/level-selector@~1/dist/level-selector.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dash-shaka-playback@~4/dist/dash-shaka-playback.min.js"></script>
 <script type="module">
   import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 

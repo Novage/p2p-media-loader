@@ -7,11 +7,13 @@ import { subscribeToUiEvents } from "../utils";
 import { useScripts } from "../../../hooks/useScripts";
 import { Loader } from "../loader/Loader";
 
+// Clappr plays DASH through its `dash-shaka-playback` package, whose peer
+// range is Shaka 3 and 4: this player alone loads Shaka 4.
 const SCRIPTS = [
   "https://cdn.jsdelivr.net/npm/shaka-player@~4/dist/shaka-player.compiled.min.js",
-  "https://cdn.jsdelivr.net/npm/@clappr/player@~0/dist/clappr.min.js",
-  "https://cdn.jsdelivr.net/gh/clappr/clappr-level-selector-plugin@~0/dist/level-selector.min.js",
-  "https://cdn.jsdelivr.net/npm/dash-shaka-playback@~3/dist/dash-shaka-playback.external.min.js",
+  "https://cdn.jsdelivr.net/npm/@clappr/player@~0.14/dist/clappr.min.js",
+  "https://cdn.jsdelivr.net/npm/@clappr/level-selector@~1/dist/level-selector.min.js",
+  "https://cdn.jsdelivr.net/npm/dash-shaka-playback@~4/dist/dash-shaka-playback.min.js",
 ];
 
 export const ShakaClappr = ({
@@ -84,7 +86,7 @@ export const ShakaClappr = ({
     onPeerConnect,
     onPeerClose,
     streamUrl,
-    
+
     areScriptsLoaded,
   ]);
 
