@@ -786,9 +786,44 @@ VHS consults the global callback sets only for players that have none of their
 own. An integrator who relies on `videojs.Vhs.xhr.onRequest` for a bound player
 should move those hooks to that player.
 
-VHS exposes no presentation-delay setting comparable to the other engines': it
-starts a live stream at its own seekable end, honouring `EXT-X-START` and
-`HOLD-BACK` where present. The adapter leaves that placement alone.
+**Live placement, through VHS internals.** VHS has no setting comparable to
+the other engines' for where a live stream plays or how far ahead it fetches.
+It plays behind the edge by the delay its parsed manifest gives —
+`suggestedPresentationDelay`, then `HOLD-BACK`, then three target durations —
+and buffers ahead by `GOAL_BUFFER_LENGTH`, 30 s and page-wide. Left alone it
+starts a few segments behind the edge and asks for every new segment as soon
+as it is listed: on 2 s DASH segments, two peers each fetched every segment
+over HTTP and shared none.
+
+So the adapter places Video.js by the rule the other adapters follow, on the
+player's own VHS objects. On each manifest the core reads, it takes the live
+delay from `liveDelayFor` and writes it as `suggestedPresentationDelay` on the
+manifest VHS's main playlist loader parsed (`mainPlaylistLoader_.main` on its playlist controller). VHS reads it there for the start position and the
+seekable range, and keeps it across refreshes: a refresh merges the new
+manifest into the old object and carries only its duration, update period and
+timeline starts across. A delay the manifest suggests itself is set aside, as
+the dash.js adapter sets it aside: a server's suggestion places the player near
+the edge. The write happens when the core has the window and again on the
+loader's `loadedplaylist`, which VHS fires before the `loadedmetadata` that
+picks the start position. The forward buffer is a ceiling over this player's
+`playlistController_.goalBufferLength()`, which VHS's segment loaders call: the
+smaller of VHS's own goal and `playerBufferFor` the delay. Nothing page-wide is
+touched.
+
+One consequence is Video.js's own: VHS ends the seekable range at the same
+delay, so a viewer cannot seek nearer the edge than where the player is
+placed. On a DVR window that takes the last minute at most off the range; on a
+short live window it leaves little to seek in, where the other engines keep
+the whole window seekable. Video.js's live UI reads the same range, so its
+"live" is the placed delay, and going live keeps the player where peers can
+serve it.
+
+A new source, the engine's release, or a presentation with nothing live in it
+gives both back: the controller's own `goalBufferLength` again, and the
+manifest's own delay where the delay written is still there. These are VHS
+internals, read with care for their absence: where they are missing the
+adapter places nothing, counts `VhsPlacement:unavailable`, and the player
+plays as VHS would.
 
 VHS is also the only engine here that caps the rendition by the size the player
 is rendered at — `limitRenditionByPlayerDimensions`, on unless set to `false`.

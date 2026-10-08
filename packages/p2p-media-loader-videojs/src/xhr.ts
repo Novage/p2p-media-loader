@@ -4,6 +4,7 @@ import {
   byteRangeFromRangeHeader,
   debug,
   runAll,
+  type ProcessedManifest,
 } from "p2p-media-loader-core";
 import {
   REQUEST_TYPE,
@@ -196,6 +197,10 @@ export class RequestRouter {
     private readonly core: Core,
     private readonly player: VideoJsPlayerLike,
     private readonly videojs: VideoJsLike,
+    /** What the core made of each manifest, for the live placement. */
+    private readonly onManifestProcessed?: (
+      manifest: ProcessedManifest,
+    ) => void,
   ) {}
 
   /** Puts this player's hooks on the xhr function of its current VHS handler. */
@@ -534,9 +539,10 @@ export class RequestRouter {
   }
 
   /** Nothing the core does with what it is handed may break playback. */
-  private process(work: () => void) {
+  private process(work: () => ProcessedManifest | undefined) {
     try {
-      work();
+      const processed = work();
+      if (processed) this.onManifestProcessed?.(processed);
     } catch (failure) {
       this.logger("the core failed to process a response: %O", failure);
     }

@@ -91,7 +91,10 @@ throughout.
   each report; see [`specs/playback-contract.md`](specs/playback-contract.md).
 - **A live player is placed as deep in the live window as the window allows**,
   by one rule shared across the adapters, so the segments between a peer's
-  buffer and the live edge are as many as possible for peers to exchange. On
+  buffer and the live edge are as many as possible for peers to exchange.
+  Video.js 8 has no setting for this, so its adapter writes the delay into the
+  manifest VHS parsed and caps that player's buffer goal: on 2 s DASH segments
+  two Video.js peers went from sharing nothing to sharing segments both ways. On
   HLS.js and dash.js, a viewer that a pause or a stall leaves more than two
   segments past that placement is brought back to it — through the latency limit
   the adapter sets on HLS.js, and when playback resumes on dash.js — so the

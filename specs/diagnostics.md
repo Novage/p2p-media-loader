@@ -202,7 +202,9 @@ the groups and the cases a reader of a snapshot must know.
   player's manifests by result (`ManifestParse`), and clock synchronizations
   and re-parses by result. The HLS.js adapter counts each check of a start
   placement by result (`HlsStartPlacement:corrected`, `:kept`, and `:chosen`
-  for a start the integrator or the playlist chose).
+  for a start the integrator or the playlist chose). The Video.js adapter
+  counts each live delay it writes (`VhsPlacement:applied`) and each VHS it
+  cannot place (`VhsPlacement:unavailable`).
 - **Probes:** each segment storage's size; the peers that each swarm's
   connection manager holds (`PeersHeld`) and its P2P loader wraps
   (`PeersWrapped`), which must be equal.

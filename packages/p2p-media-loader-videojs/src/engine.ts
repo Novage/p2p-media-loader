@@ -15,6 +15,7 @@ import {
   trackMediaElementPlayback,
 } from "p2p-media-loader-core";
 import { FirstManifestHooks, RequestRouter, RouterRegistry } from "./xhr.js";
+import { VhsLivePlacement } from "./live-placement.js";
 import type {
   VhsXhr,
   VideoJsLike,
@@ -101,6 +102,7 @@ export class VideoJsP2PEngine {
 
   private player?: VideoJsPlayerLike;
   private router?: RequestRouter;
+  private placement?: VhsLivePlacement;
   /** The page-wide xhr function whose hooks this engine holds, if any. */
   private retainedXhr?: VhsXhr;
   private readonly playback = trackMediaElementPlayback((state) =>
@@ -207,7 +209,13 @@ export class VideoJsP2PEngine {
     bound.set(player, this);
 
     this.player = player;
-    this.router = new RequestRouter(this.core, player, this.videojs);
+    this.placement = new VhsLivePlacement(player);
+    this.router = new RequestRouter(
+      this.core,
+      player,
+      this.videojs,
+      this.placement.update,
+    );
     registry.add(this.router);
     this.retainedXhr = firstManifestHooks.retain(this.videojs);
     player.on("xhr-hooks-ready", this.handleXhrHooksReady);
@@ -302,6 +310,9 @@ export class VideoJsP2PEngine {
 
   /** A new source brings a new VHS handler, with its own xhr to hook. */
   private handleLoadStart = () => {
+    // The next source is placed on its own window, from the player's own
+    // settings; what was written for this one is given back.
+    this.placement?.release("replaced");
     this.router?.ensureTopLevelManifest();
     this.registerMediaElement();
   };
@@ -330,6 +341,10 @@ export class VideoJsP2PEngine {
     const failures = runAll([
       () => this.core.destroy(),
       () => this.playback.stop(),
+      () => {
+        this.placement?.release("destroyed");
+        this.placement = undefined;
+      },
       () => {
         if (!this.router) return;
         registry.remove(this.router);

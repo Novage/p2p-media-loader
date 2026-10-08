@@ -242,10 +242,9 @@ Pass:
 - The playback oracle (`p2pml:playback-oracle`) agrees with the media
   element, as [verification.md](verification.md) describes.
 - Both tabs hold a peer. In steady state, both tabs get segments over P2P,
-  and the two tabs together fetch each segment over HTTP about once. A player
-  that the adapter does not place on live — Video.js 8 is one
-  ([player-adapters.md](player-adapters.md)) — can play so near the live edge
-  on short segments that it gets no P2P; record its latency with the result.
+  and the two tabs together fetch each segment over HTTP about once. Record
+  each player's latency with the result: a player that plays near the live
+  edge on short segments gets little or no P2P.
 - No leak, no anomaly, and no error in the console.
 - Record the dropped frames (`video.getVideoPlaybackQuality()`). A share
   above 1% of the frames is a finding to examine.

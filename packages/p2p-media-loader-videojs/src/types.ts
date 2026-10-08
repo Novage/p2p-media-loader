@@ -112,7 +112,7 @@ export type VhsHandlerLike = {
    * it has not made yet: under `preload="none"` VHS parks the load here and
    * runs it on the first `play`, clearing the field as it goes.
    */
-  playlistController_?: { loadOnPlay_?: (() => void) | null };
+  playlistController_?: VhsPlaylistControllerLike;
   representations?(): VhsRepresentation[];
   /** VHS's own bandwidth estimate, in bits per second. */
   bandwidth?: number;
@@ -121,6 +121,22 @@ export type VhsHandlerLike = {
    * and `llhls` decides whether it plays low-latency HLS by partial segments.
    */
   options_?: { withCredentials?: boolean; llhls?: boolean };
+};
+
+/**
+ * VHS's controller for one source, as far as the adapter reaches into it:
+ * these are VHS internals, read with care for their absence.
+ */
+export type VhsPlaylistControllerLike = {
+  loadOnPlay_?: (() => void) | null;
+  /** How far ahead of the playhead VHS buffers, read by its segment loaders. */
+  goalBufferLength?: () => number;
+  /** The loader of the top-level manifest, and what it parsed. */
+  mainPlaylistLoader_?: {
+    main?: { suggestedPresentationDelay?: number };
+    on(type: string, listener: () => void): void;
+    off(type: string, listener: () => void): void;
+  };
 };
 
 /** VHS options as an integrator gives them: on the tech, or page-wide. */
