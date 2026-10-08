@@ -501,8 +501,7 @@ These need what the assistant does not have, or a judgement it cannot make.
 8. **Production streams.** Customer-like streams: token-signed URLs, CDN
    access rules, and CORS settings.
 9. **Privacy settings.** Brave, private windows, and Firefox with strict
-   privacy settings. Playback must continue over HTTP only. A page without
-   WebRTC is in Part 1, test 10.
+   privacy settings. Playback must continue over HTTP only.
 10. **Mobile proxy.** Native players through the local proxy
     ([mobile-proxy.md](mobile-proxy.md)) on a real Android and iOS app.
 11. **Release pipeline.** A dry run of the publish workflow, which needs the
