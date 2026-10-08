@@ -10,7 +10,8 @@ if (!compiledLedger) throw new Error("diagnostics are compiled out");
 const diagnostics = compiledLedger;
 
 // The ledger decides once, at its first record. Turning the namespace off
-// again after that keeps the ledger on and its log quiet.
+// again after that keeps the ledger on and the anomalies these tests cause
+// out of the output.
 debug.enable("p2pml:diagnostics");
 diagnostics.snapshot();
 debug.disable();

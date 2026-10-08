@@ -49,11 +49,11 @@ selector lists the namespace like the others.
 When they are on, `globalThis.__p2pmlDiagnostics` holds `snapshot()` and
 `clearAnomalies()`.
 
-Each open and close is also logged, under its own namespace,
-`p2pml:diagnostics:log`. It is separate because a busy page opens and closes a
-record for every request and download: logged by default, those lines push
-everything else out of the console's buffer. A pattern such as `p2pml:*`
-enables both.
+Each anomaly is also logged, under `p2pml:diagnostics`. Each open and close is
+logged under a namespace of its own, `p2pml:diagnostics:log`. It is separate
+because a busy page opens and closes a record for every request and download:
+logged by default, those lines push everything else out of the console's
+buffer. A pattern such as `p2pml:*` enables both.
 
 When they are off, each call returns at once. The ledger keeps no record,
 installs no global, and holds no reference.
@@ -173,8 +173,7 @@ the groups and the cases a reader of a snapshot must know.
   synchronizations and re-parses by result.
 - **Probes:** each segment storage's size; the peers that each swarm's
   connection manager holds (`PeersHeld`) and its P2P loader wraps
-  (`PeersWrapped`), which must be equal; and each hybrid loader's playhead
-  estimate (`Playhead:<main|secondary>`), with the source it is based on.
+  (`PeersWrapped`), which must be equal.
 - **Anomalies:** a close of a token that is not open or of no token, and the
   timers under rule 2.
 
@@ -209,11 +208,6 @@ A test takes a snapshot before a step and after it:
   `Download:p2p:failed` that grows while both peers stay connected.
 - **A drift** shows as two probes that disagree, such as `PeersHeld` and
   `PeersWrapped` for one swarm.
-- **A playhead estimate that is wrong** shows in `Playhead`: between two
-  snapshots, the estimate must move as far as the media element's
-  `currentTime`. The core's estimate is in manifest time and the player's time
-  may be offset from it, so compare the distances moved, never the values
-  ([playback-contract.md](playback-contract.md)).
 - **No P2P between two tabs** is read with the swarms of their open P2P
   loaders, the detail of each `P2PLoader` record. Tabs on different renditions
   are in different swarms and share nothing, which is correct.

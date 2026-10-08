@@ -39,7 +39,14 @@ type Ledger = {
   readonly probes: Map<string, () => unknown>;
   readonly anomalies: string[];
   sequence: number;
+  /** Anomalies: rare, and what a reader must not miss. */
   readonly log: debug.Debugger;
+  /**
+   * Each open and close, under a namespace of its own: a busy page makes one
+   * for every request and download, which would push everything else out of
+   * the console's buffer.
+   */
+  readonly recordLog: debug.Debugger;
 };
 
 /** `undefined` until the first record decides; `null` when off. */
@@ -56,6 +63,7 @@ function active(): Ledger | null {
     anomalies: [],
     sequence: 0,
     log: debug(NAMESPACE),
+    recordLog: debug(`${NAMESPACE}:log`),
   };
   (globalThis as { __p2pmlDiagnostics?: unknown }).__p2pmlDiagnostics = {
     snapshot: () => ledgerApi.snapshot(),
@@ -84,7 +92,7 @@ const ledgerApi = {
     state.open.set(token, { kind, detail });
     const live = (state.live.get(kind) ?? 0) + 1;
     state.live.set(kind, live);
-    state.log("open  %s %s (live %d)", token, detail, live);
+    state.recordLog("open  %s %s (live %d)", token, detail, live);
     return token;
   },
 
@@ -110,7 +118,7 @@ const ledgerApi = {
     const live = (state.live.get(entry.kind) ?? 1) - 1;
     if (live === 0) state.live.delete(entry.kind);
     else state.live.set(entry.kind, live);
-    state.log("close %s %s (live %d)", token, cause, live);
+    state.recordLog("close %s %s (live %d)", token, cause, live);
   },
 
   /** Adds to a counter: `Area:qualifier:result`, from fixed words only. */

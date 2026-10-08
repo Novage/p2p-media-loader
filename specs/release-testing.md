@@ -68,16 +68,16 @@ is not a stall until the test has waited for it.
 - The debug loggers, through `localStorage.debug`. Set it before the page
   loads: the `debug` library reads it at load.
 
-  | Logger                       | Shows                                                    |
-  | ---------------------------- | -------------------------------------------------------- |
-  | `p2pml-core:registry-miss`   | A player request that the registry does not know         |
-  | `p2pml:playback-oracle`      | The core's playhead beside the media element's           |
-  | `p2pml-core:manifest`        | The registry each manifest gives                         |
-  | `p2pml-core:clock`           | Clock synchronization and re-parses of clock-based lists |
-  | `p2pml-core:hybrid-loader-*` | Requests, and each prefetch "as owner" or "as backup #n" |
-  | `p2pml-core:tracker`         | Announces, offers, answers, peers held and released      |
-  | `p2pml:diagnostics`          | Enables the ledger ([diagnostics.md](diagnostics.md))    |
-  | `p2pml:diagnostics:log`      | Each open and close of a ledger record                   |
+  | Logger                       | Shows                                                                         |
+  | ---------------------------- | ----------------------------------------------------------------------------- |
+  | `p2pml-core:registry-miss`   | A player request that the registry does not know                              |
+  | `p2pml:playback-oracle`      | The core's playhead beside the media element's                                |
+  | `p2pml-core:manifest`        | The registry each manifest gives                                              |
+  | `p2pml-core:clock`           | Clock synchronization and re-parses of clock-based lists                      |
+  | `p2pml-core:hybrid-loader-*` | Requests, and each prefetch "as owner" or "as backup #n"                      |
+  | `p2pml-core:tracker`         | Announces, offers, answers, peers held and released                           |
+  | `p2pml:diagnostics`          | Enables the ledger ([diagnostics.md](diagnostics.md)), and logs its anomalies |
+  | `p2pml:diagnostics:log`      | Each open and close of a ledger record                                        |
 
   The browser keeps only the most recent console lines. Enable only the
   loggers that a test reads, or the lines it needs are lost: one busy page
@@ -90,8 +90,7 @@ stream, player or core that owned it is gone. Enable the diagnostics ledger
 ([diagnostics.md](diagnostics.md)) in each tab, and take a snapshot of
 `globalThis.__p2pmlDiagnostics` before and after each step. The ledger also
 counts downloads by source and result, registry misses and closed peers by
-cause, timers that fire after their owner was destroyed, and the core's
-playhead estimate. Some resources are released late by design; the list is in
+cause, and timers that fire after their owner was destroyed. Some resources are released late by design; the list is in
 [diagnostics.md](diagnostics.md), "What is recorded". An investigation that
 needs more detail adds one-off probes under the rules in
 [diagnostics.md](diagnostics.md), and removes them when it ends. The ledger
@@ -162,8 +161,8 @@ Pass:
 - `readyState` 4 and no media error in both tabs.
 - No registry miss, except for the WebM renditions that
   [verification.md](verification.md) lists as playing without P2P.
-- The core's playhead estimate (the `Playhead` probes) moves with the media
-  element's `currentTime`.
+- The playback oracle (`p2pml:playback-oracle`) agrees with the media
+  element, as [verification.md](verification.md) describes.
 - Both tabs hold a peer. In steady state, both tabs get segments over P2P,
   and the two tabs together fetch each segment over HTTP about once. A player
   that the adapter does not place on live — Video.js 8 is one
@@ -197,8 +196,7 @@ Pass:
 
 - Each seek reaches `readyState` 3 or more within 15 seconds. Most take less
   than 5 seconds.
-- After each seek, the core's playhead estimate moves with the media
-  element's `currentTime` again.
+- The playback oracle agrees after each seek.
 - Tab A gets segments from tab B over P2P at positions that B prefetched.
 - No leak.
 
