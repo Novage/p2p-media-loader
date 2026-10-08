@@ -1,7 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
 import type { HlsConfig } from "hls.js";
+import { debug } from "p2p-media-loader-core";
 import { HlsJsP2PEngine } from "../src/engine.js";
 import { injectMixin } from "../src/engine-static.js";
+import { diagnostics as compiledLedger } from "../src/diagnostics.js";
+
+// Absent only in a prebuilt bundle; the tests run on the source.
+if (!compiledLedger) throw new Error("diagnostics are compiled out");
+const ledger = compiledLedger;
+// The ledger decides once, at its first record: on, for the whole file.
+debug.enable("p2pml:diagnostics");
+ledger.snapshot();
+debug.disable();
+
+const count = (name: string) => ledger.snapshot()?.counters[name] ?? 0;
 
 /**
  * A stand-in for the HLS.js instance: enough surface for the engine to bind
@@ -35,6 +47,64 @@ function createFakeHls() {
   return hls;
 }
 
+const MASTER_URL = "https://cdn.example/live/master.m3u8";
+const MEDIA_URL = "https://cdn.example/live/720p.m3u8";
+const MASTER = `#EXTM3U
+#EXT-X-STREAM-INF:BANDWIDTH=1000000,RESOLUTION=1280x720
+720p.m3u8
+`;
+
+type PlaylistLoader = {
+  load(context: unknown, config: unknown, callbacks: unknown): void;
+};
+
+/** The playlist loader each fake HLS.js was given, and its next sequence. */
+const playlists = new WeakMap<
+  object,
+  { loader: PlaylistLoader; sequence: number }
+>();
+
+/** What HLS.js's own loader answers the next request with. */
+let nextResponse: string | undefined;
+
+class FakeLoader {
+  stats = {};
+  context = {};
+  load(
+    context: { url: string },
+    _config: unknown,
+    callbacks: { onSuccess: (...args: unknown[]) => void },
+  ) {
+    const data = nextResponse;
+    nextResponse = undefined;
+    if (data === undefined) return;
+    callbacks.onSuccess({ url: context.url, data }, {}, context, null);
+  }
+  abort() {}
+  destroy() {}
+}
+
+/**
+ * Loads a playlist through the engine's playlist loader, as HLS.js does, and
+ * calls `onRead` where HLS.js would read it.
+ */
+function respond(
+  loader: PlaylistLoader,
+  type: string,
+  url: string,
+  data: string,
+  onRead: () => void = () => undefined,
+) {
+  nextResponse = data;
+  loader.load({ type, url }, {}, { onSuccess: onRead });
+}
+
+/**
+ * One refresh of the level playlist, as HLS.js goes through it: the playlist
+ * is loaded — through the engine's loader, into the core — and then HLS.js
+ * announces the level it parsed. Each refresh lists segments after the last
+ * one's, so the timeline runs on.
+ */
 function levelUpdated(
   hls: ReturnType<typeof createFakeHls>,
   details: {
@@ -45,22 +115,45 @@ function levelUpdated(
     /** How many fragments the playlist lists; by default, what fills the window. */
     fragments?: number;
   },
+  options: { type?: string; onRead?: () => void } = {},
 ) {
   const segment = details.averagetargetduration ?? 2;
+  const fragments =
+    details.fragments ??
+    Math.max(5, Math.round(details.totalduration / segment));
+  const state = playlists.get(hls);
+  if (!state) throw new Error("set up without a playlist loader");
+  // Every segment the average, and the last one whatever makes the total.
+  const durations = Array.from({ length: fragments }, (_, i) =>
+    i < fragments - 1 ? segment : details.totalduration - segment * i,
+  );
+  const lines = [
+    "#EXTM3U",
+    "#EXT-X-VERSION:3",
+    `#EXT-X-TARGETDURATION:${details.targetduration ?? 6}`,
+    `#EXT-X-MEDIA-SEQUENCE:${state.sequence}`,
+    ...durations.flatMap((duration, i) => [
+      `#EXTINF:${duration.toFixed(3)},`,
+      `seg${state.sequence + i}.ts`,
+    ]),
+    ...(details.live ? [] : ["#EXT-X-ENDLIST"]),
+  ];
+  state.sequence += fragments;
+  respond(
+    state.loader,
+    options.type ?? "level",
+    MEDIA_URL,
+    `${lines.join("\n")}\n`,
+    options.onRead,
+  );
+
   fire(hls, "hlsLevelUpdated", {
     details: {
       live: details.live,
       totalduration: details.totalduration,
       targetduration: details.targetduration ?? 6,
       averagetargetduration: details.averagetargetduration,
-      fragments: Array.from(
-        {
-          length:
-            details.fragments ??
-            Math.max(5, Math.round(details.totalduration / segment)),
-        },
-        () => ({ type: "main" }),
-      ),
+      fragments: Array.from({ length: fragments }, () => ({ type: "main" })),
     },
   });
 }
@@ -91,14 +184,11 @@ function setup(config?: ConstructorParameters<typeof HlsJsP2PEngine>[0]) {
   const { pLoader } = engine.getConfigForHlsJs() as {
     pLoader: new (config: HlsConfig) => unknown;
   };
-  class FakeLoader {
-    stats = {};
-    context = {};
-    load() {}
-    abort() {}
-    destroy() {}
-  }
-  new pLoader({ loader: FakeLoader } as unknown as HlsConfig);
+  const loader = new pLoader({
+    loader: FakeLoader,
+  } as unknown as HlsConfig) as PlaylistLoader;
+  respond(loader, "manifest", MASTER_URL, MASTER);
+  playlists.set(hls, { loader, sequence: 0 });
   return { engine, hls };
 }
 
@@ -116,6 +206,62 @@ describe("HLS.js live window placement", () => {
     expect(hls.config.liveMaxLatencyDuration).toBe(30);
     expect(hls.config.maxBufferLength).toBe(24);
     expect(hls.config.maxMaxBufferLength).toBe(24);
+  });
+
+  it("places the player before HLS.js reads the playlist it starts from", () => {
+    // HLS.js picks a live stream's start while it reads the first playlist,
+    // and 1.6 keeps it: a delay set any later would leave the player at
+    // HLS.js's default, three target durations from the edge.
+    const { hls } = setup();
+    let delayAtRead: number | undefined;
+    levelUpdated(
+      hls,
+      { live: true, totalduration: 28, averagetargetduration: 2 },
+      { onRead: () => (delayAtRead = hls.config.liveSyncDuration) },
+    );
+    expect(delayAtRead).toBe(26);
+  });
+
+  it("is placed by the main level alone, not by an audio rendition's playlist", () => {
+    const { hls } = setup();
+    levelUpdated(hls, {
+      live: true,
+      totalduration: 28,
+      averagetargetduration: 2,
+    });
+    levelUpdated(
+      hls,
+      { live: true, totalduration: 60, averagetargetduration: 2 },
+      { type: "audioTrack" },
+    );
+    expect(hls.config.liveSyncDuration).toBe(26);
+  });
+
+  it("counts each placement it writes, and each it leaves to the integrator", () => {
+    const applied = count("HlsPlacement:applied");
+    const integrator = count("HlsPlacement:integrator");
+    const { hls } = setup();
+    levelUpdated(hls, {
+      live: true,
+      totalduration: 28,
+      averagetargetduration: 2,
+    });
+    levelUpdated(hls, {
+      live: true,
+      totalduration: 28,
+      averagetargetduration: 2,
+    });
+    expect(count("HlsPlacement:applied")).toBe(applied + 1);
+
+    const configured = setup();
+    configured.hls.userConfig.liveSyncDuration = 10;
+    levelUpdated(configured.hls, {
+      live: true,
+      totalduration: 28,
+      averagetargetduration: 2,
+    });
+    expect(count("HlsPlacement:integrator")).toBe(integrator + 1);
+    expect(count("HlsPlacement:applied")).toBe(applied + 1);
   });
 
   it("tunes a four-segment playlist, the narrowest window with room in it", () => {

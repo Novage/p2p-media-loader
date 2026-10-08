@@ -1,6 +1,5 @@
 import type Hls from "hls.js";
 import type {
-  LevelDetails,
   LevelUpdatedData,
   PlaylistLevelType,
   HlsConfig,
@@ -16,11 +15,14 @@ import {
   debug,
   DefinedCoreConfig,
   highDemandWindowFor,
+  liveDelayFor,
   liveDelayFromWindow,
   maxLiveLatencyFor,
   playerBufferFor,
   runAll,
   trackMediaElementPlayback,
+  type LiveDelay,
+  type ProcessedManifest,
 } from "p2p-media-loader-core";
 import { injectMixin } from "./engine-static.js";
 import { hlsManifestParser } from "p2p-media-loader-core/hls";
@@ -374,7 +376,6 @@ export class HlsJsP2PEngine {
       // times the real segment; the playlist's average is the segment.
       const segment =
         data.details.averagetargetduration ?? data.details.targetduration;
-      if (data.details.live) this.updateLiveSync(data.details, segment);
 
       const { userConfig } = this.currentHlsInstance;
       if (
@@ -390,10 +391,39 @@ export class HlsJsP2PEngine {
   };
 
   /**
+   * Places a live player from what the core made of its main playlist, before
+   * HLS.js reads that playlist. HLS.js picks where a live stream starts while
+   * it reads the first one; set any later, the delay would come after the
+   * start. HLS.js 1.7 picks the start again at the first fragment, but 1.6
+   * keeps the one it picked, and never moves a playhead nearer the edge than
+   * the delay back to it: a player on 1.6 — Video.js 10 ships 1.6.7 — would
+   * play near the edge, where there is nothing to share.
+   *
+   * The main level only, the narrowest window the rule below still places,
+   * and the deepest delay where a playlist lists more than one stream.
+   */
+  private placeLive = (manifest: ProcessedManifest) => {
+    let placement: { target: LiveDelay; window: number } | undefined;
+    for (const stream of manifest.streams) {
+      if (stream.type !== "main" || !stream.isLive) continue;
+      if (stream.segmentCount < MIN_TUNABLE_FRAGMENTS) continue;
+      const target = liveDelayFor({ streams: [stream] });
+      if (!target || (placement && placement.target.delay >= target.delay)) {
+        continue;
+      }
+      placement = {
+        target,
+        window: stream.declaredWindow ?? stream.end - stream.start,
+      };
+    }
+    if (placement) this.updateLiveSync(placement.target, placement.window);
+  };
+
+  /**
    * Places the player deep in the live window so that the segments between
    * its buffer and the live edge — the ones peers exchange — are as many as
-   * the window allows: where exactly is the core's `liveDelayFromWindow` to
-   * say, the same answer every adapter gets, and the player's own forward
+   * the window allows: where exactly is the core's `liveDelayFor` to say,
+   * the same answer every adapter gets, and the player's own forward
    * buffer keeps the fetch positions inside the window as the playhead drifts
    * past the tail. Applied through HLS.js's own `targetLatency` API, with a
    * re-sync threshold at the core's `maxLiveLatencyFor`, two segments beyond
@@ -413,18 +443,12 @@ export class HlsJsP2PEngine {
    * HLS.js's own config validation forbids, and the count-based settings and
    * the duration-based ones must not be mixed.
    */
-  private updateLiveSync(details: LevelDetails, segment: number) {
+  private updateLiveSync(target: LiveDelay, window: number) {
     const hls = this.currentHlsInstance;
     if (!hls) return;
 
-    const window = details.totalduration;
-    if (!(segment > 0) || !(window > 0)) return;
-
-    const targetLatency = liveDelayFromWindow(window, segment);
-    const maxLatency = Math.max(
-      maxLiveLatencyFor({ delay: targetLatency, segment }),
-      window,
-    );
+    const { delay: targetLatency, segment } = target;
+    const maxLatency = Math.max(maxLiveLatencyFor(target), window);
 
     // Segment durations are not exact multiples, so the window length drifts
     // by fractions of a second between refreshes. Only a change of at least
@@ -441,17 +465,22 @@ export class HlsJsP2PEngine {
       userConfig.liveMaxLatencyDuration !== undefined ||
       userConfig.liveMaxLatencyDurationCount !== undefined
     ) {
+      diagnostics?.count("HlsPlacement:integrator");
       return;
     }
 
+    let applied = false;
     if (differs(hls.config.liveSyncDuration, targetLatency)) {
       this.debug(`Setting targetLatency to ${targetLatency}`);
       hls.targetLatency = targetLatency;
+      applied = true;
     }
     if (differs(hls.config.liveMaxLatencyDuration, maxLatency)) {
       this.debug(`Setting liveMaxLatencyDuration to ${maxLatency}`);
       hls.config.liveMaxLatencyDuration = maxLatency;
+      applied = true;
     }
+    if (applied) diagnostics?.count("HlsPlacement:applied");
   }
 
   /**
@@ -594,7 +623,7 @@ export class HlsJsP2PEngine {
     const engine = this;
     return class PlaylistLoader extends PlaylistLoaderBase {
       constructor(config: HlsConfig) {
-        super(config, core);
+        super(config, core, engine.placeLive);
         engine.initHlsEvents();
       }
     };

@@ -249,6 +249,21 @@ left alone.
   settings has a target of their own, and a threshold written against ours
   could sit below it — a config HLS.js itself rejects — or mix its count-based
   settings with a duration-based one.
+
+  The delay is set from what the core made of each main playlist — a
+  variant's, or a media playlist loaded as the manifest — in the adapter's
+  playlist loader, before HLS.js reads that playlist; an audio or subtitle
+  rendition's playlist does not set it. HLS.js picks where a live stream
+  starts while it reads the first playlist. 1.7 picks again at the first
+  fragment, but 1.6 keeps the start it picked, and never moves a playhead that
+  is nearer the edge than the delay back to it. Set on `LEVEL_UPDATED`, after
+  the read, the delay came too late on 1.6, and the player started three
+  target durations from the edge, HLS.js's default, with nothing to share:
+  Video.js 10.0.1 ships HLS.js 1.6.7, and played the USP DVR stream 10 s from
+  the edge where HLS.js 1.7 played it 60 s from it. Each delay written is
+  counted under `HlsPlacement:applied`, and each playlist left to an
+  integrator's own settings under `HlsPlacement:integrator`.
+
 - **Low-latency mode off.** HLS.js enables it by default; on a low-latency
   playlist it then requests partial segments, which the core deliberately does
   not register ([architecture.md](architecture.md)), so those requests would
@@ -265,6 +280,15 @@ integration is two calls, with nothing added to this package:
 the playlist loader, by which time the adapter has its instance. Playback
 should be pinned to MSE (`preferPlayback`): native HLS on Safari would bypass
 HLS.js and with it the core. The demo's `videojs10_hls` player is this.
+
+v10 runs its own HLS.js, 1.6.7 in v10.0.1, which is why the delay is set
+before HLS.js reads the playlist (above). And on a live stream, when the video
+element has no `autoplay`, v10 seeks once at the first `play` to the end of
+the seekable range less the playlist's `HOLD-BACK`, or less three target
+durations: its own live edge, which does not read HLS.js's latency, and so
+places the player near the edge again. That is v10's choice, not one the
+adapter can see; an integration that wants the player placed for P2P sets
+`autoplay` on the element, as the demo does.
 
 **Hosted in a player built on HLS.js.** MediaElement, Clappr, OpenPlayer and
 players like them choose between HLS.js and the browser's own HLS playback

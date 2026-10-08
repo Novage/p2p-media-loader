@@ -209,6 +209,12 @@ These predate 5.0.0 and affect 4.x deployments as well.
   asked for 4K after its first segment and stalled on it. Bandwidth is now
   measured per download, from the request to the last byte, and downloads
   that run side by side are counted by their total.
+- With HLS.js 1.6, a live player started three target durations from the
+  edge, HLS.js's default, and stayed there with nothing to share. The
+  engine set its live delay after HLS.js had read the playlist and picked
+  its start, which 1.6 keeps. The delay is now set before HLS.js reads the
+  playlist. Video.js 10.0.1 ships HLS.js 1.6.7, and played the USP DVR
+  stream 10 s from the edge with no P2P.
 - A tracker that accepted a connection and closed it at once was answered with
   a reconnect every second indefinitely, each carrying an announce and a batch
   of offers. The backoff is now cleared by a connection that lasted.

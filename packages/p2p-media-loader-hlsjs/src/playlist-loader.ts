@@ -7,7 +7,7 @@ import {
   LoaderStats,
   PlaylistLoaderContext,
 } from "hls.js";
-import { Core } from "p2p-media-loader-core";
+import { Core, type ProcessedManifest } from "p2p-media-loader-core";
 import { isSecondaryPlayer } from "./secondary-player.js";
 
 /**
@@ -27,6 +27,19 @@ const PLAYLISTS_THE_CORE_READS = new Set<string>([
 ]);
 
 /**
+ * The playlists that describe the main level: a variant's media playlist,
+ * and a media playlist loaded as the manifest itself. An audio or subtitle
+ * rendition's would describe the same window, and must not place the player.
+ */
+const MAIN_PLAYLISTS = new Set<string>(["manifest", "level"]);
+
+/**
+ * Told what the core made of a main playlist, before HLS.js reads it. See
+ * `HlsJsP2PEngine`'s live placement.
+ */
+export type OnMainPlaylistProcessed = (manifest: ProcessedManifest) => void;
+
+/**
  * Wraps HLS.js's own playlist loader so the manifests that describe this
  * presentation are also handed to the core: the master and every media
  * playlist, fetched by the primary player. What a player HLS.js built beside
@@ -40,11 +53,17 @@ export class PlaylistLoaderBase implements Loader<PlaylistLoaderContext> {
   #defaultLoader: Loader<LoaderContext>;
   #core: Core;
   readonly #ofAnotherPlayer: boolean;
+  readonly #onMainPlaylistProcessed?: OnMainPlaylistProcessed;
 
-  constructor(config: HlsConfig, core: Core) {
+  constructor(
+    config: HlsConfig,
+    core: Core,
+    onMainPlaylistProcessed?: OnMainPlaylistProcessed,
+  ) {
     this.#defaultLoader = new config.loader(config);
     this.#core = core;
     this.#ofAnotherPlayer = isSecondaryPlayer(config);
+    this.#onMainPlaylistProcessed = onMainPlaylistProcessed;
   }
 
   /**
@@ -76,14 +95,14 @@ export class PlaylistLoaderBase implements Loader<PlaylistLoaderContext> {
     callbacks: LoaderCallbacks<LoaderContext>,
   ) {
     const core = this.#core;
-    const parsed =
-      !this.#ofAnotherPlayer &&
-      PLAYLISTS_THE_CORE_READS.has((context as PlaylistLoaderContext).type);
+    const onMainPlaylistProcessed = this.#onMainPlaylistProcessed;
+    const { type } = context as PlaylistLoaderContext;
+    const parsed = !this.#ofAnotherPlayer && PLAYLISTS_THE_CORE_READS.has(type);
     this.#defaultLoader.load(context, config, {
       ...callbacks,
       onSuccess(response, stats, loaderContext, networkDetails) {
         if (parsed && typeof response.data === "string") {
-          core.processManifest({
+          const processed = core.processManifest({
             // The response URL is post-redirect, and URIs resolve against it,
             // as HLS.js itself does. What was asked for goes along with it:
             // that is the name the master gave this playlist.
@@ -91,6 +110,11 @@ export class PlaylistLoaderBase implements Loader<PlaylistLoaderContext> {
             requestedUrl: loaderContext.url,
             data: response.data,
           });
+          // Before HLS.js reads the playlist: the start it picks from it is
+          // where the player begins, and some versions keep it.
+          if (processed && MAIN_PLAYLISTS.has(type)) {
+            onMainPlaylistProcessed?.(processed);
+          }
         }
         callbacks.onSuccess(response, stats, loaderContext, networkDetails);
       },
