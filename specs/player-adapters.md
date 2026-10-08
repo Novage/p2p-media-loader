@@ -656,6 +656,15 @@ without a registry lookup or the miss it would report.
   apart by VHS's `requestType`. One engine serves one player and touches
   nothing else on the page.
 - Playback: the media element behind `player.tech()`.
+- **Low-latency HLS off.** VHS plays a low-latency playlist by its partial
+  segments unless `llhls` is `false`, and the core registers none of them
+  ([architecture.md](architecture.md)), so every request of the stream would
+  bypass P2P. The engine sets `llhls: false` on the handler for each source
+  when VHS announces its hooks, which is before the handler creates the
+  playlist loader that reads it. An `llhls` the integrator gave — on the
+  source, in the tech's `vhs` options, or in `videojs.options.vhs` — is theirs
+  and is left alone. The handler goes with its source, so nothing is given
+  back.
 
 Playlists and MPDs — a subtitle track's playlist among them, which VHS fetches
 as an `hls-playlist` like any other and the core ignores

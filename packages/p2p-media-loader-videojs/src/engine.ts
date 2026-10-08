@@ -273,8 +273,32 @@ export class VideoJsP2PEngine {
    * the source, its first one included.
    */
   private handleXhrHooksReady = () => {
+    this.turnOffLowLatencyHls();
     this.router?.expectFirstManifest();
   };
+
+  /**
+   * Plays a low-latency HLS stream by its full segments. VHS plays
+   * low-latency HLS unless told otherwise, and then fetches partial segments,
+   * which the core does not register (specs/architecture.md), so every
+   * request of such a stream would bypass P2P. Written to the handler for
+   * this source, which reads it when it creates its playlist loader, right
+   * after this event. An `llhls` the integrator gave — on the source, the
+   * tech or the page-wide options — is theirs and is left alone. The handler
+   * goes with its source, so there is nothing to give back.
+   */
+  private turnOffLowLatencyHls() {
+    const tech = this.player?.tech(true);
+    const options = tech?.vhs?.options_;
+    if (!options) return;
+    const given = [
+      tech.vhs?.source_?.llhls,
+      tech.options_?.vhs?.llhls,
+      this.videojs.options?.vhs?.llhls,
+    ];
+    if (given.some((value) => value !== undefined)) return;
+    options.llhls = false;
+  }
 
   /** A new source brings a new VHS handler, with its own xhr to hook. */
   private handleLoadStart = () => {

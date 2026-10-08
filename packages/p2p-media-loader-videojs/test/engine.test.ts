@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { VideoJsP2PEngine } from "../src/engine.js";
-import type { VhsXhr, VideoJsLike, VideoJsPlayerLike } from "../src/types.js";
+import type {
+  VhsOptionsLike,
+  VhsXhr,
+  VideoJsLike,
+  VideoJsPlayerLike,
+} from "../src/types.js";
 import { hookRegistry } from "./helpers.js";
 
 function fakeVideoJs() {
@@ -44,13 +49,24 @@ function fakePlayer() {
  * caching a source and the tech taking it on, and that dispatches the events
  * VHS and Video.js fire on it.
  */
-function fakeLoadingPlayer() {
+function fakeLoadingPlayer(
+  given: {
+    tech?: VhsOptionsLike;
+    source?: { llhls?: boolean };
+  } = {},
+) {
   const xhr = hookRegistry(vi.fn() as unknown as VhsXhr);
 
-  let vhs: { xhr: VhsXhr } | undefined;
+  let vhs:
+    | {
+        xhr: VhsXhr;
+        options_: { llhls?: boolean };
+        source_: { src: string; llhls?: boolean };
+      }
+    | undefined;
   const listeners = new Map<string, Set<() => void>>();
   const player = {
-    tech: () => ({ el: () => null, vhs }),
+    tech: () => ({ el: () => null, vhs, options_: given.tech }),
     currentSrc: () => "https://cdn.example/hls/master.m3u8",
     on: (type: string, listener: () => void) => {
       (listeners.get(type) ?? listeners.set(type, new Set()).get(type))!.add(
@@ -65,8 +81,16 @@ function fakeLoadingPlayer() {
     xhr,
     /** VHS taking the source on: the handler, its xhr, then the event. */
     handleSource: () => {
-      vhs = { xhr };
+      vhs = {
+        xhr,
+        options_: {},
+        source_: {
+          src: "https://cdn.example/hls/master.m3u8",
+          ...given.source,
+        },
+      };
       for (const listener of listeners.get("xhr-hooks-ready") ?? []) listener();
+      return vhs;
     },
   };
 }
@@ -115,6 +139,36 @@ describe("VideoJsP2PEngine", () => {
 
     engine.destroy();
     expect(xhr._requestCallbackSet?.size ?? 0).toBe(0);
+  });
+
+  it("plays low-latency HLS by full segments, which the core registers", () => {
+    // VHS fetches partial segments of a low-latency playlist unless told
+    // otherwise, and the core registers none of them.
+    const { videojs } = fakeVideoJs();
+    const { player, handleSource } = fakeLoadingPlayer();
+    const engine = new VideoJsP2PEngine({ core: { swarmId: "s" } }, videojs);
+    engine.bindPlayer(player);
+
+    expect(handleSource().options_.llhls).toBe(false);
+    engine.destroy();
+  });
+
+  it("leaves low-latency HLS as the integrator set it, wherever they set it", () => {
+    const sources = [
+      { tech: { vhs: { llhls: true } } },
+      { source: { llhls: true } },
+      { page: { vhs: { llhls: true } } },
+    ];
+    for (const { page, ...given } of sources) {
+      const { videojs } = fakeVideoJs();
+      if (page) videojs.options = page;
+      const { player, handleSource } = fakeLoadingPlayer(given);
+      const engine = new VideoJsP2PEngine({ core: { swarmId: "s" } }, videojs);
+      engine.bindPlayer(player);
+
+      expect(handleSource().options_.llhls).toBeUndefined();
+      engine.destroy();
+    }
   });
 
   it("lets a second engine take a player over rather than run beside it", () => {

@@ -102,8 +102,11 @@ export type VhsRepresentation = {
 /** The VHS handler behind a player's tech. */
 export type VhsHandlerLike = {
   xhr: VhsXhr;
-  /** The source this handler was created for, as VHS records it. */
-  source_?: { src?: string };
+  /**
+   * The source this handler was created for, as VHS records it. VHS takes
+   * some options from the source object itself, `llhls` among them.
+   */
+  source_?: { src?: string; llhls?: boolean };
   /**
    * VHS's controller for that source. `loadOnPlay_` is the manifest request
    * it has not made yet: under `preload="none"` VHS parks the load here and
@@ -113,13 +116,21 @@ export type VhsHandlerLike = {
   representations?(): VhsRepresentation[];
   /** VHS's own bandwidth estimate, in bits per second. */
   bandwidth?: number;
-  /** The options VHS was created with; `withCredentials` goes on its requests. */
-  options_?: { withCredentials?: boolean };
+  /**
+   * The options VHS was created with; `withCredentials` goes on its requests,
+   * and `llhls` decides whether it plays low-latency HLS by partial segments.
+   */
+  options_?: { withCredentials?: boolean; llhls?: boolean };
 };
+
+/** VHS options as an integrator gives them: on the tech, or page-wide. */
+export type VhsOptionsLike = { vhs?: { llhls?: boolean } };
 
 export type VideoJsTechLike = {
   el(): Element | null;
   vhs?: VhsHandlerLike;
+  /** The tech's options, `html5` in the player's; VHS reads `vhs` here. */
+  options_?: VhsOptionsLike;
 };
 
 /** The player surface the engine uses; a real `videojs.Player` satisfies it. */
@@ -141,6 +152,8 @@ export type VideoJsNamespace = typeof import("video.js").default;
 export type VideoJsLike = {
   xhr: (options: VhsRequestOptions, callback: VhsCallback) => VhsRequest;
   Vhs: { xhr: VhsXhr };
+  /** Page-wide defaults, under which VHS merges each tech's own options. */
+  options?: VhsOptionsLike;
   registerPlugin(name: string, plugin: (...args: never[]) => unknown): unknown;
   getPlugin(name: string): unknown;
   deregisterPlugin(name: string): void;
