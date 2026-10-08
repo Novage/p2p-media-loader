@@ -36,16 +36,22 @@ export const DashJsMediaElement = ({
     const { videoContainer, videoElement } = createVideoElements();
     containerRef.current.appendChild(videoContainer);
 
-    // @ts-ignore
-    const player = new MediaElementPlayer(videoElement.id, {
-      iconSprite: "/mejs-controls.svg",
-      videoHeight: "100%",
-    });
-
-    player.setSrc(streamUrl);
-    player.load();
+    // One task later: in development React mounts, unmounts and mounts again,
+    // and a MediaElement player removed before its renderer has loaded still
+    // creates its engine afterwards, on a page it is no longer on.
+    let player: any;
+    const start = setTimeout(() => {
+      // @ts-ignore
+      player = new MediaElementPlayer(videoElement.id, {
+        iconSprite: "/mejs-controls.svg",
+        videoHeight: "100%",
+      });
+      player.setSrc(streamUrl);
+      player.load();
+    }, 0);
 
     return () => {
+      clearTimeout(start);
       player?.remove();
       engine.destroy();
       videoContainer.remove();
