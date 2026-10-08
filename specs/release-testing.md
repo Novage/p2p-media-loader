@@ -26,32 +26,37 @@ about P2P. Use more than two tabs where a test says so.
 player keys are in `packages/p2p-media-loader-demo/src/constants.ts`.
 
 **Move the tabs together.** Most tests need two or more tabs to change stream
-or player at the same moment. Install the same small driver in each tab. It
-listens on a `BroadcastChannel`, runs the code that tab A sends, and replies
-with the result; tab A collects one reply for each tab it expects. With this,
-one script in tab A runs a test across any number of tabs. Each tab changes its
-own query parameters without a reload:
+or player at the same moment. Open each tab with `driver=1` in the demo's
+query: the dev server then loads a test driver (`demo/src/test-driver.ts`),
+which the production build of the demo leaves out. Every driven tab listens on
+one `BroadcastChannel`. Tab A sends code; every tab runs it and replies with
+the result, and tab A collects one reply for each tab it expects. With this,
+one script in tab A runs a test across any number of tabs.
 
-```js
-const go = (params) => {
-  const search = new URLSearchParams(location.search);
-  for (const [key, value] of Object.entries(params)) search.set(key, value);
-  history.pushState({}, "", "?" + search);
-  dispatchEvent(new PopStateEvent("popstate"));
-};
-```
+The driver puts its helpers on `window.__h`:
 
-The demo destroys the old player and core and creates new ones. This is also
-the stream change that the lifecycle tests examine. A reload removes the
-driver; install it again after each reload.
+| Helper                   | Does                                                                                                           |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| `all(code, count, ms?)`  | Runs `code` in this tab and in `count - 1` others, and returns every reply                                     |
+| `others(code, count, …)` | Runs `code` in the other tabs only                                                                             |
+| `go(params)`             | Changes the demo's query parameters without a reload; the demo destroys the player and core and makes new ones |
+| `play()`                 | Plays with sound at a low volume                                                                               |
+| `state()`                | `readyState`, media error, time, latency, and the diagnostics snapshot                                         |
+| `delta(after, before)`   | Counter differences between two snapshots                                                                      |
+| `sleep(ms)`, `video()`   | Waits; returns the page's video element                                                                        |
+
+`go` is also the stream change that the lifecycle tests examine, and the
+`driver` parameter stays in the query through it.
 
 **Every tab with the driver follows every command.** A tab left over from an
-earlier test, with its driver still installed, silently joins the next one.
-Before each test, reload or close every tab that is not part of it.
+earlier test silently joins the next one. Before each test, close every driven
+tab that is not part of it, or reload it without `driver=1`.
 
 **Run long tests in the page.** A browser tool call can time out before a test
-of a minute or more ends. Start the test as a function in tab A that keeps its
-results in a page variable, and read the variable in later calls.
+of a minute or more ends. `window.__bg(name, task)` runs the test inside tab A
+and keeps its log and result in `window.__R[name]`; read it in later calls.
+When `all` expects more tabs than answer, it waits for its timeout, so a test
+that names a wrong tab count is slow, not wrong.
 
 **Keep the hidden tab playing.** Only one tab is visible, and it can be one that
 is not in the test, so all the test tabs can be hidden. Chrome slows the timers
