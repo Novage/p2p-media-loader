@@ -113,7 +113,8 @@ describe("HttpRequestExecutor timeouts", () => {
   });
 
   it("waits for the headers longer than for a stalled body", async () => {
-    // Safari's first requests of a page took more than 3 s to answer.
+    // A slow network, a new connection or a CDN filling its cache can take
+    // longer than the stall timeout to answer.
     const held = heldFetch();
     const request = executeWith(held.respond);
 
