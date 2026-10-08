@@ -1,17 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { HlsConfig } from "hls.js";
 import { HlsJsP2PEngine } from "../src/engine.js";
 import { injectMixin } from "../src/engine-static.js";
-import { diagnostics as compiledLedger } from "../src/diagnostics.js";
-import { debug } from "p2p-media-loader-core";
-
-// Absent only in a prebuilt bundle; the tests run on the source.
-if (!compiledLedger) throw new Error("diagnostics are compiled out");
-const ledger = compiledLedger;
-// The ledger decides once, at its first record: on, for the whole file.
-debug.enable("p2pml:diagnostics");
-ledger.snapshot();
-debug.disable();
 
 /**
  * A stand-in for the HLS.js instance: enough surface for the engine to bind
@@ -32,9 +22,7 @@ function createFakeHls() {
       maxBufferLength: 30,
       maxMaxBufferLength: 600,
     },
-    media: undefined as unknown,
-    /** What HLS.js reports as the position at its live delay. */
-    liveSyncPosition: null as number | null,
+    media: undefined,
     set targetLatency(value: number) {
       hls.targetLatencySets++;
       hls.config.liveSyncDuration = value;
@@ -56,8 +44,6 @@ function levelUpdated(
     targetduration?: number;
     /** How many fragments the playlist lists; by default, what fills the window. */
     fragments?: number;
-    /** The media playlist's `EXT-X-START:TIME-OFFSET`, if it has one. */
-    startTimeOffset?: number;
   },
 ) {
   const segment = details.averagetargetduration ?? 2;
@@ -67,7 +53,6 @@ function levelUpdated(
       totalduration: details.totalduration,
       targetduration: details.targetduration ?? 6,
       averagetargetduration: details.averagetargetduration,
-      startTimeOffset: details.startTimeOffset ?? null,
       fragments: Array.from(
         {
           length:
@@ -452,229 +437,6 @@ describe("HLS.js live window placement", () => {
     });
     expect(hls.config.maxBufferLength).toBe(0);
     expect(hls.config.maxMaxBufferLength).toBe(600);
-  });
-});
-
-/** A media element: its events, and the properties the engine reads. */
-function fakeMedia(currentTime: number) {
-  return Object.assign(new EventTarget(), {
-    currentTime,
-    paused: true,
-    seeking: false,
-    readyState: 0,
-    playbackRate: 1,
-    buffered: { length: 0, start: () => 0, end: () => 0 },
-  });
-}
-
-/**
- * A placed live window: 28 s of 2 s segments ending at 100, so the delay of
- * 26 s puts the player at 74. The element is attached and still paused.
- */
-function placedLive(
-  config: ConstructorParameters<typeof HlsJsP2PEngine>[0] = {
-    restoreLiveDelayOnStart: true,
-  },
-) {
-  const { engine, hls } = setup(config);
-  const media = fakeMedia(0);
-  hls.media = media;
-  fire(hls, "hlsMediaAttached");
-  hls.liveSyncPosition = 74;
-  levelUpdated(hls, {
-    live: true,
-    totalduration: 28,
-    averagetargetduration: 2,
-  });
-  return { engine, hls, media };
-}
-
-/** Starts playback at `at`, as the element reports it. */
-async function startPlaying(media: ReturnType<typeof fakeMedia>, at: number) {
-  media.currentTime = at;
-  media.paused = false;
-  media.readyState = 4;
-  media.dispatchEvent(new Event("playing"));
-  await vi.advanceTimersByTimeAsync(0);
-}
-
-describe("HLS.js start placement", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("moves a player that started near the live edge back to its delay, once", async () => {
-    // Vidstack seeks to two seconds from the edge when it has not yet read
-    // HLS.js's sync position, and nothing brings it back.
-    const { media } = placedLive();
-
-    await startPlaying(media, 98);
-    expect(media.currentTime).toBe(74);
-
-    // A viewer who then seeks to the edge stays there.
-    media.currentTime = 98;
-    media.dispatchEvent(new Event("seeked"));
-    media.dispatchEvent(new Event("playing"));
-    await vi.advanceTimersByTimeAsync(0);
-    expect(media.currentTime).toBe(98);
-  });
-
-  it("leaves a player that started within a segment of its delay", async () => {
-    const { media } = placedLive();
-
-    await startPlaying(media, 75.5);
-    expect(media.currentTime).toBe(75.5);
-  });
-
-  it("checks after a wrapper's own handler for the same event", async () => {
-    const { media } = placedLive();
-    media.currentTime = 74;
-    media.paused = false;
-    media.readyState = 4;
-    media.dispatchEvent(new Event("playing"));
-    // The wrapper's handler, in the same task, moves the playhead.
-    media.currentTime = 98;
-    await vi.advanceTimersByTimeAsync(0);
-
-    expect(media.currentTime).toBe(74);
-  });
-
-  it("decides nothing before the element has data", async () => {
-    // Vidstack calls `play()` before HLS.js moves `currentTime` to its start,
-    // and a playlist refresh then finds the element playing at 0.
-    const { hls, media } = placedLive();
-    media.paused = false;
-    levelUpdated(hls, {
-      live: true,
-      totalduration: 28,
-      averagetargetduration: 2,
-    });
-    await vi.advanceTimersByTimeAsync(0);
-
-    await startPlaying(media, 98);
-    expect(media.currentTime).toBe(74);
-  });
-
-  it("does nothing unless the integrator turns it on", async () => {
-    const { media } = placedLive({});
-
-    await startPlaying(media, 98);
-    expect(media.currentTime).toBe(98);
-  });
-
-  it("leaves a start position the integrator configured", async () => {
-    const { hls } = setup({ restoreLiveDelayOnStart: true });
-    hls.userConfig.startPosition = 96;
-    const media = fakeMedia(0);
-    hls.media = media;
-    fire(hls, "hlsMediaAttached");
-    hls.liveSyncPosition = 74;
-    levelUpdated(hls, {
-      live: true,
-      totalduration: 28,
-      averagetargetduration: 2,
-    });
-
-    await startPlaying(media, 96);
-    expect(media.currentTime).toBe(96);
-  });
-
-  it("leaves the start a media playlist's EXT-X-START asks for", async () => {
-    const { hls } = setup({ restoreLiveDelayOnStart: true });
-    const media = fakeMedia(0);
-    hls.media = media;
-    fire(hls, "hlsMediaAttached");
-    hls.liveSyncPosition = 74;
-    levelUpdated(hls, {
-      live: true,
-      totalduration: 28,
-      averagetargetduration: 2,
-      startTimeOffset: -6,
-    });
-
-    await startPlaying(media, 94);
-    expect(media.currentTime).toBe(94);
-  });
-
-  it("leaves the start a multivariant playlist's EXT-X-START asks for", async () => {
-    const { hls, media } = placedLive();
-    fire(hls, "hlsManifestLoading");
-    fire(hls, "hlsManifestLoaded", { startTimeOffset: -6 });
-    levelUpdated(hls, {
-      live: true,
-      totalduration: 28,
-      averagetargetduration: 2,
-    });
-
-    await startPlaying(media, 94);
-    expect(media.currentTime).toBe(94);
-  });
-
-  it("leaves a placement the integrator configured", async () => {
-    const { hls } = setup({ restoreLiveDelayOnStart: true });
-    hls.userConfig.liveSyncDuration = 4;
-    const media = fakeMedia(0);
-    hls.media = media;
-    fire(hls, "hlsMediaAttached");
-    hls.liveSyncPosition = 96;
-    levelUpdated(hls, {
-      live: true,
-      totalduration: 28,
-      averagetargetduration: 2,
-    });
-
-    await startPlaying(media, 99);
-    expect(media.currentTime).toBe(99);
-  });
-
-  it("records each check, and leaves no listener or timer once destroyed", async () => {
-    // Other tests here leave their engines alive, so this compares the
-    // ledger with itself rather than with zero.
-    ledger.clearAnomalies();
-    const before = ledger.snapshot();
-    const count = (name: string) =>
-      (ledger.snapshot()?.counters[name] ?? 0) - (before?.counters[name] ?? 0);
-    const { engine, hls, media } = placedLive();
-
-    await startPlaying(media, 98);
-    fire(hls, "hlsManifestLoading");
-    levelUpdated(hls, {
-      live: true,
-      totalduration: 28,
-      averagetargetduration: 2,
-    });
-    await startPlaying(media, 75);
-    expect(count("HlsStartPlacement:corrected")).toBe(1);
-    expect(count("HlsStartPlacement:kept")).toBe(1);
-
-    // A check scheduled when the engine lets the player go is cleared.
-    fire(hls, "hlsManifestLoading");
-    media.dispatchEvent(new Event("playing"));
-    engine.destroy();
-    await vi.advanceTimersByTimeAsync(0);
-
-    const after = ledger.snapshot();
-    expect(after?.live).toEqual(before?.live);
-    expect(after?.anomalies).toEqual([]);
-  });
-
-  it("checks each new source", async () => {
-    const { hls, media } = placedLive();
-    await startPlaying(media, 74.5);
-
-    fire(hls, "hlsManifestLoading");
-    media.paused = true;
-    levelUpdated(hls, {
-      live: true,
-      totalduration: 28,
-      averagetargetduration: 2,
-    });
-    await startPlaying(media, 98);
-
-    expect(media.currentTime).toBe(74);
   });
 });
 

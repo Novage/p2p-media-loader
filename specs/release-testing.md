@@ -34,7 +34,7 @@ on screen while they run. In the Claude desktop app this is the built-in
 browser pane, which is hidden unless the person opens it. A hidden page gives
 false results: Chrome pauses its muted video, and a play after such a pause
 can move the playhead to the live edge, which reads as a player that plays too
-near the edge; Vidstack loads nothing until its player can be seen; and the
+near the edge; a player that waits until it can be seen loads nothing; and the
 timers run slower. Open the page with `preview_start` and its URL, which also
 brings the pane up, and then confirm in the page itself:
 `document.visibilityState` is `visible` and `innerWidth` is not 0. A pane the
@@ -421,7 +421,7 @@ seconds or more to start a low-latency stream in a hidden tab.
 
 ### 12. Configuration
 
-- The IndexedDB storage example (`vidstack_indexeddb_hls`).
+- The IndexedDB storage example (`hlsjs_indexeddb_hls`).
 - A `swarmId` in each tab, and two tabs with different `swarmId` values: these
   must not meet.
 - P2P disabled, upload disabled, and an `httpRequestSetup` hook, set in a
@@ -437,7 +437,7 @@ The hook: it is called for each HTTP download.
 ### 13. Player wrappers
 
 Play a live HLS stream and a live DASH stream in every player of the demo:
-Video.js 10, Vidstack, Plyr, DPlayer, Clappr, OpenPlayerJS and MediaElement,
+Video.js 10, DPlayer, Clappr, OpenPlayerJS and MediaElement,
 first with the same wrapper in both tabs, then with the raw engine in the
 second tab on the same rendition. Clappr does not autoplay: click its play
 button. Run it in Chrome and in Safari. Both report native HLS

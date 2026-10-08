@@ -59,7 +59,7 @@
     "p2p-media-loader-core": "workspace:*"
   },
   "devDependencies": {
-    "video.js": "^8.24.0",
-    "vitest": "^5.0.0"
+    "video.js": "^8.24.1",
+    "vitest": "^5.0.3"
   }
 }

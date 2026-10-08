@@ -57,7 +57,7 @@
     "p2p-media-loader-core": "workspace:*"
   },
   "devDependencies": {
-    "hls.js": "^1.7.2",
-    "vitest": "^5.0.0"
+    "hls.js": "^1.7.3",
+    "vitest": "^5.0.3"
   }
 }

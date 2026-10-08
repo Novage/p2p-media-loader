@@ -58,7 +58,7 @@
     "p2p-media-loader-core": "workspace:*"
   },
   "devDependencies": {
-    "shaka-player": "^5.2.9",
-    "vitest": "^5.0.0"
+    "shaka-player": "^5.2.12",
+    "vitest": "^5.0.3"
   }
 }

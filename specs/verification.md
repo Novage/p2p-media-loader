@@ -39,13 +39,6 @@ HLS; dash.js for DASH; Shaka Player and Video.js for both. Video.js 10 hosts
 the HLS.js and dash.js engines rather than bringing one of its own, and is
 played through both.
 
-Also not a P2P problem, and Firefox only: Vidstack calls its dash.js provider
-ready when dash.js reports the manifest loaded, and autoplays there, while
-dash.js is still attaching its MediaSource; attaching it replaces the source
-on the media element and aborts that play request, leaving the player paused
-on a ready stream. The demo's Vidstack dash.js player plays once more when the
-media is ready. It reproduces with P2P switched off.
-
 ## Streams for special cases
 
 The release tests ([release-testing.md](release-testing.md)) also need streams

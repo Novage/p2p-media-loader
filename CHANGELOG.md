@@ -101,11 +101,7 @@ throughout.
   player keeps fetching segments its peers still hold, rather than playing on
   behind the window over HTTP alone until it stalls. On a DVR window wider than
   that, a viewer who rewound into the window stays where they chose, and is
-  brought back only once a pause carries them out of it. On HLS.js, the
-  opt-in `restoreLiveDelayOnStart` moves a player that starts more than a
-  segment nearer the edge than that placement back to it, once per source:
-  Vidstack sometimes seeks a live stream to two seconds from the edge as it
-  starts, and then played 2 to 6 seconds behind it with almost no P2P.
+  brought back only once a pause carries them out of it.
 - **`highDemandTimeWindow` is optional and derived on live.** Left unset, VOD
   keeps 15 s and a live stream gets half of what the player buffers — at least
   a segment, at most 15 s — from the live window's geometry, so the far half of
@@ -191,6 +187,10 @@ throughout.
 - The `p2pml:core-as-bundle` export condition, which existed to spare consumers
   a `bittorrent-tracker` dependency and Node polyfills that the core no longer
   has.
+- The Plyr and Vidstack examples, from the demo and the API documentation. Both
+  players are deprecated in favour of Video.js 10, which the demo and the
+  documentation cover with HLS.js and dash.js. The demo's IndexedDB storage
+  example now runs on plain HLS.js.
 
 ### Fixed
 

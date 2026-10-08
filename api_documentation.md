@@ -301,82 +301,7 @@ For additional examples using npm packages, please refer to our [React demo](htt
 
 ## Using P2P Media Loader from a CDN via JavaScript Modules
 
-**P2P Media Loader** supports a wide variety of players that use HLS.js as their underlying media engine. Let's use the [Vidstack](https://www.vidstack.io/) player for a comprehensive HLS.js example:
-
-### Integrating P2P with Vidstack and HLS.js
-
-```html
-<!doctype html>
-<html>
-  <head>
-    <!-- Include the HLS.js library from a CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@~1/dist/hls.min.js"></script>
-
-    <!-- Import map for the P2P Media Loader modules. The engine imports the
-         core and its HLS manifest parser by bare specifier; both must resolve
-         to the same core bundle, here the one carrying only the HLS parser. -->
-    <script type="importmap">
-      {
-        "imports": {
-          "p2p-media-loader-core": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core-hls.es.min.js",
-          "p2p-media-loader-core/hls": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core-hls.es.min.js",
-          "p2p-media-loader-hlsjs": "https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@^5/dist/p2p-media-loader-hlsjs.es.min.js"
-        }
-      }
-    </script>
-
-    <!-- Include Vidstack player stylesheets -->
-    <link rel="stylesheet" href="https://cdn.vidstack.io/player/theme.css" />
-    <link rel="stylesheet" href="https://cdn.vidstack.io/player/video.css" />
-
-    <!-- Include the Vidstack player library from a CDN -->
-    <script src="https://cdn.vidstack.io/player" type="module"></script>
-
-    <!-- Module script to initialize the Vidstack player with P2P Media Loader -->
-    <script type="module">
-      import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
-
-      const player = document.querySelector("media-player");
-      // Inject P2P capabilities into HLS.js
-      const HlsWithP2P = HlsJsP2PEngine.injectMixin(window.Hls);
-
-      player.addEventListener("provider-change", (event) => {
-        const provider = event.detail;
-
-        // Check if the provider is HLS
-        if (provider?.type === "hls") {
-          provider.library = HlsWithP2P;
-
-          provider.config = {
-            p2p: {
-              core: {
-                swarmId: "Optional custom swarm ID for stream",
-                // other P2P engine configuration parameters go here
-              },
-              onHlsJsCreated: (hls) => {
-                hls.p2pEngine.addEventListener("onPeerConnect", (params) => {
-                  console.log("Peer connected:", params.peerId);
-                });
-                // Subscribe to P2P engine and HLS.js events here
-              },
-            },
-          };
-        }
-      });
-    </script>
-  </head>
-
-  <body>
-    <div style="width: 800px">
-      <!-- Vidstack media player with an HLS stream -->
-      <media-player src="streamUrl">
-        <media-provider></media-provider>
-        <media-video-layout></media-video-layout>
-      </media-player>
-    </div>
-  </body>
-</html>
-```
+**P2P Media Loader** supports a wide variety of players that use HLS.js as their underlying media engine. The examples start with a standalone HLS.js player:
 
 ### **Integrating P2P with a standalone HLS.js player**
 
@@ -530,56 +455,6 @@ For additional examples using npm packages, please refer to our [React demo](htt
 
   player.setSrc(streamUrl);
   player.load();
-</script>
-```
-
-### **Integrating P2P with Plyr and HLS.js**
-
-```html
-<script type="module">
-  import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
-
-  const videoElement = document.querySelector("#video");
-
-  const HlsWithP2P = HlsJsP2PEngine.injectMixin(window.Hls);
-
-  const hls = new HlsWithP2P({
-    p2p: {
-      core: {
-        swarmId: "Optional custom swarm ID for stream",
-        // Other P2P engine configuration parameters go here
-      },
-      onHlsJsCreated(hls) {
-        // Subscribe to P2P engine and HLS.js events here
-      },
-    },
-  });
-
-  hls.on(Hls.Events.MANIFEST_PARSED, () => {
-    const levels = hls.levels;
-
-    const quality = {
-      default: levels[levels.length - 1].height,
-      options: levels.map((level) => level.height),
-      forced: true,
-      onChange: (newQuality) => {
-        levels.forEach((level, levelIndex) => {
-          if (level.height === newQuality) {
-            hls.currentLevel = levelIndex;
-          }
-        });
-      },
-    };
-
-    player = new Plyr(videoElement, {
-      quality,
-      autoplay: true,
-      muted: true,
-    });
-  });
-
-  hls.attachMedia(videoElement);
-  hls.loadSource(streamUrl);
 </script>
 ```
 
@@ -783,38 +658,6 @@ For additional examples using npm packages, please refer to our [React demo](htt
 </script>
 ```
 
-### **Integrating P2P with Plyr and Shaka Player**
-
-```html
-<script type="module">
-  import { ShakaP2PEngine } from "p2p-media-loader-shaka";
-
-  ShakaP2PEngine.registerPlugins();
-
-  const videoElement = document.getElementById("video");
-
-  const initPlayer = () => {
-    const shakaP2PEngine = new ShakaP2PEngine({
-      core: {
-        swarmId: "Optional custom swarm ID for stream",
-        // Other P2P Media Loader Core options
-      },
-    });
-    const shakaPlayer = new shaka.Player();
-
-    shakaPlayer.attach(videoElement);
-
-    shakaP2PEngine.bindShakaPlayer(shakaPlayer);
-
-    shakaPlayer.load(streamUrl);
-
-    const plyrPlayer = new Plyr(videoElement);
-  };
-
-  initPlayer();
-</script>
-```
-
 ### Integrating P2P with dash.js
 
 ```html
@@ -863,74 +706,6 @@ For additional examples using npm packages, please refer to our [React demo](htt
 The examples below assume the same import map and reference the dash.js and
 P2P Media Loader modules by those specifiers.
 
-### **Integrating P2P with Vidstack and dash.js**
-
-```html
-<!doctype html>
-<html>
-  <head>
-    <!-- Import map: the core with the DASH parser, the engine, and dash.js -->
-    <script type="importmap">
-      {
-        "imports": {
-          "p2p-media-loader-core": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core-dash.es.min.js",
-          "p2p-media-loader-core/dash": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core-dash.es.min.js",
-          "p2p-media-loader-dashjs": "https://cdn.jsdelivr.net/npm/p2p-media-loader-dashjs@^5/dist/p2p-media-loader-dashjs.es.min.js",
-          "dashjs": "https://cdn.jsdelivr.net/npm/dashjs@^5/dist/modern/esm/dash.all.min.js"
-        }
-      }
-    </script>
-
-    <!-- Include Vidstack player stylesheets -->
-    <link rel="stylesheet" href="https://cdn.vidstack.io/player/theme.css" />
-    <link rel="stylesheet" href="https://cdn.vidstack.io/player/video.css" />
-
-    <!-- Include the Vidstack player library from a CDN -->
-    <script src="https://cdn.vidstack.io/player" type="module"></script>
-
-    <script type="module">
-      import { MediaPlayer } from "dashjs";
-      import { DashJsP2PEngine } from "p2p-media-loader-dashjs";
-
-      const engine = new DashJsP2PEngine({
-        core: {
-          swarmId: "Optional custom swarm ID for stream",
-          // Other P2P engine configuration parameters go here
-        },
-      });
-      engine.addEventListener("onPeerConnect", (params) => {
-        console.log("Peer connected:", params.peerId);
-      });
-
-      const player = document.querySelector("media-player");
-      player.addEventListener("provider-change", (event) => {
-        const provider = event.detail;
-        if (provider?.type !== "dash") return;
-
-        // Use the dash.js from the import map rather than Vidstack's CDN default
-        provider.library = MediaPlayer;
-
-        // Vidstack invokes this with each new dash.js instance right before
-        // attaching it to the media — the point at which the engine must bind.
-        provider.onInstance((instance) => {
-          engine.bindPlayer(instance);
-        });
-      });
-    </script>
-  </head>
-
-  <body>
-    <div style="width: 800px">
-      <!-- Vidstack media player with an MPEG-DASH stream -->
-      <media-player src="https://example.com/stream.mpd" autoplay muted>
-        <media-provider></media-provider>
-        <media-video-layout></media-video-layout>
-      </media-player>
-    </div>
-  </body>
-</html>
-```
-
 ### **Integrating P2P with DPlayer and dash.js**
 
 ```html
@@ -961,59 +736,6 @@ P2P Media Loader modules by those specifiers.
       },
     },
   });
-</script>
-```
-
-### **Integrating P2P with Plyr and dash.js**
-
-```html
-<script type="module">
-  import { MediaPlayer } from "dashjs";
-  import { DashJsP2PEngine } from "p2p-media-loader-dashjs";
-
-  const videoElement = document.getElementById("video");
-
-  const engine = new DashJsP2PEngine({
-    core: {
-      swarmId: "Optional custom swarm ID for stream",
-      // Other P2P engine configuration parameters go here
-    },
-  });
-
-  const dashPlayer = MediaPlayer().create();
-  engine.bindPlayer(dashPlayer); // before initialize()
-
-  // Build Plyr's quality menu once dash.js knows the renditions
-  dashPlayer.on("streamInitialized", () => {
-    const representations = dashPlayer.getRepresentationsByType("video");
-    const heights = [...new Set(representations.map((r) => r.height))].sort(
-      (a, b) => a - b,
-    );
-
-    const quality = {
-      default: heights[heights.length - 1],
-      options: heights,
-      forced: true,
-      onChange: (newQuality) => {
-        const target = representations.find((r) => r.height === newQuality);
-        if (!target) return;
-        dashPlayer.updateSettings({
-          streaming: { abr: { autoSwitchBitrate: { video: false } } },
-        });
-        // Keep the buffer: replacing it lands the player on the live edge
-        // with nothing ahead for peers to fill
-        dashPlayer.setRepresentationForTypeById("video", target.id, false);
-      },
-    };
-
-    const plyrPlayer = new Plyr(videoElement, {
-      quality,
-      autoplay: true,
-      muted: true,
-    });
-  });
-
-  dashPlayer.initialize(videoElement, streamUrl, true);
 </script>
 ```
 

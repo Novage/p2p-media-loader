@@ -200,9 +200,7 @@ the groups and the cases a reader of a snapshot must know.
 - **Counters:** downloads by source and result, player requests by result,
   registry misses, evictions by reason, closed peers by cause, parses of the
   player's manifests by result (`ManifestParse`), and clock synchronizations
-  and re-parses by result. The HLS.js adapter counts each check of a start
-  placement by result (`HlsStartPlacement:corrected`, `:kept`, and `:chosen`
-  for a start the integrator or the playlist chose). The Video.js adapter
+  and re-parses by result. The Video.js adapter
   counts each live delay it writes (`VhsPlacement:applied`) and each VHS it
   cannot place (`VhsPlacement:unavailable`).
 - **Probes:** each segment storage's size; the peers that each swarm's

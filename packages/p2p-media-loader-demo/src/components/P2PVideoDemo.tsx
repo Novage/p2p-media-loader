@@ -15,21 +15,16 @@ import { DebugTools } from "./debugTools/DebugTools";
 import { PlayerKey } from "../types";
 import { HlsjsDPlayer } from "./players/hlsjs/HlsjsDPLayer";
 import { HlsjsClapprPlayer } from "./players/hlsjs/HlsjsClapprPlayer";
-import { HlsjsPlyr } from "./players/hlsjs/HlsjsPlyr";
 import { HlsjsOpenPlayer } from "./players/hlsjs/HlsjsOpenPlayer";
 import { Shaka } from "./players/shaka/Shaka";
 import { ShakaDPlayer } from "./players/shaka/ShakaDPlayer";
 import { ShakaClappr } from "./players/shaka/ShakaClappr";
 import { HlsjsMediaElement } from "./players/hlsjs/HlsjsMediaElement";
-import { ShakaPlyr } from "./players/shaka/ShakaPlyr";
 import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
-import { HlsjsVidstack } from "./players/hlsjs/HlsjsVidstack";
 import { PeerDetails } from "p2p-media-loader-core";
-import { HlsjsVidstackIndexedDB } from "./players/hlsjs/HlsjsVidstackIndexedDB";
+import { HlsjsIndexedDB } from "./players/hlsjs/HlsjsIndexedDB";
 import { DashJs } from "./players/dashjs/DashJs";
-import { DashJsVidstack } from "./players/dashjs/DashJsVidstack";
 import { DashJsDPlayer } from "./players/dashjs/DashJsDPlayer";
-import { DashJsPlyr } from "./players/dashjs/DashJsPlyr";
 import { DashJsMediaElement } from "./players/dashjs/DashJsMediaElement";
 import { VideoJs } from "./players/videojs/VideoJs";
 import { VideoJs10Hls } from "./players/videojs10/VideoJs10Hls";
@@ -56,21 +51,16 @@ declare global {
 
 const playerComponents = {
   openPlayer_hls: HlsjsOpenPlayer,
-  plyr_hls: HlsjsPlyr,
   clappr_hls: HlsjsClapprPlayer,
   dplayer_hls: HlsjsDPlayer,
   hlsjs_hls: HlsjsPlayer,
-  vidstack_indexeddb_hls: HlsjsVidstackIndexedDB,
+  hlsjs_indexeddb_hls: HlsjsIndexedDB,
   shaka: Shaka,
   dplayer_shaka: ShakaDPlayer,
   clappr_shaka: ShakaClappr,
   mediaElement_hls: HlsjsMediaElement,
-  plyr_shaka: ShakaPlyr,
-  vidstack_hls: HlsjsVidstack,
-  vidstack_dashjs: DashJsVidstack,
   dashjs: DashJs,
   dplayer_dashjs: DashJsDPlayer,
-  plyr_dashjs: DashJsPlyr,
   mediaElement_dashjs: DashJsMediaElement,
   videojs: VideoJs,
   videojs10_hls: VideoJs10Hls,

@@ -46,14 +46,13 @@
     "clean:build": "rimraf lib dist build p2p-media-loader-demo-*.tgz"
   },
   "dependencies": {
-    "@videojs/dash-video": "10.0.0-rc.2",
-    "@videojs/hlsjs-video": "10.0.0-rc.2",
-    "@videojs/react": "10.0.0-rc.2",
-    "@vidstack/react": "^1.15.6",
+    "@videojs/dash-video": "10.0.1",
+    "@videojs/hlsjs-video": "10.0.1",
+    "@videojs/react": "10.0.1",
     "d3": "^7.9.0",
     "dashjs": "^5.2.1",
     "dplayer": "^1.27.1",
-    "hls.js": "^1.7.2",
+    "hls.js": "^1.7.3",
     "mediaelement": "^7.1.0",
     "openplayerjs": "^2.14.12",
     "p2p-media-loader-core": "workspace:*",
@@ -61,20 +60,19 @@
     "p2p-media-loader-hlsjs": "workspace:*",
     "p2p-media-loader-shaka": "workspace:*",
     "p2p-media-loader-videojs": "workspace:*",
-    "plyr": "^3.8.4",
-    "shaka-player": "^5.2.9",
-    "video.js": "^8.24.0"
+    "shaka-player": "^5.2.12",
+    "video.js": "^8.24.1"
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",
     "@types/dplayer": "^1.25.6",
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.7",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "cpy-cli": "^7.0.0",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.6",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
   },
   "peerDependencies": {
     "react": ">=16",

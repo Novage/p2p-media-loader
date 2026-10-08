@@ -48,6 +48,12 @@ For Shaka map `p2p-media-loader-core`, `p2p-media-loader-core/hls` and
 carries both parsers. A missing entry fails at module resolution rather than
 silently; see `specs/packaging.md`.
 
+A player built on HLS.js decides on its own whether to use HLS.js or the
+browser's own HLS playback, and native playback bypasses P2P. Safari reports
+native HLS support, and so does recent Chrome; MediaElement, for one, prefers
+it by default and needs `renderers: ["native_hls", "html5"]` to use HLS.js
+first. The README says so under "Key Features".
+
 DASH `SegmentBase` streams keep their segment list in a `sidx` box inside the
 media file; the core reads it from the response the player fetches, so these
 streams share like any other. WebM representations index with an EBML `Cues`
@@ -74,6 +80,17 @@ both play through VHS, so its bundles map `p2p-media-loader-core`,
 `p2p-media-loader-core/hls` and `p2p-media-loader-core/dash` to
 `p2p-media-loader-core.es.min.js`. On Safari and iOS VHS stands aside unless
 `overrideNative` is set, and nothing is shared there.
+
+On live, the adapter places Video.js as the other engines are placed: deep in
+the live window, with a forward buffer a segment short of that delay, so peers
+have time to fetch each segment before the player asks for it. VHS has no
+setting for either, so the adapter writes the delay as
+`suggestedPresentationDelay` on the manifest VHS parsed and caps that player's
+buffer goal; nothing page-wide changes. VHS ends its seekable range at the same
+delay, so a viewer cannot seek nearer the live edge than the placement. The
+adapter also plays a low-latency HLS stream by its full segments (VHS's
+`llhls: false`) unless the integrator set `llhls` themselves: the core does not
+share partial segments.
 
 ### Custom integrations
 
@@ -142,6 +159,17 @@ URL for HLS, the Representation id for DASH. The `onStreamRegistrationError`
 event keeps its shape; it fires once per failing stream, only for
 `streamSwarmIdBuilder` failures.
 
+### HTTP timeouts
+
+`httpNotReceivingBytesTimeoutMs` (3 s by default) now counts from the
+response's headers, and then from each chunk of the body. In v4 it counted
+from the start of the request, so an answer that took more than 3 s to start —
+a slow network, a new connection, a CDN filling its cache — was aborted as a
+stalled transfer and tried again. The wait for the headers now has a limit of
+its own, `httpFirstByteTimeoutMs`, 10 s by default. A deployment that raised
+`httpNotReceivingBytesTimeoutMs` in v4 to let slow first answers through can
+set it back, and set `httpFirstByteTimeoutMs` instead.
+
 ### `highDemandTimeWindow`
 
 `StreamConfig.highDemandTimeWindow` is `number | undefined` and defaults to
@@ -196,8 +224,8 @@ is exported.
   `SegmentBase` stream's `sidx` index, recognised and read from the response
   the player fetched.
 - `onSegmentRegistryMiss` core event — a segment request the registry did not
-  know, which the player then loaded itself. Initialization segments are
-  recognised and never reported.
+  know, which the player then loaded itself. Initialization segments, and the
+  segments of subtitles and trick play, are recognised and never reported.
 - `byteRangeFromRangeHeader(header)` — converts a `Range: bytes=a-b` header to
   the inclusive `ByteRange` the lookup methods take.
 - `identityProperties(streams)` — the identity input for every stream a
@@ -206,6 +234,11 @@ is exported.
   `p2p-media-loader-core/server`, so a server reproduces the client's choice.
 - Bundles: `p2p-media-loader-core.es.min.js` carries both parsers;
   `-hls` and `-dash` variants carry one.
+- `httpFirstByteTimeoutMs` stream option — see "HTTP timeouts" above.
+- For integrators who bundle the npm packages themselves:
+  `p2p-media-loader-core/shims/xmldom`, the browser's `DOMParser`, to alias
+  `@xmldom/xmldom` to, and the `__P2PML_DIAGNOSTICS__` define, which removes
+  the diagnostics ledger. The README's "Reduce the Bundle Size" shows both.
 
 ## v3 → v4
 

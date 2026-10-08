@@ -26,6 +26,7 @@ export type {
   ParsedStream,
   ParsedSegment,
   ParsedInitSegment,
+  SegmentLocation,
   SegmentIndexSource,
   UtcTimingSource,
 } from "./manifest/types.js";

@@ -25,4 +25,6 @@ export type {
   VhsResponse,
   VhsResponseHook,
   VhsXhr,
+  VhsPlaylistControllerLike,
+  VhsOptionsLike,
 } from "./types.js";
