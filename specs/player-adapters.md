@@ -252,6 +252,26 @@ the playlist loader, by which time the adapter has its instance. Playback
 should be pinned to MSE (`preferPlayback`): native HLS on Safari would bypass
 HLS.js and with it the core. The demo's `videojs10_hls` player is this.
 
+**Hosted in a player built on HLS.js.** Vidstack, MediaElement, Clappr,
+OpenPlayer and players like them choose between HLS.js and the browser's own
+HLS playback themselves, and native playback bypasses HLS.js and with it the
+core. Safari reports native HLS support, and so does recent Chrome (152 in the
+release test), so a player that prefers native playback wherever the browser
+reports it plays without P2P in both. The integration has to keep the
+player on HLS.js; the adapter cannot, since it is not asked:
+
+- MediaElement prefers native playback by default. List its HLS.js renderer
+  first: `renderers: ["native_hls", "html5"]` — MediaElement names the HLS.js
+  renderer `native_hls`.
+- Vidstack tries HLS.js first unless `preferNativeHLS` is set; leave it unset.
+- Clappr and OpenPlayer, as the demo sets them up, play through HLS.js in both
+  browsers.
+- DPlayer and Plyr have no HLS playback of their own: the page creates HLS.js
+  and attaches it, so there is nothing to choose.
+
+The demo's players for each are set this way, and each was seen to play
+through MSE in Chrome 152 and Safari 27.
+
 Because the engine attaches inside HLS.js's construction of the playlist
 loader, a failure in letting the previous instance go — an integrator's
 segment storage throwing from its teardown — is logged there, not raised: a

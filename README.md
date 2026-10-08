@@ -78,6 +78,7 @@ This library makes it possible to build large-scale P2P mesh networks — often 
   - Engines: HLS.js, Shaka Player, dash.js, Video.js 8 (VHS)
   - Video.js 10 needs no integration package of ours: it plays HLS and MPEG-DASH through media adapters powered by HLS.js and dash.js, which the HLS.js and dash.js integrations drive directly
   - Video players: [Vidstack](https://www.vidstack.io/), [Clappr](http://clappr.io/), [MediaElement](https://www.mediaelementjs.com/), [Plyr](https://plyr.io/), [DPlayer](https://dplayer.diygod.dev/), [OpenPlayerJS](https://www.openplayerjs.com/), [PlayerJS](https://playerjs.com/) , and others that support HLS.js or Shaka video engines. These players can be integrated via custom integration with the library API.
+  - Make sure the player plays HLS through HLS.js, not through the browser's own HLS playback, which bypasses P2P. Safari and recent Chrome both report native HLS support, and some players prefer it by default: MediaElement, for one, needs `renderers: ["native_hls", "html5"]` to use HLS.js first.
 - Supports adaptive bitrate streaming of HLS and MPEG-DASH protocols
 - Supports DRM-protected and encrypted streams, including Widevine, PlayReady, FairPlay, and HLS AES-128:
   - Peers exchange segments exactly as the CDN delivers them, still encrypted. Decryption stays in the video player; the library never decrypts media and never stores or shares decrypted data
