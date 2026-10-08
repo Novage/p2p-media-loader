@@ -99,6 +99,7 @@ export class Core {
     p2pNotReceivingBytesTimeoutMs: 2000,
     p2pInactiveLoaderDestroyTimeoutMs: 30 * 1000,
     httpNotReceivingBytesTimeoutMs: 3000,
+    httpFirstByteTimeoutMs: 10000,
     httpErrorRetries: 3,
     p2pErrorRetries: 3,
     announceTrackers: [

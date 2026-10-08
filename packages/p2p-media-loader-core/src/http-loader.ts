@@ -16,7 +16,10 @@ import {
 
 type HttpConfig = Pick<
   CoreConfig,
-  "httpNotReceivingBytesTimeoutMs" | "httpRequestSetup" | "validateHTTPSegment"
+  | "httpNotReceivingBytesTimeoutMs"
+  | "httpFirstByteTimeoutMs"
+  | "httpRequestSetup"
+  | "validateHTTPSegment"
 >;
 
 export class HttpRequestExecutor {
@@ -46,6 +49,7 @@ export class HttpRequestExecutor {
       onAbort: () => this.abortController.abort(),
       notReceivingBytesTimeoutMs:
         this.httpConfig.httpNotReceivingBytesTimeoutMs,
+      firstByteTimeoutMs: this.httpConfig.httpFirstByteTimeoutMs,
     };
 
     const completed = this.request.tryCompleteByLoadedBytes(
@@ -143,6 +147,7 @@ export class HttpRequestExecutor {
       if (this.isAborted()) {
         throw new DOMException("Request aborted", "AbortError");
       }
+      requestControls.startResponse();
 
       this.handleResponseHeaders(response);
 

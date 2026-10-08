@@ -13,6 +13,8 @@ import { EventTarget } from "../utils/event-target.js";
 
 export type LoadProgress = {
   startTimestamp: number;
+  /** When the response's headers arrived; HTTP only. */
+  responseTimestamp?: number;
   lastLoadedChunkTimestamp?: number;
   startFromByte?: number;
   loadedBytes: number;
@@ -33,6 +35,7 @@ export type RequestAttempt = HttpRequestAttempt | P2PRequestAttempt;
 
 export type RequestControls = Readonly<{
   addLoadedChunk: Request["addLoadedChunk"];
+  startResponse: Request["startResponse"];
   completeOnSuccess: Request["completeOnSuccess"];
   failWithError: Request["failWithError"];
 }>;
@@ -72,6 +75,7 @@ export class Request {
     error: RequestError<RequestAbortErrorType>,
   ) => void;
   private notReceivingBytesTimeoutMs?: number;
+  private firstByteTimeoutMs?: number;
   private readonly _logger: debug.Debugger;
   private _isHandledByProcessQueue = false;
   private readonly onSegmentError: CoreEventMap["onSegmentError"];
@@ -187,6 +191,7 @@ export class Request {
     requestData: StartRequestParameters,
     controls: {
       notReceivingBytesTimeoutMs?: number;
+      firstByteTimeoutMs?: number;
       onAbort: (errorType: RequestError<RequestAbortErrorType>) => void;
     },
     validate:
@@ -285,6 +290,12 @@ export class Request {
     requestData: StartRequestParameters,
     controls: {
       notReceivingBytesTimeoutMs?: number;
+      /**
+       * How long to wait for the response to start, where the source has
+       * a response that starts — HTTP's headers. Until `startResponse`,
+       * this limit applies in place of `notReceivingBytesTimeoutMs`.
+       */
+      firstByteTimeoutMs?: number;
       onAbort: (errorType: RequestError<RequestAbortErrorType>) => void;
     },
   ): RequestControls {
@@ -312,13 +323,13 @@ export class Request {
     };
     this.manageBandwidthCalculatorsState("start");
 
-    const { notReceivingBytesTimeoutMs } = controls;
+    const { notReceivingBytesTimeoutMs, firstByteTimeoutMs } = controls;
     this._onAbortCallback = controls.onAbort;
     this.notReceivingBytesTimeoutMs = notReceivingBytesTimeoutMs;
+    this.firstByteTimeoutMs = firstByteTimeoutMs;
 
-    if (notReceivingBytesTimeoutMs !== undefined) {
-      this.notReceivingBytesTimeout.start(notReceivingBytesTimeoutMs);
-    }
+    const timeoutMs = firstByteTimeoutMs ?? notReceivingBytesTimeoutMs;
+    if (timeoutMs !== undefined) this.notReceivingBytesTimeout.start(timeoutMs);
 
     this.logger(
       `${requestData.downloadSource} ${this.segment.externalId} started`,
@@ -335,10 +346,26 @@ export class Request {
 
     return {
       addLoadedChunk: this.addLoadedChunk,
+      startResponse: this.startResponse,
       completeOnSuccess: this.completeOnSuccess,
       failWithError: this.failWithError,
     };
   }
+
+  /**
+   * The response has started: its headers arrived. From here on the wait is
+   * for bytes, under `notReceivingBytesTimeoutMs`, counted from now.
+   */
+  private startResponse = () => {
+    this.throwErrorIfNotLoadingStatus();
+    if (!this.progress) return;
+    this.progress.responseTimestamp = performance.now();
+    if (this.notReceivingBytesTimeoutMs === undefined) {
+      this.notReceivingBytesTimeout.clear();
+    } else {
+      this.notReceivingBytesTimeout.restart(this.notReceivingBytesTimeoutMs);
+    }
+  };
 
   cancel() {
     this.throwErrorIfNotLoadingStatus();
@@ -364,24 +391,28 @@ export class Request {
 
   private abortOnTimeout = () => {
     this.throwErrorIfNotLoadingStatus();
-    if (
-      !this.currentAttempt ||
-      !this.progress ||
-      this.notReceivingBytesTimeoutMs === undefined
-    ) {
-      return;
-    }
+    if (!this.currentAttempt || !this.progress) return;
+
+    // Until the response starts, the wait is for it, under its own limit.
+    const { responseTimestamp, lastLoadedChunkTimestamp, startTimestamp } =
+      this.progress;
+    const waitingForResponse =
+      this.firstByteTimeoutMs !== undefined &&
+      responseTimestamp === undefined &&
+      lastLoadedChunkTimestamp === undefined;
+    const limitMs = waitingForResponse
+      ? this.firstByteTimeoutMs
+      : this.notReceivingBytesTimeoutMs;
+    if (limitMs === undefined) return;
 
     const now = performance.now();
     const lastActive =
-      this.progress.lastLoadedChunkTimestamp ?? this.progress.startTimestamp;
+      lastLoadedChunkTimestamp ?? responseTimestamp ?? startTimestamp;
     const msSinceLastActive = now - lastActive;
 
-    if (msSinceLastActive < this.notReceivingBytesTimeoutMs) {
+    if (msSinceLastActive < limitMs) {
       // False alarm! The stream is still downloading. Reschedule the timer.
-      this.notReceivingBytesTimeout.restart(
-        this.notReceivingBytesTimeoutMs - msSinceLastActive,
-      );
+      this.notReceivingBytesTimeout.restart(limitMs - msSinceLastActive);
       return;
     }
 

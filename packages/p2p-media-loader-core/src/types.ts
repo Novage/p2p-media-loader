@@ -132,6 +132,7 @@ export type DynamicStreamProperties =
   | "p2pNotReceivingBytesTimeoutMs"
   | "p2pInactiveLoaderDestroyTimeoutMs"
   | "httpNotReceivingBytesTimeoutMs"
+  | "httpFirstByteTimeoutMs"
   | "httpErrorRetries"
   | "p2pErrorRetries"
   | "validateP2PSegment"
@@ -423,7 +424,9 @@ export type StreamConfig = {
   p2pInactiveLoaderDestroyTimeoutMs: number;
 
   /**
-   * The timeout duration (in milliseconds) for not receiving bytes from an HTTP download.
+   * The timeout duration (in milliseconds) for not receiving bytes from an HTTP download,
+   * counted from the response's headers and then from each chunk of its body. The wait for
+   * the headers has a limit of its own, `httpFirstByteTimeoutMs`.
    *
    * @default
    * ```typescript
@@ -431,6 +434,19 @@ export type StreamConfig = {
    * ```
    */
   httpNotReceivingBytesTimeoutMs: number;
+
+  /**
+   * The timeout duration (in milliseconds) for an HTTP download to receive the response's
+   * headers, counted from the start of the request. A connection made at page start, a slow
+   * network, or a CDN filling its cache can take seconds to answer, and an answer that has
+   * not started is not a transfer that stalled.
+   *
+   * @default
+   * ```typescript
+   * httpFirstByteTimeoutMs: 10000
+   * ```
+   */
+  httpFirstByteTimeoutMs: number;
 
   /**
    * The number of retries allowed following an HTTP error.

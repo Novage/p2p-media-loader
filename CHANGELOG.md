@@ -189,6 +189,13 @@ throughout.
 
 These predate 5.0.0 and affect 4.x deployments as well.
 
+- An HTTP download that waited more than 3 s for the response's headers was
+  aborted as stalled: `httpNotReceivingBytesTimeoutMs` ran from the start of
+  the request and counted body bytes only. Safari's first requests of a page
+  took that long, and so can a slow network or a CDN filling its cache; the
+  aborts could keep a player from starting. That timeout now runs from the
+  headers, and the wait for them has a limit of its own,
+  `httpFirstByteTimeoutMs`, 10 s by default.
 - A tracker that accepted a connection and closed it at once was answered with
   a reconnect every second indefinitely, each carrying an announce and a batch
   of offers. The backoff is now cleared by a connection that lasted.
