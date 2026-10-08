@@ -52,18 +52,20 @@ The release tests ([release-testing.md](release-testing.md)) also need streams
 for cases the matrix does not cover. They are not part of the matrix: each
 exercises one behaviour, on the engines that support it.
 
-| Case                            | Stream                                                                                                 | Notes                                                                       |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
-| Long run                        | `https://hls-harbor-livepush.akamaized.net/live_cdn/nsqIStpj8PaG-Ev/emcQJ0pGpremocy/index.m3u8`        | HLS live; no daily request limit, unlike `livesim2`                         |
-| Several periods                 | `https://livesim2.dashif.org/livesim2/periods_60/testpic_2s/Manifest.mpd`                              | a new period every 60 s                                                     |
-| A live stream that ends         | `https://livesim2.dashif.org/livesim2/stop_<epoch seconds>/testpic_2s/Manifest.mpd`                    | the MPD becomes static at the stop time, with a duration counted from 1970  |
-| Low-latency DASH                | `https://livesim2.dashif.org/livesim2/chunkdur_1/ato_7/testpic4_8s/Manifest300.mpd`                    | chunked segments and `availabilityTimeOffset`                               |
-| Audio only, live                | `https://livesim2.dashif.org/livesim2/testpic_2s/audio.mpd`                                            | an MPD of audio representations only                                        |
-| Several audio tracks, subtitles | `https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_fmp4/master.m3u8` | HLS with alternative audio renditions, closed captions and WebVTT subtitles |
-| HLS AES-128                     | `https://playertest.longtailvideo.com/adaptive/oceans_aes/oceans_aes.m3u8`                             | `EXT-X-KEY:METHOD=AES-128`                                                  |
+| Case                            | Stream                                                                                                 | Notes                                                                        |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| Long run                        | `https://hls-harbor-livepush.akamaized.net/live_cdn/nsqIStpj8PaG-Ev/emcQJ0pGpremocy/index.m3u8`        | HLS live; no daily request limit, unlike `livesim2`                          |
+| Several periods                 | `https://livesim2.dashif.org/livesim2/periods_60/testpic_2s/Manifest.mpd`                              | a new period every 60 s                                                      |
+| A live stream that ends         | `https://livesim2.dashif.org/livesim2/stop_<epoch seconds>/testpic_2s/Manifest.mpd`                    | the MPD becomes static at the stop time, with a duration counted from 1970   |
+| Low-latency DASH                | `https://livesim2.dashif.org/livesim2/chunkdur_1/ato_7/testpic4_8s/Manifest300.mpd`                    | chunked segments and `availabilityTimeOffset`                                |
+| Audio only, live                | `https://livesim2.dashif.org/livesim2/testpic_2s/audio.mpd`                                            | an MPD of audio representations only                                         |
+| Several audio tracks, subtitles | `https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_fmp4/master.m3u8` | HLS with alternative audio renditions, closed captions and WebVTT subtitles  |
+| Low-latency HLS                 | `https://stream.mux.com/v69RSHhFelSm4701snP22dYz2jICy4E4FUyk02rW4gxRM.m3u8`                            | live, 2 s segments, 1 s parts, delivery directives (`_HLS_msn`, `_HLS_part`) |
+| HLS AES-128                     | `https://playertest.longtailvideo.com/adaptive/oceans_aes/oceans_aes.m3u8`                             | `EXT-X-KEY:METHOD=AES-128`                                                   |
 
-No low-latency HLS stream is listed. A stream named as one may not carry
-`EXT-X-PART` tags: check its media playlist before using it.
+The low-latency HLS stream carried `EXT-X-PART` tags with a 1 s part target
+when it was added. A stream named as low latency may not carry them: check
+its media playlist before using it.
 
 ## Isolating a test swarm
 

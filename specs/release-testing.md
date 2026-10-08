@@ -3,10 +3,14 @@
 What is tested before a release, in addition to the automated checks in
 [`AGENTS.md`](../AGENTS.md). The tests are in two parts:
 
-- **Part 1** lists the tests an AI assistant runs. It needs only a shell, the
-  demo, and a Chromium browser it controls.
-- **Part 2** lists the tests a person runs. They need other browsers, other
-  devices, other networks, or human eyes and ears.
+- **Part 1** lists the tests an AI assistant runs. It needs a shell, the demo,
+  a Chromium browser it controls, and, on macOS, Safari through
+  `safaridriver`.
+- **Part 2** lists the tests a person runs. They need other devices, other
+  networks, browsers the assistant cannot drive, or human eyes and ears.
+
+A test moves from Part 2 to Part 1 as soon as the assistant can run it: an
+assistant runs it the same way each time, and records every number.
 
 The streams, the way to isolate a test swarm, and the checks on each stream
 are in [verification.md](verification.md). This document refers to them and
@@ -47,6 +51,37 @@ The driver puts its helpers on `window.__h`:
 
 `go` is also the stream change that the lifecycle tests examine, and the
 `driver` parameter stays in the query through it.
+
+**Drive Safari through `safaridriver`.** It is Apple's WebDriver for Safari,
+part of macOS, so the assistant can drive the real Safari over HTTP with no
+other software. A person enables it once:
+
+1. In Safari > Settings > Advanced, select "Show features for web developers".
+2. In Safari > Settings > Developer, select "Allow remote automation".
+3. In a terminal, run `safaridriver --enable` and give the administrator
+   password.
+4. Quit Safari (⌘Q). A Safari that was open before step 2 refuses the
+   connection: each session request times out.
+
+The assistant then starts `safaridriver -p 4444` in the background and uses
+the W3C WebDriver endpoints: `POST /session` with
+`{"capabilities": {"alwaysMatch": {"browserName": "safari"}}}`, then `/url`
+to open a page, `/execute/sync` and `/execute/async` to run code in it, and
+`DELETE /session/<id>` at the end. A small script in the scratch directory
+does this with the standard library of any language.
+
+- A session opens its own Safari window, with a clean state. Set
+  `localStorage.debug` on `http://localhost:5173/` first, then open the test
+  page.
+- The console cannot be read through WebDriver. Read the ledger snapshot
+  instead, and push what a probe records to an array on `window`.
+- A session left open by a script that was stopped makes the next
+  `POST /session` fail. Restart `safaridriver`.
+- The test driver's `BroadcastChannel` does not reach another browser. Drive
+  the Safari session and the Chrome tabs separately, and compare their
+  snapshots.
+- A Safari session and a Chrome tab in one swarm are two peers of different
+  browsers: the test of P2P between Safari's and Chrome's WebRTC.
 
 **Every tab with the driver follows every command.** A tab left over from an
 earlier test silently joins the next one. Before each test, close every driven
@@ -115,7 +150,7 @@ renditions are in different swarms, which is correct, and are not a defect.
 
 - Do not edit the source while a test runs. Vite reloads the changed modules
   in the open pages, and the test then measures a mix of old and new code. The
-  temporary demo edit of test 11 is made between tests, and is followed by a
+  temporary demo edit of test 12 is made between tests, and is followed by a
   check that the driver and the ledger are still there.
 - Reload the tabs between test groups. Tabs that ran many tests can carry
   state from earlier tests.
@@ -136,13 +171,18 @@ renditions are in different swarms, which is correct, and are not a defect.
   `--pack-destination`, a worktree of an older release, and a consumer
   project all go in a scratch directory, and are removed at the end.
 
-**Plan for about four hours.** The long run takes an hour and runs in its own
-tabs, beside the other tests. Its tabs must not have the driver.
+**Plan for about five hours.** The long run takes an hour and runs in its own
+tabs, beside the other tests. Its tabs must not have the driver. The Safari
+runs add about an hour.
 
 ## Part 1: tests for the AI assistant
 
 Each test lists what to do and what must be true. "No leak" means: after each
 step, nothing that the previous step opened is still open.
+
+**Run in Safari too.** Tests 2, 3, 4, 5, 13 and 14 run again with one Safari
+session and one Chrome tab as the two peers of a swarm. The pass rules are the
+same, and both browsers must get segments over P2P from each other.
 
 ### 1. Automated checks
 
@@ -173,6 +213,8 @@ Pass:
   ([player-adapters.md](player-adapters.md)) — can play so near the live edge
   on short segments that it gets no P2P; record its latency with the result.
 - No leak, no anomaly, and no error in the console.
+- Record the dropped frames (`video.getVideoPlaybackQuality()`). A share
+  above 1% of the frames is a finding to examine.
 
 ### 3. Pause
 
@@ -204,7 +246,33 @@ Pass:
 - Tab A gets segments from tab B over P2P at positions that B prefetched.
 - No leak.
 
-### 5. Quality switches
+### 5. Playback rate on VOD
+
+Viewers often watch VOD at a higher speed, so this is tested as a feature. For
+every engine and every VOD stream, in two tabs:
+
+- tab A at `playbackRate` 2 and tab B at 1, for 60 seconds;
+- both tabs at 2, for 60 seconds;
+- tab A at 1.5, then 0.5, then back to 1, 20 seconds each;
+- a seek in tab A while it plays at 2.
+
+Set the rate on the media element, or through the player's own speed control
+where it has one: a player can set its own rate back when its source changes.
+
+Pass:
+
+- `currentTime` advances at the rate, within 10%, with no `waiting` event
+  after the start, and the buffer ahead of the playhead never empties.
+- The core's time windows scale with the rate
+  ([playback-contract.md](playback-contract.md), "The time windows"): at 2,
+  the prefetch reaches about twice as far ahead in media time.
+- Both tabs at 2: both get segments over P2P, and the two tabs together fetch
+  each segment over HTTP about once. Tab A at 2 and B at 1: A gets segments
+  over P2P where B is ahead of it, and the HTTP downloads stay within what A
+  alone needs.
+- Dropped frames are recorded as in test 2. No leak, no anomaly.
+
+### 6. Quality switches
 
 On a stream with several renditions, use the demo's quality selector to
 switch:
@@ -222,7 +290,7 @@ Pass:
   is a swarm.
 - The P2P loader of the old rendition closes. No leak.
 
-### 6. Simultaneous joins
+### 7. Simultaneous joins
 
 Move both tabs into a new swarm at the same moment, 16 times, and alternate
 engines.
@@ -232,7 +300,7 @@ log shows each glare settled: one peer takes the answer to its own offer, the
 other refuses that answer ([webtorrent-manager spec](../packages/p2p-media-loader-core/src/webtorrent/webtorrent-manager/spec.md),
 "Glare").
 
-### 7. Three to five peers
+### 8. Three to five peers
 
 With three to five tabs on one live stream and one VOD stream:
 
@@ -245,7 +313,7 @@ stall when a tab closes, and a backup fetches what the closed owner did not
 deliver; the tabs together fetch each segment over HTTP about once
 ([prefetch.md](prefetch.md)). No leak.
 
-### 8. Player and source lifecycle
+### 9. Player and source lifecycle
 
 - Change stream or player 20 times, less than 2 seconds apart.
 - Change stream while segment requests are open.
@@ -260,7 +328,7 @@ Pass: no error after a destroy, no event from a destroyed core, no leak, and
 the last stream plays and shares. With two players, each has its own records,
 and destroying one leaves the other's records and playback as they were.
 
-### 9. Network faults
+### 10. Network faults
 
 Wrap `window.fetch`, `XMLHttpRequest` and `window.WebSocket` in the page
 before the players start (the driver changes players without a reload, so a
@@ -275,16 +343,19 @@ cancelled. Use the wrappers to:
 - answer a manifest request with an error;
 - delay every response, as on a slow network;
 - close the tracker sockets, and refuse new ones for 30 seconds;
-- set the `trackers` query parameter to a tracker that does not exist.
+- set the `trackers` query parameter to a tracker that does not exist;
+- remove `RTCPeerConnection` from the page before the players start, as a
+  browser with WebRTC disabled does.
 
 Pass: failed requests are tried again; a segment that fails over HTTP comes
 over P2P where a peer has it; playback continues or recovers when the fault
 stops; tracker sockets reconnect with a growing delay, and peer connections
 already open stay open; an unreachable tracker gives HTTP-only playback, and
-its reconnect delay grows rather than looping. The browser logs each failed
-`WebSocket` itself; that is not an error loop.
+its reconnect delay grows rather than looping. Without WebRTC, the stream
+plays over HTTP only, with no error loop and no leak. The browser logs each
+failed `WebSocket` itself; that is not an error loop.
 
-### 10. Live edge cases
+### 11. Live edge cases
 
 The streams are in [verification.md](verification.md), "Streams for special
 cases".
@@ -308,11 +379,14 @@ Pass: with a wrong clock, the ledger shows a clock synchronization, there is
 no registry miss, and no owner request fails with 404 or 425; a stream that
 ends plays to its end, the page does not stop for longer than a second, and
 the core stops its re-parses and its downloads after the end; each period
-plays and shares; low-latency parts are not registered, go over HTTP, and do
-not stop playback ([architecture.md](architecture.md)). A player can take 30
+plays and shares; HLS.js and Video.js play a low-latency HLS stream by its
+full segments, since their adapters turn low latency off, so the page requests
+no partial segment and has no registry miss; a part that a player requests
+anyway is not registered, goes over HTTP, and does not stop playback
+([architecture.md](architecture.md)). A player can take 30
 seconds or more to start a low-latency stream in a hidden tab.
 
-### 11. Configuration
+### 12. Configuration
 
 - The IndexedDB storage example (`vidstack_indexeddb_hls`).
 - A `swarmId` in each tab, and two tabs with different `swarmId` values: these
@@ -327,20 +401,25 @@ P2P disabled: no tracker socket and no P2P loader. Upload disabled in one tab:
 that tab still downloads over P2P, and the other tab gets nothing from it.
 The hook: it is called for each HTTP download.
 
-### 12. Player wrappers
+### 13. Player wrappers
 
 Play a live HLS stream and a live DASH stream in every player of the demo:
 Video.js 10, Vidstack, Plyr, DPlayer, Clappr, OpenPlayerJS and MediaElement,
 first with the same wrapper in both tabs, then with the raw engine in the
 second tab on the same rendition. Clappr does not autoplay: click its play
-button. Check what the browser reports for native HLS
-(`video.canPlayType("application/vnd.apple.mpegurl")`): a wrapper that prefers
-native HLS when it is offered bypasses the engine, and with it P2P.
+button. Run it in Chrome and in Safari. Both report native HLS
+(`video.canPlayType("application/vnd.apple.mpegurl")`), and a wrapper that
+prefers native HLS when it is offered bypasses the engine, and with it P2P
+([player-adapters.md](player-adapters.md), "Hosted in a player built on
+HLS.js").
 
-Pass: each wrapper plays, records its latency, and shares segments with the
-other tab.
+Pass: each wrapper plays through MSE — the visible video's source is a `blob:`
+URL, and requests reach the core (`PlayerRequest` counts) — records its
+latency, and shares segments with the other tab. A hidden element with the
+manifest URL beside it, as MediaElement keeps, is not native playback while
+it makes no requests.
 
-### 13. Special streams
+### 14. Special streams
 
 - An audio-only live stream.
 - A stream with several audio tracks, and a stream with subtitles.
@@ -352,7 +431,7 @@ page's resource timing shows the key fetched by the player and only the
 segments by the core's `fetch` — and the tab that receives a segment over P2P
 plays it, which shows that ciphertext was shared ([encryption.md](encryption.md)).
 
-### 14. Mixed versions
+### 15. Mixed versions
 
 Run the demo of the last release (a worktree at its tag, with its own
 install, on another port) and the demo of this release, in one swarm. Compare
@@ -364,7 +443,7 @@ Pass: peers with the same `PEER_PROTOCOL_VERSION` meet and share segments.
 Peers with different versions never meet, and neither shows an error
 ([segment-identity.md](segment-identity.md)).
 
-### 15. Long run
+### 16. Long run
 
 Play the long-run stream in [verification.md](verification.md) in two tabs of
 their own for 60 minutes, beside the other tests. Each tab samples itself
@@ -375,7 +454,7 @@ segment count, and the count of open resources stay flat; the live latency
 stays at its delay; the count of clock re-parses grows at one for each segment
 duration; the tracker socket count stays the same.
 
-### 16. Consumer install
+### 17. Consumer install and documentation
 
 Install the packed tarballs in a new Vite project and a new webpack project,
 in a scratch directory, with the player versions the demo uses. Write a small
@@ -384,17 +463,24 @@ demo's player components show it. Build it, type-check it with library
 checking on, and play a stream with it in two tabs, with the diagnostics
 ledger enabled.
 
+Write the integrations by following `README.md` and `MIGRATION.md` as an
+integrator would, not from the repository's code. Then read the API
+documentation that typedoc builds for each public class and option.
+
 Pass: the projects build and type-check with no error; both tabs play and
 share with each player; the ledger works in the packed build and records no
-anomaly.
+anomaly. Each step the documents leave out, each example that does not compile
+or run, and each public option with no description is a finding.
 
 ## Part 2: tests for a person
 
 These need what the assistant does not have, or a judgement it cannot make.
 
-1. **Other browsers.** Firefox, Safari on macOS, Safari on iOS and iPadOS,
-   Chrome on Android, and Edge. Run the stream matrix and the pause test in
-   each. Include Safari's native HLS where a player uses it.
+1. **Other browsers.** Safari on iOS and iPadOS, Chrome on Android, Firefox,
+   and Edge. Run the stream matrix, the pause test and the playback rate test
+   in each. Include Safari's native HLS where a player uses it. Desktop Safari
+   and Chrome are in Part 1. Firefox moves there once a run through
+   `geckodriver` has been done.
 2. **Real networks.** Two devices on different networks, for example home
    Wi-Fi and mobile data, so that connections go through STUN and NAT. Also a
    network that blocks WebRTC, such as a strict corporate firewall: playback
@@ -405,19 +491,19 @@ These need what the assistant does not have, or a judgement it cannot make.
 4. **Low-end devices.** An old Android phone and a smart TV browser: CPU load,
    memory, and battery use during a long stream.
 5. **Picture and sound.** Watch and listen at segment boundaries, after seeks,
-   and after quality switches, with P2P on. Look for frozen frames, glitches,
-   and loss of audio and video synchronization.
+   after quality switches, and at 2× speed, with P2P on. Look for glitches and
+   loss of audio and video synchronization. Part 1 counts stalls and dropped
+   frames; what they look and sound like needs a person.
 6. **DRM.** Widevine, PlayReady and FairPlay streams with their license
    servers.
 7. **Real audience.** Ten or more viewers on different devices, on the public
    trackers or a production tracker. Check the P2P share and the tracker load.
 8. **Production streams.** Customer-like streams: token-signed URLs, CDN
    access rules, and CORS settings.
-9. **Privacy settings.** Brave, private windows, Firefox with strict privacy
-   settings, and WebRTC disabled. Playback must continue over HTTP only.
+9. **Privacy settings.** Brave, private windows, and Firefox with strict
+   privacy settings. Playback must continue over HTTP only. A page without
+   WebRTC is in Part 1, test 10.
 10. **Mobile proxy.** Native players through the local proxy
     ([mobile-proxy.md](mobile-proxy.md)) on a real Android and iOS app.
-11. **Documentation.** Follow `README.md` and `MIGRATION.md` with a real
-    integration, and read the API documentation for gaps.
-12. **Release pipeline.** A dry run of the publish workflow, which needs the
+11. **Release pipeline.** A dry run of the publish workflow, which needs the
     registry credentials.
