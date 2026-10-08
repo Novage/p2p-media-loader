@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Core } from "../src/core.js";
+import debug from "debug";
+import { diagnostics as compiledLedger } from "../src/diagnostics.js";
 import { liveDelayFor } from "../src/live-delay.js";
 import { dashManifestParser } from "../src/manifest/dash.js";
 import { hlsManifestParser } from "../src/manifest/hls.js";
@@ -13,6 +15,14 @@ import {
   DASH_TEMPLATE_DURATION_DYNAMIC,
   HLS_LIVE_NO_PDT_REFRESH_1,
 } from "./fixtures/index.js";
+
+// Absent only in a prebuilt bundle; the tests run on the source.
+if (!compiledLedger) throw new Error("diagnostics are compiled out");
+const ledger = compiledLedger;
+// The ledger decides once, at its first record: on, for the whole file.
+debug.enable("p2pml:diagnostics");
+ledger.snapshot();
+debug.disable();
 
 const MPD_URL = "https://cdn.example/dash/manifest.mpd";
 const video = (number: number) =>
@@ -230,6 +240,8 @@ describe("Core on a segment list computed from the clock", () => {
 
     // The player's refresh fails to parse: livesim2 ends a stream with a
     // static MPD that lists every segment since 1970.
+    const failedBefore =
+      ledger.snapshot()?.counters["ManifestParse:failed"] ?? 0;
     parse.mockImplementationOnce(() => {
       throw new RangeError("Invalid array length");
     });
@@ -240,6 +252,9 @@ describe("Core on a segment list computed from the clock", () => {
       }),
     ).toBeUndefined();
     const parses = parse.mock.calls.length;
+    expect(ledger.snapshot()?.counters["ManifestParse:failed"]).toBe(
+      failedBefore + 1,
+    );
 
     await vi.advanceTimersByTimeAsync(20_000);
 

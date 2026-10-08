@@ -47,15 +47,24 @@ delete it; when rejected, delete it.
 - **Package manager: pnpm.** The workspace is `packages/*` and `demo`. Never run
   `npm install` in a workspace package.
 - **Verify before reporting done:** `pnpm type-check`, `pnpm lint`, `pnpm test`,
-  and `npx prettier --check "specs/**/*.md" AGENTS.md` when specs changed.
+  and `npx prettier --check "specs/**/*.md" AGENTS.md` when specs changed. For a
+  change to `packages/*/src`, also go through the diagnostics checklist below,
+  and say in the report what was added to the ledger, or why nothing was.
 - **Before a release:** `pnpm knip` as well, with no findings, and `pnpm jscpd`
   within its budget. See [`specs/packaging.md`](specs/packaging.md). Then run
   the tests in [`specs/release-testing.md`](specs/release-testing.md): Part 1
   is for an AI assistant, Part 2 lists what a person must test.
-- **Diagnostics records change with the code.** A change that adds, changes or
-  removes something that must be released — a connection, a timer, a listener,
-  a registration, a storage — opens and closes its record in the diagnostics
-  ledger in the same change. See [`specs/diagnostics.md`](specs/diagnostics.md).
+- **Diagnostics change with the code, in the same change.** Nothing fails when
+  they are missing, so they are easy to forget; check them on purpose. Go
+  through "Checking a change" in [`specs/diagnostics.md`](specs/diagnostics.md):
+  - every listener, timer, connection, registration, storage or kept object the
+    change acquires opens a ledger record and closes it on every path that
+    releases it; a timer is cleared on destroy and records an anomaly if it
+    fires after;
+  - every new outcome — a failure, a fallback, a correction, a decision made
+    on the player's behalf — has a counter for each way it can go;
+  - a unit test enables the ledger and shows the records closed and the
+    counters moving, and fails when the release step is removed.
 - Match the surrounding code's style, comment density and naming. The codebase
   favours comments that explain _why_ over comments that restate the code.
 

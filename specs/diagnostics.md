@@ -121,8 +121,11 @@ race, and an anomaly for it would be a false alarm.
 
 **3. Each result is a counter.** Each outcome of a request (by source and
 result), each registry miss, each eviction (by reason), each closed peer (by
-cause), and each clock synchronization and re-parse (by result) adds to a
-counter. A counter name is `Area:qualifier:result`, from fixed words. A name
+cause), each parse of a player's manifest and each clock synchronization and
+re-parse (by result), and each decision the code makes on the player's behalf
+(by result, whichever way it went) adds to a counter. A new branch that ends
+in a different outcome — a failure, a fallback, a correction — is a new
+result, and gets its counter in the same change. A counter name is `Area:qualifier:result`, from fixed words. A name
 never contains a URL, an id or a number: the set of names must stay small.
 
 **4. A state that can drift has a probe.** Where two parts of the code must
@@ -156,6 +159,32 @@ detail than the ledger keeps, for example a log line for each election. Such a
 probe follows rules 3 to 5, and is removed when the investigation ends, or
 becomes a permanent record under these rules.
 
+## Checking a change
+
+Rule 6 is the one most easily forgotten: diagnostics are not in the way of a
+change working, so nothing fails when they are missing. Before a change to
+`packages/*/src` is reported done, its author — person or AI agent — goes
+through this list, and the report says what was added or why nothing was
+needed:
+
+1. **Resources.** Each listener, timer, connection, registration, storage,
+   request or kept object the change acquires has an `open` where it is
+   acquired and a `close` on every path that releases it: destroy, failure,
+   replacement. Each timer is cleared on destroy, and its callback records an
+   anomaly if it runs after destroy (rule 2). A timer scheduled more than once
+   keeps one record at a time.
+2. **Results.** Each new outcome — a new branch that fails, falls back,
+   corrects, or decides on the player's behalf — has a counter (rule 3), for
+   each way it can go, not only the interesting one.
+3. **Drift.** A value that two parts of the code must agree on has a probe
+   (rule 4).
+4. **A test.** A unit test enables the ledger and checks that after teardown
+   no resource of the change's kinds is open and no anomaly was recorded, and
+   that the counters move as the change says (rule 8). Removing the change's
+   release step must make that test fail.
+5. **This spec.** "What is recorded" names any new group of counters a reader
+   of a snapshot must know.
+
 ## What is recorded
 
 The code is the full list: each call to `diagnostics?.open`, `count` and
@@ -169,10 +198,11 @@ the groups and the cases a reader of a snapshot must know.
   adapter, its listeners, hooks, request filters and registrations on the
   player.
 - **Counters:** downloads by source and result, player requests by result,
-  registry misses, evictions by reason, closed peers by cause, and clock
-  synchronizations and re-parses by result. The HLS.js adapter counts each
-  check of a start placement by result (`HlsStartPlacement:corrected`,
-  `:kept`, and `:chosen` for a start the integrator or the playlist chose).
+  registry misses, evictions by reason, closed peers by cause, parses of the
+  player's manifests by result (`ManifestParse`), and clock synchronizations
+  and re-parses by result. The HLS.js adapter counts each check of a start
+  placement by result (`HlsStartPlacement:corrected`, `:kept`, and `:chosen`
+  for a start the integrator or the playlist chose).
 - **Probes:** each segment storage's size; the peers that each swarm's
   connection manager holds (`PeersHeld`) and its P2P loader wraps
   (`PeersWrapped`), which must be equal.

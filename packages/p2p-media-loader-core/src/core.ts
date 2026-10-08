@@ -428,9 +428,11 @@ export class Core {
     };
     const applied = this.applyManifest(source);
     if (!applied) {
+      diagnostics?.count("ManifestParse:failed");
       this.clockedManifest.failed(source);
       return undefined;
     }
+    diagnostics?.count("ManifestParse:succeed");
 
     // The first manifest that registers a stream names the swarm unless the
     // integration already did. By what was asked for: every viewer asks for
