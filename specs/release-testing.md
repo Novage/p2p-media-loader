@@ -550,6 +550,32 @@ test 17, in the same consumer projects.
 
 Pass: no findings. List each one with the document, the section and the fix.
 
+### 19. Player versions
+
+The release is tested with the players the demo loads, so those must be the
+ones integrators get today. List every player and plugin the demo uses: the
+dependencies in `packages/p2p-media-loader-demo/package.json` and
+`demo/package.json`, and every script URL in the demo's source, such as
+Clappr's. For each:
+
+- **The newest release.** The version the lockfile installs, or that a CDN
+  range resolves to, is npm's `latest` (`npm view <package> dist-tags`). A
+  newer version on another tag, such as `next-8`, does not count. An older
+  major is a finding unless the demo says why where it loads it, as for
+  Clappr's Shaka 4, which its DASH plugin requires.
+- **Not deprecated.** `npm view <package>@<version> deprecated` is empty.
+- **From its current home.** The source repository is not archived (GitHub
+  API, `archived`). A package that moved is loaded from where it moved to,
+  as Clappr's plugins moved into the Clappr monorepo.
+- **Pinned copies.** A player that pins its own engine (Video.js 10.0.1 pins
+  `hls.js` 1.6.7 and `dashjs` 5.2.0) is recorded with that version: the demo
+  cannot change it, and the adapter must work with it.
+- **Still maintained.** Record each package's last release. One with no
+  release for two years or more (DPlayer: January 2023) is reported as a
+  watch item, with the state of its repository.
+
+Pass: no findings. List the watch items and the pinned copies with the result.
+
 ## Part 2: tests for a person
 
 These need what the assistant does not have, or a judgement it cannot make.
