@@ -200,7 +200,13 @@ the groups and the cases a reader of a snapshot must know.
 - **Counters:** downloads by source and result, player requests by result,
   registry misses, evictions by reason, closed peers by cause, parses of the
   player's manifests by result (`ManifestParse`), and clock synchronizations
-  and re-parses by result. The Video.js adapter
+  and re-parses by result. Each player request is counted by how it moves the
+  stream's buffer edge (`SegmentRequest:extend`, `:rerequest` and `:seek`);
+  each change of the seek count the player reports (`Seek:reported`); each
+  seek that holds a stream's prefetch until the stream requests at the new
+  position (`Prefetch:held-for-seek`, once for each seek); and each buffer a
+  stream takes from the shared playhead (`Playhead:shared`) or from its own
+  view (`Playhead:own`), as in specs/playback-contract.md. The Video.js adapter
   counts each live delay it writes (`VhsPlacement:applied`) and each VHS it
   cannot place (`VhsPlacement:unavailable`); the HLS.js adapter, each live
   delay it writes (`HlsPlacement:applied`) and each main playlist it leaves to

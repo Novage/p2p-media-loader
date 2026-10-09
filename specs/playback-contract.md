@@ -114,16 +114,17 @@ timeline** where the player's buffer of that stream currently ends.
 The `max` guards against out-of-order completion of parallel requests dragging
 the edge backwards.
 
-Telling a re-request from a seek takes the seek count where the integration
-reports one: a request before the edge is a seek's first request when the count
-has moved since the stream's previous request, and a re-request otherwise.
-Where the integration reports `bufferAhead` but no count, a seek to media the
-player does not hold leaves it near zero, and a re-request leaves it where it
-was: a request that does not continue the previous one is taken for a seek
-when the reported `bufferAhead` has fallen below one segment of the stream,
-and for a re-request when it has not. A seek inside the buffer issues no
-request, so it is neither. Only inference, where nothing is reported, takes
-every such request for a seek (see "When the player reports nothing").
+Telling a re-request from a seek takes the seek count. Where the integration
+reports one, a request before the edge is a seek's first request when the count
+has moved since the stream's previous request, and a re-request when it has
+not. Where it reports none, the two cannot be told apart: a seek back into an
+earlier buffered island asks for a segment before the edge with a full buffer
+reported, exactly as a re-request does, and a re-request taken for a seek costs
+a stream a playhead behind until it requests past the edge again, where a seek
+taken for a re-request leaves it ahead until playback reaches the edge, minutes
+later. So without a count, as with inference, a request that does not continue
+the stream is taken for a seek, as before (see "When the player reports
+nothing"), and re-requests keep that error.
 
 Keeping the edge explicit rather than deriving it from the last requested
 segment removes a silent one-segment-duration error: the correct origin depends
@@ -192,10 +193,10 @@ A stream is current, and takes part in the minimum, only when:
   dates each playlist is anchored at zero on its own first parse, the edges
   differ by an unknown offset, and each stream keeps its own estimate,
   `bufferEdge - bufferAhead`;
-- **its edge is re-anchored since the last seek.** Until the stream's first
-  request after a seek its edge describes the old position (see "Behaviour
-  under seeking"); taken as the minimum, it would move every other stream's
-  playhead there;
+- **its edge is re-anchored since the last seek into unbuffered media.** Until
+  the stream's first request after such a seek its edge describes the old
+  position (see "Behaviour under seeking"); taken as the minimum, it would move
+  every other stream's playhead there;
 - **core sees its requests.** A stream type whose requests pass the core by —
   its P2P switched off, or segments the registry does not list — has an edge
   that stops while playback goes on, and would hold the minimum where it
@@ -436,21 +437,37 @@ the streams do not request together, and the player reports first. Measured:
 
 These were cancelled before any byte arrived, but a later request, or a peer
 that answers, makes them real downloads of media nobody will play, and with the
-roles reversed they are video. So when the reported `seekCount` changes, every
-stream's edge stops counting: its loader starts no prefetch, and its edge takes
-no part in the shared playhead, until its own first request after the seek
-re-anchors it. A stream whose request has arrived already prefetches from its
-new edge. The pause costs a stream only the time until its own request, and
-never a download.
+roles reversed they are video. So when the reported `seekCount` changes and the
+report shows no media at the new position, every stream's edge stops counting:
+its loader starts no prefetch, and its edge takes no part in the shared
+playhead, until its own first request after the seek re-anchors it. The report
+of the seek decides this, not a later one: once one stream's media arrives at
+the new position, the player reports a buffer that the other streams do not
+have yet. A stream whose request has arrived already prefetches from its new
+edge. The pause costs a stream only the time until its own request, and never a
+download.
+
+A seek into media the player holds is not paused. The player reports a buffer
+at the new position at once, and may make no request for as long as that buffer
+lasts — HLS.js video made none in the 8 s measured after a seek 7 s back inside
+it — so a pause until the request would stop the prefetch for all that time.
+After a seek inside the buffer the edges are the ones the player holds, as the
+table shows; after one into an earlier island they are wrong until the request
+the player makes at once. Either way, each stream's first request after the
+seek re-anchors its edge, as after any other seek.
+
+An island that runs to the end of a VOD stream brings no request at all, and
+its error stays until the next seek: measured on HLS.js, 21.5 s. Nothing is
+left to fetch there, so it moves only the store's position.
 
 **The seek count is optional, and everything above works without it.** An
 integration that reports none — a native shim that does not count seeks, a
-player read some other way — keeps today's behaviour at a seek: core learns of
-it from each stream's first request at the new position, telling it from a
-re-request by `bufferAhead` as "The buffer edge" describes, and until that
-request the old edges count, so the downloads measured above can still start.
-They are bounded by that short window. The shared playhead and the edge rule
-work as without a seek, in regular playback, which is most of it.
+player read some other way — keeps the behaviour before it: core learns of a
+seek from each stream's first request at the new position, any request that
+does not continue the stream counts as one, and until that request the old
+edges count, so the downloads measured above can still start. They are bounded
+by that short window. The shared playhead works as with a count, in regular
+playback, which is most of it.
 
 ## When the player reports nothing
 

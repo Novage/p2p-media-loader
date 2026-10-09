@@ -187,12 +187,12 @@ describe("PlaybackTracker buffer edge", () => {
 });
 
 describe("PlaybackTracker seek detection", () => {
-  it("reports a seek for a non-successor request and not otherwise", () => {
+  it("takes a non-successor request for a seek when no seek count is reported", () => {
     const t = new PlaybackTracker(segment(5), {}, () => 0);
-    expect(t.onSegmentRequested(segment(6))).toBe(false);
-    expect(t.onSegmentRequested(segment(6))).toBe(false); // retry
-    expect(t.onSegmentRequested(segment(40))).toBe(true);
-    expect(t.onSegmentRequested(segment(2))).toBe(true);
+    expect(t.onSegmentRequested(segment(6))).toBe("extend");
+    expect(t.onSegmentRequested(segment(6))).toBe("extend"); // retry
+    expect(t.onSegmentRequested(segment(40))).toBe("seek");
+    expect(t.onSegmentRequested(segment(2))).toBe("seek");
   });
 
   it("judges continuity on the timeline, so DASH ids stepping by 20 are not seeks", () => {
@@ -203,11 +203,11 @@ describe("PlaybackTracker seek detection", () => {
       endTime: (i + 1) * duration,
     });
     const t = new PlaybackTracker(dash(5), {}, () => 0);
-    expect(t.onSegmentRequested(dash(6))).toBe(false);
-    expect(t.onSegmentRequested(dash(7))).toBe(false);
+    expect(t.onSegmentRequested(dash(6))).toBe("extend");
+    expect(t.onSegmentRequested(dash(7))).toBe("extend");
     // Skipping one segment is a jump; so is going back.
-    expect(t.onSegmentRequested(dash(9))).toBe(true);
-    expect(t.onSegmentRequested(dash(3))).toBe(true);
+    expect(t.onSegmentRequested(dash(9))).toBe("seek");
+    expect(t.onSegmentRequested(dash(3))).toBe("seek");
   });
 
   it("tolerates timeline rounding but not a missing segment", () => {
@@ -218,14 +218,92 @@ describe("PlaybackTracker seek detection", () => {
     );
     expect(
       t.onSegmentRequested({ externalId: 40, startTime: 4.01, endTime: 8.02 }),
-    ).toBe(false);
+    ).toBe("extend");
     expect(
       t.onSegmentRequested({
         externalId: 120,
         startTime: 12.03,
         endTime: 16.04,
       }),
-    ).toBe(true);
+    ).toBe("seek");
+  });
+});
+
+describe("PlaybackTracker with a seek count", () => {
+  /** A tracker that has been told a seek count, its buffer filled to 60 s. */
+  function filled() {
+    const t = new PlaybackTracker(segment(0), {}, () => 0);
+    t.report({ bufferAhead: 0, rate: 1, seekCount: 0 });
+    for (let i = 0; i < 10; i++) {
+      t.onSegmentRequested(segment(i));
+      t.onSegmentDelivered(segment(i));
+    }
+    t.report({ bufferAhead: 50, rate: 1, seekCount: 0 });
+    return t;
+  }
+
+  it("keeps the edge on a re-request inside the buffer, which is not a seek", () => {
+    // dash.js replaces segments it buffered at a higher quality: with no seek
+    // between, a request before the edge fetches again what the player holds.
+    const t = filled();
+    expect(t.onSegmentRequested(segment(3))).toBe("rerequest");
+    t.onSegmentDelivered(segment(3));
+    expect(t.getPlayback().bufferEdge).toBe(10 * SEG);
+    // The player resumes at its buffer end: that continues the stream.
+    expect(t.onSegmentRequested(segment(10))).toBe("extend");
+    expect(t.getPlayback().bufferEdge).toBe(10 * SEG);
+  });
+
+  it("takes the first request after the count moves for a seek, wherever it lands", () => {
+    const t = filled();
+    t.report({ bufferAhead: 20, rate: 1, seekCount: 1 });
+    // Back into a buffered island: before the edge, a full buffer reported —
+    // only the count tells it from a re-request.
+    expect(t.onSegmentRequested(segment(4))).toBe("seek");
+    expect(t.getPlayback().bufferEdge).toBe(4 * SEG);
+    // A seek even to the very next segment re-anchors.
+    t.report({ bufferAhead: 0, rate: 1, seekCount: 2 });
+    expect(t.onSegmentRequested(segment(5))).toBe("seek");
+  });
+
+  it("holds the edge back only while the player has no media at the new position", () => {
+    // Into unbuffered media: the old edge describes the position left.
+    const t = filled();
+    t.report({ bufferAhead: 0, rate: 1, seekCount: 1 });
+    expect(t.isSeekPending()).toBe(true);
+    expect(t.onSegmentRequested(segment(30))).toBe("seek");
+    expect(t.isSeekPending()).toBe(false);
+
+    // The other stream's media arriving there does not end it: this stream
+    // still has none at the new position.
+    const w = filled();
+    w.report({ bufferAhead: 0, rate: 1, seekCount: 1 });
+    w.report({ bufferAhead: 4, rate: 1, seekCount: 1 });
+    expect(w.isSeekPending()).toBe(true);
+
+    // Inside the buffer: a buffer at once, and no request while it lasts.
+    // The edge is the one the player holds, and counts.
+    const u = filled();
+    u.report({ bufferAhead: 57, rate: 1, seekCount: 1 });
+    expect(u.isSeekPending()).toBe(false);
+    expect(u.getPlayback().bufferEdge).toBe(10 * SEG);
+    // Its next request still re-anchors: after a seek into an earlier island,
+    // that is the one that corrects the edge.
+    expect(u.onSegmentRequested(segment(10))).toBe("seek");
+    expect(u.getPlayback().bufferEdge).toBe(10 * SEG);
+  });
+
+  it("starts from the first count it is told, which is not a seek", () => {
+    const t = new PlaybackTracker(segment(0), {}, () => 0);
+    t.report({ bufferAhead: 0, rate: 1, seekCount: 7 });
+    expect(t.isSeekPending()).toBe(false);
+    expect(t.onSegmentRequested(segment(0))).toBe("extend");
+  });
+
+  it("follows a forward jump with no seek as a move, not a re-request", () => {
+    const t = filled();
+    expect(t.onSegmentRequested(segment(12))).toBe("extend");
+    expect(t.getPlayback().bufferEdge).toBe(12 * SEG);
   });
 });
 

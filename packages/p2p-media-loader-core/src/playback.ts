@@ -37,6 +37,19 @@ export type PlaybackState = {
 
   /** Effective playback rate; 0 while paused. */
   readonly rate: number;
+
+  /**
+   * How many seeks the player has started since it began playing this
+   * source. Optional: an integration that cannot see seeks leaves it out,
+   * and everything still works.
+   *
+   * A count rather than a flag, so that a seek that began and ended between
+   * two reports — a native shim reports on an interval — still shows. When it
+   * moves, the core stops prefetching for each stream from the position the
+   * player left, until that stream's own first request at the new one. See
+   * specs/playback-contract.md, "Behaviour under seeking".
+   */
+  readonly seekCount?: number;
 };
 
 /**
@@ -128,13 +141,18 @@ export function trackMediaElementPlayback(
   report: (state: PlaybackState) => void,
 ): MediaElementPlaybackTracker {
   let watched: HTMLMediaElement | undefined;
+  // Every seek of every element watched: the core compares counts, not
+  // their value, so a new element continues the count rather than restarting
+  // it.
+  let seekCount = 0;
 
   const handle = (event: Event) => {
     const target = event.target as HTMLMediaElement;
+    if (event.type === "seeking") seekCount++;
     if (oracle.enabled) {
       oracle(`media.currentTime=${target.currentTime.toFixed(3)}`);
     }
-    report(getPlaybackStateFromMediaElement(target));
+    report({ ...getPlaybackStateFromMediaElement(target), seekCount });
   };
 
   let watchToken: DiagnosticsToken | undefined;

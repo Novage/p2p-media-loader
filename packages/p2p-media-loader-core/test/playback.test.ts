@@ -4,6 +4,18 @@ import {
   getPlaybackStateFromMediaElement,
   trackMediaElementPlayback,
 } from "../src/playback.js";
+import debug from "debug";
+import { Core } from "../src/core.js";
+import { diagnostics as compiledLedger } from "../src/diagnostics.js";
+
+// Absent only in a prebuilt bundle; the tests run on the source.
+if (!compiledLedger) throw new Error("diagnostics are compiled out");
+const ledger = compiledLedger;
+// The ledger decides once, at its first record: on, for the whole file.
+debug.enable("p2pml:diagnostics");
+ledger.snapshot();
+debug.disable();
+const count = (name: string) => ledger.snapshot()?.counters[name] ?? 0;
 
 describe("getBufferAhead", () => {
   it("measures from the range containing the playhead", () => {
@@ -91,7 +103,7 @@ describe("trackMediaElementPlayback", () => {
     };
     const fire = (type: string) => {
       for (const listener of listeners.get(type) ?? []) {
-        listener({ target: media } as unknown as Event);
+        listener({ target: media, type } as unknown as Event);
       }
     };
     const count = () =>
@@ -121,6 +133,25 @@ describe("trackMediaElementPlayback", () => {
       fire(event);
     }
     expect(reported).toEqual(Array<number>(8).fill(15));
+  });
+
+  it("counts every seek into the state it reports, across elements", () => {
+    // A count, so that a seek that began and ended between two reports still
+    // shows; a new element continues it rather than starting again.
+    const first = fakeMedia();
+    const second = fakeMedia();
+    const counts: (number | undefined)[] = [];
+    const tracker = trackMediaElementPlayback((state) =>
+      counts.push(state.seekCount),
+    );
+    tracker.watch(first.media);
+    first.fire("timeupdate");
+    first.fire("seeking");
+    first.fire("seeked");
+    first.fire("seeking");
+    tracker.watch(second.media);
+    second.fire("seeking");
+    expect(counts).toEqual([0, 1, 1, 2, 3]);
   });
 
   it("stops reporting, and stops twice without complaint", () => {
@@ -155,5 +186,19 @@ describe("trackMediaElementPlayback", () => {
     expect(report).not.toHaveBeenCalled();
     second.fire("timeupdate");
     expect(report).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Core.updatePlayback", () => {
+  it("counts each seek the player reports, not the first count it sees", () => {
+    const before = count("Seek:reported");
+    const core = new Core();
+    core.updatePlayback({ bufferAhead: 0, rate: 1 });
+    core.updatePlayback({ bufferAhead: 0, rate: 1, seekCount: 3 });
+    core.updatePlayback({ bufferAhead: 5, rate: 1, seekCount: 3 });
+    core.updatePlayback({ bufferAhead: 0, rate: 1, seekCount: 4 });
+    core.updatePlayback({ bufferAhead: 0, rate: 1, seekCount: 6 });
+    expect(count("Seek:reported")).toBe(before + 2);
+    core.destroy();
   });
 });

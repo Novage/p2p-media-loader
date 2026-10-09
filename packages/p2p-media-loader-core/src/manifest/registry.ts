@@ -62,10 +62,21 @@ export type RegistryStream = {
   readonly isLive?: boolean;
   /** The live window the stream's manifest declares; see `ParsedStream`. */
   readonly declaredWindow?: number;
+  /**
+   * Whether the stream's start times mean the same as every other stream's
+   * of the presentation: DASH's presentation time, HLS's programme dates, or
+   * an HLS playlist laid out from sequence zero that listed every segment
+   * from the start — a VOD one at its first parse. A sliding HLS playlist
+   * without programme dates is laid out from wherever its first parse began,
+   * and its zero is not another playlist's. See specs/playback-contract.md,
+   * "One playhead for all streams".
+   */
+  readonly sharedTimeline?: boolean;
   readonly segments: ReadonlyMap<string, RegistrySegment>;
 };
 
-type MutableStream = Omit<RegistryStream, "segments"> & {
+type MutableStream = Omit<RegistryStream, "segments" | "sharedTimeline"> & {
+  sharedTimeline?: boolean;
   segments: Map<string, RegistrySegment>;
   /** HLS without PDT: start time of every sequence number laid out so far. */
   timeline: Map<number, number>;
@@ -364,6 +375,7 @@ export class ManifestRegistry {
       declaredWindow: parsed.segments
         ? parsed.declaredWindow
         : existing?.declaredWindow,
+      sharedTimeline: existing?.sharedTimeline,
       segments: existing?.segments ?? new Map<string, RegistrySegment>(),
       timeline: existing?.timeline ?? new Map<number, number>(),
     };
@@ -524,10 +536,17 @@ export class ManifestRegistry {
     protocol: ParsedManifest["protocol"],
   ): number[] {
     if (protocol === "dash") {
+      stream.sharedTimeline = true;
       return segments.map((s) => s.presentationTime ?? 0);
     }
     const { timeline } = stream;
     const dates = segments.map((s) => s.programDateTime);
+    // Decided once, at the first layout: what that parse anchored on stays
+    // the anchor.
+    if (stream.sharedTimeline === undefined && segments.length) {
+      stream.sharedTimeline =
+        dates.every((date) => date !== undefined) || stream.isLive === false;
+    }
     if (dates.every((date): date is number => date !== undefined)) {
       // Remembered by sequence all the same: a packager that drops its
       // programme dates mid-session — a failover to another origin — would

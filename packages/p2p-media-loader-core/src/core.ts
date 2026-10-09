@@ -54,6 +54,7 @@ import {
   PEER_PROTOCOL_VERSION,
 } from "./stream-identity.js";
 import { BandwidthCalculator } from "./bandwidth-calculator.js";
+import { SharedPlayhead } from "./shared-playhead.js";
 import { SegmentMemoryStorage } from "./segment-storage/segment-memory-storage.js";
 import { EventTarget } from "./utils/event-target.js";
 import {
@@ -138,6 +139,10 @@ export class Core {
   private mainStreamConfig: StreamConfig;
   private secondaryStreamConfig: StreamConfig;
   private commonCoreConfig: CommonCoreConfig;
+  /** The playhead the streams of the current source share. */
+  private sharedPlayhead = new SharedPlayhead();
+  /** The seek count of the last report, to count each seek once. */
+  private lastSeekCount?: number;
   private readonly bandwidthCalculators: BandwidthCalculators = {
     all: new BandwidthCalculator(),
     http: new BandwidthCalculator(),
@@ -663,6 +668,7 @@ export class Core {
     stream: StreamWithSegments,
     registryStream: RegistryStream,
   ): void {
+    stream.sharedTimeline = registryStream.sharedTimeline === true;
     let changed = false;
     // What the manifest stopped listing, by identity rather than by key: a key
     // can change under a segment that stays, as when a CDN signs the URLs of
@@ -765,8 +771,9 @@ export class Core {
    * snapshot, so consumers can never reach or retain core state.
    */
   private toStreamSnapshot(stream: StreamWithSegments): Stream {
+    // The core's own state stays out of the public payload.
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { segments, ...snapshot } = stream;
+    const { segments, sharedTimeline, ...snapshot } = stream;
     return snapshot;
   }
 
@@ -980,6 +987,15 @@ export class Core {
    * @param state - The current playback state.
    */
   updatePlayback(state: PlaybackState): void {
+    if (state.seekCount !== undefined) {
+      if (
+        this.lastSeekCount !== undefined &&
+        state.seekCount !== this.lastSeekCount
+      ) {
+        diagnostics?.count("Seek:reported");
+      }
+      this.lastSeekCount = state.seekCount;
+    }
     this.mainStreamLoader?.updatePlayback(state);
     this.secondaryStreamLoader?.updatePlayback(state);
   }
@@ -1120,6 +1136,8 @@ export class Core {
 
     this.mainStreamLoader = undefined;
     this.secondaryStreamLoader = undefined;
+    this.sharedPlayhead = new SharedPlayhead();
+    this.lastSeekCount = undefined;
     if (this.storageDiagnosticsToken) {
       diagnostics?.close(this.storageDiagnosticsToken, "destroyed");
       this.storageDiagnosticsToken = undefined;
@@ -1319,6 +1337,7 @@ export class Core {
       this.webTorrentSocketPool,
       this.eventTarget,
       this.peerId,
+      this.sharedPlayhead,
     );
   }
 }

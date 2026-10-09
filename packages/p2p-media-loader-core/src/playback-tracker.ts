@@ -42,6 +42,19 @@ export type PlaybackTrackerConfig = {
   idleFullBufferRatio: number;
 };
 
+/**
+ * What a player request was, for the buffer edge. See
+ * specs/playback-contract.md, "The buffer edge".
+ *
+ * - `extend`: the request continues the stream; the edge moves to its start
+ *   where that is further.
+ * - `rerequest`: the player is fetching again media it holds, with no seek
+ *   between — dash.js replaces segments at a higher quality this way; the edge
+ *   stays.
+ * - `seek`: the player jumped; the edge re-anchors at the request.
+ */
+export type RequestKind = "extend" | "rerequest" | "seek";
+
 const DEFAULT_PLAYBACK_TRACKER_CONFIG: PlaybackTrackerConfig = {
   reportStaleAfterMs: 2000,
   initialBufferTarget: 30,
@@ -55,6 +68,17 @@ export class PlaybackTracker {
   private readonly now: () => number;
 
   private reported?: { state: PlaybackState; at: number };
+
+  /**
+   * The seek count the integration last reported, and the one it had reported
+   * when this stream last requested. They differ while a seek this stream has
+   * not requested after is under way. Both undefined while the integration
+   * reports no count.
+   */
+  private seekCount?: number;
+  private seekCountAtRequest?: number;
+  /** Whether the player reported media at the position of the last seek. */
+  private seekLandedInBuffer = false;
 
   /**
    * Manifest time at which the player's buffer currently ends: the anchor's
@@ -93,6 +117,17 @@ export class PlaybackTracker {
     const now = this.now();
     const bufferAhead = Math.max(0, state.bufferAhead);
     this.reported = { state: { bufferAhead, rate: state.rate }, at: now };
+    if (state.seekCount !== undefined) {
+      // The report of the seek itself says where it landed. A later one does
+      // not: once another stream's media arrives there, the player reports a
+      // buffer although this stream has none at the new position.
+      if (state.seekCount !== this.seekCount) {
+        this.seekLandedInBuffer = bufferAhead > 0;
+      }
+      this.seekCount = state.seekCount;
+      // The first count this stream sees is where it starts from, not a seek.
+      this.seekCountAtRequest ??= state.seekCount;
+    }
     // A report is the one measurement of the buffer there is, so inference
     // anchors on it as well. An integration that samples its player rarely —
     // a proxy once per segment — spends most of its time inferring, and
@@ -101,31 +136,77 @@ export class PlaybackTracker {
     this.reanchor(now, bufferAhead);
   }
 
+  /** Whether the integration reports a seek count. */
+  reportsSeekCount(): boolean {
+    return this.seekCount !== undefined;
+  }
+
+  /**
+   * A seek has been reported that this stream has not requested since. Its
+   * next request re-anchors the edge, wherever it is.
+   */
+  private hasSeekSinceRequest(): boolean {
+    return (
+      this.seekCount !== undefined && this.seekCount !== this.seekCountAtRequest
+    );
+  }
+
+  /**
+   * A seek has been reported that this stream has not requested since, and
+   * the player held no media at the new position: the edge describes the
+   * position it left. A seek into buffered media reports a buffer at once,
+   * and may bring no request for as long as that buffer lasts; its edge is
+   * the one the player holds, or, after a seek into an earlier island, wrong
+   * until the request the player then makes at once. See
+   * specs/playback-contract.md, "Behaviour under seeking".
+   */
+  isSeekPending(): boolean {
+    return this.hasSeekSinceRequest() && !this.seekLandedInBuffer;
+  }
+
   /**
    * The player asked for a segment. In flight, its buffer ends where that
    * segment begins; that is precisely why it is being requested.
    *
-   * Also the seek detector: a request that is not the successor of the previous
-   * one means the player jumped, and a jump means its buffer was discarded.
-   * Returns whether a seek was detected so the caller can react.
+   * Also the seek detector. With a seek count, a seek is a request after the
+   * count moved, and a request before the edge with no seek between is the
+   * player fetching again what it holds. Without one, the two cannot be told
+   * apart, and a request that does not continue the stream is taken for a
+   * seek. See specs/playback-contract.md, "The buffer edge".
    */
-  onSegmentRequested(segment: SegmentLike): boolean {
+  onSegmentRequested(segment: SegmentLike): RequestKind {
     const now = this.now();
     const previous = this.anchor;
+    const seekSinceRequest = this.hasSeekSinceRequest();
+    const countReported = this.seekCount !== undefined;
     this.anchor = segment;
-    this.bufferEdge = segment.startTime;
+    this.seekCountAtRequest = this.seekCount;
 
     // Continuity is judged on the timeline, not on `externalId`: HLS ids step
     // by one, DASH ids by the segment's length in 100 ms units. A retry of the
-    // same segment is not a jump either.
+    // same segment is not a jump either. A request that resumes at the edge
+    // after re-requests continues the stream too.
     const isSuccessor =
       segment.externalId === previous.externalId ||
-      continues(previous, segment);
+      continues(previous, segment) ||
+      continuesAt(this.bufferEdge, segment);
 
-    if (!isSuccessor) {
+    let kind: RequestKind;
+    if (seekSinceRequest) kind = "seek";
+    else if (isSuccessor) kind = "extend";
+    else if (!countReported) kind = "seek";
+    else if (segment.startTime < this.bufferEdge) kind = "rerequest";
+    else kind = "extend";
+
+    if (kind === "seek") {
+      this.bufferEdge = segment.startTime;
       this.reanchor(now, 0);
-      return true;
+      return kind;
     }
+    if (kind === "rerequest") return kind;
+
+    this.bufferEdge = Math.max(this.bufferEdge, segment.startTime);
+    if (!isSuccessor) return kind;
 
     // A sequential request arriving after an idle gap: the player was not
     // fetching because it had nowhere to put the data. Its buffer was at target.
@@ -141,7 +222,7 @@ export class PlaybackTracker {
       this.learnBufferTarget(this.unclampedInferredBufferAhead(now));
       this.reanchor(now, this.bufferTarget);
     }
-    return false;
+    return kind;
   }
 
   /** A segment's bytes reached the player: the buffer now extends through it. */
@@ -216,6 +297,11 @@ function clamp(value: number, min: number, max: number): number {
  * two durations — enough to absorb timeline rounding, not enough to hide a
  * skipped segment.
  */
+/** Whether `next` starts at `edge`, within half its own duration. */
+function continuesAt(edge: number, next: SegmentLike): boolean {
+  return Math.abs(next.startTime - edge) <= (next.endTime - next.startTime) / 2;
+}
+
 function continues(previous: SegmentLike, next: SegmentLike): boolean {
   const tolerance =
     Math.min(

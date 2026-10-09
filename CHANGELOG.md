@@ -89,6 +89,24 @@ throughout.
 - **Playback is reported as `{ bufferAhead, rate }`** rather than an absolute
   position. The core keeps its own estimate of the playhead and re-anchors it on
   each report; see [`specs/playback-contract.md`](specs/playback-contract.md).
+- **All the streams of a presentation share one playhead.** A player reports
+  one buffer, the lagging stream's, so the stream that ran ahead — usually
+  audio — saw its next segments as needed sooner than they were, and fetched
+  them over HTTP while their P2P copies could still arrive: 4 s early on
+  average on dash.js, up to 34 s on HLS.js. Its estimate is now within 0.2 s
+  on dash.js, HLS.js and Shaka. See
+  [`specs/playback-contract.md`](specs/playback-contract.md), "One playhead for
+  all streams".
+- **`PlaybackState` takes an optional `seekCount`**, which
+  `trackMediaElementPlayback` fills from the media element's `seeking` events.
+  After a seek into unbuffered media, a stream starts no prefetch until its
+  own request at the new position: the streams do not request together, and
+  in between, dash.js audio and HLS.js video started downloads at the position
+  the player had left. With the count, a request before the buffer edge with
+  no seek between is a re-request, and keeps the edge. An integration that
+  reports no count keeps the behaviour before it. See
+  [`specs/playback-contract.md`](specs/playback-contract.md), "Behaviour under
+  seeking".
 - **A live player is placed as deep in the live window as the window allows**,
   by one rule shared across the adapters, so the segments between a peer's
   buffer and the live edge are as many as possible for peers to exchange.

@@ -116,6 +116,18 @@ import { HybridLoader } from "../src/hybrid-loader.js";
 import { Core } from "../src/core.js";
 import { BandwidthCalculator } from "../src/bandwidth-calculator.js";
 import { EventTarget } from "../src/utils/event-target.js";
+import { SharedPlayhead } from "../src/shared-playhead.js";
+import debug from "debug";
+import { diagnostics as compiledLedger } from "../src/diagnostics.js";
+
+// Absent only in a prebuilt bundle; the tests run on the source.
+if (!compiledLedger) throw new Error("diagnostics are compiled out");
+const ledger = compiledLedger;
+// The ledger decides once, at its first record: on, for the whole file.
+debug.enable("p2pml:diagnostics");
+ledger.snapshot();
+debug.disable();
+const count = (name: string) => ledger.snapshot()?.counters[name] ?? 0;
 
 const SEGMENT_DURATION = 4;
 
@@ -817,6 +829,128 @@ describe("HybridLoader: a stored segment that reads back empty", () => {
     expect(callbacks.onSuccess).toHaveBeenCalledTimes(1);
     // The queue moves on to the next segment; this one is not fetched again.
     expect(state.httpStarted).not.toContain("seg-0");
+    loader.destroy();
+  });
+});
+
+describe("HybridLoader: one playhead for all streams", () => {
+  beforeEach(() => {
+    vi.stubGlobal("window", globalThis);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /** A loader of `stream`, telling `positions` where it puts the playhead. */
+  function loaderOf(
+    stream: StreamWithSegments,
+    shared: SharedPlayhead,
+    positions: number[],
+  ) {
+    const storage = {
+      ...emptyStorage,
+      onPlaybackUpdated: (position: number) => positions.push(position),
+    } as unknown as SegmentStorage;
+    return new HybridLoader(
+      stream.segments.get("seg-0")!,
+      { isLive: false, liveTarget: undefined },
+      { ...Core.DEFAULT_STREAM_CONFIG, httpDownloadInitialTimeoutMs: 0 },
+      { all: new BandwidthCalculator(), http: new BandwidthCalculator() },
+      storage,
+      {} as never,
+      new EventTarget<CoreEventMap>(),
+      "me",
+      shared,
+    );
+  }
+
+  async function playBoth(audioShared: boolean) {
+    const video = createStream(30, "720p");
+    const audio = createStream(30, "audio");
+    (audio as { type: string }).type = "secondary";
+    video.sharedTimeline = true;
+    audio.sharedTimeline = audioShared;
+    const shared = new SharedPlayhead();
+    const videoAt: number[] = [];
+    const audioAt: number[] = [];
+    const videoLoader = loaderOf(video, shared, videoAt);
+    const audioLoader = loaderOf(audio, shared, audioAt);
+    const callbacks = { onSuccess: vi.fn(), onError: vi.fn() };
+    // Video's buffer ends at 40 s, audio's at 44 s: audio runs a segment ahead.
+    await videoLoader.loadSegment(video.segments.get("seg-10")!, callbacks);
+    await audioLoader.loadSegment(audio.segments.get("seg-11")!, callbacks);
+    // The player reports the lagging stream's buffer: playhead at 30 s.
+    videoLoader.updatePlayback({ bufferAhead: 10, rate: 1 });
+    audioLoader.updatePlayback({ bufferAhead: 10, rate: 1 });
+    await flush();
+    videoLoader.destroy();
+    audioLoader.destroy();
+    return { video: videoAt.at(-1), audio: audioAt.at(-1) };
+  }
+
+  it("places both streams at one playhead, the lagging stream's", async () => {
+    const shared = count("Playhead:shared");
+    // Each from its own edge, audio would be at 34 s: ahead by its lead.
+    expect(await playBoth(true)).toEqual({ video: 30, audio: 30 });
+    expect(count("Playhead:shared")).toBeGreaterThan(shared);
+  });
+
+  it("leaves a stream on another timeline to its own estimate", async () => {
+    expect(await playBoth(false)).toEqual({ video: 30, audio: 34 });
+  });
+});
+
+describe("HybridLoader: a seek the player reported", () => {
+  beforeEach(() => {
+    vi.stubGlobal("window", globalThis);
+    fakes.state.peerCount = 0;
+    fakes.state.httpStarted.length = 0;
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("starts nothing from the position the player left, until the stream requests at the new one", async () => {
+    const held = count("Prefetch:held-for-seek");
+    const seeks = count("SegmentRequest:seek");
+    const { loader, segment, callbacks, state } = setup();
+    loader.updatePlayback({ bufferAhead: 0, rate: 1, seekCount: 0 });
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+
+    // The player seeks into unbuffered media: the count moves before it
+    // requests anything. Two queue passes (a report throttles its own, so the
+    // manifest's update forces one) start nothing, and count the hold once.
+    state.httpStarted.length = 0;
+    loader.updatePlayback({ bufferAhead: 0, rate: 1, seekCount: 1 });
+    loader.updateStream(segment(0).stream);
+    await flush();
+    loader.updateStream(segment(0).stream);
+    await flush();
+    expect(state.httpStarted).toEqual([]);
+    expect(count("Prefetch:held-for-seek")).toBe(held + 1);
+
+    // Its request at the new position re-anchors the stream, and is fetched.
+    await loader.loadSegment(segment(20), callbacks);
+    await flush();
+    expect(state.httpStarted).toContain("seg-20");
+    expect(count("SegmentRequest:seek")).toBe(seeks + 1);
+    loader.destroy();
+  });
+
+  it("does not hold a stream whose seek landed in media the player holds", async () => {
+    // A seek inside the buffer brings no request for as long as the buffer
+    // lasts; holding until then would stop the prefetch for all that time.
+    const held = count("Prefetch:held-for-seek");
+    const { loader, segment, callbacks } = setup();
+    loader.updatePlayback({ bufferAhead: 0, rate: 1, seekCount: 0 });
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+
+    loader.updatePlayback({ bufferAhead: 12, rate: 1, seekCount: 1 });
+    loader.updateStream(segment(0).stream);
+    await flush();
+    expect(count("Prefetch:held-for-seek")).toBe(held);
     loader.destroy();
   });
 });

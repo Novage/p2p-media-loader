@@ -32,6 +32,8 @@ export type SegmentWithStream<TStream extends Stream = Stream> = Segment & {
  */
 export type StreamWithSegments<TStream extends Stream = Stream> = TStream & {
   readonly segments: Map<string, SegmentWithStream<TStream>>;
+  /** The registry's `sharedTimeline`, kept current by each manifest. */
+  sharedTimeline?: boolean;
 };
 
 export type BandwidthCalculators = Readonly<{

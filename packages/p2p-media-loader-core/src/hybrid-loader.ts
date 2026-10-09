@@ -33,13 +33,14 @@ import { SegmentStorage } from "./segment-storage/index.js";
 import { WebTorrentSocketPool } from "./webtorrent/webtorrent-socket-pool/index.js";
 import { PlaybackTracker } from "./playback-tracker.js";
 import type { PlaybackState } from "./playback.js";
+import { SharedPlayhead, type PlayheadParticipant } from "./shared-playhead.js";
 
 const FAILED_ATTEMPTS_CLEAR_INTERVAL = 60000;
 const PEER_UPDATE_LATENCY = 1000;
 /** Weight of the newest sample in the running estimate of a stream's segment size. */
 const SEGMENT_BYTES_EWMA_ALPHA = 0.3;
 
-export class HybridLoader {
+export class HybridLoader implements PlayheadParticipant {
   private readonly requests: RequestsContainer;
   private engineRequest?: EngineRequest;
   private readonly p2pLoaders: P2PLoadersContainer;
@@ -68,6 +69,8 @@ export class HybridLoader {
    */
   private readingFromStorage?: EngineRequest;
   private readonly createdAt = performance.now();
+  /** Whether a seek's hold on prefetching has been counted already. */
+  private seekHoldCounted = false;
 
   constructor(
     private lastRequestedSegment: Readonly<SegmentWithStream>,
@@ -78,10 +81,13 @@ export class HybridLoader {
     private readonly webTorrentSocketPool: WebTorrentSocketPool,
     private readonly eventTarget: EventTarget<CoreEventMap>,
     private readonly peerId: string,
+    /** The other streams of the presentation; alone by default. */
+    private readonly sharedPlayhead: SharedPlayhead = new SharedPlayhead(),
   ) {
     const activeStream = this.lastRequestedSegment.stream;
     this.playbackTracker = new PlaybackTracker(this.lastRequestedSegment);
     this.playback = this.playbackTracker.getPlayback();
+    this.sharedPlayhead.join(this);
     this.requests = new RequestsContainer(
       this.requestProcessQueueMicrotask,
       this.bandwidthCalculators,
@@ -183,7 +189,17 @@ export class HybridLoader {
         this.levelChangedTimestamp = performance.now();
       }
       this.lastRequestedSegment = segment;
-      const isSeek = this.playbackTracker.onSegmentRequested(segment);
+      const kind = this.playbackTracker.onSegmentRequested(segment);
+      diagnostics?.count(`SegmentRequest:${kind}`);
+      this.seekHoldCounted = false;
+      const isSeek = kind === "seek";
+      // Without a seek count, this request is the only sign of a seek, and
+      // the other streams' edges still describe the position it left.
+      if (isSeek && !this.playbackTracker.reportsSeekCount()) {
+        this.sharedPlayhead.onSeek(this);
+      } else {
+        this.sharedPlayhead.onRequest(this);
+      }
       this.syncPlayback();
       if (isSeek) {
         this.logger("seek detected: buffer edge re-anchored");
@@ -418,6 +434,7 @@ export class HybridLoader {
       availableStorageCapacityPercent,
     } = this.generateQueue();
     const stored = this.processRequests(queueSegmentIds, queueDownloadRatio);
+    if (this.holdsForSeek()) return;
 
     const {
       simultaneousHttpDownloads,
@@ -620,6 +637,7 @@ export class HybridLoader {
       performance.now() - this.createdAt < httpDownloadInitialTimeoutMs;
 
     if (isInitialHttpWait) return;
+    if (this.holdsForSeek()) return;
 
     // Nothing to elect without peers — checked before measuring the storage,
     // which walks the whole segment cache.
@@ -925,17 +943,37 @@ export class HybridLoader {
     );
   }
 
+  /**
+   * The player has started a seek this stream has not requested after: the
+   * queue would be built from the position it left, so nothing new is
+   * fetched until the stream's own request at the new one. Downloads already
+   * under way are left to the queue that request builds. See
+   * specs/playback-contract.md, "Behaviour under seeking".
+   */
+  private holdsForSeek(): boolean {
+    if (!this.playbackTracker.isSeekPending()) return false;
+    if (!this.seekHoldCounted) {
+      this.seekHoldCounted = true;
+      diagnostics?.count("Prefetch:held-for-seek");
+    }
+    return true;
+  }
+
+  /** See `PlayheadParticipant`. */
+  currentEdge(): number | undefined {
+    if (this.destroyed || this.config.isP2PDisabled) return undefined;
+    if (this.lastRequestedSegment.stream.sharedTimeline !== true) {
+      return undefined;
+    }
+    if (this.playbackTracker.isSeekPending()) return undefined;
+    const own = this.playbackTracker.getPlayback();
+    return own.source === "reported" ? own.bufferEdge : undefined;
+  }
+
   updatePlayback(state: PlaybackState) {
     this.playbackTracker.report(state);
     const changed = this.syncPlayback();
     if (!changed) return;
-
-    if (this.oracleLogger.enabled) {
-      const { bufferEdge, bufferAhead, source } = this.playback;
-      this.oracleLogger(
-        `${this.lastRequestedSegment.stream.type} playhead≈${(bufferEdge - bufferAhead).toFixed(3)} (${source})`,
-      );
-    }
     this.requestProcessQueueMicrotask(false);
   }
 
@@ -949,7 +987,13 @@ export class HybridLoader {
    * collapse every window to the segment at the playhead.
    */
   private syncPlayback(): boolean {
-    const next = this.playbackTracker.getPlayback();
+    const own = this.playbackTracker.getPlayback();
+    // The stream's own buffer, where the streams share a playhead: the
+    // reported one is the lagging stream's. See SharedPlayhead.
+    const next = {
+      ...own,
+      bufferAhead: this.sharedPlayhead.bufferAheadFor(this, own),
+    };
     const rate = next.rate === 0 ? this.playback.rate : next.rate;
     const { playback } = this;
     const changed =
@@ -964,10 +1008,14 @@ export class HybridLoader {
     // proxy that never reports would otherwise leave the store with no
     // playhead at all, evicting nothing for the whole session.
     if (changed) {
-      this.segmentStorage.onPlaybackUpdated(
-        next.bufferEdge - next.bufferAhead,
-        rate,
-      );
+      const playhead = next.bufferEdge - next.bufferAhead;
+      this.segmentStorage.onPlaybackUpdated(playhead, rate);
+      // Here, not only on a report: a request moves the edge too.
+      if (this.oracleLogger.enabled) {
+        this.oracleLogger(
+          `${this.lastRequestedSegment.stream.type} playhead≈${playhead.toFixed(3)} (${next.source})`,
+        );
+      }
     }
     return changed;
   }
@@ -981,6 +1029,7 @@ export class HybridLoader {
   destroy() {
     diagnostics?.close(this.diagnosticsToken, "destroyed");
     this.destroyed = true;
+    this.sharedPlayhead.leave(this);
     clearTimeout(this.prefetchTimerId);
     clearTimeout(this.initialHttpDelayTimeoutId);
     this.engineRequest?.abort();
