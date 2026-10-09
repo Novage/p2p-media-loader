@@ -60,12 +60,15 @@ player, never when the player consumes them, and a player holding 30 seconds of
 buffer issues requests indistinguishable from one holding 2 seconds. A thin
 native shim around the player reports it instead:
 
-|               | ExoPlayer                                        | AVPlayer                                                          |
-| ------------- | ------------------------------------------------ | ----------------------------------------------------------------- |
-| `bufferAhead` | `getTotalBufferedDuration()` — already the value | `loadedTimeRanges` + `currentTime()`, via core's `getBufferAhead` |
-| `rate`        | `playbackParameters.speed`, 0 when not playing   | `rate`                                                            |
+|               | ExoPlayer                                                         | AVPlayer                                                          |
+| ------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `bufferAhead` | `getTotalBufferedDuration()` — already the value                  | `loadedTimeRanges` + `currentTime()`, via core's `getBufferAhead` |
+| `rate`        | `playbackParameters.speed`, 0 when not playing                    | `rate`                                                            |
+| `seekCount`   | counts `onPositionDiscontinuity` with `DISCONTINUITY_REASON_SEEK` | counts `AVPlayerItem.timeJumpedNotification`                      |
 
-Polled on a short interval and posted into the WebView.
+Polled on a short interval and posted into the WebView. A seek is counted when
+the player's event fires, not polled, so one that begins and ends between two
+posts still moves the count ([playback-contract.md](playback-contract.md)).
 
 An integration that declines to wrap the player still functions: core falls back
 to inferring playback state from the request pattern, with the limits described

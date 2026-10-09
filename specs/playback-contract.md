@@ -32,6 +32,12 @@ type PlaybackState = {
 
   /** Effective playback rate; 0 while paused. */
   readonly rate: number;
+
+  /**
+   * How many seeks the player has started since it began playing this
+   * source. Optional: an integration that cannot see seeks leaves it out.
+   */
+  readonly seekCount?: number;
 };
 ```
 
@@ -40,6 +46,16 @@ _duration_, so it is invariant under the offset. Combined with the last
 requested segment — which core already knows, in manifest time — it is
 sufficient. No calibration step exists because no absolute comparison is ever
 made.
+
+**`seekCount` is a count, not a flag.** A seek begins before the player
+requests anything at its new position, and core must know at once that the
+buffer it was told about is gone (see "Behaviour under seeking"). A browser
+adapter counts the media element's `seeking` events. A native shim counts the
+player's own seek events — ExoPlayer's `onPositionDiscontinuity` with
+`DISCONTINUITY_REASON_SEEK`, AVPlayer's `AVPlayerItem.timeJumpedNotification`
+— and posts the state on an interval ([mobile-proxy.md](mobile-proxy.md)). A
+seek can begin and end between two such posts; a flag would miss it, and a
+count that has moved cannot.
 
 The contract is also the intersection of what every target player can answer,
 which is why it is expressed this way rather than in any player's own terms.
@@ -78,16 +94,36 @@ staleness resumes.
 
 ## The buffer edge
 
-Core tracks `bufferEdge`: the point on the **manifest timeline** where the
-player's buffer currently ends.
+Core tracks `bufferEdge`, for each stream: the point on the **manifest
+timeline** where the player's buffer of that stream currently ends.
 
-- When a segment is requested, the buffer ends where that segment begins — that
-  is precisely why the player is requesting it. `bufferEdge = segment.startTime`.
+- When a segment is requested that extends the buffer, the buffer ends where
+  that segment begins — that is precisely why the player is requesting it.
+  `bufferEdge = segment.startTime`.
 - When the segment is delivered, the buffer extends through it.
   `bufferEdge = max(bufferEdge, segment.endTime)`.
+- After a seek, the stream's first request re-anchors the edge wherever it is:
+  `bufferEdge = segment.startTime`.
+- A request for a segment that starts before the edge, with no seek between,
+  is not a move: the player is fetching again media it holds — dash.js
+  replaces segments it buffered at a higher quality this way. The edge stays.
+  Moving it back would make every segment of the stream look further from the
+  playhead than it is, the direction that stalls; measured on dash.js, it put
+  the estimate 16 s behind.
 
 The `max` guards against out-of-order completion of parallel requests dragging
 the edge backwards.
+
+Telling a re-request from a seek takes the seek count where the integration
+reports one: a request before the edge is a seek's first request when the count
+has moved since the stream's previous request, and a re-request otherwise.
+Where the integration reports `bufferAhead` but no count, a seek to media the
+player does not hold leaves it near zero, and a re-request leaves it where it
+was: a request that does not continue the previous one is taken for a seek
+when the reported `bufferAhead` has fallen below one segment of the stream,
+and for a re-request when it has not. A seek inside the buffer issues no
+request, so it is neither. Only inference, where nothing is reported, takes
+every such request for a seek (see "When the player reports nothing").
 
 Keeping the edge explicit rather than deriving it from the last requested
 segment removes a silent one-segment-duration error: the correct origin depends
@@ -103,24 +139,104 @@ most one segment in that interval and the next reported state corrects it. The
 same bound applies at startup, when a player issues several requests at once
 before any has been appended. Neither transient accumulates.
 
+## One playhead for all streams
+
+`bufferAhead` is one number, and a presentation with separate audio has two
+buffers. What every player reports is the shorter of them, the lagging
+stream's: the time until playback runs out of data, which is set by whichever
+stream runs out first.
+
+- **Browsers.** The media element's `buffered` is, by the Media Source
+  Extensions specification, the intersection of the active SourceBuffers. With
+  HLS.js, dash.js and Shaka on DASH and on HLS with separate audio, the end of
+  the element's range was `min(audio end, video end)` in every sample, in both
+  directions. The one exception the specification makes is after
+  `endOfStream()`, at the end of a VOD stream, where each buffer's last range
+  counts to the highest end.
+- **ExoPlayer.** Its buffered position is the minimum over the audio and video
+  loaders, leaving out a track that has loaded to its end
+  (`CompositeSequenceableLoader.getBufferedPositionUs`).
+- **AVPlayer.** `loadedTimeRanges` is not documented per track. Measured in
+  Safari, whose native HLS is AVFoundation, it never went past the lagging
+  stream while audio ran up to 13 s ahead.
+
+So `bufferEdge - bufferAhead` is the playhead only for the lagging stream. For
+the stream that runs ahead it lands ahead of the playhead by that stream's
+lead, and the error moves: forward by a segment each time that stream's
+segment arrives, back by a segment each time the lagging stream's does.
+Every next segment of the leading stream then looks needed sooner than it is,
+by the lead, and is fetched over HTTP, or given to a backup, while its P2P copy
+could still have arrived. Measured: 4 s on average for dash.js audio, up to
+34 s for HLS.js audio.
+
+Core therefore keeps one playhead for all the streams of a presentation:
+
+```
+playhead = min(bufferEdge of each current stream) - bufferAhead
+```
+
+The lagging stream's edge is the minimum and its buffer is `bufferAhead`, so
+this is the playhead, and a stream's own buffer is `bufferEdge - playhead`.
+Nothing jumps: a segment of the leading stream moves neither the minimum nor
+`bufferAhead`, and one of the lagging stream moves both by the same amount.
+Measured against the true SourceBuffers, it put video within 0.1 s on DASH and
+HLS, and dash.js audio within 0.03 s on average. What remains is the
+delivered-not-appended transient of "The buffer edge": HLS.js keeps a delivered
+audio segment for up to about 3 s before appending it, and for that time the
+audio buffer reads one segment long.
+
+A stream is current, and takes part in the minimum, only when:
+
+- **its timeline is the others'.** DASH places every stream on the MPD's
+  timeline; HLS does with `EXT-X-PROGRAM-DATE-TIME`. On HLS without programme
+  dates each playlist is anchored at zero on its own first parse, the edges
+  differ by an unknown offset, and each stream keeps its own estimate,
+  `bufferEdge - bufferAhead`;
+- **its edge is re-anchored since the last seek.** Until the stream's first
+  request after a seek its edge describes the old position (see "Behaviour
+  under seeking"); taken as the minimum, it would move every other stream's
+  playhead there;
+- **core sees its requests.** A stream type whose requests pass the core by —
+  its P2P switched off, or segments the registry does not list — has an edge
+  that stops while playback goes on, and would hold the minimum where it
+  stopped.
+
+With one stream, or one current stream, the playhead is that stream's own
+estimate, as before.
+
+**The end of a VOD stream.** `bufferAhead` stops being the minimum only where
+nothing is left to fetch. A Media Source player calls `endOfStream()` once it
+has appended every segment of every stream, and from then on the element counts
+each buffer's last range to the highest end of them: the playhead comes out
+low by the difference between the streams' ends, typically less than a
+segment, and that moves only the store's position, by as much. ExoPlayer leaves
+a track that has loaded to its end out of its buffered position while another
+still loads; that track's edge is at its end, past every other, so it is never
+the minimum, and the playhead stays right. A stream that has requested its
+last segment therefore keeps its place in the minimum, and needs no rule of its
+own.
+
 ## Distance from the playhead
 
-The buffer edge sits exactly `bufferAhead` in front of the playhead, so:
+The playhead of the section above sits `bufferEdge - playhead` behind each
+stream's buffer edge, so:
 
 ```
-distance(segment) = segment.startTime - bufferEdge + bufferAhead
+distance(segment) = segment.startTime - playhead
+                  = segment.startTime - min(bufferEdge) + bufferAhead
 ```
 
-Every term is a difference. `segment.startTime - bufferEdge` is a
+Every term is a difference. `segment.startTime - min(bufferEdge)` is a
 manifest-space delta and exact; `bufferAhead` is a player-space duration and
 offset-free. The offset between the two timebases cancels and never appears.
+With one stream, `min(bufferEdge)` is its own edge.
 
 All scheduling decisions are expressed on this axis:
 
 ```ts
 function isSegmentInTimeWindow(segment, playback, timeWindowLength) {
-  const start = segment.startTime - playback.bufferEdge + playback.bufferAhead;
-  const end = segment.endTime - playback.bufferEdge + playback.bufferAhead;
+  const start = segment.startTime - playback.playhead;
+  const end = segment.endTime - playback.playhead;
   return !(timeWindowLength * playback.rate < start || 0 > end);
 }
 ```
@@ -237,11 +353,16 @@ when each segment was stored. **Both sides of that comparison are manifest
 time.** The position core passes is derived, not the player's clock:
 
 ```
-position = bufferEdge - bufferAhead
+position = playhead = min(bufferEdge) - bufferAhead
 ```
 
-Each loader reports the playhead on its own stream's timeline, and the store
-keeps the latest report. The store is told at the start of a stream and
+Where the streams share a timeline, every loader reports this one playhead, so
+the store's position no longer flips between the lagging stream's and the
+leading one's at each report — which, on a lead of 30 s, would drop segments
+30 s early behind the playhead, ones a peer a little behind still wants. On HLS
+without programme dates each loader reports its own stream's estimate, on its
+own timeline, and the store keeps the latest report. The store is told at the
+start of a stream and
 whenever the core's estimate moves — on a player's report, and on the core's
 own inference where the player reports nothing — so a store sees positions,
 and evicts, on a session where `updatePlayback` is never called. On live HLS
@@ -298,6 +419,38 @@ wrong by the offset this design exists to avoid.
 The third row is the one that motivates the design. Both terms are anchored to
 the same buffer edge, so seeking within a buffered range needs no new
 information from the player and produces no error.
+
+**Between the seek and each stream's first request, the old edges lie.** The
+rows above are exact once each stream has requested at its new position, but
+the streams do not request together, and the player reports first. Measured:
+
+- The `seeking` report arrives before any request, with `bufferAhead` near 0 at
+  an unbuffered target. Every loader still has its old edge, so it reads an
+  empty buffer at the old position and may start an urgent HTTP download
+  there — HLS.js video got one, at the position it had left, 8 ms before its
+  own first request.
+- One stream requests before the other. dash.js video requested at the target
+  after 19 ms, and in the millisecond before its audio did, core started two
+  audio downloads at the old position. HLS.js audio followed its video by about
+  a second.
+
+These were cancelled before any byte arrived, but a later request, or a peer
+that answers, makes them real downloads of media nobody will play, and with the
+roles reversed they are video. So when the reported `seekCount` changes, every
+stream's edge stops counting: its loader starts no prefetch, and its edge takes
+no part in the shared playhead, until its own first request after the seek
+re-anchors it. A stream whose request has arrived already prefetches from its
+new edge. The pause costs a stream only the time until its own request, and
+never a download.
+
+**The seek count is optional, and everything above works without it.** An
+integration that reports none — a native shim that does not count seeks, a
+player read some other way — keeps today's behaviour at a seek: core learns of
+it from each stream's first request at the new position, telling it from a
+re-request by `bufferAhead` as "The buffer edge" describes, and until that
+request the old edges count, so the downloads measured above can still start.
+They are bounded by that short window. The shared playhead and the edge rule
+work as without a seek, in regular playback, which is most of it.
 
 ## When the player reports nothing
 

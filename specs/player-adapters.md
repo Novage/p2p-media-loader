@@ -113,9 +113,10 @@ asked for 4K next and stalled on it.
 
 ## 3. Report playback state
 
-Push `{ bufferAhead, rate }` whenever it changes. Core exports
+Push `{ bufferAhead, rate, seekCount }` whenever it changes. Core exports
 `getBufferAhead(ranges, currentTime)` so that the range-walking is written once
-rather than per adapter.
+rather than per adapter, and `trackMediaElementPlayback`, which every adapter
+here uses, counts the media element's `seeking` events into `seekCount`.
 
 `bufferAhead` must come from the buffered range **containing** the playhead, not
 the last range. After a seek across a gap the buffer is a set of disjoint
