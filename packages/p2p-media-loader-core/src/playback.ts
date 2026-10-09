@@ -45,9 +45,11 @@ export type PlaybackState = {
    *
    * A count rather than a flag, so that a seek that began and ended between
    * two reports — a native shim reports on an interval — still shows. When it
-   * moves, the core stops prefetching for each stream from the position the
-   * player left, until that stream's own first request at the new one. See
-   * specs/playback-contract.md, "Behaviour under seeking".
+   * moves and `bufferAhead` in the same report is 0, the seek went to media
+   * the player does not hold: the core stops prefetching for each stream
+   * from the position the player left, until that stream's own first request
+   * at the new one. See specs/playback-contract.md, "Behaviour under
+   * seeking".
    */
   readonly seekCount?: number;
 };
