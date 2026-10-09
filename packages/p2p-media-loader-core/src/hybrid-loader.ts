@@ -13,6 +13,7 @@ import {
 import { P2PLoadersContainer } from "./p2p/loaders-container.js";
 import { RequestsContainer } from "./requests/request-container.js";
 import { EngineRequest } from "./requests/engine-request.js";
+import type { Request } from "./requests/request.js";
 import * as QueueUtils from "./utils/queue.js";
 import * as LoggerUtils from "./utils/logger.js";
 import * as Utils from "./utils/utils.js";
@@ -434,7 +435,7 @@ export class HybridLoader implements PlayheadParticipant {
       availableStorageCapacityPercent,
     } = this.generateQueue();
     const stored = this.processRequests(queueSegmentIds, queueDownloadRatio);
-    if (this.holdsForSeek()) return;
+    const heldForSeek = this.holdsForSeek();
 
     const {
       simultaneousHttpDownloads,
@@ -474,8 +475,19 @@ export class HybridLoader implements PlayheadParticipant {
       // from before the read so that an abort meanwhile finds it, and a
       // download started for it here would run beside the bytes the storage
       // is about to hand over.
+      // At once, too, while a seek holds the queue: the player can request
+      // the new position before the seek is reported, and its request is
+      // then taken for a re-request. The hold is for prefetch only; held,
+      // this request would keep the player waiting for ever.
+      // And at once when the queue does not hold it: a request behind the
+      // estimated playhead, or past the windows, would otherwise wait for a
+      // window that never reaches it, and the player with it.
+      const outsideQueue = !queueSegmentIds.has(segment.runtimeId);
       const shouldStartLoadImmediatelyEngineRequest =
-        (engineRequest.shouldBeStartedImmediately || noPeers) &&
+        (engineRequest.shouldBeStartedImmediately ||
+          noPeers ||
+          heldForSeek ||
+          outsideQueue) &&
         engineRequest.status === "pending" &&
         engineRequest !== this.readingFromStorage &&
         (!request ||
@@ -485,12 +497,16 @@ export class HybridLoader implements PlayheadParticipant {
 
       if (shouldStartLoadImmediatelyEngineRequest) {
         // Don't abort requests when processing engine request
-        // to avoid race condition with aborts in the requests queue
-
+        // to avoid race condition with aborts in the requests queue —
+        // except where the queue pass that would free a slot for it does
+        // not run (a seek holds it) or does not reach it (the request lies
+        // outside the queue): there the download furthest ahead gives way.
         const canLoadThroughHttp =
           !isInitialHttpWait &&
           (request?.failedAttempts.httpAttemptsCount ?? 0) < httpErrorRetries &&
-          this.requests.executingHttpCount < simultaneousHttpDownloads;
+          (this.requests.executingHttpCount < simultaneousHttpDownloads ||
+            ((heldForSeek || outsideQueue) &&
+              this.abortFurthestHttpDownloadFor(segment)));
 
         if (canLoadThroughHttp) {
           this.loadThroughHttp(segment);
@@ -505,6 +521,8 @@ export class HybridLoader implements PlayheadParticipant {
         }
       }
     }
+
+    if (heldForSeek) return;
 
     for (const item of queue) {
       const { statuses, segment } = item;
@@ -762,6 +780,29 @@ export class HybridLoader implements PlayheadParticipant {
     );
   }
 
+  /**
+   * Frees an HTTP slot for the player's request: aborts the loading HTTP
+   * download furthest ahead that is not for `segment`.
+   */
+  private abortFurthestHttpDownloadFor(segment: SegmentWithStream): boolean {
+    let furthest: Request | undefined;
+    for (const request of this.requests.items()) {
+      if (
+        request.downloadSource !== "http" ||
+        request.status !== "loading" ||
+        request.segment === segment
+      ) {
+        continue;
+      }
+      if (!furthest || request.segment.startTime > furthest.segment.startTime) {
+        furthest = request;
+      }
+    }
+    if (!furthest) return false;
+    furthest.cancel();
+    return true;
+  }
+
   private abortLastLoadingInQueueAfterItem(
     queue: QueueUtils.QueueItem[],
     segment: SegmentWithStream,
@@ -946,8 +987,9 @@ export class HybridLoader implements PlayheadParticipant {
   /**
    * The player has started a seek this stream has not requested after: the
    * queue would be built from the position it left, so nothing new is
-   * fetched until the stream's own request at the new one. Downloads already
-   * under way are left to the queue that request builds. See
+   * prefetched until the stream's own request at the new one. A request the
+   * player has open is still fetched. Downloads already under way are left
+   * to the queue that request builds. See
    * specs/playback-contract.md, "Behaviour under seeking".
    */
   private holdsForSeek(): boolean {

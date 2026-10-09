@@ -104,12 +104,18 @@ timeline** where the player's buffer of that stream currently ends.
   `bufferEdge = max(bufferEdge, segment.endTime)`.
 - After a seek, the stream's first request re-anchors the edge wherever it is:
   `bufferEdge = segment.startTime`.
-- A request for a segment that starts before the edge, with no seek between,
-  is not a move: the player is fetching again media it holds — dash.js
-  replaces segments it buffered at a higher quality this way. The edge stays.
-  Moving it back would make every segment of the stream look further from the
-  playhead than it is, the direction that stalls; measured on dash.js, it put
-  the estimate 16 s behind.
+- A request for a segment that starts before the edge, with no seek between
+  and after the request that set the edge was delivered, is not a move: the
+  player is fetching again media it holds — dash.js replaces segments it
+  buffered at a higher quality this way. The edge stays. Moving it back would
+  make every segment of the stream look further from the playhead than it is,
+  the direction that stalls; measured on dash.js, it put the estimate 16 s
+  behind.
+- After a request the player abandoned before it was delivered, a request
+  before the edge is a move, and re-anchors the edge as a seek does: the
+  player never held media up to that edge. HLS.js does this as it starts a
+  live stream — it asked for the live edge, aborted, and asked 14 s earlier,
+  with no seek reported. Kept, the edge put the playhead past the request.
 
 The `max` guards against out-of-order completion of parallel requests dragging
 the edge backwards.
@@ -445,7 +451,18 @@ of the seek decides this, not a later one: once one stream's media arrives at
 the new position, the player reports a buffer that the other streams do not
 have yet. A stream whose request has arrived already prefetches from its new
 edge. The pause costs a stream only the time until its own request, and never a
-download.
+download. The player's own request is fetched even while its stream is held: a
+player can request the new position before the seek is reported — HLS.js did,
+on a seek back into a DVR window — and that request is then taken for a
+re-request. Held, it would keep the player waiting for ever.
+
+For the same reason, a player request that the queue does not hold — behind
+the estimated playhead, or past the windows — is fetched at once, and, where a
+seek holds the queue or the request lies outside it, the HTTP download furthest
+ahead gives way to it. The windows place prefetch; they never decide whether
+the player's own request is served. Without this, a wrong estimate left the
+request outside every window: HLS.js stayed at `readyState` 0 for good while
+core prefetched the segments after it.
 
 A seek into media the player holds is not paused. The player reports a buffer
 at the new position at once, and may make no request for as long as that buffer

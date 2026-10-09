@@ -938,6 +938,50 @@ describe("HybridLoader: a seek the player reported", () => {
     loader.destroy();
   });
 
+  it("serves the player's own request when the seek is reported after it", async () => {
+    // HLS.js handles the media element's seeking event before the adapter
+    // reports it: the request for the new position comes first, is taken for
+    // a re-request, and only then does the count move. Holding that request
+    // would leave the player waiting for it for ever.
+    const { loader, segment, callbacks, state } = setup();
+    loader.updatePlayback({ bufferAhead: 0, rate: 1, seekCount: 0 });
+    await loader.loadSegment(segment(10), callbacks);
+    await flush();
+    // Delivered: the player holds media to the edge, so the request before
+    // it below is taken for a re-request.
+    const controls = state.httpControls.get("seg-10")!;
+    controls.addLoadedChunk(new Uint8Array(16));
+    controls.completeOnSuccess();
+    await flush();
+
+    state.httpStarted.length = 0;
+    const request = loader.loadSegment(segment(2), callbacks);
+    loader.updatePlayback({ bufferAhead: 0, rate: 1, seekCount: 1 });
+    await request;
+    await flush();
+    expect(state.httpStarted).toContain("seg-2");
+    loader.destroy();
+  });
+
+  it("fetches a request behind the playhead the player abandoned its request for", async () => {
+    // HLS.js on a live stream asked for one segment, aborted it, and asked
+    // for an earlier one. With a peer there is no fetch at once by default,
+    // and a request outside the queue would wait for a window that never
+    // reaches it: the player stayed at readyState 0 for good.
+    fakes.state.peerCount = 1;
+    const { loader, segment, callbacks, state } = setup();
+    loader.updatePlayback({ bufferAhead: 0, rate: 1, seekCount: 0 });
+    await loader.loadSegment(segment(10), callbacks);
+    await flush();
+    loader.abortSegmentRequest("seg-10");
+
+    state.httpStarted.length = 0;
+    await loader.loadSegment(segment(6), callbacks);
+    await flush();
+    expect(state.httpStarted).toContain("seg-6");
+    loader.destroy();
+  });
+
   it("does not hold a stream whose seek landed in media the player holds", async () => {
     // A seek inside the buffer brings no request for as long as the buffer
     // lasts; holding until then would stop the prefetch for all that time.

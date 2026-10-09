@@ -89,6 +89,12 @@ export class PlaybackTracker {
    */
   private bufferEdge: number;
   private anchor: SegmentLike;
+  /**
+   * Whether the request that set the edge was delivered. Only then does the
+   * player hold media up to the edge, and a request before it is fetching
+   * again what it holds; after a request it abandoned, it is a move.
+   */
+  private anchorDelivered = false;
   private lastDeliveryEndedAt = 0;
 
   // Inference anchor: the buffer held `atBuffer` seconds when the wall clock
@@ -179,7 +185,9 @@ export class PlaybackTracker {
     const previous = this.anchor;
     const seekSinceRequest = this.hasSeekSinceRequest();
     const countReported = this.seekCount !== undefined;
+    const { anchorDelivered } = this;
     this.anchor = segment;
+    this.anchorDelivered = false;
     this.seekCountAtRequest = this.seekCount;
 
     // Continuity is judged on the timeline, not on `externalId`: HLS ids step
@@ -195,8 +203,8 @@ export class PlaybackTracker {
     if (seekSinceRequest) kind = "seek";
     else if (isSuccessor) kind = "extend";
     else if (!countReported) kind = "seek";
-    else if (segment.startTime < this.bufferEdge) kind = "rerequest";
-    else kind = "extend";
+    else if (segment.startTime >= this.bufferEdge) kind = "extend";
+    else kind = anchorDelivered ? "rerequest" : "seek";
 
     if (kind === "seek") {
       this.bufferEdge = segment.startTime;
@@ -227,6 +235,9 @@ export class PlaybackTracker {
 
   /** A segment's bytes reached the player: the buffer now extends through it. */
   onSegmentDelivered(segment: SegmentLike): void {
+    if (segment.externalId === this.anchor.externalId) {
+      this.anchorDelivered = true;
+    }
     this.delivered += Math.max(0, segment.endTime - segment.startTime);
     this.lastDeliveryEndedAt = this.now();
     // Never let an out-of-order completion drag the edge backwards.

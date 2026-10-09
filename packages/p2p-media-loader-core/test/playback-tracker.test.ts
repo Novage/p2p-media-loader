@@ -293,6 +293,19 @@ describe("PlaybackTracker with a seek count", () => {
     expect(u.getPlayback().bufferEdge).toBe(10 * SEG);
   });
 
+  it("moves the edge back after a request the player abandoned", () => {
+    // HLS.js correcting its start position on a live stream: it asked for the
+    // edge, aborted that, and asked for an earlier segment, with no seek
+    // reported. Nothing was ever buffered at the edge, so this is a move,
+    // not a re-request; kept, the edge would leave the request behind the
+    // playhead, outside every window, and never fetched.
+    const t = new PlaybackTracker(segment(0), {}, () => 0);
+    t.report({ bufferAhead: 0, rate: 1, seekCount: 0 });
+    t.onSegmentRequested(segment(10));
+    expect(t.onSegmentRequested(segment(6))).toBe("seek");
+    expect(t.getPlayback().bufferEdge).toBe(6 * SEG);
+  });
+
   it("starts from the first count it is told, which is not a seek", () => {
     const t = new PlaybackTracker(segment(0), {}, () => 0);
     t.report({ bufferAhead: 0, rate: 1, seekCount: 7 });
