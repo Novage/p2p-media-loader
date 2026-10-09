@@ -1,4 +1,4 @@
-import { shaka } from "./shaka-import";
+import { shaka, loadStream } from "./shaka-import";
 import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 import { PlayerProps } from "../../../types";
 import { useEffect, useRef } from "react";
@@ -51,7 +51,7 @@ export const ShakaDPlayer = ({
             });
 
             shakaP2PEngine.bindShakaPlayer(shakaPlayer);
-            void shakaPlayer.load(streamUrl);
+            void loadStream(shakaPlayer, streamUrl);
           },
         },
       },
@@ -68,7 +68,6 @@ export const ShakaDPlayer = ({
     onPeerConnect,
     onPeerClose,
     streamUrl,
-    
   ]);
 
   return shaka.Player.isBrowserSupported() ? (

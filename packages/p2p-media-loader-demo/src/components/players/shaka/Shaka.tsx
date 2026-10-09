@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { ShakaP2PEngine } from "p2p-media-loader-shaka";
 import { PlayerProps } from "../../../types";
 import "shaka-player/dist/controls.css";
-import { shaka, shakaUI, shakaType } from "./shaka-import";
+import { shaka, shakaUI, shakaType, loadStream } from "./shaka-import";
 import { createVideoElements, subscribeToUiEvents } from "../utils";
 
 export const Shaka = ({
@@ -90,7 +90,7 @@ export const Shaka = ({
       }
 
       shakaP2PEngineInit.bindShakaPlayer(playerInit);
-      await playerInit.load(streamUrl);
+      await loadStream(playerInit, streamUrl);
     };
 
     void setupPlayer();
@@ -103,7 +103,6 @@ export const Shaka = ({
     onPeerConnect,
     onPeerClose,
     streamUrl,
-    
   ]);
 
   return shaka.Player.isBrowserSupported() ? (
