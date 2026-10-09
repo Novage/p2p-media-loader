@@ -23,7 +23,11 @@ function manifest(segmentCount: number, segmentSeconds: number) {
  * Enough of a Shaka player for the engine to bind to and configure. Its
  * configuration reflects what was configured, as the real one's does.
  */
-function setup({ bufferingGoal = 10, defaultPresentationDelay = 0 } = {}) {
+function setup({
+  bufferingGoal = 10,
+  defaultPresentationDelay = 0,
+  segmentPrefetchLimit = undefined as number | undefined,
+} = {}) {
   const configuration = {
     manifest: {
       // Shaka's own default, unless a test says the integrator placed the
@@ -34,7 +38,17 @@ function setup({ bufferingGoal = 10, defaultPresentationDelay = 0 } = {}) {
     // The fake Shaka below reports 4.7.0, which takes the older setting.
     // Shaka's own buffering goal is 10 s, unless a test says the integrator
     // set one.
-    streaming: { useNativeHlsOnSafari: true, bufferingGoal },
+    streaming: {
+      useNativeHlsOnSafari: true,
+      bufferingGoal,
+      // Shaka 4.7 has no segment prefetch; a test that stands for a later
+      // Shaka gives it one.
+      ...(segmentPrefetchLimit === undefined ? {} : { segmentPrefetchLimit }),
+    } as {
+      useNativeHlsOnSafari: boolean;
+      bufferingGoal: number;
+      segmentPrefetchLimit?: number;
+    },
   };
   const filters: shaka.extern.RequestFilter[] = [];
   /** The player events the engine listens for, so a test can fire them. */
@@ -240,6 +254,27 @@ describe("shaka live window placement", () => {
     engine.destroy();
 
     expect(configuration.streaming.useNativeHlsOnSafari).toBe(true);
+  });
+
+  it("turns Shaka's own segment prefetch off, and gives it back", () => {
+    // The core serves one request for each stream, and a second aborts the
+    // first. Shaka 5 prefetches a segment ahead: at rate 2 it asked for two
+    // at once, each retry aborted the other, and playback stopped.
+    const { configuration, engine } = setup({ segmentPrefetchLimit: 1 });
+    expect(configuration.streaming.segmentPrefetchLimit).toBe(0);
+
+    engine.destroy();
+
+    expect(configuration.streaming.segmentPrefetchLimit).toBe(1);
+  });
+
+  it("leaves a Shaka without segment prefetch as it is", () => {
+    const { configuration, configure } = setup();
+    expect(configuration.streaming).not.toHaveProperty("segmentPrefetchLimit");
+    expect(configure).not.toHaveBeenCalledWith(
+      "streaming.segmentPrefetchLimit",
+      expect.anything(),
+    );
   });
 
   it("lets go of the player even when tearing the core down throws", () => {

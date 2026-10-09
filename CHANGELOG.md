@@ -195,6 +195,16 @@ throughout.
   anonymously when its playlist arrived, and never shared. Variants' identity
   is unchanged. See [`specs/segment-identity.md`](specs/segment-identity.md).
 
+- **The Shaka engine turns Shaka's own segment prefetch off**
+  (`streaming.segmentPrefetchLimit` 0 on a Shaka that has it) and gives it back
+  on `destroy()`. Shaka 5 asks for the next segment while the one it needs is
+  still loading; the core serves one request for each stream, so the second
+  aborted the first. At rate 2 on DASH this stopped playback for good. The
+  core prefetches for the player anyway. Only an abort Shaka asked for is
+  reported to it as an abort, which it never retries; one the core made is a
+  network error, which Shaka's retry parameters govern. See
+  [`specs/player-adapters.md`](specs/player-adapters.md).
+
 ### Removed
 
 - `Core.addStreamIfNoneExists`, `updateStream`, `getStreamSegmentRuntimeIds`,

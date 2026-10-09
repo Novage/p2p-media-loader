@@ -156,16 +156,19 @@ export class Loader {
         };
       } catch (error) {
         // Shaka's networking engine retries and reports only its own error
-        // type, so a core failure is translated: an abort into the operation
-        // Shaka itself cancelled, anything else into a recoverable network
+        // type, so a core failure is translated: the operation Shaka itself
+        // cancelled into its abort, anything else into a recoverable network
         // error carrying the cause, which Shaka's retry parameters govern.
+        // That includes an abort Shaka did not ask for: the core keeps one
+        // request for each stream and aborts it when the player asks for
+        // another segment of that stream, as Shaka does when it prefetches
+        // ahead. Reported as Shaka's own abort, the segment would never be
+        // asked for again, and playback would wait at its hole for ever.
         const { Error: ShakaError } = this.shaka.util;
-        const isAbort =
-          error instanceof CoreRequestError && error.type === "aborted";
         throw new ShakaError(
           ShakaError.Severity.RECOVERABLE,
           ShakaError.Category.NETWORK,
-          isAbort
+          aborted
             ? ShakaError.Code.OPERATION_ABORTED
             : ShakaError.Code.HTTP_ERROR,
           segmentUrl,

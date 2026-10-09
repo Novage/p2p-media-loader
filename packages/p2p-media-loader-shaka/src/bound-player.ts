@@ -177,6 +177,18 @@ export class BoundPlayer {
       false,
       (streaming as unknown as Record<string, unknown>)[nativeHls],
     );
+
+    // Shaka 5 fetches a segment ahead of the one it needs, while that one is
+    // still loading. The core serves one request for each stream, and a
+    // second aborts the first: at rate 2 Shaka asked for two at once, each
+    // retry aborted the other, and playback stopped. The core prefetches for
+    // the player anyway. Taken from every player, as native HLS is; a Shaka
+    // without the setting is left as it is.
+    const prefetch = (streaming as unknown as Record<string, unknown>)
+      .segmentPrefetchLimit;
+    if (prefetch !== undefined) {
+      take("streaming.segmentPrefetchLimit", 0, prefetch);
+    }
     return failures;
   }
 

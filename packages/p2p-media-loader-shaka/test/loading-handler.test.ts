@@ -315,6 +315,23 @@ describe("Shaka loading handler", () => {
     expect(error.data).toEqual([url, failure, RequestType.SEGMENT]);
   });
 
+  it("reports an abort Shaka did not ask for as a network error, which Shaka retries", async () => {
+    // The core keeps one request for each stream, and aborts it when the
+    // player asks for another segment of the stream. Shaka does, prefetching
+    // a segment ahead: at rate 2 on DASH it asked for the next two at once.
+    // As its own abort, the first would never be asked for again, and
+    // playback would wait at the hole it leaves for ever.
+    const { loader, core } = setup();
+    const abort = new CoreRequestError("aborted");
+    core.loadSegment.mockRejectedValueOnce(abort);
+    const error = (await loader
+      .load(url, request(), RequestType.SEGMENT)
+      .promise.catch((e: unknown) => e)) as FakeShakaError;
+    expect(error.severity).toBe(FakeShakaError.Severity.RECOVERABLE);
+    expect(error.code).toBe(FakeShakaError.Code.HTTP_ERROR);
+    expect(error.data).toEqual([url, abort, RequestType.SEGMENT]);
+  });
+
   it("falls back to Shaka's fetch for a segment the core does not serve", () => {
     const { loader, core, parse } = setup(false);
     loader.load(url, request(), RequestType.SEGMENT);

@@ -413,7 +413,12 @@ destroyed: the two that place the player in a live window —
 `manifest.dash.ignoreSuggestedPresentationDelay` — and the one that keeps
 playback inside the networking engine, `streaming.preferNativeHls` on Shaka 5
 or `streaming.useNativeHlsOnSafari` before it, since native HLS plays where
-nothing can be served. Given back only while the player is still there to take
+nothing can be served. `streaming.segmentPrefetchLimit` is set to 0 on a Shaka
+that has it: Shaka 5 fetches a segment ahead while the one it needs still
+loads, and the core serves one request for each stream, so the second aborts
+the first. At rate 2 on DASH, Shaka asked for two at once, each retry aborted
+the other, and playback stopped; the core prefetches for the player anyway.
+Given back only while the player is still there to take
 them: a player being destroyed drops its configuration, and Shaka's
 `configure` asserts it has one. Its load mode is what says so, since its
 networking engine outlives the configuration by as long as the requests in
