@@ -133,8 +133,14 @@ if (core.isSegmentLoadable(url, byteRange)) {
 }
 ```
 
-Playback is reported as `{ bufferAhead, rate }` through
-`core.updatePlayback(getPlaybackStateFromMediaElement(media))` (see the v4.x
+Playback is reported as `{ bufferAhead, rate, seekCount? }` through
+`core.updatePlayback`.
+`trackMediaElementPlayback((state) => core.updatePlayback(state)).watch(media)`
+reports it from a media element after every event that can change it, with
+`seekCount` counted from the element's `seeking` events.
+`getPlaybackStateFromMediaElement(media)` gives one state, with no seek count.
+The seek count is optional: without it, core learns of a seek from the player's
+next request, and may prefetch from the old position until then (see the v4.x
 notes below and `specs/playback-contract.md`).
 
 ### Removed from `Core`
