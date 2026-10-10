@@ -106,7 +106,7 @@ const PLAYBACK_PLAYING: MediaPlayerEvents["PLAYBACK_PLAYING"] =
  *   },
  * });
  * engine.bindPlayer(player); // before initialize()
- * player.initialize(videoElement, manifestUrl, true);
+ * player.initialize(videoElement, streamUrl, true);
  */
 export class DashJsP2PEngine {
   private player?: MediaPlayerClass;

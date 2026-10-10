@@ -83,16 +83,19 @@ const bound = new WeakMap<VideoJsPlayerLike, VideoJsP2PEngine>();
  * @example
  * // One engine, one player, no page-wide setup
  * const player = videojs("video", { html5: { vhs: { overrideNative: true } } });
- * const engine = new VideoJsP2PEngine({ core: { swarmId: "example-swarm-id" } });
+ * const engine = new VideoJsP2PEngine(
+ *   { core: { swarmId: "example-swarm-id" } },
+ *   videojs, // may be left out where Video.js is on `window`
+ * );
  * engine.bindPlayer(player);
- * player.src({ src: manifestUrl, type: "application/x-mpegURL" });
+ * player.src({ src: streamUrl, type: "application/x-mpegURL" });
  *
  * @example
  * // As a Video.js plugin, with the page-wide hook in place
  * VideoJsP2PEngine.registerPlugins(videojs);
  * const player = videojs("video", { html5: { vhs: { overrideNative: true } } });
  * const engine = player.p2pMediaLoader({ core: { swarmId: "example-swarm-id" } });
- * player.src({ src: manifestUrl, type: "application/x-mpegURL" });
+ * player.src({ src: streamUrl, type: "application/x-mpegURL" });
  */
 export class VideoJsP2PEngine {
   /** The Video.js plugin `registerPlugins` adds: `player.p2pMediaLoader(config)`. */

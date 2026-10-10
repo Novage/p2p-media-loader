@@ -289,8 +289,8 @@ export class HlsJsP2PEngine {
    *
    * const newDynamicConfig = {
    *   core: {
-   *     // Increase the number of cached segments to 1000
-   *     cachedSegmentsCount: 1000,
+   *     // Limit the segments kept in memory to 1000 MiB
+   *     segmentMemoryStorageLimit: 1000,
    *     // 50 minutes of segments will be preemptively downloaded via HTTP connections
    *     httpDownloadTimeWindow: 3000,
    *     // 100 minutes of segments will be preemptively downloaded via P2P connections

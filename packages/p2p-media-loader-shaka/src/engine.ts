@@ -64,7 +64,9 @@ const registrationTokens: (string | undefined)[] = [];
  * own manifest parsers run untouched; the core parses the same bytes itself.
  *
  * @example
- * // Initializing the ShakaP2PEngine with custom configuration
+ * // Initializing the ShakaP2PEngine with custom configuration. The second
+ * // argument is the Shaka you imported; only a page that loads Shaka with a
+ * // <script> tag, as `window.shaka`, can leave it out.
  * const shakaP2PEngine = new ShakaP2PEngine({
  *   core: {
  *     simultaneousHttpDownloads: 3,
@@ -80,7 +82,7 @@ const registrationTokens: (string | undefined)[] = [];
  *     },
  *     swarmId: "example-swarm-id"
  *   }
- * });
+ * }, shaka);
  */
 export class ShakaP2PEngine {
   private readonly playback = trackMediaElementPlayback((state) =>
@@ -185,8 +187,8 @@ export class ShakaP2PEngine {
    *
    * const newDynamicConfig = {
    *   core: {
-   *     // Increase the number of cached segments to 1000
-   *     cachedSegmentsCount: 1000,
+   *     // Limit the segments kept in memory to 1000 MiB
+   *     segmentMemoryStorageLimit: 1000,
    *     // 50 minutes of segments will be preemptively downloaded via HTTP connections
    *     httpDownloadTimeWindow: 3000,
    *     // 100 minutes of segments will be preemptively downloaded via P2P connections

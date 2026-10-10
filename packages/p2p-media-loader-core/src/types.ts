@@ -187,9 +187,7 @@ export type DynamicStreamProperties =
  * @example
  * ```typescript
  * const dynamicConfig: DynamicCoreConfig = {
- *   core: {
- *     cachedSegmentsCount: 200,
- *   },
+ *   segmentMemoryStorageLimit: 512, // MiB
  *   mainStream: {
  *     highDemandTimeWindow: 20,
  *     p2pDownloadTimeWindow: 6000,

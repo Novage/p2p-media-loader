@@ -167,12 +167,17 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
        },
      });
 
-     const engine = new VideoJsP2PEngine({
-       core: {
-         swarmId: "Optional custom swarm ID for stream",
-         // Other P2P engine configuration parameters go here
+     const engine = new VideoJsP2PEngine(
+       {
+         core: {
+           swarmId: "Optional custom swarm ID for stream",
+           // Other P2P engine configuration parameters go here
+         },
        },
-     });
+       // The Video.js you imported. Only a page that loads Video.js with a
+       // <script> tag, as `window.videojs`, can leave it out.
+       videojs,
+     );
      engine.addEventListener("onPeerConnect", (params) => {
        console.log("Peer connected:", params.peerId);
      });
@@ -297,6 +302,12 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
      source only when one is set, so the engine binds in between:
 
      ```tsx
+     import { useState } from "react";
+     import {
+       useAttachMedia,
+       useDestroy,
+       useMediaInstance,
+     } from "@videojs/react";
      import { DashAdapter } from "@videojs/dash-video";
      import { DashJsP2PEngine } from "p2p-media-loader-dashjs";
 
@@ -1058,7 +1069,7 @@ The global namespaces are `window.p2pml.hlsjs`, `window.p2pml.shaka`,
 ### Integrating P2P with Shaka Player (IIFE)
 
 ```html
-<script src="https://unpkg.com/shaka-player/dist/shaka-player.compiled.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/shaka-player@5/dist/shaka-player.compiled.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@^5/dist/p2p-media-loader-shaka.iife.min.js"></script>
 
 <script>
@@ -1212,8 +1223,11 @@ const allowlist = infoHashes.map((h) => Buffer.from(h, "utf8").toString("hex"));
 For full control, configure a custom `streamSwarmIdBuilder` on the client and apply `computeInfoHash` to the same string on the server. This way the infohash depends only on values the server authors itself:
 
 ```typescript
-// Client
-const config = {
+import type { CoreConfig } from "p2p-media-loader-core";
+import { computeInfoHash } from "p2p-media-loader-core/server";
+
+// Client: the engine's `core` configuration
+const config: CoreConfig = {
   swarmId: videoUuid,
   streamSwarmIdBuilder: ({ swarmId, streamType, properties }) =>
     `my-app-${swarmId}-${streamType}-${properties.height ?? 0}-${properties.bitrate ?? 0}`,
