@@ -14,7 +14,7 @@ import {
   DynamicCoreConfig,
   debug,
   DefinedCoreConfig,
-  highDemandWindowFor,
+  urgentBufferThresholdFor,
   liveDelayFor,
   liveDelayFromWindow,
   maxLiveLatencyFor,
@@ -144,7 +144,7 @@ export class HlsJsP2PEngine {
    * The ceiling moves with the live window, which on a channel whose DVR
    * window is still filling grows refresh by refresh. Writing only downwards
    * would latch the buffer at the narrowest window ever seen, leaving the
-   * player buffering less than the core's high-demand window — the very
+   * player buffering less than the core's urgency threshold — the very
    * failure the ceiling exists to prevent. So what this engine wrote is
    * recognisable as its own and moves in either direction, while a value
    * written from outside is somebody else's latest word and caps it.
@@ -506,9 +506,10 @@ export class HlsJsP2PEngine {
   /**
    * How far ahead of the playhead HLS.js may fetch — `maxBufferLength` is
    * that, in seconds. On a live window it is held a segment short of the live
-   * delay, by the rule every adapter shares: the core calls the nearer half of
-   * that buffer high-demand and leaves the farther half for peers to fill
-   * before the player asks. On VOD it is held to the high-demand window, with
+   * delay, by the rule every adapter shares: the core sets its urgency
+   * threshold at half of that buffer, and the other half is the time peers
+   * have to fill the player's requests before they become urgent. On VOD it
+   * is held to the urgency threshold, with
    * a floor of two fragments for a player that could not otherwise keep
    * going: the core's prefetch runs ahead of the player there whatever the
    * player buffers, since nothing bounds the stream ahead.
@@ -534,15 +535,16 @@ export class HlsJsP2PEngine {
         segment: fragmentDuration,
       });
     } else {
-      // What each stream's loader will actually schedule by, not what was
-      // configured: a stream left unconfigured derives the default off live,
-      // and a buffer sized under it would leave that stream's segments
-      // high-demand the moment the player asks for them.
+      // What each stream's loader will actually judge by, not what was
+      // configured: a stream left unconfigured derives the default off live.
       const { mainStream, secondaryStream } = this.core.getConfig();
       p2pOptimalBufferLength = Math.max(
         fragmentDuration * 2,
-        highDemandWindowFor(mainStream.highDemandTimeWindow, undefined),
-        highDemandWindowFor(secondaryStream.highDemandTimeWindow, undefined),
+        urgentBufferThresholdFor(mainStream.urgentBufferThreshold, undefined),
+        urgentBufferThresholdFor(
+          secondaryStream.urgentBufferThreshold,
+          undefined,
+        ),
       );
     }
 

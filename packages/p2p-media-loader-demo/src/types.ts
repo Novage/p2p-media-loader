@@ -19,7 +19,6 @@ export type PlayerProps = {
   coreOptions: {
     announceTrackers: string[];
     swarmId?: string;
-    httpDownloadInitialTimeoutMs?: number;
   };
 } & Partial<
   Pick<

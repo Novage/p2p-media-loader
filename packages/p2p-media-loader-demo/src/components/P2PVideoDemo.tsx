@@ -150,7 +150,6 @@ export const P2PVideoDemo = ({
     () => ({
       announceTrackers: trackers,
       swarmId: queryParams.swarmId === "" ? undefined : queryParams.swarmId,
-      httpDownloadInitialTimeoutMs: 3000,
     }),
     [trackers, queryParams.swarmId],
   );

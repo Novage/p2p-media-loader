@@ -3,32 +3,36 @@
 **Status: not adopted.** This is a candidate extension to
 [playback-contract.md](../playback-contract.md), recorded so that the decision
 to build it can be made on a measured deployment rather than on the appeal of
-the idea. Nothing in the system behaves this way today: core has two playback
-sources, `reported` and `inferred`, and the only CMCD handling that exists is
-stripping the `CMCD` query argument from registry keys and the swarm ID (see
-[manifest-registry.md](../manifest-registry.md)).
+the idea. Nothing in the system behaves this way today: core learns the
+player's buffer only from the reports an integration makes, and the only CMCD
+handling that exists is stripping the `CMCD` query argument from registry keys
+and the swarm ID (see [manifest-registry.md](../manifest-registry.md)).
 
 ## The gap it closes
 
-Core learns where the player is in one of two ways. An adapter that can read
-the player reports `bufferAhead` and `rate` on every media event; that is exact,
-continuous, and knows about pauses. Where nothing can read the player, core
-infers the buffer from the request pattern, which is approximate and blind to a
-seek that issues no request.
+Core needs one number from the player, for one decision: the buffer ahead of
+the playhead, to tell whether a request is urgent
+([playback-contract.md](../playback-contract.md), "Urgency"). An integration
+reports it with `rate` on every change. A player that never reports is taken
+as one with nothing buffered, so every request that the store cannot serve is
+urgent and goes over HTTP. Such a player still plays, but it gets from peers
+only what prefetch puts in the store before it asks.
 
-The second case is the proxy architecture of
-[mobile-proxy.md](../mobile-proxy.md): a native player fetching through a local
-HTTP proxy, with no shim wrapping it. There, a player that emits CMCD
-(CTA-5004, Common Media Client Data) is already describing its own buffer in
-the very request core is handling — the `bl` key is the buffer length ahead of
-the playhead in milliseconds, `dl` the deadline until it drains, `pr` the
-playback rate. Reading them would replace an estimate with the player's own
-number, once per request, at no cost to the integration.
+That case is the proxy architecture of [mobile-proxy.md](../mobile-proxy.md)
+without its shim: a native player that fetches through a local HTTP proxy, with
+nothing that reads the player. There, a player that emits CMCD (CTA-5004,
+Common Media Client Data) already gives its buffer in the request that core
+handles. The `bl` key is the buffer length ahead of the playhead in
+milliseconds, `dl` the deadline until it drains, and `pr` the playback rate.
+These are the values of the contract, and they come exactly when core needs
+them: with the request whose urgency it decides.
 
-In a browser this closes nothing. The media element is free and continuous, and
-both bundled adapters already report from it; the spec's rule is that a
-directly readable player always wins. The proposal matters only where a player
-cannot be read and the host application has already turned CMCD on.
+So CMCD can meet the reporting requirement for a player that emits it. A later
+version may accept it as the required report for integrations that cannot
+wrap their player, where today it requires a shim.
+
+In a browser this closes nothing. The media element is free and continuous,
+and every bundled adapter already reports from it.
 
 ## Design
 
@@ -36,72 +40,66 @@ cannot be read and the host application has already turned CMCD on.
 the URL the player built. Before the URL is normalized into a registry key, the
 `CMCD` query argument — the only transmission mode that touches the URL — is
 parsed as the comma-separated `key=value` list CTA-5004 defines. In a proxy,
-the header mode (`CMCD-Request`, `CMCD-Status`, ...) is equally readable and
-the proxy would pass those headers to core through the same call; in a browser
+the header mode (`CMCD-Request`, `CMCD-Status`, ...) is equally readable, and
+the proxy passes those headers to core through the same call. In a browser,
 header mode never reaches core and is not needed there.
 
-**What it yields.** `bufferAhead` in seconds, from `dl` divided out by `pr`
-when `pr` is present and non-zero — the quantity the player itself derived —
-and from `bl` otherwise. Should an implementation ever send `pr=0`, the
-division is degenerate: scaling `dl` back would report a full buffer as empty,
-so `bl` is authoritative whenever `pr` is zero. `rate` is `pr` when present and
-1 when absent, as the specification directs.
+**What it yields.** A report, applied before the request it came with is
+judged:
+
+- `bufferAhead` in seconds, from `dl` divided by `pr` when `pr` is present and
+  not zero — the value the player itself derived — and from `bl` otherwise. If
+  an implementation sends `pr=0`, the division is degenerate: scaling `dl` back
+  would report a full buffer as empty, so `bl` is used whenever `pr` is zero.
+- `rate` is `pr` when present, and 1 when absent, as the specification
+  directs.
+
+The reading then ages as any report does
+([playback-contract.md](../playback-contract.md), "The age of a report"), so a
+request that waits becomes urgent as the buffer drains.
+
+**Which stream it describes.** `bl` can be measured per media track rather
+than across the presentation: HLS.js reports the requested track's forward
+buffer, Media3 the overall buffered duration from the playhead. A per-track
+value is the requesting stream's own buffer, which is what its request needs.
+So a CMCD reading applies to the stream whose request carried it, and not to
+the other streams.
 
 **What it cannot yield.** A pause. CTA-5004 defines `pr=0` as "not playing",
 but implementations report the media element's `playbackRate`, which stays at 1
-while paused — and more fundamentally CMCD is request-triggered, and a pause is
-the absence of requests. A paused player looks like a playing one, with the same
-consequence as under inference: the estimate decays and core prefetches a
-window beyond the edge once. The shim does not have this limit, which is why
-[mobile-proxy.md](../mobile-proxy.md) prefers it.
+while paused. More fundamentally, CMCD comes with requests, and a pause is the
+absence of requests. A paused player's reading ages as if it were playing, so a
+request that waits during a pause can become urgent and go over HTTP where P2P
+had time. The cost is P2P share, never playback. The shim does not have this
+limit, which is why [mobile-proxy.md](../mobile-proxy.md) prefers it.
 
-**Where it ranks.** A third source, `cmcd`, between `reported` and `inferred`:
+**Precedence.** A report from the integration and a CMCD reading are the same
+kind of value. Core uses the most recent of them for a stream.
 
-| Source     | Accuracy                          | Available when                      |
-| ---------- | --------------------------------- | ----------------------------------- |
-| `reported` | exact                             | the integration can read the player |
-| `cmcd`     | exact, `bufferAhead` only         | the player emits CMCD               |
-| `inferred` | approximate, blind to quiet seeks | always                              |
-
-A fresh `reported` state always wins. A CMCD reading is a sample taken when the
-request was issued, so it arrives once per segment duration in steady state and
-is stale between times; the same staleness window applies to it as to a
-reported state, and past the window core falls to inference as it does today.
-
-**Never blended.** `bl` may be measured per media track rather than across the
-presentation — HLS.js reports the requested track's forward buffer, Media3 the
-overall buffered duration from the playhead — and neither is interchangeable
-with a media element's intersected buffered ranges. A CMCD reading therefore
-stands on its own: it is never averaged with, or used to correct, another
-source, and the buffer-full and seek anchors of inference are not fed from it.
-
-**Bounds.** Parsing a short query argument per request; no wire change, no new
-configuration. The tracker gains one source and one line in its priority order.
+**Bounds.** Parsing a short query argument, or a few headers, per request. No
+wire change, and no new configuration.
 
 ## How to decide
 
-The question is whether inference is wrong enough, in a real proxy deployment
-whose player emits CMCD, to be worth a third source. Measure there, not in a
-browser, where the answer is already no:
+The question is how much P2P a proxied player that reports nothing loses, and
+whether CMCD gets it back. Measure in a real proxy deployment, not in a browser,
+where the answer is already that nothing is lost:
 
 1. Run the proxy integration without a shim against a host application that
-   has CMCD enabled — Media3 with a `CmcdConfiguration.Factory`; AVPlayer does
+   has CMCD enabled — Media3 with a `CmcdConfiguration.Factory`. AVPlayer does
    not emit CMCD and cannot take part.
-2. Log, at every segment request, the `bl` the request carried beside the
-   `bufferAhead` inference produced at that moment (`p2pml:playback-oracle` prints
-   the inferred value and its source).
-3. Compute the inference error per request, in seconds, over a session of ten
-   minutes or more including a few seeks.
+2. Run each session twice, for ten minutes or more with a few seeks: once with
+   no report, once with the CMCD readings applied.
+3. Compare the P2P share, the share of requests that were urgent, and the
+   HTTP copies of each segment in the swarm.
 
-**Implement** when the inference error exceeds one segment duration on more
-than a small share of requests, or when the sessions show player stalls or a
-lower P2P share that the logs tie to a wrong estimate. **Do not implement** if
-inference tracks `bl` within a segment: the third source would then add a code
-path no deployment needs.
+**Implement** when the CMCD readings raise the P2P share by a clear margin, or
+when an integration that needs P2P cannot add a shim. **Do not implement** if
+prefetch alone gives such a player most of its P2P share: the reading would
+then add a code path no deployment needs.
 
 Before building, ask whether the integration can wrap the player instead. An
 application willing to edit how it builds its media source to enable CMCD is
-one step from installing the shim, and the shim is strictly better: continuous,
-exact, and aware of pauses. This proposal is for the host that has CMCD on
-already and will not add a shim; if that host does not exist, neither should
-the source.
+one step from installing the shim, and the shim is better: continuous, exact,
+and aware of pauses. This proposal is for the host that has CMCD on already
+and will not add a shim.

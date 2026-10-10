@@ -18,12 +18,9 @@ import * as QueueUtils from "./utils/queue.js";
 import * as LoggerUtils from "./utils/logger.js";
 import * as Utils from "./utils/utils.js";
 import * as ElectionUtils from "./utils/election.js";
+import { PlaybackTimeWindowsConfig } from "./utils/stream.js";
 import {
-  getDistanceFromPlayhead,
-  PlaybackTimeWindowsConfig,
-} from "./utils/stream.js";
-import {
-  highDemandWindowFor,
+  urgentBufferThresholdFor,
   playerBufferFor,
   type LiveDelay,
 } from "./live-delay.js";
@@ -34,25 +31,18 @@ import { SegmentStorage } from "./segment-storage/index.js";
 import { WebTorrentSocketPool } from "./webtorrent/webtorrent-socket-pool/index.js";
 import { PlaybackTracker } from "./playback-tracker.js";
 import type { PlaybackState } from "./playback.js";
-import { SharedPlayhead, type PlayheadParticipant } from "./shared-playhead.js";
 
 const FAILED_ATTEMPTS_CLEAR_INTERVAL = 60000;
 const PEER_UPDATE_LATENCY = 1000;
 /** Weight of the newest sample in the running estimate of a stream's segment size. */
 const SEGMENT_BYTES_EWMA_ALPHA = 0.3;
 
-export class HybridLoader implements PlayheadParticipant {
+export class HybridLoader {
   private readonly requests: RequestsContainer;
   private engineRequest?: EngineRequest;
   private readonly p2pLoaders: P2PLoadersContainer;
-  private playback: Playback;
-  private readonly playbackTracker: PlaybackTracker;
+  private readonly playbackTracker = new PlaybackTracker();
   private readonly logger: debug.Debugger;
-  // Diagnostic only. Logs the core's own playhead estimate — buffer edge less
-  // buffer ahead, in manifest time — in the namespace the media-element
-  // tracker logs media.currentTime in, so the two can be read side by side.
-  // Enable with localStorage.debug = "p2pml:playback-oracle".
-  private readonly oracleLogger = debug("p2pml:playback-oracle");
   private levelChangedTimestamp?: number;
   private lastQueueProcessingTimeStamp?: number;
   private prefetchTimerId?: number;
@@ -61,8 +51,8 @@ export class HybridLoader implements PlayheadParticipant {
   private readonly segmentBytesByStream = new Map<string, number>();
   private initialHttpDelayTimeoutId?: number;
   private isProcessQueueMicrotaskCreated = false;
-  /** The high-demand window last logged, so the log says when it moves. */
-  private loggedWindow?: { highDemand: number; source: string };
+  /** The urgency threshold last logged, so the log says when it moves. */
+  private loggedThreshold?: { threshold: number; source: string };
   private destroyed = false;
   /**
    * The engine request the storage is answering, while it is: this loader's
@@ -70,8 +60,11 @@ export class HybridLoader implements PlayheadParticipant {
    */
   private readingFromStorage?: EngineRequest;
   private readonly createdAt = performance.now();
-  /** Whether a seek's hold on prefetching has been counted already. */
-  private seekHoldCounted = false;
+  /**
+   * The engine request that was not urgent when it arrived, while it waits:
+   * counted once more if it becomes urgent before it is served.
+   */
+  private waitingNotUrgent?: EngineRequest;
 
   constructor(
     private lastRequestedSegment: Readonly<SegmentWithStream>,
@@ -82,13 +75,8 @@ export class HybridLoader implements PlayheadParticipant {
     private readonly webTorrentSocketPool: WebTorrentSocketPool,
     private readonly eventTarget: EventTarget<CoreEventMap>,
     private readonly peerId: string,
-    /** The other streams of the presentation; alone by default. */
-    private readonly sharedPlayhead: SharedPlayhead = new SharedPlayhead(),
   ) {
     const activeStream = this.lastRequestedSegment.stream;
-    this.playbackTracker = new PlaybackTracker(this.lastRequestedSegment);
-    this.playback = this.playbackTracker.getPlayback();
-    this.sharedPlayhead.join(this);
     this.requests = new RequestsContainer(
       this.requestProcessQueueMicrotask,
       this.bandwidthCalculators,
@@ -109,40 +97,26 @@ export class HybridLoader implements PlayheadParticipant {
     this.logger = debug(`p2pml-core:hybrid-loader-${activeStream.type}`);
     this.logger.color = "coral";
 
-    // The store is told where the playhead is from the start, and again on
-    // every change (see `syncPlayback`): a proxy that never reports would
-    // otherwise leave it with no playhead at all until the first delivery.
-    // A custom storage is the integrator's code and free to throw; a throw
-    // here would be a loader that never exists, and a stream that never
-    // plays through the core.
-    for (const failure of runAll([
-      () =>
-        this.segmentStorage.onPlaybackUpdated(
-          this.playback.bufferEdge - this.playback.bufferAhead,
-          this.playback.rate,
-        ),
-    ])) {
-      this.logger("the storage refused the playhead: %O", failure);
-    }
-
+    this.notifyStoragePosition();
     this.setIntervalLoading();
   }
 
   /**
-   * A backup's deadline passes with no queue event behind it — a paused
-   * player reports nothing, a proxy never does — so the election is
-   * re-checked on a timer as well. Its period is one to two seconds whatever
-   * the swarm's size: the deadlines it judges are sub-second multiples of a
-   * fetch time, and a period that grew with the peer count would let a
-   * segment enter the high-demand window unfetched with the timer still tens
-   * of seconds off.
+   * A backup's deadline, and the moment a waiting request becomes urgent,
+   * pass with no queue event behind them — a paused player reports nothing,
+   * and a report ages between two others — so both are re-checked on a timer
+   * as well. Its period is one to two seconds whatever the swarm's size: the
+   * deadlines it judges are sub-second multiples of a fetch time, and a
+   * period that grew with the peer count would let a request become urgent
+   * unfetched with the timer still tens of seconds off.
    * The jitter spreads the passes of peers that started together.
    *
-   * Every tick elects. The election reads the playhead estimate, the
-   * connected peers, the bandwidth samples behind the fetch-time estimate
-   * and the HTTP slots in use, and any of them can move with no pass to show
-   * for it; tracking which one did would cost more bookkeeping than the
-   * passes it saves.
+   * Every tick elects, and while a request waits, every tick runs a whole
+   * pass, which judges the request again. The election reads the player's
+   * last report, the connected peers, the bandwidth samples behind the
+   * fetch-time estimate and the HTTP slots in use, and any of them can move
+   * with no pass to show for it; tracking which one did would cost more
+   * bookkeeping than the passes it saves.
    * A queue is a walk over the stream's segment map up to the segment last
    * requested — sub-millisecond at any length a stream has — and a reporting
    * player already drives that walk once a second through its reports.
@@ -155,8 +129,11 @@ export class HybridLoader implements PlayheadParticipant {
         diagnostics?.anomaly("HybridLoader prefetch tick after destroy");
       }
       try {
-        this.syncPlayback();
-        this.prefetchThroughHttp();
+        if (this.engineRequest?.status === "pending") {
+          this.processQueue();
+        } else {
+          this.prefetchThroughHttp();
+        }
       } catch (error) {
         // A custom segment storage is the integrator's code and may throw
         // once; the timer outlives it — for a paused player or a proxy it is
@@ -189,25 +166,11 @@ export class HybridLoader implements PlayheadParticipant {
         // measured before the switch says nothing about the new one.
         this.levelChangedTimestamp = performance.now();
       }
+      // Every request moves the position, whatever kind it is: one that
+      // continues the stream, the first after a seek, or one for media the
+      // player holds. See specs/playback-contract.md, "The position".
       this.lastRequestedSegment = segment;
-      const kind = this.playbackTracker.onSegmentRequested(segment);
-      diagnostics?.count(`SegmentRequest:${kind}`);
-      this.seekHoldCounted = false;
-      const isSeek = kind === "seek";
-      // Without a seek count, this request is the only sign of a seek, and
-      // the other streams' edges still describe the position it left.
-      if (isSeek && !this.playbackTracker.reportsSeekCount()) {
-        this.sharedPlayhead.onSeek(this);
-      } else {
-        this.sharedPlayhead.onRequest(this);
-      }
-      this.syncPlayback();
-      if (isSeek) {
-        this.logger("seek detected: buffer edge re-anchored");
-        // After a seek the player has nothing buffered at the new position; do
-        // not wait for peers before starting this request.
-        engineRequest.markAsShouldBeStartedImmediately();
-      }
+      this.notifyStoragePosition();
       // This loader's request from here, before the storage is read: a
       // custom storage answers asynchronously, and an abort arriving while
       // it does must find the request to abort — or the bytes would be
@@ -264,11 +227,11 @@ export class HybridLoader implements PlayheadParticipant {
           const { queueDownloadRatio } = this.generateQueue();
           engineRequest.resolve(data, this.getBandwidth(queueDownloadRatio));
           this.engineRequest = undefined;
-          this.playbackTracker.onSegmentDelivered(segment);
-          this.syncPlayback();
           return;
         }
       }
+
+      this.judgeUrgencyOnArrival(engineRequest);
 
       // If the engine explicitly requests a segment that previously failed during
       // background pre-fetching, clear its error history so it can be retried.
@@ -356,11 +319,6 @@ export class HybridLoader implements PlayheadParticipant {
               this.getBandwidth(queueDownloadRatio),
             );
             this.engineRequest = undefined;
-            // The buffer edge tracks what the player holds. Only an engine
-            // request delivers to the player; a background prefetch fills the
-            // store and leaves the player's buffer where it was.
-            this.playbackTracker.onSegmentDelivered(segment);
-            this.syncPlayback();
           }
           this.requests.remove(request);
           this.noteSegmentBytes(segment, request.data.byteLength);
@@ -435,14 +393,9 @@ export class HybridLoader implements PlayheadParticipant {
       availableStorageCapacityPercent,
     } = this.generateQueue();
     const stored = this.processRequests(queueSegmentIds, queueDownloadRatio);
-    const heldForSeek = this.holdsForSeek();
 
-    const {
-      simultaneousHttpDownloads,
-      simultaneousP2PDownloads,
-      httpErrorRetries,
-      httpDownloadInitialTimeoutMs,
-    } = this.config;
+    const { simultaneousP2PDownloads, httpDownloadInitialTimeoutMs } =
+      this.config;
 
     const timeSinceStart = performance.now() - this.createdAt;
     const isInitialHttpWait =
@@ -459,130 +412,17 @@ export class HybridLoader implements PlayheadParticipant {
       }, httpDownloadInitialTimeoutMs - timeSinceStart);
     }
 
-    const { engineRequest } = this;
-    if (engineRequest) {
-      const { segment } = engineRequest;
-      const request = this.requests.get(segment);
+    this.processEngineRequest(isInitialHttpWait);
 
-      // With no peer connected there is nobody to take the segment from and
-      // no election to fetch it over HTTP: the player's request beyond the
-      // high-demand window — the player buffers further than the window on
-      // live, so that peers have room — would otherwise wait for the window
-      // to reach it.
-      const noPeers = this.p2pLoaders.currentLoader.connectedPeerCount === 0;
-
-      // Not while the storage is answering it: the request is this loader's
-      // from before the read so that an abort meanwhile finds it, and a
-      // download started for it here would run beside the bytes the storage
-      // is about to hand over.
-      // At once, too, while a seek holds the queue: the player can request
-      // the new position before the seek is reported, and its request is
-      // then taken for a re-request. The hold is for prefetch only; held,
-      // this request would keep the player waiting for ever.
-      // And at once when the queue does not hold it: a request behind the
-      // estimated playhead, or past the windows, would otherwise wait for a
-      // window that never reaches it, and the player with it.
-      const outsideQueue = !queueSegmentIds.has(segment.runtimeId);
-      const shouldStartLoadImmediatelyEngineRequest =
-        (engineRequest.shouldBeStartedImmediately ||
-          noPeers ||
-          heldForSeek ||
-          outsideQueue) &&
-        engineRequest.status === "pending" &&
-        engineRequest !== this.readingFromStorage &&
-        (!request ||
-          request.status === "not-started" ||
-          request.status === "failed" ||
-          request.status === "aborted");
-
-      if (shouldStartLoadImmediatelyEngineRequest) {
-        // Don't abort requests when processing engine request
-        // to avoid race condition with aborts in the requests queue —
-        // except where the queue pass that would free a slot for it does
-        // not run (a seek holds it) or does not reach it (the request lies
-        // outside the queue): there the download furthest ahead gives way.
-        const canLoadThroughHttp =
-          !isInitialHttpWait &&
-          (request?.failedAttempts.httpAttemptsCount ?? 0) < httpErrorRetries &&
-          (this.requests.executingHttpCount < simultaneousHttpDownloads ||
-            ((heldForSeek || outsideQueue) &&
-              this.abortFurthestHttpDownloadFor(segment)));
-
-        if (canLoadThroughHttp) {
-          this.loadThroughHttp(segment);
-        } else {
-          const canLoadThroughP2P =
-            this.p2pLoaders.currentLoader.isSegmentLoadedBySomeone(segment) &&
-            this.requests.executingP2PCount < simultaneousP2PDownloads;
-
-          if (canLoadThroughP2P) {
-            this.loadThroughP2P(segment);
-          }
-        }
-      }
-    }
-
-    if (heldForSeek) return;
-
-    for (const item of queue) {
-      const { statuses, segment } = item;
-      const request = this.requests.get(segment);
-
-      if (request?.status === "succeed") continue;
-
-      if (statuses.isHighDemand) {
-        const canLoadThroughHttp =
-          !isInitialHttpWait &&
-          (request?.failedAttempts.httpAttemptsCount ?? 0) < httpErrorRetries;
-
-        if (request?.status === "loading") {
-          // A high-demand segment already coming over P2P is worth moving to
-          // HTTP: the window it is in is the one the player is about to play.
-          const shouldSwitchFromP2PToHttp =
-            canLoadThroughHttp &&
-            request.downloadSource === "p2p" &&
-            (this.requests.executingHttpCount < simultaneousHttpDownloads ||
-              this.abortLastLoadingInQueueAfterItem(queue, segment, "http"));
-
-          if (shouldSwitchFromP2PToHttp) {
-            request.cancel();
-            this.loadThroughHttp(segment);
-          }
-
-          continue;
-        }
-
-        const shouldLoadThroughHttp =
-          canLoadThroughHttp &&
-          (this.requests.executingHttpCount < simultaneousHttpDownloads ||
-            this.abortLastLoadingInQueueAfterItem(queue, segment, "http"));
-
-        if (shouldLoadThroughHttp) {
-          this.loadThroughHttp(segment);
-          continue;
-        }
-
-        const canLoadThroughP2P =
-          this.p2pLoaders.currentLoader.isSegmentLoadedBySomeone(segment) &&
-          (this.requests.executingP2PCount < simultaneousP2PDownloads ||
-            this.abortLastLoadingInQueueAfterItem(queue, segment, "p2p"));
-
-        if (canLoadThroughP2P) {
-          this.loadThroughP2P(segment);
-        }
-      } else {
-        // Regular requests load via P2P; HTTP prefetching is the owner's job,
-        // decided below.
-
-        const canLoadThroughP2P =
-          statuses.isP2PDownloadable &&
-          request?.status !== "loading" &&
-          this.requests.executingP2PCount < simultaneousP2PDownloads;
-
-        if (canLoadThroughP2P) {
-          this.loadThroughP2P(segment);
-        }
-      }
+    // Prefetch over P2P: a segment in the P2P window from any peer that has
+    // it. Nothing in the queue is urgent; HTTP prefetching is the owner's
+    // job, decided below.
+    for (const { segment, statuses } of queue) {
+      if (!statuses.isP2PDownloadable) continue;
+      if (this.requests.executingP2PCount >= simultaneousP2PDownloads) break;
+      const status = this.requests.get(segment)?.status;
+      if (status === "succeed" || status === "loading") continue;
+      this.loadThroughP2P(segment);
     }
 
     // A queue pass runs on every playlist refresh, so the owner of a segment
@@ -598,6 +438,126 @@ export class HybridLoader implements PlayheadParticipant {
         stored ? undefined : availableStorageCapacityPercent,
       );
     }
+  }
+
+  /**
+   * The player's request, judged by its urgency. See
+   * specs/playback-contract.md, "Urgency".
+   *
+   * - Urgent: over HTTP at once, taking a slot from the HTTP download
+   *   furthest ahead where none is free, and moving a P2P download of it to
+   *   HTTP. With no peer connected it is fetched the same way: nobody can
+   *   give the segment, and no election runs.
+   * - Not urgent: from a peer that has it. If none has it, the election
+   *   decides who fetches it over HTTP (`prefetchThroughHttp`), or it waits;
+   *   the buffer drains while it waits, and it becomes urgent in time.
+   */
+  private processEngineRequest(isInitialHttpWait: boolean) {
+    const { engineRequest } = this;
+    // Not while the storage is answering it: the request is this loader's
+    // from before the read so that an abort meanwhile finds it, and a
+    // download started for it here would run beside the bytes the storage
+    // is about to hand over.
+    if (
+      engineRequest?.status !== "pending" ||
+      engineRequest === this.readingFromStorage
+    ) {
+      return;
+    }
+    const { segment } = engineRequest;
+    const request = this.requests.get(segment);
+    const urgent = this.isUrgent();
+    if (urgent && this.waitingNotUrgent === engineRequest) {
+      this.waitingNotUrgent = undefined;
+      diagnostics?.count("SegmentRequest:became-urgent");
+      this.logger(
+        `became urgent: ${LoggerUtils.getSegmentString(segment)} (buffer ${this.playbackTracker.bufferAhead().toFixed(2)}s)`,
+      );
+    }
+
+    const { simultaneousP2PDownloads, httpErrorRetries } = this.config;
+    const p2pLoader = this.p2pLoaders.currentLoader;
+    const canLoadThroughHttp =
+      !isInitialHttpWait &&
+      (request?.failedAttempts.httpAttemptsCount ?? 0) < httpErrorRetries;
+
+    if (request?.status === "loading") {
+      if (
+        urgent &&
+        request.downloadSource === "p2p" &&
+        canLoadThroughHttp &&
+        this.freeSlotFor(segment, "http")
+      ) {
+        request.cancel();
+        this.loadThroughHttp(segment);
+      }
+      return;
+    }
+    if (request?.status === "succeed") return;
+
+    const startNow =
+      urgent ||
+      p2pLoader.connectedPeerCount === 0 ||
+      engineRequest.shouldBeStartedImmediately;
+    if (startNow && canLoadThroughHttp && this.freeSlotFor(segment, "http")) {
+      this.loadThroughHttp(segment);
+      return;
+    }
+
+    // Not urgent, or no HTTP for it — before the initial HTTP delay ends, or
+    // once its HTTP attempts are spent: from a peer that has it. Only a
+    // request that must start now takes a slot from prefetch to do so.
+    if (
+      p2pLoader.isSegmentLoadingOrLoadedBySomeone(segment) &&
+      (this.requests.executingP2PCount < simultaneousP2PDownloads ||
+        (startNow && this.abortFurthestDownloadFor(segment, "p2p")))
+    ) {
+      this.loadThroughP2P(segment);
+    }
+  }
+
+  /** Whether a slot of `source` is free for `segment`, freeing one if not. */
+  private freeSlotFor(
+    segment: SegmentWithStream,
+    source: DownloadSource,
+  ): boolean {
+    const executing =
+      source === "http"
+        ? this.requests.executingHttpCount
+        : this.requests.executingP2PCount;
+    const limit =
+      source === "http"
+        ? this.config.simultaneousHttpDownloads
+        : this.config.simultaneousP2PDownloads;
+    return executing < limit || this.abortFurthestDownloadFor(segment, source);
+  }
+
+  /**
+   * Whether a request the player makes now is urgent: its buffer is below the
+   * urgency threshold, at the rate it plays. See specs/playback-contract.md,
+   * "Urgency".
+   */
+  private isUrgent(): boolean {
+    return (
+      this.playbackTracker.bufferAhead() <
+      this.urgentBufferThreshold() * this.playbackTracker.rate()
+    );
+  }
+
+  /**
+   * Counts and logs the urgency of a request the storage cannot serve, as it
+   * arrives; a request that is not urgent is remembered, to count it again
+   * if it becomes urgent while it waits.
+   */
+  private judgeUrgencyOnArrival(engineRequest: EngineRequest) {
+    const urgent = this.isUrgent();
+    diagnostics?.count(
+      urgent ? "SegmentRequest:urgent" : "SegmentRequest:not-urgent",
+    );
+    this.waitingNotUrgent = urgent ? undefined : engineRequest;
+    this.logger(
+      `${urgent ? "urgent" : "not urgent"}: ${LoggerUtils.getSegmentString(engineRequest.segment)} (buffer ${this.playbackTracker.bufferAhead().toFixed(2)}s, threshold ${this.urgentBufferThreshold().toFixed(2)}s)`,
+    );
   }
 
   // api method for engines
@@ -629,19 +589,21 @@ export class HybridLoader implements PlayheadParticipant {
 
   /**
    * HTTP prefetching of segments nobody has yet: fetches the ones this peer
-   * owns before they reach high demand. Each candidate has one elected owner
-   * among the connected peers (see specs/prefetch.md); the owner fetches at
-   * once, everyone else waits for its announcement and takes the segment
-   * over P2P. The others are ranked as backups by the same scores, and a
-   * backup steps in only when waiting any longer would risk the fetch
-   * landing inside the player's high-demand window — judged from the time
-   * left until then and the fetch time this peer expects.
+   * owns before its player asks. Each candidate has one elected owner among
+   * the connected peers (see specs/prefetch.md); the owner fetches at once,
+   * everyone else waits for its announcement and takes the segment over P2P.
+   * The others are ranked as backups by the same scores. A backup acts only
+   * on the segment its own player has requested, and steps in only when
+   * waiting any longer would risk the request becoming urgent first — judged
+   * from the time left until then and the fetch time this peer expects.
+   * Before the request there is no deadline to judge: the core keeps no
+   * playhead to measure one from.
    *
    * @param queue - The queue of the pass this runs at the end of. Generating
    * one walks the stream's segments from the first to the one last requested,
    * which is the length of the stream on a long VOD, so a pass generates one
    * queue and uses it twice. The prefetch timer has no pass behind it and
-   * passes nothing; it has synced the playback itself.
+   * passes nothing.
    * @param capacityPercent - The storage capacity the pass measured for that
    * queue; measuring walks the whole segment cache, so a pass measures once.
    */
@@ -655,7 +617,6 @@ export class HybridLoader implements PlayheadParticipant {
       performance.now() - this.createdAt < httpDownloadInitialTimeoutMs;
 
     if (isInitialHttpWait) return;
-    if (this.holdsForSeek()) return;
 
     // Nothing to elect without peers — checked before measuring the storage,
     // which walks the whole segment cache.
@@ -667,21 +628,23 @@ export class HybridLoader implements PlayheadParticipant {
     if (availableStorageCapacityPercent <= 10) return;
 
     const { simultaneousHttpDownloads, httpErrorRetries } = this.config;
-    const timeWindows = this.timeWindows();
-    const { highDemandTimeWindow } = timeWindows;
     const peerIds = Array.from(p2pLoader.connectedPeerIds);
     const { http } = this.bandwidthCalculators;
     const measuredBandwidth = Math.max(
       http.getBandwidthLoadingOnly(10),
       http.getBandwidthLoadingOnly(30),
     );
+    const requested =
+      this.engineRequest?.status === "pending"
+        ? this.engineRequest.segment.runtimeId
+        : undefined;
 
     const items =
       queue ??
       QueueUtils.generateQueue(
         this.lastRequestedSegment,
-        this.playback,
-        timeWindows,
+        this.playback(),
+        this.timeWindows(),
         p2pLoader,
         availableStorageCapacityPercent,
       );
@@ -714,28 +677,32 @@ export class HybridLoader implements PlayheadParticipant {
         peerIds,
         segment.externalId,
       );
-      const secondsToHighDemand = ElectionUtils.wallSecondsToHighDemand(
-        getDistanceFromPlayhead(segment, this.playback).start,
-        highDemandTimeWindow,
-        this.playback.rate,
-      );
-      const estimatedFetchSeconds = this.estimateFetchSeconds(
-        segment,
-        measuredBandwidth,
-      );
-
-      if (
-        ElectionUtils.shouldFetchNow({
-          rank,
-          secondsToHighDemand,
-          estimatedFetchSeconds,
-        })
-      ) {
-        this.logger(
-          `prefetch ${LoggerUtils.getSegmentString(segment)} as ${rank === 0 ? "owner" : `backup #${rank}`}`,
+      if (rank > 0) {
+        if (segment.runtimeId !== requested) continue;
+        const secondsLeft = ElectionUtils.secondsToUrgent(
+          this.playbackTracker.bufferAhead(),
+          this.urgentBufferThreshold(),
+          this.playbackTracker.rate(),
         );
-        this.loadThroughHttp(segment);
+        const estimatedFetchSeconds = this.estimateFetchSeconds(
+          segment,
+          measuredBandwidth,
+        );
+        if (
+          !ElectionUtils.shouldFetchNow({
+            rank,
+            secondsLeft,
+            estimatedFetchSeconds,
+          })
+        ) {
+          continue;
+        }
       }
+
+      this.logger(
+        `prefetch ${LoggerUtils.getSegmentString(segment)} as ${rank === 0 ? "owner" : `backup #${rank}`}`,
+      );
+      this.loadThroughHttp(segment);
     }
   }
 
@@ -781,14 +748,17 @@ export class HybridLoader implements PlayheadParticipant {
   }
 
   /**
-   * Frees an HTTP slot for the player's request: aborts the loading HTTP
-   * download furthest ahead that is not for `segment`.
+   * Frees a slot for the player's request that must start now: aborts the
+   * loading download of `source` furthest ahead that is not for `segment`.
    */
-  private abortFurthestHttpDownloadFor(segment: SegmentWithStream): boolean {
+  private abortFurthestDownloadFor(
+    segment: SegmentWithStream,
+    source: DownloadSource,
+  ): boolean {
     let furthest: Request | undefined;
     for (const request of this.requests.items()) {
       if (
-        request.downloadSource !== "http" ||
+        request.downloadSource !== source ||
         request.status !== "loading" ||
         request.segment === segment
       ) {
@@ -803,91 +773,78 @@ export class HybridLoader implements PlayheadParticipant {
     return true;
   }
 
-  private abortLastLoadingInQueueAfterItem(
-    queue: QueueUtils.QueueItem[],
-    segment: SegmentWithStream,
-    downloadSource: DownloadSource,
-  ): boolean {
-    for (const { segment: itemSegment } of Utils.arrayBackwards(queue)) {
-      if (itemSegment === segment) break;
-      const request = this.requests.get(itemSegment);
-      if (
-        request?.downloadSource === downloadSource &&
-        request.status === "loading"
-      ) {
-        request.cancel();
-        return true;
-      }
-    }
-    return false;
-  }
-
   private getAvailableStorageCapacityPercent(): number {
     const { totalCapacity, usedCapacity } = this.segmentStorage.getUsage();
     return 100 - (usedCapacity / totalCapacity) * 100;
   }
 
-  /**
-   * The windows a pass schedules by. The high-demand window is derived from
-   * the live placement where none is configured — the nearer half of what the
-   * player buffers, see `highDemandWindowFor` — and the derivation is logged
-   * when it first resolves and whenever it moves, so a stream that shares
-   * little can be read against the geometry it was scheduled on.
-   */
+  /** The two windows a pass prefetches by. */
   private timeWindows(): PlaybackTimeWindowsConfig {
-    const {
-      highDemandTimeWindow: configured,
-      httpDownloadTimeWindow,
-      p2pDownloadTimeWindow,
-    } = this.config;
-    const target = this.streamDetails.isLive
-      ? this.streamDetails.liveTarget
-      : undefined;
-    const highDemandTimeWindow = highDemandWindowFor(configured, target);
-    this.logTimeWindow(highDemandTimeWindow, configured, target);
+    const { httpDownloadTimeWindow, p2pDownloadTimeWindow } = this.config;
+    return { httpDownloadTimeWindow, p2pDownloadTimeWindow };
+  }
+
+  /** Where the windows are measured from, and the rate that sizes them. */
+  private playback(): Playback {
     return {
-      highDemandTimeWindow,
-      httpDownloadTimeWindow,
-      p2pDownloadTimeWindow,
+      position: this.lastRequestedSegment.startTime,
+      rate: this.playbackTracker.rate(),
     };
   }
 
   /**
-   * Says where the window came from, not merely whether a number was
+   * The buffer below which a request is urgent. It is derived from the live
+   * placement where none is configured — half of what the player buffers, see
+   * `urgentBufferThresholdFor` — and the derivation is logged when it first
+   * resolves and whenever it moves, so a stream that shares little can be
+   * read against the geometry it was judged on.
+   */
+  private urgentBufferThreshold(): number {
+    const configured = this.config.urgentBufferThreshold;
+    const target = this.streamDetails.isLive
+      ? this.streamDetails.liveTarget
+      : undefined;
+    const threshold = urgentBufferThresholdFor(configured, target);
+    this.logThreshold(threshold, configured, target);
+    return threshold;
+  }
+
+  /**
+   * Says where the threshold came from, not merely whether a number was
    * configured: on live the geometry caps what an integrator asks for, and
-   * this line is the only place that is visible. Reporting a capped window as
-   * theirs is what would send someone looking for the bug in their own
+   * this line is the only place that is visible. Reporting a capped threshold
+   * as theirs is what would send someone looking for the bug in their own
    * configuration.
    */
-  private logTimeWindow(
-    highDemand: number,
+  private logThreshold(
+    threshold: number,
     configured: number | undefined,
     target: LiveDelay | undefined,
   ) {
     const seconds = (value: number) => Number(value.toFixed(2));
-    // `highDemandWindowFor` returns the configured number itself where it
-    // stands, so anything else is the geometry having capped it.
+    // `urgentBufferThresholdFor` returns the configured number itself where
+    // it stands, so anything else is the geometry having capped it.
     let source: string;
     if (configured === undefined) source = target ? "derived" : "default";
-    else if (highDemand === configured) source = "configured";
+    else if (threshold === configured) source = "configured";
     else source = `configured ${seconds(configured)}s, capped by the window`;
 
-    const last = this.loggedWindow;
-    // Segment durations are not exact multiples, so a derived window drifts
-    // by fractions of a second between refreshes; only half a segment is a
-    // change of the window itself.
+    const last = this.loggedThreshold;
+    // Segment durations are not exact multiples, so a derived threshold
+    // drifts by fractions of a second between refreshes; only half a segment
+    // is a change of the threshold itself.
     const tolerance = target ? target.segment / 2 : 0;
     if (
       last?.source === source &&
-      Math.abs(last.highDemand - highDemand) <= tolerance
+      Math.abs(last.threshold - threshold) <= tolerance
     ) {
       return;
     }
-    this.loggedWindow = { highDemand, source };
+    this.loggedThreshold = { threshold, source };
     if (target) {
       this.logger(
-        "high-demand window %ss (%s): live delay %ss, segment %ss, player buffer %ss",
-        seconds(highDemand),
+        "urgency threshold %ss (%s): live delay %ss, segment %ss, player buffer %ss",
+        seconds(threshold),
         source,
         seconds(target.delay),
         seconds(target.segment),
@@ -895,15 +852,14 @@ export class HybridLoader implements PlayheadParticipant {
       );
     } else {
       this.logger(
-        "high-demand window %ss (%s), no live window",
-        seconds(highDemand),
+        "urgency threshold %ss (%s), no live window",
+        seconds(threshold),
         source,
       );
     }
   }
 
   private generateQueue() {
-    this.syncPlayback();
     const queue: QueueItem[] = [];
     const queueSegmentIds = new Set<string>();
     let maxPossibleLength = 0;
@@ -913,7 +869,7 @@ export class HybridLoader implements PlayheadParticipant {
       this.getAvailableStorageCapacityPercent();
     for (const item of QueueUtils.generateQueue(
       this.lastRequestedSegment,
-      this.playback,
+      this.playback(),
       this.timeWindows(),
       this.p2pLoaders.currentLoader,
       availableStorageCapacityPercent,
@@ -985,81 +941,40 @@ export class HybridLoader implements PlayheadParticipant {
   }
 
   /**
-   * The player has started a seek this stream has not requested after: the
-   * queue would be built from the position it left, so nothing new is
-   * prefetched until the stream's own request at the new one. A request the
-   * player has open is still fetched. Downloads already under way are left
-   * to the queue that request builds. See
-   * specs/playback-contract.md, "Behaviour under seeking".
+   * Takes the player's report. A request that waits is judged again at once
+   * when the report shows it has become urgent; otherwise a pass follows at
+   * most once a second, as reports come several times a second.
+   *
+   * @param at - When the report was made, for a loader created after it.
    */
-  private holdsForSeek(): boolean {
-    if (!this.playbackTracker.isSeekPending()) return false;
-    if (!this.seekHoldCounted) {
-      this.seekHoldCounted = true;
-      diagnostics?.count("Prefetch:held-for-seek");
-    }
-    return true;
-  }
-
-  /** See `PlayheadParticipant`. */
-  currentEdge(): number | undefined {
-    if (this.destroyed || this.config.isP2PDisabled) return undefined;
-    if (this.lastRequestedSegment.stream.sharedTimeline !== true) {
-      return undefined;
-    }
-    if (this.playbackTracker.isSeekPending()) return undefined;
-    const own = this.playbackTracker.getPlayback();
-    return own.source === "reported" ? own.bufferEdge : undefined;
-  }
-
-  updatePlayback(state: PlaybackState) {
-    this.playbackTracker.report(state);
-    const changed = this.syncPlayback();
-    if (!changed) return;
-    this.requestProcessQueueMicrotask(false);
+  updatePlayback(state: PlaybackState, at?: number) {
+    const rateChanged = this.playbackTracker.report(state, at);
+    if (rateChanged) this.notifyStoragePosition();
+    const request = this.engineRequest;
+    const becameUrgent =
+      request?.status === "pending" &&
+      this.waitingNotUrgent === request &&
+      this.isUrgent();
+    this.requestProcessQueueMicrotask(becameUrgent || rateChanged);
   }
 
   /**
-   * Takes the tracker's current view as this loader's `playback`. Returns
-   * whether anything changed.
-   *
-   * A paused player reports rate 0. Window sizing keeps the last non-zero
-   * rate instead, so prefetching continues while paused: a viewer who pauses
-   * and resumes finds the buffer ready, where a rate of nothing would
-   * collapse every window to the segment at the playhead.
+   * Tells the store the position: the start of the segment requested last,
+   * on the manifest timeline, as its segment times are. See
+   * specs/playback-contract.md, "What the segment store receives". A custom
+   * storage is the integrator's code and free to throw; a throw here would
+   * be a request that never settles, or a loader that never exists.
    */
-  private syncPlayback(): boolean {
-    const own = this.playbackTracker.getPlayback();
-    // The stream's own buffer, where the streams share a playhead: the
-    // reported one is the lagging stream's. See SharedPlayhead.
-    const next = {
-      ...own,
-      bufferAhead: this.sharedPlayhead.bufferAheadFor(this, own),
-    };
-    const rate = next.rate === 0 ? this.playback.rate : next.rate;
-    const { playback } = this;
-    const changed =
-      playback.bufferEdge !== next.bufferEdge ||
-      playback.bufferAhead !== next.bufferAhead ||
-      playback.rate !== rate ||
-      playback.source !== next.source;
-    this.playback = { ...next, rate };
-    // The store compares this position against the segment times it was
-    // given, which are manifest time — so the position must be manifest time
-    // too. Told from here rather than from the player's reports alone: a
-    // proxy that never reports would otherwise leave the store with no
-    // playhead at all, evicting nothing for the whole session.
-    if (changed) {
-      const playhead = next.bufferEdge - next.bufferAhead;
-      this.segmentStorage.onPlaybackUpdated(playhead, rate);
-      // Here, not only on a report: a request moves the edge too.
-      if (this.oracleLogger.enabled) {
-        this.oracleLogger(
-          `${this.lastRequestedSegment.stream.type} playhead≈${playhead.toFixed(3)} (${next.source})`,
-        );
-      }
+  private notifyStoragePosition() {
+    for (const failure of runAll([
+      () =>
+        this.segmentStorage.onPlaybackUpdated(
+          this.lastRequestedSegment.startTime,
+          this.playbackTracker.rate(),
+        ),
+    ])) {
+      this.logger("the storage refused the position: %O", failure);
     }
-    return changed;
   }
 
   updateStream(stream: StreamWithSegments) {
@@ -1071,7 +986,6 @@ export class HybridLoader implements PlayheadParticipant {
   destroy() {
     diagnostics?.close(this.diagnosticsToken, "destroyed");
     this.destroyed = true;
-    this.sharedPlayhead.leave(this);
     clearTimeout(this.prefetchTimerId);
     clearTimeout(this.initialHttpDelayTimeoutId);
     this.engineRequest?.abort();

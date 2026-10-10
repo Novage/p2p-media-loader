@@ -1,9 +1,10 @@
 # Playback contract
 
 Core needs two things from the player: **where it is** in the stream, and **how
-urgently** it needs the segment it just asked for. The first is already known —
-the last requested segment says it. This spec is mostly about the second, and
-about doing both without ever comparing a manifest time to a player time.
+urgently** it needs the segment it asked for. Both come from what the player
+does and says, never from an estimate. The player's last request gives the
+position. The buffer that the player reports gives the urgency. Core never
+estimates a playhead, and never compares a manifest time to a player time.
 
 ## The problem
 
@@ -20,6 +21,13 @@ are different timebases, separated by an offset that core cannot derive:
 The offset also drifts, and changes at discontinuities. Measuring it is possible
 but fragile, and every consumer of the measurement inherits its error.
 
+A playhead estimated on the manifest timeline, from the requests and the
+reported buffer, avoids the offset but has errors of its own. It is wrong after
+a seek until the player requests again, and wrong after a seek next to a
+buffered island for as long as the island lasts. Each fix needs more state:
+seek detection, re-request detection, delivery tracking. So core keeps no
+playhead at all.
+
 ## The contract
 
 ```ts
@@ -32,121 +40,46 @@ type PlaybackState = {
 
   /** Effective playback rate; 0 while paused. */
   readonly rate: number;
-
-  /**
-   * How many seeks the player has started since it began playing this
-   * source. Optional: an integration that cannot see seeks leaves it out.
-   */
-  readonly seekCount?: number;
 };
 ```
 
 **There is no position field, and that is the point.** `bufferAhead` is a
-_duration_, so it is invariant under the offset. Combined with the last
-requested segment — which core already knows, in manifest time — it is
-sufficient. No calibration step exists because no absolute comparison is ever
-made.
+_duration_, so it is invariant under the offset. Core uses it for one decision
+only: whether a request the player has made is urgent. No calibration step
+exists because no absolute comparison is ever made.
 
-**`seekCount` is a count, not a flag.** A seek begins before the player
-requests anything at its new position, and core must know at once that the
-buffer it was told about is gone (see "Behaviour under seeking"). A browser
-adapter counts the media element's `seeking` events. A native shim counts the
-player's own seek events — ExoPlayer's `onPositionDiscontinuity` with
-`DISCONTINUITY_REASON_SEEK`, AVPlayer's `AVPlayerItem.timeJumpedNotification`
-— and posts the state on an interval ([mobile-proxy.md](mobile-proxy.md)). A
-seek can begin and end between two such posts; a flag would miss it, and a
-count that has moved cannot.
+**Every integration reports.** A browser adapter reports from the media
+element, through `trackMediaElementPlayback`. A native integration reports from
+its player through a shim ([mobile-proxy.md](mobile-proxy.md)). Before the
+first report, core takes `bufferAhead` as 0 and `rate` as 1: the player has
+nothing buffered yet, so its first requests are urgent. A stream that starts
+later than the others — the audio of a presentation, say — starts from the
+last report, aged since it was made. An integration that
+never reports still plays by the same rule. Every request that the store cannot
+serve is urgent and goes over HTTP, so such a player gets from peers only what
+prefetch puts in the store first.
 
 The contract is also the intersection of what every target player can answer,
 which is why it is expressed this way rather than in any player's own terms.
 See [player-adapters.md](player-adapters.md).
 
-## Sources, in order of preference
+### The age of a report
 
-| Source     | Accuracy                          | Available when                      |
-| ---------- | --------------------------------- | ----------------------------------- |
-| `reported` | exact                             | the integration can read the player |
-| `inferred` | approximate, blind to quiet seeks | always                              |
+A report describes one instant. Between two reports the player consumes media
+at its rate, so core uses:
 
-A directly readable player always wins. In a browser the media element is free,
-continuous and unconditional, so the fallback is never preferred there. A third
-source — a player's own CMCD buffer report, for the proxy architecture where
-nothing can read the player — is recorded as a proposal, not built; see
-[proposals/cmcd-playback-source.md](proposals/cmcd-playback-source.md).
+```
+bufferAhead now = max(0, reported bufferAhead − seconds since the report × rate)
+```
 
-### Staleness
+A browser adapter reports on media events, several times a second while
+playing, so this changes almost nothing there. It matters when reports stop: a
+player that went away without a word, or a shim that posts on an interval.
+Without it, a frozen report of a full buffer would keep a request waiting for
+a buffer that is long gone. A paused report (`rate` 0) does not age: a paused
+player consumes nothing. The next report replaces it.
 
-A `reported` state describes one instant. Core keeps the most recent one and
-treats it as current for a bounded window (on the order of a couple of
-seconds); past that, it falls to inference rather than trusting a value the
-player may have long moved on from. A browser adapter reporting on media events
-never approaches the window while playing; a proxy that could only sample the
-player once per segment would, which is why inference has to be sound on its
-own.
-
-A **paused** report (`rate` 0) does not expire. Media events stop while paused,
-so nothing would refresh it, and falling to inference would decay the estimate
-as though the player were still consuming — a paused viewer would look like one
-about to run dry. Nothing moves while paused; the one thing that can change,
-the buffer growing, fires `progress`, which reports again. The next `play`,
-`seeking` or `ratechange` event replaces the paused report and ordinary
-staleness resumes.
-
-## The buffer edge
-
-Core tracks `bufferEdge`, for each stream: the point on the **manifest
-timeline** where the player's buffer of that stream currently ends.
-
-- When a segment is requested that extends the buffer, the buffer ends where
-  that segment begins — that is precisely why the player is requesting it.
-  `bufferEdge = segment.startTime`.
-- When the segment is delivered, the buffer extends through it.
-  `bufferEdge = max(bufferEdge, segment.endTime)`.
-- After a seek, the stream's first request re-anchors the edge wherever it is:
-  `bufferEdge = segment.startTime`.
-- A request for a segment that starts before the edge, with no seek between
-  and after the request that set the edge was delivered, is not a move: the
-  player is fetching again media it holds — dash.js replaces segments it
-  buffered at a higher quality this way. The edge stays. Moving it back would
-  make every segment of the stream look further from the playhead than it is,
-  the direction that stalls; measured on dash.js, it put the estimate 16 s
-  behind.
-- After a request the player abandoned before it was delivered, a request
-  before the edge is a move, and re-anchors the edge as a seek does: the
-  player never held media up to that edge. HLS.js does this as it starts a
-  live stream — it asked for the live edge, aborted, and asked 14 s earlier,
-  with no seek reported. Kept, the edge put the playhead past the request.
-
-The `max` guards against out-of-order completion of parallel requests dragging
-the edge backwards.
-
-Telling a re-request from a seek takes the seek count. Where the integration
-reports one, a request before the edge is a seek's first request when the count
-has moved since the stream's previous request, and a re-request when it has
-not. Where it reports none, the two cannot be told apart: a seek back into an
-earlier buffered island asks for a segment before the edge with a full buffer
-reported, exactly as a re-request does, and a re-request taken for a seek costs
-a stream a playhead behind until it requests past the edge again, where a seek
-taken for a re-request leaves it ahead until playback reaches the edge, minutes
-later. So without a count, as with inference, a request that does not continue
-the stream is taken for a seek, as before (see "When the player reports
-nothing"), and re-requests keep that error.
-
-Keeping the edge explicit rather than deriving it from the last requested
-segment removes a silent one-segment-duration error: the correct origin depends
-on whether that segment has been delivered yet, which differs between the
-request path and everything else that reads playback state.
-
-"Delivered" means handed to the player, not appended to its media buffer. The
-edge advances only when bytes reach the player through its own request — a
-background prefetch fills the core's store and leaves the player's buffer where
-it was, so it must not move the edge. Because the player appends a delivered
-segment a moment after receiving it, the estimate overstates the playhead by at
-most one segment in that interval and the next reported state corrects it. The
-same bound applies at startup, when a player issues several requests at once
-before any has been appended. Neither transient accumulates.
-
-## One playhead for all streams
+### One buffer for all streams
 
 `bufferAhead` is one number, and a presentation with separate audio has two
 buffers. What every player reports is the shorter of them, the lagging
@@ -159,7 +92,7 @@ stream runs out first.
   the element's range was `min(audio end, video end)` in every sample, in both
   directions. The one exception the specification makes is after
   `endOfStream()`, at the end of a VOD stream, where each buffer's last range
-  counts to the highest end.
+  counts to the highest end. Nothing is left to fetch then.
 - **ExoPlayer.** Its buffered position is the minimum over the audio and video
   loaders, leaving out a track that has loaded to its end
   (`CompositeSequenceableLoader.getBufferedPositionUs`).
@@ -167,112 +100,135 @@ stream runs out first.
   Safari, whose native HLS is AVFoundation, it never went past the lagging
   stream while audio ran up to 13 s ahead.
 
-So `bufferEdge - bufferAhead` is the playhead only for the lagging stream. For
-the stream that runs ahead it lands ahead of the playhead by that stream's
-lead, and the error moves: forward by a segment each time that stream's
-segment arrives, back by a segment each time the lagging stream's does.
-Every next segment of the leading stream then looks needed sooner than it is,
-by the lead, and is fetched over HTTP, or given to a backup, while its P2P copy
-could still have arrived. Measured: 4 s on average for dash.js audio, up to
-34 s for HLS.js audio.
+Core judges the requests of every stream by this one buffer. For the stream
+that runs ahead, its own buffer is longer by its lead, so its request can be
+urgent when it need not be. The error is always toward urgent: the cost is an
+HTTP download that P2P could have made, and only while the buffer is low — at
+the start, after a seek, in a stall — where HTTP is the right choice anyway.
 
-Core therefore keeps one playhead for all the streams of a presentation:
+Core does not correct for the lead. A correction compares the streams'
+positions, and after a seek one stream's position is old until that stream
+requests at the new place. Measured, the second stream's first request came
+19 ms after the first on dash.js, and about a second after it for HLS.js audio.
+Taken as the lowest position, an old one makes the other stream's seek request
+look far from the playhead and not urgent, and the player waits for it.
+Preventing that needs seek detection, which is what this design removes.
 
-```
-playhead = min(bufferEdge of each current stream) - bufferAhead
-```
+## The position
 
-The lagging stream's edge is the minimum and its buffer is `bufferAhead`, so
-this is the playhead, and a stream's own buffer is `bufferEdge - playhead`.
-Nothing jumps: a segment of the leading stream moves neither the minimum nor
-`bufferAhead`, and one of the lagging stream moves both by the same amount.
-Measured against the true SourceBuffers, it put video within 0.1 s on DASH and
-HLS, and dash.js audio within 0.03 s on average. What remains is the
-delivered-not-appended transient of "The buffer edge": HLS.js keeps a delivered
-audio segment for up to about 3 s before appending it, and for that time the
-audio buffer reads one segment long.
+Each stream's position is the segment its player requested last, on the
+manifest timeline. The player requests a segment because its buffer ends
+there, so in steady playback the position is where the player's buffer ends:
+ahead of the playhead by `bufferAhead`.
 
-A stream is current, and takes part in the minimum, only when:
+The position is a fact, not an estimate. Every request moves it, whatever kind
+of request it is:
 
-- **its timeline is the others'.** DASH places every stream on the MPD's
-  timeline; HLS does with `EXT-X-PROGRAM-DATE-TIME`. On HLS without programme
-  dates each playlist is anchored at zero on its own first parse, the edges
-  differ by an unknown offset, and each stream keeps its own estimate,
-  `bufferEdge - bufferAhead`;
-- **its edge is re-anchored since the last seek into unbuffered media.** Until
-  the stream's first request after such a seek its edge describes the old
-  position (see "Behaviour under seeking"); taken as the minimum, it would move
-  every other stream's playhead there;
-- **core sees its requests.** A stream type whose requests pass the core by —
-  its P2P switched off, or segments the registry does not list — has an edge
-  that stops while playback goes on, and would hold the minimum where it
-  stopped.
+- **A request that continues the stream** moves it forward by a segment.
+- **A request after a seek** moves it to the new place.
+- **A request for media the player holds** moves it back. dash.js replaces
+  segments that it buffered at a lower quality this way. The queue then
+  continues from there, at the quality the player asks for now.
 
-With one stream, or one current stream, the playhead is that stream's own
-estimate, as before.
+Core does not tell these apart, and needs no seek count, no delivery state and
+no re-anchoring to do so.
 
-**The end of a VOD stream.** `bufferAhead` stops being the minimum only where
-nothing is left to fetch. A Media Source player calls `endOfStream()` once it
-has appended every segment of every stream, and from then on the element counts
-each buffer's last range to the highest end of them: the playhead comes out
-low by the difference between the streams' ends, typically less than a
-segment, and that moves only the store's position, by as much. ExoPlayer leaves
-a track that has loaded to its end out of its buffered position while another
-still loads; that track's edge is at its end, past every other, so it is never
-the minimum, and the playhead stays right. A stream that has requested its
-last segment therefore keeps its place in the minimum, and needs no rule of its
-own.
+Each stream keeps its own position. The streams are not compared (see "One
+buffer for all streams").
 
-## Distance from the playhead
+## Urgency
 
-The playhead of the section above sits `bufferEdge - playhead` behind each
-stream's buffer edge, so:
+A player request is **urgent** when the store cannot serve it and
 
 ```
-distance(segment) = segment.startTime - playhead
-                  = segment.startTime - min(bufferEdge) + bufferAhead
+bufferAhead now < urgentBufferThreshold × rate
 ```
 
-Every term is a difference. `segment.startTime - min(bufferEdge)` is a
-manifest-space delta and exact; `bufferAhead` is a player-space duration and
-offset-free. The offset between the two timebases cancels and never appears.
-With one stream, `min(bufferEdge)` is its own edge.
+`rate` here is the last non-zero rate the player reported, and 1 before any.
+A paused player with an empty buffer still has a request that is urgent: a
+paused player that asks for media wants its first frame.
 
-All scheduling decisions are expressed on this axis:
+- **An urgent request** is fetched over HTTP at once. If every HTTP slot is in
+  use, the HTTP prefetch download furthest ahead stops and gives its slot to
+  the request. A P2P download of the request that is under way moves to HTTP.
+  Where HTTP is not allowed — during `httpDownloadInitialTimeoutMs`, or once
+  the request's HTTP attempts are spent — it is taken from a peer that has it,
+  and takes a P2P slot from prefetch the same way.
+- **A request that is not urgent** is fetched from a peer that has the
+  segment. If no peer has it, the election decides who fetches it over HTTP
+  ([prefetch.md](prefetch.md)). Otherwise it waits.
+- **With no peer connected**, a request is fetched over HTTP at once. Nobody
+  can give the segment, and no election runs.
 
-```ts
-function isSegmentInTimeWindow(segment, playback, timeWindowLength) {
-  const start = segment.startTime - playback.playhead;
-  const end = segment.endTime - playback.playhead;
-  return !(timeWindowLength * playback.rate < start || 0 > end);
-}
-```
+Core judges a waiting request again on every report and on the prefetch timer
+([prefetch.md](prefetch.md), "Backups"). The buffer drains while the request
+waits, so a request that waits too long becomes urgent and goes over HTTP. A
+player's request therefore never waits longer than its buffer allows.
 
-The same axis governs the high-demand, HTTP and P2P windows, and eviction from
-the segment store.
+**Nothing else is urgent.** A segment that the player has not requested is
+never fetched as urgent, wherever it is. A segment is needed now only when the
+player asks for it with a low buffer. Any other guess of "needed now" rests on
+a playhead that core does not know, and after a seek it would put the urgent
+region where the player was, not where it is.
+
+**A player with P2P is never slower than without it, on the same player
+parameters.** Without P2P, the player fetches each request over HTTP as soon as
+it makes it; how many requests it makes, and when, its own parameters decide.
+An urgent request does the same: it waits for no slot, no peer and no window.
+A request that is not urgent may wait for P2P, but only while the buffer is
+above the threshold, so playback does not suffer from the wait. Core does not
+try to be faster than the player alone, for example by fetching over HTTP, for
+itself, segments its player has not asked for: that spends the HTTP bytes P2P
+exists to save. Such a segment comes over HTTP only through the election, once
+for the whole swarm ([prefetch.md](prefetch.md)). The one delay is the integrator's own choice: `httpDownloadInitialTimeoutMs`
+holds HTTP back at the start of a stream.
+
+**A request inside the buffer.** For a request that continues the stream, the
+requested segment is at the end of the buffer, so `bufferAhead` is the time
+until the player needs it. A request for media the player holds — a quality
+replacement — is played sooner than the buffer runs out. Its urgency is judged
+by the whole buffer all the same. If P2P does not deliver it in time, the
+player keeps the copy it holds: the cost is quality for that segment, never a
+stall.
 
 ## The time windows
 
-Three windows ahead of the playhead, each a length on the axis above, decide
-what a queue pass does with a segment:
+Two windows ahead of each stream's position decide what a queue pass prefetches
+for that stream:
 
-- **High-demand.** A segment inside it is one the player is about to play:
-  core fetches it over HTTP at once, and moves a P2P download of it to HTTP.
+```
+distance(segment) = segment.startTime − position     // both on the manifest timeline
+inside(window)    = distance ≤ window × rate
+```
+
 - **HTTP.** A segment inside it may be prefetched over HTTP, by the peer the
   election chooses ([prefetch.md](prefetch.md)).
 - **P2P.** A segment inside it is taken over P2P from any peer that has it.
 
-The HTTP and P2P windows are `httpDownloadTimeWindow` and
-`p2pDownloadTimeWindow`, and at their defaults they reach the whole stream; on
-live the playlist bounds them. The high-demand window is `highDemandTimeWindow`
-off live, or 15 seconds where that is unconfigured. On live it is derived from
-the geometry of the window itself, by the rule the core exports as
-`highDemandWindowFor`:
+They are `httpDownloadTimeWindow` and `p2pDownloadTimeWindow`, and at their
+defaults they reach the whole stream; on live the playlist bounds them. The
+queue starts at the requested segment, so a window never reaches behind the
+position. When the store runs short of space, the windows shrink: at 10 % free
+the P2P window falls to the HTTP window, and at 5 % free both are 0.
+
+The windows scale with the playback rate: at twice normal speed they cover
+twice the media. A paused player keeps the last non-zero rate, so prefetch
+continues while paused: a viewer who pauses and resumes finds the buffer
+ready, where a rate of nothing would collapse every window to the requested
+segment. Live players hold the rate at one outside their own catch-up, so this
+rarely matters there.
+
+## The urgency threshold
+
+`urgentBufferThreshold` is the buffer below which a request is urgent. Off live
+it is the configured value, or 15 seconds where none is configured. On live it
+is derived from the geometry of the window itself, by the rule the core exports
+as `urgentBufferThresholdFor`:
 
 ```
 liveDelay    = liveDelayFromWindow(window, segment)   // one segment inside the tail, at most a minute
 playerBuffer = max(2 × segment, liveDelay − segment)   // one segment short of the edge
-highDemand   = min(configured ?? 15, playerBuffer / 2)   // and at least a segment where nothing is configured
+threshold    = min(configured ?? 15, playerBuffer / 2)  // and at least a segment where nothing is configured
 maxLatency   = liveDelay + 2 × segment                  // re-synced to liveDelay past this
 ```
 
@@ -304,22 +260,24 @@ pull such a viewer back within a refresh.
 
 On live the configured number is a ceiling rather than an override. Nothing
 configured here widens the player's buffer, which every adapter sizes from the
-geometry, so a window configured past half that buffer would cover everything
-the player fetches and leave the election nothing — the failure this rule
-exists to prevent. A number still narrows the window, which gives peers more
-room rather than less. An integration that wants the player to fetch over HTTP
+geometry, so a threshold configured past half that buffer would make every
+request urgent and leave the election nothing — the failure this rule exists to
+prevent. A number still lowers the threshold, which gives peers more room
+rather than less. An integration that wants the player to fetch over HTTP
 regardless asks for that with `isP2PDisabled`.
 
 The player's forward buffer is what every adapter sizes to `playerBuffer`
-([player-adapters.md](player-adapters.md)); the core calls the nearer half of
-it high-demand and leaves the farther half to the election. That order is the
-invariant this design rests on: **the player's buffer must reach further than
-the high-demand window, by more than a handoff costs** — one peer's playlist
-refresh ahead of another's, one HTTP fetch, one P2P transfer. A buffer at or
-inside the window makes every segment the player fetches high-demand on
-arrival, so each peer fetches the whole stream from the origin and the election
-never has a segment to run on. A four-segment playlist of five-second segments
-is the tight case: delay 15 s, buffer 10 s, window 5 s, and 5 s of room.
+([player-adapters.md](player-adapters.md)). The player asks for a segment when
+its buffer has room for one more, so it asks with a buffer near
+`playerBuffer − segment`. The request is not urgent until the buffer drains to
+the threshold, and that time is the room peers have to hand the segment over.
+That order is the invariant this design rests on: **the player's buffer must
+reach further than the urgency threshold, by more than a handoff costs** — one
+peer's playlist refresh ahead of another's, one HTTP fetch, one P2P transfer. A
+buffer at or below the threshold makes every request urgent when it is made, so
+each peer fetches the whole stream from the origin and the election never has a
+segment to run on. A four-segment playlist of five-second segments is the tight
+case: delay 15 s, buffer 10 s, threshold 5 s, and 5 s of room.
 
 A window narrower than that has no room to give, whatever an adapter does: a
 player needs two segments of buffer to keep going, and on a window of two or
@@ -330,23 +288,18 @@ apply the floor, which still sits nearer the edge than the default it
 replaces. Such a window is transient in practice, a channel whose playlist has
 only just started publishing.
 
-The window is derived from the presentation's placement, not from each
+The threshold is derived from the presentation's placement, not from each
 stream's own playlist: the widest live main stream decides, and the widest live
 stream of any kind where there is no main one — the same stream the adapters
 size the player by. An audio playlist often carries a wider window than the
-video's, and a window derived from it would exceed the buffer the player
+video's, and a threshold derived from it would exceed the buffer the player
 actually holds.
 
-Because the player buffers further than the window on live, the segment the
-player asks for is often not high-demand when it asks. That request is a
-candidate like any other for the election, which the owner fetches at once and
-a backup by its deadline. With no peer connected there is no owner and nothing
-to take the segment from, so core fetches the player's request over HTTP at
-once rather than let it wait for the window to reach it.
-
-The windows scale with the playback rate: at twice normal speed the derived
-window covers twice the media. Live players hold the rate at one outside their
-own catch-up, so this rarely matters there.
+Off live, the adapters hold the player's buffer to the threshold. The player
+then asks for each segment with a buffer below the threshold, so each request
+is urgent when it is made. Nothing bounds a VOD stream ahead of the player, so
+the core prefetches beyond the player's buffer through the windows, and the
+player's requests are served from the store.
 
 ## What the segment store receives
 
@@ -354,39 +307,30 @@ own catch-up, so this rarely matters there.
 `customSegmentStorageFactory` — so it is worth being explicit about what one is
 given.
 
-The store is told the playhead through `onPlaybackUpdated(position, rate)`, and
+The store is told a position through `onPlaybackUpdated(position, rate)`, and
 it compares that position against the `startTime` and `endTime` it was given
 when each segment was stored. **Both sides of that comparison are manifest
-time.** The position core passes is derived, not the player's clock:
+time.** The position is the start of the segment that a player requested last,
+of whichever stream requested last. The store is told at the start of a stream,
+on every player request, and on every change of the reported rate.
 
-```
-position = playhead = min(bufferEdge) - bufferAhead
-```
-
-Where the streams share a timeline, every loader reports this one playhead, so
-the store's position no longer flips between the lagging stream's and the
-leading one's at each report — which, on a lead of 30 s, would drop segments
-30 s early behind the playhead, ones a peer a little behind still wants. On HLS
-without programme dates each loader reports its own stream's estimate, on its
-own timeline, and the store keeps the latest report. The store is told at the
-start of a stream and
-whenever the core's estimate moves — on a player's report, and on the core's
-own inference where the player reports nothing — so a store sees positions,
-and evicts, on a session where `updatePlayback` is never called. On live HLS
-without programme dates the main and the secondary playlist are anchored at
-zero on their own first parse, so their timelines can differ by seconds; a
-segment of one judged against the other's position is then off by that much,
-inside the trailing window the store keeps on a live stream. That window is
-three segments, measured in the segment's own length, and never less than
-fifteen seconds. The segments are what peers need of each other: they sit
-within a second or two on one stream, and a peer a little behind another must
-still find what it wants held. The floor is for the skew above, which is a
-fixed offset rather than a count of segments, and on a stream of short segments
-would otherwise fall outside a window measured in them. Neither term follows a
-configured window — the high-demand window is sized for scheduling ahead of the
-playhead and can be as short as one segment. A position kept per stream or per type would be exact while
-both report and would freeze the moment one stops, retaining its segments for
-ever, so the store does not. Both values sit on the manifest timeline, which is
+The position is where the player's buffer ends, not where the playhead is. On
+VOD the store keeps everything from the position on, and may drop the
+segments the player already holds once it is full. On live the store keeps a
+trailing window behind the position. Every peer measures it from its own last
+request, and peers at one placement request within a second or two of each
+other, so each keeps what the others still ask for. That window is three
+segments, measured in the segment's own length, and never less than fifteen
+seconds. The floor is for a skew between timelines: on live HLS without
+programme dates the main and the secondary playlist are anchored at zero on
+their own first parse, so their timelines can differ by seconds, and a segment
+of one judged against the other's position is off by that much. That skew is a
+fixed offset rather than a count of segments, and on a stream of short
+segments it would otherwise fall outside a window measured in them. Neither
+term follows the urgency threshold, which is sized for requests and can be as
+short as one segment. A position kept per stream or per type would freeze the
+moment one stream stops requesting, and retain its segments for ever, so the
+store keeps one, the latest. Both values sit on the manifest timeline, which is
 what keeps the comparison valid, and is why neither of them is
 `video.currentTime`.
 
@@ -395,8 +339,8 @@ no longer lists segments of a stream: a live window has moved past them.
 Nothing can request such a segment again. The core matches every request
 through the segments the manifests list, and a peer asks only for what its own
 manifest lists, so a stored copy can never be served. The store may drop it at
-once, wherever the playhead is, and the bundled one does. The trailing window
-alone is not enough for a paused player: its playhead does not move, so every
+once, wherever the position is, and the bundled one does. The trailing window
+alone is not enough for a paused player: its position does not move, so every
 segment ends after it, and on a live stream with peers the core goes on
 fetching this peer's share of each new one — a paused peer still owns segments
 in the election, and its neighbours would otherwise wait for a backup. Each
@@ -416,123 +360,20 @@ wrong by the offset this design exists to avoid.
 
 ## Behaviour under seeking
 
-| Situation                                         | Outcome                                                                                                                                                                                                                            |
-| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Seek forward into unbuffered media                | Buffer discarded, player requests at the new position, `bufferAhead` is 0. Exact, and urgency correctly maxes out.                                                                                                                 |
-| Seek backward into unbuffered media               | Same. Exact.                                                                                                                                                                                                                       |
-| Seek backward **inside** the buffer               | No request is issued at all. The edge is unchanged and `bufferAhead` has grown by exactly the distance seeked, so the two cancel. Exact.                                                                                           |
-| Seek across a gap into an earlier buffered island | The edge describes a later island while `bufferAhead` is measured in an earlier one. Wrong until the player issues a request, which it does immediately to extend the range it is now playing. Self-correcting within one request. |
+Core does not detect seeks. A seek reaches it as a report and, usually, a
+request at the new place:
 
-The third row is the one that motivates the design. Both terms are anchored to
-the same buffer edge, so seeking within a buffered range needs no new
-information from the player and produces no error.
+| Seek                                         | What core receives                                                      | Outcome                                                                                                              |
+| -------------------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Into unbuffered media, forward or back       | A report with `bufferAhead` 0, then a request at the new place          | The request is urgent and goes over HTTP at once. The position moves to it.                                          |
+| Back inside the buffer                       | A report with a longer buffer, and no request                           | Nothing changes. The player's next request continues from the position.                                              |
+| Into an earlier buffered island              | A request after the island's end, at once                               | The position moves to it. Its urgency is judged by the island's buffer.                                              |
+| To just before a buffered island             | A request in the gap, with `bufferAhead` 0; later, one after the island | The gap request is urgent. The position stays at the gap until the next request; the windows ahead cover the island. |
+| Into an island that runs to the end of a VOD | Nothing                                                                 | The position stays. Prefetch continues after it, bounded by the windows and the storage brake.                       |
 
-**Between the seek and each stream's first request, the old edges lie.** The
-rows above are exact once each stream has requested at its new position, but
-the streams do not request together, and the player reports first. Measured:
-
-- The `seeking` report arrives before any request, with `bufferAhead` near 0 at
-  an unbuffered target. Every loader still has its old edge, so it reads an
-  empty buffer at the old position and may start an urgent HTTP download
-  there — HLS.js video got one, at the position it had left, 8 ms before its
-  own first request.
-- One stream requests before the other. dash.js video requested at the target
-  after 19 ms, and in the millisecond before its audio did, core started two
-  audio downloads at the old position. HLS.js audio followed its video by about
-  a second.
-
-These were cancelled before any byte arrived, but a later request, or a peer
-that answers, makes them real downloads of media nobody will play, and with the
-roles reversed they are video. So when the reported `seekCount` changes and the
-report shows no media at the new position, every stream's edge stops counting:
-its loader starts no prefetch, and its edge takes no part in the shared
-playhead, until its own first request after the seek re-anchors it. The report
-of the seek decides this, not a later one: once one stream's media arrives at
-the new position, the player reports a buffer that the other streams do not
-have yet. A stream whose request has arrived already prefetches from its new
-edge. The pause costs a stream only the time until its own request, and never a
-download. The player's own request is fetched even while its stream is held: a
-player can request the new position before the seek is reported — HLS.js did,
-on a seek back into a DVR window — and that request is then taken for a
-re-request. Held, it would keep the player waiting for ever.
-
-For the same reason, a player request that the queue does not hold — behind
-the estimated playhead, or past the windows — is fetched at once, and, where a
-seek holds the queue or the request lies outside it, the HTTP download furthest
-ahead gives way to it. The windows place prefetch; they never decide whether
-the player's own request is served. Without this, a wrong estimate left the
-request outside every window: HLS.js stayed at `readyState` 0 for good while
-core prefetched the segments after it.
-
-A seek into media the player holds is not paused. The player reports a buffer
-at the new position at once, and may make no request for as long as that buffer
-lasts — HLS.js video made none in the 8 s measured after a seek 7 s back inside
-it — so a pause until the request would stop the prefetch for all that time.
-After a seek inside the buffer the edges are the ones the player holds, as the
-table shows; after one into an earlier island they are wrong until the request
-the player makes at once. Either way, each stream's first request after the
-seek re-anchors its edge, as after any other seek.
-
-An island that runs to the end of a VOD stream brings no request at all, and
-its error stays until the next seek: measured on HLS.js, 21.5 s. Nothing is
-left to fetch there, so it moves only the store's position.
-
-**The seek count is optional, and everything above works without it.** An
-integration that reports none — a native shim that does not count seeks, a
-player read some other way — keeps the behaviour before it: core learns of a
-seek from each stream's first request at the new position, any request that
-does not continue the stream counts as one, and until that request the old
-edges count, so the downloads measured above can still start. They are bounded
-by that short window. The shared playhead works as with a count, in regular
-playback, which is most of it.
-
-## When the player reports nothing
-
-Some integrations cannot wrap the player — a proxy that a native application
-points at, with no SDK around its player. Core then infers `PlaybackState` from
-the request pattern it already observes. Inference is a fallback _inside_ core,
-not a second contract: an adapter's only job is to report if it can and stay
-silent if it cannot.
-
-Inference re-anchors on three reliable events and integrates between them:
-
-- **Report** — an integration that reports at all reports the truth, so the
-  most recent one anchors inference too. An integration that samples its player
-  rarely — a proxy once per segment — spends most of its time inferred, and
-  each of those stretches then starts from a measurement seconds old rather
-  than from whichever seek or idle gap last anchored it.
-- **Seek** — a requested segment that does not continue the previous one on
-  the timeline — its start is not the previous end, within half a segment —
-  means the player jumped, and a jump means its buffer was discarded.
-  `bufferAhead` resets to zero. Continuity is judged on time, not on
-  `externalId`, whose step is one for HLS but a segment's length in 100 ms
-  units for DASH (see [segment-identity.md](segment-identity.md)).
-- **Buffer full** — a sequential request arriving after an idle gap longer than
-  a fraction of a segment duration means the player was not fetching because it
-  had nowhere to put the data. `bufferAhead` is at the player's target, which is
-  itself learned as a moving average of the estimate at these moments.
-- **Between anchors** — delivered media time minus elapsed wall-clock time,
-  clamped to the learned target.
-
-The learned target is not taken from reports: a report arriving mid-fill is
-below the player's target and would drag it down. It stays what the idle gaps
-say it is.
-
-Inferred estimates are scaled down by a safety factor before use.
-Underestimating the buffer costs P2P ratio; overestimating it stalls the viewer.
-The bias is deliberately toward the cheaper failure.
-
-Playback rate is ambiguous when inferring and is assumed to be 1. This is safe:
-assuming playback decays the estimate, which only ever makes core more willing
-to use HTTP, and core acts only when a request arrives, so a paused player costs
-nothing.
-
-### Limits of inference
-
-**A seek that issues no requests is invisible.** Seeking backward inside a
-buffered range produces no network activity, so inference cannot detect it and
-its estimate stays wrong until the player next requests something. Reported
-state handles this case exactly.
-
-Inference is a graceful degradation, not an equivalent. Any integration that can
-report playback state should.
+**Between the seek and the first request**, the position is the old one, for
+milliseconds to about a second (see "One buffer for all streams"). Prefetch
+from the old position continues in that time, but nothing there is urgent,
+because urgency belongs to a request and the player makes none there. The
+first request at the new place moves the queue, and the downloads that are no
+longer in it are cancelled.

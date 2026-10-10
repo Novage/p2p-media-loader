@@ -39,9 +39,9 @@ export {
 /** @internal Shared by the engine packages; see its declaration. */
 export { downloadTimeMs } from "./download-time.js";
 export {
-  DEFAULT_HIGH_DEMAND_TIME_WINDOW,
+  DEFAULT_URGENT_BUFFER_THRESHOLD,
   INITIAL_LIVE_DELAY,
-  highDemandWindowFor,
+  urgentBufferThresholdFor,
   liveDelayFor,
   liveDelayForSegments,
   liveDelayFromWindow,

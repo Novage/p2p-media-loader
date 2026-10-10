@@ -510,48 +510,6 @@ s102.ts
     expect(times).toEqual([2, 4]);
   });
 
-  it("knows which streams lay out on a timeline the others share", () => {
-    // DASH's presentation time, HLS's programme dates, and an HLS playlist
-    // that listed every segment from the start are shared; a sliding HLS
-    // playlist without dates is laid out from wherever its first parse began.
-    const sharedOf = (apply: (r: ManifestRegistry) => void, key: string) => {
-      const registry = new ManifestRegistry();
-      apply(registry);
-      return registry.getStream(key)?.sharedTimeline;
-    };
-    expect(
-      sharedOf(
-        (r) => r.apply(dashManifestParser.parse(DASH_SEGMENT_TEMPLATE, MASTER)),
-        "video-720p",
-      ),
-    ).toBe(true);
-    expect(
-      sharedOf(
-        (r) => r.apply(hls(HLS_MEDIA_VOD_BYTERANGE, MEDIA_1080)),
-        MEDIA_1080,
-      ),
-    ).toBe(true);
-    expect(
-      sharedOf(
-        (r) => r.apply(hls(HLS_LIVE_NO_PDT_REFRESH_1, MEDIA_1080)),
-        MEDIA_1080,
-      ),
-    ).toBe(false);
-    const dated = `#EXTM3U
-#EXT-X-TARGETDURATION:2
-#EXT-X-MEDIA-SEQUENCE:100
-#EXT-X-PROGRAM-DATE-TIME:2026-09-12T20:00:00.000Z
-#EXTINF:2.0,
-s100.ts
-#EXT-X-PROGRAM-DATE-TIME:2026-09-12T20:00:02.000Z
-#EXTINF:2.0,
-s101.ts
-`;
-    expect(sharedOf((r) => r.apply(hls(dated, MEDIA_1080)), MEDIA_1080)).toBe(
-      true,
-    );
-  });
-
   it("keeps the timeline when a refresh drops the programme dates", () => {
     // A packager failing over to an origin without EXT-X-PROGRAM-DATE-TIME:
     // the next refresh must anchor on the sequence numbers it shares with the

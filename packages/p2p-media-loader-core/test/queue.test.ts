@@ -50,16 +50,13 @@ const noPeers = {
 
 const config = {
   ...Core.DEFAULT_STREAM_CONFIG,
-  highDemandTimeWindow: 15,
   httpDownloadTimeWindow: 3000,
   p2pDownloadTimeWindow: 6000,
 };
 
 const playbackAt = (segment: SegmentWithStream): Playback => ({
-  bufferEdge: segment.endTime,
-  bufferAhead: 10,
+  position: segment.startTime,
   rate: 1,
-  source: "reported",
 });
 
 function queueOf(anchor: SegmentWithStream, playback: Playback) {

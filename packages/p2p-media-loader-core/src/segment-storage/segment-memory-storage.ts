@@ -29,12 +29,13 @@ type Playback = {
 
 const BYTES_PER_MiB = 1048576;
 /**
- * How far behind the playhead a live stream's segments are kept: three of
+ * How far behind the position a live stream's segments are kept: three of
  * their own lengths, and never less than {@link LIVE_TRAILING_MIN_SECONDS}.
  *
- * Three segments is what peers need of each other. They sit within a second
- * or two on one stream, and a peer a little behind another must still find
- * the segment it wants held rather than have to fetch it again.
+ * Three segments is what peers need of each other. The position is where a
+ * player's buffer ends, and peers at one placement request within a second or
+ * two of each other on one stream, so a peer a little behind another still
+ * finds the segment it wants held rather than having to fetch it again.
  */
 const LIVE_TRAILING_SEGMENTS = 3;
 
@@ -45,7 +46,7 @@ const LIVE_TRAILING_SEGMENTS = 3;
  * are each anchored at zero on their own first parse, so the two timelines
  * can differ by seconds (see specs/playback-contract.md). A window measured
  * only in segments is narrower than that skew on a short-segment stream, and
- * would evict one stream's segments while its own playhead was still short of
+ * would evict one stream's segments while its own position was still short of
  * them — segments the loader then fetches again over HTTP and stops seeding.
  * Seconds are the right unit for a fixed offset, and the few megabytes this
  * keeps are nothing against a budget of gigabytes.
@@ -72,7 +73,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
   /**
    * Whether the stream the player last asked a segment of is live, which is
    * what tells the retention rule to keep a trailing window. Undefined until
-   * the first request, when there is no playhead to measure anything against
+   * the first request, when there is no position to measure anything against
    * either.
    */
   private lastRequestedIsLive?: boolean;
@@ -198,9 +199,9 @@ export class SegmentMemoryStorage implements SegmentStorage {
   }
 
   /**
-   * Drops segments their manifest stopped listing, whatever the playhead: no
+   * Drops segments their manifest stopped listing, whatever the position: no
    * request can reach them again. Without this, a paused live player's
-   * storage would keep every segment that ends after its frozen playhead —
+   * storage would keep every segment that ends after its frozen position —
    * each new one its peers fetch with it — until the storage brake stopped it.
    */
   onSegmentsRemoved(
@@ -307,18 +308,18 @@ export class SegmentMemoryStorage implements SegmentStorage {
   }
 
   /**
-   * Whether the cache has to keep this segment: everything the playhead has
-   * not passed, and on live a trailing window as well, so a peer a little
-   * behind this one — or a viewer who pauses or steps back — still finds it
-   * there. That window is the segment's own length a few times over, under a
-   * floor in seconds, and follows no configured window: the high-demand
-   * window is sized for scheduling ahead of the playhead and can be as short
-   * as a single segment.
+   * Whether the cache has to keep this segment: everything from the position
+   * on — the start of the segment a player requested last — and on live a
+   * trailing window as well, so a peer a little behind this one — or a viewer
+   * who pauses or steps back — still finds it there. That window is the
+   * segment's own length a few times over, under a floor in seconds, and
+   * follows no configured value: the urgency threshold is sized for requests
+   * and can be as short as a single segment.
    *
    * Eviction frees what this refuses to keep and `getUsage` reports what it
    * keeps as occupied, so the brake on prefetching is measured against the
-   * same rule that decides what can be freed. Reporting only the bytes ahead
-   * of the playhead would leave a live stream's retained trailing window
+   * same rule that decides what can be freed. Reporting only the bytes from
+   * the position on would leave a live stream's retained trailing window
    * invisible: unfreeable capacity that the brake would treat as free.
    */
   private isRetained(

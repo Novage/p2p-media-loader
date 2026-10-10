@@ -87,26 +87,23 @@ throughout.
   returns a promise; `hasSegment`, `isSegmentLoadable` and `abortSegmentLoading`
   take the same pair.
 - **Playback is reported as `{ bufferAhead, rate }`** rather than an absolute
-  position. The core keeps its own estimate of the playhead and re-anchors it on
-  each report; see [`specs/playback-contract.md`](specs/playback-contract.md).
-- **All the streams of a presentation share one playhead.** A player reports
-  one buffer, the lagging stream's, so the stream that ran ahead — usually
-  audio — saw its next segments as needed sooner than they were, and fetched
-  them over HTTP while their P2P copies could still arrive: 4 s early on
-  average on dash.js, up to 34 s on HLS.js. Its estimate is now within 0.2 s
-  on dash.js, HLS.js and Shaka. See
-  [`specs/playback-contract.md`](specs/playback-contract.md), "One playhead for
-  all streams".
-- **`PlaybackState` takes an optional `seekCount`**, which
-  `trackMediaElementPlayback` fills from the media element's `seeking` events.
-  After a seek into unbuffered media, a stream starts no prefetch until its
-  own request at the new position: the streams do not request together, and
-  in between, dash.js audio and HLS.js video started downloads at the position
-  the player had left. With the count, a request before the buffer edge with
-  no seek between is a re-request, and keeps the edge. An integration that
-  reports no count keeps the behaviour before it. See
-  [`specs/playback-contract.md`](specs/playback-contract.md), "Behaviour under
-  seeking".
+  position, and every integration reports it. The core keeps no playhead: the
+  segment a player requested last is its position, and the reported buffer
+  decides whether that request is urgent. A player that never reports is taken
+  as one with nothing buffered. See
+  [`specs/playback-contract.md`](specs/playback-contract.md).
+- **Only a player's own request is urgent.** A request is fetched over HTTP at
+  once when the player's buffer is below `urgentBufferThreshold`; with more
+  buffer, it waits for a peer while the buffer drains. In 4.x every segment
+  within the high-demand window ahead of the playhead was fetched over HTTP,
+  whether the player had asked for it or not. A player with P2P is now never
+  slower than without it, on the same player parameters, and never faster at
+  the cost of HTTP bytes. The core needs no seek detection: after a seek, the
+  player's first request at the new place is urgent because its buffer is
+  empty there, and nothing at the place it left is urgent. Backups in the
+  prefetch election act only on the segment their own player has requested.
+  See [`specs/playback-contract.md`](specs/playback-contract.md), "Urgency",
+  and [`specs/prefetch.md`](specs/prefetch.md), "Backups".
 - **A live player is placed as deep in the live window as the window allows**,
   by one rule shared across the adapters, so the segments between a peer's
   buffer and the live edge are as many as possible for peers to exchange.
@@ -120,26 +117,27 @@ throughout.
   behind the window over HTTP alone until it stalls. On a DVR window wider than
   that, a viewer who rewound into the window stays where they chose, and is
   brought back only once a pause carries them out of it.
-- **`highDemandTimeWindow` is optional and derived on live.** Left unset, VOD
-  keeps 15 s and a live stream gets half of what the player buffers — at least
-  a segment, at most 15 s — from the live window's geometry, so the far half of
-  the buffer is room for the prefetch election. Off live a number is still the
-  window; on live it is a ceiling, since nothing configured here widens the
-  player's buffer and a window past half of it would leave the election
-  nothing. The adapters size the player's forward buffer one segment short of
-  the live delay rather than to the high-demand window, on hls.js, dash.js and
+- **`highDemandTimeWindow` is renamed `urgentBufferThreshold`, and is optional
+  and derived on live.** Left unset, VOD keeps 15 s and a live stream gets half
+  of what the player buffers — at least a segment, at most 15 s — from the live
+  window's geometry, so the other half of the buffer is room for the prefetch
+  election. Off live a number is still the threshold; on live it is a ceiling,
+  since nothing configured here widens the player's buffer and a threshold
+  past half of it would make every request urgent. The adapters size the
+  player's forward buffer one segment short of the live delay rather than to
+  the urgency threshold, on hls.js, dash.js and
   Shaka alike, and hls.js tunes a four-segment playlist, the narrowest with
   room in it. On a four-segment live playlist, where the delay, the window and
   the buffer all measured 15 s, two peers pulled 1.68 copies of each segment
   from the origin and no election ever ran. The memory storage keeps three
   trailing segments on live, under a floor of 15 s, instead of the window's
   length. See [`specs/playback-contract.md`](specs/playback-contract.md), "The
-  time windows".
+  urgency threshold".
 - **Segment storage is told when a live window moves past segments**, through
   the optional `SegmentStorage.onSegmentsRemoved`, and the memory storage drops
   them at once. Nothing can request such a segment again. A paused live player
   keeps fetching its share for its peers, as the election needs, and its
-  storage kept every segment after its frozen playhead: on one stream with one
+  storage kept every segment after its frozen position: on one stream with one
   peer, 9.5 MiB in a 45 s pause, bounded only by the storage brake. It is now
   bounded by the live window. See
   [`specs/playback-contract.md`](specs/playback-contract.md), "What the segment

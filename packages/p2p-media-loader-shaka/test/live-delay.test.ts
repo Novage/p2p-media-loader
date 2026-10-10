@@ -601,7 +601,7 @@ describe("shaka live window placement", () => {
   it("holds the buffering goal a segment short of the delay", () => {
     const { configuration, deliver } = setup();
     // 48 s behind the edge, the player may fetch 40 s ahead: Shaka's own
-    // 10 s goal would sit inside the core's high-demand window.
+    // 10 s goal would sit below the core's urgency threshold.
     deliver(manifest(7, 8));
     expect(configuration.streaming.bufferingGoal).toBe(40);
   });

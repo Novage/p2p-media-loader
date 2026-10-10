@@ -133,15 +133,15 @@ if (core.isSegmentLoadable(url, byteRange)) {
 }
 ```
 
-Playback is reported as `{ bufferAhead, rate, seekCount? }` through
-`core.updatePlayback`.
+Playback is reported as `{ bufferAhead, rate }` through `core.updatePlayback`,
+and every integration must report it.
 `trackMediaElementPlayback((state) => core.updatePlayback(state)).watch(media)`
-reports it from a media element after every event that can change it, with
-`seekCount` counted from the element's `seeking` events.
-`getPlaybackStateFromMediaElement(media)` gives one state, with no seek count.
-The seek count is optional: without it, core learns of a seek from the player's
-next request, and may prefetch from the old position until then (see the v4.x
-notes below and `specs/playback-contract.md`).
+reports it from a media element after every event that can change it.
+`getPlaybackStateFromMediaElement(media)` gives one state. The core uses the
+buffer to decide whether each request is urgent. It takes a player that has not
+reported as one with nothing buffered, so an integration that never reports
+still plays, but fetches over HTTP every segment the storage cannot serve (see
+`specs/playback-contract.md`).
 
 ### Removed from `Core`
 
@@ -176,35 +176,51 @@ its own, `httpFirstByteTimeoutMs`, 10 s by default. A deployment that raised
 `httpNotReceivingBytesTimeoutMs` in v4 to let slow first answers through can
 set it back, and set `httpFirstByteTimeoutMs` instead.
 
-### `highDemandTimeWindow`
+### `highDemandTimeWindow` is now `urgentBufferThreshold`
 
-`StreamConfig.highDemandTimeWindow` is `number | undefined` and defaults to
-`undefined`, which derives the window: 15 s on VOD, and on live half of what
-the player buffers, from the live window (see
-`specs/playback-contract.md`, "The time windows"). Code that reads
-`getConfig().mainStream.highDemandTimeWindow` as a number must handle
-`undefined`.
+`StreamConfig.highDemandTimeWindow` is renamed `urgentBufferThreshold`, and its
+meaning changes. In v4 it was a window ahead of the playhead: every segment
+inside it was fetched over HTTP at once, whether the player had asked for it or
+not. In v5 it is the buffer below which a request the player has made is
+urgent: an urgent request is fetched over HTTP at once, and a request made with
+more buffer waits for a peer while the buffer drains. Nothing the player has
+not asked for is ever urgent, so a player with P2P is never slower than without
+it, on the same player parameters (see `specs/playback-contract.md`,
+"Urgency").
+
+It is `number | undefined` and defaults to `undefined`, which derives the
+threshold: 15 s on VOD, and on live half of what the player buffers, from the
+live window (see `specs/playback-contract.md`, "The urgency threshold"). Code
+that reads `getConfig().mainStream.urgentBufferThreshold` as a number must
+handle `undefined`.
 
 **Setting a number does not reproduce v4**, and on a live stream it should be
 left unset. In v4 the number sized both the core's urgent window and the
 player's forward buffer, which is why the two collided; in v5 the buffer
 follows the live window's geometry, so on live the configured number is only a
-ceiling — it narrows the derived window and is ignored where it would reach
+ceiling — it lowers the derived threshold and is ignored where it would reach
 past half the player's buffer. Carrying v4's `highDemandTimeWindow: 15` onto a
-short live window therefore buys nothing, and leaving it unset is what gives
-the election room. Off live the number is still the window.
+short live window as `urgentBufferThreshold: 15` therefore buys nothing, and
+leaving it unset is what gives the election room. Off live the number is still
+the threshold.
 
 A **custom `SegmentStorage`** is handed the same value: `initialize` receives
-the configured stream configurations, so `mainStreamConfig.highDemandTimeWindow`
-is `undefined` unless an integrator set one. This type-checks unchanged, and
-fails silently at runtime — `undefined + endTime` is `NaN`, and
-`position <= NaN` is false — so a storage that carried over the v4 retention
-rule `position <= highDemandTimeWindow + endTime` drops every segment the
-playhead has passed and stops seeding the trailing window. Measure retention in
-the segment's own length instead, as the bundled storage now does: it keeps
-three segment lengths behind the playhead, independent of any configured
-window. Where the effective window is genuinely wanted, `highDemandWindowFor`
-is exported.
+the configured stream configurations, so
+`mainStreamConfig.urgentBufferThreshold` is `undefined` unless an integrator
+set one. A storage that carried over the v4 retention rule
+`position <= highDemandTimeWindow + endTime` fails to compile, since the
+property is gone; rewritten as `position <= urgentBufferThreshold + endTime`,
+it fails silently at runtime — `undefined + endTime` is `NaN`, and
+`position <= NaN` is false — and drops every segment behind the position.
+Measure retention in the segment's own length instead, as the bundled storage
+now does: it keeps three segment lengths behind the position, independent of
+any configured value. Where the effective threshold is genuinely wanted,
+`urgentBufferThresholdFor` is exported.
+
+The position a storage is told through `onPlaybackUpdated` is the start of the
+segment a player requested last, on the manifest timeline: where the player's
+buffer ends, not where its playhead is (see `specs/playback-contract.md`, "What
+the segment store receives").
 
 ### New APIs
 
@@ -217,8 +233,8 @@ is exported.
   working.
 - An **integration** toolkit for whoever writes a player adapter:
   `liveDelayFor`, `liveDelayForSegments`, `liveDelayFromWindow`,
-  `playerBufferFor`, `maxLiveLatencyFor`, `highDemandWindowFor`,
-  `INITIAL_LIVE_DELAY`, `DEFAULT_HIGH_DEMAND_TIME_WINDOW` and
+  `playerBufferFor`, `maxLiveLatencyFor`, `urgentBufferThresholdFor`,
+  `INITIAL_LIVE_DELAY`, `DEFAULT_URGENT_BUFFER_THRESHOLD` and
   `trackMediaElementPlayback` — the live window geometry the core schedules
   by, which every adapter sizes the player's buffer with, and the
   media-element tracking they share. An
@@ -382,7 +398,7 @@ A new optional method, `onSegmentsRemoved(swarmId, streamSwarmId, segmentIds)`,
 tells a storage which segments a live window has moved past. Nothing can
 request them again, so a storage may drop them at once. Without it, a storage
 keeps them until its own rules let them go — which, behind a paused player's
-frozen playhead, can be indefinitely.
+frozen position, can be indefinitely.
 
 ### Runtime configuration
 

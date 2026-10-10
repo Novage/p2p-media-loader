@@ -8,7 +8,6 @@
  */
 
 import { diagnostics, type DiagnosticsToken } from "./diagnostics.js";
-import debug from "debug";
 
 /** A buffered interval, in seconds on the player's own timeline. */
 export type TimeRange = {
@@ -19,14 +18,15 @@ export type TimeRange = {
 };
 
 /**
- * Playback state as reported by a player integration.
+ * Playback state as reported by a player integration. Every integration
+ * reports it; a player that has not is taken as one with nothing buffered.
  *
  * There is no playhead position here, and that is the point. Where the player
  * is in the stream is already known from the last requested segment, in
  * manifest time; `bufferAhead` is a duration, so it is invariant under the
- * offset between the player's timeline and the manifest's. Never reporting an
- * absolute position is what lets a manifest-derived registry and any player
- * share one timebase with no calibration step.
+ * offset between the player's timeline and the manifest's. The core uses it
+ * for one decision: whether a request the player has made is urgent. See
+ * specs/playback-contract.md.
  */
 export type PlaybackState = {
   /**
@@ -37,21 +37,6 @@ export type PlaybackState = {
 
   /** Effective playback rate; 0 while paused. */
   readonly rate: number;
-
-  /**
-   * How many seeks the player has started since it began playing this
-   * source. Optional: an integration that cannot see seeks leaves it out,
-   * and everything still works.
-   *
-   * A count rather than a flag, so that a seek that began and ended between
-   * two reports — a native shim reports on an interval — still shows. When it
-   * moves and `bufferAhead` in the same report is 0, the seek went to media
-   * the player does not hold: the core stops prefetching for each stream
-   * from the position the player left, until that stream's own first request
-   * at the new one. See specs/playback-contract.md, "Behaviour under
-   * seeking".
-   */
-  readonly seekCount?: number;
 };
 
 /**
@@ -125,10 +110,6 @@ export type MediaElementPlaybackTracker = {
   stop(): void;
 };
 
-// See HybridLoader.oracleLogger: logs media.currentTime beside the core's
-// estimate, so the two can be compared when the playhead is in doubt.
-const oracle = debug("p2pml:playback-oracle");
-
 /**
  * Reports a media element's playback to a receiver. Every adapter whose
  * player plays through a media element uses this, so the events the core
@@ -143,18 +124,9 @@ export function trackMediaElementPlayback(
   report: (state: PlaybackState) => void,
 ): MediaElementPlaybackTracker {
   let watched: HTMLMediaElement | undefined;
-  // Every seek of every element watched: the core compares counts, not
-  // their value, so a new element continues the count rather than restarting
-  // it.
-  let seekCount = 0;
 
   const handle = (event: Event) => {
-    const target = event.target as HTMLMediaElement;
-    if (event.type === "seeking") seekCount++;
-    if (oracle.enabled) {
-      oracle(`media.currentTime=${target.currentTime.toFixed(3)}`);
-    }
-    report({ ...getPlaybackStateFromMediaElement(target), seekCount });
+    report(getPlaybackStateFromMediaElement(event.target as HTMLMediaElement));
   };
 
   let watchToken: DiagnosticsToken | undefined;

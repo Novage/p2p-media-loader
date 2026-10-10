@@ -69,8 +69,8 @@ then fills a SourceBuffer for each type on its own schedule, and the two end
 apart, as they do on a DASH stream with separate audio: audio ran up to 4 s
 ahead of video on the AV1 stream, and up to 2 s behind it. The media element's
 `buffered` is where both have data, so its end is the shorter buffer's, and
-the stream whose buffer runs ahead has its playhead estimated too far forward
-by the difference ([playback-contract.md](playback-contract.md)). The Chrome
+the core judges the requests of both streams by that shorter buffer
+([playback-contract.md](playback-contract.md), "One buffer for all streams"). The Chrome
 the streams were added with played AV1 and HEVC; a browser without a decoder
 for a variant skips it.
 
@@ -104,13 +104,14 @@ the streams they would share in production; only the audience changes.
 
 ## What is checked
 
-**Playback contract.** With `localStorage.debug = "p2pml:playback-oracle"`, the
-core logs its estimated playhead beside the media element's `currentTime`. The
-two must agree to within a `timeupdate` tick in steady state and after each of
-the seek cases in [playback-contract.md](playback-contract.md): forward into
-unbuffered media, backward into unbuffered media, backward inside the buffer,
-and across a gap into an earlier buffered island. A delivered-but-not-appended
-segment may show a one-segment overstatement that the next report corrects.
+**Playback contract.** With `localStorage.debug = "p2pml-core:hybrid-loader-*"`,
+the core logs each player request with the buffer it judged it by and whether
+it was urgent. The buffer must agree with the media element's to within a
+`timeupdate` tick, in steady state and after each of the seek cases in
+[playback-contract.md](playback-contract.md). A request made with the buffer
+below the threshold must be urgent and start at once, and a request that waits
+must become urgent before the buffer runs out. After a seek into unbuffered
+media, no urgent download may start at the position the player left.
 
 **Manifest interpretation.** With `localStorage.debug = "p2pml-core:manifest"`,
 the core logs the registry it derives from each manifest: the streams, their

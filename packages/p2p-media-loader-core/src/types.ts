@@ -150,7 +150,7 @@ export type DefinedCoreConfig = CommonCoreConfig & {
 
 /** Represents a set of properties that can be dynamically modified at runtime. */
 export type DynamicStreamProperties =
-  | "highDemandTimeWindow"
+  | "urgentBufferThreshold"
   | "httpDownloadInitialTimeoutMs"
   | "httpDownloadTimeWindow"
   | "p2pDownloadTimeWindow"
@@ -189,11 +189,11 @@ export type DynamicStreamProperties =
  * const dynamicConfig: DynamicCoreConfig = {
  *   segmentMemoryStorageLimit: 512, // MiB
  *   mainStream: {
- *     highDemandTimeWindow: 20,
+ *     urgentBufferThreshold: 20,
  *     p2pDownloadTimeWindow: 6000,
  *   },
  *   secondaryStream: {
- *     highDemandTimeWindow: 10,
+ *     urgentBufferThreshold: 10,
  *     p2pDownloadTimeWindow: 3000,
  *   }
  * };
@@ -265,7 +265,7 @@ export type CommonCoreConfig = {
  *
  * ```typescript
  * const config: CoreConfig = {
- *  highDemandTimeWindow: 15,
+ *  urgentBufferThreshold: 15,
  *  httpDownloadTimeWindow: 3000,
  *  p2pDownloadTimeWindow: 6000,
  *  swarmId: "custom swarm ID for video stream",
@@ -277,7 +277,7 @@ export type CommonCoreConfig = {
  * ```typescript
  * const config: CoreConfig = {
  *  // Configuration for both streams
- *  highDemandTimeWindow: 20,
+ *  urgentBufferThreshold: 20,
  *  httpDownloadTimeWindow: 3000,
  *  p2pDownloadTimeWindow: 6000,
  *  mainStream: {
@@ -334,31 +334,33 @@ export type StreamConfig = {
    */
   isP2PDisabled: boolean;
   /**
-   * Defines the duration of the time window (in seconds) during which segments are preemptively loaded to ensure smooth playback.
-   * This window prioritizes the fetching of media segments that will be played imminently.
+   * The buffer (in seconds) below which a player request is urgent. An urgent
+   * request is fetched over HTTP at once; a request made with more buffer
+   * than this waits for P2P while the buffer drains. Nothing but a player
+   * request is ever urgent.
    *
    * @default
    * ```typescript
-   * highDemandTimeWindow: undefined
+   * urgentBufferThreshold: undefined
    * ```
    *
-   * - When `undefined`, the window is derived: 15 seconds on VOD, and on a
+   * - When `undefined`, the threshold is derived: 15 seconds on VOD, and on a
    *   live stream half of what the player buffers ahead of the playhead —
    *   at least one segment, at most 15 seconds — so that the rest of the
-   *   buffer is left for peers to fill before the player asks (see
-   *   specs/playback-contract.md, "The time windows").
-   * - A number is the window on VOD. On live it is a ceiling: it narrows the
-   *   derived window but never widens it past half the player's buffer, which
-   *   the live window's geometry sizes and no configuration here changes. A
-   *   window wider than that buffer would make every segment the player
-   *   fetches urgent, leaving nothing for peers; `isP2PDisabled` is how to
+   *   buffer is the time peers have to fill the player's requests (see
+   *   specs/playback-contract.md, "The urgency threshold").
+   * - A number is the threshold on VOD. On live it is a ceiling: it lowers
+   *   the derived threshold but never raises it past half the player's
+   *   buffer, which the live window's geometry sizes and no configuration
+   *   here changes. A threshold as high as that buffer would make every
+   *   request urgent, leaving nothing for peers; `isP2PDisabled` is how to
    *   ask for that deliberately.
    */
-  highDemandTimeWindow: number | undefined;
+  urgentBufferThreshold: number | undefined;
 
   /**
-   * Defines the time window (in seconds) for HTTP segment downloads. This property specifies the duration
-   * over which media segments are preemptively fetched using HTTP requests.
+   * Defines the time window (in seconds) for HTTP segment downloads. This property specifies the duration,
+   * from the segment the player requested last, over which media segments are preemptively fetched using HTTP requests.
    *
    * To achieve a higher P2P ratio, it is recommended to set `httpDownloadTimeWindow` lower than `p2pDownloadTimeWindow`.
    *
@@ -387,7 +389,7 @@ export type StreamConfig = {
   httpDownloadInitialTimeoutMs: number;
 
   /**
-   * Defines the time window (in seconds) dedicated to preemptively fetching media segments via Peer-to-Peer (P2P) downloads.
+   * Defines the time window (in seconds), from the segment the player requested last, dedicated to preemptively fetching media segments via Peer-to-Peer (P2P) downloads.
    * This duration determines how much content is downloaded in advance via P2P connections to ensure smooth playback and reduce reliance on HTTP downloads.
    *
    * To achieve a higher P2P ratio, it is recommended to set this time window higher than `httpDownloadTimeWindow` to maximize P2P usage.

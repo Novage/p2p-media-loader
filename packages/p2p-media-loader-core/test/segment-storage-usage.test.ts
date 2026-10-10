@@ -95,10 +95,10 @@ describe("SegmentMemoryStorage usage reporting", () => {
     });
   });
 
-  it("keeps the trailing window in segments, whatever the high-demand window", async () => {
-    // The high-demand window is sized for scheduling ahead of the playhead
-    // and can be as short as a segment; retention behind it does not follow.
-    const storage = await createStorage(true, { highDemandTimeWindow: 1 });
+  it("keeps the trailing window in segments, whatever the urgency threshold", async () => {
+    // The urgency threshold is sized for requests and can be as short as a
+    // segment; retention behind the position does not follow it.
+    const storage = await createStorage(true, { urgentBufferThreshold: 1 });
 
     storage.onPlaybackUpdated(45, 1);
 

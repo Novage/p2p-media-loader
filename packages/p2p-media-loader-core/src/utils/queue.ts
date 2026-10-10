@@ -15,6 +15,10 @@ export type QueueItem = {
   statuses: SegmentPlaybackStatuses;
 };
 
+/**
+ * The segments a queue pass prefetches: from the segment the player requested
+ * last, forward, while a segment is in the HTTP or the P2P window.
+ */
 export function* generateQueue(
   lastRequestedSegment: Readonly<SegmentWithStream>,
   playback: Readonly<Playback>,
@@ -28,50 +32,12 @@ export function* generateQueue(
     stream.segments.get(runtimeId) ?? reanchor(stream, lastRequestedSegment);
   if (!requestedSegment) return;
 
-  const queueSegments = stream.segments.values();
-
-  let first: SegmentWithStream;
-
-  do {
-    const next = queueSegments.next();
-    if (next.done) return; // should never happen
-    first = next.value;
-  } while (first !== requestedSegment);
-
-  const firstStatuses = getSegmentPlaybackStatuses(
-    first,
-    playback,
-    playbackConfig,
-    currentP2PLoader,
-    availablePercentMemory,
-  );
-  if (isNotActualStatuses(firstStatuses)) {
-    const next = queueSegments.next();
-
-    // for cases when engine requests segment that is a little bit
-    // earlier than current playhead position
-    // it could happen when playhead position is significantly changed by user
-    if (next.done) return;
-
-    const second = next.value;
-
-    const secondStatuses = getSegmentPlaybackStatuses(
-      second,
-      playback,
-      playbackConfig,
-      currentP2PLoader,
-      availablePercentMemory,
-    );
-
-    if (isNotActualStatuses(secondStatuses)) return;
-    firstStatuses.isHighDemand = true;
-    yield { segment: first, statuses: firstStatuses };
-    yield { segment: second, statuses: secondStatuses };
-  } else {
-    yield { segment: first, statuses: firstStatuses };
-  }
-
-  for (const segment of queueSegments) {
+  let started = false;
+  for (const segment of stream.segments.values()) {
+    if (!started) {
+      if (segment !== requestedSegment) continue;
+      started = true;
+    }
     const statuses = getSegmentPlaybackStatuses(
       segment,
       playback,
@@ -79,7 +45,7 @@ export function* generateQueue(
       currentP2PLoader,
       availablePercentMemory,
     );
-    if (isNotActualStatuses(statuses)) break;
+    if (!statuses.isHttpDownloadable && !statuses.isP2PDownloadable) break;
     yield { segment, statuses };
   }
 }
@@ -106,9 +72,4 @@ function reanchor(
   for (const segment of stream.segments.values()) {
     if (segment.startTime >= lastRequestedSegment.startTime) return segment;
   }
-}
-
-function isNotActualStatuses(statuses: SegmentPlaybackStatuses) {
-  const { isHighDemand, isHttpDownloadable, isP2PDownloadable } = statuses;
-  return !isHighDemand && !isHttpDownloadable && !isP2PDownloadable;
 }

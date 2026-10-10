@@ -4,10 +4,11 @@ import type { ProcessedManifest } from "./types.js";
  * Where the player sits in a live window, and how much of the window it may
  * fetch. Both follow from the window's geometry — its length and the length of
  * a segment in it — and the core and every adapter size from the same rules
- * here, so the player's forward buffer and the core's high-demand window stay
- * in the order the design needs: the buffer reaching further than the window,
- * by enough for peers to hand a segment over. See specs/playback-contract.md,
- * "The time windows", and specs/player-adapters.md.
+ * here, so the player's forward buffer and the core's urgency threshold stay
+ * in the order the design needs: the buffer reaching further than the
+ * threshold, by enough for peers to hand a segment over. See
+ * specs/playback-contract.md, "The urgency threshold", and
+ * specs/player-adapters.md.
  *
  * The playhead goes as deep as the window allows, one segment inside the
  * tail, never more than a minute behind the edge. A playhead that a pause or
@@ -29,13 +30,13 @@ const MIN_BUFFER_SEGMENTS = 2;
 const LIVE_RESYNC_MARGIN_SEGMENTS = 2;
 
 /**
- * The high-demand window when none is configured: what a VOD player gets, and
+ * The urgency threshold when none is configured: what a VOD player gets, and
  * the most a live one gets — a live window narrower than twice this derives a
- * smaller one, so that half of what the player buffers is left to peers.
+ * lower one, so that half of what the player buffers is left to peers.
  *
  * @category Integration
  */
-export const DEFAULT_HIGH_DEMAND_TIME_WINDOW = 15;
+export const DEFAULT_URGENT_BUFFER_THRESHOLD = 15;
 
 /**
  * Where a live player is placed, and the segment length the placement was
@@ -112,38 +113,38 @@ export function maxLiveLatencyFor(target: LiveDelay): number {
 }
 
 /**
- * The high-demand window the core schedules by: the nearer half of what the
- * player buffers, so the farther half is room for the prefetch election to
- * fill over P2P before the player asks; see specs/prefetch.md, "Room". Left
+ * The buffer below which a player request is urgent: half of what the player
+ * buffers, so the other half is the time peers have to fill the player's
+ * requests before they become urgent; see specs/prefetch.md, "Room". Left
  * unconfigured it is also never more than the default, and never less than a
  * segment. Off live there is no geometry to derive from and the configured
- * number, or the default, is the window.
+ * number, or the default, is the threshold.
  *
  * **On live a configured number is a ceiling, not an override.** The player's
  * buffer is sized from the window's geometry by every adapter, and nothing an
- * integrator configures here widens it; a window configured past half that
- * buffer would cover everything the player fetches, so each peer would pull
- * the whole stream from the origin and the election would never see a
+ * integrator configures here widens it; a threshold configured past half that
+ * buffer would make every request urgent when it is made, so each peer would
+ * pull the whole stream from the origin and the election would never see a
  * segment. That is the failure this rule exists to prevent, so the geometry
- * wins. A number still narrows the window, which leaves peers more room
+ * wins. A number still lowers the threshold, which leaves peers more room
  * rather than less. Whoever wants the player to fetch over HTTP regardless
  * has `isP2PDisabled`.
  *
- * @param configured - `StreamConfig.highDemandTimeWindow`.
+ * @param configured - `StreamConfig.urgentBufferThreshold`.
  * @param target - The live window's placement, or `undefined` off live.
  *
  * @category Integration
  */
-export function highDemandWindowFor(
+export function urgentBufferThresholdFor(
   configured: number | undefined,
   target: LiveDelay | undefined,
 ): number {
-  if (!target) return configured ?? DEFAULT_HIGH_DEMAND_TIME_WINDOW;
+  if (!target) return configured ?? DEFAULT_URGENT_BUFFER_THRESHOLD;
   const room = playerBufferFor(target) / 2;
   if (configured !== undefined) return Math.min(configured, room);
   return Math.max(
     target.segment,
-    Math.min(DEFAULT_HIGH_DEMAND_TIME_WINDOW, room),
+    Math.min(DEFAULT_URGENT_BUFFER_THRESHOLD, room),
   );
 }
 

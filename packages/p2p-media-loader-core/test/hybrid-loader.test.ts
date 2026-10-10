@@ -116,7 +116,7 @@ import { HybridLoader } from "../src/hybrid-loader.js";
 import { Core } from "../src/core.js";
 import { BandwidthCalculator } from "../src/bandwidth-calculator.js";
 import { EventTarget } from "../src/utils/event-target.js";
-import { SharedPlayhead } from "../src/shared-playhead.js";
+import { rankForSegment } from "../src/utils/election.js";
 import debug from "debug";
 import { diagnostics as compiledLedger } from "../src/diagnostics.js";
 
@@ -201,9 +201,9 @@ function setup(
     ...Core.DEFAULT_STREAM_CONFIG,
     simultaneousHttpDownloads: 1,
     simultaneousP2PDownloads: 1,
-    // Shorter than a segment: only the requested segment is high-demand, so
-    // a test sees one slot being fought over, not a cascade.
-    highDemandTimeWindow: 3,
+    // A request is urgent below 3 s of buffer. A test that reports nothing
+    // has 0 s, so its requests are urgent; one that reports chooses.
+    urgentBufferThreshold: 3,
     httpDownloadTimeWindow: 40,
     p2pDownloadTimeWindow: 60,
     httpDownloadInitialTimeoutMs: 0,
@@ -240,7 +240,7 @@ function setup(
   return { loader, segment, callbacks, startLoading, status, state, bandwidth };
 }
 
-describe("HybridLoader: making room for a high-demand segment", () => {
+describe("HybridLoader: making room for an urgent request", () => {
   beforeEach(() => {
     // HybridLoader schedules its prefetch timer on `window`.
     vi.stubGlobal("window", globalThis);
@@ -256,7 +256,7 @@ describe("HybridLoader: making room for a high-demand segment", () => {
     vi.unstubAllGlobals();
   });
 
-  it("aborts the last HTTP download after the segment in the queue, keeping earlier ones", async () => {
+  it("takes the HTTP slot of the download furthest ahead, keeping nearer ones", async () => {
     const { loader, segment, callbacks, startLoading, status, state } = setup();
     // Two HTTP downloads further down the queue already hold the one slot
     // (the container counts them both; the limit only gates new starts).
@@ -290,8 +290,8 @@ describe("HybridLoader: making room for a high-demand segment", () => {
   });
 
   it("frees a P2P slot the same way when HTTP is not an option", async () => {
-    // httpErrorRetries 0: no HTTP attempt is ever allowed, so the high-demand
-    // segment can only go through a peer that has it.
+    // httpErrorRetries 0: no HTTP attempt is ever allowed, so the urgent
+    // request can only go through a peer that has it.
     const { loader, segment, callbacks, startLoading, status, state } = setup({
       httpErrorRetries: 0,
     });
@@ -309,14 +309,11 @@ describe("HybridLoader: making room for a high-demand segment", () => {
     loader.destroy();
   });
 
-  it("never aborts a download ahead of the segment in the queue", async () => {
-    const { loader, segment, callbacks, startLoading, status, state } = setup({
-      // Two high-demand segments this time: 3 and 4.
-      highDemandTimeWindow: 6,
-    });
-    // The player seeks to segment 3, which is already downloading over HTTP
-    // and holds the only slot. Segment 4 is high-demand too, but the only
-    // HTTP download in the queue is ahead of it, so it must wait.
+  it("leaves the download of its own segment alone", async () => {
+    // The player seeks to segment 3, which prefetch is already downloading
+    // over HTTP in the only slot. Nothing is aborted, and nothing ahead of it
+    // is fetched over HTTP: only the player's request is ever urgent.
+    const { loader, segment, callbacks, startLoading, status, state } = setup();
     startLoading(3, "http");
 
     await loader.loadSegment(segment(3), callbacks);
@@ -345,88 +342,120 @@ describe("HybridLoader: making room for a high-demand segment", () => {
   });
 });
 
-describe("HybridLoader: the high-demand window", () => {
+describe("HybridLoader: urgency", () => {
   beforeEach(() => {
     vi.stubGlobal("window", globalThis);
     const { state } = fakes;
     state.peerCount = 0;
     state.loadedBySomeone.clear();
     state.httpStarted.length = 0;
+    state.httpAborted.length = 0;
     state.p2pStarted.length = 0;
+    state.p2pAborted.length = 0;
   });
   afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
-  /** Three HTTP slots, and no window configured: what the loader derives decides. */
+  /** Three HTTP slots, and no threshold configured: what the loader derives decides. */
   const derived = {
     simultaneousHttpDownloads: 3,
-    highDemandTimeWindow: undefined,
+    urgentBufferThreshold: undefined,
   };
   /** A four-segment window of five second segments: the delay is 15 s. */
   const liveTarget = { delay: 15, segment: 5 };
 
-  it("is the default off live", async () => {
-    // 15 s reaches segments 0 to 3 of 4 s each; three slots fill.
+  /** Whether a request made with `bufferAhead` of buffer is urgent. */
+  async function judged(
+    bufferAhead: number,
+    config: Partial<StreamConfig>,
+    streamDetails: StreamDetails = { isLive: false, liveTarget: undefined },
+  ) {
+    const urgent = count("SegmentRequest:urgent");
+    const notUrgent = count("SegmentRequest:not-urgent");
+    const { loader, segment, callbacks } = setup(
+      config,
+      emptyStorage,
+      streamDetails,
+    );
+    loader.updatePlayback({ bufferAhead, rate: 1 });
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+    loader.destroy();
+    const wasUrgent = count("SegmentRequest:urgent") === urgent + 1;
+    const wasNot = count("SegmentRequest:not-urgent") === notUrgent + 1;
+    expect(wasUrgent).not.toBe(wasNot);
+    return wasUrgent;
+  }
+
+  it("takes a player that has not reported as one with nothing buffered", async () => {
+    // With a peer connected, a request that is not urgent would wait for it.
+    fakes.state.peerCount = 1;
+    const urgent = count("SegmentRequest:urgent");
+    const { loader, segment, callbacks, state } = setup();
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+
+    expect(count("SegmentRequest:urgent")).toBe(urgent + 1);
+    expect(state.httpStarted).toContain("seg-0");
+    loader.destroy();
+  });
+
+  it("fetches over HTTP only the player's request, nothing ahead of it", async () => {
+    // Three free slots, and segments 1 and 2 close behind the request. The
+    // player asks for them when it wants them; fetching them first would be
+    // faster than the player alone, at the cost of the HTTP bytes P2P saves.
     const { loader, segment, callbacks, state } = setup(derived);
 
     await loader.loadSegment(segment(0), callbacks);
     await flush();
 
-    expect(state.httpStarted).toEqual(["seg-0", "seg-1", "seg-2"]);
+    expect(state.httpStarted).toEqual(["seg-0"]);
     loader.destroy();
+  });
+
+  it("is 15 s of buffer off live by default", async () => {
+    expect(await judged(14, derived)).toBe(true);
+    expect(await judged(16, derived)).toBe(false);
   });
 
   it("is half the player's buffer on live, derived from the live window", async () => {
-    // Delay 15 less a segment is a 10 s buffer; half of it reaches segments
-    // 0 and 1 only, and a slot stays free.
-    const { loader, segment, callbacks, state } = setup(derived, emptyStorage, {
-      isLive: true,
-      liveTarget,
-    });
+    // Delay 15 less a segment is a 10 s buffer; half of it is 5 s.
+    const live = { isLive: true, liveTarget };
+    expect(await judged(4, derived, live)).toBe(true);
+    expect(await judged(6, derived, live)).toBe(false);
+  });
 
+  it("is lowered by a configured number on live, and never raised by one", async () => {
+    // 30 s over a player that buffers 10 s would make every request urgent,
+    // leaving the election nothing: the geometry wins, at the same 5 s.
+    const live = { isLive: true, liveTarget };
+    expect(
+      await judged(6, { ...derived, urgentBufferThreshold: 30 }, live),
+    ).toBe(false);
+    // Lower than the derived threshold is the integrator's to ask for: it
+    // leaves peers more room, not less.
+    expect(
+      await judged(4, { ...derived, urgentBufferThreshold: 3 }, live),
+    ).toBe(false);
+  });
+
+  it("scales with the playback rate", async () => {
+    // At 2x, 10 s of buffer lasts 5 s: under a 3 s threshold it is 6 s.
+    const { loader, segment, callbacks, state } = setup();
+    fakes.state.peerCount = 1;
+    loader.updatePlayback({ bufferAhead: 5, rate: 2 });
     await loader.loadSegment(segment(0), callbacks);
     await flush();
-
-    expect(state.httpStarted).toEqual(["seg-0", "seg-1"]);
+    expect(state.httpStarted).toContain("seg-0");
     loader.destroy();
   });
 
-  it("is narrowed by a configured number on live, and never widened by one", async () => {
-    // 30 s of urgency over a player that buffers 10 s would cover everything
-    // it fetches, leaving the election nothing: the geometry wins, and the
-    // window is the same 5 s it derives.
-    const wide = setup({ ...derived, highDemandTimeWindow: 30 }, emptyStorage, {
-      isLive: true,
-      liveTarget,
-    });
-    await wide.loader.loadSegment(wide.segment(0), wide.callbacks);
-    await flush();
-    expect(wide.state.httpStarted).toEqual(["seg-0", "seg-1"]);
-    wide.loader.destroy();
-
-    fakes.state.httpStarted.length = 0;
-
-    // Narrower than the derived window is the integrator's to ask for: it
-    // leaves peers more room, not less.
-    const narrow = setup(
-      { ...derived, highDemandTimeWindow: 3 },
-      emptyStorage,
-      {
-        isLive: true,
-        liveTarget,
-      },
-    );
-    await narrow.loader.loadSegment(narrow.segment(0), narrow.callbacks);
-    await flush();
-    expect(narrow.state.httpStarted).toEqual(["seg-0"]);
-    narrow.loader.destroy();
-  });
-
-  it("fetches the player's request beyond the window at once when no peer is connected", async () => {
-    // The player buffers 10 s ahead and asks for the segment at the end of
-    // its buffer, outside the 5 s window. Nobody to take it from, nobody to
-    // elect: it goes over HTTP now rather than when the window reaches it.
+  it("fetches a request that is not urgent at once when no peer is connected", async () => {
+    // Nobody to take it from, nobody to elect: it goes over HTTP now.
     const { loader, segment, callbacks, state } = setup(derived, emptyStorage, {
       isLive: true,
       liveTarget,
@@ -440,12 +469,83 @@ describe("HybridLoader: the high-demand window", () => {
     loader.destroy();
   });
 
-  it("leaves the same request to the election while a peer is connected", async () => {
+  it("takes a request that is not urgent from a peer that has it", async () => {
+    fakes.state.peerCount = 1;
+    fakes.state.loadedBySomeone.add("seg-0");
+    const { loader, segment, callbacks, state } = setup();
+    loader.updatePlayback({ bufferAhead: 10, rate: 1 });
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+
+    expect(state.p2pStarted).toEqual(["seg-0"]);
+    expect(state.httpStarted).not.toContain("seg-0");
+    loader.destroy();
+  });
+
+  it("moves a request coming over P2P to HTTP when its buffer drains", async () => {
+    fakes.state.peerCount = 1;
+    fakes.state.loadedBySomeone.add("seg-0");
+    const became = count("SegmentRequest:became-urgent");
+    const { loader, segment, callbacks, state } = setup();
+    loader.updatePlayback({ bufferAhead: 10, rate: 1 });
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+    expect(state.p2pStarted).toEqual(["seg-0"]);
+
+    loader.updatePlayback({ bufferAhead: 2, rate: 1 });
+    await flush();
+
+    expect(state.p2pAborted).toEqual(["seg-0"]);
+    expect(state.httpStarted).toContain("seg-0");
+    expect(count("SegmentRequest:became-urgent")).toBe(became + 1);
+    loader.destroy();
+  });
+
+  it("judges a waiting request again as the buffer drains, with no new report", async () => {
+    // The player stopped reporting with 10 s buffered. The report ages at
+    // the rate it gave, and the timer judges the request again: it becomes
+    // urgent before the buffer runs out, rather than waiting for ever.
     // Segment 2 ranks this peer as the backup of `peer-0`, and a fast link
-    // puts its deadline well after the 5 s the segment has before the
-    // window: the owner's turn first.
+    // keeps the backup's turn until just before the request is urgent.
+    vi.useFakeTimers();
+    let clock = 0;
+    vi.spyOn(performance, "now").mockImplementation(() => clock);
+    fakes.state.peerCount = 1;
     const { loader, segment, callbacks, state, bandwidth } = setup(
-      derived,
+      {},
+      emptyStorage,
+      undefined,
+      2,
+    );
+    const download = bandwidth.http.startLoading(clock - 1000);
+    bandwidth.http.addBytes(download, 20_000_000);
+    bandwidth.http.stopLoading(download, clock);
+    loader.updatePlayback({ bufferAhead: 10, rate: 1 });
+    await loader.loadSegment(segment(2), callbacks);
+    await flushMicrotasks();
+    expect(state.httpStarted).not.toContain("seg-2");
+
+    clock += 6_000;
+    vi.advanceTimersByTime(2000);
+    await flushMicrotasks();
+    expect(state.httpStarted).not.toContain("seg-2");
+
+    clock += 2_000;
+    vi.advanceTimersByTime(2000);
+    await flushMicrotasks();
+    expect(state.httpStarted).toContain("seg-2");
+    loader.destroy();
+  });
+
+  it("leaves a request that is not urgent to the election while a peer is connected", async () => {
+    // Segment 2 ranks this peer as the backup of `peer-0`, and a fast link
+    // puts its deadline well after the 5 s the request has before it is
+    // urgent: the owner's turn first.
+    // Slots enough for what this peer owns ahead as well: a backup takes
+    // none from prefetch, only an urgent request does.
+    const { loader, segment, callbacks, state, bandwidth } = setup(
+      { ...derived, simultaneousHttpDownloads: 10 },
       emptyStorage,
       { isLive: true, liveTarget },
       2,
@@ -460,9 +560,34 @@ describe("HybridLoader: the high-demand window", () => {
     await loader.loadSegment(segment(2), callbacks);
     await flush();
 
-    // The pass still prefetches what this peer owns further ahead.
     expect(state.httpStarted).not.toContain("seg-2");
     expect(state.p2pStarted).toEqual([]);
+
+    // Half a second before it would be urgent, the backup steps in.
+    loader.updatePlayback({ bufferAhead: 5.4, rate: 1 });
+    loader.updateStream(segment(2).stream);
+    await flush();
+    expect(state.httpStarted).toContain("seg-2");
+    loader.destroy();
+  });
+
+  it("never steps in as a backup for a segment its player has not asked for", async () => {
+    // The request comes from a peer, and the prefetch runs on the segments
+    // ahead of it. Before the player asks there is no deadline to judge, so
+    // only this peer's own segments are fetched over HTTP, whatever time is
+    // left — a backup's turn comes with its player's request.
+    fakes.state.peerCount = 1;
+    fakes.state.loadedBySomeone.add("seg-0");
+    const { loader, segment, callbacks, state } = setup(derived);
+    loader.updatePlayback({ bufferAhead: 10, rate: 1 });
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+
+    expect(state.httpStarted.length).toBeGreaterThan(0);
+    for (const id of state.httpStarted) {
+      expect(rankForSegment("me", ["peer-0"], Number(id.slice(4)))).toBe(0);
+    }
     loader.destroy();
   });
 });
@@ -562,10 +687,12 @@ describe("HybridLoader: a stored segment that reads back empty", () => {
     // in flight. Filed under the new rendition's identity, its bytes would be
     // served to the player, and to peers, as the new rendition's segment.
     const storeSegment = vi.fn(() => Promise.resolve());
-    const { loader, segment, callbacks, state } = setup({}, {
-      ...emptyStorage,
-      storeSegment,
-    } as unknown as SegmentStorage);
+    // A second slot, so the new rendition's urgent request takes none from
+    // the download in flight.
+    const { loader, segment, callbacks, state } = setup(
+      { simultaneousHttpDownloads: 2 },
+      { ...emptyStorage, storeSegment } as unknown as SegmentStorage,
+    );
     const previous = segment(0).stream;
     const controls = state.requests
       .getOrCreateRequest(segment(1))
@@ -624,10 +751,10 @@ describe("HybridLoader: a stored segment that reads back empty", () => {
   });
 
   it("re-checks backup deadlines within two seconds whatever the swarm size", async () => {
-    // A proxy never reports, so the timer is all that drives the election;
-    // the playhead estimate then decays with the clock. The deadlines are
-    // sub-second; a period that grew with the peer count would leave a
-    // segment to enter the high-demand window unfetched.
+    // A paused player reports nothing, and a report ages with the clock, so
+    // the timer is what drives the election between reports. The deadlines
+    // are sub-second; a period that grew with the peer count would leave a
+    // request to become urgent unfetched.
     vi.useFakeTimers();
     let clock = 0;
     vi.spyOn(performance, "now").mockImplementation(() => clock);
@@ -641,8 +768,8 @@ describe("HybridLoader: a stored segment that reads back empty", () => {
       await flushMicrotasks();
       queueGenerations.count = 0;
 
-      // Time passes; the estimate moves with the clock, and the election
-      // last judged from a playhead that has since moved.
+      // Time passes; the report ages with the clock, and the election last
+      // judged from a buffer that has since drained.
       clock += 5_000;
       vi.advanceTimersByTime(2000);
 
@@ -655,8 +782,8 @@ describe("HybridLoader: a stored segment that reads back empty", () => {
 
   it("keeps ticking after a tick threw", async () => {
     // A custom storage that fails once from the timer's election. The timer
-    // is all that elects for a paused player or a proxy; a chain ended by
-    // one throw would end for the session.
+    // is all that elects for a paused player; a chain ended by one throw
+    // would end for the session.
     let failNext = false;
     const getUsage = vi.fn(() => {
       if (failNext) {
@@ -679,7 +806,7 @@ describe("HybridLoader: a stored segment that reads back empty", () => {
       loader.updatePlayback({ bufferAhead: 10, rate: 1 });
       await flushMicrotasks();
 
-      // The estimate has moved; this tick elects, and its measurement throws.
+      // The report has aged; this tick elects, and its measurement throws.
       clock += 5_000;
       failNext = true;
       vi.advanceTimersByTime(2000);
@@ -717,39 +844,34 @@ describe("HybridLoader: a stored segment that reads back empty", () => {
     loader.destroy();
   });
 
-  it("tells the storage where the playhead is although the player never reports", async () => {
-    // A proxy reports nothing; the estimate the loader infers is all the
-    // storage can judge retention by. Left untold, it would evict nothing.
+  it("tells the storage the position from the start and on every request", async () => {
+    // The position is the start of the segment requested last, on the
+    // manifest timeline: told at once, so the storage can judge retention
+    // whether or not the player ever reports.
     const onPlaybackUpdated = vi.fn();
-    const { loader, segment, callbacks, state } = setup({}, {
+    const { loader, segment, callbacks } = setup({}, {
       ...emptyStorage,
       onPlaybackUpdated,
     } as unknown as SegmentStorage);
-    // Told from the start...
-    expect(onPlaybackUpdated).toHaveBeenCalledTimes(1);
-    const [position, rate] = onPlaybackUpdated.mock.calls[0] as [
-      number,
-      number,
-    ];
-    expect(Number.isFinite(position)).toBe(true);
-    expect(rate).toBe(1);
+    expect(onPlaybackUpdated.mock.calls).toEqual([[0, 1]]);
 
-    // ...and again as the estimate moves: a delivery extends the buffer edge.
-    await loader.loadSegment(segment(0), callbacks);
+    await loader.loadSegment(segment(3), callbacks);
     await flush();
-    const controls = state.httpControls.get("seg-0")!;
-    controls.addLoadedChunk(new Uint8Array(16));
-    controls.completeOnSuccess();
-    await flush();
+    expect(onPlaybackUpdated.mock.calls.at(-1)).toEqual([12, 1]);
 
-    expect(onPlaybackUpdated.mock.calls.length).toBeGreaterThan(1);
+    // A change of the rate to size by is told too; a pause is not one.
+    loader.updatePlayback({ bufferAhead: 5, rate: 2 });
+    expect(onPlaybackUpdated.mock.calls.at(-1)).toEqual([12, 2]);
+    const told = onPlaybackUpdated.mock.calls.length;
+    loader.updatePlayback({ bufferAhead: 5, rate: 0 });
+    expect(onPlaybackUpdated.mock.calls.length).toBe(told);
     loader.destroy();
   });
 
   it("starts no download for a segment the storage is answering", async () => {
     // A seek to a segment the storage holds: the request is this loader's
     // from before the read, so an abort meanwhile finds it — and a pass
-    // meanwhile must not start the immediate download a seek calls for.
+    // meanwhile must not start the download an urgent request calls for.
     let release!: (data: ArrayBuffer) => void;
     const storage = {
       ...emptyStorage,
@@ -773,7 +895,7 @@ describe("HybridLoader: a stored segment that reads back empty", () => {
     loader.destroy();
   });
 
-  it("survives a storage that refuses the playhead at construction", async () => {
+  it("survives a storage that refuses the position at construction", async () => {
     const storage = {
       ...emptyStorage,
       onPlaybackUpdated: () => {
@@ -833,144 +955,79 @@ describe("HybridLoader: a stored segment that reads back empty", () => {
   });
 });
 
-describe("HybridLoader: one playhead for all streams", () => {
-  beforeEach(() => {
-    vi.stubGlobal("window", globalThis);
-  });
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  /** A loader of `stream`, telling `positions` where it puts the playhead. */
-  function loaderOf(
-    stream: StreamWithSegments,
-    shared: SharedPlayhead,
-    positions: number[],
-  ) {
-    const storage = {
-      ...emptyStorage,
-      onPlaybackUpdated: (position: number) => positions.push(position),
-    } as unknown as SegmentStorage;
-    return new HybridLoader(
-      stream.segments.get("seg-0")!,
-      { isLive: false, liveTarget: undefined },
-      { ...Core.DEFAULT_STREAM_CONFIG, httpDownloadInitialTimeoutMs: 0 },
-      { all: new BandwidthCalculator(), http: new BandwidthCalculator() },
-      storage,
-      {} as never,
-      new EventTarget<CoreEventMap>(),
-      "me",
-      shared,
-    );
-  }
-
-  async function playBoth(audioShared: boolean) {
-    const video = createStream(30, "720p");
-    const audio = createStream(30, "audio");
-    (audio as { type: string }).type = "secondary";
-    video.sharedTimeline = true;
-    audio.sharedTimeline = audioShared;
-    const shared = new SharedPlayhead();
-    const videoAt: number[] = [];
-    const audioAt: number[] = [];
-    const videoLoader = loaderOf(video, shared, videoAt);
-    const audioLoader = loaderOf(audio, shared, audioAt);
-    const callbacks = { onSuccess: vi.fn(), onError: vi.fn() };
-    // Video's buffer ends at 40 s, audio's at 44 s: audio runs a segment ahead.
-    await videoLoader.loadSegment(video.segments.get("seg-10")!, callbacks);
-    await audioLoader.loadSegment(audio.segments.get("seg-11")!, callbacks);
-    // The player reports the lagging stream's buffer: playhead at 30 s.
-    videoLoader.updatePlayback({ bufferAhead: 10, rate: 1 });
-    audioLoader.updatePlayback({ bufferAhead: 10, rate: 1 });
-    await flush();
-    videoLoader.destroy();
-    audioLoader.destroy();
-    return { video: videoAt.at(-1), audio: audioAt.at(-1) };
-  }
-
-  it("places both streams at one playhead, the lagging stream's", async () => {
-    const shared = count("Playhead:shared");
-    // Each from its own edge, audio would be at 34 s: ahead by its lead.
-    expect(await playBoth(true)).toEqual({ video: 30, audio: 30 });
-    expect(count("Playhead:shared")).toBeGreaterThan(shared);
-  });
-
-  it("leaves a stream on another timeline to its own estimate", async () => {
-    expect(await playBoth(false)).toEqual({ video: 30, audio: 34 });
-  });
-});
-
-describe("HybridLoader: a seek the player reported", () => {
+describe("HybridLoader: seeks and re-requests", () => {
   beforeEach(() => {
     vi.stubGlobal("window", globalThis);
     fakes.state.peerCount = 0;
+    fakes.state.loadedBySomeone.clear();
     fakes.state.httpStarted.length = 0;
+    fakes.state.httpAborted.length = 0;
   });
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("starts nothing from the position the player left, until the stream requests at the new one", async () => {
-    const held = count("Prefetch:held-for-seek");
-    const seeks = count("SegmentRequest:seek");
+  it("fetches the first request after a seek into unbuffered media at once", async () => {
+    // A peer is connected, so nothing but urgency fetches it at once: the
+    // player reports an empty buffer at the new place.
+    fakes.state.peerCount = 1;
     const { loader, segment, callbacks, state } = setup();
-    loader.updatePlayback({ bufferAhead: 0, rate: 1, seekCount: 0 });
+    loader.updatePlayback({ bufferAhead: 20, rate: 1 });
+    state.loadedBySomeone.add("seg-0");
     await loader.loadSegment(segment(0), callbacks);
     await flush();
 
-    // The player seeks into unbuffered media: the count moves before it
-    // requests anything. Two queue passes (a report throttles its own, so the
-    // manifest's update forces one) start nothing, and count the hold once.
-    state.httpStarted.length = 0;
-    loader.updatePlayback({ bufferAhead: 0, rate: 1, seekCount: 1 });
-    loader.updateStream(segment(0).stream);
-    await flush();
-    loader.updateStream(segment(0).stream);
-    await flush();
-    expect(state.httpStarted).toEqual([]);
-    expect(count("Prefetch:held-for-seek")).toBe(held + 1);
-
-    // Its request at the new position re-anchors the stream, and is fetched.
+    loader.updatePlayback({ bufferAhead: 0, rate: 1 });
     await loader.loadSegment(segment(20), callbacks);
     await flush();
     expect(state.httpStarted).toContain("seg-20");
-    expect(count("SegmentRequest:seek")).toBe(seeks + 1);
     loader.destroy();
   });
 
-  it("serves the player's own request when the seek is reported after it", async () => {
-    // HLS.js handles the media element's seeking event before the adapter
-    // reports it: the request for the new position comes first, is taken for
-    // a re-request, and only then does the count move. Holding that request
-    // would leave the player waiting for it for ever.
+  it("starts nothing urgent at the position the player left", async () => {
+    // Between the seek and the first request at the new place, the position
+    // is the old one; the report says the buffer is empty. A request is the
+    // only thing that is ever urgent, so nothing goes over HTTP for the
+    // segments after the old position.
     const { loader, segment, callbacks, state } = setup();
-    loader.updatePlayback({ bufferAhead: 0, rate: 1, seekCount: 0 });
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+    state.httpStarted.length = 0;
+
+    loader.updatePlayback({ bufferAhead: 0, rate: 1 });
+    loader.updateStream(segment(0).stream);
+    await flush();
+    expect(state.httpStarted).toEqual([]);
+    loader.destroy();
+  });
+
+  it("moves the position with every request, back as well as forward", async () => {
+    // dash.js replaces a buffered segment at a higher quality: a request
+    // behind the last one. The position, and the queue, move back to it.
+    const onPlaybackUpdated = vi.fn();
+    const { loader, segment, callbacks, state } = setup({}, {
+      ...emptyStorage,
+      onPlaybackUpdated,
+    } as unknown as SegmentStorage);
     await loader.loadSegment(segment(10), callbacks);
     await flush();
-    // Delivered: the player holds media to the edge, so the request before
-    // it below is taken for a re-request.
-    const controls = state.httpControls.get("seg-10")!;
-    controls.addLoadedChunk(new Uint8Array(16));
-    controls.completeOnSuccess();
+    state.httpControls.get("seg-10")!.addLoadedChunk(new Uint8Array(16));
+    state.httpControls.get("seg-10")!.completeOnSuccess();
     await flush();
 
     state.httpStarted.length = 0;
-    const request = loader.loadSegment(segment(2), callbacks);
-    loader.updatePlayback({ bufferAhead: 0, rate: 1, seekCount: 1 });
-    await request;
+    await loader.loadSegment(segment(2), callbacks);
     await flush();
+    expect(onPlaybackUpdated.mock.calls.at(-1)).toEqual([8, 1]);
     expect(state.httpStarted).toContain("seg-2");
     loader.destroy();
   });
 
-  it("fetches a request behind the playhead the player abandoned its request for", async () => {
+  it("serves a request behind the one the player abandoned", async () => {
     // HLS.js on a live stream asked for one segment, aborted it, and asked
-    // for an earlier one. With a peer there is no fetch at once by default,
-    // and a request outside the queue would wait for a window that never
-    // reaches it: the player stayed at readyState 0 for good.
+    // for an earlier one. The request is the position; nothing makes it wait.
     fakes.state.peerCount = 1;
     const { loader, segment, callbacks, state } = setup();
-    loader.updatePlayback({ bufferAhead: 0, rate: 1, seekCount: 0 });
     await loader.loadSegment(segment(10), callbacks);
     await flush();
     loader.abortSegmentRequest("seg-10");
@@ -979,22 +1036,6 @@ describe("HybridLoader: a seek the player reported", () => {
     await loader.loadSegment(segment(6), callbacks);
     await flush();
     expect(state.httpStarted).toContain("seg-6");
-    loader.destroy();
-  });
-
-  it("does not hold a stream whose seek landed in media the player holds", async () => {
-    // A seek inside the buffer brings no request for as long as the buffer
-    // lasts; holding until then would stop the prefetch for all that time.
-    const held = count("Prefetch:held-for-seek");
-    const { loader, segment, callbacks } = setup();
-    loader.updatePlayback({ bufferAhead: 0, rate: 1, seekCount: 0 });
-    await loader.loadSegment(segment(0), callbacks);
-    await flush();
-
-    loader.updatePlayback({ bufferAhead: 12, rate: 1, seekCount: 1 });
-    loader.updateStream(segment(0).stream);
-    await flush();
-    expect(count("Prefetch:held-for-seek")).toBe(held);
     loader.destroy();
   });
 });

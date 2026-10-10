@@ -54,7 +54,6 @@ import {
   PEER_PROTOCOL_VERSION,
 } from "./stream-identity.js";
 import { BandwidthCalculator } from "./bandwidth-calculator.js";
-import { SharedPlayhead } from "./shared-playhead.js";
 import { SegmentMemoryStorage } from "./segment-storage/segment-memory-storage.js";
 import { EventTarget } from "./utils/event-target.js";
 import {
@@ -92,7 +91,7 @@ export class Core {
     isP2PDisabled: false,
     simultaneousHttpDownloads: 2,
     simultaneousP2PDownloads: 3,
-    highDemandTimeWindow: undefined,
+    urgentBufferThreshold: undefined,
     httpDownloadInitialTimeoutMs: 0,
     httpDownloadTimeWindow: 3000,
     p2pDownloadTimeWindow: 6000,
@@ -139,10 +138,11 @@ export class Core {
   private mainStreamConfig: StreamConfig;
   private secondaryStreamConfig: StreamConfig;
   private commonCoreConfig: CommonCoreConfig;
-  /** The playhead the streams of the current source share. */
-  private sharedPlayhead = new SharedPlayhead();
-  /** The seek count of the last report, to count each seek once. */
-  private lastSeekCount?: number;
+  /**
+   * The player's last report on the current source, and when it came: a
+   * stream loader created after it starts from it rather than from nothing.
+   */
+  private lastPlayback?: { state: PlaybackState; at: number };
   private readonly bandwidthCalculators: BandwidthCalculators = {
     all: new BandwidthCalculator(),
     http: new BandwidthCalculator(),
@@ -668,7 +668,6 @@ export class Core {
     stream: StreamWithSegments,
     registryStream: RegistryStream,
   ): void {
-    stream.sharedTimeline = registryStream.sharedTimeline === true;
     let changed = false;
     // What the manifest stopped listing, by identity rather than by key: a key
     // can change under a segment that stays, as when a CDN signs the URLs of
@@ -773,7 +772,7 @@ export class Core {
   private toStreamSnapshot(stream: StreamWithSegments): Stream {
     // The core's own state stays out of the public payload.
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { segments, sharedTimeline, ...snapshot } = stream;
+    const { segments, ...snapshot } = stream;
     return snapshot;
   }
 
@@ -978,7 +977,11 @@ export class Core {
   }
 
   /**
-   * Reports the player's playback state to the stream loaders.
+   * Reports the player's playback state to the stream loaders. Every
+   * integration must call it whenever the state changes: the core judges
+   * whether each request is urgent by the reported buffer, and takes a player
+   * that has not reported as one with nothing buffered, so that every request
+   * the storage cannot serve goes over HTTP at once.
    *
    * Only the buffer ahead of the playhead and the rate are needed — never the
    * absolute position. See `getPlaybackStateFromMediaElement` for the browser
@@ -987,15 +990,7 @@ export class Core {
    * @param state - The current playback state.
    */
   updatePlayback(state: PlaybackState): void {
-    if (state.seekCount !== undefined) {
-      if (
-        this.lastSeekCount !== undefined &&
-        state.seekCount !== this.lastSeekCount
-      ) {
-        diagnostics?.count("Seek:reported");
-      }
-      this.lastSeekCount = state.seekCount;
-    }
+    this.lastPlayback = { state, at: performance.now() };
     this.mainStreamLoader?.updatePlayback(state);
     this.secondaryStreamLoader?.updatePlayback(state);
   }
@@ -1136,8 +1131,7 @@ export class Core {
 
     this.mainStreamLoader = undefined;
     this.secondaryStreamLoader = undefined;
-    this.sharedPlayhead = new SharedPlayhead();
-    this.lastSeekCount = undefined;
+    this.lastPlayback = undefined;
     if (this.storageDiagnosticsToken) {
       diagnostics?.close(this.storageDiagnosticsToken, "destroyed");
       this.storageDiagnosticsToken = undefined;
@@ -1328,7 +1322,7 @@ export class Core {
         ? this.mainStreamConfig
         : this.secondaryStreamConfig;
 
-    return new HybridLoader(
+    const loader = new HybridLoader(
       segment,
       this.streamDetails,
       streamConfig,
@@ -1337,8 +1331,11 @@ export class Core {
       this.webTorrentSocketPool,
       this.eventTarget,
       this.peerId,
-      this.sharedPlayhead,
     );
+    if (this.lastPlayback) {
+      loader.updatePlayback(this.lastPlayback.state, this.lastPlayback.at);
+    }
+    return loader;
   }
 }
 

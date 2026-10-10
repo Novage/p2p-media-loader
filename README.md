@@ -180,4 +180,6 @@ Subsequently, **P2P Media Loader** transmits media stream details and connection
 
 **P2P Media Loader** then connects with these peers to download additional media segments and simultaneously shares segments that it has already downloaded.
 
+A segment the player asks for while its buffer is low is fetched over HTTP(S) at once, so a player with **P2P Media Loader** is never slower than without it. With more buffer, the request waits for a peer that has the segment while the buffer drains.
+
 Periodically, peers in the P2P swarm download segments the swarm does not hold yet over HTTP(S) and distribute them to others via P2P. Each such segment has one elected owner among the connected peers: every peer scores itself and its neighbours for that segment, and the lowest score fetches. Ownership rotates from segment to segment, so no peer is the swarm's permanent origin.

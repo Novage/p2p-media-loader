@@ -555,16 +555,16 @@ describe("dash.js live window placement", () => {
     expect(settings.streaming.delay.useSuggestedPresentationDelay).toBe(true);
   });
 
-  it("sizes the buffer from the window, not from the high demand window", () => {
+  it("sizes the buffer from the window, not from the urgency threshold", () => {
     const { settings, player, deliverMpd, engine } = setup();
     deliverMpd(mpd(7, 8));
     expect(settings.streaming.buffer.bufferTimeDefault).toBe(40);
     const afterFirst = player.updateSettings.mock.calls.length;
 
-    // The high demand window is the core's to size, from this same window;
+    // The urgency threshold is the core's to size, from this same window;
     // a number configured for it is the core's business, not the player's.
     engine.applyDynamicConfig({
-      core: { mainStream: { highDemandTimeWindow: 60 } },
+      core: { mainStream: { urgentBufferThreshold: 60 } },
     });
     deliverMpd(mpd(7, 8));
     expect(settings.streaming.buffer.bufferTimeDefault).toBe(40);

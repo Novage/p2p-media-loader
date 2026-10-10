@@ -3,7 +3,7 @@ import {
   hash32,
   rankForSegment,
   shouldFetchNow,
-  wallSecondsToHighDemand,
+  secondsToUrgent,
 } from "../src/utils/election.js";
 
 const PEERS = [
@@ -84,21 +84,21 @@ describe("backup ranking and deadlines", () => {
     expect(
       shouldFetchNow({
         rank: 0,
-        secondsToHighDemand: 20,
+        secondsLeft: 20,
         estimatedFetchSeconds: fetch,
       }),
     ).toBe(true);
     expect(
       shouldFetchNow({
         rank: 1,
-        secondsToHighDemand: 20,
+        secondsLeft: 20,
         estimatedFetchSeconds: fetch,
       }),
     ).toBe(false);
     expect(
       shouldFetchNow({
         rank: 2,
-        secondsToHighDemand: 20,
+        secondsLeft: 20,
         estimatedFetchSeconds: fetch,
       }),
     ).toBe(false);
@@ -106,14 +106,14 @@ describe("backup ranking and deadlines", () => {
     expect(
       shouldFetchNow({
         rank: 1,
-        secondsToHighDemand: 2.4,
+        secondsLeft: 2.4,
         estimatedFetchSeconds: fetch,
       }),
     ).toBe(true);
     expect(
       shouldFetchNow({
         rank: 2,
-        secondsToHighDemand: 2.4,
+        secondsLeft: 2.4,
         estimatedFetchSeconds: fetch,
       }),
     ).toBe(false);
@@ -121,7 +121,7 @@ describe("backup ranking and deadlines", () => {
     expect(
       shouldFetchNow({
         rank: 2,
-        secondsToHighDemand: 1.9,
+        secondsLeft: 1.9,
         estimatedFetchSeconds: fetch,
       }),
     ).toBe(true);
@@ -129,21 +129,26 @@ describe("backup ranking and deadlines", () => {
     expect(
       shouldFetchNow({
         rank: 1,
-        secondsToHighDemand: 8,
+        secondsLeft: 8,
         estimatedFetchSeconds: 4,
       }),
     ).toBe(true);
   });
 });
 
-describe("wallSecondsToHighDemand", () => {
-  it("measures the distance in wall-clock seconds, as the fetch estimate is", () => {
-    // 8 media seconds beyond a 15 s window: 8 s away at rate 1, 4 s at 2x.
-    expect(wallSecondsToHighDemand(23, 15, 1)).toBe(8);
-    expect(wallSecondsToHighDemand(38, 15, 2)).toBe(4);
+describe("secondsToUrgent", () => {
+  it("measures the time until the buffer drains to the threshold, in wall-clock seconds", () => {
+    // 8 media seconds above a 15 s threshold: 8 s away at rate 1. At 2x the
+    // threshold covers twice the media, 30 s, so 38 s of buffer is 4 s away.
+    expect(secondsToUrgent(23, 15, 1)).toBe(8);
+    expect(secondsToUrgent(38, 15, 2)).toBe(4);
   });
 
-  it("treats a paused player as playing at 1x", () => {
-    expect(wallSecondsToHighDemand(23, 15, 0)).toBe(8);
+  it("is not positive once the buffer is below the threshold", () => {
+    expect(secondsToUrgent(10, 15, 1)).toBe(-5);
+  });
+
+  it("treats a rate of 0 as playing at 1x", () => {
+    expect(secondsToUrgent(23, 15, 0)).toBe(8);
   });
 });

@@ -113,10 +113,13 @@ asked for 4K next and stalled on it.
 
 ## 3. Report playback state
 
-Push `{ bufferAhead, rate, seekCount }` whenever it changes. Core exports
+Push `{ bufferAhead, rate }` whenever it changes. Every adapter must report:
+core judges the urgency of each request by the reported buffer, and takes a
+player that has not reported as one with nothing buffered
+([playback-contract.md](playback-contract.md)). Core exports
 `getBufferAhead(ranges, currentTime)` so that the range-walking is written once
 rather than per adapter, and `trackMediaElementPlayback`, which every adapter
-here uses, counts the media element's `seeking` events into `seekCount`.
+here uses, reports from the media element's events.
 
 `bufferAhead` must come from the buffered range **containing** the playhead, not
 the last range. After a seek across a gap the buffer is a set of disjoint
@@ -154,8 +157,8 @@ three rules.
    never raises past it. What the adapter wrote is its own, and is given back up
    as well as taken down: a ceiling that only ever fell would latch at the
    narrowest window ever seen, leaving the player buffering less than the core's
-   high-demand window, which is the failure the ceiling exists to prevent
-   ([playback-contract.md](playback-contract.md), "The time windows").
+   urgency threshold, which is the failure the ceiling exists to prevent
+   ([playback-contract.md](playback-contract.md), "The urgency threshold").
 4. **What the adapter wrote is given back when it lets the player go**, and
    only while it is still what the player holds. A player outlives the engine
    bound to it — an integrator turns P2P off, or binds a second engine — and a
@@ -163,10 +166,10 @@ three rules.
    value written from outside since is the integrator's word and stays as they
    left it.
 
-The effective high-demand window is `highDemandWindowFor`, and an adapter that
-needs it calls that rather than reading `highDemandTimeWindow` from the config:
-the configured value is `undefined` wherever the window is derived, and an
-unset stream is not one to be skipped over but one using the default.
+The effective urgency threshold is `urgentBufferThresholdFor`, and an adapter
+that needs it calls that rather than reading `urgentBufferThreshold` from the
+config: the configured value is `undefined` wherever the threshold is derived,
+and an unset stream is not one to be skipped over but one using the default.
 
 ## Supported players
 
@@ -217,17 +220,17 @@ left alone.
   `maxMaxBufferLength` are held one segment short of the live delay, and never
   below two segments — the playlist's average segment, as below — by the
   `playerBufferFor` rule the core exports and every adapter applies. The core
-  calls the nearer half of that buffer high-demand and leaves the farther half
-  for peers to fill before the player asks
-  ([playback-contract.md](playback-contract.md), "The time windows"). On VOD
-  they are held to the high-demand window instead: nothing bounds the stream
+  sets its urgency threshold at half of that buffer, and the other half is the
+  time peers have to fill the player's requests before they become urgent
+  ([playback-contract.md](playback-contract.md), "The urgency threshold"). On
+  VOD they are held to the urgency threshold instead: nothing bounds the stream
   ahead of the player there, so the core prefetches beyond the player's buffer
-  whatever its length, and the player is held to the window so that the core
-  does the rest. Both keys are ceilings kept by the rules above: HLS.js's own
+  whatever its length, and the player is held to the threshold so that the
+  core does the rest. Both keys are ceilings kept by the rules above: HLS.js's own
   defaults, or a lower value the integrator set, are never raised past, what
   the adapter itself wrote is given back up when the window grows, and both are
   put back as the instance held them when the engine lets it go. The VOD
-  ceiling is the wider of the two streams' effective windows, since either
+  ceiling is the higher of the two streams' effective thresholds, since either
   stream's loader schedules by its own.
 - **Position in the live window.** Every segment between the player's buffer
   and the live edge is one peers can fetch for each other, so the player is
@@ -521,8 +524,9 @@ window: one segment short of the delay, never below two segments, by the
 is measured from the delay: applied over an integrator's own placement it would
 reach past the live edge by however far the two delays differ, and every fetch
 beyond the edge misses the registry. Shaka's
-own goal sits inside the core's high-demand window, so left alone the player
-would fetch every segment itself and nothing would be left for peers. Unlike
+own goal sits below the core's urgency threshold, so left alone every request
+would be urgent, every segment would come over HTTP, and nothing would be left
+for peers. Unlike
 the delay, Shaka reads the goal as it fetches, so the source playing buffers to
 it from the next segment on. It is measured from the delay the source was
 actually placed at — the first one applied to it, since a later write is for
@@ -637,8 +641,9 @@ than left wherever dash.js puts it, which is at the edge.
 - **Forward buffer.** `bufferTimeDefault`, `bufferTimeAtTopQuality` and
   `bufferTimeAtTopQualityLongForm` are held one segment short of the live
   delay and never below two segments, by the `playerBufferFor` rule every
-  adapter shares. The core calls the nearer half of that buffer high-demand and
-  leaves the farther half for peers to fill before the player asks.
+  adapter shares. The core sets its urgency threshold at half of that buffer,
+  and the other half is the time peers have to fill the player's requests
+  before they become urgent.
 
 The second is not a refinement of the first. A live delay places the
 **playhead**; what the player fetches is a forward buffer ahead of it, and

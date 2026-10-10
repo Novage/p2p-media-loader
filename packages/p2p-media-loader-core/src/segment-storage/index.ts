@@ -5,12 +5,12 @@ export interface SegmentStorage {
    * Initializes the storage.
    *
    * The stream configurations are the configured values, not the effective
-   * ones: `highDemandTimeWindow` is `undefined` unless an integrator set a
+   * ones: `urgentBufferThreshold` is `undefined` unless an integrator set a
    * number, since the core derives it per stream from the live window (see
-   * specs/playback-contract.md, "The time windows"). A storage that sizes
+   * specs/playback-contract.md, "The urgency threshold"). A storage that sizes
    * anything from it must handle `undefined` — arithmetic on it yields `NaN`,
    * and every comparison against `NaN` is false. Retention behind the
-   * playhead is not the high-demand window's business in any case; the
+   * position is not the urgency threshold's business in any case; the
    * bundled storage measures it in the segment's own length.
    *
    * @param coreConfig The core configuration containing storage options.
@@ -24,16 +24,15 @@ export interface SegmentStorage {
   ): Promise<void>;
 
   /**
-   * Updates the storage with the core's estimate of the playhead.
-   * @param position The playhead on the manifest timeline — the same
-   * timeline as the `startTime`/`endTime` passed to `onSegmentRequested`, so
-   * the two are directly comparable. It is derived from the last requested
-   * segment and the player's reported buffer — or, where the player reports
-   * nothing, from the core's own estimate of what it holds — never read from
-   * the player's clock (see specs/playback-contract.md). Told at the start
-   * and whenever the estimate moves, whether or not `updatePlayback` was
-   * called.
-   * @param rate The current playback rate.
+   * Updates the storage with the player's position.
+   * @param position The start of the segment a player requested last, on the
+   * manifest timeline — the same timeline as the `startTime`/`endTime` passed
+   * to `onSegmentRequested`, so the two are directly comparable. It is where
+   * the player's buffer ends, not where its playhead is, and it is never read
+   * from the player's clock (see specs/playback-contract.md, "What the
+   * segment store receives"). Told at the start of a stream, on every player
+   * request, and on every change of the reported rate.
+   * @param rate The playback rate: the last non-zero one reported, or 1.
    */
   onPlaybackUpdated(position: number, rate: number): void;
 
@@ -86,7 +85,7 @@ export interface SegmentStorage {
    * stream's manifest: a live window has moved past them. Nothing can request
    * such a segment again — the core matches every request through the
    * segments the manifests list, and a peer asks only for what its own
-   * manifest lists — so a storage may drop it at once, wherever the playhead
+   * manifest lists — so a storage may drop it at once, wherever the position
    * is. That is what keeps the storage of a paused live player bounded by the
    * window while the player goes on fetching its share for its peers.
    *
@@ -127,7 +126,7 @@ export interface SegmentStorage {
     totalCapacity: number;
     /**
      * How much of `totalCapacity` the kept segments take, in the same unit.
-     * As the storage fills, the core loads less far ahead of the playhead.
+     * As the storage fills, the core loads less far ahead of the player.
      */
     usedCapacity: number;
   };

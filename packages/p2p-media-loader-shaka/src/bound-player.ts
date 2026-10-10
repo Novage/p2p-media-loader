@@ -298,10 +298,10 @@ export class BoundPlayer {
       this.#applied = target.delay;
     }
     // A segment short of the delay, never below two segments — the rule every
-    // adapter shares: the core calls the nearer half of that buffer
-    // high-demand and leaves the farther half for peers to fill before the
-    // player asks. Left at Shaka's default, the goal sits inside the core's
-    // window and the player fetches every segment itself. Measured from where
+    // adapter shares: the core sets its urgency threshold at half of that
+    // buffer, and the other half is the time peers have to fill the player's
+    // requests. Left at Shaka's default, the goal sits below the core's
+    // threshold, every request is urgent, and every segment comes over HTTP. Measured from where
     // the player was placed rather than from the window last parsed — and
     // from the window where that has since narrowed past the placement, since
     // a window that no longer reaches the playhead is one Shaka seeks forward

@@ -7,19 +7,15 @@ import {
 import { P2PLoader } from "../p2p/loader.js";
 
 export type SegmentPlaybackStatuses = {
-  isHighDemand: boolean;
   isHttpDownloadable: boolean;
   isP2PDownloadable: boolean;
 };
 
-/**
- * The three windows a queue pass schedules by, resolved to seconds: the
- * high-demand window is derived on live where none is configured (see
- * `highDemandWindowFor`), the other two are the configured values.
- */
-export type PlaybackTimeWindowsConfig = {
-  highDemandTimeWindow: number;
-} & Pick<StreamConfig, "httpDownloadTimeWindow" | "p2pDownloadTimeWindow">;
+/** The two windows a queue pass prefetches by, in seconds. */
+export type PlaybackTimeWindowsConfig = Pick<
+  StreamConfig,
+  "httpDownloadTimeWindow" | "p2pDownloadTimeWindow"
+>;
 
 export function getSegmentFromStreamsMap(
   streams: Map<string, StreamWithSegments>,
@@ -44,17 +40,9 @@ function calculateTimeWindows(
   timeWindowsConfig: PlaybackTimeWindowsConfig,
   availableMemoryInPercent: number,
 ) {
-  const {
-    highDemandTimeWindow,
-    httpDownloadTimeWindow,
-    p2pDownloadTimeWindow,
-  } = timeWindowsConfig;
+  const { httpDownloadTimeWindow, p2pDownloadTimeWindow } = timeWindowsConfig;
 
-  const result = {
-    highDemandTimeWindow,
-    httpDownloadTimeWindow,
-    p2pDownloadTimeWindow,
-  };
+  const result = { httpDownloadTimeWindow, p2pDownloadTimeWindow };
 
   if (availableMemoryInPercent <= 5) {
     result.httpDownloadTimeWindow = 0;
@@ -73,18 +61,10 @@ export function getSegmentPlaybackStatuses(
   currentP2PLoader: P2PLoader,
   availableMemoryPercent: number,
 ): SegmentPlaybackStatuses {
-  const {
-    highDemandTimeWindow,
-    httpDownloadTimeWindow,
-    p2pDownloadTimeWindow,
-  } = calculateTimeWindows(timeWindowsConfig, availableMemoryPercent);
+  const { httpDownloadTimeWindow, p2pDownloadTimeWindow } =
+    calculateTimeWindows(timeWindowsConfig, availableMemoryPercent);
 
   return {
-    isHighDemand: isSegmentInTimeWindow(
-      segment,
-      playback,
-      highDemandTimeWindow,
-    ),
     isHttpDownloadable: isSegmentInTimeWindow(
       segment,
       playback,
@@ -97,30 +77,18 @@ export function getSegmentPlaybackStatuses(
 }
 
 /**
- * Seconds from the playhead to a segment's edges, positive ahead.
- *
- * The buffer edge sits exactly `bufferAhead` in front of the playhead, so
- * subtracting it converts manifest time into distance from the playhead. Both
- * terms are differences — a manifest-space delta and a player-space duration —
- * so the offset between the two timelines cancels and never has to be known.
+ * Whether a segment lies in a window that starts at the position — the start
+ * of the segment the player requested last — and reaches `timeWindowLength`
+ * seconds of media ahead at the playback rate. Both sides are manifest time.
+ * See specs/playback-contract.md, "The time windows".
  */
-export function getDistanceFromPlayhead(
-  segment: Pick<SegmentWithStream, "startTime" | "endTime">,
-  playback: Pick<Playback, "bufferEdge" | "bufferAhead">,
-): { start: number; end: number } {
-  const { bufferEdge, bufferAhead } = playback;
-  return {
-    start: segment.startTime - bufferEdge + bufferAhead,
-    end: segment.endTime - bufferEdge + bufferAhead,
-  };
-}
-
 export function isSegmentInTimeWindow(
   segment: Pick<SegmentWithStream, "startTime" | "endTime">,
-  playback: Pick<Playback, "bufferEdge" | "bufferAhead" | "rate">,
+  playback: Playback,
   timeWindowLength: number,
 ): boolean {
-  const { start, end } = getDistanceFromPlayhead(segment, playback);
+  const start = segment.startTime - playback.position;
+  const end = segment.endTime - playback.position;
   const rightMargin = timeWindowLength * playback.rate;
   return !(rightMargin < start || 0 > end);
 }

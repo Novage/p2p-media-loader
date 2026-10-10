@@ -143,10 +143,9 @@ in turn where a test measures more than one.
   | Logger                       | Shows                                                                         |
   | ---------------------------- | ----------------------------------------------------------------------------- |
   | `p2pml-core:registry-miss`   | A player request that the registry does not know                              |
-  | `p2pml:playback-oracle`      | The core's playhead beside the media element's                                |
   | `p2pml-core:manifest`        | The registry each manifest gives                                              |
   | `p2pml-core:clock`           | Clock synchronization and re-parses of clock-based lists                      |
-  | `p2pml-core:hybrid-loader-*` | Requests, and each prefetch "as owner" or "as backup #n"                      |
+  | `p2pml-core:hybrid-loader-*` | Requests and their urgency, and each prefetch "as owner" or "as backup #n"    |
   | `p2pml-core:tracker`         | Announces, offers, answers, peers held and released                           |
   | `p2pml:diagnostics`          | Enables the ledger ([diagnostics.md](diagnostics.md)), and logs its anomalies |
   | `p2pml:diagnostics:log`      | Each open and close of a ledger record                                        |
@@ -244,8 +243,9 @@ Pass:
 - `readyState` 4 and no media error in both tabs.
 - No registry miss, except for the WebM renditions that
   [verification.md](verification.md) lists as playing without P2P.
-- The playback oracle (`p2pml:playback-oracle`) agrees with the media
-  element, as [verification.md](verification.md) describes.
+- The buffer that each request is judged by agrees with the media element's,
+  and the requests are urgent as [verification.md](verification.md),
+  "Playback contract", describes.
 - Both tabs hold a peer. In steady state, both tabs get segments over P2P,
   and the two tabs together fetch each segment over HTTP about once. Record
   each player's latency with the result: a player that plays near the live
@@ -273,14 +273,32 @@ Pass:
 
 For every engine and every VOD stream: let both tabs play for 10 seconds.
 Then seek tab A 12 times to random positions, forward and back, while tab B
-plays. Wait 1.5 to 4 seconds between seeks. Include the four seek cases in
-[playback-contract.md](playback-contract.md).
+plays. Wait 1.5 to 4 seconds between seeks. Include the seek cases in
+[playback-contract.md](playback-contract.md). Record the positions, the waits,
+the time from load to `readyState` 3, and the time each seek takes to reach
+`readyState` 3.
+
+Then compare with the same player without P2P
+([playback-contract.md](playback-contract.md), "Urgency"). Open a tab with P2P
+disabled, through the temporary demo edit of test 12, on the same stream and
+the same engine; undo the edit afterwards as test 12 says. The adapters write the same player settings whether P2P is
+on or not, so the player's parameters are the same. Load the stream, and seek
+to the same positions in the same order, with the same waits. Run this tab
+after tab A, not beside it: two tabs at once share the link. A CDN that caches
+the first run favours the second, which is the tab without P2P, so the
+comparison errs against P2P.
 
 Pass:
 
 - Each seek reaches `readyState` 3 or more within 15 seconds. Most take less
   than 5 seconds.
-- The playback oracle agrees after each seek.
+- Tab A is not slower than the tab without P2P: its time to `readyState` 3 at
+  load, and its median seek time, are at most 0.3 seconds longer. Repeat in
+  both tabs a seek that took more than 1 second longer in tab A; it fails when
+  it is that much slower again.
+- After each seek into unbuffered media, the first request at the new place is
+  urgent and starts at once, and no urgent download starts at the position the
+  player left ([verification.md](verification.md), "Playback contract").
 - Tab A gets segments from tab B over P2P at positions that B prefetched.
 - No leak.
 

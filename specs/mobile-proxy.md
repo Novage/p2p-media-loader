@@ -60,19 +60,20 @@ player, never when the player consumes them, and a player holding 30 seconds of
 buffer issues requests indistinguishable from one holding 2 seconds. A thin
 native shim around the player reports it instead:
 
-|               | ExoPlayer                                                         | AVPlayer                                                          |
-| ------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------- |
-| `bufferAhead` | `getTotalBufferedDuration()` — already the value                  | `loadedTimeRanges` + `currentTime()`, via core's `getBufferAhead` |
-| `rate`        | `playbackParameters.speed`, 0 when not playing                    | `rate`                                                            |
-| `seekCount`   | counts `onPositionDiscontinuity` with `DISCONTINUITY_REASON_SEEK` | counts `AVPlayerItem.timeJumpedNotification`                      |
+|               | ExoPlayer                                        | AVPlayer                                                          |
+| ------------- | ------------------------------------------------ | ----------------------------------------------------------------- |
+| `bufferAhead` | `getTotalBufferedDuration()` — already the value | `loadedTimeRanges` + `currentTime()`, via core's `getBufferAhead` |
+| `rate`        | `playbackParameters.speed`, 0 when not playing   | `rate`                                                            |
 
-Polled on a short interval and posted into the WebView. A seek is counted when
-the player's event fires, not polled, so one that begins and ends between two
-posts still moves the count ([playback-contract.md](playback-contract.md)).
+Polled on a short interval and posted into the WebView. Between two posts core
+ages the last one by the time since it, at its rate
+([playback-contract.md](playback-contract.md), "The age of a report").
 
-An integration that declines to wrap the player still functions: core falls back
-to inferring playback state from the request pattern, with the limits described
-in [playback-contract.md](playback-contract.md).
+An integration that declines to wrap the player still plays: core takes a
+player that never reports as one with nothing buffered, so every request that
+the store cannot serve is urgent and goes over HTTP. Such a player gets from
+peers only what prefetch puts in the store first
+([playback-contract.md](playback-contract.md)).
 
 CMCD does not remove the need for the shim on either platform, despite reaching
 the proxy in every transmission mode. AVPlayer does not emit it. ExoPlayer does,
@@ -82,10 +83,9 @@ application has passed a `CmcdConfiguration.Factory`, which means editing how it
 builds its media source. Any integration willing to do that is better served by
 the shim: it is continuous rather than one sample per request, and it knows when
 playback is paused, which CMCD structurally cannot. Reading CMCD where a host
-application has already enabled it is recorded as a proposal, with the
-measurement that would justify it
-([proposals/cmcd-playback-source.md](proposals/cmcd-playback-source.md)); it
-is not a path to a shim-free integration.
+application has already enabled it, as the report of a player that has no
+shim, is recorded as a proposal, with the measurement that would justify it
+([proposals/cmcd-playback-source.md](proposals/cmcd-playback-source.md)).
 
 ## Constraints of the environment
 

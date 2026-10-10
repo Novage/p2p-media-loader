@@ -65,12 +65,6 @@ export function utf8ToUintArray(utf8String: string): Uint8Array {
   return new TextEncoder().encode(utf8String);
 }
 
-export function* arrayBackwards<T>(arr: T[]) {
-  for (let i = arr.length - 1; i >= 0; i--) {
-    yield arr[i];
-  }
-}
-
 function isObject(item: unknown): item is Record<string, unknown> {
   return !!item && typeof item === "object" && !Array.isArray(item);
 }

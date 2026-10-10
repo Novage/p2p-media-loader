@@ -31,11 +31,11 @@ choice is made on data rather than recollection. When a proposal is adopted it
 is folded into the spec it extends and removed from the folder; when it is
 rejected it is deleted.
 
-| Proposal                                                                 | Would close                                               |
-| ------------------------------------------------------------------------ | --------------------------------------------------------- |
-| [p2p-inflight-announcements.md](proposals/p2p-inflight-announcements.md) | Duplicate HTTP fetches by backups on slow relay chains    |
-| [cmcd-playback-source.md](proposals/cmcd-playback-source.md)             | Inferred playback state where a proxied player emits CMCD |
-| [webm-cues-index.md](proposals/webm-cues-index.md)                       | No P2P for WebM `SegmentBase` representations             |
+| Proposal                                                                 | Would close                                            |
+| ------------------------------------------------------------------------ | ------------------------------------------------------ |
+| [p2p-inflight-announcements.md](proposals/p2p-inflight-announcements.md) | Duplicate HTTP fetches by backups on slow relay chains |
+| [cmcd-playback-source.md](proposals/cmcd-playback-source.md)             | No playback report where a proxied player emits CMCD   |
+| [webm-cues-index.md](proposals/webm-cues-index.md)                       | No P2P for WebM `SegmentBase` representations          |
 
 ## Keeping these current
 

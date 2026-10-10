@@ -55,7 +55,7 @@ export const HlsjsPlayer = ({
     };
     // nextLevel switches at the next fragment without flushing the buffer.
     // currentLevel flushes it and resumes at the live edge, which leaves no
-    // window ahead of the playhead for peers to fill.
+    // segments ahead of the player's buffer for peers to fill.
     const onQualityChange = () =>
       (hls.nextLevel = parseInt(qualityElement.value, 10));
 

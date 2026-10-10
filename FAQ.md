@@ -171,7 +171,6 @@ localStorage.debug = "p2pml-core:*,p2pml-hlsjs:*";
 | --------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | `p2pml-core:*`                                                        | The core: requests, downloads, peers, trackers, manifests, clock |
 | `p2pml-hlsjs:*`, `p2pml-shaka:*`, `p2pml-dashjs:*`, `p2pml-videojs:*` | Each player integration                                          |
-| `p2pml:playback-oracle`                                               | The core's playhead estimate beside the media element's time     |
 | `p2pml:diagnostics`                                                   | Turns the diagnostics ledger on, and logs its anomalies (README) |
 
 To narrow the output, name one logger, for example `localStorage.debug = 'p2pml-core:peer'`. Check the source code for all the possible log types.

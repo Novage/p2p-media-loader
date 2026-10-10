@@ -371,8 +371,8 @@ export class DashJsP2PEngine {
   /**
    * How far ahead of the playhead dash.js may fetch: a segment short of the
    * live delay, never less than a couple of segments — the rule every adapter
-   * shares. The core calls the nearer half of that buffer high-demand and
-   * leaves the farther half for peers to fill before the player asks; the
+   * shares. The core sets its urgency threshold at half of that buffer, and
+   * the other half is the time peers have to fill the player's requests; the
    * segment between the buffer and the edge is the one the registry may not
    * know yet.
    *

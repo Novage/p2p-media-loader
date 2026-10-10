@@ -65,40 +65,42 @@ export function rankForSegment(
 const ANNOUNCEMENT_ALLOWANCE_SECONDS = 0.5;
 
 /**
- * Wall-clock seconds until a segment enters the high-demand window, from its
- * distance ahead of the playhead in media seconds: what the fetch-time
- * estimate is measured in. At a rate other than 1 the two differ, and a
- * paused player's rate is the last non-zero one it had.
+ * Wall-clock seconds until a request the player has made becomes urgent: until
+ * its buffer, in media seconds, drains to the urgency threshold at the
+ * playback rate. That is what the fetch-time estimate is measured in. The
+ * rate is the last non-zero one the player reported. See
+ * specs/playback-contract.md, "Urgency".
  */
-export function wallSecondsToHighDemand(
-  distanceStart: number,
-  highDemandTimeWindow: number,
+export function secondsToUrgent(
+  bufferAhead: number,
+  urgentBufferThreshold: number,
   rate: number,
 ): number {
   const playing = rate || 1;
-  return (distanceStart - highDemandTimeWindow * playing) / playing;
+  return (bufferAhead - urgentBufferThreshold * playing) / playing;
 }
 
 /**
  * Whether a peer should fetch a segment over HTTP now.
  *
- * The owner always should. A backup should only when waiting any longer
- * would risk the fetch landing inside the player's high-demand window: it
- * steps in once the time left until then falls to a multiple of the fetch
- * time it expects. The multiple shrinks with rank — the first backup at
- * twice the fetch time, the second at one and a half, and so on towards
+ * The owner always should. A backup should only for a segment its player has
+ * requested, and only when waiting any longer would risk the request becoming
+ * urgent first: it steps in once the time left until then falls to a
+ * multiple of the fetch time it expects. The multiple shrinks with rank — the
+ * first backup at twice the fetch time, the second at one and a half, and so on towards
  * once — so backups act in order, each only when the one before it has not.
  */
 export function shouldFetchNow(params: {
   rank: number;
-  secondsToHighDemand: number;
+  /** Wall-clock seconds until the request becomes urgent; see `secondsToUrgent`. */
+  secondsLeft: number;
   estimatedFetchSeconds: number;
 }): boolean {
-  const { rank, secondsToHighDemand, estimatedFetchSeconds } = params;
+  const { rank, secondsLeft, estimatedFetchSeconds } = params;
   if (rank === 0) return true;
   const factor = 1 + 1 / rank;
   return (
-    secondsToHighDemand <=
+    secondsLeft <=
     estimatedFetchSeconds * factor + ANNOUNCEMENT_ALLOWANCE_SECONDS
   );
 }
