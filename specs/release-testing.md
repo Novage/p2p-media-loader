@@ -295,41 +295,62 @@ Pass:
   the storage limit.
 - P2P continues in both directions after the resume. No leak.
 
-### 4. Random seeks on VOD
+### 4. Seeks on VOD
 
-For every engine and every VOD stream: let both tabs play for 10 seconds.
-Then seek tab A 12 times to random positions, forward and back, while tab B
-plays. Wait 1.5 to 4 seconds between seeks. Include the seek cases in
-[playback-contract.md](playback-contract.md). Record the positions, the waits,
-the time from load to `readyState` 3, and the time each seek takes to reach
-`readyState` 3.
+A player with P2P must not seek or start slower than the same player without
+it, on the same player parameters
+([playback-contract.md](playback-contract.md), "Urgency"). For every engine and
+every VOD stream:
 
-Then compare with the same player without P2P
-([playback-contract.md](playback-contract.md), "Urgency"). Open a tab with P2P
-disabled, through the temporary demo edit of test 12, on the same stream and
-the same engine; undo the edit afterwards as test 12 says. The adapters write
-the same player settings whether P2P is on or not, so the player's parameters
-are the same. Load the stream, and seek with the same waits to positions of the
-same kinds, moved by 2% of the stream's length: the same positions would come
-from the browser's HTTP cache in the second tab. Pause tab B while tab A
-seeks, and run the tab without P2P after tab A, not beside it: tabs on one
-machine share its link. A paused peer still prefetches what it owns, so where
-tab A is slower, repeat its run with tab B closed: then tab A has no peer, and
-what is left is the core's own cost.
+1. **With P2P.** Load the stream in both tabs, in a new swarm, and let them
+   play for 10 seconds, so that tab B holds segments. Pause tab B: it still
+   gives segments over P2P, and its player's downloads stop sharing the link
+   with tab A. Then seek tab A 12 times, with waits of 1.5 to 4 seconds, by a
+   fixed plan in fractions of the stream's length that covers the seek cases
+   of [playback-contract.md](playback-contract.md), "Behaviour under seeking":
+   forward and back into unbuffered media, back inside the buffer, into an
+   earlier buffered island, to just before an island, and near the end. For
+   example: 0.30, 0.27, 0.32, 0.10, 0.30, 0.60, 0.57, 0.12, 0.90, 0.40, 0.95,
+   0.45.
+2. **Without P2P.** After step 1, not beside it, load the stream in tab A alone
+   with P2P disabled, through the temporary demo edit of test 12; undo the
+   edit when the test ends, as test 12 says. The adapters write the same player
+   settings whether P2P is on or not, so the player's parameters are the same.
+   Run the same plan with the same waits, at positions moved by 2% of the
+   stream's length: the same positions would come from the browser's HTTP
+   cache.
+3. **With tab B closed**, where tab A was slower in step 1. Move tab B to
+   another swarm, and run step 1 again in tab A, at positions moved by 4%. Tab
+   A then has no peer, and what is left is the core's own cost. On one machine
+   a paused peer still prefetches what it owns, and its downloads share the
+   machine's link with tab A; the comparison with a peer present is made on two
+   machines, in Part 2.
+
+Record the time from the change of source to `readyState` 3 (load), the time
+from each seek to `readyState` 3 with `seeking` false, whether the target was
+buffered, and the first request after each seek with its urgency
+(`p2pml-core:hybrid-loader-*`).
+
+One measurement is noisy: the network's own variation is as large as the limit.
+Where a comparison fails, repeat it before judging. Repeat a load 3 times in
+each mode, in turns. Repeat a seek that took more than 1 second longer 3 times
+in each mode, with seeks of the same kind, and with tab B closed. Judge by the
+medians of the repeats.
 
 Pass:
 
 - Each seek reaches `readyState` 3 or more within 15 seconds. Most take less
   than 5 seconds.
-- Tab A is not slower than the tab without P2P: its time to `readyState` 3 at
-  load, and its median seek time, are at most 0.3 seconds longer. Repeat in
-  both tabs a seek that took more than 1 second longer in tab A; it fails when
-  it is that much slower again.
+- The core's own cost is at most 0.3 seconds: tab A's time to `readyState` 3 at
+  load and its median seek time, in step 1, or in step 3 where step 1 was
+  slower, are at most 0.3 seconds longer than in step 2, after the repeats.
 - After each seek into unbuffered media, the first request at the new place is
-  urgent and starts at once, and no urgent download starts at the position the
-  player left ([verification.md](verification.md), "Playback contract").
-- Tab A gets segments from tab B over P2P at positions that B prefetched.
-- No leak.
+  urgent and starts at once, or the store serves it, and no urgent download
+  starts at the position the player left ([verification.md](verification.md),
+  "Playback contract").
+- In step 1, tab A gets segments from tab B over P2P. Where the two tabs did
+  not connect, run step 1 again in a new swarm.
+- No leak, no anomaly.
 
 ### 5. Playback rate on VOD
 
@@ -640,7 +661,9 @@ These need what the assistant does not have, or a judgement it cannot make.
 2. **Real networks.** Two devices on different networks, for example home
    Wi-Fi and mobile data, so that connections go through STUN and NAT. Also a
    network that blocks WebRTC, such as a strict corporate firewall: playback
-   must continue over HTTP only.
+   must continue over HTTP only. Run test 4 of Part 1 there with the peer on
+   the other device, so that its downloads do not share the measured link:
+   with a peer present, a seek and a start must be no slower than without P2P.
 3. **Mobile use.** Lock the screen, send the browser to the background, and
    move between Wi-Fi and mobile data while a stream plays. Playback and P2P
    must recover.
