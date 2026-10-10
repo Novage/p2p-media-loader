@@ -217,10 +217,15 @@ now does: it keeps three segment lengths behind the position, independent of
 any configured value. Where the effective threshold is genuinely wanted,
 `urgentBufferThresholdFor` is exported.
 
-The position a storage is told through `onPlaybackUpdated` is the start of the
-segment a player requested last, on the manifest timeline: where the player's
-buffer ends, not where its playhead is (see `specs/playback-contract.md`, "What
-the segment store receives").
+The position a storage is told through
+`onPlaybackUpdated(position, rate, streamType)` is the start of the segment the
+player requested last, on the manifest timeline: where the player's buffer
+ends, not where its playhead is. Each stream type has a position of its own,
+and the new third argument says whose it is. A storage that keeps one position
+for both types evicts the segments of the stream that lags while that stream
+still prefetches them, and fetches them again in a loop; judge each segment by
+the position of its own type, as the bundled storage does (see
+`specs/playback-contract.md`, "What the segment store receives").
 
 ### New APIs
 

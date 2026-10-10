@@ -307,32 +307,35 @@ player's requests are served from the store.
 `customSegmentStorageFactory` — so it is worth being explicit about what one is
 given.
 
-The store is told a position through `onPlaybackUpdated(position, rate)`, and
-it compares that position against the `startTime` and `endTime` it was given
-when each segment was stored. **Both sides of that comparison are manifest
-time.** The position is the start of the segment that a player requested last,
-of whichever stream requested last. The store is told at the start of a stream,
-on every player request, and on every change of the reported rate.
+The store is told a position through `onPlaybackUpdated(position, rate,
+streamType)`, and it compares that position against the `startTime` and
+`endTime` it was given when each segment was stored. **Both sides of that
+comparison are manifest time.** The position is the start of the segment that
+the player requested last, for each stream type. The store is told at the
+start of a stream, on every player request, and on every change of the
+reported rate.
+
+**Each segment is judged against its own stream type's position**, which is
+where that stream's own queue starts. One position for both types would be the
+other stream's half the time. At the start of a live DASH stream, dash.js
+filled video 12–20 s ahead of audio. Judged by video's position, the audio
+segments that the audio queue still prefetched were evicted, and fetched
+again: one peer made 300 HTTP downloads in 30 s on a window of 60 segments. A
+type that stops requesting keeps its last position, and its loader stops
+fetching with it, so what that keeps is only what it already holds.
 
 The position is where the player's buffer ends, not where the playhead is. On
 VOD the store keeps everything from the position on, and may drop the
 segments the player already holds once it is full. On live the store keeps a
 trailing window behind the position. Every peer measures it from its own last
-request, and peers at one placement request within a second or two of each
-other, so each keeps what the others still ask for. That window is three
-segments, measured in the segment's own length, and never less than fifteen
-seconds. The floor is for a skew between timelines: on live HLS without
-programme dates the main and the secondary playlist are anchored at zero on
-their own first parse, so their timelines can differ by seconds, and a segment
-of one judged against the other's position is off by that much. That skew is a
-fixed offset rather than a count of segments, and on a stream of short
-segments it would otherwise fall outside a window measured in them. Neither
-term follows the urgency threshold, which is sized for requests and can be as
-short as one segment. A position kept per stream or per type would freeze the
-moment one stream stops requesting, and retain its segments for ever, so the
-store keeps one, the latest. Both values sit on the manifest timeline, which is
-what keeps the comparison valid, and is why neither of them is
-`video.currentTime`.
+request, so each keeps what peers a little behind it still ask for. That
+window is three segments, measured in the segment's own length, and never less
+than fifteen seconds: on a stream of short segments three of them are a few
+seconds, less than peers' positions can differ by — a peer that started a
+little later, or stalled once. Neither term follows the urgency threshold,
+which is sized for requests and can be as short as one segment. Both values
+sit on the manifest timeline, which is what keeps the comparison valid, and is
+why neither of them is `video.currentTime`.
 
 The store is also told, through `onSegmentsRemoved`, when a refreshed manifest
 no longer lists segments of a stream: a live window has moved past them.

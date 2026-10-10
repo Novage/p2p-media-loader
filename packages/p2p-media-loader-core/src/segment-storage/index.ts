@@ -33,8 +33,17 @@ export interface SegmentStorage {
    * segment store receives"). Told at the start of a stream, on every player
    * request, and on every change of the reported rate.
    * @param rate The playback rate: the last non-zero one reported, or 1.
+   * @param streamType The type of the stream that requested: each type has a
+   * position of its own, and a storage that keeps one for both evicts the
+   * segments of the stream that lags while that stream's queue still wants
+   * them — see specs/playback-contract.md, "What the segment store
+   * receives".
    */
-  onPlaybackUpdated(position: number, rate: number): void;
+  onPlaybackUpdated(
+    position: number,
+    rate: number,
+    streamType: StreamType,
+  ): void;
 
   /**
    * Provides the storage with information about a segment requested by the player.

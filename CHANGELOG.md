@@ -139,7 +139,9 @@ throughout.
   keeps fetching its share for its peers, as the election needs, and its
   storage kept every segment after its frozen position: on one stream with one
   peer, 9.5 MiB in a 45 s pause, bounded only by the storage brake. It is now
-  bounded by the live window. See
+  bounded by the live window. The storage is also told each stream type's
+  position, as a third argument of `onPlaybackUpdated`, and the memory storage
+  judges each segment by its own type's position. See
   [`specs/playback-contract.md`](specs/playback-contract.md), "What the segment
   store receives".
 - **`bitrate` enters a stream's identity only where a manifest needs it** to

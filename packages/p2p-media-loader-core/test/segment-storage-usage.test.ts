@@ -26,7 +26,7 @@ async function createStorage(
   segmentSeconds = 10,
 ) {
   const storage = await initStorage(streamConfig);
-  storage.onPlaybackUpdated(0, 1);
+  storage.onPlaybackUpdated(0, 1, "main");
 
   for (let index = 0; index < 3; index++) {
     const startTime = index * segmentSeconds;
@@ -60,7 +60,7 @@ describe("SegmentMemoryStorage usage reporting", () => {
 
     // Past the first segment by more than three of its lengths, and past the
     // second by less: the second one stays, so it occupies capacity.
-    storage.onPlaybackUpdated(45, 1);
+    storage.onPlaybackUpdated(45, 1, "main");
 
     expect(storage.getUsage()).toEqual({
       totalCapacity: 1,
@@ -71,7 +71,7 @@ describe("SegmentMemoryStorage usage reporting", () => {
   it("counts only what is ahead of the playhead on demand streams", async () => {
     const storage = await createStorage(false);
 
-    storage.onPlaybackUpdated(28, 1);
+    storage.onPlaybackUpdated(28, 1, "main");
 
     expect(storage.getUsage()).toEqual({
       totalCapacity: 1,
@@ -87,7 +87,7 @@ describe("SegmentMemoryStorage usage reporting", () => {
 
     // Ten seconds past the end of the first segment: inside the floor, so
     // all three are still held.
-    storage.onPlaybackUpdated(12, 1);
+    storage.onPlaybackUpdated(12, 1, "main");
 
     expect(storage.getUsage()).toEqual({
       totalCapacity: 1,
@@ -100,7 +100,7 @@ describe("SegmentMemoryStorage usage reporting", () => {
     // segment; retention behind the position does not follow it.
     const storage = await createStorage(true, { urgentBufferThreshold: 1 });
 
-    storage.onPlaybackUpdated(45, 1);
+    storage.onPlaybackUpdated(45, 1, "main");
 
     expect(storage.getUsage()).toEqual({
       totalCapacity: 1,
@@ -110,7 +110,7 @@ describe("SegmentMemoryStorage usage reporting", () => {
 
   it("reports as occupied exactly what eviction leaves behind", async () => {
     const storage = await createStorage(true);
-    storage.onPlaybackUpdated(45, 1);
+    storage.onPlaybackUpdated(45, 1, "main");
 
     const before = storage.getUsage().usedCapacity;
 
@@ -169,7 +169,7 @@ describe("SegmentMemoryStorage dropping what a manifest stopped listing", () => 
     // A paused live player: the playhead is behind all three, so the
     // trailing window would keep every one of them.
     const storage = await createStorage(true);
-    storage.onPlaybackUpdated(0, 1);
+    storage.onPlaybackUpdated(0, 1, "main");
     const changed: string[] = [];
     storage.setSegmentChangeCallback((streamSwarmId) =>
       changed.push(streamSwarmId),
@@ -197,5 +197,54 @@ describe("SegmentMemoryStorage dropping what a manifest stopped listing", () => 
       0, 1, 2,
     ]);
     expect(changed).toEqual([]);
+  });
+});
+
+describe("SegmentMemoryStorage positions by stream type", () => {
+  it("judges each segment by its own stream type's position", async () => {
+    // A live DASH start: dash.js fills video 20 s ahead of audio. Audio
+    // segments ahead of audio's own position are still in the audio queue;
+    // judged by video's position, they were evicted and fetched again, over
+    // and over.
+    const storage = await initStorage();
+    const AUDIO = "v3-swarm-secondary-hash";
+    const store = async (
+      streamSwarmId: string,
+      type: "main" | "secondary",
+      index: number,
+    ) => {
+      storage.onSegmentRequested(
+        SWARM_ID,
+        streamSwarmId,
+        index,
+        index * 2,
+        index * 2 + 2,
+        type,
+        true,
+      );
+      await storage.storeSegment(
+        SWARM_ID,
+        streamSwarmId,
+        index,
+        new ArrayBuffer(16),
+        index * 2,
+        index * 2 + 2,
+        type,
+        true,
+      );
+    };
+    storage.onPlaybackUpdated(0, 1, "secondary");
+    for (let i = 0; i < 4; i++) await store(AUDIO, "secondary", i);
+
+    // Video's request is 40 s ahead of audio's.
+    storage.onPlaybackUpdated(40, 1, "main");
+    await store(STREAM_SWARM_ID, "main", 20);
+
+    expect(storage.getStoredSegmentIds(SWARM_ID, AUDIO)).toEqual([0, 1, 2, 3]);
+
+    // Audio's own position moves on: its old segments leave in turn.
+    storage.onPlaybackUpdated(40, 1, "secondary");
+    await store(AUDIO, "secondary", 20);
+    expect(storage.getStoredSegmentIds(SWARM_ID, AUDIO)).toEqual([20]);
   });
 });

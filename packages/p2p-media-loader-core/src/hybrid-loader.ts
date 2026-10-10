@@ -971,6 +971,7 @@ export class HybridLoader {
         this.segmentStorage.onPlaybackUpdated(
           this.lastRequestedSegment.startTime,
           this.playbackTracker.rate(),
+          this.lastRequestedSegment.stream.type,
         ),
     ])) {
       this.logger("the storage refused the position: %O", failure);

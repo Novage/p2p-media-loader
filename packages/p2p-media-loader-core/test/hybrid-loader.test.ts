@@ -853,15 +853,15 @@ describe("HybridLoader: a stored segment that reads back empty", () => {
       ...emptyStorage,
       onPlaybackUpdated,
     } as unknown as SegmentStorage);
-    expect(onPlaybackUpdated.mock.calls).toEqual([[0, 1]]);
+    expect(onPlaybackUpdated.mock.calls).toEqual([[0, 1, "main"]]);
 
     await loader.loadSegment(segment(3), callbacks);
     await flush();
-    expect(onPlaybackUpdated.mock.calls.at(-1)).toEqual([12, 1]);
+    expect(onPlaybackUpdated.mock.calls.at(-1)).toEqual([12, 1, "main"]);
 
     // A change of the rate to size by is told too; a pause is not one.
     loader.updatePlayback({ bufferAhead: 5, rate: 2 });
-    expect(onPlaybackUpdated.mock.calls.at(-1)).toEqual([12, 2]);
+    expect(onPlaybackUpdated.mock.calls.at(-1)).toEqual([12, 2, "main"]);
     const told = onPlaybackUpdated.mock.calls.length;
     loader.updatePlayback({ bufferAhead: 5, rate: 0 });
     expect(onPlaybackUpdated.mock.calls.length).toBe(told);
@@ -1018,7 +1018,7 @@ describe("HybridLoader: seeks and re-requests", () => {
     state.httpStarted.length = 0;
     await loader.loadSegment(segment(2), callbacks);
     await flush();
-    expect(onPlaybackUpdated.mock.calls.at(-1)).toEqual([8, 1]);
+    expect(onPlaybackUpdated.mock.calls.at(-1)).toEqual([8, 1, "main"]);
     expect(state.httpStarted).toContain("seg-2");
     loader.destroy();
   });
