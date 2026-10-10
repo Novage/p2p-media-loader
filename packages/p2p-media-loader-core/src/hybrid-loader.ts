@@ -482,19 +482,25 @@ export class HybridLoader {
       (request?.failedAttempts.httpAttemptsCount ?? 0) < httpErrorRetries;
 
     if (request?.status === "loading") {
-      if (
-        urgent &&
-        request.downloadSource === "p2p" &&
-        canLoadThroughHttp &&
-        this.freeSlotFor(segment, "http")
-      ) {
+      if (!urgent) return;
+      if (request.downloadSource === "http") {
+        // Already coming over HTTP — perhaps fetched as the owner's prefetch
+        // before it was urgent: it has the link to itself from now on.
+        this.yieldHttpPrefetchTo(segment);
+      } else if (canLoadThroughHttp) {
         request.cancel();
+        this.yieldHttpPrefetchTo(segment);
         this.loadThroughHttp(segment);
       }
       return;
     }
     if (request?.status === "succeed") return;
 
+    if (urgent && canLoadThroughHttp) {
+      this.yieldHttpPrefetchTo(segment);
+      this.loadThroughHttp(segment);
+      return;
+    }
     const startNow =
       urgent ||
       p2pLoader.connectedPeerCount === 0 ||
@@ -514,6 +520,46 @@ export class HybridLoader {
     ) {
       this.loadThroughP2P(segment);
     }
+  }
+
+  /**
+   * Gives the link to an urgent request: stops every HTTP download of this
+   * loader that is not for `segment`. An owner's prefetch keeps its HTTP slots
+   * busy, and beside it the player's request downloads slower than it would
+   * without P2P. P2P downloads go on — they are what P2P is for, and a peer's
+   * upload rarely fills a viewer's link. See specs/playback-contract.md,
+   * "Urgency".
+   */
+  private yieldHttpPrefetchTo(segment: SegmentWithStream) {
+    for (const request of this.requests.items()) {
+      if (
+        request.downloadSource !== "http" ||
+        request.status !== "loading" ||
+        request.segment === segment
+      ) {
+        continue;
+      }
+      request.cancel();
+      diagnostics?.count("Prefetch:yielded-to-urgent");
+      this.logger(
+        `stopped ${LoggerUtils.getSegmentString(request.segment)} for the urgent ${LoggerUtils.getSegmentString(segment)}`,
+      );
+    }
+  }
+
+  /**
+   * Whether the player's urgent request is downloading over HTTP: the HTTP
+   * prefetch then starts nothing until it ends.
+   */
+  private isUrgentRequestOnHttp(): boolean {
+    const { engineRequest } = this;
+    if (engineRequest?.status !== "pending") return false;
+    const request = this.requests.get(engineRequest.segment);
+    return (
+      request?.status === "loading" &&
+      request.downloadSource === "http" &&
+      this.isUrgent()
+    );
   }
 
   /** Whether a slot of `source` is free for `segment`, freeing one if not. */
@@ -617,6 +663,8 @@ export class HybridLoader {
       performance.now() - this.createdAt < httpDownloadInitialTimeoutMs;
 
     if (isInitialHttpWait) return;
+    // An urgent request has the link to itself while it downloads.
+    if (this.isUrgentRequestOnHttp()) return;
 
     // Nothing to elect without peers — checked before measuring the storage,
     // which walks the whole segment cache.

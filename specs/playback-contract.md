@@ -148,10 +148,14 @@ bufferAhead now < urgentBufferThreshold × rate
 A paused player with an empty buffer still has a request that is urgent: a
 paused player that asks for media wants its first frame.
 
-- **An urgent request** is fetched over HTTP at once. If every HTTP slot is in
-  use, the HTTP prefetch download furthest ahead stops and gives its slot to
-  the request. A P2P download of the request that is under way moves to HTTP.
-  Where HTTP is not allowed — during `httpDownloadInitialTimeoutMs`, or once
+- **An urgent request** is fetched over HTTP at once, and has the link to
+  itself: every other HTTP download of its stream stops, and the HTTP prefetch
+  starts nothing until the request is delivered. An owner's prefetch keeps
+  its HTTP slots busy, and an HTTP download from a CDN can fill a viewer's
+  link, so beside it the player's request downloads slower than it would
+  without P2P. P2P downloads go on: they are what P2P is for, and a peer's
+  upload rarely fills a viewer's link. A P2P download of the request that is
+  under way moves to HTTP. Where HTTP is not allowed — during `httpDownloadInitialTimeoutMs`, or once
   the request's HTTP attempts are spent — it is taken from a peer that has it,
   and takes a P2P slot from prefetch the same way.
 - **A request that is not urgent** is fetched from a peer that has the
@@ -175,8 +179,9 @@ region where the player was, not where it is.
 parameters.** Without P2P, the player fetches each request over HTTP as soon as
 it makes it; how many requests it makes, and when, its own parameters decide.
 An urgent request does the same: it waits for no slot, no peer and no window.
-A request that is not urgent may wait for P2P, but only while the buffer is
-above the threshold, so playback does not suffer from the wait. Core does not
+It does not share the link with the core's own HTTP prefetch either. A request
+that is not urgent may wait for P2P, but only while the buffer is above the
+threshold, so playback does not suffer from the wait. Core does not
 try to be faster than the player alone, for example by fetching over HTTP, for
 itself, segments its player has not asked for: that spends the HTTP bytes P2P
 exists to save. Such a segment comes over HTTP only through the election, once

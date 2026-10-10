@@ -83,6 +83,13 @@ The election is evaluated on every queue pass, and a queue pass runs on every
 playlist refresh, so the owner begins fetching when the segment appears rather
 than on a timer.
 
+An owner's prefetch gives way to its own player. While the player's urgent
+request downloads over HTTP, the peer's other HTTP downloads stop and no
+prefetch starts ([playback-contract.md](playback-contract.md), "Urgency"); the
+owner fetches what it owns once the request is delivered. Its neighbours wait
+a little longer for those segments, and their backups cover a delay that would
+reach their own players.
+
 ## Backups
 
 A non-owner does not wait forever, and it does not wait by the clock. The

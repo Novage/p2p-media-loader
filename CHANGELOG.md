@@ -98,7 +98,9 @@ throughout.
   within the high-demand window ahead of the playhead was fetched over HTTP,
   whether the player had asked for it or not. A player with P2P is now never
   slower than without it, on the same player parameters, and never faster at
-  the cost of HTTP bytes. The core needs no seek detection: after a seek, the
+  the cost of HTTP bytes. An urgent request also has the link to itself: the
+  peer's HTTP prefetch stops while it downloads, so that the owner's
+  prefetch does not slow it down. The core needs no seek detection: after a seek, the
   player's first request at the new place is urgent because its buffer is
   empty there, and nothing at the place it left is urgent. Backups in the
   prefetch election act only on the segment their own player has requested.

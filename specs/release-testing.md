@@ -307,12 +307,15 @@ the time from load to `readyState` 3, and the time each seek takes to reach
 Then compare with the same player without P2P
 ([playback-contract.md](playback-contract.md), "Urgency"). Open a tab with P2P
 disabled, through the temporary demo edit of test 12, on the same stream and
-the same engine; undo the edit afterwards as test 12 says. The adapters write the same player settings whether P2P is
-on or not, so the player's parameters are the same. Load the stream, and seek
-to the same positions in the same order, with the same waits. Run this tab
-after tab A, not beside it: two tabs at once share the link. A CDN that caches
-the first run favours the second, which is the tab without P2P, so the
-comparison errs against P2P.
+the same engine; undo the edit afterwards as test 12 says. The adapters write
+the same player settings whether P2P is on or not, so the player's parameters
+are the same. Load the stream, and seek with the same waits to positions of the
+same kinds, moved by 2% of the stream's length: the same positions would come
+from the browser's HTTP cache in the second tab. Pause tab B while tab A
+seeks, and run the tab without P2P after tab A, not beside it: tabs on one
+machine share its link. A paused peer still prefetches what it owns, so where
+tab A is slower, repeat its run with tab B closed: then tab A has no peer, and
+what is left is the core's own cost.
 
 Pass:
 

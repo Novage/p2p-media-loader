@@ -256,25 +256,28 @@ describe("HybridLoader: making room for an urgent request", () => {
     vi.unstubAllGlobals();
   });
 
-  it("takes the HTTP slot of the download furthest ahead, keeping nearer ones", async () => {
-    const { loader, segment, callbacks, startLoading, status, state } = setup();
-    // Two HTTP downloads further down the queue already hold the one slot
-    // (the container counts them both; the limit only gates new starts).
+  it("stops every other HTTP download, so it has the link to itself", async () => {
+    // The owner's prefetch shared the link with the urgent request and made
+    // a seek slower than without P2P.
+    const prefetchStopped = count("Prefetch:yielded-to-urgent");
+    const { loader, segment, callbacks, startLoading, status, state } = setup({
+      simultaneousHttpDownloads: 3,
+    });
     startLoading(5, "http");
     startLoading(8, "http");
 
     await loader.loadSegment(segment(0), callbacks);
     await flush();
 
-    expect(state.httpAborted).toEqual(["seg-8"]);
+    expect(state.httpAborted.sort()).toEqual(["seg-5", "seg-8"]);
+    expect(status(5)).toBe("aborted");
     expect(status(8)).toBe("aborted");
-    expect(status(5)).toBe("loading");
     expect(state.httpStarted).toEqual(["seg-0"]);
-    expect(status(0)).toBe("loading");
+    expect(count("Prefetch:yielded-to-urgent")).toBe(prefetchStopped + 2);
     loader.destroy();
   });
 
-  it("only aborts downloads of the source it needs a slot for", async () => {
+  it("leaves P2P downloads alone", async () => {
     const { loader, segment, callbacks, startLoading, status, state } = setup();
     startLoading(5, "http");
     startLoading(8, "p2p"); // last in the queue, but the wrong kind
@@ -326,10 +329,13 @@ describe("HybridLoader: making room for an urgent request", () => {
     loader.destroy();
   });
 
-  it("does not abort anything while a slot is free", async () => {
+  it("stops nothing for a request that is not urgent", async () => {
+    // No peer is connected, so the request starts at once all the same; with
+    // a full buffer it is not urgent, and the free slot is enough.
     const { loader, segment, callbacks, startLoading, status, state } = setup({
       simultaneousHttpDownloads: 2,
     });
+    loader.updatePlayback({ bufferAhead: 10, rate: 1 });
     startLoading(8, "http");
 
     await loader.loadSegment(segment(0), callbacks);
@@ -338,6 +344,27 @@ describe("HybridLoader: making room for an urgent request", () => {
     expect(state.httpAborted).toEqual([]);
     expect(status(8)).toBe("loading");
     expect(state.httpStarted).toEqual(["seg-0"]);
+    loader.destroy();
+  });
+
+  it("starts no HTTP prefetch while the urgent request downloads, and resumes after", async () => {
+    // A peer is connected, so the pass ends with the owner's prefetch.
+    fakes.state.peerCount = 1;
+    const { loader, segment, callbacks, state } = setup({
+      simultaneousHttpDownloads: 3,
+    });
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+    loader.updateStream(segment(0).stream);
+    await flush();
+    expect(state.httpStarted).toEqual(["seg-0"]);
+
+    const controls = state.httpControls.get("seg-0")!;
+    controls.addLoadedChunk(new Uint8Array(16));
+    controls.completeOnSuccess();
+    await flush();
+    expect(state.httpStarted.length).toBeGreaterThan(1);
     loader.destroy();
   });
 });
@@ -687,12 +714,13 @@ describe("HybridLoader: a stored segment that reads back empty", () => {
     // in flight. Filed under the new rendition's identity, its bytes would be
     // served to the player, and to peers, as the new rendition's segment.
     const storeSegment = vi.fn(() => Promise.resolve());
-    // A second slot, so the new rendition's urgent request takes none from
-    // the download in flight.
+    // A second slot, and a full buffer: the new rendition's request is not
+    // urgent, so it leaves the download in flight alone.
     const { loader, segment, callbacks, state } = setup(
       { simultaneousHttpDownloads: 2 },
       { ...emptyStorage, storeSegment } as unknown as SegmentStorage,
     );
+    loader.updatePlayback({ bufferAhead: 10, rate: 1 });
     const previous = segment(0).stream;
     const controls = state.requests
       .getOrCreateRequest(segment(1))
