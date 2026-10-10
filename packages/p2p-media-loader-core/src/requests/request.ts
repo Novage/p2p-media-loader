@@ -1,9 +1,7 @@
+import { diagnostics, type DiagnosticsToken } from "../diagnostics.js";
 import debug from "debug";
-import {
-  BandwidthCalculators,
-  Playback,
-  SegmentWithStream,
-} from "../internal-types.js";
+import { BandwidthCalculators, SegmentWithStream } from "../internal-types.js";
+import type { BandwidthDownload } from "../bandwidth-calculator.js";
 import {
   CoreEventMap,
   RequestError,
@@ -11,12 +9,13 @@ import {
   RequestErrorType,
   Segment,
 } from "../types.js";
-import * as StreamUtils from "../utils/stream.js";
 import * as Utils from "../utils/utils.js";
 import { EventTarget } from "../utils/event-target.js";
 
 export type LoadProgress = {
   startTimestamp: number;
+  /** When the response's headers arrived; HTTP only. */
+  responseTimestamp?: number;
   lastLoadedChunkTimestamp?: number;
   startFromByte?: number;
   loadedBytes: number;
@@ -36,8 +35,8 @@ type P2PRequestAttempt = {
 export type RequestAttempt = HttpRequestAttempt | P2PRequestAttempt;
 
 export type RequestControls = Readonly<{
-  firstBytesReceived: Request["firstBytesReceived"];
   addLoadedChunk: Request["addLoadedChunk"];
+  startResponse: Request["startResponse"];
   completeOnSuccess: Request["completeOnSuccess"];
   failWithError: Request["failWithError"];
 }>;
@@ -72,11 +71,17 @@ export class Request {
   private _totalBytes?: number;
   private _status: RequestStatus = "not-started";
   private progress?: LoadProgress;
+  /** The attempt under way, as the shared bandwidth calculators measure it. */
+  private bandwidthDownloads?: {
+    all: BandwidthDownload;
+    http?: BandwidthDownload;
+  };
   private notReceivingBytesTimeout: Timeout;
   private _onAbortCallback?: (
     error: RequestError<RequestAbortErrorType>,
   ) => void;
   private notReceivingBytesTimeoutMs?: number;
+  private firstByteTimeoutMs?: number;
   private readonly _logger: debug.Debugger;
   private _isHandledByProcessQueue = false;
   private readonly onSegmentError: CoreEventMap["onSegmentError"];
@@ -88,8 +93,6 @@ export class Request {
     readonly segment: SegmentWithStream,
     private readonly requestProcessQueueCallback: () => void,
     private readonly bandwidthCalculators: BandwidthCalculators,
-    private readonly playback: Playback,
-    private readonly playbackConfig: StreamUtils.PlaybackTimeWindowsConfig,
     eventTarget: EventTarget<CoreEventMap>,
     readonly infoHash: string,
   ) {
@@ -120,7 +123,21 @@ export class Request {
     return this._status;
   }
 
+  /** The download attempt under way: open from `loading` until it settles. */
+  private downloadToken?: DiagnosticsToken;
+
   private setStatus(status: RequestStatus) {
+    if (
+      this._status === "loading" &&
+      status !== "loading" &&
+      this.downloadToken
+    ) {
+      diagnostics?.close(this.downloadToken, status);
+      diagnostics?.count(
+        `Download:${this.currentAttempt?.downloadSource ?? "?"}:${status}`,
+      );
+      this.downloadToken = undefined;
+    }
     this._status = status;
     this._isHandledByProcessQueue = false;
   }
@@ -180,6 +197,7 @@ export class Request {
     requestData: StartRequestParameters,
     controls: {
       notReceivingBytesTimeoutMs?: number;
+      firstByteTimeoutMs?: number;
       onAbort: (errorType: RequestError<RequestAbortErrorType>) => void;
     },
     validate:
@@ -278,6 +296,12 @@ export class Request {
     requestData: StartRequestParameters,
     controls: {
       notReceivingBytesTimeoutMs?: number;
+      /**
+       * How long to wait for the response to start, where the source has
+       * a response that starts — HTTP's headers. Until `startResponse`,
+       * this limit applies in place of `notReceivingBytesTimeoutMs`.
+       */
+      firstByteTimeoutMs?: number;
       onAbort: (errorType: RequestError<RequestAbortErrorType>) => void;
     },
   ): RequestControls {
@@ -294,6 +318,10 @@ export class Request {
 
     this.setStatus("loading");
     this.currentAttempt = { ...requestData };
+    this.downloadToken = diagnostics?.open(
+      `Download:${requestData.downloadSource}`,
+      String(this.segment.externalId),
+    );
     this.progress = {
       startFromByte: this._loadedBytes,
       loadedBytes: 0,
@@ -301,13 +329,13 @@ export class Request {
     };
     this.manageBandwidthCalculatorsState("start");
 
-    const { notReceivingBytesTimeoutMs } = controls;
+    const { notReceivingBytesTimeoutMs, firstByteTimeoutMs } = controls;
     this._onAbortCallback = controls.onAbort;
     this.notReceivingBytesTimeoutMs = notReceivingBytesTimeoutMs;
+    this.firstByteTimeoutMs = firstByteTimeoutMs;
 
-    if (notReceivingBytesTimeoutMs !== undefined) {
-      this.notReceivingBytesTimeout.start(notReceivingBytesTimeoutMs);
-    }
+    const timeoutMs = firstByteTimeoutMs ?? notReceivingBytesTimeoutMs;
+    if (timeoutMs !== undefined) this.notReceivingBytesTimeout.start(timeoutMs);
 
     this.logger(
       `${requestData.downloadSource} ${this.segment.externalId} started`,
@@ -323,12 +351,27 @@ export class Request {
     });
 
     return {
-      firstBytesReceived: this.firstBytesReceived,
       addLoadedChunk: this.addLoadedChunk,
+      startResponse: this.startResponse,
       completeOnSuccess: this.completeOnSuccess,
       failWithError: this.failWithError,
     };
   }
+
+  /**
+   * The response has started: its headers arrived. From here on the wait is
+   * for bytes, under `notReceivingBytesTimeoutMs`, counted from now.
+   */
+  private startResponse = () => {
+    this.throwErrorIfNotLoadingStatus();
+    if (!this.progress) return;
+    this.progress.responseTimestamp = performance.now();
+    if (this.notReceivingBytesTimeoutMs === undefined) {
+      this.notReceivingBytesTimeout.clear();
+    } else {
+      this.notReceivingBytesTimeout.restart(this.notReceivingBytesTimeoutMs);
+    }
+  };
 
   cancel() {
     this.throwErrorIfNotLoadingStatus();
@@ -354,24 +397,28 @@ export class Request {
 
   private abortOnTimeout = () => {
     this.throwErrorIfNotLoadingStatus();
-    if (
-      !this.currentAttempt ||
-      !this.progress ||
-      this.notReceivingBytesTimeoutMs === undefined
-    ) {
-      return;
-    }
+    if (!this.currentAttempt || !this.progress) return;
+
+    // Until the response starts, the wait is for it, under its own limit.
+    const { responseTimestamp, lastLoadedChunkTimestamp, startTimestamp } =
+      this.progress;
+    const waitingForResponse =
+      this.firstByteTimeoutMs !== undefined &&
+      responseTimestamp === undefined &&
+      lastLoadedChunkTimestamp === undefined;
+    const limitMs = waitingForResponse
+      ? this.firstByteTimeoutMs
+      : this.notReceivingBytesTimeoutMs;
+    if (limitMs === undefined) return;
 
     const now = performance.now();
     const lastActive =
-      this.progress.lastLoadedChunkTimestamp ?? this.progress.startTimestamp;
+      lastLoadedChunkTimestamp ?? responseTimestamp ?? startTimestamp;
     const msSinceLastActive = now - lastActive;
 
-    if (msSinceLastActive < this.notReceivingBytesTimeoutMs) {
+    if (msSinceLastActive < limitMs) {
       // False alarm! The stream is still downloading. Reschedule the timer.
-      this.notReceivingBytesTimeout.restart(
-        this.notReceivingBytesTimeoutMs - msSinceLastActive,
-      );
+      this.notReceivingBytesTimeout.restart(limitMs - msSinceLastActive);
       return;
     }
 
@@ -445,20 +492,17 @@ export class Request {
     if (!this.currentAttempt || !this.progress) return;
 
     const { byteLength } = chunk;
-    const { all: allBC, http: httpBC } = this.bandwidthCalculators;
-    allBC.addBytes(byteLength);
-    if (this.currentAttempt.downloadSource === "http") {
-      httpBC.addBytes(byteLength);
+    const downloads = this.bandwidthDownloads;
+    if (downloads) {
+      const { all: allBC, http: httpBC } = this.bandwidthCalculators;
+      allBC.addBytes(downloads.all, byteLength);
+      if (downloads.http) httpBC.addBytes(downloads.http, byteLength);
     }
 
     this.bytes.push(chunk);
     this.progress.lastLoadedChunkTimestamp = performance.now();
     this.progress.loadedBytes += byteLength;
     this._loadedBytes += byteLength;
-  };
-
-  private firstBytesReceived = () => {
-    this.throwErrorIfNotLoadingStatus();
   };
 
   private throwErrorIfNotLoadingStatus() {
@@ -476,9 +520,21 @@ export class Request {
 
   private manageBandwidthCalculatorsState(state: "start" | "stop") {
     const { all, http } = this.bandwidthCalculators;
-    const method = state === "start" ? "startLoading" : "stopLoading";
-    if (this.currentAttempt?.downloadSource === "http") http[method]();
-    all[method]();
+    if (state === "start") {
+      this.bandwidthDownloads = {
+        all: all.startLoading(),
+        http:
+          this.currentAttempt?.downloadSource === "http"
+            ? http.startLoading()
+            : undefined,
+      };
+      return;
+    }
+    const downloads = this.bandwidthDownloads;
+    this.bandwidthDownloads = undefined;
+    if (!downloads) return;
+    all.stopLoading(downloads.all);
+    if (downloads.http) http.stopLoading(downloads.http);
   }
 }
 

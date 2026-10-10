@@ -26,7 +26,7 @@
     "ecdn",
     "cdn"
   ],
-  "version": "4.0.0",
+  "version": "5.0.0",
   "files": [
     "dist",
     "lib",
@@ -34,19 +34,34 @@
   ],
   "exports": {
     ".": "./src/index.ts",
-    "./server": "./src/server.ts"
+    "./hls": "./src/hls.ts",
+    "./dash": "./src/dash.ts",
+    "./server": "./src/server.ts",
+    "./shims/xmldom": "./src/manifest/shims/dom-parser.ts"
   },
   "types": "./src/index.ts",
   "publishConfig": {
     "exports": {
       ".": {
         "types": "./lib/index.d.ts",
-        "p2pml:core-as-bundle": "./dist/p2p-media-loader-core.es.js",
         "import": "./lib/index.js"
+      },
+      "./hls": {
+        "types": "./lib/hls.d.ts",
+        "import": "./lib/hls.js"
+      },
+      "./dash": {
+        "types": "./lib/dash.d.ts",
+        "import": "./lib/dash.js"
       },
       "./server": {
         "types": "./lib/server.d.ts",
         "import": "./lib/server.js"
+      },
+      "./shims/xmldom": {
+        "types": "./lib/manifest/shims/dom-parser.d.ts",
+        "import": "./lib/manifest/shims/dom-parser.js",
+        "default": "./lib/manifest/shims/dom-parser.js"
       }
     },
     "types": "./lib/index.d.ts"
@@ -55,9 +70,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "rimraf lib build && pnpm build:es && pnpm build:esm && pnpm build:esm-min",
-    "build:esm": "vite build --mode esm",
-    "build:esm-min": "vite build --mode esm-min",
+    "build": "rimraf lib dist build && pnpm build:es && pnpm build:esm && pnpm build:esm-min",
+    "build:esm": "vite build --mode esm && vite build --mode esm-hls && vite build --mode esm-dash",
+    "build:esm-min": "vite build --mode esm-min && vite build --mode esm-hls-min && vite build --mode esm-dash-min",
     "build:es": "tsc",
     "prettier": "prettier --write .",
     "lint": "eslint src --report-unused-disable-directives --max-warnings 0 --flag unstable_native_nodejs_ts_config",
@@ -68,9 +83,12 @@
   },
   "dependencies": {
     "@types/debug": "^4.1.13",
-    "debug": "^4.4.3"
+    "@videojs/vhs-utils": "^4.1.2",
+    "debug": "^4.4.3",
+    "m3u8-parser": "^7.2.0",
+    "mpd-parser": "^1.4.0"
   },
   "devDependencies": {
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.3"
   }
 }

@@ -1,3 +1,4 @@
+import { diagnostics, type DiagnosticsToken } from "../diagnostics.js";
 import { Peer } from "./peer.js";
 import { CoreEventMap, PeerError, StreamConfig } from "../types.js";
 import { SegmentWithStream, StreamWithSegments } from "../internal-types.js";
@@ -29,6 +30,8 @@ export class P2PLoader {
   readonly #webTorrentSocketPool: WebTorrentSocketPool;
   readonly #eventTarget: EventTarget<EventTargetMap>;
   readonly #onSegmentAnnouncement: () => void;
+  readonly #diagnosticsToken: DiagnosticsToken | undefined;
+  readonly #unprobePeers: (() => void) | undefined;
   #churnCleanupTimeoutId?: ReturnType<typeof setTimeout>;
 
   readonly #onPeerConnect: CoreEventMap["onPeerConnect"];
@@ -136,6 +139,16 @@ export class P2PLoader {
     );
 
     this.#webtorrentManager.start();
+    // Must equal the manager's PeersHeld: a peer held there and not wrapped
+    // here is connected and never used.
+    this.#unprobePeers = diagnostics?.probe(
+      `PeersWrapped:${this.#stream.infoHash.slice(0, 8)}`,
+      () => this.#peersMap.size,
+    );
+    this.#diagnosticsToken = diagnostics?.open(
+      "P2PLoader",
+      this.#stream.streamSwarmId.slice(-12),
+    );
 
     this.#churnCleanupTimeoutId = setTimeout(
       this.#churnCleanup,
@@ -229,6 +242,10 @@ export class P2PLoader {
       if (peer.getSegmentStatus(segment) === "loaded") return true;
     }
     return false;
+  }
+
+  get connectedPeerIds(): IterableIterator<string> {
+    return this.#peersMap.keys();
   }
 
   get connectedPeerCount() {
@@ -425,7 +442,18 @@ export class P2PLoader {
     const peerClosedWhileAwait = !this.#peersMap.has(peer.id);
     if (peerClosedWhileAwait) return;
 
-    if (!segmentData) {
+    if (!segmentData || segmentData.byteLength === 0) {
+      if (segmentData) {
+        // Storage handed back a segment with no bytes. Core owns what it
+        // stores and never lets a consumer touch it, so this can only be a
+        // storage implementation that does not — most likely one whose buffer
+        // was detached by a player transmuxing it. Say the segment is absent
+        // rather than pass the defect on, and say so loudly: silently seeding
+        // nothing looks exactly like having no peers.
+        this.#webtorrentManagerLogger(
+          `refusing to upload empty segment ${segmentExternalId} to peer ${peer.id}: segment storage returned no bytes`,
+        );
+      }
       peer.sendSegmentAbsentCommand(segmentExternalId, requestId);
       return;
     }
@@ -439,6 +467,8 @@ export class P2PLoader {
   };
 
   destroy() {
+    diagnostics?.close(this.#diagnosticsToken, "destroyed");
+    this.#unprobePeers?.();
     clearTimeout(this.#churnCleanupTimeoutId);
     this.#churnCleanupTimeoutId = undefined;
 
@@ -461,7 +491,7 @@ export class P2PLoader {
   }
 }
 
-export function selectPeerForDownload(peersWithSegment: Peer[]): Peer {
+function selectPeerForDownload(peersWithSegment: Peer[]): Peer {
   if (peersWithSegment.length === 1) {
     return peersWithSegment[0];
   }

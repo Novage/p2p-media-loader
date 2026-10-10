@@ -16,7 +16,10 @@ import {
 
 type HttpConfig = Pick<
   CoreConfig,
-  "httpNotReceivingBytesTimeoutMs" | "httpRequestSetup" | "validateHTTPSegment"
+  | "httpNotReceivingBytesTimeoutMs"
+  | "httpFirstByteTimeoutMs"
+  | "httpRequestSetup"
+  | "validateHTTPSegment"
 >;
 
 export class HttpRequestExecutor {
@@ -46,6 +49,7 @@ export class HttpRequestExecutor {
       onAbort: () => this.abortController.abort(),
       notReceivingBytesTimeoutMs:
         this.httpConfig.httpNotReceivingBytesTimeoutMs,
+      firstByteTimeoutMs: this.httpConfig.httpFirstByteTimeoutMs,
     };
 
     const completed = this.request.tryCompleteByLoadedBytes(
@@ -143,10 +147,9 @@ export class HttpRequestExecutor {
       if (this.isAborted()) {
         throw new DOMException("Request aborted", "AbortError");
       }
+      requestControls.startResponse();
 
       this.handleResponseHeaders(response);
-
-      requestControls.firstBytesReceived();
 
       if (!response.body || typeof response.body.getReader !== "function") {
         // Fallback for older browsers (e.g. Chrome < 43) that do not support ReadableStream
@@ -203,6 +206,18 @@ export class HttpRequestExecutor {
         throw new RequestError(
           "http-bytes-mismatch",
           `HTTP response truncated: received ${this.request.loadedBytes} of ${this.request.totalBytes} bytes`,
+        );
+      }
+
+      // A 200 with no body is not a segment. Nothing downstream would notice:
+      // it would be stored, announced, seeded to peers and appended by the
+      // player, which is a stall or a rendition exclusion rather than an error.
+      // Failing the attempt leaves the retry rules to deal with it.
+      if (this.request.loadedBytes === 0) {
+        this.request.clearLoadedBytes();
+        throw new RequestError<"http-bytes-mismatch">(
+          "http-bytes-mismatch",
+          "HTTP response carried no bytes",
         );
       }
 

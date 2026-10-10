@@ -7,74 +7,70 @@ import { sha1 } from "./utils/hash.js";
  *
  * Changing the identity derivation in any way requires bumping this version.
  */
-export const PEER_PROTOCOL_VERSION = "v2";
+export const PEER_PROTOCOL_VERSION = "v3";
 
 /**
- * Computes a stable, unique identity hash for a stream based on its properties.
- * The result is identical for all peers regardless of the player in use or the
- * stream's position in the manifest.
+ * Computes a stream's identity hash from the properties the core read from
+ * the manifest. Every peer parses the same manifest with the same parser, so
+ * the input is already identical everywhere and nothing is normalized: the
+ * fields are joined as given. `null`, `undefined` and `""` hash alike, and so
+ * do a missing `bitrate` and 0.
  *
- * Uses a SHA-1 hash of the normalized properties, encoded to standard Base64.
+ * `bitrate` belongs in the input only when the manifest needs it to tell the
+ * stream apart from another of the same type — see {@link identityProperties},
+ * which the core applies before hashing. A server reproducing a client's hash
+ * must make the same choice.
  *
- * This function is environment-agnostic and can be used on a server (Node.js 16+)
- * to reproduce the identity hash a client computes for the same stream.
+ * Environment-agnostic: usable in Node.js 16+ as well as in the browser.
  */
-export function computeStreamIdentityHash({
-  bitrate,
-  codecs,
-  width,
-  height,
-  language,
-  channels,
-  name,
-  frameRate,
-  videoRange,
-}: StreamProperties): string {
-  const normalizedCodecs = codecs
-    ? codecs
-        .split(",")
-        .map((c: string) => {
-          c = c.trim().toLowerCase();
-          // Normalize decimal RFC 4281 avc1 codecs to hex (e.g., avc1.66.30 -> avc1.42001e)
-          const parts = c.split(".");
-          if (
-            parts.length === 3 &&
-            (parts[0] === "avc1" || parts[0] === "avc")
-          ) {
-            const profile = parseInt(parts[1], 10);
-            const level = parseInt(parts[2], 10);
-            if (
-              !isNaN(profile) &&
-              !isNaN(level) &&
-              parts[1] === profile.toString() &&
-              parts[2] === level.toString()
-            ) {
-              const profileHex = `00${profile.toString(16)}`.slice(-2);
-              const levelHex = `00${level.toString(16)}`.slice(-2);
-              c = `${parts[0]}.${profileHex}00${levelHex}`;
-            }
-          }
-          return c;
-        })
-        .sort()
-        .join(",")
-    : "";
-  const normalizedLanguage =
-    language && language !== "und" ? language.slice(0, 2).toLowerCase() : "";
-  const normalizedChannels = channels ? channels.toString().split("/")[0] : "";
-  const normalizedName = name ? name.toLowerCase().trim() : "";
-
-  // Normalize frame rates to eliminate trailing zeros (e.g. "30.000" -> "30")
-  const normalizedFrameRate =
-    frameRate && !isNaN(Number(frameRate)) ? Number(frameRate).toString() : "";
-
-  const normalizedVideoRange = videoRange
-    ? videoRange.toUpperCase().trim()
-    : "";
-
-  const str = `${bitrate ?? 0}-${normalizedCodecs}-${width ?? ""}-${height ?? ""}-${normalizedLanguage}-${normalizedChannels}-${normalizedName}-${normalizedFrameRate}-${normalizedVideoRange}`;
-
+export function computeStreamIdentityHash(
+  properties: StreamProperties,
+): string {
+  const field = (value: string | number | null | undefined) =>
+    value === undefined || value === null ? "" : String(value);
+  const str = [
+    properties.bitrate ?? 0,
+    field(properties.codecs),
+    field(properties.width),
+    field(properties.height),
+    field(properties.language),
+    field(properties.channels),
+    field(properties.name),
+    field(properties.frameRate),
+    field(properties.videoRange),
+  ].join("-");
   return btoa(sha1(str));
+}
+
+/**
+ * The properties that feed each stream's identity, given every stream one
+ * manifest declares: the stream's own properties with `bitrate` dropped,
+ * unless another stream of the same type in the manifest would then be
+ * indistinguishable from it — a ladder with two rungs at one resolution.
+ *
+ * Bandwidth is the one attribute an origin may recompute on every request:
+ * some live packagers publish the encoder's current rate, so two viewers who
+ * fetched the master seconds apart would read different `BANDWIDTH` for the
+ * same rendition and, were it hashed, never meet. It is therefore left out of
+ * identity wherever the rest of the properties already tell the streams apart.
+ * The decision depends only on the manifest, so every peer makes the same one.
+ */
+export function identityProperties(
+  streams: readonly { type: StreamType; properties: StreamProperties }[],
+): StreamProperties[] {
+  const withoutBitrate = streams.map((s): StreamProperties => ({
+    ...s.properties,
+    bitrate: undefined,
+  }));
+  const occurrences = new Map<string, number>();
+  const keys = streams.map((s, i) => {
+    const key = `${s.type}|${computeStreamIdentityHash(withoutBitrate[i])}`;
+    occurrences.set(key, (occurrences.get(key) ?? 0) + 1);
+    return key;
+  });
+  return streams.map((s, i) =>
+    (occurrences.get(keys[i]) ?? 0) > 1 ? s.properties : withoutBitrate[i],
+  );
 }
 
 /**

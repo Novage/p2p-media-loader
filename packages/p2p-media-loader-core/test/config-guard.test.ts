@@ -34,7 +34,7 @@ describe("swarm identity config", () => {
 
     // Plain-JS callers can pass properties excluded from DynamicCoreConfig.
     core.applyDynamicConfig({
-      highDemandTimeWindow: 30,
+      urgentBufferThreshold: 30,
       mainStream: {
         swarmId: "hijacked-swarm",
         streamSwarmIdBuilder: () => "hijacked-key",
@@ -51,7 +51,7 @@ describe("swarm identity config", () => {
     expect(config.secondaryStream.swarmId).toBe("initial-swarm");
     expect(config.secondaryStream.streamSwarmIdBuilder).toBe(builder);
     // ...while sibling dynamic properties still apply.
-    expect(config.mainStream.highDemandTimeWindow).toBe(30);
+    expect(config.mainStream.urgentBufferThreshold).toBe(30);
     expect(config.mainStream.p2pDownloadTimeWindow).toBe(9000);
   });
 });

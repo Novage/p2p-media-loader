@@ -1,3 +1,5 @@
+import { diagnostics } from "../../diagnostics.js";
+import debug from "debug";
 import {
   PeerError,
   TrackerError,
@@ -6,7 +8,10 @@ import {
 } from "../../types.js";
 import { EventTarget } from "../../utils/event-target.js";
 import { getRTCErrorMessage, isTerminalConnectionState } from "../utils.js";
-import { WebTorrentClient } from "../webtorrent-client/index.js";
+import {
+  WebTorrentClient,
+  type PeerHandshake,
+} from "../webtorrent-client/index.js";
 import { WebTorrentSocketPool } from "../webtorrent-socket-pool/index.js";
 
 export interface WebTorrentManagerConfig {
@@ -69,8 +74,21 @@ export class WebTorrentManager {
   readonly #config: ResolvedConfig;
   readonly #eventTarget = new EventTarget<WebTorrentManagerEventMap>();
 
-  readonly #connectingPeers = new Set<string>();
+  /** Peers a handshake is under way with, by the handshake that claimed each. */
+  readonly #connectingPeers = new Map<string, PeerHandshake>();
   readonly #connectedPeers = new Map<string, ConnectedPeer>();
+
+  /**
+   * Which peer ids this manager holds, and why it turns one away. A peer id
+   * kept here after its connection is gone can never be admitted again, so
+   * every admission and every close is logged with the sizes behind the
+   * decision. Enable with localStorage.debug = "p2pml-core:tracker".
+   */
+  readonly #logger = debug("p2pml-core:tracker");
+
+  #held(): string {
+    return `held ${this.#connectedPeers.size} connected, ${this.#connectingPeers.size} connecting`;
+  }
 
   readonly #clients = new Set<{
     client: WebTorrentClient;
@@ -81,13 +99,24 @@ export class WebTorrentManager {
   #destroyed = false;
   #started = false;
 
-  #claimPeer = (remotePeerId: string): boolean => {
+  #claimPeer = (remotePeerId: string, handshake: PeerHandshake): boolean => {
     if (this.#destroyed) return false;
 
-    if (
-      this.#connectingPeers.has(remotePeerId) ||
-      this.#connectedPeers.has(remotePeerId)
-    ) {
+    const current = this.#connectingPeers.get(remotePeerId);
+    if (current && this.#settlesGlare(current, handshake, remotePeerId)) {
+      this.#connectingPeers.set(remotePeerId, handshake);
+      current.cancel();
+      this.#logger(
+        `glare with ${remotePeerId.slice(-6)}: took the answer to our offer and gave up answering theirs (${this.#held()})`,
+      );
+      return true;
+    }
+
+    if (current || this.#connectedPeers.has(remotePeerId)) {
+      this.#logger(
+        `turned away ${remotePeerId.slice(-6)}: already %s (${this.#held()})`,
+        current ? "connecting" : "connected",
+      );
       return false;
     }
 
@@ -99,14 +128,54 @@ export class WebTorrentManager {
         Math.max(1.0, this.#config.maxPeersMultiplier()),
     );
     if (this.#connectingPeers.size + this.#connectedPeers.size >= hardLimit) {
+      this.#logger(
+        `turned away ${remotePeerId.slice(-6)}: at the hard limit of ${hardLimit} (${this.#held()})`,
+      );
       return false;
     }
 
-    this.#connectingPeers.add(remotePeerId);
+    this.#connectingPeers.set(remotePeerId, handshake);
     return true;
   };
 
+  /**
+   * Whether a second handshake with a peer replaces the one under way.
+   *
+   * Two peers that offer to each other at once — over different trackers, or
+   * the same one — can each answer the other's offer, and each then holds the
+   * other as answerer when the answer to its own offer arrives. Were both to
+   * refuse that answer, each would wait on the handshake the other refused,
+   * and neither would connect until a later announce. Both keep the handshake
+   * whose offerer has the lower peer id instead: the lower peer takes the
+   * answer to its offer and gives up answering, the higher refuses that
+   * answer and goes on answering — the same handshake on both sides.
+   *
+   * Every other duplicate is turned away. A refused offer costs nothing: its
+   * sender only waits on an answer that never comes, and the offer expires.
+   */
+  #settlesGlare(
+    current: PeerHandshake,
+    next: PeerHandshake,
+    remotePeerId: string,
+  ): boolean {
+    return (
+      current.role === "answerer" &&
+      next.role === "offerer" &&
+      this.#config.peerId < remotePeerId
+    );
+  }
+
+  /**
+   * Must equal the P2P loader's PeersWrapped: a peer held here and not
+   * wrapped there is connected and never used.
+   */
+  readonly #unprobe: (() => void) | undefined;
+
   constructor(config: WebTorrentManagerConfig) {
+    this.#unprobe = diagnostics?.probe(
+      `PeersHeld:${config.infoHash.slice(0, 8)}`,
+      () => this.#connectedPeers.size,
+    );
     this.#config = {
       ...config,
       maxPeers: config.maxPeers ?? (() => WEBTORRENT_DEFAULT_MAX_PEERS),
@@ -165,7 +234,13 @@ export class WebTorrentManager {
             peerId: string;
             connection: RTCPeerConnection;
             channel: RTCDataChannel;
+            handshake: PeerHandshake;
           }) => {
+            if (this.#connectingPeers.get(event.peerId) !== event.handshake) {
+              // A handshake given up for another that connected regardless.
+              event.connection.close();
+              return;
+            }
             this.#connectingPeers.delete(event.peerId);
             this.#addConnectedPeer(
               event.peerId,
@@ -178,8 +253,11 @@ export class WebTorrentManager {
           const onPeerConnectFailed = (event: {
             peerId: string;
             error: PeerConnectError;
+            handshake: PeerHandshake;
           }) => {
-            if (this.#connectingPeers.has(event.peerId)) {
+            // A handshake given up for another is not a failure, and the claim
+            // is the other's to release.
+            if (this.#connectingPeers.get(event.peerId) === event.handshake) {
               this.#connectingPeers.delete(event.peerId);
               this.#eventTarget.dispatchEvent("peerConnectFailed", {
                 peerId: event.peerId,
@@ -242,6 +320,7 @@ export class WebTorrentManager {
   public destroy(): void {
     if (this.#destroyed) return;
     this.#destroyed = true;
+    this.#unprobe?.();
 
     // Remove our listeners BEFORE destroying the client. This ensures that
     // if client.destroy() synchronously dispatches events,
@@ -294,6 +373,9 @@ export class WebTorrentManager {
     // Synchronously extract from map first to prevent re-entrant double-fire
     // if close() synchronously triggers event listeners.
     this.#connectedPeers.delete(peerId);
+    this.#logger(
+      `released ${peerId.slice(-6)}: ${cause.error?.message ?? cause.disconnectReason} (${this.#held()})`,
+    );
 
     connected.cleanup();
     try {
@@ -320,6 +402,9 @@ export class WebTorrentManager {
     trackerUrl: string,
   ): void {
     if (isTerminalConnectionState(connection.iceConnectionState)) {
+      this.#logger(
+        `${peerId.slice(-6)} was already ${connection.iceConnectionState} when it reached the manager`,
+      );
       try {
         connection.close();
       } catch {
@@ -390,6 +475,7 @@ export class WebTorrentManager {
       trackerUrl,
       cleanup,
     });
+    this.#logger(`holding ${peerId.slice(-6)} (${this.#held()})`);
 
     connection.addEventListener(
       "iceconnectionstatechange",

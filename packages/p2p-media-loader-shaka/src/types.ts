@@ -1,38 +1,31 @@
 import type shaka from "shaka-player/dist/shaka-player.compiled.d.ts";
-import type { Stream as CoreStream, Core } from "p2p-media-loader-core";
-import { SegmentManager } from "./segment-manager.js";
-
-export type StreamProtocol = "hls" | "dash";
-
-export type StreamInfo = {
-  protocol?: StreamProtocol;
-  manifestResponseUrl?: string;
-};
-
-export type HookedStream = shaka.extern.Stream & {
-  streamUrl?: string;
-  mediaSequenceTimeMap?: Map<number, number>;
-  isSegmentIndexAlreadyRead?: boolean;
-};
-
-export type Stream = CoreStream & {
-  shakaStream: HookedStream;
-};
+import type { Core, ProcessedManifest } from "p2p-media-loader-core";
 
 export type Shaka = typeof shaka;
 
 export type P2PMLShakaData = {
-  player: shaka.Player;
-  core: Core<Stream>;
+  core: Core;
   shaka: Shaka;
-  streamInfo: StreamInfo;
-  segmentManager: SegmentManager;
+  /**
+   * What the presentation playing now is, or `undefined` once the engine has
+   * let the player go. A request holds on to this when it is made and asks
+   * again when it settles: a manifest of the source before it — another
+   * source on this player, or another player entirely — would otherwise be
+   * read into a core now serving a different presentation, registering
+   * streams nothing plays and, if it beats that presentation's own first
+   * manifest, naming the swarm after a stream this player never asked for.
+   */
+  currentSource: () => object | undefined;
+  /**
+   * Called with how the core sees the presentation, each time it reads
+   * something that describes it: a manifest, before Shaka parses the same
+   * bytes, and a stream's external segment index, which Shaka requests from
+   * the middle of its own parse. What is configured from the latter reaches
+   * the next load rather than the one that fetched it.
+   */
+  onManifestProcessed: (manifest: ProcessedManifest) => void;
 };
 
 export type HookedRequest = shaka.extern.Request & {
-  p2pml?: P2PMLShakaData;
-};
-
-export type HookedNetworkingEngine = shaka.net.NetworkingEngine & {
   p2pml?: P2PMLShakaData;
 };

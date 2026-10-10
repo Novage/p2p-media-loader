@@ -107,6 +107,13 @@
   cursor: pointer;
 }
 
+.peer-hint {
+  margin: 0.5em 0 0;
+  font-size: 0.9em;
+  line-height: 1.5em;
+  color: #6c757d;
+}
+
 .node-network {
   margin: 3em auto;
   outline: 1px solid #eee;

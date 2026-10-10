@@ -96,7 +96,6 @@ export const HlsjsOpenPlayer = ({
     onPeerConnect,
     onPeerClose,
     streamUrl,
-    
   ]);
 
   return Hls.isSupported() ? (

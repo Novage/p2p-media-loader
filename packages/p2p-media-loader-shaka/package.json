@@ -1,6 +1,6 @@
 {
   "name": "p2p-media-loader-shaka",
-  "version": "4.0.0",
+  "version": "5.0.0",
   "description": "P2P Media Loader Shaka Player integration",
   "license": "Apache-2.0",
   "author": "Novage",
@@ -41,7 +41,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "rimraf lib build && pnpm build:es && pnpm build:esm && pnpm build:esm-min && pnpm build:iife && pnpm build:iife-min",
+    "build": "rimraf lib dist build && pnpm build:es && pnpm build:esm && pnpm build:esm-min && pnpm build:iife && pnpm build:iife-min",
     "build:esm": "vite build --mode esm",
     "build:esm-min": "vite build --mode esm-min",
     "build:iife": "vite build --mode iife",
@@ -58,7 +58,7 @@
     "p2p-media-loader-core": "workspace:*"
   },
   "devDependencies": {
-    "shaka-player": "^5.2.9",
-    "vitest": "^5.0.0"
+    "shaka-player": "^5.2.13",
+    "vitest": "^5.0.3"
   }
 }

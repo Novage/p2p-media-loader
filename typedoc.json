@@ -5,5 +5,6 @@
   "exclude": ["packages/p2p-media-loader-demo"],
   "entryPointStrategy": "packages",
   "customCss": "typedoc/styles.css",
-  "readme": "api_documentation.md"
+  "readme": "api_documentation.md",
+  "excludeInternal": true
 }

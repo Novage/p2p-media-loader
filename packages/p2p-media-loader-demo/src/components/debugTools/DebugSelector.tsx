@@ -85,6 +85,9 @@ const loggers = [
   "p2pml-core:request-main",
   "p2pml-core:request-secondary",
   "p2pml-core:segment-memory-storage",
+  // Read once, when the page loads: reload after selecting it.
+  "p2pml:diagnostics",
+  "p2pml:diagnostics:log",
 ] as const;
 
 const loggersToStorageItem = (list: string[]) => {

@@ -1,8 +1,20 @@
 import { defineConfig } from "vite";
 import type { UserConfig } from "vite";
+import {
+  browserBundleAliases,
+  bundleDefines,
+} from "../../vite.common.config.ts";
 
-const getESMConfig = ({ minify }: { minify: boolean }): UserConfig => {
+const getESMConfig = ({
+  minify,
+  isBuild,
+}: {
+  minify: boolean;
+  isBuild: boolean;
+}): UserConfig => {
   return {
+    resolve: { alias: isBuild ? browserBundleAliases : undefined },
+    define: isBuild ? bundleDefines : undefined,
     build: {
       emptyOutDir: false,
       minify,
@@ -14,15 +26,30 @@ const getESMConfig = ({ minify }: { minify: boolean }): UserConfig => {
         formats: ["es"],
         entry: "src/index.ts",
       },
+      // Core and the parsers stay bare imports for the page's import map to
+      // resolve — to one core bundle, which carries all three. Inlining the
+      // parsers here would ship them twice. See specs/packaging.md.
       rolldownOptions: {
-        external: ["p2p-media-loader-core"],
+        external: [
+          "p2p-media-loader-core",
+          "p2p-media-loader-core/hls",
+          "p2p-media-loader-core/dash",
+        ],
       },
     },
   };
 };
 
-const getIIFEConfig = ({ minify }: { minify: boolean }): UserConfig => {
+const getIIFEConfig = ({
+  minify,
+  isBuild,
+}: {
+  minify: boolean;
+  isBuild: boolean;
+}): UserConfig => {
   return {
+    resolve: { alias: isBuild ? browserBundleAliases : undefined },
+    define: isBuild ? bundleDefines : undefined,
     build: {
       emptyOutDir: false,
       minify,
@@ -39,18 +66,19 @@ const getIIFEConfig = ({ minify }: { minify: boolean }): UserConfig => {
   };
 };
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command }) => {
+  const isBuild = command === "build";
   switch (mode) {
     case "esm":
-      return getESMConfig({ minify: false });
+      return getESMConfig({ minify: false, isBuild });
 
     case "esm-min":
-      return getESMConfig({ minify: true });
+      return getESMConfig({ minify: true, isBuild });
     case "iife":
-      return getIIFEConfig({ minify: false });
+      return getIIFEConfig({ minify: false, isBuild });
     case "iife-min":
-      return getIIFEConfig({ minify: true });
+      return getIIFEConfig({ minify: true, isBuild });
     default:
-      return getESMConfig({ minify: true });
+      return getESMConfig({ minify: true, isBuild });
   }
 });

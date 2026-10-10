@@ -4,7 +4,7 @@
     <title>Shaka Player with P2P Media Loader (IIFE)</title>
 
     <!-- Load Shaka Player -->
-    <script src="https://cdn.jsdelivr.net/npm/shaka-player@~4/dist/shaka-player.compiled.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/shaka-player@~5/dist/shaka-player.compiled.min.js"></script>
 
     <!-- Load P2P Media Loader IIFE bundle. This does not use type="module" -->
     <!-- <script src="./shaka/p2p-media-loader-shaka.iife.js"></script> -->
@@ -14,41 +14,83 @@
     <h1>P2P Media Loader Shaka IIFE Bundle Test</h1>
     <video id="video" width="640" controls autoplay></video>
 
+    <h2>Downloaded segments</h2>
+    <ol id="segment-log"></ol>
+
     <script>
       const manifestUri = "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8";
 
-      async function initApp() {
-        if (shaka.Player.isBrowserSupported()) {
-          const video = document.getElementById("video");
+      // The IIFE bundle exists for browsers without ES module support — old
+      // Smart TVs among them — and is built for ES2015. This page must parse
+      // there too, so it uses promise chains rather than async/await (ES2017)
+      // and no trailing commas in argument lists.
+      function initApp() {
+        // Shaka's polyfills fill in what old browsers lack — MediaCapabilities
+        // above all, which Shaka's variant filtering relies on. Without them a
+        // Smart TV drops every variant and reports error 4032.
+        shaka.polyfill.installAll();
 
-          // The IIFE bundle exports its contents on the global variable defined in vite config
-          const { ShakaP2PEngine } = window.p2pml.shaka;
-
-          ShakaP2PEngine.registerPlugins();
-          const engine = new ShakaP2PEngine();
-
-          const player = new shaka.Player();
-          await player.attach(video);
-
-          player.addEventListener("error", function (event) {
-            console.error(
-              "Error code",
-              event.detail.code,
-              "object",
-              event.detail,
-            );
-          });
-
-          engine.bindShakaPlayer(player);
-
-          try {
-            await player.load(manifestUri);
-          } catch (e) {
-            console.error("Error code", e.code, "object", e);
-          }
-        } else {
+        if (!shaka.Player.isBrowserSupported()) {
           console.error("Shaka Player not supported in this browser.");
+          return;
         }
+        const video = document.getElementById("video");
+
+        // The IIFE bundle exports its contents on the global variable defined in vite config
+        const { ShakaP2PEngine } = window.p2pml.shaka;
+
+        ShakaP2PEngine.registerPlugins();
+        const engine = new ShakaP2PEngine();
+
+        // Every segment the core delivered, appended to the page with where it
+        // came from: "http" or "p2p" (with the peer's id).
+        const segmentLog = document.getElementById("segment-log");
+        engine.addEventListener("onSegmentLoaded", function (details) {
+          const segment = details.segment;
+          // The file name tells quality levels apart: each level numbers its
+          // own segments, so one externalId recurs after a quality switch.
+          const fileName = segment.url.split("?")[0].split("/").pop();
+          const source =
+            details.downloadSource === "p2p"
+              ? "p2p from " + details.peerId
+              : details.downloadSource;
+          const item = document.createElement("li");
+          item.textContent =
+            details.streamType +
+            " segment " +
+            segment.externalId +
+            " " +
+            fileName +
+            " (" +
+            segment.startTime.toFixed(1) +
+            "s–" +
+            segment.endTime.toFixed(1) +
+            "s, " +
+            (details.bytesLength / 1024).toFixed(0) +
+            " KiB) — " +
+            source;
+          segmentLog.appendChild(item);
+        });
+
+        const player = new shaka.Player();
+        player.addEventListener("error", function (event) {
+          console.error(
+            "Error code",
+            event.detail.code,
+            "object",
+            event.detail
+          );
+        });
+
+        player
+          .attach(video)
+          .then(function () {
+            engine.bindShakaPlayer(player);
+            return player.load(manifestUri);
+          })
+          .catch(function (e) {
+            console.error("Error code", e.code, "object", e);
+          });
       }
 
       document.addEventListener("DOMContentLoaded", initApp);

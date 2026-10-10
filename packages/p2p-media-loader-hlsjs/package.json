@@ -1,7 +1,7 @@
 {
   "name": "p2p-media-loader-hlsjs",
-  "version": "4.0.0",
-  "description": "P2P Media Loader hls.js integration",
+  "version": "5.0.0",
+  "description": "P2P Media Loader HLS.js integration",
   "license": "Apache-2.0",
   "author": "Novage",
   "homepage": "https://github.com/Novage/p2p-media-loader",
@@ -40,7 +40,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "rimraf lib build && pnpm build:es && pnpm build:esm && pnpm build:esm-min && pnpm build:iife && pnpm build:iife-min",
+    "build": "rimraf lib dist build && pnpm build:es && pnpm build:esm && pnpm build:esm-min && pnpm build:iife && pnpm build:iife-min",
     "build:esm": "vite build --mode esm",
     "build:esm-min": "vite build --mode esm-min",
     "build:iife": "vite build --mode iife",
@@ -57,7 +57,7 @@
     "p2p-media-loader-core": "workspace:*"
   },
   "devDependencies": {
-    "hls.js": "^1.7.2",
-    "vitest": "^5.0.0"
+    "hls.js": "^1.7.3",
+    "vitest": "^5.0.3"
   }
 }

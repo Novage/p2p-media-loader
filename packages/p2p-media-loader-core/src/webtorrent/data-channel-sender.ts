@@ -3,6 +3,17 @@ import { getRTCErrorMessage } from "./utils.js";
 
 const MAX_BUFFERED_AMOUNT = 64 * 1024; // 64 KB, matching simple-peer
 
+/**
+ * How long the send may sit on a full buffer without any of it draining. A
+ * peer that stops reading while holding the connection open would otherwise
+ * leave the send unsettled for good: SCTP keeps the channel healthy, no
+ * `bufferedamountlow` ever arrives, and the peer reads as uploading forever,
+ * which exempts it from churn cleanup and blocks its next upload. Ten
+ * seconds without a single byte leaving a 64 KB buffer is well below any
+ * throughput worth keeping the slot for.
+ */
+const STALL_TIMEOUT_MS = 10_000;
+
 export class DataChannelSender {
   #currentSendContext?: { cancel: () => void };
 
@@ -29,10 +40,19 @@ export class DataChannelSender {
 
     let offset = 0;
     let isSettled = false;
+    let stallTimeoutId: ReturnType<typeof setTimeout> | undefined;
+    let stalledAtOffset = -1;
+
+    const clearStallTimeout = () => {
+      if (stallTimeoutId === undefined) return;
+      clearTimeout(stallTimeoutId);
+      stallTimeoutId = undefined;
+    };
 
     const cleanup = (): boolean => {
       if (isSettled) return false;
       isSettled = true;
+      clearStallTimeout();
       this.#currentSendContext = undefined;
       this.channel.removeEventListener("bufferedamountlow", sendChunks);
       this.channel.removeEventListener("closing", onClose);
@@ -61,6 +81,18 @@ export class DataChannelSender {
     const buffer = ArrayBuffer.isView(data) ? data.buffer : data;
     const byteOffset = ArrayBuffer.isView(data) ? data.byteOffset : 0;
 
+    const onStall = () => {
+      stallTimeoutId = undefined;
+      if (cleanup()) {
+        reject(
+          new Error(
+            `Send stalled: nothing sent for ${STALL_TIMEOUT_MS} ms ` +
+              `(${offset} of ${data.byteLength} bytes sent)`,
+          ),
+        );
+      }
+    };
+
     const sendChunks = () => {
       if (isSettled) return;
       if (this.channel.readyState !== "open") {
@@ -77,6 +109,14 @@ export class DataChannelSender {
       try {
         while (offset < data.byteLength) {
           if (this.channel.bufferedAmount > MAX_BUFFERED_AMOUNT) {
+            // The watchdog is rearmed by progress, not by the drain event
+            // alone: commands share the channel and can refill the buffer
+            // between the event and this handler.
+            if (stallTimeoutId === undefined || offset !== stalledAtOffset) {
+              clearStallTimeout();
+              stalledAtOffset = offset;
+              stallTimeoutId = setTimeout(onStall, STALL_TIMEOUT_MS);
+            }
             return;
           }
 

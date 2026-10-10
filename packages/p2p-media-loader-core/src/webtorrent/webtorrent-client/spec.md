@@ -30,12 +30,14 @@ interface WebTorrentClientConfig {
   channelConfig?: RTCDataChannelInit; // Optional Data Channel overrides
   offerTimeout?: number; // Time (in ms) to keep unanswered offers before destroying them. Default: 50000 (50s).
   offersCount?: number; // Maximum number of offers to generate per announce interval. Default: 5.
-  connectionTimeout?: number; // Time (in ms) to wait for the data channel to open. Default: 15000 (15s).
+  connectionTimeout?: number; // Time (in ms) to wait for the data channel to open. The answerer waits 5 s more (see "Receiving Offers"). Default: 15000 (15s).
 
   // Callback invoked when a peer_id is discovered via an offer or answer.
   // Attempts to claim the peer to prevent duplicate connections.
   // Return true to accept and connect, false if the peer is already claimed/connected.
-  claimPeer?: (peerId: string) => boolean;
+  // `handshake` says whether we answer the peer's offer or it answered ours,
+  // and can cancel the exchange; see "Early Deduplication".
+  claimPeer?: (peerId: string, handshake: PeerHandshake) => boolean;
 
   // Callback invoked before every announce to determine if new offers should be generated.
   // Return false to stop generating offers (numwant: 0), while still answering incoming offers.
@@ -52,8 +54,11 @@ interface WebTorrentClientConfig {
 
 ### Events
 
-- `peerConnected` (payload: `{ peerId: string, connection: RTCPeerConnection, channel: RTCDataChannel }`): Fired when the peer finishes WebRTC signaling and its Data Channel is successfully opened. The Swarm Manager takes immediate ownership.
-- `peerConnectFailed` (payload: `{ peerId: string, error: string }`): Fired if WebRTC SDP negotiation fails or the data channel fails to open after a peer has been claimed (e.g., ICE gathering timeout or connection timeout), allowing the manager to release the claim.
+- `peerConnected` (payload: `{ peerId: string, connection: RTCPeerConnection, channel: RTCDataChannel, handshake: PeerHandshake }`): Fired when the peer finishes WebRTC signaling and its Data Channel is successfully opened. The Swarm Manager takes immediate ownership.
+- `peerConnectFailed` (payload: `{ peerId: string, error: PeerConnectError, handshake: PeerHandshake }`): Fired if WebRTC SDP negotiation fails, the data channel fails to open, or the handshake is cancelled, after a peer has been claimed (e.g., ICE gathering timeout or connection timeout), allowing the manager to release the claim.
+
+Both carry the `handshake` object that was passed to `claimPeer`, so the claimant can tell which of its exchanges with the peer ended.
+
 - `warning` (payload: `string`): Fired if the tracker returns a warning, or if the client encounters a local recoverable issue during signaling or offer/answer creation.
 - `error` (payload: `string`): Fired if the tracker returns an error, or if the underlying WebSocket encounters a failure.
 
@@ -67,6 +72,8 @@ Because the higher layer (e.g., Peer Manager) may spin up multiple `WebTorrentCl
 
 1. **When Receiving an Offer:** The tracker JSON includes the remote `peer_id`. The client immediately calls `claimPeer(peer_id)`. If it returns `false`, the client **ignores the JSON message entirely** and does not create an `RTCPeerConnection`.
 2. **When Receiving an Answer:** The tracker forwards an `answer` to a pending offer we sent. The JSON includes the remote `peer_id`. The client calls `claimPeer(peer_id)`. If it returns `false`, the client **immediately closes** the pending `RTCPeerConnection` and discards the answer.
+
+Each call passes a `PeerHandshake`: `{ role: "answerer" }` for an offer we answer, `{ role: "offerer" }` for an answer to our offer, and a `cancel()` that abandons the exchange. A cancelled exchange closes its `RTCPeerConnection` and ends with `peerConnectFailed`, like one that failed. The manager cancels one only to settle glare: two peers that answer each other's offers at once (see the WebTorrent Manager spec, "Glare").
 
 ### Message Validation
 
@@ -199,15 +206,15 @@ When generating offers, we do **not** know which peer will receive them. All off
 #### Receiving Offers
 
 1. The tracker sends an incoming `offer` originating from another peer. This payload **does** contain their `peer_id`.
-2. **Deduplication Check**: Call `claimPeer(peer_id)`. Abort if `false`.
+2. **Deduplication Check**: Call `claimPeer(peer_id, { role: "answerer", cancel })`. Abort if `false`.
 3. The client creates a new `RTCPeerConnection` and calls `setRemoteDescription`.
 4. It creates an SDP answer, waits for ICE gathering, and sends it back to the tracker.
-5. **Wait for Connection**: Signaling is complete. The client waits for the data channel to open, then emits the `peerConnected` event with `{ peerId, connection, channel }`. The client then hands off ownership of the connection.
+5. **Wait for Connection**: Signaling is complete. The client waits for the data channel to open, then emits the `peerConnected` event with `{ peerId, connection, channel }`. The client then hands off ownership of the connection. The answerer waits `connectionTimeout` plus 5 s. Its wait starts when it sends the answer, and the tracker must then deliver the answer to the offerer. The offerer's wait starts only when the answer arrives. Without the 5 s, a slow tracker makes the answerer give up first, while the connection is still forming.
 
 #### Receiving Answers
 
 1. The tracker forwards an `answer` SDP to an `offer_id` we previously sent. This payload now reveals the remote `peer_id`.
-2. **Deduplication Check**: We finally know who answered! Call `claimPeer(peer_id)`.
+2. **Deduplication Check**: We finally know who answered! Call `claimPeer(peer_id, { role: "offerer", cancel })`.
 3. If `claimPeer` returns `false` (we are already connected to them via another route), we look up the pending `RTCPeerConnection` by `offer_id`, immediately call `.close()`, clear the timeout, delete it, and abort.
 4. If `true`, the client applies `setRemoteDescription(answer)` to the pending connection and clears the timeout.
 5. **Wait for Connection**: Signaling is complete. The client removes the connection from `pendingOffers`, waits for the data channel to open, and emits the `peerConnected` event with `{ peerId, connection, channel }`.
