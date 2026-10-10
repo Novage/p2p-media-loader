@@ -16,6 +16,29 @@ The streams, the way to isolate a test swarm, and the checks on each stream
 are in [verification.md](verification.md). This document refers to them and
 does not repeat them.
 
+## Findings
+
+A test run finds problems. It does not fix them.
+
+- **Do not fix the code or the documentation during a run.** This includes
+  the source, the tests, the specs and the guides. Temporary edits are
+  allowed: the demo edit of test 12, a one-off probe
+  ([diagnostics.md](diagnostics.md)), a log line that an investigation needs.
+  Each is removed when it is no longer needed, and is never committed. At the
+  end of the run, `git status` and `git worktree list` show nothing that the
+  run added.
+- **Report the findings at the end of the run, for review.** For each finding,
+  give the test, the stream and the engine, what was expected, what happened,
+  the evidence (counters, logs, measurements), whether it occurred again in
+  fresh tabs, and whether the last release has it too. Who reviews the report
+  decides what is fixed and when.
+- **Stop the run and report at once when a finding needs an immediate fix:**
+  core functionality is broken, for example playback stops for good, a
+  request is never served, P2P does not work at all, or the core loads the
+  same segments again and again. Tests run after such a finding measure the
+  defect, not the release. The run continues after the fix, from the test
+  that found it.
+
 ## How the browser tests run
 
 **Every browser test runs in at least two tabs.** Each tab is a peer. The tabs
@@ -258,7 +281,10 @@ Pass:
 
 For every engine, on live, DVR and VOD streams: let both tabs play for 20
 seconds, pause tab A for 40 seconds while tab B plays, then play A for 15
-seconds more.
+seconds more. On DVR, seek tab A to the middle of the window before the pause:
+a viewer the pause carries to within the adapters' margin of the window's
+start is brought back to the live delay by design (see
+[playback-contract.md](playback-contract.md), "The urgency threshold").
 
 Pass:
 
@@ -449,8 +475,9 @@ seconds or more to start a low-latency stream in a hidden tab.
   must not meet.
 - P2P disabled, upload disabled, and an `httpRequestSetup` hook, set in a
   temporary local edit of the demo. Read each from a query parameter, so that
-  one edit serves all three, and undo the edit with `git restore` at the end.
-  Do not commit it.
+  one edit serves all three, and undo the edit at the end. Undo it by hand, or
+  with `git restore` only where the file has no other uncommitted change:
+  `git restore` discards those too. Do not commit it.
 
 Pass: each setting has its documented effect, and playback is not affected.
 P2P disabled: no tracker socket and no P2P loader. Upload disabled in one tab:

@@ -106,12 +106,14 @@ the streams they would share in production; only the audience changes.
 
 **Playback contract.** With `localStorage.debug = "p2pml-core:hybrid-loader-*"`,
 the core logs each player request with the buffer it judged it by and whether
-it was urgent. The buffer must agree with the media element's to within a
-`timeupdate` tick, in steady state and after each of the seek cases in
-[playback-contract.md](playback-contract.md). A request made with the buffer
-below the threshold must be urgent and start at once, and a request that waits
-must become urgent before the buffer runs out. After a seek into unbuffered
-media, no urgent download may start at the position the player left.
+it was urgent. The buffer must agree with the media element's to within one
+segment, in steady state and after each of the seek cases in
+[playback-contract.md](playback-contract.md): the element's buffer grows by a
+segment when one is appended, and the core sees that at the next media event.
+A request made with the buffer below the threshold must be urgent and start at
+once, and a request that waits must become urgent before the buffer runs out.
+After a seek into unbuffered media, no urgent download may start at the
+position the player left.
 
 **Manifest interpretation.** With `localStorage.debug = "p2pml-core:manifest"`,
 the core logs the registry it derives from each manifest: the streams, their
