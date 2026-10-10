@@ -1,3 +1,4 @@
+import { isWebRtcAvailable } from "./webtorrent/webtorrent-client/webrtc-utils.js";
 import { diagnostics, type DiagnosticsToken } from "./diagnostics.js";
 import { HybridLoader } from "./hybrid-loader.js";
 import { runAll } from "./run-all.js";
@@ -158,6 +159,8 @@ export class Core {
   private static bandwidthProbeSequence = 0;
   private unprobeBandwidth?: () => void;
   private readonly webTorrentSocketPool = new WebTorrentSocketPool();
+  /** Whether the missing WebRTC has been logged and counted already. */
+  private webRtcMissingReported = false;
   private readonly logger = debug("p2pml-core:core");
   private readonly socketPoolLogger = debug(
     "p2pml-core:webtorrent-socket-pool",
@@ -1040,8 +1043,25 @@ export class Core {
         ? this.mainStreamConfig
         : this.secondaryStreamConfig;
     if (config.isP2PDisabled) return false;
+    if (!this.hasWebRtc()) return false;
 
     return this.isShareable(segment.stream);
+  }
+
+  /**
+   * Whether the page has WebRTC. Without it no peer can connect, so the core
+   * serves nothing and the player loads every segment itself, as with P2P
+   * disabled: no tracker socket opens and no announce repeats for nothing.
+   * Said once per core.
+   */
+  private hasWebRtc(): boolean {
+    if (isWebRtcAvailable) return true;
+    if (!this.webRtcMissingReported) {
+      this.webRtcMissingReported = true;
+      this.logger("no WebRTC on this page: P2P is off, the player loads alone");
+      diagnostics?.count("WebRtc:unavailable");
+    }
+    return false;
   }
 
   /**

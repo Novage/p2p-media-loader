@@ -55,9 +55,16 @@ if (core.isSegmentLoadable(url, byteRange)) {
 Falling back on an unrecognised URL is normal operation, not an error path. It
 is what makes a disagreement between core's parse and the player's harmless.
 
-`isSegmentLoadable` is the one check to make: it answers `false` both for a URL
-the registry does not know and for a stream whose P2P is switched off, and it
-reports the former through the registry-miss diagnostic.
+`isSegmentLoadable` is the one check to make. It answers `false` in three
+cases:
+
+- for a URL the registry does not know, which it reports through the
+  registry-miss diagnostic;
+- for a stream whose P2P is switched off;
+- on a page without WebRTC. No peer can connect there, so the player loads
+  every segment itself, as with P2P switched off, and the core opens no
+  tracker socket. The core reads `RTCPeerConnection` once, when it loads: a
+  browser with WebRTC switched off has none from the start.
 
 **Cancellation is `core.abortSegmentLoading(url, byteRange)`**, which is what
 every adapter here calls. A player announces an abort by calling something —

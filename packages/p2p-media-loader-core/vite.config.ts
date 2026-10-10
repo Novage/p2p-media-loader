@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import type { UserConfig } from "vite";
+import type {} from "vitest/config";
 import {
   browserBundleAliases,
   bundleDefines,
@@ -46,5 +47,8 @@ export default defineConfig(({ mode, command }) => {
   const base = minify ? mode.slice(0, -"-min".length) : mode;
   const variant: Variant =
     base === "esm-hls" ? "hls" : base === "esm-dash" ? "dash" : "all";
-  return getESMConfig({ minify, variant, isBuild: command === "build" });
+  return {
+    ...getESMConfig({ minify, variant, isBuild: command === "build" }),
+    test: { setupFiles: ["test/setup.ts"] },
+  };
 });

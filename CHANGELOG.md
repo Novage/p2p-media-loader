@@ -206,6 +206,11 @@ throughout.
   reported to it as an abort, which it never retries; one the core made is a
   network error, which Shaka's retry parameters govern. See
   [`specs/player-adapters.md`](specs/player-adapters.md).
+- **On a page without WebRTC, the player loads every segment itself.** No
+  peer can connect there. Before, the core took the player's requests, opened
+  its tracker sockets, and announced at each interval with offers that it
+  could not make. Now `isSegmentLoadable` answers `false`, as with P2P
+  disabled, and no tracker socket opens.
 
 ### Removed
 

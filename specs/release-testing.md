@@ -450,15 +450,21 @@ cancelled. Use the wrappers to:
 - delay every response, as on a slow network;
 - close the tracker sockets, and refuse new ones for 30 seconds;
 - set the `trackers` query parameter to a tracker that does not exist;
-- remove `RTCPeerConnection` from the page before the players start, as a
-  browser with WebRTC disabled does.
+- remove `RTCPeerConnection` from the page before the page's modules load, as
+  a browser with WebRTC disabled has none from the start. The core reads it
+  once, when it loads: removed later, the core keeps the real constructor and
+  P2P still works. Load the demo in a same-origin iframe, and remove it from
+  the iframe's window when its document's `readyState` leaves `loading`:
+  module scripts run after that and before `DOMContentLoaded`.
 
 Pass: failed requests are tried again; a segment that fails over HTTP comes
 over P2P where a peer has it; playback continues or recovers when the fault
 stops; tracker sockets reconnect with a growing delay, and peer connections
 already open stay open; an unreachable tracker gives HTTP-only playback, and
 its reconnect delay grows rather than looping. Without WebRTC, the stream
-plays over HTTP only, with no error loop and no leak. The browser logs each
+plays over HTTP only, with no error loop and no leak; the player loads every
+segment itself, and the core opens no tracker socket and no P2P loader, as
+with P2P disabled. The browser logs each
 failed `WebSocket` itself; that is not an error loop.
 
 ### 11. Live edge cases
