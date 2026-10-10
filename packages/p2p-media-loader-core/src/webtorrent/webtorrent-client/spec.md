@@ -30,7 +30,7 @@ interface WebTorrentClientConfig {
   channelConfig?: RTCDataChannelInit; // Optional Data Channel overrides
   offerTimeout?: number; // Time (in ms) to keep unanswered offers before destroying them. Default: 50000 (50s).
   offersCount?: number; // Maximum number of offers to generate per announce interval. Default: 5.
-  connectionTimeout?: number; // Time (in ms) to wait for the data channel to open. Default: 15000 (15s).
+  connectionTimeout?: number; // Time (in ms) to wait for the data channel to open. The answerer waits 5 s more (see "Receiving Offers"). Default: 15000 (15s).
 
   // Callback invoked when a peer_id is discovered via an offer or answer.
   // Attempts to claim the peer to prevent duplicate connections.
@@ -209,7 +209,7 @@ When generating offers, we do **not** know which peer will receive them. All off
 2. **Deduplication Check**: Call `claimPeer(peer_id, { role: "answerer", cancel })`. Abort if `false`.
 3. The client creates a new `RTCPeerConnection` and calls `setRemoteDescription`.
 4. It creates an SDP answer, waits for ICE gathering, and sends it back to the tracker.
-5. **Wait for Connection**: Signaling is complete. The client waits for the data channel to open, then emits the `peerConnected` event with `{ peerId, connection, channel }`. The client then hands off ownership of the connection.
+5. **Wait for Connection**: Signaling is complete. The client waits for the data channel to open, then emits the `peerConnected` event with `{ peerId, connection, channel }`. The client then hands off ownership of the connection. The answerer waits `connectionTimeout` plus 5 s. Its wait starts when it sends the answer, and the tracker must then deliver the answer to the offerer. The offerer's wait starts only when the answer arrives. Without the 5 s, a slow tracker makes the answerer give up first, while the connection is still forming.
 
 #### Receiving Answers
 

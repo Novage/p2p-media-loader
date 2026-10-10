@@ -274,6 +274,11 @@ These predate 5.0.0 and affect 4.x deployments as well.
   neither connection completed and the peers stayed apart until the tracker's
   next announce, minutes later. Both now keep the handshake offered by the
   peer with the lower peer id.
+- A peer that answered an offer started its connection timeout when it sent
+  the answer, before the tracker delivered it to the other peer. The peer that
+  made the offer started only when the answer arrived. A slow tracker thus made
+  the answering peer give up first, while the connection was still forming.
+  The answering peer now waits 5 seconds more than `webRtcConnectionTimeoutMs`.
 
 ## 4.0.0
 

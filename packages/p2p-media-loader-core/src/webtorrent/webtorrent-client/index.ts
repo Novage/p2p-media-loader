@@ -56,6 +56,15 @@ const WEBTORRENT_DEFAULT_CONNECTION_TIMEOUT = 15000;
 const WEBTORRENT_DEFAULT_OFFERS_COUNT = 5;
 const WEBTORRENT_DEFAULT_ICE_GATHERING_TIMEOUT = 5000;
 
+/**
+ * Added to the answerer's wait for the data channel. The answerer starts to
+ * wait when it sends its answer, and the tracker must then deliver that answer
+ * to the offerer. The offerer starts to wait when the answer arrives. Without
+ * this allowance, a slow tracker makes the answerer give up first, while the
+ * connection is still forming.
+ */
+const ANSWER_RELAY_ALLOWANCE_MS = 5000;
+
 export interface WebTorrentClientConfig {
   wsClient: WebSocketClient;
   infoHash: string;
@@ -690,7 +699,12 @@ export class WebTorrentClient {
 
       this.#wsClient.send(JSON.stringify(payload));
 
-      const channel = await this.#waitForConnection(pc, undefined, signal);
+      const channel = await this.#waitForConnection(
+        pc,
+        undefined,
+        signal,
+        this.#config.connectionTimeout() + ANSWER_RELAY_ALLOWANCE_MS,
+      );
       throwIfAborted(signal);
 
       this.#logger(`${this.#who} connected to ${remotePeerId.slice(-6)}`);
@@ -751,6 +765,7 @@ export class WebTorrentClient {
         pending.connection,
         pending.channel,
         signal,
+        this.#config.connectionTimeout(),
       );
       throwIfAborted(signal);
 
@@ -887,6 +902,7 @@ export class WebTorrentClient {
     pc: RTCPeerConnection,
     channel: RTCDataChannel | undefined,
     signal: HandshakeSignal,
+    timeoutMs: number,
   ): Promise<RTCDataChannel> {
     const { promise, resolve, reject } =
       getPromiseWithResolvers<RTCDataChannel>();
@@ -971,7 +987,7 @@ export class WebTorrentClient {
     timeoutId = setTimeout(() => {
       cleanup();
       reject(new Error("Data channel open timeout"));
-    }, this.#config.connectionTimeout());
+    }, timeoutMs);
 
     pc.addEventListener("iceconnectionstatechange", rejectIfTerminalState);
     signal.addEventListener("abort", onAbort);

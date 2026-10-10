@@ -738,6 +738,8 @@ export type StreamConfig = {
 
   /**
    * The maximum duration (in milliseconds) to wait for the actual RTCDataChannel to open after signaling has completed.
+   * A peer that answers an offer waits 5 seconds more: its wait starts when it
+   * sends the answer, before the tracker delivers it to the other peer.
    *
    * @default
    * ```typescript
