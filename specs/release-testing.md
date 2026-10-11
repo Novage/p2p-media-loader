@@ -182,7 +182,7 @@ in turn where a test measures more than one.
 **Count resources.** A leak shows as a resource that stays open after the
 stream, player or core that owned it is gone. Enable the diagnostics ledger
 ([diagnostics.md](diagnostics.md)) in each tab, and take a snapshot of
-`globalThis.__p2pmlDiagnostics` before and after each step. The ledger also
+`window.__p2pmlDiagnostics` before and after each step. The ledger also
 counts downloads by source and result, registry misses and closed peers by
 cause, and timers that fire after their owner was destroyed. Some resources are released late by design; the list is in
 [diagnostics.md](diagnostics.md), "What is recorded". An investigation that

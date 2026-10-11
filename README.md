@@ -141,10 +141,10 @@ localStorage.debug = "p2pml:diagnostics";
 The ledger appears on `globalThis` at that first record, so read it once a player has started:
 
 ```js
-const snapshot = globalThis.__p2pmlDiagnostics.snapshot();
+const snapshot = window.__p2pmlDiagnostics.snapshot();
 // snapshot.live: open resources by kind; snapshot.counters: results;
 // snapshot.anomalies: states that must not occur
-globalThis.__p2pmlDiagnostics.clearAnomalies();
+window.__p2pmlDiagnostics.clearAnomalies();
 ```
 
 The ledger is in the npm packages unless your build defines `__P2PML_DIAGNOSTICS__` as `false`. The prebuilt bundles in `dist/` leave it out.

@@ -65,10 +65,15 @@ function active(): Ledger | null {
     log: debug(NAMESPACE),
     recordLog: debug(`${NAMESPACE}:log`),
   };
-  (globalThis as { __p2pmlDiagnostics?: unknown }).__p2pmlDiagnostics = {
-    snapshot: () => ledgerApi.snapshot(),
-    clearAnomalies: () => ledgerApi.clearAnomalies(),
-  };
+  // `window`, not `globalThis`: the IIFE builds serve Chromium 49-era devices,
+  // and `globalThis` only arrived in Chromium 71. With no `window`, as in a
+  // server render, the ledger still records; only the page handle is missing.
+  if (typeof window !== "undefined") {
+    (window as { __p2pmlDiagnostics?: unknown }).__p2pmlDiagnostics = {
+      snapshot: () => ledgerApi.snapshot(),
+      clearAnomalies: () => ledgerApi.clearAnomalies(),
+    };
+  }
   return ledger;
 }
 

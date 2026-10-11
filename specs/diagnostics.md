@@ -46,7 +46,7 @@ that enables the namespace enables diagnostics, as for every other logger. The
 setting is read once; a change applies after the next load. The demo's logger
 selector lists the namespace like the others.
 
-When they are on, `globalThis.__p2pmlDiagnostics` holds `snapshot()` and
+When they are on, `window.__p2pmlDiagnostics` holds `snapshot()` and
 `clearAnomalies()`.
 
 Each anomaly is also logged, under `p2pml:diagnostics`. Each open and close is
