@@ -322,6 +322,10 @@ export class HybridLoader {
           }
           this.requests.remove(request);
           this.noteSegmentBytes(segment, request.data.byteLength);
+          this.p2pLoaders.noteDownloadedBytes(
+            segment.stream,
+            request.data.byteLength,
+          );
 
           this.logger(
             `succeed: ${LoggerUtils.getSegmentString(segment)} (byteLength: ${request.data.byteLength})`,

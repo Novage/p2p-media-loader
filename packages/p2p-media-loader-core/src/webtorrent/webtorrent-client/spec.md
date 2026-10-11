@@ -97,8 +97,8 @@ Periodically (based on the tracker's `interval`), or when first connecting, the 
   "info_hash": "<20-character-binary-string>",
   "peer_id": "<20-character-binary-string>",
   "numwant": 5,
-  "uploaded": 0,
-  "downloaded": 0,
+  "uploaded": 1048576, // bytes sent to peers in this swarm since joining it
+  "downloaded": 3145728, // bytes of this swarm's segments delivered, over HTTP and P2P
   "event": "started", // "started", "completed", "stopped", or omitted
   "offers": [
     {
@@ -109,6 +109,14 @@ Periodically (based on the tracker's `interval`), or when first connecting, the 
   "trackerid": "<tracker-assigned-id>" // included if previously received from tracker
 }
 ```
+
+`uploaded` and `downloaded` are the swarm's totals since this peer joined it, read at each announce from `transferredBytes`; the `stopped` announce carries the final ones. The P2P loader counts complete transfers only: a segment when it is delivered, whether it came over HTTP, over P2P, or partly over each, and an upload when its last byte is sent, counting only the bytes sent. Peers exchange segments only inside one swarm, so every byte one peer uploads is a byte another peer downloads over P2P. A tracker can therefore compute, for each `info_hash`:
+
+- P2P bytes: the sum of `uploaded`;
+- all bytes: the sum of `downloaded`;
+- HTTP bytes: the difference, and the P2P share as P2P bytes over all bytes.
+
+The totals restart at 0 when a peer joins a swarm again (a new `started`). A tracker that sums them adds, for each peer, the growth since that peer's previous announce.
 
 #### 2. Tracker Announce Response (Tracker -> Client)
 

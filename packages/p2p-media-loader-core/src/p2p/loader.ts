@@ -20,6 +20,13 @@ export class P2PLoader {
   readonly #webtorrentManager: WebTorrentManager;
   readonly #peersMap = new Map<string, Peer>();
   #isAnnounceMicrotaskCreated = false;
+  /**
+   * Bytes moved in this swarm since this loader joined it, reported to the
+   * trackers. Complete transfers only: a segment when it is delivered, an
+   * upload when its last byte is sent.
+   */
+  #downloadedBytes = 0;
+  #uploadedBytes = 0;
   readonly #webtorrentManagerLogger = debug("p2pml-core:webtorrent-manager");
   readonly #churnLogger = debug("p2pml-core:churn-cleanup");
 
@@ -81,6 +88,10 @@ export class P2PLoader {
       offerTimeout: () => this.#config.webRtcOfferTimeoutMs,
       iceGatheringTimeout: () => this.#config.webRtcIceGatheringTimeoutMs,
       connectionTimeout: () => this.#config.webRtcConnectionTimeoutMs,
+      transferredBytes: () => ({
+        uploaded: this.#uploadedBytes,
+        downloaded: this.#downloadedBytes,
+      }),
     });
 
     this.#webtorrentManager.addEventListener(
@@ -457,7 +468,7 @@ export class P2PLoader {
       peer.sendSegmentAbsentCommand(segmentExternalId, requestId);
       return;
     }
-    await peer.uploadSegmentData(
+    this.#uploadedBytes += await peer.uploadSegmentData(
       segment,
       requestId,
       byteFrom !== undefined
@@ -465,6 +476,11 @@ export class P2PLoader {
         : segmentData,
     );
   };
+
+  /** A segment of this swarm was delivered, over HTTP or P2P. */
+  noteDownloadedBytes(bytes: number) {
+    this.#downloadedBytes += bytes;
+  }
 
   destroy() {
     diagnostics?.close(this.#diagnosticsToken, "destroyed");

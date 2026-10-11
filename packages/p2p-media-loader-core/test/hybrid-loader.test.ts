@@ -25,6 +25,8 @@ const fakes = vi.hoisted(() => {
     httpAborted: [] as string[],
     p2pStarted: [] as string[],
     p2pAborted: [] as string[],
+    /** Delivered bytes as counted for the trackers: [stream key, bytes]. */
+    downloaded: [] as [string, number][],
     httpControls: new Map<
       string,
       { addLoadedChunk: (c: Uint8Array) => void; completeOnSuccess: () => void }
@@ -65,6 +67,9 @@ const fakes = vi.hoisted(() => {
       return loader;
     }
     changeCurrentLoader() {}
+    noteDownloadedBytes(stream: { runtimeId: string }, bytes: number) {
+      state.downloaded.push([stream.runtimeId, bytes]);
+    }
     destroy() {}
   }
   class FakeHttpRequestExecutor {
@@ -626,6 +631,7 @@ describe("HybridLoader: a stored segment that reads back empty", () => {
     state.peerCount = 0;
     state.loadedBySomeone.clear();
     state.httpStarted.length = 0;
+    state.downloaded.length = 0;
   });
   afterEach(() => {
     // A test that timed out under fake timers never reaches its own cleanup.
@@ -740,6 +746,28 @@ describe("HybridLoader: a stored segment that reads back empty", () => {
       previous.streamSwarmId,
       1,
     ]);
+    loader.destroy();
+  });
+
+  it("counts a delivered segment for the trackers of its own stream's swarm", async () => {
+    // As above: a request of the previous rendition settles after a switch.
+    // Its bytes are that swarm's, whatever the current loader is.
+    const { loader, segment, callbacks, state } = setup({
+      simultaneousHttpDownloads: 2,
+    });
+    loader.updatePlayback({ bufferAhead: 10, rate: 1 });
+    const previous = segment(0).stream;
+    const controls = state.requests
+      .getOrCreateRequest(segment(1))
+      .start({ downloadSource: "http" }, { onAbort: () => undefined });
+
+    const next = createStream(30, "1080p");
+    await loader.loadSegment(next.segments.get("seg-0")!, callbacks);
+    controls.addLoadedChunk(new Uint8Array(16));
+    controls.completeOnSuccess();
+    await flush();
+
+    expect(state.downloaded).toEqual([[previous.runtimeId, 16]]);
     loader.destroy();
   });
 

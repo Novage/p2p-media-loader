@@ -11,6 +11,7 @@ import { getRTCErrorMessage, isTerminalConnectionState } from "../utils.js";
 import {
   WebTorrentClient,
   type PeerHandshake,
+  type TransferredBytes,
 } from "../webtorrent-client/index.js";
 import { WebTorrentSocketPool } from "../webtorrent-socket-pool/index.js";
 
@@ -27,6 +28,8 @@ export interface WebTorrentManagerConfig {
   connectionTimeout?: () => number;
   maxPeers?: () => number;
   maxPeersMultiplier?: () => number;
+  /** Reported to every tracker in each announce. */
+  transferredBytes?: () => TransferredBytes;
 }
 
 export type WebTorrentManagerEventMap = {
@@ -221,6 +224,7 @@ export class WebTorrentManager {
             offerTimeout: this.#config.offerTimeout,
             iceGatheringTimeout: this.#config.iceGatheringTimeout,
             connectionTimeout: this.#config.connectionTimeout,
+            transferredBytes: this.#config.transferredBytes,
             // shouldGenerateOffers is used to proactively INITIATE connections.
             // We stop actively hunting for peers once we hit the soft limit (maxPeers).
             // This prevents artificial hyper-churn where a stable swarm constantly

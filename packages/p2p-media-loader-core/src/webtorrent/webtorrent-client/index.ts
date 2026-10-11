@@ -65,6 +65,17 @@ const WEBTORRENT_DEFAULT_ICE_GATHERING_TIMEOUT = 5000;
  */
 const ANSWER_RELAY_ALLOWANCE_MS = 5000;
 
+/**
+ * Bytes this peer has moved in one swarm since it joined it: what it
+ * downloaded, over HTTP and P2P together, and what it uploaded to peers. Sent
+ * as the announce's `uploaded` and `downloaded`, so that a tracker can count a
+ * swarm's P2P bytes (the sum of `uploaded`) against all of its bytes (the sum
+ * of `downloaded`).
+ */
+export type TransferredBytes = { uploaded: number; downloaded: number };
+
+const NOTHING_TRANSFERRED: TransferredBytes = { uploaded: 0, downloaded: 0 };
+
 export interface WebTorrentClientConfig {
   wsClient: WebSocketClient;
   infoHash: string;
@@ -77,6 +88,7 @@ export interface WebTorrentClientConfig {
   connectionTimeout?: () => number;
   claimPeer?: (peerId: string, handshake: PeerHandshake) => boolean;
   shouldGenerateOffers?: () => boolean;
+  transferredBytes?: () => TransferredBytes;
 }
 
 type PendingOffer = {
@@ -188,6 +200,7 @@ export class WebTorrentClient {
         (() => WEBTORRENT_DEFAULT_CONNECTION_TIMEOUT),
       claimPeer: config.claimPeer ?? (() => true),
       shouldGenerateOffers: config.shouldGenerateOffers ?? (() => true),
+      transferredBytes: config.transferredBytes ?? (() => NOTHING_TRANSFERRED),
     };
 
     this.#wsClient = config.wsClient;
@@ -625,13 +638,14 @@ export class WebTorrentClient {
     offers: { offer: { type: string; sdp: string }; offer_id: string }[];
     event?: string;
   }): Record<string, unknown> {
+    const { uploaded, downloaded } = this.#config.transferredBytes();
     const payload: Record<string, unknown> = {
       action: "announce",
       info_hash: this.#config.infoHash,
       peer_id: this.#config.peerId,
       numwant,
-      uploaded: 0,
-      downloaded: 0,
+      uploaded,
+      downloaded,
       offers,
     };
 

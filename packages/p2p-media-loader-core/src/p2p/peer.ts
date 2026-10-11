@@ -383,19 +383,20 @@ export class Peer {
     }
   }
 
+  /** Resolves with the bytes sent: all of `data` when the upload completed, 0 otherwise. */
   async uploadSegmentData(
     segment: SegmentWithStream,
     requestId: number,
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-arguments
     data: ArrayBuffer | ArrayBufferView<ArrayBuffer>,
-  ) {
-    if (this.#isDestroyed) return;
+  ): Promise<number> {
+    if (this.#isDestroyed) return 0;
 
     if (requestId !== this.#latestRequestedUploadRequestId) {
       this.#logger(
         `discarding obsolete upload request ${requestId} for segment ${segment.externalId}`,
       );
-      return;
+      return 0;
     }
 
     const { externalId } = segment;
@@ -408,7 +409,7 @@ export class Peer {
       r: requestId,
       s: data.byteLength,
     };
-    if (!this.#sendCommand(command)) return;
+    if (!this.#sendCommand(command)) return 0;
     try {
       await this.#peerProtocol.splitSegmentDataToChunksAndUploadAsync(
         data,
@@ -418,12 +419,14 @@ export class Peer {
         this.isDestroyed ||
         requestId !== this.#latestRequestedUploadRequestId
       ) {
-        return;
+        return 0;
       }
       this.#sendSegmentDataSendingCompletedCommand(segment, requestId);
       this.#logger(`segment ${externalId} has been sent to ${this.id}`);
+      return data.byteLength;
     } catch (error) {
       this.#logger(`cancel segment uploading ${externalId}: %O`, error);
+      return 0;
     }
   }
 

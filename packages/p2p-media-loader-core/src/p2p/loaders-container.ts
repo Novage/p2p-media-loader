@@ -143,6 +143,16 @@ export class P2PLoadersContainer {
     return this.#currentLoaderItem.loader;
   }
 
+  /**
+   * Counts a delivered segment in its own stream's swarm, which is not always
+   * the current one: a request of the previous rendition can settle after a
+   * switch. A segment whose loader is already gone is not counted; that swarm
+   * has sent its final totals.
+   */
+  noteDownloadedBytes(stream: Stream, bytes: number) {
+    this.#loaders.get(stream.runtimeId)?.loader.noteDownloadedBytes(bytes);
+  }
+
   destroy() {
     for (const { loader, destroyTimeoutId } of this.#loaders.values()) {
       loader.destroy();

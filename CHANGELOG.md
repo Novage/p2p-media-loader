@@ -79,6 +79,14 @@ throughout.
   `p2p-media-loader-core/dash` subpaths, so a deployment carries only the
   parsers it uses. Prebuilt bundles follow: `p2p-media-loader-core.es.min.js`
   carries both, `-hls` and `-dash` carry one.
+- **Each announce reports the bytes this peer moved in the swarm.** The
+  standard `uploaded` and `downloaded` fields, which were always 0, now carry
+  the swarm's totals since the peer joined it: `downloaded` counts every
+  delivered segment, over HTTP and P2P, and `uploaded` the bytes of every
+  completed upload. Every byte uploaded is another peer's P2P download, so a
+  tracker can compute each swarm's P2P and HTTP bytes and their ratio with no
+  change to the protocol. See the WebTorrent client's
+  [`spec.md`](packages/p2p-media-loader-core/src/webtorrent/webtorrent-client/spec.md).
 
 ### Changed
 
