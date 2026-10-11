@@ -595,9 +595,11 @@ export type StreamConfig = {
    *
    * @example
    * ```typescript
-   * // Include bitrate: resolution alone collides on multi-bitrate ladders.
-   * streamSwarmIdBuilder: ({ swarmId, streamType, properties }) =>
-   *   `my-app-${swarmId}-${streamType}-${properties.height ?? 0}-${properties.bitrate ?? 0}`,
+   * const config: CoreConfig = {
+   *   // Include bitrate: resolution alone collides on multi-bitrate ladders.
+   *   streamSwarmIdBuilder: ({ swarmId, streamType, properties }) =>
+   *     `my-app-${swarmId}-${streamType}-${properties.height ?? 0}-${properties.bitrate ?? 0}`,
+   * };
    * ```
    */
   streamSwarmIdBuilder?: (

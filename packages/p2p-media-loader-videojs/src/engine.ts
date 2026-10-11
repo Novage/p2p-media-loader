@@ -91,9 +91,15 @@ const bound = new WeakMap<VideoJsPlayerLike, VideoJsP2PEngine>();
  * player.src({ src: streamUrl, type: "application/x-mpegURL" });
  *
  * @example
- * // As a Video.js plugin, with the page-wide hook in place
+ * // As a Video.js plugin, with the page-wide hook in place. Video.js's types
+ * // do not know the plugin, so the player type it adds is named here.
+ * type PlayerWithP2P = ReturnType<typeof videojs> & {
+ *   p2pMediaLoader(config?: PartialVideoJsP2PEngineConfig): VideoJsP2PEngine;
+ * };
  * VideoJsP2PEngine.registerPlugins(videojs);
- * const player = videojs("video", { html5: { vhs: { overrideNative: true } } });
+ * const player = videojs("video", {
+ *   html5: { vhs: { overrideNative: true } },
+ * }) as PlayerWithP2P;
  * const engine = player.p2pMediaLoader({ core: { swarmId: "example-swarm-id" } });
  * player.src({ src: streamUrl, type: "application/x-mpegURL" });
  */
