@@ -178,6 +178,8 @@ declare module "mpd-parser" {
         /** In `timescale` units. */
         duration?: number;
         timescale?: number;
+        /** In `timescale` units. */
+        presentationTimeOffset?: number;
         /** Kept as written. */
         endNumber?: string;
         /** The media URL template. */

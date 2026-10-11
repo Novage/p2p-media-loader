@@ -165,6 +165,45 @@ Presentation time is measured on the presentation timeline, not relative to a
 period, so a multi-period presentation does not restart identities at each
 period boundary.
 
+### Where a numbered template's segment sits on that timeline
+
+A `SegmentTemplate@duration` with no `SegmentTimeline` numbers its segments
+(`$Number$`) and gives no media time. Segment `k` of a period sits at
+`periodStart + (k − startNumber) × duration / timescale`. The template's
+`@presentationTimeOffset` says where the media's own timestamps begin, which
+the player needs to place the bytes; it does not move the segment on the
+presentation timeline.
+
+`mpd-parser` computes a template segment's time as `periodStart + (time −
+presentationTimeOffset) / timescale`. That is right for a `SegmentTimeline`,
+whose `S@t` is a media time and holds the offset. For a duration template it
+counts `time` from the period start, as `index × duration`, and so takes off
+an offset it never added: every segment lands `presentationTimeOffset` early.
+A presentation whose media timeline runs on across periods — `livesim2`'s
+`periods_60`, a packager's ad breaks — sets each period's offset to that
+period's own start, and its times then begin at 0 in every period. Its
+periods carry the same Representations, so they share one stream swarm, and
+two periods' segments shared one `externalId`: the storage served the
+previous period's segment for the next one's request, and dash.js appended
+it 60 s back, leaving the new period's place empty.
+
+The parser therefore hands `mpd-parser` each duration template with no
+offset (`withNumberedTemplateTimes` in `manifest/dash.ts`), and `mpd-parser`
+places its segments from the period start. Nothing else it computes from the
+offset changes; which segments a live window holds does not depend on it. A
+`SegmentTimeline`, a `SegmentList` and a `SegmentBase` keep the times they
+had. A duration template whose offset is 0 — a single-period stream as most
+packagers write it — keeps the same `externalId`s.
+
+The same times are the segments' start times in the core, so the storage's
+position and the prefetch windows run on the presentation timeline too, and
+the previous period's segments fall behind the position as any other.
+
+`mpd-parser` lists a live period up to the present, past the start of the
+next one, so a segment near a period change comes under both periods, with
+one URL. With the offset taken out, both entries carry the same time and the
+same `externalId`, and the registry, which finds a segment by URL, holds one.
+
 ### Where a `SegmentBase` subsegment sits on that timeline
 
 A `SegmentBase` representation lists no segments: its subsegments come from the

@@ -481,7 +481,10 @@ Date()` as well as `Date.now` — and restore it afterwards. A player that
   `/livesim2/stop_<epoch seconds>/testpic_2s/Manifest.mpd`, about a minute
   ahead. Its MPD becomes static at that time. Measure the longest pause of the
   page's main thread with a 100 ms heartbeat timer.
-- **Several periods.** Use `livesim2` with `periods_60`.
+- **Several periods.** Use `livesim2` with `periods_60`, with dash.js, for at
+  least three period changes. Read the media element's `buffered` ranges every
+  10 seconds. dash.js jumps a small gap in the buffer, so a player that plays
+  on can still have skipped part of a period.
 - **Low latency.** Use a low-latency DASH stream (`livesim2` with
   `chunkdur_1/ato_7`) and a low-latency HLS stream. Check first that the HLS
   media playlist has `EXT-X-PART` tags: a stream listed as low latency does
@@ -491,7 +494,7 @@ Pass: with a wrong clock, the ledger shows a clock synchronization, there is
 no registry miss, and no owner request fails with 404 or 425; a stream that
 ends plays to its end, the page does not stop for longer than a second, and
 the core stops its re-parses and its downloads after the end; each period
-plays and shares; HLS.js and Video.js play a low-latency HLS stream by its
+plays and shares, and the buffer has no gap at a period change; HLS.js and Video.js play a low-latency HLS stream by its
 full segments, since their adapters turn low latency off, so the page requests
 no partial segment and has no registry miss; a part that a player requests
 anyway is not registered, goes over HTTP, and does not stop playback

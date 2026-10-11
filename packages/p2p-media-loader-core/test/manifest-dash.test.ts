@@ -9,10 +9,13 @@ import {
   DASH_LIVE_START,
   DASH_OPEN_TIMELINE_MIXED,
   DASH_MULTI_PERIOD,
+  DASH_MULTI_PERIOD_OFFSET,
+  DASH_PERIODS_LIVE,
   DASH_SEGMENT_BASE,
   DASH_SEGMENT_BASE_LIVE,
   DASH_SEGMENT_TEMPLATE,
   DASH_SEGMENT_TIMELINE_DYNAMIC,
+  DASH_SEGMENT_TIMELINE_OFFSET,
   DASH_SEGMENT_TIMELINE_OPEN,
   DASH_TEMPLATE_DURATION_DYNAMIC,
   DASH_WITH_TEXT_IMAGE_AND_TRICK_MODE,
@@ -107,6 +110,63 @@ describe("dashManifestParser", () => {
       "p1-1.m4s",
       "p1-2.m4s",
     ]);
+  });
+
+  it("places a numbered template's segments from the period start, whatever its presentationTimeOffset", () => {
+    // The offset says where the media timestamps begin; it does not move a
+    // segment of a duration template on the presentation timeline.
+    const [video] = dashManifestParser.parse(
+      DASH_MULTI_PERIOD_OFFSET,
+      URL,
+    ).streams;
+    expect(video.segments?.map((s) => s.presentationTime)).toEqual([
+      0, 10, 20, 30,
+    ]);
+  });
+
+  it("keeps presentation time global across live periods whose offset is their own start", () => {
+    // livesim2's periods_60, 700 s in: segments 64 and 65 of the first period
+    // and 66 to 69 of the second. mpd-parser lists a live period up to the
+    // present, past the next one's start, so 66 to 69 also come under the
+    // first period — with the same URLs, and now the same times.
+    const parsed = dashManifestParser.parse(DASH_PERIODS_LIVE, URL, {
+      now: DASH_LIVE_START + 700_000,
+    });
+    const [video] = parsed.streams;
+    const timesByNumber = new Map<string, Set<number | undefined>>();
+    for (const s of video.segments ?? []) {
+      const number = /(\d+)\.m4s$/.exec(s.url)?.[1] ?? "";
+      const times = timesByNumber.get(number) ?? new Set();
+      times.add(s.presentationTime);
+      timesByNumber.set(number, times);
+    }
+    expect(
+      Array.from(timesByNumber, ([number, times]) => [number, [...times]]),
+    ).toEqual([
+      ["64", [640]],
+      ["65", [650]],
+      ["66", [660]],
+      ["67", [670]],
+      ["68", [680]],
+      ["69", [690]],
+    ]);
+
+    // One identity per segment, rising with time: no period gives another
+    // period's segment its identity.
+    const registry = new ManifestRegistry();
+    registry.apply(parsed);
+    const ids = Array.from(
+      registry.getStream("V300")?.segments.values() ?? [],
+    ).map((s) => s.externalId);
+    expect(ids).toEqual([6400, 6500, 6600, 6700, 6800, 6900]);
+  });
+
+  it("still takes a SegmentTimeline's presentationTimeOffset off its media time", () => {
+    const [video] = dashManifestParser.parse(
+      DASH_SEGMENT_TIMELINE_OFFSET,
+      URL,
+    ).streams;
+    expect(video.segments?.map((s) => s.presentationTime)).toEqual([20, 24]);
   });
 
   it("reads live off the MPD however far into the document its tag sits", () => {

@@ -31,7 +31,15 @@ throughout.
   by each integration out of what its player exposes. Peers on different
   players derive the same identity for the same segment, so a swarm shared
   between players holds in practice. A rendition is still a swarm: engines left
-  on their own adaptive logic may sit in different ones.
+  on their own adaptive logic may sit in different ones. A DASH segment
+  numbered by a `SegmentTemplate@duration` is placed from its period start,
+  whatever the template's `presentationTimeOffset`, so the periods of a live
+  stream that repeat the same Representations no longer give two segments one
+  identity. 5.0.0-alpha.2 and alpha.3 did: the storage served the previous
+  period's segment for the next one's request, and dash.js stalled at each
+  period change. See
+  [`specs/segment-identity.md`](specs/segment-identity.md), "Where a numbered
+  template's segment sits on that timeline".
 - **The HLS.js and Shaka integrations need much less of their players' APIs.**
   Neither describes streams or segments any more, so neither decorates a
   manifest parser nor reads its player's internal representation of the stream.

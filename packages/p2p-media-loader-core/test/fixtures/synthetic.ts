@@ -284,6 +284,69 @@ export const DASH_MULTI_PERIOD = MPD(
 );
 
 /**
+ * `DASH_MULTI_PERIOD` with a `presentationTimeOffset` in each period, as a
+ * packager writes it when the media timestamps do not start at 0.
+ */
+export const DASH_MULTI_PERIOD_OFFSET = MPD(
+  "static",
+  `  <Period id="p0" start="PT0S" duration="PT20S">
+    <AdaptationSet mimeType="video/mp4">
+      <Representation id="v0" bandwidth="1000000" codecs="avc1.4d401f">
+        <SegmentTemplate media="p0-$Number$.m4s" initialization="p0-init.mp4" duration="10000" timescale="1000" startNumber="1" presentationTimeOffset="100000"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+  <Period id="p1" start="PT20S" duration="PT20S">
+    <AdaptationSet mimeType="video/mp4">
+      <Representation id="v0" bandwidth="1000000" codecs="avc1.4d401f">
+        <SegmentTemplate media="p1-$Number$.m4s" initialization="p1-init.mp4" duration="10000" timescale="1000" startNumber="1" presentationTimeOffset="200000"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>`,
+);
+
+/**
+ * A live presentation with a new period every 60 s, as livesim2 writes
+ * `periods_60`: the same Representation in every period, numbered on from the
+ * last, and each period's `presentationTimeOffset` its own start, so that the
+ * media timeline runs on across periods. 10 s segments, a 60 s window.
+ */
+export const DASH_PERIODS_LIVE = `<?xml version="1.0" encoding="UTF-8"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" profiles="urn:mpeg:dash:profile:isoff-live:2011" type="dynamic" availabilityStartTime="2026-01-01T00:00:00Z" minimumUpdatePeriod="PT10S" timeShiftBufferDepth="PT60S" minBufferTime="PT2S">
+  <Period id="P10" start="PT600S">
+    <AdaptationSet mimeType="video/mp4">
+      <SegmentTemplate media="$RepresentationID$/$Number$.m4s" initialization="$RepresentationID$/init.mp4" duration="10" startNumber="60" presentationTimeOffset="600"/>
+      <Representation id="V300" bandwidth="300000" codecs="avc1.64001e" width="640" height="360"/>
+    </AdaptationSet>
+  </Period>
+  <Period id="P11" start="PT660S">
+    <AdaptationSet mimeType="video/mp4">
+      <SegmentTemplate media="$RepresentationID$/$Number$.m4s" initialization="$RepresentationID$/init.mp4" duration="10" startNumber="66" presentationTimeOffset="660"/>
+      <Representation id="V300" bandwidth="300000" codecs="avc1.64001e" width="640" height="360"/>
+    </AdaptationSet>
+  </Period>
+</MPD>`;
+
+/**
+ * A `SegmentTimeline` whose media time starts at its `presentationTimeOffset`:
+ * the offset is part of `S@t`, and the first segment sits at the period start.
+ */
+export const DASH_SEGMENT_TIMELINE_OFFSET = MPD(
+  "static",
+  `  <Period id="0" start="PT20S">
+    <AdaptationSet mimeType="video/mp4">
+      <Representation id="v" bandwidth="2000000" codecs="avc1.64001f" width="1920" height="1080">
+        <SegmentTemplate media="v-$Time$.m4s" initialization="v-init.mp4" timescale="1000" presentationTimeOffset="120000">
+          <SegmentTimeline>
+            <S t="120000" d="4000" r="1"/>
+          </SegmentTimeline>
+        </SegmentTemplate>
+      </Representation>
+    </AdaptationSet>
+  </Period>`,
+);
+
+/**
  * A live `SegmentBase` stream, whose period starts 30 s in. Its MPD gives no
  * duration for the parser to lay the index out from, so the index carries no
  * period start and only the playlist does.

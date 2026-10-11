@@ -68,7 +68,9 @@ export const dashManifestParser: ManifestParser = {
     const now = context?.now ?? Date.now();
     const inherited = inheritAttributes(mpd, { manifestUri: url, NOW: now });
     const manifest = toM3u8({
-      dashPlaylists: toPlaylists(inherited.representationInfo),
+      dashPlaylists: toPlaylists(
+        withNumberedTemplateTimes(inherited.representationInfo),
+      ),
       locations: inherited.locations,
       contentSteering: inherited.contentSteeringInfo,
       eventStream: inherited.eventStream,
@@ -159,6 +161,51 @@ export const dashManifestParser: ManifestParser = {
     };
   },
 };
+
+/**
+ * The Representations, with the offset taken out of each one a
+ * `SegmentTemplate@duration` numbers, so that mpd-parser places its segments
+ * on the presentation timeline.
+ *
+ * mpd-parser places a template's segment at `periodStart + (time −
+ * presentationTimeOffset) / timescale`. A `SegmentTimeline` gives `time` as
+ * the media time, `S@t`, which holds the offset, and the result is right. A
+ * duration template has no media time: mpd-parser counts `time` from the
+ * period start, as `index × duration`, and takes off an offset it never
+ * added. Every segment then lands `presentationTimeOffset` early. A
+ * multi-period presentation whose media timeline runs on across periods sets
+ * the offset to the period's own start, and its times then begin at 0 in every
+ * period: two periods with the same Representations give two segments one
+ * identity, and the storage serves one period's segment for the other's.
+ * See specs/segment-identity.md.
+ *
+ * For a duration template the DASH timing model places segment `k` at
+ * `periodStart + (k − startNumber) × duration / timescale`; the offset only
+ * says where the media's own timestamps begin. So it is 0 here. Nothing else
+ * mpd-parser computes from it — which segments a live window holds included —
+ * changes.
+ */
+function withNumberedTemplateTimes(
+  representations: readonly MpdRepresentationInfo[],
+): MpdRepresentationInfo[] {
+  return representations.map((info) => {
+    const { template, segmentTimeline } = info.segmentInfo;
+    if (
+      !template?.duration ||
+      segmentTimeline ||
+      !template.presentationTimeOffset
+    ) {
+      return info;
+    }
+    return {
+      ...info,
+      segmentInfo: {
+        ...info.segmentInfo,
+        template: { ...template, presentationTimeOffset: 0 },
+      },
+    };
+  });
+}
 
 /**
  * Every segment and initialization segment the playlists list, by location.
