@@ -67,6 +67,9 @@ const registrationTokens: (string | undefined)[] = [];
  * // Initializing the ShakaP2PEngine with custom configuration. The second
  * // argument is the Shaka you imported; only a page that loads Shaka with a
  * // <script> tag, as `window.shaka`, can leave it out.
+ * import shaka from "shaka-player";
+ * import { ShakaP2PEngine } from "p2p-media-loader-shaka";
+ *
  * const shakaP2PEngine = new ShakaP2PEngine({
  *   core: {
  *     simultaneousHttpDownloads: 3,
@@ -120,8 +123,22 @@ export class ShakaP2PEngine {
 
   /**
    * Configures and initializes the Shaka Player instance with predefined settings optimized for P2P performance.
+   * Call it after `registerPlugins` and before `player.load()`.
+   *
+   * Binding lets go of the player this engine had before, and takes this
+   * player over from any other engine bound to it, destroying that engine.
+   * It sets `streaming.segmentPrefetchLimit` to 0 where Shaka has the setting,
+   * and turns native HLS off (`streaming.preferNativeHls` on Shaka 5 and
+   * later, `streaming.useNativeHlsOnSafari` before), since native playback
+   * bypasses the networking engine. Where the player has Shaka's default
+   * presentation delay, the engine also places it in the live window. The
+   * settings it changes are given back when it lets the player go, on
+   * `destroy()` or on binding another player.
    *
    * @param player The Shaka Player instance to configure.
+   * @throws {Error} If no `registerPlugins` call is in effect for this
+   * engine's Shaka. Otherwise the player is bound even when part of the
+   * binding fails, and the first failure is thrown once it is.
    */
   bindShakaPlayer(player: shaka.Player) {
     if (this.bound?.player === player) return;
@@ -187,8 +204,8 @@ export class ShakaP2PEngine {
    *
    * const newDynamicConfig = {
    *   core: {
-   *     // Limit the segments kept in memory to 1000 MiB
-   *     segmentMemoryStorageLimit: 1000,
+   *     // Stop uploading segments to peers
+   *     isP2PUploadDisabled: true,
    *     // 50 minutes of segments will be preemptively downloaded via HTTP connections
    *     httpDownloadTimeWindow: 3000,
    *     // 100 minutes of segments will be preemptively downloaded via P2P connections
@@ -205,7 +222,8 @@ export class ShakaP2PEngine {
   /**
    * Retrieves the current configuration of the `ShakaP2PEngine`.
    *
-   * @returns The configuration as a readonly object.
+   * @returns A copy of the configuration; changing it changes nothing in the
+   * engine.
    */
   getConfig(): ShakaP2PEngineConfig {
     return { core: this.core.getConfig() };
@@ -217,18 +235,24 @@ export class ShakaP2PEngine {
    * @param listener The callback function to be invoked when the event is triggered.
    *
    * @example
+   * // Assuming `shakaP2PEngine` is an instance of ShakaP2PEngine
+   *
    * // Listening for a segment being successfully loaded
    * shakaP2PEngine.addEventListener('onSegmentLoaded', (details) => {
    *   console.log('Segment Loaded:', details);
    * });
    *
    * @example
+   * // Assuming `shakaP2PEngine` is an instance of ShakaP2PEngine
+   *
    * // Handling segment load errors
    * shakaP2PEngine.addEventListener('onSegmentError', (errorDetails) => {
    *   console.error('Error loading segment:', errorDetails);
    * });
    *
    * @example
+   * // Assuming `shakaP2PEngine` is an instance of ShakaP2PEngine
+   *
    * // Tracking data downloaded from peers
    * shakaP2PEngine.addEventListener('onChunkDownloaded', (bytesLength, downloadSource, peerId) => {
    *   console.log(`Downloaded ${bytesLength} bytes from ${downloadSource} ${peerId ? 'from peer ' + peerId : 'from server'}`);
@@ -340,7 +364,14 @@ export class ShakaP2PEngine {
     );
   };
 
-  /** Cleans up and releases all resources, and unregisters all event handlers. */
+  /**
+   * Cleans up and releases all resources, and unregisters all event handlers.
+   * The bound player is let go and given back the settings the engine took.
+   *
+   * Every step runs even when one before it throws, and the first failure is
+   * rethrown once all have run. Listeners added with `addEventListener` are
+   * not removed: they are on the core, which is emptied, not discarded.
+   */
   destroy() {
     const failures = this.releaseBinding();
     if (failures.length) throw failures[0];

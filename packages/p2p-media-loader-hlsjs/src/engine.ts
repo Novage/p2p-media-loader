@@ -112,6 +112,8 @@ type ForwardBufferKey = (typeof FORWARD_BUFFER_KEYS)[number];
  *
  * @example
  * // Creating an instance of HlsJsP2PEngine with custom configuration
+ * import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
+ *
  * const hlsP2PEngine = new HlsJsP2PEngine({
  *   core: {
  *     simultaneousHttpDownloads: 3,
@@ -163,6 +165,9 @@ export class HlsJsP2PEngine {
    * @returns The enhanced HLS.js class with P2P functionalities.
    *
    * @example
+   * import Hls from "hls.js";
+   * import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
+   *
    * const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
    *
    * const hls = new HlsWithP2P({
@@ -200,18 +205,24 @@ export class HlsJsP2PEngine {
    * @param listener The callback function to be invoked when the event is triggered.
    *
    * @example
+   * // Assuming `p2pEngine` is an instance of HlsJsP2PEngine
+   *
    * // Listening for a segment being successfully loaded
    * p2pEngine.addEventListener('onSegmentLoaded', (details) => {
    *   console.log('Segment Loaded:', details);
    * });
    *
    * @example
+   * // Assuming `p2pEngine` is an instance of HlsJsP2PEngine
+   *
    * // Handling segment load errors
    * p2pEngine.addEventListener('onSegmentError', (errorDetails) => {
    *   console.error('Error loading segment:', errorDetails);
    * });
    *
    * @example
+   * // Assuming `p2pEngine` is an instance of HlsJsP2PEngine
+   *
    * // Tracking data downloaded from peers
    * p2pEngine.addEventListener('onChunkDownloaded', (bytesLength, downloadSource, peerId) => {
    *   console.log(`Downloaded ${bytesLength} bytes from ${downloadSource} ${peerId ? 'from peer ' + peerId : 'from server'}`);
@@ -274,7 +285,8 @@ export class HlsJsP2PEngine {
 
   /**
    * Retrieves the current configuration of the HLS.js P2P engine.
-   * @returns A readonly version of the `HlsJsP2PEngineConfig`.
+   * @returns A copy of the `HlsJsP2PEngineConfig`; changing it changes
+   * nothing in the engine.
    */
   getConfig(): HlsJsP2PEngineConfig {
     return { core: this.core.getConfig() };
@@ -289,8 +301,8 @@ export class HlsJsP2PEngine {
    *
    * const newDynamicConfig = {
    *   core: {
-   *     // Limit the segments kept in memory to 1000 MiB
-   *     segmentMemoryStorageLimit: 1000,
+   *     // Stop uploading segments to peers
+   *     isP2PUploadDisabled: true,
    *     // 50 minutes of segments will be preemptively downloaded via HTTP connections
    *     httpDownloadTimeWindow: 3000,
    *     // 100 minutes of segments will be preemptively downloaded via P2P connections
@@ -606,7 +618,14 @@ export class HlsJsP2PEngine {
     }
   };
 
-  /** Cleans up and releases all resources, and unregisters all event handlers. */
+  /**
+   * Cleans up and releases all resources, and unregisters all event handlers.
+   * Runs by itself when the bound HLS.js instance is destroyed.
+   *
+   * Every step runs even when one before it throws, and the first failure is
+   * rethrown once all have run. Listeners added with `addEventListener` are
+   * not removed: they are on the core, which is emptied, not discarded.
+   */
   destroy = () => {
     // Each step runs whatever the ones before it made of themselves: the core
     // destroys an integrator's own segment storage and is free to throw, and

@@ -98,7 +98,10 @@ const PLAYBACK_PLAYING: MediaPlayerEvents["PLAYBACK_PLAYING"] =
  * own manifest parsing runs untouched; the core parses the same bytes itself.
  *
  * @example
- * const player = dashjs.MediaPlayer().create();
+ * import { MediaPlayer } from "dashjs";
+ * import { DashJsP2PEngine } from "p2p-media-loader-dashjs";
+ *
+ * const player = MediaPlayer().create();
  * const engine = new DashJsP2PEngine({
  *   core: {
  *     swarmId: "example-swarm-id",
@@ -210,7 +213,8 @@ export class DashJsP2PEngine {
   /**
    * Retrieves the current configuration of the `DashJsP2PEngine`.
    *
-   * @returns The configuration as a readonly object.
+   * @returns A copy of the configuration; changing it changes nothing in the
+   * engine.
    */
   getConfig(): DashJsP2PEngineConfig {
     return { core: this.core.getConfig() };
@@ -222,6 +226,8 @@ export class DashJsP2PEngine {
    * @param listener The callback function to be invoked when the event is triggered.
    *
    * @example
+   * // Assuming `engine` is an instance of DashJsP2PEngine
+   *
    * engine.addEventListener('onSegmentLoaded', (details) => {
    *   console.log('Segment Loaded:', details);
    * });
@@ -596,7 +602,14 @@ export class DashJsP2PEngine {
     if (media) this.playback.watch(media);
   }
 
-  /** Cleans up and releases all resources, and unregisters all event handlers. */
+  /**
+   * Cleans up and releases all resources, and unregisters all event handlers.
+   * The bound player is let go and given back the settings the engine wrote.
+   *
+   * Every step runs even when one before it throws, and the first failure is
+   * rethrown once all have run. Listeners added with `addEventListener` are
+   * not removed: they are on the core, which is emptied, not discarded.
+   */
   destroy() {
     // Only if it is still ours: another engine may have taken this player on
     // since, and it has already been given back to it.

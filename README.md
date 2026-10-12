@@ -92,8 +92,8 @@ This library makes it possible to build large-scale P2P mesh networks — often 
 
 These steps apply when you bundle the npm packages yourself, with Vite, webpack, Rollup or esbuild. The prebuilt bundles in each package's `dist/` folder already include them.
 
-- **Use the browser's XML parser (MPEG-DASH only).** The MPEG-DASH manifest parser is published for Node and browsers alike, so it imports a complete XML parser, `@xmldom/xmldom`. Every browser already has one. Point that import at `p2p-media-loader-core/shims/xmldom`, which exports the browser's `DOMParser`. This removes about 25 KB, gzipped.
-- **Leave out the diagnostics ledger.** The packages contain a ledger of open resources that is used in testing, and it is off unless you turn it on (see [Diagnostics](#diagnostics) below). Define `__P2PML_DIAGNOSTICS__` as `false` to remove it. This removes about 1.4 KB, gzipped.
+- **Use the browser's XML parser (MPEG-DASH only).** The MPEG-DASH manifest parser is published for Node and browsers alike, so it imports a complete XML parser, `@xmldom/xmldom`. Every browser already has one. Point that import at `p2p-media-loader-core/shims/xmldom`, which exports the browser's `DOMParser`. This removes about 23 KB, gzipped.
+- **Leave out the diagnostics ledger.** The packages contain a ledger of open resources that is used in testing, and it is off unless you turn it on (see [Diagnostics](#diagnostics) below). Define `__P2PML_DIAGNOSTICS__` as `false` to remove it. This removes about 1.5 KB, gzipped.
 
 Vite:
 
@@ -138,11 +138,12 @@ To turn it on, set the `debug` namespace before the page loads, then reload. The
 localStorage.debug = "p2pml:diagnostics";
 ```
 
-The ledger appears on `globalThis` at that first record, so read it once a player has started:
+The ledger appears on `window` at that first record, so read it once a player has started:
 
 ```js
 const snapshot = window.__p2pmlDiagnostics.snapshot();
-// snapshot.live: open resources by kind; snapshot.counters: results;
+// snapshot.live: open resources by kind; snapshot.open: each open resource;
+// snapshot.counters: results; snapshot.probes: values read for the snapshot;
 // snapshot.anomalies: states that must not occur
 window.__p2pmlDiagnostics.clearAnomalies();
 ```

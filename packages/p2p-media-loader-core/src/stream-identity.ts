@@ -87,7 +87,11 @@ export function buildStreamSwarmId(
 }
 
 /**
- * Computes the default stream swarm ID for a stream from its raw properties.
+ * Computes the default stream swarm ID for a stream from its identity
+ * properties: its entry in what {@link identityProperties} returns for the
+ * manifest's streams, which keeps `bitrate` only where the manifest needs it.
+ * Passing the raw properties of a stream whose bitrate the core dropped gives
+ * an ID no client announces.
  *
  * This is the derivation a client with no `streamSwarmIdBuilder` configured uses.
  * Run it on a server (Node.js 16+) to predict a stream's swarm ID — and, via

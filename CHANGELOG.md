@@ -22,9 +22,9 @@ throughout.
 
 - **Smaller bundles for integrators who bundle the npm packages.** The core
   exports `p2p-media-loader-core/shims/xmldom`, the browser's `DOMParser`, to
-  alias `@xmldom/xmldom` to in a browser build: about 25 KB gzipped less for
+  alias `@xmldom/xmldom` to in a browser build: about 23 KB gzipped less for
   MPEG-DASH. Defining `__P2PML_DIAGNOSTICS__` as `false` removes the
-  diagnostics ledger, about 1.4 KB more. The README's "Reduce the Bundle Size"
+  diagnostics ledger, about 1.5 KB more. The README's "Reduce the Bundle Size"
   shows both for Vite and webpack; the prebuilt bundles already include them.
 - **Identity is computed in the core, from the manifest** — the HLS media
   sequence number, or the DASH presentation time in 100 ms units — rather than
@@ -142,12 +142,12 @@ throughout.
   and derived on live.** Left unset, VOD keeps 15 s and a live stream gets half
   of what the player buffers — at least a segment, at most 15 s — from the live
   window's geometry, so the other half of the buffer is room for the prefetch
-  election. Off live a number is still the threshold; on live it is a ceiling,
-  since nothing configured here widens the player's buffer and a threshold
-  past half of it would make every request urgent. The adapters size the
-  player's forward buffer one segment short of the live delay rather than to
-  the urgency threshold, on hls.js, dash.js and
-  Shaka alike, and hls.js tunes a four-segment playlist, the narrowest with
+  election. Off live a number is still the threshold; on live it is capped at
+  half the player's buffer, since nothing configured here widens that buffer
+  and a threshold past half of it would make every request urgent. The
+  adapters size the player's forward buffer one segment short of the live
+  delay rather than to the urgency threshold, on hls.js, dash.js and Shaka
+  alike, and hls.js tunes a four-segment playlist, the narrowest with
   room in it. On a four-segment live playlist, where the delay, the window and
   the buffer all measured 15 s, two peers pulled 1.68 copies of each segment
   from the origin and no election ever ran. The memory storage keeps three
@@ -225,6 +225,14 @@ throughout.
   reported to it as an abort, which it never retries; one the core made is a
   network error, which Shaka's retry parameters govern. See
   [`specs/player-adapters.md`](specs/player-adapters.md).
+- **The HLS.js engine plays a low-latency HLS stream by its full segments.**
+  `getConfigForHlsJs()` carries `lowLatencyMode: false`, which the mixin
+  applies unless the integrator set `lowLatencyMode` themselves; an
+  integration that spreads that config into its own overrides it by setting
+  `lowLatencyMode` after the spread. In low-latency mode HLS.js requests
+  partial segments, which the core does not register, so those requests
+  would bypass P2P. The Video.js adapter does the same through VHS's
+  `llhls: false`.
 - **On a page without WebRTC, the player loads every segment itself.** No
   peer can connect there. Before, the core took the player's requests, opened
   its tracker sockets, and announced at each interval with offers that it

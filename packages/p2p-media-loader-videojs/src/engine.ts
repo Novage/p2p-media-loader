@@ -81,8 +81,18 @@ const bound = new WeakMap<VideoJsPlayerLike, VideoJsP2PEngine>();
  * `p2pMediaLoader` Video.js plugin for integrators who prefer that style.
  *
  * @example
- * // One engine, one player, no page-wide setup
- * const player = videojs("video", { html5: { vhs: { overrideNative: true } } });
+ * // One engine, one player. `limitRenditionByPlayerDimensions: false` has VHS
+ * // choose a rendition on bandwidth alone, as HLS.js, dash.js and Shaka do,
+ * // rather than by the player's size: a rendition is a swarm, so its viewers
+ * // then share swarms with theirs.
+ * import videojs from "video.js";
+ * import { VideoJsP2PEngine } from "p2p-media-loader-videojs";
+ *
+ * const player = videojs("video", {
+ *   html5: {
+ *     vhs: { overrideNative: true, limitRenditionByPlayerDimensions: false },
+ *   },
+ * });
  * const engine = new VideoJsP2PEngine(
  *   { core: { swarmId: "example-swarm-id" } },
  *   videojs, // may be left out where Video.js is on `window`
@@ -91,14 +101,22 @@ const bound = new WeakMap<VideoJsPlayerLike, VideoJsP2PEngine>();
  * player.src({ src: streamUrl, type: "application/x-mpegURL" });
  *
  * @example
- * // As a Video.js plugin, with the page-wide hook in place. Video.js's types
- * // do not know the plugin, so the player type it adds is named here.
+ * // As a Video.js plugin. Video.js's types do not know the plugin, so the
+ * // player type it adds is named here.
+ * import videojs from "video.js";
+ * import {
+ *   VideoJsP2PEngine,
+ *   type PartialVideoJsP2PEngineConfig,
+ * } from "p2p-media-loader-videojs";
+ *
  * type PlayerWithP2P = ReturnType<typeof videojs> & {
  *   p2pMediaLoader(config?: PartialVideoJsP2PEngineConfig): VideoJsP2PEngine;
  * };
  * VideoJsP2PEngine.registerPlugins(videojs);
  * const player = videojs("video", {
- *   html5: { vhs: { overrideNative: true } },
+ *   html5: {
+ *     vhs: { overrideNative: true, limitRenditionByPlayerDimensions: false },
+ *   },
  * }) as PlayerWithP2P;
  * const engine = player.p2pMediaLoader({ core: { swarmId: "example-swarm-id" } });
  * player.src({ src: streamUrl, type: "application/x-mpegURL" });
@@ -197,7 +215,13 @@ export class VideoJsP2PEngine {
    * Attaches the engine to a Video.js player, hooking that player's own VHS
    * request and response hooks. Its playlists, MPDs and segments go through
    * the core from then on, whether it has a source already or loads one
-   * later. Nothing outside this player is touched.
+   * later.
+   *
+   * Binding also puts a request and a response hook on the page-wide
+   * `videojs.Vhs.xhr`, shared by every bound engine and taken off when the
+   * last of them is destroyed. They see every VHS request on the page and act
+   * only on the top-level manifest of a bound player's source; every other
+   * request passes them unchanged.
    *
    * @param player The Video.js player.
    */
@@ -248,7 +272,8 @@ export class VideoJsP2PEngine {
   /**
    * Retrieves the current configuration of the `VideoJsP2PEngine`.
    *
-   * @returns The configuration as a readonly object.
+   * @returns A copy of the configuration; changing it changes nothing in the
+   * engine.
    */
   getConfig(): VideoJsP2PEngineConfig {
     return { core: this.core.getConfig() };
@@ -260,6 +285,8 @@ export class VideoJsP2PEngine {
    * @param listener The callback function to be invoked when the event is triggered.
    *
    * @example
+   * // Assuming `engine` is an instance of VideoJsP2PEngine
+   *
    * engine.addEventListener('onSegmentLoaded', (details) => {
    *   console.log('Segment Loaded:', details);
    * });
@@ -341,7 +368,14 @@ export class VideoJsP2PEngine {
     this.playback.watch(element);
   }
 
-  /** Cleans up and releases all resources, and unregisters all event handlers. */
+  /**
+   * Cleans up and releases all resources, and unregisters all event handlers.
+   * Runs by itself when the bound player is disposed.
+   *
+   * Every step runs even when one before it throws, and the first failure is
+   * rethrown once all have run. Listeners added with `addEventListener` are
+   * not removed: they are on the core, which is emptied, not discarded.
+   */
   destroy() {
     // Each step runs whatever the ones before it made of themselves: the core
     // destroys an integrator's own segment storage and is free to throw, and

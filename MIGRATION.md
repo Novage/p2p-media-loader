@@ -24,9 +24,16 @@ and every stream still plays over HTTP.
 `p2p-media-loader-hlsjs` and `p2p-media-loader-shaka` keep their public API.
 `ShakaP2PEngine.registerPlugins` now registers only the networking schemes;
 Shaka's own manifest parsers are no longer replaced. npm and IIFE consumers
-have nothing to change. `p2p-media-loader-shaka` works with Shaka Player 4.3
-and later as well as 5 — the adapter uses only the networking plugin API,
-which both share — and, as before, declares no peer dependency on it.
+have nothing to change in their code. `p2p-media-loader-shaka` works with
+Shaka Player 5, and with Shaka Player 4, which the demo loads for Clappr's
+DASH plugin; where the two name a setting differently, the adapter reads
+Shaka's major version. As before, it declares no peer dependency on Shaka.
+
+The HLS.js engine now plays a low-latency HLS stream by its full segments:
+`getConfigForHlsJs()` carries `lowLatencyMode: false`, which the mixin
+applies unless the integrator set `lowLatencyMode` themselves, and which an
+integration that spreads that config into its own overrides by setting
+`lowLatencyMode` after the spread. The core does not share partial segments.
 
 **ESM bundles from a CDN need two or three more import map entries.** The
 engine's `dist/*.es.js` imports the core _and_ its manifest parsers by bare
@@ -115,7 +122,8 @@ core.processManifest({
 ```
 
 Segment requests are resolved by URL and byte range rather than by a
-runtime identifier the integration composed:
+runtime identifier the integration composed. The v4 half below is the code
+being replaced, and does not compile against v5:
 
 ```typescript
 // v4
@@ -183,10 +191,11 @@ meaning changes. In v4 it was a window ahead of the playhead: every segment
 inside it was fetched over HTTP at once, whether the player had asked for it or
 not. In v5 it is the buffer below which a request the player has made is
 urgent: an urgent request is fetched over HTTP at once, and a request made with
-more buffer waits for a peer while the buffer drains. Nothing the player has
-not asked for is ever urgent, so a player with P2P is never slower than without
-it, on the same player parameters (see `specs/playback-contract.md`,
-"Urgency").
+more buffer waits for a peer while the buffer drains. The threshold scales
+with the playback rate: at rate 2, a request is urgent while the buffer is
+below twice the threshold. Nothing the player has not asked for is ever
+urgent, so a player with P2P is never slower than without it, on the same
+player parameters (see `specs/playback-contract.md`, "Urgency").
 
 It is `number | undefined` and defaults to `undefined`, which derives the
 threshold: 15 s on VOD, and on live half of what the player buffers, from the
@@ -197,12 +206,13 @@ handle `undefined`.
 **Setting a number does not reproduce v4**, and on a live stream it should be
 left unset. In v4 the number sized both the core's urgent window and the
 player's forward buffer, which is why the two collided; in v5 the buffer
-follows the live window's geometry, so on live the configured number is only a
-ceiling — it lowers the derived threshold and is ignored where it would reach
-past half the player's buffer. Carrying v4's `highDemandTimeWindow: 15` onto a
-short live window as `urgentBufferThreshold: 15` therefore buys nothing, and
-leaving it unset is what gives the election room. Off live the number is still
-the threshold.
+follows the live window's geometry, so on live the configured number is capped
+at half the player's buffer: up to that it is the threshold, above or below
+the derived one, and past it the threshold is half the buffer. A threshold
+past that would make every request urgent and leave the election nothing.
+Carrying v4's `highDemandTimeWindow: 15` onto a short live window as
+`urgentBufferThreshold: 15` therefore buys nothing: it is capped to the value
+the core derives anyway. Off live the number is still the threshold.
 
 A **custom `SegmentStorage`** is handed the same value: `initialize` receives
 the configured stream configurations, so
@@ -213,9 +223,11 @@ property is gone; rewritten as `position <= urgentBufferThreshold + endTime`,
 it fails silently at runtime — `undefined + endTime` is `NaN`, and
 `position <= NaN` is false — and drops every segment behind the position.
 Measure retention in the segment's own length instead, as the bundled storage
-now does: it keeps three segment lengths behind the position, independent of
-any configured value. Where the effective threshold is genuinely wanted,
-`urgentBufferThresholdFor` is exported.
+now does: on live it keeps three segment lengths behind the position, and at
+least 15 s, independent of any configured value; off live it lets segments
+behind the position go only when it reaches its memory limit. Where the
+effective threshold is genuinely wanted, `urgentBufferThresholdFor` is
+exported.
 
 The position a storage is told through
 `onPlaybackUpdated(position, rate, streamType)` is the start of the segment the
@@ -281,7 +293,7 @@ swarms with v3 peers. No infohash changes unless you configure the new
 ### `Stream` type
 
 `Stream.index` is replaced by `Stream.identityHash`, and streams now carry
-their full computed identity:
+their full computed identity. The 4.x type:
 
 ```typescript
 type Stream = {
@@ -298,7 +310,9 @@ type Stream = {
 ### `Core.addStreamIfNoneExists`
 
 Custom integrations no longer compute the stream identifier. Pass the raw
-properties instead; identity fields are computed by the core:
+properties instead; identity fields are computed by the core. Both halves are
+pre-v5 code: v5 removed `addStreamIfNoneExists` (see "Removed from `Core`"
+above).
 
 ```typescript
 // v3

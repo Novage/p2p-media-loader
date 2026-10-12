@@ -114,8 +114,9 @@ export type Stream = {
 
   /**
    * The swarm ID the stream was registered with: the configured `swarmId`
-   * or, if not set, the first manifest's response URL with its query string
-   * discarded. Resolved once at registration.
+   * or, if not set, the URL of the first manifest that registered a stream —
+   * the URL that was requested, where the adapter reports it — with its query
+   * string discarded. Resolved once at registration.
    */
   readonly swarmId: string;
 
@@ -183,11 +184,17 @@ export type DynamicStreamProperties =
  *
  * Note that `swarmId` and `streamSwarmIdBuilder` cannot be changed at runtime:
  * stream identity is derived from them once, when a stream is registered.
+ * Of the common settings, `segmentMemoryStorageLimit` and
+ * `customSegmentStorageFactory` take effect from the next segment storage the
+ * core creates — on the first segment request, or the first after `destroy()`
+ * — and `trackerClientVersionPrefix` not at all.
  *
  * @example
  * ```typescript
+ * import type { DynamicCoreConfig } from "p2p-media-loader-core";
+ *
  * const dynamicConfig: DynamicCoreConfig = {
- *   segmentMemoryStorageLimit: 512, // MiB
+ *   isP2PUploadDisabled: true, // stop uploading to peers
  *   mainStream: {
  *     urgentBufferThreshold: 20,
  *     p2pDownloadTimeWindow: 6000,
@@ -231,13 +238,18 @@ export type CommonCoreConfig = {
    *    - Android WebView: 1024 MiB
    *    - iOS WebView: 1024 MiB
    *
+   * Read when the segment storage is created, on the first segment request
+   * and the first after `Core.destroy()`: a change through
+   * `applyDynamicConfig` applies from the next storage, not to the one in use.
    */
   segmentMemoryStorageLimit: number | undefined;
 
   /**
-   * An optional custom storage factory for the segment storage. Called once,
-   * on the first segment request; `isLive` is derived from the manifests
-   * processed so far (see specs/manifest-registry.md, "Live detection").
+   * An optional custom storage factory for the segment storage. Called on
+   * the first segment request, and again on the first after `Core.destroy()`;
+   * `isLive` is derived from the manifests processed so far (see
+   * specs/manifest-registry.md, "Live detection"). A change through
+   * `applyDynamicConfig` applies from the next call, not to the storage in use.
    *
    * @default
    * ```typescript
@@ -248,6 +260,9 @@ export type CommonCoreConfig = {
 
   /**
    * The prefix to use for the WebTorrent client version during tracker communications.
+   *
+   * Read once, when the core is constructed: a change through
+   * `applyDynamicConfig` has no effect.
    *
    * @default
    * ```typescript
@@ -264,6 +279,8 @@ export type CommonCoreConfig = {
  * @example Configuration for basic video stream
  *
  * ```typescript
+ * import type { CoreConfig } from "p2p-media-loader-core";
+ *
  * const config: CoreConfig = {
  *  urgentBufferThreshold: 15,
  *  httpDownloadTimeWindow: 3000,
@@ -275,6 +292,8 @@ export type CommonCoreConfig = {
  * @example Configuration for advanced video stream
  *
  * ```typescript
+ * import type { CoreConfig } from "p2p-media-loader-core";
+ *
  * const config: CoreConfig = {
  *  // Configuration for both streams
  *  urgentBufferThreshold: 20,
@@ -349,12 +368,16 @@ export type StreamConfig = {
    *   at least one segment, at most 15 seconds — so that the rest of the
    *   buffer is the time peers have to fill the player's requests (see
    *   specs/playback-contract.md, "The urgency threshold").
-   * - A number is the threshold on VOD. On live it is a ceiling: it lowers
-   *   the derived threshold but never raises it past half the player's
-   *   buffer, which the live window's geometry sizes and no configuration
-   *   here changes. A threshold as high as that buffer would make every
+   * - A number is the threshold on VOD. On live it is capped at half the
+   *   player's buffer, which the live window's geometry sizes and no
+   *   configuration here changes: up to that cap the number is the threshold
+   *   as given — above the derived value or below a segment alike — and past
+   *   it the cap is. A threshold as high as that buffer would make every
    *   request urgent, leaving nothing for peers; `isP2PDisabled` is how to
    *   ask for that deliberately.
+   * - The threshold scales with the playback rate: a request is urgent when
+   *   the buffer is below the threshold times the last non-zero rate the
+   *   player reported (1 before any), so at 2× it takes twice the buffer.
    */
   urgentBufferThreshold: number | undefined;
 
@@ -498,9 +521,7 @@ export type StreamConfig = {
 
   /**
    * A list of URLs to the WebTorrent trackers used for announcing and discovering peers (i.e., WebRTC signaling).
-   *
-   * WARNING: In the Safari browser, only the first tracker will be utilized. Safari has known issues with multiple trackers,
-   * which can lead to problems sending SDP messages during WebRTC signaling.
+   * The stream is announced to every tracker in the list.
    *
    * @default
    * The default trackers used are:
@@ -536,10 +557,12 @@ export type StreamConfig = {
 
   /**
    * An optional unique identifier for the swarm, used to isolate peer pools by media stream.
-   * If left undefined, the first manifest's response URL — after redirects,
-   * with its query string discarded — names the swarm. Set it when that URL
-   * differs between viewers of the same content, for example a redirect to a
-   * per-viewer edge host or a token in the path (see specs/segment-identity.md).
+   * If left undefined, the URL of the first manifest that registers a stream —
+   * the URL the player requested, before any redirect, where the adapter
+   * reports it, as every bundled adapter does — names the swarm, with its
+   * query string discarded. Set it when that URL differs between viewers of
+   * the same content, for example a per-viewer host or a token in the path
+   * (see specs/segment-identity.md).
    *
    * The natural value is the identifier the surrounding system already has for
    * the content — a database row key, an asset id — rather than another URL:
@@ -595,10 +618,14 @@ export type StreamConfig = {
    *
    * @example
    * ```typescript
+   * import type { CoreConfig } from "p2p-media-loader-core";
+   *
    * const config: CoreConfig = {
-   *   // Include bitrate: resolution alone collides on multi-bitrate ladders.
-   *   streamSwarmIdBuilder: ({ swarmId, streamType, properties }) =>
-   *     `my-app-${swarmId}-${streamType}-${properties.height ?? 0}-${properties.bitrate ?? 0}`,
+   *   // From properties every viewer reads alike — not `bitrate`, which an
+   *   // origin may recompute on every request. Streams of one type that match
+   *   // on all of these need `identityHash` instead.
+   *   streamSwarmIdBuilder: ({ swarmId, streamType, properties: p }) =>
+   *     `my-app-${swarmId}-${streamType}-${p.codecs ?? ""}-${p.height ?? 0}-${p.frameRate ?? ""}-${p.language ?? ""}`,
    * };
    * ```
    */
@@ -689,6 +716,7 @@ export type StreamConfig = {
   /**
    * The interval (in milliseconds) at which the background churning process evaluates and prunes the worst-performing
    * peers if the total connection count exceeds `p2pMaxPeers`.
+   * A value below 1000 is treated as 1000.
    *
    * @default
    * ```typescript
@@ -757,7 +785,8 @@ export type StreamConfig = {
 export type StreamSwarmIdBuilderContext = {
   /**
    * The swarm ID of the stream: the configured `swarmId` or, if unset, the
-   * first manifest's response URL with its query string discarded.
+   * URL of the first manifest that registered a stream — the URL that was
+   * requested, where the adapter reports it — with its query string discarded.
    */
   swarmId: string;
 
@@ -1078,8 +1107,9 @@ export type CoreEventMap = {
    * Invoked when the player requests a segment the registry does not know.
    * The request falls back to the player's own loader and plays without P2P;
    * this event makes the disagreement between the core's manifest parse and
-   * the player's observable rather than silent. Initialization segments, and
-   * the segments of subtitles and trick play, are recognised and never
+   * the player's observable rather than silent. Initialization segments,
+   * external segment indexes (a DASH `SegmentBase` stream's `sidx` range),
+   * and the segments of subtitles and trick play are recognised and never
    * reported.
    *
    * @param params - The URL and byte range that missed.
@@ -1173,8 +1203,8 @@ export type CoreEventMap = {
   /**
    * Called when a chunk of data has been successfully uploaded to a peer.
    *
-   * @param bytesLength - The length of the segment in bytes.
-   * @param peerId - The peer ID, if the segment was downloaded from a peer
+   * @param bytesLength - The size of the uploaded chunk in bytes.
+   * @param peerId - The ID of the peer the chunk was uploaded to.
    * @param streamType - The type of stream that the chunk belongs to.
    * @param infoHash - The info hash of the swarm that the chunk belongs to.
    */

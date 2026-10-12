@@ -120,15 +120,15 @@ export function maxLiveLatencyFor(target: LiveDelay): number {
  * segment. Off live there is no geometry to derive from and the configured
  * number, or the default, is the threshold.
  *
- * **On live a configured number is a ceiling, not an override.** The player's
- * buffer is sized from the window's geometry by every adapter, and nothing an
- * integrator configures here widens it; a threshold configured past half that
- * buffer would make every request urgent when it is made, so each peer would
- * pull the whole stream from the origin and the election would never see a
- * segment. That is the failure this rule exists to prevent, so the geometry
- * wins. A number still lowers the threshold, which leaves peers more room
- * rather than less. Whoever wants the player to fetch over HTTP regardless
- * has `isP2PDisabled`.
+ * **On live a configured number is capped at half the player's buffer.** The
+ * player's buffer is sized from the window's geometry by every adapter, and
+ * nothing an integrator configures here widens it; a threshold configured past
+ * half that buffer would make every request urgent when it is made, so each
+ * peer would pull the whole stream from the origin and the election would
+ * never see a segment. That is the failure this rule exists to prevent, so
+ * past the cap the geometry wins. Up to it the number stands as given — above
+ * the derived threshold or below a segment alike. Whoever wants the player to
+ * fetch over HTTP regardless has `isP2PDisabled`.
  *
  * @param configured - `StreamConfig.urgentBufferThreshold`.
  * @param target - The live window's placement, or `undefined` off live.

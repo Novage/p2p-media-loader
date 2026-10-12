@@ -213,8 +213,9 @@ export type ManifestParseContext = {
  * two integrations can never derive identity differently. See
  * specs/packaging.md.
  *
- * Parsers are plain objects, not class instances: the core's config handling
- * copies own properties only.
+ * The core keeps the parsers it is given as they are, outside its merged
+ * configuration, and calls them on the objects passed in; see
+ * `CoreConfig.manifestParsers`.
  */
 export type ManifestParser = {
   /**

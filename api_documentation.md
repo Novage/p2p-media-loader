@@ -14,29 +14,31 @@
 
 To include **P2P Media Loader** in your project using npm, follow these steps:
 
-1. Install the package via npm:
+1. Install the package via npm, together with its player. The engine
+   packages declare no dependency on the player they integrate, so the player
+   is yours to install:
    - For HLS.js integration:
 
      ```bash
-     npm install p2p-media-loader-hlsjs
+     npm install p2p-media-loader-hlsjs hls.js
      ```
 
    - For Shaka Player integration:
 
      ```bash
-     npm install p2p-media-loader-shaka
+     npm install p2p-media-loader-shaka shaka-player
      ```
 
    - For dash.js integration:
 
      ```bash
-     npm install p2p-media-loader-dashjs
+     npm install p2p-media-loader-dashjs dashjs
      ```
 
    - For Video.js 8 integration:
 
      ```bash
-     npm install p2p-media-loader-videojs
+     npm install p2p-media-loader-videojs video.js@8
      ```
 
    Install `p2p-media-loader-core` as well, at the same version, when your
@@ -55,7 +57,11 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
      media adapters powered by HLS.js and dash.js, so it uses the HLS.js and
      dash.js integrations above.
 
-1. Import and use it in your project:
+1. Import and use it in your project. The TypeScript examples assume
+   `"moduleResolution": "bundler"`, as Vite's project templates set it. Under
+   `node16` or `nodenext`, the default imports of Shaka Player and Video.js do
+   not type-check, and neither do the declarations of
+   `p2p-media-loader-shaka`, which refer to Shaka's types.
    - HLS.js integration — the engine is mixed into the `Hls` class, so the
      player is created and used exactly as without P2P:
 
@@ -159,9 +165,15 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
      import { VideoJsP2PEngine } from "p2p-media-loader-videojs";
 
      const player = videojs(videoElement, {
-       // VHS stands aside for native HLS on Safari and iOS unless told otherwise
        html5: {
-         vhs: { overrideNative: true },
+         vhs: {
+           // VHS stands aside for native HLS on Safari and iOS unless told
+           // otherwise
+           overrideNative: true,
+           // Choose the rendition on bandwidth, as other players do: a
+           // rendition is a swarm
+           limitRenditionByPlayerDimensions: false,
+         },
          nativeAudioTracks: false,
          nativeVideoTracks: false,
        },
@@ -208,7 +220,7 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
 
      const player = videojs(videoElement, {
        html5: {
-         vhs: { overrideNative: true },
+         vhs: { overrideNative: true, limitRenditionByPlayerDimensions: false },
          nativeAudioTracks: false,
          nativeVideoTracks: false,
        },
@@ -219,11 +231,11 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
      player.src({ src: streamUrl, type: "application/x-mpegURL" });
      ```
 
-     Note that VHS caps the rendition it plays by the size the player is
-     rendered at, which no other engine does, and that a rendition is a swarm:
-     a page mixing Video.js with other players usually wants
-     `vhs: { limitRenditionByPlayerDimensions: false }` so that its viewers
-     can share.
+     The examples set `limitRenditionByPlayerDimensions: false` because VHS
+     otherwise caps the rendition it plays by the size the player is rendered
+     at, which no other engine does, and a rendition is a swarm: without it, a
+     small Video.js player picks a lower rendition than viewers on other
+     players and shares with none of them.
 
    - Video.js 10 — there is no Video.js engine to hook here. v10 dropped VHS
      and plays through media adapters powered by HLS.js
@@ -271,6 +283,10 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
          engine.addEventListener("onPeerConnect", (params) => {
            console.log("Peer connected:", params.peerId);
          });
+         // The adapter defaults to "metadata" and holds HLS.js to a 1 s
+         // buffer until playback starts; Firefox then never autoplays a
+         // live stream of 2 s segments.
+         media.preload = "auto";
          // A getter: resolved when HLS.js builds its playlist loader, by
          // which time the adapter has its instance.
          engine.bindHls(() => media.engine);
@@ -303,6 +319,7 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
 
      ```tsx
      import { useState } from "react";
+     import type { MediaPlayerClass } from "dashjs";
      import {
        useAttachMedia,
        useDestroy,
@@ -326,7 +343,7 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
        const media = useMediaInstance(DashAdapter, (media) => {
          // Before the source, so before dash.js's first request. Bind once
          // per player: dash.js keeps the loader it first resolved.
-         engine.bindPlayer(media.engine);
+         engine.bindPlayer(media.engine as unknown as MediaPlayerClass);
          media.source = { src: streamUrl };
        });
        const attachRef = useAttachMedia(media);
@@ -335,10 +352,11 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
      }
      ```
 
-     If TypeScript rejects `media.engine` there, your project has two copies
-     of dash.js — Video.js bundles its own — and the two declarations are
-     nominally different; cast it to your `MediaPlayerClass`. It is the same
-     player either way.
+     The cast is there because the project has two copies of dash.js: the
+     one you installed, whose types the engine takes, and the one
+     `@videojs/dash-video` pins for itself (5.2.0 in Video.js 10.0.1).
+     TypeScript does not accept one copy's player type as the other's. It is
+     the same player either way.
 
      Quality selection, captions and the rest stay Video.js's own; the engine
      only supplies the bytes.
@@ -406,6 +424,7 @@ The dash.js engine maps `p2p-media-loader-core` and `p2p-media-loader-core/dash`
 
   const player = new Playerjs({
     id: "player",
+    file: streamUrl,
     hlsconfig: {
       p2p: {
         core: {
@@ -415,7 +434,7 @@ The dash.js engine maps `p2p-media-loader-core` and `p2p-media-loader-core/dash`
         onHlsJsCreated: (hls) => {
           // Subscribe to P2P engine and HLS.js events here
           hls.p2pEngine.addEventListener("onPeerConnect", (details) => {
-            console.log(`Connected to peer ${details.peerId})`);
+            console.log(`Connected to peer ${details.peerId}`);
           });
         },
       },
@@ -583,11 +602,11 @@ Clappr plays HLS through HLS.js, built into `@clappr/player`; the quality menu i
     <link
       rel="stylesheet"
       type="text/css"
-      href="https://unpkg.com/shaka-player/dist/controls.css"
+      href="https://unpkg.com/shaka-player@5/dist/controls.css"
     />
 
     <!-- Link to Shaka Player's compiled UI script -->
-    <script src="https://unpkg.com/shaka-player/dist/shaka-player.ui.js"></script>
+    <script src="https://unpkg.com/shaka-player@5/dist/shaka-player.ui.js"></script>
 
     <!-- Import map for the P2P Media Loader modules. The engine imports the
          core and both manifest parsers by bare specifier; all three must
@@ -902,8 +921,14 @@ another way to attach one. For Video.js 10, see the next section.
 
       const player = videojs("video", {
         html5: {
-          // VHS stands aside for native HLS on Safari and iOS unless told otherwise
-          vhs: { overrideNative: true },
+          vhs: {
+            // VHS stands aside for native HLS on Safari and iOS unless told
+            // otherwise
+            overrideNative: true,
+            // Choose the rendition on bandwidth, as other players do: a
+            // rendition is a swarm
+            limitRenditionByPlayerDimensions: false,
+          },
           nativeAudioTracks: false,
           nativeVideoTracks: false,
         },
@@ -998,6 +1023,10 @@ The HLS.js and dash.js integrations therefore drive it directly, with no
       hlsEngine.addEventListener("onPeerConnect", (params) => {
         console.log("Peer connected:", params.peerId);
       });
+      // The element defaults to "metadata" and holds HLS.js to a 1 s buffer
+      // until playback starts; Firefox then never autoplays a live stream of
+      // 2 s segments.
+      hlsVideo.preload = "auto";
       // A getter: HLS.js is constructed when the source is set below
       hlsEngine.bindHls(() => hlsVideo.engine);
 
@@ -1163,7 +1192,7 @@ pair it with the P2P Media Loader IIFE bundle, which targets ES2015.
 
     var player = videojs("video", {
       html5: {
-        vhs: { overrideNative: true },
+        vhs: { overrideNative: true, limitRenditionByPlayerDimensions: false },
         nativeAudioTracks: false,
         nativeVideoTracks: false,
       },
@@ -1209,7 +1238,7 @@ const inputs = identityProperties(streams); // streams: { type, properties }[]
 const infoHashes = streams.map((stream, i) =>
   computeInfoHash(
     computeStreamSwarmId({
-      swarmId, // the configured swarmId, or the master manifest's URL without its query string
+      swarmId, // the configured swarmId, or the URL the player requested the master manifest at, without its query string
       streamType: stream.type,
       properties: inputs[i],
     }),
@@ -1220,25 +1249,32 @@ const infoHashes = streams.map((stream, i) =>
 const allowlist = infoHashes.map((h) => Buffer.from(h, "utf8").toString("hex"));
 ```
 
-For full control, configure a custom `streamSwarmIdBuilder` on the client and apply `computeInfoHash` to the same string on the server. This way the infohash depends only on values the server authors itself:
+For full control, configure a custom `streamSwarmIdBuilder` on the client and apply `computeInfoHash` to the same string on the server. This way the infohash depends only on values the server authors itself, here the video's ID and the stream properties of the manifest it publishes:
 
 ```typescript
 import type { CoreConfig } from "p2p-media-loader-core";
-import { computeInfoHash } from "p2p-media-loader-core/server";
+import {
+  computeInfoHash,
+  computeStreamIdentityHash,
+  identityProperties,
+} from "p2p-media-loader-core/server";
 
 // Client: the engine's `core` configuration
 const config: CoreConfig = {
   swarmId: videoUuid,
-  streamSwarmIdBuilder: ({ swarmId, streamType, properties }) =>
-    `my-app-${swarmId}-${streamType}-${properties.height ?? 0}-${properties.bitrate ?? 0}`,
+  streamSwarmIdBuilder: ({ swarmId, streamType, identityHash }) =>
+    `my-app-${swarmId}-${streamType}-${identityHash}`,
 };
 
-// Server (per quality, at transcode time)
-const infoHash = computeInfoHash(
-  `my-app-${videoUuid}-main-${height}-${bitrate}`,
+// Server: `streams` lists the manifest's streams, as in the example above
+const inputs = identityProperties(streams);
+const infoHashes = streams.map((stream, i) =>
+  computeInfoHash(
+    `my-app-${videoUuid}-${stream.type}-${computeStreamIdentityHash(inputs[i])}`,
+  ),
 );
 ```
 
-The stream swarm ID must be deterministic and identical across all peers of a swarm, and **every distinct stream must map to a distinct ID**. Include enough properties to guarantee that: resolution alone collides on ladders with several bitrates at the same resolution, so the example above adds `bitrate`. If your ladder can have several renditions sharing those fields (e.g. different codecs at the same resolution and bitrate), add the distinguishing property too, or incorporate the stream's `identityHash` (reproduce it server-side with `computeStreamIdentityHash` over the input `identityProperties` yields for that stream). Two different streams resolving to the same ID fail to register (reported through the `onStreamRegistrationError` core event) and play without P2P. The builder cannot be changed at runtime. Clients can also observe each registered stream's computed identity through the `onStreamAdded` core event.
+The stream swarm ID must be deterministic and identical across all peers of a swarm, and **every distinct stream must map to a distinct ID**. The example uses the stream's `identityHash` because it is both: it hashes the stream's properties from the manifest, with `bitrate` only where two streams of the same type need it to be told apart. A builder that composes the ID from properties itself faces the same choice: resolution alone collides on ladders with several bitrates at the same resolution, while `bitrate` splits a swarm where an origin recomputes it per request, as some live packagers do. Two different streams resolving to the same ID fail to register (reported through the `onStreamRegistrationError` core event) and play without P2P. The builder cannot be changed at runtime. Clients can also observe each registered stream's computed identity through the `onStreamAdded` core event.
 
 The builder context also provides `defaultStreamSwarmId` — the ID the default derivation would produce — which is guaranteed unique per stream and convenient as a base for custom IDs (e.g. `` `${tenant}-${defaultStreamSwarmId}` ``; reproduce it server-side with `computeStreamSwarmId` or compose it with `buildStreamSwarmId(swarmId, streamType, identityHash)`).

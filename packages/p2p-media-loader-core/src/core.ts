@@ -204,6 +204,8 @@ export class Core {
    *
    * @example
    * // Create a Core instance with custom configuration for HTTP and P2P downloads.
+   * import { Core } from "p2p-media-loader-core";
+   *
    * const core = new Core({
    *   simultaneousHttpDownloads: 5,
    *   simultaneousP2PDownloads: 5,
@@ -213,6 +215,8 @@ export class Core {
    *
    * @example
    * // Create a Core instance using the default configuration.
+   * import { Core } from "p2p-media-loader-core";
+   *
    * const core = new Core();
    */
   constructor(config?: Partial<CoreConfig>) {
@@ -249,9 +253,10 @@ export class Core {
   }
 
   /**
-   * Retrieves the current configuration for the core instance, ensuring immutability.
+   * Retrieves the current configuration for the core instance.
    *
-   * @returns A deep readonly version of the core configuration.
+   * @returns A deep copy of the core configuration. Changing it changes
+   * nothing in the core; `applyDynamicConfig` is how to do that.
    */
   getConfig(): DefinedCoreConfig {
     return {
@@ -264,9 +269,19 @@ export class Core {
   /**
    * Applies a set of dynamic configuration updates to the core, merging with the existing configuration.
    *
+   * Three common settings are accepted here but do not change the running
+   * core. `customSegmentStorageFactory` is called, and the built-in memory
+   * storage reads `segmentMemoryStorageLimit`, when the segment storage is
+   * created — on the first segment request after construction or after
+   * `destroy()` — so a change applies from the next storage, not to the one
+   * in use. `trackerClientVersionPrefix` is read once, at construction, and a
+   * change to it has no effect.
+   *
    * @param dynamicConfig - A set of configuration changes to apply.
    *
    * @example
+   * // Assuming `core` is an instance of Core
+   *
    * // Example of dynamically updating the download time windows and timeout settings.
    * const dynamicConfig = {
    *   httpDownloadTimeWindow: 60,  // Set HTTP download time window to 60 seconds
@@ -370,15 +385,17 @@ export class Core {
   }
 
   /**
-   * Names the swarm explicitly, in place of the first manifest's response URL.
+   * Names the swarm explicitly, in place of the first manifest's URL.
    *
    * By default the swarm ID is the URL of the first manifest handed to
-   * `processManifest`, with its entire query string discarded. An integration
-   * that knows a better name — one shared by every viewer regardless of CDN
-   * or redirect — may set it here before the first manifest arrives, or
-   * configure `swarmId` instead. See specs/segment-identity.md.
+   * `processManifest` that registers a stream — its `requestedUrl` where the
+   * caller passes one, its `url` otherwise — with its entire query string
+   * discarded. An integration that knows a better name — one shared by every
+   * viewer regardless of CDN or redirect — may set it here before the first
+   * manifest arrives, or configure `swarmId` instead. See
+   * specs/segment-identity.md.
    *
-   * @param url - The full URL to the manifest response.
+   * @param url - The URL to name the swarm by; its query string is discarded.
    */
   setManifestResponseUrl(url: string): void {
     this.manifestResponseUrl = stripQuery(url);
@@ -387,14 +404,17 @@ export class Core {
   /**
    * Parses a manifest the player has fetched and brings the registry up to
    * date: streams are registered with their identity, their segments are
-   * added and removed by URL key, and the live state is derived. This is the
-   * only way streams and segments enter the core. See
-   * specs/manifest-registry.md.
+   * added and removed by URL key, and the live state is derived. This is how
+   * streams enter the core; segments also come from `processSegmentIndex`,
+   * and from the core parsing a clock-based manifest again as time passes.
+   * See specs/manifest-registry.md.
    *
-   * Never throws. A manifest with no matching parser is ignored, and a parse
-   * failure leaves the registry as it was — a transient bad response must not
-   * empty a working segment list. Idempotent: re-processing an unchanged
-   * manifest changes nothing and emits no events.
+   * A manifest with no matching parser is ignored, and a parse failure leaves
+   * the registry as it was — a transient bad response must not empty a
+   * working segment list. A failure inside `parse` is caught; one thrown by a
+   * parser's `canParse`, consulted when no `protocol` is given, propagates.
+   * Idempotent: re-processing an unchanged manifest changes nothing and emits
+   * no events.
    *
    * @returns What the manifest described — each stream it listed segments
    * for, with the bounds of those segments on the manifest timeline — so an
@@ -908,6 +928,10 @@ export class Core {
    * every source failed.
    * @throws {Error} If the segment is not in the registry; check
    * `isSegmentLoadable` first.
+   * @throws What initializing the segment storage threw — a
+   * `customSegmentStorageFactory` that is not a function or that throws, or a
+   * storage whose `initialize` rejects — unless the request was aborted
+   * meanwhile. The next request tries the initialization again.
    */
   async loadSegment(
     url: string,
@@ -1000,15 +1024,18 @@ export class Core {
 
   /**
    * Whether the core will serve a request for this segment: it is in the
-   * registry and P2P is enabled for its stream type. This is the check an
-   * adapter makes before routing a request through `loadSegment`; a `false`
-   * means "use the player's own loader".
+   * registry, P2P is enabled for its stream type, the page has WebRTC, and
+   * its stream is shareable — not a stream no manifest identified that shares
+   * its swarm with another of its type. This is the check an adapter makes
+   * before routing a request through `loadSegment`; a `false` means "use the
+   * player's own loader".
    *
    * A request for a URL the registry does not know is reported through the
    * `onSegmentRegistryMiss` event, so a disagreement between the core's parse
-   * and the player's is observable. Initialization segments, and the
-   * segments of subtitles and trick play, are recognised and passed through
-   * without a report; they are never shared.
+   * and the player's is observable. Initialization segments, external segment
+   * indexes (see `isSegmentIndex`), and the segments of subtitles and trick
+   * play are recognised and passed through without a report; they are never
+   * shared.
    *
    * @param url - The URL the player is about to request.
    * @param byteRange - Its byte range, when the segment is a range of a file.
@@ -1103,6 +1130,14 @@ export class Core {
   /**
    * Cleans up resources used by the Core instance, including destroying any active stream loaders
    * and clearing stored segments.
+   *
+   * The core is left ready for the next source: the manifest registry and
+   * the registered streams are emptied, and the swarm name the last source
+   * gave — by `setManifestResponseUrl` or by its first manifest — is
+   * forgotten, so the next source names its own. A configured `swarmId` stays.
+   * Every part is torn down even when one before it throws — an integrator's
+   * own segment storage is free to — and the first failure is rethrown once
+   * all have run.
    *
    * Event listeners deliberately survive: the player integrations reuse one
    * Core instance across media sources, destroying it between loads, and
