@@ -206,7 +206,9 @@ the groups and the cases a reader of a snapshot must know.
   `:not-urgent`), and each one that waited and then became urgent
   (`SegmentRequest:became-urgent`), and each HTTP download stopped to give
   an urgent request the link (`Prefetch:yielded-to-urgent`), as in
-  specs/playback-contract.md, "Urgency". The Video.js adapter
+  specs/playback-contract.md, "Urgency". Each P2P attempt that an urgent
+  request gets after its HTTP attempt fails is counted too
+  (`SegmentRequest:peer-after-http-failure`). The Video.js adapter
   counts each live delay it writes (`VhsPlacement:applied`) and each VHS it
   cannot place (`VhsPlacement:unavailable`); the HLS.js adapter, each live
   delay it writes (`HlsPlacement:applied`) and each main playlist it leaves to
