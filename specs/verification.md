@@ -32,6 +32,19 @@ requests pass through untouched — the right outcome for a player asking for
 bytes that are not segments. Check both against plain Video.js before reading
 anything into them.
 
+On the Netflix stream, the MPD gives two video renditions
+(`ElephantsDream_H264BPL30_0175` and `_0250`) `Initialization range="0-983"`
+and `indexRange="984-11245"`. Their initialization takes 985 bytes, so both
+ranges start one byte early; `_0500` has the correct ones. The core finds no
+`sidx` box in those bytes, and the two renditions play without P2P. dash.js
+finds no `sidx` box either, and searches for one: it reads a wrong box size and
+asks for bytes about 1.9 GB and 3.7 GB into the files. The origin redirects
+these requests to `http://dash.edgesuite.net`, which answers `200` with the
+whole file, 14 MB and 20 MB. dash.js starts only when both arrive, and gives up
+on a request after 20 s and sends it again. On a slow origin the stream
+therefore never starts, with P2P or without it, fresh or after another stream.
+Check such a failure against plain dash.js before reading anything into it.
+
 Not in the table on purpose: `dash264/TestCases/2a/qualcomm/1/MultiResMPEG2.mpd` is a `SegmentBase` stream whose media Chrome refuses to append (Shaka error 3014), on Shaka's own demo page as much as here. It is not a P2P problem; do not use it to judge one.
 
 Every stream is played on every engine that supports its protocol: HLS.js for
