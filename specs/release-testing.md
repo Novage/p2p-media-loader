@@ -337,6 +337,13 @@ each mode, in turns. Repeat a seek that took more than 1 second longer 3 times
 in each mode, with seeks of the same kind, and with tab B closed. Judge by the
 medians of the repeats.
 
+Compare a player only with the same player without P2P, never with another
+player. A seek outside the buffer costs the download of one segment at the
+player's rendition, and players choose renditions and buffer sizes differently.
+On the mux VOD, HLS.js chose 720p or 1080p and took about 3.4 s for each seek,
+with P2P or without it. Plain Video.js on a 320-pixel element limits its
+rendition to the player's size, chose 184p, and took 0.7 s.
+
 Pass:
 
 - Each seek reaches `readyState` 3 or more within 15 seconds. Most take less
