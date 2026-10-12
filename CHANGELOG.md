@@ -250,6 +250,10 @@ throughout.
 
 These predate 5.0.0 and affect 4.x deployments as well.
 
+- An HTTP response refused on its headers — an error status, or a whole file
+  sent with `200` for a byte range — was never read or cancelled, so its
+  connection stayed busy until the browser collected the response. An
+  HTTP/1.1 host has six connections for every tab of the browser.
 - An HTTP download that waited more than 3 s for the response's headers was
   aborted as stalled: `httpNotReceivingBytesTimeoutMs` ran from the start of
   the request and counted body bytes only. A slow network, a new connection

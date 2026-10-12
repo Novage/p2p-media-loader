@@ -34,10 +34,11 @@ function execute(body: BodyInit | null, status = 200) {
 
 function executeWith(
   respond: (request: globalThis.Request) => Promise<Response>,
+  byteRange?: { start: number; end: number },
 ) {
   const eventTarget = new EventTarget<CoreEventMap>();
   const request = new SegmentRequest(
-    segment,
+    byteRange ? { ...segment, byteRange } : segment,
     () => undefined,
     { all: new BandwidthCalculator(), http: new BandwidthCalculator() },
     eventTarget,
@@ -153,5 +154,55 @@ describe("HttpRequestExecutor timeouts", () => {
     expect(request.failedAttempts.lastAttempt?.error.type).toBe(
       "bytes-receiving-timeout",
     );
+  });
+});
+
+describe("HttpRequestExecutor on a response refused on its headers", () => {
+  beforeEach(() => {
+    vi.stubGlobal("window", globalThis);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /** A body that records whether it was cancelled, and never ends by itself. */
+  function watchedBody() {
+    const body = { cancelled: false };
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array([1, 2, 3, 4]));
+      },
+      cancel() {
+        body.cancelled = true;
+      },
+    });
+    return { body, stream };
+  }
+
+  it("cancels the body of an error status", async () => {
+    const { body, stream } = watchedBody();
+    const request = execute(stream, 503);
+    await settle();
+
+    expect(request.status).toBe("failed");
+    expect(request.failedAttempts.lastAttempt?.error.type).toBe("http-error");
+    expect(body.cancelled).toBe(true);
+  });
+
+  it("cancels the whole file sent for a byte range", async () => {
+    // A server that ignores the range answers 200 with the whole file: the
+    // body can be far larger than the segment, and nobody reads it.
+    const { body, stream } = watchedBody();
+    const request = executeWith(
+      () => Promise.resolve(new Response(stream, { status: 200 })),
+      { start: 0, end: 3 },
+    );
+    await settle();
+
+    expect(request.status).toBe("failed");
+    expect(request.failedAttempts.lastAttempt?.error.type).toBe(
+      "http-unexpected-status-code",
+    );
+    expect(body.cancelled).toBe(true);
   });
 });

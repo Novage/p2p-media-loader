@@ -81,6 +81,7 @@ export class HttpRequestExecutor {
   private async fetch(requestControls: RequestControls) {
     const { segment } = this.request;
     let activeReader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+    let response: Response | undefined;
 
     if (this.isAborted()) {
       return;
@@ -142,7 +143,7 @@ export class HttpRequestExecutor {
         );
       }
 
-      const response = await window.fetch(request);
+      response = await window.fetch(request);
 
       if (this.isAborted()) {
         throw new DOMException("Request aborted", "AbortError");
@@ -238,6 +239,14 @@ export class HttpRequestExecutor {
 
       requestControls.completeOnSuccess();
     } catch (error) {
+      // A response refused on its headers is never read. Its body would keep
+      // the connection busy until the response is garbage-collected, and an
+      // HTTP/1.1 host has six connections for every tab of the browser.
+      if (!activeReader && response?.body && !response.bodyUsed) {
+        response.body.cancel().catch(() => {
+          // Swallow stream cancel errors
+        });
+      }
       this.handleError(error, requestControls);
     } finally {
       this.abortController.signal.removeEventListener("abort", onAbort);
