@@ -222,7 +222,8 @@ export class P2PLoader {
     }
   };
 
-  downloadSegment(segment: SegmentWithStream) {
+  /** @returns Whether a peer started to download `segment`. */
+  downloadSegment(segment: SegmentWithStream): boolean {
     const peersWithSegment: Peer[] = [];
     for (const peer of this.#peersMap.values()) {
       if (
@@ -233,12 +234,31 @@ export class P2PLoader {
       }
     }
 
-    if (peersWithSegment.length === 0) return;
+    if (peersWithSegment.length === 0) return false;
 
     const selectedPeer = selectPeerForDownload(peersWithSegment);
 
     const request = this.#requests.getOrCreateRequest(segment);
     selectedPeer.downloadSegment(request);
+    return true;
+  }
+
+  /**
+   * Makes a peer that has all of `segment` free to send it: where every such
+   * peer downloads something else, the download of one of them stops. A peer
+   * downloads one segment at a time, and in a small swarm the one peer that
+   * has the segment is often busy with prefetch.
+   */
+  freePeerFor(segment: SegmentWithStream) {
+    let busyPeer: Peer | undefined;
+    for (const peer of this.#peersMap.values()) {
+      if (peer.getSegmentStatus(segment) !== "loaded") continue;
+      if (!peer.downloadingSegment) return;
+      busyPeer ??= peer;
+    }
+    if (!busyPeer?.downloadingSegment) return;
+    const request = this.#requests.get(busyPeer.downloadingSegment);
+    if (request?.status === "loading") request.cancel();
   }
 
   isSegmentLoadingOrLoadedBySomeone(segment: SegmentWithStream): boolean {

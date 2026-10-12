@@ -17,6 +17,11 @@ import type { SegmentStorage } from "../src/segment-storage/index.js";
  * tracker — is the real code.
  */
 const fakes = vi.hoisted(() => {
+  type Controls = {
+    addLoadedChunk: (c: Uint8Array) => void;
+    completeOnSuccess: () => void;
+    failWithError: (error: Error) => void;
+  };
   const state = {
     requests: undefined as unknown as RequestsContainer,
     peerCount: 0,
@@ -27,10 +32,10 @@ const fakes = vi.hoisted(() => {
     p2pAborted: [] as string[],
     /** Delivered bytes as counted for the trackers: [stream key, bytes]. */
     downloaded: [] as [string, number][],
-    httpControls: new Map<
-      string,
-      { addLoadedChunk: (c: Uint8Array) => void; completeOnSuccess: () => void }
-    >(),
+    httpControls: new Map<string, Controls>(),
+    p2pControls: new Map<string, Controls>(),
+    /** Segments a peer was made free for. */
+    peerFreedFor: [] as string[],
   };
   class FakeP2PLoader {
     get connectedPeerCount() {
@@ -50,12 +55,17 @@ const fakes = vi.hoisted(() => {
     broadcastAnnouncement() {}
     downloadSegment(segment: SegmentWithStream) {
       state.p2pStarted.push(segment.runtimeId);
-      state.requests
+      const controls = state.requests
         .getOrCreateRequest(segment)
         .start(
           { downloadSource: "p2p", peerId: "peer-0" },
           { onAbort: () => state.p2pAborted.push(segment.runtimeId) },
         );
+      state.p2pControls.set(segment.runtimeId, controls as never);
+      return true;
+    }
+    freePeerFor(segment: SegmentWithStream) {
+      state.peerFreedFor.push(segment.runtimeId);
     }
   }
   const loader = new FakeP2PLoader();
@@ -124,6 +134,7 @@ import { EventTarget } from "../src/utils/event-target.js";
 import { rankForSegment } from "../src/utils/election.js";
 import debug from "debug";
 import { diagnostics as compiledLedger } from "../src/diagnostics.js";
+import { RequestError } from "../src/types.js";
 
 // Absent only in a prebuilt bundle; the tests run on the source.
 if (!compiledLedger) throw new Error("diagnostics are compiled out");
@@ -1092,6 +1103,164 @@ describe("HybridLoader: seeks and re-requests", () => {
     await loader.loadSegment(segment(6), callbacks);
     await flush();
     expect(state.httpStarted).toContain("seg-6");
+    loader.destroy();
+  });
+});
+
+describe("HybridLoader: a peer after a failed HTTP attempt", () => {
+  beforeEach(() => {
+    vi.stubGlobal("window", globalThis);
+    const { state } = fakes;
+    state.peerCount = 1;
+    state.loadedBySomeone.clear();
+    state.httpStarted.length = 0;
+    state.httpAborted.length = 0;
+    state.p2pStarted.length = 0;
+    state.p2pAborted.length = 0;
+    state.peerFreedFor.length = 0;
+    state.httpControls.clear();
+    state.p2pControls.clear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // The election's HTTP prefetch of later segments goes on while the
+  // urgent request is not on HTTP; only the player's segment counts here.
+  const httpOf = (id: string) =>
+    fakes.state.httpStarted.filter((started) => started === id);
+  const p2pOf = (id: string) =>
+    fakes.state.p2pStarted.filter((started) => started === id);
+  const httpError = () => new RequestError("http-error", "503");
+  const peerError = () => new RequestError("peer-closed");
+
+  it("tries a peer that has the segment once, between two HTTP attempts", async () => {
+    fakes.state.loadedBySomeone.add("seg-0");
+    const tried = count("SegmentRequest:peer-after-http-failure");
+    const { loader, segment, callbacks, startLoading, status, state } = setup({
+      httpErrorRetries: 3,
+    });
+    // The one P2P slot is busy with prefetch: the urgent request takes it.
+    state.loadedBySomeone.add("seg-8");
+    startLoading(8, "p2p");
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+    expect(httpOf("seg-0")).toEqual(["seg-0"]);
+
+    state.httpControls.get("seg-0")!.failWithError(httpError());
+    await flush();
+    expect(state.p2pStarted).toEqual(["seg-0"]);
+    expect(state.peerFreedFor).toEqual(["seg-0"]);
+    expect(state.p2pAborted).toEqual(["seg-8"]);
+    expect(status(8)).toBe("aborted");
+    expect(httpOf("seg-0")).toEqual(["seg-0"]);
+    expect(count("SegmentRequest:peer-after-http-failure")).toBe(tried + 1);
+
+    // A pass while the peer sends it leaves the P2P attempt alone.
+    loader.updatePlayback({ bufferAhead: 0, rate: 2 });
+    await flush();
+    expect(status(0)).toBe("loading");
+    expect(state.p2pAborted).toEqual(["seg-8"]);
+    expect(httpOf("seg-0")).toEqual(["seg-0"]);
+
+    // The peer fails too: HTTP again at once, and no second P2P attempt.
+    state.p2pControls.get("seg-0")!.failWithError(peerError());
+    await flush();
+    expect(httpOf("seg-0")).toEqual(["seg-0", "seg-0"]);
+    state.httpControls.get("seg-0")!.failWithError(httpError());
+    await flush();
+    expect(httpOf("seg-0")).toEqual(["seg-0", "seg-0", "seg-0"]);
+    expect(callbacks.onError).not.toHaveBeenCalled();
+    state.httpControls.get("seg-0")!.failWithError(httpError());
+    await flush();
+
+    expect(p2pOf("seg-0")).toEqual(["seg-0"]);
+    expect(callbacks.onError).toHaveBeenCalledTimes(1);
+    expect(callbacks.onError.mock.calls[0][0]).toMatchObject({
+      type: "failed",
+    });
+    loader.destroy();
+  });
+
+  it("delivers the segment the peer sends", async () => {
+    fakes.state.loadedBySomeone.add("seg-0");
+    const { loader, segment, callbacks, state } = setup();
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+    state.httpControls.get("seg-0")!.failWithError(httpError());
+    await flush();
+    const controls = state.p2pControls.get("seg-0")!;
+    controls.addLoadedChunk(new Uint8Array(16));
+    controls.completeOnSuccess();
+    await flush();
+
+    expect(callbacks.onSuccess).toHaveBeenCalledTimes(1);
+    expect(callbacks.onError).not.toHaveBeenCalled();
+    expect(httpOf("seg-0")).toEqual(["seg-0"]);
+    loader.destroy();
+  });
+
+  it("goes to HTTP again when no peer has the segment", async () => {
+    const { loader, segment, callbacks, state } = setup();
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+    state.httpControls.get("seg-0")!.failWithError(httpError());
+    await flush();
+
+    expect(state.p2pStarted).toEqual([]);
+    expect(httpOf("seg-0")).toEqual(["seg-0", "seg-0"]);
+    loader.destroy();
+  });
+
+  it("tries no peer when no HTTP attempt would remain after it", async () => {
+    // The last attempt is HTTP: with one HTTP attempt, the player's request
+    // fails with it. P2P prefetch may fetch the segment after that.
+    fakes.state.loadedBySomeone.add("seg-0");
+    const tried = count("SegmentRequest:peer-after-http-failure");
+    const { loader, segment, callbacks, state } = setup({
+      httpErrorRetries: 1,
+    });
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+    state.httpControls.get("seg-0")!.failWithError(httpError());
+    await flush();
+
+    expect(callbacks.onError).toHaveBeenCalledTimes(1);
+    expect(count("SegmentRequest:peer-after-http-failure")).toBe(tried);
+    loader.destroy();
+  });
+
+  it("gives the player's next request for the segment its own P2P attempt", async () => {
+    fakes.state.loadedBySomeone.add("seg-0");
+    const { loader, segment, state } = setup({ httpErrorRetries: 2 });
+    const first = { onSuccess: vi.fn(), onError: vi.fn() };
+
+    await loader.loadSegment(segment(0), first);
+    await flush();
+    state.httpControls.get("seg-0")!.failWithError(httpError());
+    await flush();
+    // The peer closes, and has the segment no longer.
+    state.loadedBySomeone.delete("seg-0");
+    state.p2pControls.get("seg-0")!.failWithError(peerError());
+    await flush();
+    state.httpControls.get("seg-0")!.failWithError(httpError());
+    await flush();
+    expect(first.onError).toHaveBeenCalledTimes(1);
+
+    // Another peer has it. The player retries: HTTP first, then the peer.
+    state.loadedBySomeone.add("seg-0");
+    const second = { onSuccess: vi.fn(), onError: vi.fn() };
+    await loader.loadSegment(segment(0), second);
+    await flush();
+    state.httpControls.get("seg-0")!.failWithError(httpError());
+    await flush();
+
+    expect(httpOf("seg-0")).toEqual(["seg-0", "seg-0", "seg-0"]);
+    expect(p2pOf("seg-0")).toEqual(["seg-0", "seg-0"]);
     loader.destroy();
   });
 });

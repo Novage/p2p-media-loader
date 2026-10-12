@@ -451,7 +451,9 @@ export class HybridLoader {
    * - Urgent: over HTTP at once, taking a slot from the HTTP download
    *   furthest ahead where none is free, and moving a P2P download of it to
    *   HTTP. With no peer connected it is fetched the same way: nobody can
-   *   give the segment, and no election runs.
+   *   give the segment, and no election runs. After an HTTP attempt fails,
+   *   one attempt goes to a peer that has it before HTTP again
+   *   (`tryPeerAfterHttpFailure`).
    * - Not urgent: from a peer that has it. If none has it, the election
    *   decides who fetches it over HTTP (`prefetchThroughHttp`), or it waits;
    *   the buffer drains while it waits, and it becomes urgent in time.
@@ -491,7 +493,7 @@ export class HybridLoader {
         // Already coming over HTTP — perhaps fetched as the owner's prefetch
         // before it was urgent: it has the link to itself from now on.
         this.yieldHttpPrefetchTo(segment);
-      } else if (canLoadThroughHttp) {
+      } else if (canLoadThroughHttp && !isPeerTurn(request)) {
         request.cancel();
         this.yieldHttpPrefetchTo(segment);
         this.loadThroughHttp(segment);
@@ -501,6 +503,7 @@ export class HybridLoader {
     if (request?.status === "succeed") return;
 
     if (urgent && canLoadThroughHttp) {
+      if (request && this.tryPeerAfterHttpFailure(request)) return;
       this.yieldHttpPrefetchTo(segment);
       this.loadThroughHttp(segment);
       return;
@@ -524,6 +527,33 @@ export class HybridLoader {
     ) {
       this.loadThroughP2P(segment);
     }
+  }
+
+  /**
+   * Gives a failed urgent request its one P2P attempt: after an HTTP attempt
+   * fails, a peer that has all of the segment sends it before HTTP is tried
+   * again. An origin that fails then does not hold the player through every
+   * HTTP attempt while a peer has the segment. One attempt per request, and
+   * only while an HTTP attempt remains after it: a peer that fails too
+   * delays the player by one P2P timeout at most, and the last attempt is
+   * HTTP. A peer that is still downloading the segment is not asked; it is
+   * the one most likely to fail. See specs/playback-contract.md, "Urgency".
+   *
+   * @returns Whether the P2P attempt started.
+   */
+  private tryPeerAfterHttpFailure(request: Request): boolean {
+    if (request.status !== "failed" || !isPeerTurn(request)) return false;
+    const { segment } = request;
+    const p2pLoader = this.p2pLoaders.currentLoader;
+    if (!p2pLoader.isSegmentLoadedBySomeone(segment)) return false;
+    p2pLoader.freePeerFor(segment);
+    if (!this.freeSlotFor(segment, "p2p")) return false;
+    if (!p2pLoader.downloadSegment(segment)) return false;
+    diagnostics?.count("SegmentRequest:peer-after-http-failure");
+    this.logger(
+      `HTTP failed for the urgent ${LoggerUtils.getSegmentString(segment)}; trying a peer that has it`,
+    );
+    return true;
   }
 
   /**
@@ -1045,4 +1075,14 @@ export class HybridLoader {
     this.requests.destroy();
     this.p2pLoaders.destroy();
   }
+}
+
+/**
+ * Whether the request's next attempt is its one P2P attempt: an HTTP attempt
+ * failed last, and no P2P attempt has failed yet. While that attempt runs,
+ * the state is the same, so an urgent pass leaves it to finish.
+ */
+function isPeerTurn(request: Request): boolean {
+  const { lastAttempt, p2pAttemptsCount } = request.failedAttempts;
+  return lastAttempt?.downloadSource === "http" && p2pAttemptsCount === 0;
 }

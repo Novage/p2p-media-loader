@@ -158,6 +158,17 @@ paused player that asks for media wants its first frame.
   under way moves to HTTP. Where HTTP is not allowed — during `httpDownloadInitialTimeoutMs`, or once
   the request's HTTP attempts are spent — it is taken from a peer that has it,
   and takes a P2P slot from prefetch the same way.
+- **An urgent request whose HTTP attempt fails** goes once to a peer that has
+  all of the segment, and then to HTTP again. Without this, an origin that
+  fails holds the player through every HTTP attempt and the player's own
+  retries while a peer has the segment. The P2P attempt comes only between
+  two HTTP attempts: one attempt per request, and only while an HTTP attempt
+  remains after it, so the last attempt is always HTTP. If every peer that
+  has the segment is downloading something else, one of them stops that
+  download. A peer that is still downloading the segment is not asked. If the
+  peer fails too, the player waits at most `p2pNotReceivingBytesTimeoutMs`
+  longer than without P2P. The player's next request for the segment starts
+  with no failed attempts, and has its own P2P attempt.
 - **A request that is not urgent** is fetched from a peer that has the
   segment. If no peer has it, the election decides who fetches it over HTTP
   ([prefetch.md](prefetch.md)). Otherwise it waits.

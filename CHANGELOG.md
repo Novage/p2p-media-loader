@@ -120,6 +120,9 @@ throughout.
   player's first request at the new place is urgent because its buffer is
   empty there, and nothing at the place it left is urgent. Backups in the
   prefetch election act only on the segment their own player has requested.
+  When an urgent request's HTTP attempt fails, it goes once to a peer that
+  has the segment before HTTP again, so that an origin that fails does not
+  hold the player through every HTTP attempt while a peer has the segment.
   See [`specs/playback-contract.md`](specs/playback-contract.md), "Urgency",
   and [`specs/prefetch.md`](specs/prefetch.md), "Backups".
 - **A live player is placed as deep in the live window as the window allows**,
