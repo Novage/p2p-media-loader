@@ -441,6 +441,13 @@ Pass: no error after a destroy, no event from a destroyed core, no leak, and
 the last stream plays and shares. With two players, each has its own records,
 and destroying one leaves the other's records and playback as they were.
 
+Run the changes with the tracker log on in both tabs (`p2pml-core:tracker`
+and `p2pml-core:webtorrent-manager`), and record the time from the last change
+to the first `connected to` line of the last swarm. In one run the two tabs had
+no peer for about 110 seconds after the last change, until the next announce;
+the run had no tracker log, and six later runs connected within 2.2 seconds. If
+the wait occurs again, the log shows which step of the first handshake failed.
+
 ### 10. Network faults
 
 Wrap `window.fetch`, `XMLHttpRequest` and `window.WebSocket` in the page
