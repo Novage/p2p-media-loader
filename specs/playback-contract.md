@@ -168,7 +168,11 @@ paused player that asks for media wants its first frame.
   download. A peer that is still downloading the segment is not asked. If the
   peer fails too, the player waits at most `p2pNotReceivingBytesTimeoutMs`
   longer than without P2P. The player's next request for the segment starts
-  with no failed attempts, and has its own P2P attempt.
+  with no failed attempts, and has its own P2P attempt. The attempt is marked
+  as such: a P2P download that prefetch started, even after a failed HTTP
+  prefetch of the segment, is not it, and moves to HTTP as above. A player that
+  aborts and asks again while the attempt runs keeps it, and gets no second
+  one.
 - **A request that is not urgent** is fetched from a peer that has the
   segment. If no peer has it, the election decides who fetches it over HTTP
   ([prefetch.md](prefetch.md)). Otherwise it waits.

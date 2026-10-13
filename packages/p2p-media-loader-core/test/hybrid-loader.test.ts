@@ -1234,6 +1234,59 @@ describe("HybridLoader: a peer after a failed HTTP attempt", () => {
     loader.destroy();
   });
 
+  it("moves a P2P prefetch that followed a failed HTTP prefetch to HTTP", async () => {
+    // The owner's HTTP prefetch of the segment failed, and P2P prefetch then
+    // took it from a peer. That download is not the urgent request's P2P
+    // attempt: when the player asks for the segment with an empty buffer, it
+    // moves to HTTP, as any P2P download of an urgent request does.
+    const tried = count("SegmentRequest:peer-after-http-failure");
+    const { loader, segment, callbacks, startLoading, status, state } = setup();
+    startLoading(0, "http").failWithError(httpError());
+    startLoading(0, "p2p");
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+
+    expect(state.p2pAborted).toContain("seg-0");
+    expect(httpOf("seg-0")).toEqual(["seg-0"]);
+    expect(status(0)).toBe("loading");
+    expect(count("SegmentRequest:peer-after-http-failure")).toBe(tried);
+    loader.destroy();
+  });
+
+  it("keeps the P2P attempt when the player aborts and asks again", async () => {
+    // Players abort and ask again on a rendition change or a retry. The peer
+    // that is sending the segment keeps sending it: its bytes are not thrown
+    // away for HTTP, and the new request gets no second P2P attempt.
+    fakes.state.loadedBySomeone.add("seg-0");
+    const tried = count("SegmentRequest:peer-after-http-failure");
+    const { loader, segment, status, state } = setup();
+    const first = { onSuccess: vi.fn(), onError: vi.fn() };
+
+    await loader.loadSegment(segment(0), first);
+    await flush();
+    state.httpControls.get("seg-0")!.failWithError(httpError());
+    await flush();
+    expect(p2pOf("seg-0")).toEqual(["seg-0"]);
+
+    loader.abortSegmentRequest("seg-0");
+    const second = { onSuccess: vi.fn(), onError: vi.fn() };
+    await loader.loadSegment(segment(0), second);
+    await flush();
+
+    expect(state.p2pAborted).not.toContain("seg-0");
+    expect(status(0)).toBe("loading");
+    expect(httpOf("seg-0")).toEqual(["seg-0"]);
+
+    // The peer fails: HTTP again, and no second P2P attempt.
+    state.p2pControls.get("seg-0")!.failWithError(peerError());
+    await flush();
+    expect(httpOf("seg-0")).toEqual(["seg-0", "seg-0"]);
+    expect(p2pOf("seg-0")).toEqual(["seg-0"]);
+    expect(count("SegmentRequest:peer-after-http-failure")).toBe(tried + 1);
+    loader.destroy();
+  });
+
   it("gives the player's next request for the segment its own P2P attempt", async () => {
     fakes.state.loadedBySomeone.add("seg-0");
     const { loader, segment, state } = setup({ httpErrorRetries: 2 });

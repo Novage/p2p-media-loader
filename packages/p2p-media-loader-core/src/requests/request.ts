@@ -21,18 +21,30 @@ export type LoadProgress = {
   loadedBytes: number;
 };
 
+/**
+ * Why an attempt was started, where that changes how the core treats it:
+ * `"peer-after-http-failure"` is a player's urgent request's one P2P attempt
+ * after an HTTP attempt failed. An attempt with no tag is an ordinary one.
+ */
+export type AttemptTag = "peer-after-http-failure";
+
 type HttpRequestAttempt = {
   downloadSource: "http";
+  tag?: AttemptTag;
   error?: RequestError;
 };
 
 type P2PRequestAttempt = {
   downloadSource: "p2p";
   peerId: string;
+  tag?: AttemptTag;
   error?: RequestError;
 };
 
 export type RequestAttempt = HttpRequestAttempt | P2PRequestAttempt;
+
+/** An attempt that failed, with its error. */
+type FailedAttempt = RequestAttempt & { error: RequestError };
 
 export type RequestControls = Readonly<{
   addLoadedChunk: Request["addLoadedChunk"];
@@ -43,7 +55,7 @@ export type RequestControls = Readonly<{
 
 type OmitEncapsulated<T extends RequestAttempt> = Omit<
   T,
-  "error" | "errorTimestamp"
+  "error" | "errorTimestamp" | "tag"
 >;
 type StartRequestParameters =
   OmitEncapsulated<HttpRequestAttempt> | OmitEncapsulated<P2PRequestAttempt>;
@@ -125,6 +137,23 @@ export class Request {
 
   /** The download attempt under way: open from `loading` until it settles. */
   private downloadToken?: DiagnosticsToken;
+
+  /** The tag of the attempt under way, if it has one. */
+  get attemptTag(): AttemptTag | undefined {
+    return this._status === "loading" ? this.currentAttempt?.tag : undefined;
+  }
+
+  /**
+   * Tags the attempt under way with why it was started. The tag stays with
+   * the attempt: a failed attempt keeps it in `failedAttempts`.
+   */
+  tagAttempt(tag: AttemptTag) {
+    if (this._status !== "loading" || !this.currentAttempt) return;
+    this.currentAttempt.tag = tag;
+    this.logger(
+      `${this.currentAttempt.downloadSource} ${this.segment.externalId} is the ${tag} attempt`,
+    );
+  }
 
   private setStatus(status: RequestStatus) {
     if (
@@ -539,9 +568,9 @@ export class Request {
 }
 
 class FailedRequestAttempts {
-  private attempts: Required<RequestAttempt>[] = [];
+  private attempts: FailedAttempt[] = [];
 
-  add(attempt: Required<RequestAttempt>) {
+  add(attempt: FailedAttempt) {
     this.attempts.push(attempt);
   }
 
@@ -559,7 +588,12 @@ class FailedRequestAttempts {
     );
   }
 
-  get lastAttempt(): Readonly<Required<RequestAttempt>> | undefined {
+  /** Whether a failed attempt has the tag. */
+  hasTag(tag: AttemptTag): boolean {
+    return this.attempts.some((attempt) => attempt.tag === tag);
+  }
+
+  get lastAttempt(): Readonly<FailedAttempt> | undefined {
     return this.attempts[this.attempts.length - 1];
   }
 
