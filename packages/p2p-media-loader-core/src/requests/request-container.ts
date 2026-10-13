@@ -61,6 +61,16 @@ export class RequestsContainer {
     }
   }
 
+  /**
+   * The HTTP downloads under way. A request keeps its source after its
+   * attempt ends, so `httpRequests()` also yields stopped and failed ones.
+   */
+  *loadingHttpRequests(): Generator<Request, void> {
+    for (const request of this.httpRequests()) {
+      if (request.status === "loading") yield request;
+    }
+  }
+
   *p2pRequests(): Generator<Request, void> {
     for (const request of this.requests.values()) {
       if (request.downloadSource === "p2p") yield request;

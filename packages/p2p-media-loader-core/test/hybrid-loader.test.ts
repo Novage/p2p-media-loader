@@ -36,6 +36,8 @@ const fakes = vi.hoisted(() => {
     p2pControls: new Map<string, Controls>(),
     /** Segments a peer was made free for. */
     peerFreedFor: [] as string[],
+    /** How many times the loader asked to announce its segments. */
+    broadcasts: 0,
   };
   class FakeP2PLoader {
     get connectedPeerCount() {
@@ -52,7 +54,9 @@ const fakes = vi.hoisted(() => {
     isSegmentLoadingOrLoadedBySomeone(segment: SegmentWithStream) {
       return state.loadedBySomeone.has(segment.runtimeId);
     }
-    broadcastAnnouncement() {}
+    broadcastAnnouncement() {
+      state.broadcasts++;
+    }
     downloadSegment(segment: SegmentWithStream) {
       state.p2pStarted.push(segment.runtimeId);
       const controls = state.requests
@@ -1314,6 +1318,131 @@ describe("HybridLoader: a peer after a failed HTTP attempt", () => {
 
     expect(httpOf("seg-0")).toEqual(["seg-0", "seg-0", "seg-0"]);
     expect(p2pOf("seg-0")).toEqual(["seg-0", "seg-0"]);
+    loader.destroy();
+  });
+});
+
+describe("HybridLoader: a download stopped with bytes in hand", () => {
+  beforeEach(() => {
+    vi.stubGlobal("window", globalThis);
+    const { state } = fakes;
+    state.peerCount = 0;
+    state.loadedBySomeone.clear();
+    state.httpStarted.length = 0;
+    state.httpAborted.length = 0;
+    state.p2pStarted.length = 0;
+    state.p2pAborted.length = 0;
+    state.broadcasts = 0;
+    state.httpControls.clear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const chunk = () => new Uint8Array(100);
+
+  it("keeps a prefetch stopped for an urgent request, and goes on from its bytes", async () => {
+    // The urgent request takes the link; the prefetch of segment 5 had 100
+    // bytes. They are not thrown away: when segment 5 is fetched again, the
+    // same request goes on from them, with a Range from byte 100.
+    const kept = count("PartialRequest:kept");
+    const { loader, segment, callbacks, startLoading, status, state } = setup({
+      simultaneousHttpDownloads: 3,
+    });
+    startLoading(5, "http").addLoadedChunk(chunk());
+    const paused = state.requests.get(segment(5));
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+    // The next pass — here forced by a rate change — is the one that used to
+    // remove the stopped request with its bytes.
+    loader.updatePlayback({ bufferAhead: 0, rate: 2 });
+    await flush();
+    expect(status(5)).toBe("aborted");
+    expect(state.requests.get(segment(5))).toBe(paused);
+    expect(paused?.loadedBytes).toBe(100);
+    expect(count("PartialRequest:kept")).toBe(kept + 1);
+
+    const urgent = state.httpControls.get("seg-0")!;
+    urgent.addLoadedChunk(chunk());
+    urgent.completeOnSuccess();
+    await flush();
+    await loader.loadSegment(segment(5), {
+      onSuccess: vi.fn(),
+      onError: vi.fn(),
+    });
+    await flush();
+
+    expect(status(5)).toBe("loading");
+    expect(state.requests.get(segment(5))).toBe(paused);
+    expect(paused?.loadedBytes).toBe(100);
+    loader.destroy();
+  });
+
+  it("removes a stopped download once its segment leaves the queue", async () => {
+    const { loader, segment, callbacks, state } = setup({
+      simultaneousHttpDownloads: 3,
+    });
+    const controls = startLoading(5);
+    controls.addLoadedChunk(chunk());
+    state.requests.get(segment(5))!.cancel();
+    await loader.loadSegment(segment(4), callbacks);
+    await flush();
+    expect(state.requests.get(segment(5))?.loadedBytes).toBe(100);
+
+    // The player moves on past segment 5: it is behind the queue now.
+    await loader.loadSegment(segment(20), callbacks);
+    await flush();
+
+    expect(state.requests.get(segment(5))).toBeUndefined();
+    loader.destroy();
+
+    function startLoading(i: number) {
+      return state.requests
+        .getOrCreateRequest(segment(i))
+        .start({ downloadSource: "http" }, { onAbort: () => undefined });
+    }
+  });
+
+  it("keeps no more stopped downloads than there are slots, nearest first", async () => {
+    // One HTTP slot and one P2P slot: two stopped downloads are kept, the
+    // one furthest ahead is let go.
+    const dropped = count("PartialRequest:dropped-over-limit");
+    const { loader, segment, callbacks, state } = setup();
+    for (const i of [7, 5, 6]) {
+      state.requests
+        .getOrCreateRequest(segment(i))
+        .start({ downloadSource: "http" }, { onAbort: () => undefined })
+        .addLoadedChunk(chunk());
+      state.requests.get(segment(i))!.cancel();
+    }
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+
+    expect(state.requests.get(segment(5))?.status).toBe("aborted");
+    expect(state.requests.get(segment(6))?.status).toBe("aborted");
+    expect(state.requests.get(segment(7))).toBeUndefined();
+    expect(count("PartialRequest:dropped-over-limit")).toBe(dropped + 1);
+    loader.destroy();
+  });
+
+  it("announces at once when an urgent request already on HTTP stops other downloads", async () => {
+    // Segment 0 was coming over HTTP as prefetch when the player asked for
+    // it; segment 5 was too. Nothing else starts a download that would
+    // announce, so the yield tells peers segment 5 stopped by itself.
+    const { loader, segment, callbacks, startLoading, state } = setup({
+      simultaneousHttpDownloads: 3,
+    });
+    startLoading(0, "http");
+    startLoading(5, "http");
+    state.broadcasts = 0;
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+
+    expect(state.httpAborted).toEqual(["seg-5"]);
+    expect(state.broadcasts).toBeGreaterThan(0);
     loader.destroy();
   });
 });

@@ -54,7 +54,10 @@ lowest score in its own neighbourhood is the segment's **owner**. The owner
 fetches the segment over HTTP as soon as it sees it, and announces the fetch
 to its peers as it starts (the announcement carries segments in flight as
 well as segments held). Everyone else waits for that announcement and takes
-the segment over P2P once it is held.
+the segment over P2P once it is held. Only a fetch under way is announced in
+flight: when the owner stops one — a failure, or a pause for its player's
+urgent request — it announces again without it, so the others do not wait on
+a segment nobody is fetching.
 
 The scoring is rendezvous hashing, or highest random weight: weigh every
 candidate with a hash of the candidate and the key, take the extremum — the

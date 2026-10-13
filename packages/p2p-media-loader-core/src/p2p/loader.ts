@@ -296,7 +296,9 @@ export class P2PLoader {
     );
     const httpLoading: number[] = [];
 
-    for (const request of this.#requests.httpRequests()) {
+    // Only downloads under way: a stopped or failed one announced as loading
+    // makes peers wait for a segment that nobody is fetching.
+    for (const request of this.#requests.loadingHttpRequests()) {
       const segment = this.#stream.segments.get(request.segment.runtimeId);
       if (!segment) continue;
 

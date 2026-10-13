@@ -288,6 +288,7 @@ export class HybridLoader {
     const { httpErrorRetries } = this.config;
     const now = performance.now();
     let stored = false;
+    const partials: Request[] = [];
     for (const request of this.requests.items()) {
       const {
         downloadSource: type,
@@ -373,6 +374,20 @@ export class HybridLoader {
           break;
 
         case "aborted":
+          // A download stopped with bytes in hand — to give an urgent
+          // request the link, or a slot — is paused, not given up: the next
+          // download of the segment, over HTTP or from a peer, goes on from
+          // those bytes. Kept while the segment is still wanted.
+          if (
+            request.loadedBytes > 0 &&
+            queueSegmentIds.has(segment.runtimeId)
+          ) {
+            if (!isHandledByProcessQueue) {
+              diagnostics?.count("PartialRequest:kept");
+            }
+            partials.push(request);
+            break;
+          }
           this.requests.remove(request);
           break;
       }
@@ -386,7 +401,25 @@ export class HybridLoader {
         request.failedAttempts.clear();
       }
     }
+    this.limitPartialRequests(partials);
     return stored;
+  }
+
+  /**
+   * Keeps at most as many paused downloads as there are download slots,
+   * nearest first. Their bytes are held outside the segment storage and its
+   * limit, and a download paused far ahead may wait long for the prefetch to
+   * reach it.
+   */
+  private limitPartialRequests(partials: Request[]) {
+    const { simultaneousHttpDownloads, simultaneousP2PDownloads } = this.config;
+    const limit = simultaneousHttpDownloads + simultaneousP2PDownloads;
+    if (partials.length <= limit) return;
+    partials.sort((a, b) => a.segment.startTime - b.segment.startTime);
+    for (const request of partials.slice(limit)) {
+      this.requests.remove(request);
+      diagnostics?.count("PartialRequest:dropped-over-limit");
+    }
   }
 
   private processQueue() {
@@ -582,6 +615,7 @@ export class HybridLoader {
    * "Urgency".
    */
   private yieldHttpPrefetchTo(segment: SegmentWithStream) {
+    let stopped = false;
     for (const request of this.requests.items()) {
       if (
         request.downloadSource !== "http" ||
@@ -591,11 +625,15 @@ export class HybridLoader {
         continue;
       }
       request.cancel();
+      stopped = true;
       diagnostics?.count("Prefetch:yielded-to-urgent");
       this.logger(
         `stopped ${LoggerUtils.getSegmentString(request.segment)} for the urgent ${LoggerUtils.getSegmentString(segment)}`,
       );
     }
+    // Peers wait on a segment this peer announced as loading; tell them it
+    // stopped. Announcements in one task go out as one.
+    if (stopped) this.p2pLoaders.currentLoader.broadcastAnnouncement();
   }
 
   /**

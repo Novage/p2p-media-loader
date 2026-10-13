@@ -153,7 +153,11 @@ paused player that asks for media wants its first frame.
   starts nothing until the request is delivered. An owner's prefetch keeps
   its HTTP slots busy, and an HTTP download from a CDN can fill a viewer's
   link, so beside it the player's request downloads slower than it would
-  without P2P. P2P downloads go on: they are what P2P is for, and a peer's
+  without P2P. A download stopped this way keeps its bytes while its segment
+  is still in the queue: the next download of the segment, over HTTP or from
+  a peer, goes on from them, so the stop is a pause and costs no origin
+  traffic. At most as many such paused downloads are kept as there are
+  download slots, nearest first. P2P downloads go on: they are what P2P is for, and a peer's
   upload rarely fills a viewer's link. A P2P download of the request that is
   under way moves to HTTP. Where HTTP is not allowed — during `httpDownloadInitialTimeoutMs`, or once
   the request's HTTP attempts are spent — it is taken from a peer that has it,
