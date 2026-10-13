@@ -248,17 +248,16 @@ export class P2PLoader {
    * peer downloads something else, the download of one of them stops. A peer
    * downloads one segment at a time, and in a small swarm the one peer that
    * has the segment is often busy with prefetch.
+   *
+   * @returns Whether a download was stopped.
    */
-  freePeerFor(segment: SegmentWithStream) {
-    let busyPeer: Peer | undefined;
-    for (const peer of this.#peersMap.values()) {
-      if (peer.getSegmentStatus(segment) !== "loaded") continue;
-      if (!peer.downloadingSegment) return;
-      busyPeer ??= peer;
-    }
-    if (!busyPeer?.downloadingSegment) return;
-    const request = this.#requests.get(busyPeer.downloadingSegment);
-    if (request?.status === "loading") request.cancel();
+  freePeerFor(segment: SegmentWithStream): boolean {
+    const toStop = segmentToStopFor(this.#peersMap.values(), segment);
+    if (!toStop) return false;
+    const request = this.#requests.get(toStop);
+    if (request?.status !== "loading") return false;
+    request.cancel();
+    return true;
   }
 
   isSegmentLoadingOrLoadedBySomeone(segment: SegmentWithStream): boolean {
@@ -527,6 +526,29 @@ export class P2PLoader {
     }
     this.#peersMap.clear();
   }
+}
+
+/**
+ * The segment whose download must stop so that a peer holding all of
+ * `segment` can send it: none where such a peer is free, or where no peer
+ * holds it; otherwise the download of the first such peer, all of them busy.
+ */
+export function segmentToStopFor(
+  peers: Iterable<
+    Pick<Peer, "getSegmentStatus"> & {
+      readonly downloadingSegment: SegmentWithStream | undefined;
+    }
+  >,
+  segment: SegmentWithStream,
+): SegmentWithStream | undefined {
+  let busySegment: SegmentWithStream | undefined;
+  for (const peer of peers) {
+    if (peer.getSegmentStatus(segment) !== "loaded") continue;
+    const downloading = peer.downloadingSegment;
+    if (!downloading) return undefined;
+    busySegment ??= downloading;
+  }
+  return busySegment;
 }
 
 function selectPeerForDownload(peersWithSegment: Peer[]): Peer {

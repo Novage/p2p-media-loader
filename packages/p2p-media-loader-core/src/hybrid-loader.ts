@@ -312,6 +312,12 @@ export class HybridLoader {
       switch (status) {
         case "loading":
           if (!queueSegmentIds.has(segment.runtimeId) && !engineRequest) {
+            // Removed in this pass, so the "aborted" case never sees it.
+            if (request.attemptTag === "peer-after-http-failure") {
+              diagnostics?.count(
+                "SegmentRequest:peer-after-http-failure:aborted",
+              );
+            }
             request.cancel();
             this.requests.remove(request);
           }
@@ -319,6 +325,9 @@ export class HybridLoader {
 
         case "succeed": {
           if (!type) break;
+          if (request.lastAttemptTag === "peer-after-http-failure") {
+            diagnostics?.count("SegmentRequest:peer-after-http-failure:served");
+          }
           if (type === "http") {
             this.p2pLoaders.currentLoader.broadcastAnnouncement();
           }
@@ -363,6 +372,12 @@ export class HybridLoader {
             this.p2pLoaders.currentLoader.broadcastAnnouncement();
           }
           if (
+            !isHandledByProcessQueue &&
+            request.lastAttemptTag === "peer-after-http-failure"
+          ) {
+            diagnostics?.count("SegmentRequest:peer-after-http-failure:failed");
+          }
+          if (
             !engineRequest &&
             !stream.segments.has(request.segment.runtimeId)
           ) {
@@ -382,6 +397,14 @@ export class HybridLoader {
           break;
 
         case "aborted":
+          if (
+            !isHandledByProcessQueue &&
+            request.lastAttemptTag === "peer-after-http-failure"
+          ) {
+            diagnostics?.count(
+              "SegmentRequest:peer-after-http-failure:aborted",
+            );
+          }
           // A download stopped with bytes in hand — to give an urgent
           // request the link, or a slot — is paused, not given up: the next
           // download of the segment, over HTTP or from a peer, goes on from
@@ -600,12 +623,24 @@ export class HybridLoader {
     ) {
       return false;
     }
+    // Each way this ends is counted once: a request whose attempt does not
+    // start goes on to HTTP at once, so it is not judged here again.
     const { segment } = request;
     const p2pLoader = this.p2pLoaders.currentLoader;
-    if (!p2pLoader.isSegmentLoadedBySomeone(segment)) return false;
-    p2pLoader.freePeerFor(segment);
-    if (!this.freeSlotFor(segment, "p2p")) return false;
-    if (!p2pLoader.downloadSegment(segment)) return false;
+    if (!p2pLoader.isSegmentLoadedBySomeone(segment)) {
+      diagnostics?.count("SegmentRequest:peer-after-http-failure:no-peer");
+      return false;
+    }
+    if (p2pLoader.freePeerFor(segment)) {
+      diagnostics?.count("Prefetch:peer-freed-for-urgent");
+    }
+    if (
+      !this.freeSlotFor(segment, "p2p") ||
+      !p2pLoader.downloadSegment(segment)
+    ) {
+      diagnostics?.count("SegmentRequest:peer-after-http-failure:no-free-peer");
+      return false;
+    }
     request.tagAttempt("peer-after-http-failure");
     diagnostics?.count("SegmentRequest:peer-after-http-failure");
     this.logger(

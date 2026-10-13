@@ -143,6 +143,11 @@ export class Request {
     return this._status === "loading" ? this.currentAttempt?.tag : undefined;
   }
 
+  /** The tag of the last attempt, under way or ended, if it has one. */
+  get lastAttemptTag(): AttemptTag | undefined {
+    return this.currentAttempt?.tag;
+  }
+
   /**
    * Tags the attempt under way with why it was started. The tag stays with
    * the attempt: a failed attempt keeps it in `failedAttempts`.

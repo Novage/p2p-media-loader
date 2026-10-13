@@ -211,7 +211,11 @@ the groups and the cases a reader of a snapshot must know.
   left to finish because it was about to (`Prefetch:kept-for-urgent`), as in
   specs/playback-contract.md, "Urgency". Each P2P attempt that an urgent
   request gets after its HTTP attempt fails is counted too
-  (`SegmentRequest:peer-after-http-failure`), and so is each download stopped
+  (`SegmentRequest:peer-after-http-failure`), with how it ended (`:served`,
+  `:failed`, `:aborted`) or why it did not start (`:no-peer`, no peer holds
+  the whole segment; `:no-free-peer`, no peer or slot is free), and each
+  download stopped to free a peer for it (`Prefetch:peer-freed-for-urgent`).
+  So is each download stopped
   with bytes in hand that is kept to go on from them (`PartialRequest:kept`),
   and each one let go because more were kept than there are download slots
   (`PartialRequest:dropped-over-limit`). The Video.js adapter

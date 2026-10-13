@@ -38,6 +38,10 @@ const fakes = vi.hoisted(() => {
     p2pControls: new Map<string, Controls>(),
     /** Segments a peer was made free for. */
     peerFreedFor: [] as string[],
+    /** Whether the fake `freePeerFor` reports that it stopped a download. */
+    freePeerStops: false,
+    /** Whether the fake `downloadSegment` finds no peer free to send. */
+    p2pRefuses: false,
     /** How many times the loader asked to announce its segments. */
     broadcasts: 0,
   };
@@ -60,6 +64,7 @@ const fakes = vi.hoisted(() => {
       state.broadcasts++;
     }
     downloadSegment(segment: SegmentWithStream) {
+      if (state.p2pRefuses) return false;
       state.p2pStarted.push(segment.runtimeId);
       const controls = state.requests
         .getOrCreateRequest(segment)
@@ -72,6 +77,7 @@ const fakes = vi.hoisted(() => {
     }
     freePeerFor(segment: SegmentWithStream) {
       state.peerFreedFor.push(segment.runtimeId);
+      return state.freePeerStops;
     }
   }
   const loader = new FakeP2PLoader();
@@ -1645,6 +1651,134 @@ describe("HybridLoader: fetch priorities", () => {
     for (const id of prefetched) {
       expect(state.httpPriority.get(id)).toBe("low");
     }
+    loader.destroy();
+  });
+});
+
+describe("HybridLoader: counting how the P2P attempt after an HTTP failure goes", () => {
+  beforeEach(() => {
+    vi.stubGlobal("window", globalThis);
+    const { state } = fakes;
+    state.peerCount = 1;
+    state.loadedBySomeone.clear();
+    state.httpStarted.length = 0;
+    state.p2pStarted.length = 0;
+    state.freePeerStops = false;
+    state.p2pRefuses = false;
+    state.httpControls.clear();
+    state.p2pControls.clear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const ways = [
+    "served",
+    "failed",
+    "aborted",
+    "no-peer",
+    "no-free-peer",
+  ] as const;
+  const counts = () => ({
+    ...Object.fromEntries(
+      ways.map((way) => [
+        way,
+        count(`SegmentRequest:peer-after-http-failure:${way}`),
+      ]),
+    ),
+    freed: count("Prefetch:peer-freed-for-urgent"),
+  });
+  const delta = (before: ReturnType<typeof counts>) => {
+    const after = counts();
+    return Object.fromEntries(
+      Object.entries(after)
+        .map(([key, value]) => [
+          key,
+          value - before[key as keyof typeof before],
+        ])
+        .filter(([, value]) => value !== 0),
+    );
+  };
+
+  /** An urgent request for segment 0 whose first HTTP attempt fails. */
+  async function afterHttpFailure() {
+    const t = setup();
+    await t.loader.loadSegment(t.segment(0), t.callbacks);
+    await flush();
+    t.state.httpControls
+      .get("seg-0")!
+      .failWithError(new RequestError("http-error", "503"));
+    await flush();
+    return t;
+  }
+
+  it("counts an attempt the peer serves", async () => {
+    fakes.state.loadedBySomeone.add("seg-0");
+    const before = counts();
+    const { loader, state } = await afterHttpFailure();
+    const controls = state.p2pControls.get("seg-0")!;
+    controls.addLoadedChunk(new Uint8Array(16));
+    controls.completeOnSuccess();
+    await flush();
+
+    expect(delta(before)).toEqual({ served: 1 });
+    loader.destroy();
+  });
+
+  it("counts an attempt the peer fails, once", async () => {
+    fakes.state.loadedBySomeone.add("seg-0");
+    const before = counts();
+    const { loader, state } = await afterHttpFailure();
+    state.p2pControls
+      .get("seg-0")!
+      .failWithError(new RequestError("peer-closed"));
+    await flush();
+    loader.updatePlayback({ bufferAhead: 0, rate: 2 });
+    await flush();
+
+    expect(delta(before)).toEqual({ failed: 1 });
+    loader.destroy();
+  });
+
+  it("counts an attempt the player gives up", async () => {
+    // The player leaves the segment: its request is aborted, and the
+    // segment leaves the queue, which stops the attempt.
+    fakes.state.loadedBySomeone.add("seg-0");
+    const before = counts();
+    const { loader, segment, callbacks } = await afterHttpFailure();
+    loader.abortSegmentRequest("seg-0");
+    await loader.loadSegment(segment(20), callbacks);
+    await flush();
+
+    expect(delta(before)).toEqual({ aborted: 1 });
+    loader.destroy();
+  });
+
+  it("counts an attempt that does not start because no peer has the segment", async () => {
+    const before = counts();
+    const { loader } = await afterHttpFailure();
+
+    expect(delta(before)).toEqual({ "no-peer": 1 });
+    loader.destroy();
+  });
+
+  it("counts an attempt that does not start because no peer is free", async () => {
+    fakes.state.loadedBySomeone.add("seg-0");
+    fakes.state.p2pRefuses = true;
+    const before = counts();
+    const { loader } = await afterHttpFailure();
+
+    expect(delta(before)).toEqual({ "no-free-peer": 1 });
+    loader.destroy();
+  });
+
+  it("counts the download it stops to free a peer", async () => {
+    fakes.state.loadedBySomeone.add("seg-0");
+    fakes.state.freePeerStops = true;
+    const before = counts();
+    const { loader } = await afterHttpFailure();
+
+    expect(delta(before)).toEqual({ freed: 1 });
     loader.destroy();
   });
 });
