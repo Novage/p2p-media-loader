@@ -31,7 +31,8 @@ A test run finds problems. It does not fix them.
   give the test, the stream and the engine, what was expected, what happened,
   the evidence (counters, logs, measurements), whether it occurred again in
   fresh tabs, and whether the last release has it too. Who reviews the report
-  decides what is fixed and when.
+  decides what is fixed and when. A finding that is not fixed goes into
+  [KNOWN-ISSUES.md](../KNOWN-ISSUES.md), and each run adds a line there.
 - **Stop the run and report at once when a finding needs an immediate fix:**
   core functionality is broken, for example playback stops for good, a
   request is never served, P2P does not work at all, or the core loads the
