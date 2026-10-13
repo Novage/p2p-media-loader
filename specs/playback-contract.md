@@ -153,7 +153,11 @@ paused player that asks for media wants its first frame.
   starts nothing until the request is delivered. An owner's prefetch keeps
   its HTTP slots busy, and an HTTP download from a CDN can fill a viewer's
   link, so beside it the player's request downloads slower than it would
-  without P2P. A download stopped this way keeps its bytes while its segment
+  without P2P. A download that will finish within 0.25 s at its speed so far
+  is not stopped: stopped, its segment would be missing from the store when
+  the player asks for it next, and that request would be urgent in turn. It
+  delays the urgent request by about that much, within the core's own cost
+  that release test 4 allows. A download stopped this way keeps its bytes while its segment
   is still in the queue: the next download of the segment, over HTTP or from
   a peer, goes on from them, so the stop is a pause and costs no origin
   traffic. At most as many such paused downloads are kept as there are

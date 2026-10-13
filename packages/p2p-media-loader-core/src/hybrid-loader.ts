@@ -36,6 +36,12 @@ const FAILED_ATTEMPTS_CLEAR_INTERVAL = 60000;
 const PEER_UPDATE_LATENCY = 1000;
 /** Weight of the newest sample in the running estimate of a stream's segment size. */
 const SEGMENT_BYTES_EWMA_ALPHA = 0.3;
+/**
+ * An HTTP download the yield to an urgent request leaves to finish: one that
+ * needs at most this long. Sharing the link with it delays the urgent request
+ * by about that much, within the core's own cost that release test 4 allows.
+ */
+const YIELD_KEEP_SECONDS = 0.25;
 
 export class HybridLoader {
   private readonly requests: RequestsContainer;
@@ -65,6 +71,8 @@ export class HybridLoader {
    * counted once more if it becomes urgent before it is served.
    */
   private waitingNotUrgent?: EngineRequest;
+  /** Downloads a yield left to finish, so that each is counted once. */
+  private readonly keptForUrgent = new WeakSet<Request>();
 
   constructor(
     private lastRequestedSegment: Readonly<SegmentWithStream>,
@@ -608,9 +616,11 @@ export class HybridLoader {
 
   /**
    * Gives the link to an urgent request: stops every HTTP download of this
-   * loader that is not for `segment`. An owner's prefetch keeps its HTTP slots
-   * busy, and beside it the player's request downloads slower than it would
-   * without P2P. P2P downloads go on — they are what P2P is for, and a peer's
+   * loader that is not for `segment`, except one that will finish within
+   * `YIELD_KEEP_SECONDS` at its speed so far. An owner's prefetch keeps its
+   * HTTP slots busy, and beside it the player's request downloads slower than
+   * it would without P2P. A stopped download keeps its bytes, so the stop is a
+   * pause. P2P downloads go on — they are what P2P is for, and a peer's
    * upload rarely fills a viewer's link. See specs/playback-contract.md,
    * "Urgency".
    */
@@ -622,6 +632,20 @@ export class HybridLoader {
         request.status !== "loading" ||
         request.segment === segment
       ) {
+        continue;
+      }
+      // One about to finish keeps going: stopped, its segment would be
+      // missing from the store when the player asks for it next, and that
+      // request would be urgent in turn.
+      const secondsLeft = request.secondsToComplete;
+      if (secondsLeft !== undefined && secondsLeft <= YIELD_KEEP_SECONDS) {
+        if (!this.keptForUrgent.has(request)) {
+          this.keptForUrgent.add(request);
+          diagnostics?.count("Prefetch:kept-for-urgent");
+          this.logger(
+            `kept ${LoggerUtils.getSegmentString(request.segment)} for the urgent ${LoggerUtils.getSegmentString(segment)}: ${secondsLeft.toFixed(2)}s left`,
+          );
+        }
         continue;
       }
       request.cancel();

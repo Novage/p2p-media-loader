@@ -205,7 +205,8 @@ the groups and the cases a reader of a snapshot must know.
   counted by its urgency when it arrives (`SegmentRequest:urgent` and
   `:not-urgent`), and each one that waited and then became urgent
   (`SegmentRequest:became-urgent`), and each HTTP download stopped to give
-  an urgent request the link (`Prefetch:yielded-to-urgent`), as in
+  an urgent request the link (`Prefetch:yielded-to-urgent`), and each one
+  left to finish because it was about to (`Prefetch:kept-for-urgent`), as in
   specs/playback-contract.md, "Urgency". Each P2P attempt that an urgent
   request gets after its HTTP attempt fails is counted too
   (`SegmentRequest:peer-after-http-failure`), and so is each download stopped

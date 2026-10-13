@@ -1446,3 +1446,83 @@ describe("HybridLoader: a download stopped with bytes in hand", () => {
     loader.destroy();
   });
 });
+
+describe("HybridLoader: a download about to finish when a request is urgent", () => {
+  beforeEach(() => {
+    vi.stubGlobal("window", globalThis);
+    const { state } = fakes;
+    state.peerCount = 0;
+    state.httpStarted.length = 0;
+    state.httpAborted.length = 0;
+    state.httpControls.clear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /**
+   * A prefetch of segment 5 that received `loaded` of `total` bytes over
+   * 0.15 s, so its speed is known: `total` undefined is a response with no
+   * Content-Length.
+   */
+  async function prefetchOf5(loaded: number, total: number | undefined) {
+    const t = setup({ simultaneousHttpDownloads: 3 });
+    const controls = t.startLoading(5, "http");
+    const request = t.state.requests.get(t.segment(5))!;
+    if (total !== undefined) request.setTotalBytes(total);
+    controls.startResponse();
+    controls.addLoadedChunk(new Uint8Array(loaded));
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    return t;
+  }
+
+  it("lets a download that will finish within a quarter second finish", async () => {
+    // 9000 of 10000 bytes in 0.15 s: the last 1000 take about 0.02 s.
+    // Stopped, segment 5 would be missing when the player asks for it next.
+    const kept = count("Prefetch:kept-for-urgent");
+    const { loader, segment, callbacks, status, state } = await prefetchOf5(
+      9000,
+      10000,
+    );
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+    loader.updatePlayback({ bufferAhead: 0, rate: 2 });
+    await flush();
+
+    expect(state.httpAborted).toEqual([]);
+    expect(status(5)).toBe("loading");
+    expect(state.httpStarted).toEqual(["seg-0"]);
+    // Counted once, though every pass judges it again.
+    expect(count("Prefetch:kept-for-urgent")).toBe(kept + 1);
+    loader.destroy();
+  });
+
+  it("stops a download far from its end", async () => {
+    // 1000 of 1000000 bytes in 0.15 s: about 150 s left.
+    const { loader, segment, callbacks, status, state } = await prefetchOf5(
+      1000,
+      1_000_000,
+    );
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+
+    expect(state.httpAborted).toEqual(["seg-5"]);
+    expect(status(5)).toBe("aborted");
+    loader.destroy();
+  });
+
+  it("stops a download whose size is unknown", async () => {
+    const { loader, segment, callbacks, state } = await prefetchOf5(
+      9000,
+      undefined,
+    );
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+
+    expect(state.httpAborted).toEqual(["seg-5"]);
+    loader.destroy();
+  });
+});

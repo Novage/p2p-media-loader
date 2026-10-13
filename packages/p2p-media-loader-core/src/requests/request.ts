@@ -183,6 +183,25 @@ export class Request {
     return this._totalBytes;
   }
 
+  /**
+   * Seconds the attempt under way needs to finish at the speed it has had so
+   * far, from its response's start. Unknown — `undefined` — for a request not
+   * loading, of unknown size, with no bytes yet, or younger than a tenth of a
+   * second: its first chunks arrive in a burst, and say little of its speed.
+   */
+  get secondsToComplete(): number | undefined {
+    const { progress } = this;
+    if (this._status !== "loading" || !progress) return undefined;
+    if (this._totalBytes === undefined || progress.loadedBytes === 0) {
+      return undefined;
+    }
+    const since = progress.responseTimestamp ?? progress.startTimestamp;
+    const elapsed = (performance.now() - since) / 1000;
+    if (elapsed < 0.1) return undefined;
+    const remaining = Math.max(0, this._totalBytes - this._loadedBytes);
+    return remaining / (progress.loadedBytes / elapsed);
+  }
+
   get data(): ArrayBuffer {
     this.finalData ??= Utils.joinChunks(this.bytes).buffer;
     return this.finalData;
