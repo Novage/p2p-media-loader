@@ -161,7 +161,11 @@ paused player that asks for media wants its first frame.
   is still in the queue: the next download of the segment, over HTTP or from
   a peer, goes on from them, so the stop is a pause and costs no origin
   traffic. At most as many such paused downloads are kept as there are
-  download slots, nearest first. P2P downloads go on: they are what P2P is for, and a peer's
+  download slots, nearest first. The player's requests are fetched at high
+  fetch priority and prefetch at low, so the browser serves them first where
+  it can: with the bandwidth on HTTP/2 and HTTP/3, also against the other
+  stream's loader, and from its queue of requests for the host on any
+  protocol. A browser without fetch priorities ignores them. P2P downloads go on: they are what P2P is for, and a peer's
   upload rarely fills a viewer's link. A P2P download of the request that is
   under way moves to HTTP. Where HTTP is not allowed — during `httpDownloadInitialTimeoutMs`, or once
   the request's HTTP attempts are spent — it is taken from a peer that has it,

@@ -32,10 +32,17 @@ export class HttpRequestExecutor {
     return this.abortController.signal.aborted;
   }
 
+  /**
+   * @param priority - The fetch priority of the request the core builds:
+   * `"high"` for a segment its player has requested, `"low"` for prefetch.
+   * A browser without fetch priorities ignores it; a request built by
+   * `httpRequestSetup` keeps its own.
+   */
   constructor(
     private readonly request: SegmentRequest,
     private readonly httpConfig: HttpConfig,
     eventTarget: EventTarget<CoreEventMap>,
+    private readonly priority: RequestPriority,
   ) {
     this.onChunkDownloaded =
       eventTarget.getEventDispatcher("onChunkDownloaded");
@@ -128,7 +135,10 @@ export class HttpRequestExecutor {
           );
         }
 
-        const requestOptions: RequestInit = { headers };
+        const requestOptions: RequestInit = {
+          headers,
+          priority: this.priority,
+        };
         if (abortSignal) {
           requestOptions.signal = abortSignal;
         }

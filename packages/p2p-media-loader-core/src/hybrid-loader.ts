@@ -540,7 +540,7 @@ export class HybridLoader {
       ) {
         request.cancel();
         this.yieldHttpPrefetchTo(segment);
-        this.loadThroughHttp(segment);
+        this.loadThroughHttp(segment, "high");
       }
       return;
     }
@@ -549,7 +549,7 @@ export class HybridLoader {
     if (urgent && canLoadThroughHttp) {
       if (request && this.tryPeerAfterHttpFailure(request)) return;
       this.yieldHttpPrefetchTo(segment);
-      this.loadThroughHttp(segment);
+      this.loadThroughHttp(segment, "high");
       return;
     }
     const startNow =
@@ -557,7 +557,7 @@ export class HybridLoader {
       p2pLoader.connectedPeerCount === 0 ||
       engineRequest.shouldBeStartedImmediately;
     if (startNow && canLoadThroughHttp && this.freeSlotFor(segment, "http")) {
-      this.loadThroughHttp(segment);
+      this.loadThroughHttp(segment, "high");
       return;
     }
 
@@ -731,12 +731,22 @@ export class HybridLoader {
     this.requestProcessQueueMicrotask();
   }
 
-  private loadThroughHttp(segment: SegmentWithStream) {
+  /**
+   * @param priority - `"high"` for a segment the player has requested, so
+   * that the browser serves it before prefetch where it can: on HTTP/2 and
+   * HTTP/3 it gets the bandwidth first, and on any protocol it leaves the
+   * browser's queue for the host first. `"low"` for prefetch.
+   */
+  private loadThroughHttp(
+    segment: SegmentWithStream,
+    priority: RequestPriority,
+  ) {
     const request = this.requests.getOrCreateRequest(segment);
     const executor = new HttpRequestExecutor(
       request,
       this.config,
       this.eventTarget,
+      priority,
     );
     executor.execute();
     this.p2pLoaders.currentLoader.broadcastAnnouncement();
@@ -869,7 +879,12 @@ export class HybridLoader {
       this.logger(
         `prefetch ${LoggerUtils.getSegmentString(segment)} as ${rank === 0 ? "owner" : `backup #${rank}`}`,
       );
-      this.loadThroughHttp(segment);
+      // The player's own segment comes before prefetch, also against the
+      // other stream's loader and the browser's queue for the host.
+      this.loadThroughHttp(
+        segment,
+        segment.runtimeId === requested ? "high" : "low",
+      );
     }
   }
 

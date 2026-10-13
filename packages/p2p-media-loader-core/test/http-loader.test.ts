@@ -35,6 +35,7 @@ function execute(body: BodyInit | null, status = 200) {
 function executeWith(
   respond: (request: globalThis.Request) => Promise<Response>,
   byteRange?: { start: number; end: number },
+  priority: RequestPriority = "low",
 ) {
   const eventTarget = new EventTarget<CoreEventMap>();
   const request = new SegmentRequest(
@@ -51,6 +52,7 @@ function executeWith(
     request,
     Core.DEFAULT_STREAM_CONFIG as StreamConfig,
     eventTarget,
+    priority,
   );
   executor.execute();
   return request;
@@ -204,5 +206,35 @@ describe("HttpRequestExecutor on a response refused on its headers", () => {
       "http-unexpected-status-code",
     );
     expect(body.cancelled).toBe(true);
+  });
+});
+
+describe("HttpRequestExecutor fetch priority", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("builds its request with the priority it was given", async () => {
+    // The browser serves a "high" request before "low" prefetch where it can;
+    // one without fetch priorities ignores the option.
+    const inits: RequestInit[] = [];
+    const NativeRequest = globalThis.Request;
+    vi.stubGlobal(
+      "Request",
+      class extends NativeRequest {
+        constructor(input: RequestInfo | URL, init?: RequestInit) {
+          if (init) inits.push(init);
+          super(input, init);
+        }
+      },
+    );
+    executeWith(
+      () => Promise.resolve(new Response(new Uint8Array([1]))),
+      undefined,
+      "high",
+    );
+    await settle();
+
+    expect(inits.map((init) => init.priority)).toEqual(["high"]);
   });
 });

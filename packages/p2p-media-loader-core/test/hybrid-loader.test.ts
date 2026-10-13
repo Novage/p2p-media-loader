@@ -27,6 +27,8 @@ const fakes = vi.hoisted(() => {
     peerCount: 0,
     loadedBySomeone: new Set<string>(),
     httpStarted: [] as string[],
+    /** The fetch priority each HTTP download was started with. */
+    httpPriority: new Map<string, string>(),
     httpAborted: [] as string[],
     p2pStarted: [] as string[],
     p2pAborted: [] as string[],
@@ -95,10 +97,14 @@ const fakes = vi.hoisted(() => {
           controls: { onAbort: () => void },
         ) => unknown;
       },
+      _config: unknown,
+      _eventTarget: unknown,
+      private readonly priority: string,
     ) {}
     execute() {
       const id = this.request.segment.runtimeId;
       state.httpStarted.push(id);
+      state.httpPriority.set(id, this.priority);
       const controls = this.request.start(
         { downloadSource: "http" },
         { onAbort: () => state.httpAborted.push(id) },
@@ -1585,6 +1591,60 @@ describe("HybridLoader: a nearly full storage", () => {
 
     expect(state.httpStarted).toEqual([`seg-${owned}`]);
     expect(count("SegmentRequest:urgent")).toBe(urgent);
+    loader.destroy();
+  });
+});
+
+describe("HybridLoader: fetch priorities", () => {
+  beforeEach(() => {
+    vi.stubGlobal("window", globalThis);
+    const { state } = fakes;
+    state.peerCount = 0;
+    state.loadedBySomeone.clear();
+    state.httpStarted.length = 0;
+    state.httpPriority.clear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("asks for the player's urgent request at high priority", async () => {
+    const { loader, segment, callbacks, state } = setup();
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+
+    expect(state.httpPriority.get("seg-0")).toBe("high");
+    loader.destroy();
+  });
+
+  it("prefetches at low priority, and the player's own segment at high", async () => {
+    // With a peer connected, the election fetches what this peer owns. The
+    // segment its player asked for, not urgent with 10 s buffered, comes
+    // through the election too, and before the prefetch around it.
+    fakes.state.peerCount = 1;
+    const owned = Array.from({ length: 20 }, (_, i) => i).filter(
+      (i) => rankForSegment("me", ["peer-0"], i) === 0,
+    );
+    const { loader, segment, callbacks, state } = setup(
+      { simultaneousHttpDownloads: 10 },
+      emptyStorage,
+      undefined,
+      owned[0],
+    );
+    loader.updatePlayback({ bufferAhead: 10, rate: 1 });
+
+    await loader.loadSegment(segment(owned[0]), callbacks);
+    await flush();
+
+    expect(state.httpPriority.get(`seg-${owned[0]}`)).toBe("high");
+    const prefetched = state.httpStarted.filter(
+      (id) => id !== `seg-${owned[0]}`,
+    );
+    expect(prefetched.length).toBeGreaterThan(0);
+    for (const id of prefetched) {
+      expect(state.httpPriority.get(id)).toBe("low");
+    }
     loader.destroy();
   });
 });
