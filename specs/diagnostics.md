@@ -198,7 +198,9 @@ the groups and the cases a reader of a snapshot must know.
   adapter, its listeners, hooks, request filters and registrations on the
   player.
 - **Counters:** downloads by source and result, player requests by result,
-  a page without WebRTC (`WebRtc:unavailable`, once for each core), registry
+  a page without WebRTC (`WebRtc:unavailable`, once for each core), a config
+  key a release renamed (`Config:renamed-key`, once for each core and key),
+  registry
   misses, evictions by reason, closed peers by cause, parses of the
   player's manifests by result (`ManifestParse`), and clock synchronizations
   and re-parses by result. Each player request that the store cannot serve is

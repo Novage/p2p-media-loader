@@ -214,6 +214,12 @@ Carrying v4's `highDemandTimeWindow: 15` onto a short live window as
 `urgentBufferThreshold: 15` therefore buys nothing: it is capped to the value
 the core derives anyway. Off live the number is still the threshold.
 
+A config that still names `highDemandTimeWindow` — in plain JavaScript, or in
+an object TypeScript does not check as a literal — is not carried over, since
+the meaning changed. The core ignores the key and writes one console warning
+for each core that sees it, at the top level or in `mainStream` or
+`secondaryStream`.
+
 A **custom `SegmentStorage`** is handed the same value: `initialize` receives
 the configured stream configurations, so
 `mainStreamConfig.urgentBufferThreshold` is `undefined` unless an integrator

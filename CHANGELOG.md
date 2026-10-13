@@ -139,7 +139,8 @@ throughout.
   that, a viewer who rewound into the window stays where they chose, and is
   brought back only once a pause carries them out of it.
 - **`highDemandTimeWindow` is renamed `urgentBufferThreshold`, and is optional
-  and derived on live.** Left unset, VOD keeps 15 s and a live stream gets half
+  and derived on live.** A config that still names the old key gets one
+  console warning for each core, and the key is ignored. Left unset, VOD keeps 15 s and a live stream gets half
   of what the player buffers — at least a segment, at most 15 s — from the live
   window's geometry, so the other half of the buffer is room for the prefetch
   election. Off live a number is still the threshold; on live it is capped at
