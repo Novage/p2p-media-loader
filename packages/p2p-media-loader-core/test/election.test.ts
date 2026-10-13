@@ -147,8 +147,4 @@ describe("secondsToUrgent", () => {
   it("is not positive once the buffer is below the threshold", () => {
     expect(secondsToUrgent(10, 15, 1)).toBe(-5);
   });
-
-  it("treats a rate of 0 as playing at 1x", () => {
-    expect(secondsToUrgent(23, 15, 0)).toBe(8);
-  });
 });

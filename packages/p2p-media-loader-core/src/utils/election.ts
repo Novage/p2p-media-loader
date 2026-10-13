@@ -67,17 +67,19 @@ const ANNOUNCEMENT_ALLOWANCE_SECONDS = 0.5;
 /**
  * Wall-clock seconds until a request the player has made becomes urgent: until
  * its buffer, in media seconds, drains to the urgency threshold at the
- * playback rate. That is what the fetch-time estimate is measured in. The
- * rate is the last non-zero one the player reported. See
+ * playback rate. That is what the fetch-time estimate is measured in. See
  * specs/playback-contract.md, "Urgency".
+ *
+ * @param rate - Greater than 0: `PlaybackTracker.rate()`, the last non-zero
+ * rate the player reported, or 1. A paused player is judged as if playing,
+ * and `PlaybackTracker` decides that, not this function.
  */
 export function secondsToUrgent(
   bufferAhead: number,
   urgentBufferThreshold: number,
   rate: number,
 ): number {
-  const playing = rate || 1;
-  return (bufferAhead - urgentBufferThreshold * playing) / playing;
+  return (bufferAhead - urgentBufferThreshold * rate) / rate;
 }
 
 /**
