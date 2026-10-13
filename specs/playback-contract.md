@@ -237,7 +237,9 @@ They are `httpDownloadTimeWindow` and `p2pDownloadTimeWindow`, and at their
 defaults they reach the whole stream; on live the playlist bounds them. The
 queue starts at the requested segment, so a window never reaches behind the
 position. When the store runs short of space, the windows shrink: at 10 % free
-the P2P window falls to the HTTP window, and at 5 % free both are 0.
+the P2P window falls to the HTTP window, and at 5 % free both are 0. A window
+of 0 still holds the requested segment, where the queue starts, so the
+player's own request is still fetched.
 
 The windows scale with the playback rate: at twice normal speed they cover
 twice the media. A paused player keeps the last non-zero rate, so prefetch

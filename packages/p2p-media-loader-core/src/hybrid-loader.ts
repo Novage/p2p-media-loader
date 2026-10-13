@@ -786,7 +786,17 @@ export class HybridLoader {
 
     const availableStorageCapacityPercent =
       capacityPercent ?? this.getAvailableStorageCapacityPercent();
-    if (availableStorageCapacityPercent <= 10) return;
+    const requested =
+      this.engineRequest?.status === "pending"
+        ? this.engineRequest.segment.runtimeId
+        : undefined;
+    // A nearly full storage stops prefetch: the segments the player has not
+    // asked for. The one it has asked for is fetched all the same — the
+    // storage makes room for it — and still by the election: left out, a
+    // request that is not urgent would wait for its buffer to drain, and so
+    // would every peer that waits for this one as its owner.
+    const onlyRequested = availableStorageCapacityPercent <= 10;
+    if (onlyRequested && requested === undefined) return;
 
     const { simultaneousHttpDownloads, httpErrorRetries } = this.config;
     const peerIds = Array.from(p2pLoader.connectedPeerIds);
@@ -795,11 +805,6 @@ export class HybridLoader {
       http.getBandwidthLoadingOnly(10),
       http.getBandwidthLoadingOnly(30),
     );
-    const requested =
-      this.engineRequest?.status === "pending"
-        ? this.engineRequest.segment.runtimeId
-        : undefined;
-
     const items =
       queue ??
       QueueUtils.generateQueue(
@@ -812,6 +817,7 @@ export class HybridLoader {
 
     for (const { segment, statuses } of items) {
       if (this.requests.executingHttpCount >= simultaneousHttpDownloads) break;
+      if (onlyRequested && segment.runtimeId !== requested) continue;
       if (
         !statuses.isHttpDownloadable ||
         statuses.isP2PDownloadable ||

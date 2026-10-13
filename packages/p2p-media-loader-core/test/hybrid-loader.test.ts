@@ -1526,3 +1526,65 @@ describe("HybridLoader: a download about to finish when a request is urgent", ()
     loader.destroy();
   });
 });
+
+describe("HybridLoader: a nearly full storage", () => {
+  beforeEach(() => {
+    vi.stubGlobal("window", globalThis);
+    const { state } = fakes;
+    state.peerCount = 1;
+    state.loadedBySomeone.clear();
+    state.httpStarted.length = 0;
+    state.p2pStarted.length = 0;
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // 2 % free: prefetch stops, and both windows are 0 — the requested
+  // segment, where the queue starts, is still in them.
+  const fullStorage = {
+    ...emptyStorage,
+    getUsage: () => ({ totalCapacity: 100, usedCapacity: 98 }),
+  } as unknown as SegmentStorage;
+  // A segment this peer owns against `peer-0`, after the first.
+  const owned = Array.from({ length: 20 }, (_, i) => i + 1).find(
+    (i) => rankForSegment("me", ["peer-0"], i) === 0,
+  )!;
+
+  it("prefetches nothing the player has not asked for", async () => {
+    const { loader, segment, state } = setup(
+      { simultaneousHttpDownloads: 3 },
+      fullStorage,
+      undefined,
+      owned,
+    );
+    loader.updatePlayback({ bufferAhead: 10, rate: 1 });
+    loader.updateStream(segment(owned).stream);
+    await flush();
+
+    expect(state.httpStarted).toEqual([]);
+    loader.destroy();
+  });
+
+  it("still fetches the segment the player asked for, by the election", async () => {
+    // The request is not urgent: 10 s buffered, a 3 s threshold, and no peer
+    // has the segment. This peer is its owner, so it fetches it at once;
+    // left out, the request would wait for its buffer to drain, and so would
+    // every peer waiting for this owner. Nothing else is prefetched.
+    const { loader, segment, callbacks, state } = setup(
+      { simultaneousHttpDownloads: 3 },
+      fullStorage,
+      undefined,
+      owned,
+    );
+    loader.updatePlayback({ bufferAhead: 10, rate: 1 });
+    const urgent = count("SegmentRequest:urgent");
+
+    await loader.loadSegment(segment(owned), callbacks);
+    await flush();
+
+    expect(state.httpStarted).toEqual([`seg-${owned}`]);
+    expect(count("SegmentRequest:urgent")).toBe(urgent);
+    loader.destroy();
+  });
+});

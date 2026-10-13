@@ -21,7 +21,11 @@ is whatever the playlist carries. A long VOD truncates nothing: the default
 window reaches 3000 seconds ahead, an owner fetches what it owns across all of
 it as soon as it is elected, and what stops the peer is the storage brake —
 prefetching halts below ten percent free, and a VOD retains everything from the
-player's last request on ([playback-contract.md](playback-contract.md)). A peer therefore
+player's last request on ([playback-contract.md](playback-contract.md)). The
+brake stops prefetch only: a segment the player has requested still goes
+through the election, so that a request that is not urgent is not left to
+wait for its buffer to drain — with every peer that waits for this one as its
+owner. A peer therefore
 fills its share of the next fifty minutes and then holds. Whoever would rather
 not spend those bytes on a viewer who may leave lowers `httpDownloadTimeWindow`;
 the election needs no horizon of its own.
