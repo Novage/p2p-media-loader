@@ -127,6 +127,40 @@ function generateOfferId(): string {
 
 const VALID_SDP_TYPES = new Set(["offer", "answer", "pranswer", "rollback"]);
 
+/**
+ * What a client knows of one tracker connection. Each connection gets a new
+ * object, so none of its fields carries over from a lost socket, and an
+ * announce that outlives its connection can tell.
+ */
+type TrackerConnection = {
+  /**
+   * The peers of the swarm, this one included, as the tracker's last announce
+   * reply counted them (`complete` + `incomplete`); `null` until a reply has.
+   */
+  swarmSize: number | null;
+  /** While the first announce waits for the swarm's count. */
+  firstCountTimeoutId: ReturnType<typeof setTimeout> | null;
+  /**
+   * The first count found this peer alone, and no announce has gone out
+   * since. That count may not be the reply to this client's own announce. On
+   * a shared socket, a tracker can first answer the "stopped" of a client
+   * that left this swarm. That count does not include this peer. A later
+   * reply that counts other peers sends the offers after all, unless a peer
+   * has offered to this one since.
+   */
+  aloneByFirstCount: boolean;
+  /** The announce in flight, which a later one joins. */
+  activeAnnounce: Promise<void> | null;
+};
+
+/**
+ * A swarm count from a tracker reply. A negative or fractional value is a
+ * tracker fault, and could make a peer with others look alone.
+ */
+function isPeerCount(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
 function isSessionDescriptionInit(
   value: unknown,
 ): value is RTCSessionDescriptionInit {
@@ -159,26 +193,14 @@ export class WebTorrentClient {
   #announceTimeoutId: ReturnType<typeof setTimeout> | null = null;
   #announceIntervalSeconds: number | null = null;
   #scheduleAnnounceRunId = 0;
-  #activeAnnouncePromise: Promise<void> | null = null;
-  /** Counts the lost sockets: an announce of an earlier socket is stale. */
-  #socketLossCount = 0;
+  /**
+   * Kept across connections on purpose: the id belongs to the tracker, not to
+   * one socket, and a client sends the last one until the tracker sends a new
+   * one.
+   */
   #trackerId: string | null = null;
-  /**
-   * The peers of the swarm, this one included, as the tracker's last announce
-   * reply counted them (`complete` + `incomplete`); `null` until a reply has.
-   */
-  #swarmSize: number | null = null;
-  /** While the first announce of a connection waits for the swarm's count. */
-  #firstCountTimeoutId: ReturnType<typeof setTimeout> | null = null;
-  /**
-   * The first count found this peer alone, and no announce has gone out
-   * since. That count may not be the reply to this client's own announce. On
-   * a shared socket, a tracker can first answer the "stopped" of a client
-   * that left this swarm. That count does not include this peer. A later
-   * reply that counts other peers sends the offers after all, unless a peer
-   * has offered to this one since.
-   */
-  #aloneByFirstCount = false;
+  /** The tracker connection, from "connected" to "disconnected". */
+  #connection: TrackerConnection | null = null;
   #started = false;
   /**
    * Signaling is where a peer that dropped either finds its way back into the
@@ -266,7 +288,7 @@ export class WebTorrentClient {
     }
     this.#destroyAbortController.abort();
     this.#clearAnnounceTimeout();
-    this.#clearFirstCountTimeout();
+    this.#endConnection();
 
     this.#sendStopped();
 
@@ -294,24 +316,32 @@ export class WebTorrentClient {
     // count in its reply sizes the next one (#sendFirstOffers). A peer alone
     // in the swarm then sends none: a peer that joins later offers to it.
     // A tracker that sends no count gets the full number all the same.
-    this.#clearFirstCountTimeout();
-    this.#firstCountTimeoutId = setTimeout(() => {
+    this.#endConnection();
+    const connection: TrackerConnection = {
+      swarmSize: null,
+      firstCountTimeoutId: null,
+      aloneByFirstCount: false,
+      activeAnnounce: null,
+    };
+    connection.firstCountTimeoutId = setTimeout(() => {
       if (this.#isDestroyed()) {
         diagnostics?.anomaly("TrackerClient first-count timer after destroy");
       }
-      this.#sendFirstOffers();
+      if (connection === this.#connection) this.#sendFirstOffers();
     }, FIRST_COUNT_WAIT_MS);
+    this.#connection = connection;
     this.#sendStarted();
   };
 
   /**
    * Sends the offers of a new connection, once the swarm is counted or the
-   * wait for a count is over (`#swarmSize` still null), unless the peer is
-   * alone or at its peer limit. `#announce` sizes them from `#swarmSize`.
+   * wait for a count is over (`swarmSize` still null), unless the peer is
+   * alone or at its peer limit. `#announce` sizes them from `swarmSize`.
    */
   #sendFirstOffers(): void {
     this.#clearFirstCountTimeout();
-    if (this.#isDestroyed()) return;
+    const connection = this.#connection;
+    if (this.#isDestroyed() || !connection) return;
     // A socket disposed under a live client sends no "disconnected", so the
     // timer can still fire. No announce can go out: nothing to record.
     if (this.#wsClient.state !== "connected") return;
@@ -323,11 +353,11 @@ export class WebTorrentClient {
       this.#logger(`${this.#who} at the peer limit; no offers`);
       return;
     }
-    const counted = this.#swarmSize;
+    const counted = connection.swarmSize;
     if (counted !== null && counted <= 1) {
       diagnostics?.count("TrackerAnnounce:alone");
       this.#logger(`${this.#who} alone in the swarm; no offers`);
-      this.#aloneByFirstCount = true;
+      connection.aloneByFirstCount = true;
       return;
     }
     if (counted === null) {
@@ -360,9 +390,22 @@ export class WebTorrentClient {
   }
 
   #clearFirstCountTimeout(): void {
-    if (this.#firstCountTimeoutId === null) return;
-    clearTimeout(this.#firstCountTimeoutId);
-    this.#firstCountTimeoutId = null;
+    const connection = this.#connection;
+    if (connection?.firstCountTimeoutId == null) return;
+    clearTimeout(connection.firstCountTimeoutId);
+    connection.firstCountTimeoutId = null;
+  }
+
+  /**
+   * Forgets the connection. A new socket may reach a tracker that no longer
+   * counts this peer, so it starts from nothing. An announce still gathering
+   * its offers sees that its connection is gone and drops them: on the next
+   * socket they would go out before its count, with offers sized for the old
+   * one, and the next socket's announces would join it.
+   */
+  #endConnection(): void {
+    this.#clearFirstCountTimeout();
+    this.#connection = null;
   }
 
   #onWsDisconnected = (): void => {
@@ -370,16 +413,8 @@ export class WebTorrentClient {
       `${this.#who} tracker socket lost; announces stop until it is back`,
     );
     this.#clearAnnounceTimeout();
-    this.#clearFirstCountTimeout();
     this.#announceIntervalSeconds = null;
-    // A new socket may reach a tracker that no longer counts this peer.
-    this.#swarmSize = null;
-    // An announce still gathering its offers must not be the one the next
-    // socket joins: it would go out before that socket's count, with offers
-    // it was not sized for. It drops them instead.
-    this.#socketLossCount++;
-    this.#activeAnnouncePromise = null;
-    this.#aloneByFirstCount = false;
+    this.#endConnection();
   };
 
   #onWsMessage = (data: ArrayBuffer | string): void => {
@@ -426,6 +461,19 @@ export class WebTorrentClient {
         "error",
         new TrackerError("tracker-response", failureReason),
       );
+      // A tracker that refused the "started" announce would refuse the
+      // offers too. bittorrent-tracker names the swarm in a refusal; a
+      // failure without it can belong to another swarm on the socket.
+      if (
+        infoHash === this.#config.infoHash &&
+        this.#connection?.firstCountTimeoutId != null
+      ) {
+        this.#clearFirstCountTimeout();
+        diagnostics?.count("TrackerAnnounce:refused");
+        this.#logger(
+          `${this.#who} the tracker refused the announce (${failureReason}); no offers`,
+        );
+      }
       return;
     }
 
@@ -457,14 +505,15 @@ export class WebTorrentClient {
     // from a reply that names this swarm. A message without `info_hash`
     // reaches every client on a shared socket. A tracker that leaves it out
     // gets the full number of offers after the wait.
-    if (infoHash === this.#config.infoHash) {
+    const connection = this.#connection;
+    if (infoHash === this.#config.infoHash && connection) {
       const { complete, incomplete } = dataObject;
-      if (typeof complete === "number" && typeof incomplete === "number") {
-        this.#swarmSize = complete + incomplete;
-        if (this.#firstCountTimeoutId !== null) {
+      if (isPeerCount(complete) && isPeerCount(incomplete)) {
+        connection.swarmSize = complete + incomplete;
+        if (connection.firstCountTimeoutId !== null) {
           this.#sendFirstOffers();
-        } else if (this.#aloneByFirstCount && this.#swarmSize > 1) {
-          this.#aloneByFirstCount = false;
+        } else if (connection.aloneByFirstCount && connection.swarmSize > 1) {
+          connection.aloneByFirstCount = false;
           diagnostics?.count("TrackerAnnounce:alone-recounted");
           if (this.#config.shouldGenerateOffers()) {
             this.#logger(
@@ -478,13 +527,13 @@ export class WebTorrentClient {
           }
         }
       } else if (
-        this.#firstCountTimeoutId !== null &&
+        connection.firstCountTimeoutId !== null &&
         dataObject.action === "announce" &&
         dataObject.offer === undefined &&
         dataObject.answer === undefined
       ) {
-        // The reply to the announce, and no count in it: none will come, so
-        // the wait would only delay the offers.
+        // The reply to the announce, and no valid count in it: none will
+        // come, so the wait would only delay the offers.
         this.#sendFirstOffers();
       }
     }
@@ -574,17 +623,23 @@ export class WebTorrentClient {
   }
 
   async #announce(): Promise<void> {
-    if (this.#isDestroyed() || this.#wsClient.state !== "connected") return;
+    const connection = this.#connection;
+    if (
+      this.#isDestroyed() ||
+      !connection ||
+      this.#wsClient.state !== "connected"
+    ) {
+      return;
+    }
 
     // An announce ends the wait for a later count: it sends its own offers,
     // and the replies that follow answer it.
-    this.#aloneByFirstCount = false;
+    connection.aloneByFirstCount = false;
 
-    if (this.#activeAnnouncePromise) {
-      return this.#activeAnnouncePromise;
+    if (connection.activeAnnounce) {
+      return connection.activeAnnounce;
     }
 
-    const socketLossCount = this.#socketLossCount;
     const promise = (async () => {
       const shouldGenerateOffers = this.#config.shouldGenerateOffers();
       const configuredCount = shouldGenerateOffers
@@ -598,13 +653,11 @@ export class WebTorrentClient {
       // offer reaches a peer that joined since, if the offers of that peer
       // failed to connect. The announce after the first is sent only when the
       // count found other peers, so the floor of one does not change it.
+      const { swarmSize } = connection;
       const offersCount =
-        this.#swarmSize === null
+        swarmSize === null
           ? configuredCount
-          : Math.min(configuredCount, Math.max(this.#swarmSize - 1, 1));
-      if (offersCount < configuredCount) {
-        diagnostics?.count("TrackerAnnounce:offers-capped");
-      }
+          : Math.min(configuredCount, Math.max(swarmSize - 1, 1));
       if (!shouldGenerateOffers) {
         // A peer at its own peer limit announces to keep its place in the
         // swarm and can only be dialled, never dial: it will not reconnect to
@@ -624,7 +677,7 @@ export class WebTorrentClient {
 
       // A socket disposed under a live client sends no "disconnected": its
       // announce is dropped too, with nothing to record.
-      const socketLost = socketLossCount !== this.#socketLossCount;
+      const socketLost = connection !== this.#connection;
       if (
         this.#isDestroyed() ||
         socketLost ||
@@ -672,15 +725,19 @@ export class WebTorrentClient {
         }
         throw err;
       }
+      // Counted once the announce is out: a dropped one was never capped.
+      if (offersCount < configuredCount) {
+        diagnostics?.count("TrackerAnnounce:offers-capped");
+      }
     })();
 
-    this.#activeAnnouncePromise = promise;
+    connection.activeAnnounce = promise;
 
     try {
       await promise;
     } finally {
-      if (this.#activeAnnouncePromise === promise) {
-        this.#activeAnnouncePromise = null;
+      if (connection.activeAnnounce === promise) {
+        connection.activeAnnounce = null;
       }
     }
   }
@@ -833,7 +890,7 @@ export class WebTorrentClient {
     // A peer of the swarm has found this one, so a later count above one is
     // no sign of a wrong alone count. Some trackers also reply to the answer
     // with a count, and that count includes the offerer.
-    this.#aloneByFirstCount = false;
+    if (this.#connection) this.#connection.aloneByFirstCount = false;
 
     const { handshake, signal, end } = this.#startHandshake("answerer");
     if (!this.#config.claimPeer(remotePeerId, handshake)) {

@@ -203,7 +203,8 @@ the groups and the cases a reader of a snapshot must know.
   alone (`TrackerAnnounce:alone`), offers for the peers counted
   (`TrackerAnnounce:sized`), or all of them for want of a count
   (`TrackerAnnounce:no-count`), or none at the peer limit
-  (`TrackerAnnounce:peer-limit`) — a peer counted alone whose next count found
+  (`TrackerAnnounce:peer-limit`), or none to a tracker that refused it
+  (`TrackerAnnounce:refused`) — a peer counted alone whose next count found
   other peers, before it announced again (`TrackerAnnounce:alone-recounted`),
   and each announce, the first or a periodic one, that the count limited to
   fewer offers than configured (`TrackerAnnounce:offers-capped`), each

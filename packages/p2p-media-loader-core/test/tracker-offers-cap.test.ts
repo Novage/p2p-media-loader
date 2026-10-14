@@ -274,6 +274,24 @@ describe("WebTorrentClient: offers sized to the swarm", () => {
     client.destroy();
   });
 
+  it("takes a negative or fractional count for no count", async () => {
+    // A tracker whose counts drifted: the sum says alone, but it is not a
+    // count. The full number goes out at once, as for a reply without one.
+    const alone = counter("alone");
+    const { client, reply, offersPerAnnounce } = startClient();
+    await vi.advanceTimersByTimeAsync(0);
+    reply(2, -1);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(offersPerAnnounce()).toEqual([0, 5]);
+    expect(counter("alone")).toBe(alone);
+
+    // A periodic announce keeps the full number: no valid count came.
+    reply(0.5, 1);
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(offersPerAnnounce()).toEqual([0, 5, 5]);
+    client.destroy();
+  });
+
   it("takes no count from a reply without the info hash", async () => {
     // On a shared socket, such a reply can be another swarm's: it waits for
     // a reply that names this swarm, and offers in full after 2 s.
@@ -303,6 +321,34 @@ describe("WebTorrentClient: offers sized to the swarm", () => {
     reply(3, 0);
     await vi.advanceTimersByTimeAsync(0);
     expect(offersPerAnnounce()).toEqual([0, 2]);
+    client.destroy();
+  });
+
+  it("sends no offers when the tracker refuses the first announce", async () => {
+    // A bittorrent-tracker with an info_hash whitelist refuses the swarm.
+    const refused = counter("refused");
+    const noCount = counter("no-count");
+    const { client, message, offersPerAnnounce } = startClient();
+    await vi.advanceTimersByTimeAsync(0);
+    message({ "failure reason": "info_hash is not allowed" });
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(offersPerAnnounce()).toEqual([0]);
+    expect(counter("refused")).toBe(refused + 1);
+    expect(counter("no-count")).toBe(noCount);
+    client.destroy();
+  });
+
+  it("does not take a failure without the info hash as a refusal", async () => {
+    // On a shared socket it can belong to another swarm.
+    const refused = counter("refused");
+    const { client, message, offersPerAnnounce } = startClient();
+    await vi.advanceTimersByTimeAsync(0);
+    message({ info_hash: undefined, "failure reason": "Invalid request" });
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(offersPerAnnounce()).toEqual([0, 5]);
+    expect(counter("refused")).toBe(refused);
     client.destroy();
   });
 
@@ -356,6 +402,26 @@ describe("WebTorrentClient: offers sized to the swarm", () => {
     client.destroy();
   });
 
+  it("leaves the old wait to the old socket when the socket is back within 2 s", async () => {
+    // The old socket's wait would end at 2 s and offer in full on the new
+    // socket, before the new socket's count.
+    const noCount = counter("no-count");
+    const { client, wsClient, emit, reply, offersPerAnnounce } = startClient();
+    await vi.advanceTimersByTimeAsync(1000);
+    wsClient.state = "reconnecting";
+    emit("disconnected");
+    wsClient.state = "connected";
+    emit("connected");
+    await vi.advanceTimersByTimeAsync(1500); // past the old socket's 2 s
+    expect(offersPerAnnounce()).toEqual([0, 0]);
+    expect(counter("no-count")).toBe(noCount);
+
+    reply(1, 0);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(offersPerAnnounce()).toEqual([0, 0]);
+    client.destroy();
+  });
+
   it("stops waiting for the count while the socket is lost", async () => {
     const noCount = counter("no-count");
     const { client, wsClient, emit, offersPerAnnounce } = startClient();
@@ -394,6 +460,26 @@ describe("WebTorrentClient: offers sized to the swarm", () => {
     expect(offersPerAnnounce()).toEqual([0, 5, 0]);
     expect(connections.closed - closed).toBe(5);
     expect(counter("socket-lost")).toBe(socketLost + 1);
+    client.destroy();
+  });
+
+  it("counts no capped announce that a lost socket dropped", async () => {
+    const { client, emit, reply, offersPerAnnounce } = startClient();
+    await vi.advanceTimersByTimeAsync(0);
+    reply(3, 0); // two other peers: capped to 2 of 5
+    await vi.advanceTimersByTimeAsync(0);
+    const capped = counter("offers-capped");
+
+    gathering.delayMs = 3000;
+    await vi.advanceTimersByTimeAsync(120_000); // a capped periodic announce
+    emit("disconnected");
+    emit("connected");
+    await vi.advanceTimersByTimeAsync(0);
+    reply(1, 0);
+    await vi.advanceTimersByTimeAsync(5000); // it is dropped
+
+    expect(offersPerAnnounce()).toEqual([0, 2, 0]);
+    expect(counter("offers-capped")).toBe(capped);
     client.destroy();
   });
 

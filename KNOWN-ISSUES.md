@@ -133,11 +133,22 @@ The tests themselves are in
   `webRtcOffersCount` other peers, one of them gets no offer through that
   tracker. With more, the cap hides the error. With the default trackers,
   the other two count correctly and offer to all peers; with one
-  bittorrent-tracker only, that peer can wait up to 120 s. The fixes cost
-  more than this rare case: more offers after the correct count reach a
-  random peer, not the missed one; ignoring the reply after a `stopped`
-  loses the real reply on trackers that do not answer `stopped`; and sizing
-  from the full count wastes one connection at every join.
+  bittorrent-tracker only, that peer can wait up to 120 s. In the same race,
+  a refusal of the old client's announce could stop the new client's first
+  offers; bittorrent-tracker refuses only by swarm, so it refuses both. The
+  fixes cost more than this rare case: more offers after the correct count
+  reach a random peer, not the missed one; ignoring the reply after a
+  `stopped` loses the real reply on trackers that do not answer `stopped`;
+  and sizing from the full count wastes one connection at every join.
+- **A tracker that refuses a swarm still gets full offers in each periodic
+  announce.** After a refusal (`failure reason` with this swarm's
+  `info_hash`, for example from a bittorrent-tracker `filter`), the client
+  sends no offers after "started", but each periodic announce still gathers
+  `webRtcOffersCount` offers, which the tracker refuses again. That is 5
+  connections for the 50 s offer timeout at each interval, as before the
+  offers were sized to the swarm. It occurs only with a tracker that refuses
+  the swarm, which is a deployment's own setup, and the default trackers
+  accept every swarm.
 
 ## Release test runs
 
