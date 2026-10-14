@@ -239,6 +239,18 @@ throughout.
   its tracker sockets, and announced at each interval with offers that it
   could not make. Now `isSegmentLoadable` answers `false`, as with P2P
   disabled, and no tracker socket opens.
+- **A peer sends only as many offers as the swarm has other peers.** The
+  tracker gives each offer to a different peer and drops the rest, so each
+  extra offer only cost a WebRTC connection and its ICE gathering. The first
+  announce on a tracker connection now carries no offers. Its reply counts
+  the swarm, and the next announce offers once for each other peer, up to
+  `webRtcOffersCount`. A peer alone sends none, and a peer that joins later
+  offers to it. Each periodic announce offers once for each other peer of the
+  last count, and at least once. On the three default trackers, a peer alone
+  for 150 s made 2 offers where it made 25, and two peers that joined
+  together made 3 where they made 30; the first connection came up to 0.3 s
+  later. See the WebTorrent client's
+  [`spec.md`](packages/p2p-media-loader-core/src/webtorrent/webtorrent-client/spec.md).
 
 ### Removed
 

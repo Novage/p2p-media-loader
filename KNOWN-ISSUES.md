@@ -122,6 +122,22 @@ The tests themselves are in
   fast P2P, the player can choose a rendition that HTTP alone cannot deliver;
   if its urgent request then goes over a slow HTTP link, playback waits for
   that segment (6.5 s with HTTP limited to 3 Mbit/s).
+- **A stale tracker count can make a joining peer send one offer too few.**
+  This occurs when the player goes from rendition A to B and back to A
+  within one tracker round trip, with nothing of A stored, so that a new
+  client for A starts on the socket where the old one sent `stopped`.
+  bittorrent-tracker (tracker.webtorrent.dev) answers that `stopped` with a
+  count that leaves this peer out, and the new client takes it for the
+  reply to its own `started`. That count is one too small. With one other
+  peer, it shows this peer alone, and a later count corrects it. With two to
+  `webRtcOffersCount` other peers, one of them gets no offer through that
+  tracker. With more, the cap hides the error. With the default trackers,
+  the other two count correctly and offer to all peers; with one
+  bittorrent-tracker only, that peer can wait up to 120 s. The fixes cost
+  more than this rare case: more offers after the correct count reach a
+  random peer, not the missed one; ignoring the reply after a `stopped`
+  loses the real reply on trackers that do not answer `stopped`; and sizing
+  from the full count wastes one connection at every join.
 
 ## Release test runs
 

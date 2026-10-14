@@ -198,7 +198,17 @@ the groups and the cases a reader of a snapshot must know.
   adapter, its listeners, hooks, request filters and registrations on the
   player.
 - **Counters:** downloads by source and result, player requests by result,
-  a page without WebRTC (`WebRtc:unavailable`, once for each core), a config
+  a page without WebRTC (`WebRtc:unavailable`, once for each core), the
+  result of each tracker connection's first announce — no offers for a peer
+  alone (`TrackerAnnounce:alone`), offers for the peers counted
+  (`TrackerAnnounce:sized`), or all of them for want of a count
+  (`TrackerAnnounce:no-count`), or none at the peer limit
+  (`TrackerAnnounce:peer-limit`) — a peer counted alone whose next count found
+  other peers, before it announced again (`TrackerAnnounce:alone-recounted`),
+  and each announce, the first or a periodic one, that the count limited to
+  fewer offers than configured (`TrackerAnnounce:offers-capped`), each
+  announce dropped because its socket was lost while it gathered offers
+  (`TrackerAnnounce:socket-lost`), a config
   key a release renamed (`Config:renamed-key`, once for each core and key),
   registry
   misses, evictions by reason, closed peers by cause, parses of the

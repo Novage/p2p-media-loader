@@ -740,6 +740,11 @@ export type StreamConfig = {
   /**
    * The number of WebRTC offers to generate and send to the tracker per announce request.
    * This controls how aggressively the client attempts to discover new peers.
+   * It is the most offers an announce sends. The tracker gives each offer to a
+   * different peer. So the client sends one offer for each other peer that the
+   * tracker counts. When it is alone in a new swarm, its first announces send
+   * none, and each periodic announce sends at least one. A peer at its peer
+   * limit sends no offers, and neither does a value of 0.
    *
    * @default
    * ```typescript

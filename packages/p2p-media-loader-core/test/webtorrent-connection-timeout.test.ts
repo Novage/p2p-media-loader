@@ -79,7 +79,11 @@ describe("WebTorrentClient connection timeout", () => {
   it("gives the offerer the connection timeout from the answer it receives", async () => {
     const { client, sent, failed, receive } = startClient();
     await vi.advanceTimersByTimeAsync(0);
-    const offers = sent[0].offers as { offer_id: string }[];
+    // The first announce carries no offers; its reply counts one other peer,
+    // and the announce after it offers to that peer.
+    receive({ action: "announce", interval: 120, complete: 2, incomplete: 0 });
+    await vi.advanceTimersByTimeAsync(0);
+    const offers = sent.at(-1)!.offers as { offer_id: string }[];
 
     receive({
       offer_id: offers[0].offer_id,

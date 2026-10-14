@@ -65,20 +65,32 @@ describe("WebTorrentClient: bytes reported to the tracker", () => {
       downloaded: 0,
     });
 
+    // The socket sends no reply, so the offers go out after the 2 s wait for
+    // a count.
     transferred.downloaded = 3_000_000;
     transferred.uploaded = 1_000_000;
-    await vi.advanceTimersByTimeAsync(120_000);
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(announces()).toHaveLength(2);
     expect(announces()[1]).toMatchObject({
       uploaded: 1_000_000,
       downloaded: 3_000_000,
     });
 
-    transferred.downloaded = 4_000_000;
+    transferred.downloaded = 5_000_000;
+    transferred.uploaded = 2_000_000;
+    await vi.advanceTimersByTimeAsync(118_000); // the periodic announce
+    expect(announces()).toHaveLength(3);
+    expect(announces()[2]).toMatchObject({
+      uploaded: 2_000_000,
+      downloaded: 5_000_000,
+    });
+
+    transferred.downloaded = 6_000_000;
     client.destroy();
     expect(announces().at(-1)).toMatchObject({
       event: "stopped",
-      uploaded: 1_000_000,
-      downloaded: 4_000_000,
+      uploaded: 2_000_000,
+      downloaded: 6_000_000,
     });
   });
 });
