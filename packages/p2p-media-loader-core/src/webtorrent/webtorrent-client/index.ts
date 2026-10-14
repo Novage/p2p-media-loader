@@ -162,7 +162,6 @@ export class WebTorrentClient {
   #activeAnnouncePromise: Promise<void> | null = null;
   /** Counts the lost sockets: an announce of an earlier socket is stale. */
   #socketLossCount = 0;
-  #nextAnnounceEvent: "started" | undefined = undefined;
   #trackerId: string | null = null;
   /**
    * The peers of the swarm, this one included, as the tracker's last announce
@@ -300,20 +299,19 @@ export class WebTorrentClient {
       if (this.#isDestroyed()) {
         diagnostics?.anomaly("TrackerClient first-count timer after destroy");
       }
-      this.#firstCountTimeoutId = null;
-      this.#sendFirstOffers(null);
+      this.#sendFirstOffers();
     }, FIRST_COUNT_WAIT_MS);
-    this.#announceOrReport("started", "Initial announce failed");
+    this.#sendStarted();
   };
 
   /**
    * Sends the offers of a new connection, once the swarm is counted or the
-   * wait for a count is over (`counted` null), unless the peer is alone or at
-   * its peer limit. `#announce` sizes them.
+   * wait for a count is over (`#swarmSize` still null), unless the peer is
+   * alone or at its peer limit. `#announce` sizes them from `#swarmSize`.
    */
-  #sendFirstOffers(counted: number | null): void {
-    if (this.#isDestroyed()) return;
+  #sendFirstOffers(): void {
     this.#clearFirstCountTimeout();
+    if (this.#isDestroyed()) return;
     // A socket disposed under a live client sends no "disconnected", so the
     // timer can still fire. No announce can go out: nothing to record.
     if (this.#wsClient.state !== "connected") return;
@@ -325,27 +323,27 @@ export class WebTorrentClient {
       this.#logger(`${this.#who} at the peer limit; no offers`);
       return;
     }
-    if (counted === null) {
-      diagnostics?.count("TrackerAnnounce:no-count");
-      this.#logger(
-        `${this.#who} no swarm count from the tracker; offering in full`,
-      );
-      this.#announceOrReport(undefined, "Announce failed");
-      return;
-    }
-    if (counted <= 1) {
+    const counted = this.#swarmSize;
+    if (counted !== null && counted <= 1) {
       diagnostics?.count("TrackerAnnounce:alone");
       this.#logger(`${this.#who} alone in the swarm; no offers`);
       this.#aloneByFirstCount = true;
       return;
     }
-    diagnostics?.count("TrackerAnnounce:sized");
-    this.#announceOrReport(undefined, "Announce failed");
+    if (counted === null) {
+      diagnostics?.count("TrackerAnnounce:no-count");
+      this.#logger(
+        `${this.#who} no swarm count from the tracker; offering in full`,
+      );
+    } else {
+      diagnostics?.count("TrackerAnnounce:sized");
+    }
+    this.#announceOrReport();
   }
 
-  #announceOrReport(event: "started" | undefined, failure: string): void {
-    this.#announce(event).catch((err: unknown) => {
-      this.#reportAnnounceFailure(failure, err);
+  #announceOrReport(): void {
+    this.#announce().catch((err: unknown) => {
+      this.#reportAnnounceFailure("Announce failed", err);
     });
   }
 
@@ -377,8 +375,8 @@ export class WebTorrentClient {
     // A new socket may reach a tracker that no longer counts this peer.
     this.#swarmSize = null;
     // An announce still gathering its offers must not be the one the next
-    // socket joins: it would go out as that socket's first announce, with
-    // offers it was not sized for. It drops them instead.
+    // socket joins: it would go out before that socket's count, with offers
+    // it was not sized for. It drops them instead.
     this.#socketLossCount++;
     this.#activeAnnouncePromise = null;
     this.#aloneByFirstCount = false;
@@ -459,40 +457,36 @@ export class WebTorrentClient {
     // from a reply that names this swarm. A message without `info_hash`
     // reaches every client on a shared socket. A tracker that leaves it out
     // gets the full number of offers after the wait.
-    const forThisSwarm = infoHash === this.#config.infoHash;
-    const { complete, incomplete } = dataObject;
-    if (
-      forThisSwarm &&
-      typeof complete === "number" &&
-      typeof incomplete === "number"
-    ) {
-      this.#swarmSize = complete + incomplete;
-      if (this.#firstCountTimeoutId !== null) {
-        this.#sendFirstOffers(this.#swarmSize);
-      } else if (this.#aloneByFirstCount && this.#swarmSize > 1) {
-        this.#aloneByFirstCount = false;
-        diagnostics?.count("TrackerAnnounce:alone-recounted");
-        if (this.#config.shouldGenerateOffers()) {
-          this.#logger(
-            `${this.#who} a later count finds other peers; offering after all`,
-          );
-          this.#announceOrReport(undefined, "Announce failed");
-        } else {
-          this.#logger(
-            `${this.#who} a later count finds other peers; no offers at the peer limit`,
-          );
+    if (infoHash === this.#config.infoHash) {
+      const { complete, incomplete } = dataObject;
+      if (typeof complete === "number" && typeof incomplete === "number") {
+        this.#swarmSize = complete + incomplete;
+        if (this.#firstCountTimeoutId !== null) {
+          this.#sendFirstOffers();
+        } else if (this.#aloneByFirstCount && this.#swarmSize > 1) {
+          this.#aloneByFirstCount = false;
+          diagnostics?.count("TrackerAnnounce:alone-recounted");
+          if (this.#config.shouldGenerateOffers()) {
+            this.#logger(
+              `${this.#who} a later count finds other peers; offering after all`,
+            );
+            this.#announceOrReport();
+          } else {
+            this.#logger(
+              `${this.#who} a later count finds other peers; no offers at the peer limit`,
+            );
+          }
         }
+      } else if (
+        this.#firstCountTimeoutId !== null &&
+        dataObject.action === "announce" &&
+        dataObject.offer === undefined &&
+        dataObject.answer === undefined
+      ) {
+        // The reply to the announce, and no count in it: none will come, so
+        // the wait would only delay the offers.
+        this.#sendFirstOffers();
       }
-    } else if (
-      forThisSwarm &&
-      this.#firstCountTimeoutId !== null &&
-      dataObject.action === "announce" &&
-      dataObject.offer === undefined &&
-      dataObject.answer === undefined
-    ) {
-      // The reply to the announce, and no count in it: none will come, so
-      // the wait would only delay the offers.
-      this.#sendFirstOffers(null);
     }
 
     // Ignore offers/answers from ourselves
@@ -579,26 +573,18 @@ export class WebTorrentClient {
     }
   }
 
-  /**
-   * @param event - "started" for the first announce of a connection, which
-   * carries no offers: the count in its reply sizes the next one.
-   */
-  async #announce(event?: "started"): Promise<void> {
+  async #announce(): Promise<void> {
     if (this.#isDestroyed() || this.#wsClient.state !== "connected") return;
 
     // An announce ends the wait for a later count: it sends its own offers,
     // and the replies that follow answer it.
     this.#aloneByFirstCount = false;
-    if (event) {
-      this.#nextAnnounceEvent = event;
-    }
 
     if (this.#activeAnnouncePromise) {
       return this.#activeAnnouncePromise;
     }
 
     const socketLossCount = this.#socketLossCount;
-    const isFirst = event === "started";
     const promise = (async () => {
       const shouldGenerateOffers = this.#config.shouldGenerateOffers();
       const configuredCount = shouldGenerateOffers
@@ -612,17 +598,12 @@ export class WebTorrentClient {
       // offer reaches a peer that joined since, if the offers of that peer
       // failed to connect. The announce after the first is sent only when the
       // count found other peers, so the floor of one does not change it.
-      let offersCount: number;
-      if (isFirst) {
-        offersCount = 0;
-      } else if (this.#swarmSize === null || configuredCount === 0) {
-        offersCount = configuredCount;
-      } else {
-        const otherPeers = this.#swarmSize - 1;
-        offersCount = Math.max(Math.min(otherPeers, configuredCount), 1);
-        if (offersCount < configuredCount) {
-          diagnostics?.count("TrackerAnnounce:offers-capped");
-        }
+      const offersCount =
+        this.#swarmSize === null
+          ? configuredCount
+          : Math.min(configuredCount, Math.max(this.#swarmSize - 1, 1));
+      if (offersCount < configuredCount) {
+        diagnostics?.count("TrackerAnnounce:offers-capped");
       }
       if (!shouldGenerateOffers) {
         // A peer at its own peer limit announces to keep its place in the
@@ -674,17 +655,13 @@ export class WebTorrentClient {
         }
       }
 
-      const currentEvent = this.#nextAnnounceEvent;
-      this.#nextAnnounceEvent = undefined;
-
       const payload = this.#buildAnnouncePayload({
         numwant: offers.length,
         offers,
-        event: currentEvent,
       });
 
       this.#logger(
-        `${this.#who} announce${currentEvent ? ` "${currentEvent}"` : ""} with ${offers.length} of ${offersCount} offers`,
+        `${this.#who} announce with ${offers.length} of ${offersCount} offers`,
       );
 
       try {
@@ -775,6 +752,28 @@ export class WebTorrentClient {
     }
 
     return undefined;
+  }
+
+  /**
+   * The first announce of a connection. It carries no offers: the count in
+   * its reply sizes the next one (#sendFirstOffers).
+   */
+  #sendStarted(): void {
+    if (this.#isDestroyed() || this.#wsClient.state !== "connected") return;
+
+    const payload = this.#buildAnnouncePayload({
+      numwant: 0,
+      offers: [],
+      event: "started",
+    });
+
+    this.#logger(`${this.#who} announce "started" with no offers`);
+
+    try {
+      this.#wsClient.send(JSON.stringify(payload));
+    } catch (err: unknown) {
+      this.#reportAnnounceFailure("Initial announce failed", err);
+    }
   }
 
   #sendStopped(): void {

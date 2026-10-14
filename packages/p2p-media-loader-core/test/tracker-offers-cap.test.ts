@@ -66,18 +66,22 @@ function startClient(shouldGenerateOffers = () => true) {
     shouldGenerateOffers,
   });
   client.start();
-  /** The tracker's reply to an announce, with its swarm counts. */
-  const reply = (complete: number, incomplete: number) =>
+  /** A tracker message for this swarm; an undefined field is left out. */
+  const message = (fields: Record<string, unknown>) =>
     emit(
       "message",
-      JSON.stringify({
-        action: "announce",
-        info_hash: INFO_HASH,
-        interval: 120,
-        complete,
-        incomplete,
-      }),
+      JSON.stringify({ action: "announce", info_hash: INFO_HASH, ...fields }),
     );
+  /** The tracker's reply to an announce, with its swarm counts if given. */
+  const reply = (complete?: number, incomplete?: number) =>
+    message({ interval: 120, complete, incomplete });
+  /** A peer's offer, which the tracker relays. */
+  const peerOffer = () =>
+    message({
+      peer_id: "-PM0500-rrrrrrrrrrrr",
+      offer_id: "offer-1",
+      offer: { type: "offer", sdp: "v=0" },
+    });
   const offersPerAnnounce = () =>
     sent
       // The announces that can offer: not the "stopped" one destroy() sends,
@@ -89,7 +93,16 @@ function startClient(shouldGenerateOffers = () => true) {
           Array.isArray(message.offers),
       )
       .map((message) => (message.offers as unknown[]).length);
-  return { client, wsClient, sent, emit, reply, offersPerAnnounce };
+  return {
+    client,
+    wsClient,
+    sent,
+    emit,
+    message,
+    reply,
+    peerOffer,
+    offersPerAnnounce,
+  };
 }
 
 describe("WebTorrentClient: offers sized to the swarm", () => {
@@ -167,19 +180,10 @@ describe("WebTorrentClient: offers sized to the swarm", () => {
     // A peer that offered has found this one. tracker.webtorrent.dev replies
     // to the answer with a count that includes it: no reason to offer.
     const recounted = counter("alone-recounted");
-    const { client, emit, reply, offersPerAnnounce } = startClient();
+    const { client, reply, peerOffer, offersPerAnnounce } = startClient();
     await vi.advanceTimersByTimeAsync(0);
     reply(1, 0);
-    emit(
-      "message",
-      JSON.stringify({
-        action: "announce",
-        info_hash: INFO_HASH,
-        peer_id: "-PM0500-rrrrrrrrrrrr",
-        offer_id: "offer-1",
-        offer: { type: "offer", sdp: "v=0" },
-      }),
-    );
+    peerOffer();
     await vi.advanceTimersByTimeAsync(0);
     reply(2, 0); // the reply to the answer
     await vi.advanceTimersByTimeAsync(0);
@@ -217,19 +221,14 @@ describe("WebTorrentClient: offers sized to the swarm", () => {
   });
 
   it("echoes the tracker id of the reply in the sized announce", async () => {
-    const { client, sent, emit, offersPerAnnounce } = startClient();
+    const { client, sent, message, offersPerAnnounce } = startClient();
     await vi.advanceTimersByTimeAsync(0);
-    emit(
-      "message",
-      JSON.stringify({
-        action: "announce",
-        info_hash: INFO_HASH,
-        interval: 120,
-        complete: 0,
-        incomplete: 2,
-        "tracker id": "tracker-id-1",
-      }),
-    );
+    message({
+      interval: 120,
+      complete: 0,
+      incomplete: 2,
+      "tracker id": "tracker-id-1",
+    });
     await vi.advanceTimersByTimeAsync(0);
 
     expect(offersPerAnnounce()).toEqual([0, 1]);
@@ -263,16 +262,9 @@ describe("WebTorrentClient: offers sized to the swarm", () => {
   it("offers in full at once when the reply carries no count", async () => {
     // No count will come: waiting the 2 s would only delay the offers.
     const noCount = counter("no-count");
-    const { client, emit, offersPerAnnounce } = startClient();
+    const { client, reply, offersPerAnnounce } = startClient();
     await vi.advanceTimersByTimeAsync(0);
-    emit(
-      "message",
-      JSON.stringify({
-        action: "announce",
-        info_hash: INFO_HASH,
-        interval: 120,
-      }),
-    );
+    reply(); // no count
     await vi.advanceTimersByTimeAsync(0);
     expect(offersPerAnnounce()).toEqual([0, 5]);
 
@@ -285,17 +277,14 @@ describe("WebTorrentClient: offers sized to the swarm", () => {
   it("takes no count from a reply without the info hash", async () => {
     // On a shared socket, such a reply can be another swarm's: it waits for
     // a reply that names this swarm, and offers in full after 2 s.
-    const { client, emit, offersPerAnnounce } = startClient();
+    const { client, message, offersPerAnnounce } = startClient();
     await vi.advanceTimersByTimeAsync(0);
-    emit(
-      "message",
-      JSON.stringify({
-        action: "announce",
-        interval: 120,
-        complete: 0,
-        incomplete: 1,
-      }),
-    );
+    message({
+      info_hash: undefined,
+      interval: 120,
+      complete: 0,
+      incomplete: 1,
+    });
     await vi.advanceTimersByTimeAsync(0);
     expect(offersPerAnnounce()).toEqual([0]);
 
@@ -305,9 +294,9 @@ describe("WebTorrentClient: offers sized to the swarm", () => {
   });
 
   it("does not offer at once on a reply without the info hash and count", async () => {
-    const { client, emit, reply, offersPerAnnounce } = startClient();
+    const { client, message, reply, offersPerAnnounce } = startClient();
     await vi.advanceTimersByTimeAsync(0);
-    emit("message", JSON.stringify({ action: "announce", interval: 120 }));
+    message({ info_hash: undefined, interval: 120 });
     await vi.advanceTimersByTimeAsync(0);
     expect(offersPerAnnounce()).toEqual([0]);
 
@@ -319,18 +308,9 @@ describe("WebTorrentClient: offers sized to the swarm", () => {
 
   it("does not take a peer's offer for the reply", async () => {
     // A peer's offer is relayed with the same action, and with no count.
-    const { client, emit, reply, offersPerAnnounce } = startClient();
+    const { client, reply, peerOffer, offersPerAnnounce } = startClient();
     await vi.advanceTimersByTimeAsync(0);
-    emit(
-      "message",
-      JSON.stringify({
-        action: "announce",
-        info_hash: INFO_HASH,
-        peer_id: "-PM0500-rrrrrrrrrrrr",
-        offer_id: "offer-1",
-        offer: { type: "offer", sdp: "v=0" },
-      }),
-    );
+    peerOffer();
     await vi.advanceTimersByTimeAsync(0);
     expect(offersPerAnnounce()).toEqual([0]);
 
@@ -370,14 +350,7 @@ describe("WebTorrentClient: offers sized to the swarm", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(offersPerAnnounce()).toEqual([0, 2, 0]);
 
-    emit(
-      "message",
-      JSON.stringify({
-        action: "announce",
-        info_hash: INFO_HASH,
-        interval: 120,
-      }),
-    );
+    reply(); // no count
     await vi.advanceTimersByTimeAsync(0);
     expect(offersPerAnnounce()).toEqual([0, 2, 0, 5]);
     client.destroy();
@@ -398,8 +371,8 @@ describe("WebTorrentClient: offers sized to the swarm", () => {
 
   it("drops the offers of an announce the lost socket interrupted", async () => {
     // The socket comes back while a periodic announce still gathers its
-    // offers: joining it, the first announce of the new socket would carry
-    // them all, before the count.
+    // offers: they were sized for the old socket, and must not go out on the
+    // new one before its count.
     const socketLost = counter("socket-lost");
     const { client, emit, reply, offersPerAnnounce } = startClient();
     await vi.advanceTimersByTimeAsync(0);
@@ -421,6 +394,26 @@ describe("WebTorrentClient: offers sized to the swarm", () => {
     expect(offersPerAnnounce()).toEqual([0, 5, 0]);
     expect(connections.closed - closed).toBe(5);
     expect(counter("socket-lost")).toBe(socketLost + 1);
+    client.destroy();
+  });
+
+  it("sends the new socket's offers although an old announce still gathers", async () => {
+    // The sized announce of the new socket must not join the old announce,
+    // which is dropped: its offers would then wait for the next interval.
+    const { client, emit, reply, offersPerAnnounce } = startClient();
+    await vi.advanceTimersByTimeAsync(0);
+    reply(6, 0);
+    await vi.advanceTimersByTimeAsync(0);
+
+    gathering.delayMs = 3000;
+    await vi.advanceTimersByTimeAsync(120_000); // the periodic announce starts
+    emit("disconnected");
+    emit("connected");
+    await vi.advanceTimersByTimeAsync(0);
+    reply(3, 0); // the new socket's count: two other peers
+    await vi.advanceTimersByTimeAsync(5000);
+
+    expect(offersPerAnnounce()).toEqual([0, 5, 0, 2]);
     client.destroy();
   });
 
