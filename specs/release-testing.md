@@ -45,197 +45,23 @@ A test run finds problems. It does not fix them.
 
 ## How the browser tests run
 
-**Every browser test runs in at least two tabs.** Each tab is a peer. The tabs
-use the same `swarmId`, and nobody else uses it
-([verification.md](verification.md), "Isolating a test swarm"). One tab tests
-playback only: it has no peer, so the core never elects an owner, never
-shares, and never opens a peer connection. A result from one tab says nothing
-about P2P. Use more than two tabs where a test says so.
+The procedure — the demo servers, the test driver that moves several tabs
+together, the saved scripts in [`demo/release-tests/`](../demo/release-tests/),
+Safari through `safaridriver`, what to observe and how — is the skill
+[`.agents/skills/browser-testing`](../.agents/skills/browser-testing/SKILL.md).
+What makes a run count is stated here:
 
-**Start the demo** with `pnpm dev`. It serves on port 5173. The demo takes
-`player`, `streamUrl`, `swarmId` and `trackers` as query parameters. The
-player keys are in `packages/p2p-media-loader-demo/src/constants.ts`.
-
-**Ask the person to show the browser before the tests start**, and to keep it
-on screen while they run. In the Claude desktop app this is the built-in
-browser pane, which is hidden unless the person opens it. A hidden page gives
-false results: Chrome pauses its muted video, and a play after such a pause
-can move the playhead to the live edge, which reads as a player that plays too
-near the edge; a player that waits until it can be seen loads nothing; and the
-timers run slower. Open the page with `preview_start` and its URL, which also
-brings the pane up, and then confirm in the page itself:
-`document.visibilityState` is `visible` and `innerWidth` is not 0. A pane the
-person sees can still hold no page of this session, which then reports
-`hidden` at 0×0; the browser tools' own "displayed" or "hidden" line says the
-same. If the page is hidden, stop and ask again: a run in a hidden page is not
-counted.
-
-**Move the tabs together.** Most tests need two or more tabs to change stream
-or player at the same moment. Open each tab with `driver=1` in the demo's
-query: the dev server then loads a test driver (`demo/src/test-driver.ts`),
-which the production build of the demo leaves out. Every driven tab listens on
-one `BroadcastChannel`. Tab A sends code; every tab runs it and replies with
-the result, and tab A collects one reply for each tab it expects. With this,
-one script in tab A runs a test across any number of tabs.
-
-The driver puts its helpers on `window.__h`:
-
-| Helper                   | Does                                                                                                           |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------- |
-| `all(code, count, ms?)`  | Runs `code` in this tab and in `count - 1` others, and returns every reply                                     |
-| `others(code, count, …)` | Runs `code` in the other tabs only                                                                             |
-| `go(params)`             | Changes the demo's query parameters without a reload; the demo destroys the player and core and makes new ones |
-| `play()`                 | Plays with sound at a low volume                                                                               |
-| `state()`                | `readyState`, media error, time, latency, and the diagnostics snapshot                                         |
-| `delta(after, before)`   | Counter differences between two snapshots                                                                      |
-| `sleep(ms)`, `video()`   | Waits; returns the page's video element                                                                        |
-
-`go` is also the stream change that the lifecycle tests examine, and the
-`driver` parameter stays in the query through it.
-
-**Run the tests from the saved scripts.** The scripts that ran each test last
-time are in [`demo/release-tests/`](../demo/release-tests/): a probe that
-records what the core decided beside what the media element held, a library
-of helpers, and one module per test. A run loads them into the driven tabs,
-fixes one that has gone out of date, writes one for a test that has none, and
-saves them all; its `README.md` says how, and which commit each script last
-ran on.
-
-**Drive Safari through `safaridriver`.** It is Apple's WebDriver for Safari,
-part of macOS, so the assistant can drive the real Safari over HTTP with no
-other software. A person enables it once:
-
-1. In Safari > Settings > Advanced, select "Show features for web developers".
-2. In Safari > Settings > Developer, select "Allow remote automation".
-3. In a terminal, run `safaridriver --enable` and give the administrator
-   password.
-4. Quit Safari (⌘Q). A Safari that was open before step 2 refuses the
-   connection: each session request times out.
-
-The assistant then starts `safaridriver -p 4444` in the background and uses
-the W3C WebDriver endpoints: `POST /session` with
-`{"capabilities": {"alwaysMatch": {"browserName": "safari"}}}`, then `/url`
-to open a page, `/execute/sync` and `/execute/async` to run code in it, and
-`DELETE /session/<id>` at the end. A small script in the scratch directory
-does this with the standard library of any language.
-
-- A session opens its own Safari window, with a clean state. Set
-  `localStorage.debug` on `http://localhost:5173/` first, then open the test
-  page.
-- The console cannot be read through WebDriver. Read the ledger snapshot
-  instead, and push what a probe records to an array on `window`.
-- A session left open by a script that was stopped makes the next
-  `POST /session` fail. Restart `safaridriver`.
-- The test driver's `BroadcastChannel` does not reach another browser. Drive
-  the Safari session and the Chrome tabs separately, and compare their
-  snapshots.
-- **A Safari session does not stand for Safari on the network.** In an
-  automation session, Safari's WebRTC networking stops for about 10 seconds
-  at a time: it answers no ICE check and sends no data, and then sends the
-  delayed answers together. Chrome then reports the connection
-  `disconnected` about every 15 seconds, and the core drops the peer. A
-  normal Safari window with the same page and the same Chrome peer answered
-  every check for minutes, and never went `disconnected`. So a Safari
-  session tests playback, the player's use of MSE, and the registry, but not
-  how long a peer connection holds, how much P2P Safari shares, or a stall
-  of playback that comes with it. Those are tested by a person in a normal
-  Safari window (Part 2, test 1). Use a `swarmId` of the test's own: a public
-  stream's default swarm can hold other viewers, whose connections mix with
-  the test's.
-- To see whether a connection really goes silent, read Chrome's side:
-  `getStats()` on the peer's `RTCPeerConnection` gives the selected
-  candidate pair, its `requestsSent` and `responsesReceived`, and
-  `lastPacketReceivedTimestamp`.
-
-**Every tab with the driver follows every command.** A tab left over from an
-earlier test silently joins the next one. Before each test, close every driven
-tab that is not part of it, or reload it without `driver=1`.
-
-**Run long tests in the page.** A browser tool call can time out before a test
-of a minute or more ends. `window.__bg(name, task)` runs the test inside tab A
-and keeps its log and result in `window.__R[name]`; read it in later calls.
-When `all` expects more tabs than answer, it waits for its timeout, so a test
-that names a wrong tab count is slow, not wrong.
-
-**Keep the hidden tabs playing.** Even with the browser on screen, only its
-front tab is visible, so the other test tabs are hidden. Chrome slows the
-timers of a hidden tab and pauses video-only background media. Unmute the
-video, set a low volume, and call `play()` in each tab. Allow for slower
-timers: a step that takes 20 seconds in a visible tab can take 30 in a hidden
-one, and a slow start is not a stall until the test has waited for it.
-Measure live latency, startup placement, and anything that depends on the
-player's own controls in the front tab only, and bring each tab to the front
-in turn where a test measures more than one.
-
-**What to observe:**
-
-- The media element: `readyState`, `error`, `currentTime`, `buffered`,
-  `seekable`, `paused`.
-- The demo page: HTTP and P2P totals, and the peer graph.
-- The debug loggers, through `localStorage.debug`. Set it before the page
-  loads: the `debug` library reads it at load.
-
-  | Logger                       | Shows                                                                         |
-  | ---------------------------- | ----------------------------------------------------------------------------- |
-  | `p2pml-core:registry-miss`   | A player request that the registry does not know                              |
-  | `p2pml-core:manifest`        | The registry each manifest gives                                              |
-  | `p2pml-core:clock`           | Clock synchronization and re-parses of clock-based lists                      |
-  | `p2pml-core:hybrid-loader-*` | Requests and their urgency, and each prefetch "as owner" or "as backup #n"    |
-  | `p2pml-core:tracker`         | Announces, offers, answers, peers held and released                           |
-  | `p2pml:diagnostics`          | Enables the ledger ([diagnostics.md](diagnostics.md)), and logs its anomalies |
-  | `p2pml:diagnostics:log`      | Each open and close of a ledger record                                        |
-
-  The browser keeps only the most recent console lines. Enable only the
-  loggers that a test reads, or the lines it needs are lost: one busy page
-  with every open and close logged pushes out tens of thousands of lines.
-
-- The ledger snapshot, described below.
-
-**Count resources.** A leak shows as a resource that stays open after the
-stream, player or core that owned it is gone. Enable the diagnostics ledger
-([diagnostics.md](diagnostics.md)) in each tab, and take a snapshot of
-`window.__p2pmlDiagnostics` before and after each step. The ledger also
-counts downloads by source and result, registry misses and closed peers by
-cause, and timers that fire after their owner was destroyed. Some resources are released late by design; the list is in
-[diagnostics.md](diagnostics.md), "What is recorded". An investigation that
-needs more detail adds one-off probes under the rules in
-[diagnostics.md](diagnostics.md), and removes them when it ends. The ledger
-sees only what the library holds: an object that a player or the demo leaves
-running shows only as console errors or a growing heap.
-
-**Summarize each tab the same way.** For each tab and step, record:
-`readyState`, media error, latency behind the end of the seekable range, the
-peers held, the HTTP and P2P downloads and failures of the step (counter
-differences), registry misses, peer closes by cause, records still open from
-before the step, and anomalies. Also record the swarm of each open P2P loader
-(the detail of its `P2PLoader` record). "No P2P" between two tabs means
-nothing until their swarms are compared: two tabs that chose different
-renditions are in different swarms, which is correct, and are not a defect.
-
-**Avoid false results:**
-
-- Do not edit the source while a test runs. Vite reloads the changed modules
-  in the open pages, and the test then measures a mix of old and new code. The
-  temporary demo edit of test 12 is made between tests, and is followed by a
-  check that the driver and the ledger are still there.
-- Reload the tabs between test groups. Tabs that ran many tests can carry
-  state from earlier tests.
-- Pin the rendition when a test measures sharing between two engines
-  ([verification.md](verification.md), "Cross-player sharing"). Where a
-  player has no selector, compare the swarms of the open P2P loaders instead.
-- Confirm that each injected fault happened: count it where it is injected,
-  and treat a test whose fault count is zero as not run.
-- A defect is real only when it occurs again in fresh tabs. For a connection
-  defect, keep the `p2pml-core:tracker` log of the failure.
-- `livesim2` allows 10000 requests per IP address per day. Long live runs can
-  reach the limit; its `/reqcount` shows the count. Use an HLS live stream for
-  the long run.
-- In shell checks, quote and split lists explicitly. `zsh` does not split an
-  unquoted variable into words, so a loop over a list in one variable runs
-  once, on the whole list.
-- Keep the scratch work out of the repository: tarballs packed with
-  `--pack-destination`, a worktree of an older release, and a consumer
-  project all go in a scratch directory, and are removed at the end.
+- **Every browser test runs in at least two tabs**, each a peer, with a
+  `swarmId` nobody else uses ([verification.md](verification.md), "Isolating
+  a test swarm"). One tab tests playback only: it has no peer, so the core
+  never elects an owner, never shares, and never opens a peer connection.
+- **A run in a hidden page is not counted.** A hidden page pauses muted video,
+  delays a player that waits to be seen, and slows timers.
+- **An injected fault counts only where it happened**, on the request the test
+  meant; a test whose fault count is zero did not run.
+- **"No P2P" between two tabs is a finding only in one swarm.** A rendition is
+  a swarm, and two engines on Auto often choose different ones.
+- **A defect is real only when it occurs again in fresh tabs.**
 
 **Plan for about five hours.** The long run takes an hour and runs in its own
 tabs, beside the other tests. Its tabs must not have the driver. The Safari
@@ -249,8 +75,9 @@ step, nothing that the previous step opened is still open.
 **Run in Safari too.** Tests 2, 3, 4, 5, 13 and 14 run again in a Safari
 session, with a Chrome tab as the second peer of the swarm. The pass rules on
 playback, MSE use and the registry are the same. The rules on P2P are not
-judged in the Safari session: see "Drive Safari through `safaridriver`"
-above.
+judged in the Safari session: an automation session pauses Safari's WebRTC
+networking (the skill's
+[safari.md](../.agents/skills/browser-testing/safari.md)).
 
 ### 1. Automated checks
 

@@ -163,27 +163,11 @@ becomes a permanent record under these rules.
 
 Rule 6 is the one most easily forgotten: diagnostics are not in the way of a
 change working, so nothing fails when they are missing. Before a change to
-`packages/*/src` is reported done, its author — person or AI agent — goes
-through this list, and the report says what was added or why nothing was
-needed:
-
-1. **Resources.** Each listener, timer, connection, registration, storage,
-   request or kept object the change acquires has an `open` where it is
-   acquired and a `close` on every path that releases it: destroy, failure,
-   replacement. Each timer is cleared on destroy, and its callback records an
-   anomaly if it runs after destroy (rule 2). A timer scheduled more than once
-   keeps one record at a time.
-2. **Results.** Each new outcome — a new branch that fails, falls back,
-   corrects, or decides on the player's behalf — has a counter (rule 3), for
-   each way it can go, not only the interesting one.
-3. **Drift.** A value that two parts of the code must agree on has a probe
-   (rule 4).
-4. **A test.** A unit test enables the ledger and checks that after teardown
-   no resource of the change's kinds is open and no anomaly was recorded, and
-   that the counters move as the change says (rule 8). Removing the change's
-   release step must make that test fail.
-5. **This spec.** "What is recorded" names any new group of counters a reader
-   of a snapshot must know.
+`packages/*/src` is reported done, its author — person or AI agent — checks
+its resources, results, drift, a ledger test and this spec, and the report
+says what was added or why nothing was needed. The list is in the
+[change checklist](../.agents/skills/change-checklist/SKILL.md),
+"Diagnostics".
 
 ## What is recorded
 

@@ -26,7 +26,7 @@ node_modules
 # Agent tooling; share the checked-in settings, keep everything else local
 .claude/*
 !.claude/settings.json
-!.claude/skills/
+!.claude/skills
 .idea
 .DS_Store
 *.suo

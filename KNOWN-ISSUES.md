@@ -150,6 +150,14 @@ The tests themselves are in
   from Video.js 10 with dash.js within a second or two raises an uncaught
   `TypeError: Cannot read properties of null (reading 'id')` from a listener
   on the video element, with P2P disabled too. No ledger record stays open.
+- **Shaka 5 on Chromium 49 fails at start on the mux MPEG-TS VOD** with a
+  decode error (Shaka error 3016, then 3015 on each later append), in
+  `shaka-iife.html`. The same Shaka page without P2P Media Loader fails the
+  same way when Shaka's ABR switches rendition at start (480p to 288p); with
+  the rendition pinned to 1080p it plays. With the engine the error comes on
+  most loads, because the core's bandwidth makes Shaka switch at start.
+  Chromium 49 plays MPEG-TS only through Shaka's conversion to MP4, which
+  Shaka's team does not test on so old a browser.
 
 ## Decided: kept by design
 

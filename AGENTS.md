@@ -42,29 +42,47 @@ building it. It is not a spec: nothing in it may be cited as how the system
 behaves. When a proposal is adopted, fold it into the spec it extends and
 delete it; when rejected, delete it.
 
+## Skills are procedures
+
+`specs/` says what the system does and why. A skill says how to do a task in
+this repository: the steps, the tools and the traps. Each one is a folder in
+[`.agents/skills/`](.agents/skills/) with a `SKILL.md` whose front matter names
+the skill and says when it applies. `.claude/skills` is a symlink to that
+folder, so Claude Code loads the same files; an agent that loads no skills
+reads the `SKILL.md` of a task before it starts that task. On Windows the
+symlink needs `core.symlinks=true`.
+
+| Skill                                                        | Use it when                                                                     |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| [change-checklist](.agents/skills/change-checklist/SKILL.md) | Making a change to `packages/*`, and before reporting it done                   |
+| [review-findings](.agents/skills/review-findings/SKILL.md)   | A code review returns findings                                                  |
+| [browser-testing](.agents/skills/browser-testing/SKILL.md)   | Any test in a browser: the release tests, a live check, a fault, an old browser |
+| [release](.agents/skills/release/SKILL.md)                   | Preparing a release or a pre-release                                            |
+
+The rules for specs apply to skills too. A change that makes a skill wrong
+updates it in the same change. A skill states no design: it links the spec
+that does, and where the two disagree, the spec is right. A new skill is a new
+folder in `.agents/skills/`, added to the table above; it needs no link of its
+own.
+
 ## Conventions
 
 - **Package manager: pnpm.** The workspace is `packages/*` and `demo`. Never run
   `npm install` in a workspace package.
-- **Verify before reporting done:** `pnpm type-check`, `pnpm lint`, `pnpm test`,
-  and `npx prettier --check "specs/**/*.md" AGENTS.md` when specs changed. For a
-  change to `packages/*/src`, also go through the diagnostics checklist below,
-  and say in the report what was added to the ledger, or why nothing was.
-- **Before a release:** `pnpm knip` as well, with no findings, and `pnpm jscpd`
-  within its budget. See [`specs/packaging.md`](specs/packaging.md). Then run
-  the tests in [`specs/release-testing.md`](specs/release-testing.md): Part 1
-  is for an AI assistant, Part 2 lists what a person must test.
+- **Verify before reporting done:** `pnpm type-check`, `pnpm lint`,
+  `pnpm test`, and prettier on the changed documents. The
+  [change checklist](.agents/skills/change-checklist/SKILL.md) lists the
+  documents a change updates, the checks, and what the report says.
 - **Diagnostics change with the code, in the same change.** Nothing fails when
-  they are missing, so they are easy to forget; check them on purpose. Go
-  through "Checking a change" in [`specs/diagnostics.md`](specs/diagnostics.md):
-  - every listener, timer, connection, registration, storage or kept object the
-    change acquires opens a ledger record and closes it on every path that
-    releases it; a timer is cleared on destroy and records an anomaly if it
-    fires after;
-  - every new outcome — a failure, a fallback, a correction, a decision made
-    on the player's behalf — has a counter for each way it can go;
-  - a unit test enables the ledger and shows the records closed and the
-    counters moving, and fails when the release step is removed.
+  they are missing, so they are easy to forget; check them on purpose. For a
+  change to `packages/*/src`, go through "Diagnostics" in the change
+  checklist, and say in the report what was added to the ledger, or why
+  nothing was. The rules are in [`specs/diagnostics.md`](specs/diagnostics.md).
+- **Before a release:** `pnpm knip` with no findings, `pnpm jscpd` within its
+  budget ([`specs/packaging.md`](specs/packaging.md)), and the tests in
+  [`specs/release-testing.md`](specs/release-testing.md): Part 1 is for an AI
+  assistant, Part 2 lists what a person must test. The
+  [release](.agents/skills/release/SKILL.md) skill gives the order.
 - Match the surrounding code's style, comment density and naming. The codebase
   favours comments that explain _why_ over comments that restate the code.
 

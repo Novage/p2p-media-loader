@@ -5,8 +5,8 @@ The scripts that run the browser tests of
 each test checks; these scripts are how the last run checked it. Keep them
 current: a run fixes a script that no longer matches the code, a stream or the
 spec, writes one for a test that has none, and records here what it changed.
-The skill `.claude/skills/release-test-scripts` says the same for an AI
-assistant.
+The skill [`browser-testing`](../../.agents/skills/browser-testing/SKILL.md)
+says how a run uses them.
 
 They are plain ES modules. The dev server serves them at `/release-tests/`;
 the production build, ESLint, `tsc` and knip leave them out, as they leave out
@@ -24,8 +24,7 @@ the driver's own test code.
 
    Add `p2pml-core:tracker` for test 7, which counts glare lines.
 
-2. Open each test tab with `driver=1` in its query (the spec's "Move the tabs
-   together"). In tab A:
+2. Open each test tab with `driver=1` in its query (the skill's "Moving the tabs together"). In tab A:
 
    ```js
    const rt = await import("/release-tests/lib.js");
