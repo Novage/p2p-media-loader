@@ -21,7 +21,10 @@ does not repeat them.
 A test run finds problems. It does not fix them.
 
 - **Do not fix the code or the documentation during a run.** This includes
-  the source, the tests, the specs and the guides. Temporary edits are
+  the source, the unit tests, the specs and the guides. The test scripts in
+  [`demo/release-tests/`](../demo/release-tests/) are the exception: a run
+  uses them, and changes one that no longer matches the code, a stream or
+  this document, and keeps the change. Temporary edits are
   allowed: the demo edit of test 12, a one-off probe
   ([diagnostics.md](diagnostics.md)), a log line that an investigation needs.
   Each is removed when it is no longer needed, and is never committed. At the
@@ -89,6 +92,14 @@ The driver puts its helpers on `window.__h`:
 
 `go` is also the stream change that the lifecycle tests examine, and the
 `driver` parameter stays in the query through it.
+
+**Run the tests from the saved scripts.** The scripts that ran each test last
+time are in [`demo/release-tests/`](../demo/release-tests/): a probe that
+records what the core decided beside what the media element held, a library
+of helpers, and one module per test. A run loads them into the driven tabs,
+fixes one that has gone out of date, writes one for a test that has none, and
+saves them all; its `README.md` says how, and which commit each script last
+ran on.
 
 **Drive Safari through `safaridriver`.** It is Apple's WebDriver for Safari,
 part of macOS, so the assistant can drive the real Safari over HTTP with no

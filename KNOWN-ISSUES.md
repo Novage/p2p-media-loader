@@ -137,6 +137,20 @@ The tests themselves are in
   peer alike, and HLS.js lowers the quality to 184p step by step: the decoder,
   not P2P.
 
+- **Plain HLS.js stops for good after three failed playlist requests in a
+  row.** HLS.js 1.7.3 retries a failed level playlist twice and raises a fatal
+  `levelLoadError` on the third; the player then stalls at `readyState` 2,
+  with the engine and without it alike, and the demo does not restart loading
+  after a fatal error. Release test 10 fails one manifest request, as its
+  spec says.
+- **Shaka stalls on the Netflix `SegmentBase` VOD in a background tab.** The
+  hidden tab stops at `readyState` 2 with 6–12 s buffered while the front tab
+  plays, with P2P and without it, in 4 of 4 runs.
+- **`@videojs/dash-video` throws on a fast change of player.** Switching away
+  from Video.js 10 with dash.js within a second or two raises an uncaught
+  `TypeError: Cannot read properties of null (reading 'id')` from a listener
+  on the video element, with P2P disabled too. No ledger record stays open.
+
 ## Decided: kept by design
 
 - **No retry after a failed WebRTC handshake**, and no reconnect of a dropped
@@ -178,6 +192,14 @@ The tests themselves are in
 
 ## Release test runs
 
+- **Fourth run of Part 1, 12–15 October 2026, partial.** Tests 1–6, 9, 12, 14,
+  16, 17 and 19 passed on `35d766f` and `96f3f78`, and 13 up to the Clappr DASH
+  wrapper; test 18's findings were fixed in `2d85c26`. On `8f93cc0`, in one
+  hour: test 1, a smoke run of the stream matrix, test 10 and test 7 passed.
+  Not run: 8, 11, 15 (the last release is not wire-compatible), and Safari.
+  Its findings are the items above; the startup requests it found judged by a
+  stale buffer were fixed by `67ba5c2`. The scripts it ran are in
+  [demo/release-tests/](demo/release-tests/).
 - **Third run of Part 1, 10–12 October 2026, complete**, for the
   request-based urgency. Every test passed in Chrome; the stream matrix,
   pause, seeks, playback rate, the special streams and every player wrapper
