@@ -218,12 +218,9 @@ export class HttpRequestExecutor {
       // without throwing an error. We must verify that we received the full segment.
       // If truncated, we throw without clearing loaded bytes to allow the next
       // download attempt to resume from the current offset using HTTP Range requests.
-      const { sizePeer } = this.request.heldBytes;
-      if (
-        sizePeer !== undefined &&
-        this.request.totalBytes !== undefined &&
-        this.request.loadedBytes > this.request.totalBytes
-      ) {
+      const { heldBytes } = this.request;
+      const { sizePeer } = heldBytes;
+      if (sizePeer !== undefined && heldBytes.isOverflow) {
         // More than the size a peer gave: that peer's size was wrong.
         throw this.rejectPeer(
           sizePeer,
@@ -231,13 +228,11 @@ export class HttpRequestExecutor {
           "HTTP sent more than its size",
         );
       }
-      if (
-        this.request.totalBytes !== undefined &&
-        this.request.loadedBytes !== this.request.totalBytes
-      ) {
+      if (heldBytes.isShort || heldBytes.isOverflow) {
+        const problem = heldBytes.isShort ? "truncated" : "too long";
         throw new RequestError(
           "http-bytes-mismatch",
-          `HTTP response truncated: received ${this.request.loadedBytes} of ${this.request.totalBytes} bytes`,
+          `HTTP response ${problem}: received ${this.request.loadedBytes} of ${this.request.totalBytes} bytes`,
         );
       }
 

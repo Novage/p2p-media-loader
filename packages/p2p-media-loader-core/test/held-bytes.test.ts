@@ -99,6 +99,50 @@ describe("HeldBytes", () => {
     expect(held.isComplete).toBe(false);
   });
 
+  it("overflows a size of zero with any byte", () => {
+    const held = new HeldBytes(undefined);
+    held.setSize(0, http);
+    expect(held.wouldOverflowWith(1)).toBe(true);
+    held.add(bytes(1), http);
+    expect(held.isOverflow).toBe(true);
+  });
+
+  it("is short of its size until every byte is held, and knows which chunk would overflow it", () => {
+    const held = new HeldBytes(undefined);
+    held.add(bytes(3), http);
+    expect(held.isShort).toBe(false);
+    expect(held.wouldOverflowWith(100)).toBe(false);
+
+    held.setSize(5, http);
+    expect(held.isShort).toBe(true);
+    expect(held.wouldOverflowWith(2)).toBe(false);
+    expect(held.wouldOverflowWith(3)).toBe(true);
+
+    held.add(bytes(2), http);
+    expect(held.isShort).toBe(false);
+    expect(held.isComplete).toBe(true);
+  });
+
+  it("records no peer for an empty chunk", () => {
+    const held = new HeldBytes(undefined);
+    held.add(bytes(0), peer("a"));
+
+    expect(held.hasPeerBytes).toBe(false);
+    expect(held.owner).toBeUndefined();
+    expect(held.completionSource).toEqual(http);
+  });
+
+  it("joins the bytes again after a chunk is added", () => {
+    const held = new HeldBytes(undefined);
+    held.add(bytes(2, 1), http);
+    expect(held.data.byteLength).toBe(2);
+
+    held.add(bytes(1, 2), http);
+    held.add(bytes(1, 3), http);
+    expect(Array.from(new Uint8Array(held.data))).toEqual([1, 1, 2, 3]);
+    expect(held.data).toBe(held.data);
+  });
+
   it("clears every byte and a size a source gave, and keeps a byte range's size", () => {
     const held = new HeldBytes(1000);
     held.add(bytes(2), peer("a"));
@@ -124,5 +168,13 @@ describe("HeldBytes", () => {
     held.add(bytes(7), http);
     held.settleSize();
     expect(held.size).toBe(7);
+  });
+
+  it("records no peer for the size once the download completes", () => {
+    const held = new HeldBytes(undefined);
+    held.setSize(4, peer("a"));
+    held.add(bytes(4), http);
+    held.settleSize();
+    expect(held.sizePeer).toBeUndefined();
   });
 });

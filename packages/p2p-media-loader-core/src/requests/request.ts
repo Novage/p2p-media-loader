@@ -315,15 +315,10 @@ export class Request {
   /**
    * Sets the total size, as the attempt under way learned it: from a peer's
    * message, or from HTTP's headers. Which one is recorded, since a size a
-   * peer gave can be wrong (`totalBytesFromPeer`).
+   * peer gave can be wrong (`heldBytes.sizePeer`).
    */
   setTotalBytes(value: number) {
     this.held.setSize(value, this.attemptSource());
-  }
-
-  /** The peer that gave the total size, if a peer did. */
-  get totalBytesFromPeer(): string | undefined {
-    return this.held.sizePeer;
   }
 
   /**

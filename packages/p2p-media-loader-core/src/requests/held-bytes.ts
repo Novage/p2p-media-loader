@@ -19,6 +19,8 @@ export type HeldBytesView = Pick<
   | "hasBytesFrom"
   | "isComplete"
   | "isOverflow"
+  | "isShort"
+  | "wouldOverflowWith"
   | "completionSource"
   | "otherPeerThan"
   | "peerForExcessBytes"
@@ -33,7 +35,7 @@ export type HeldBytesView = Pick<
  * changes only through the operations here, so that a clear, a new chunk or
  * a new size leaves no field behind.
  */
-export class HeldBytes implements HeldBytesView {
+export class HeldBytes {
   private chunks: Uint8Array[] = [];
   private joined?: ArrayBuffer;
   private _length = 0;
@@ -68,7 +70,12 @@ export class HeldBytes implements HeldBytesView {
   }
 
   get data(): ArrayBuffer {
-    this.joined ??= Utils.joinChunks(this.chunks).buffer;
+    if (!this.joined) {
+      // Keep only the joined bytes, so that they are not held twice.
+      const joined = Utils.joinChunks(this.chunks, this._length);
+      this.chunks = [joined];
+      this.joined = joined.buffer;
+    }
     return this.joined;
   }
 
@@ -99,7 +106,17 @@ export class HeldBytes implements HeldBytesView {
 
   /** Whether more bytes are held than the size: a state to clear. */
   get isOverflow(): boolean {
-    return !!this._size && this._length > this._size;
+    return this._size !== undefined && this._length > this._size;
+  }
+
+  /** Whether fewer bytes are held than the size. */
+  get isShort(): boolean {
+    return this._size !== undefined && this._length < this._size;
+  }
+
+  /** Whether `byteLength` more bytes would be more than the size. */
+  wouldOverflowWith(byteLength: number): boolean {
+    return this._size !== undefined && this._length + byteLength > this._size;
   }
 
   /**
@@ -133,7 +150,9 @@ export class HeldBytes implements HeldBytesView {
     return this._sizePeer ?? this.owner;
   }
 
+  /** Adds a chunk. An empty chunk adds nothing, and records no peer. */
   add(chunk: Uint8Array, source: ByteSource) {
+    if (chunk.byteLength === 0) return;
     this.chunks.push(chunk);
     this._length += chunk.byteLength;
     this.joined = undefined;
@@ -172,8 +191,9 @@ export class HeldBytes implements HeldBytesView {
     this._sizePeer = undefined;
   }
 
-  /** The download completed: its size is the bytes held. */
+  /** The download completed: its size is the bytes held, which no peer gave. */
   settleSize() {
     this._size = this._length;
+    this._sizePeer = undefined;
   }
 }

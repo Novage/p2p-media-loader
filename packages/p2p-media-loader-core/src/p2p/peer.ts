@@ -225,9 +225,7 @@ export class Peer {
           return;
         }
 
-        const isWrongBytes = request.loadedBytes !== request.totalBytes;
-
-        if (isWrongBytes) {
+        if (!request.heldBytes.isComplete) {
           this.#destroyOnPeerError(
             "bytes-length-mismatch",
             "Peer response bytes length mismatch",
@@ -292,11 +290,7 @@ export class Peer {
 
     const { request, controls } = this.#downloadingContext;
 
-    const isOverflow =
-      request.totalBytes !== undefined &&
-      request.loadedBytes + chunk.byteLength > request.totalBytes;
-
-    if (isOverflow) {
+    if (request.heldBytes.wouldOverflowWith(chunk.byteLength)) {
       this.#destroyOnPeerError(
         "bytes-length-mismatch",
         "Peer response bytes length mismatch",

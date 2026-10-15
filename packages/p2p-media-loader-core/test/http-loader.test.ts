@@ -595,7 +595,7 @@ describe("HttpRequestExecutor finishing a peer's download", () => {
     });
 
     expect(request.status).toBe("succeed");
-    expect(request.totalBytesFromPeer).toBeUndefined();
+    expect(request.heldBytes.sizePeer).toBeUndefined();
   });
 
   it("blames the peer when the Content-Range total contradicts its size", async () => {

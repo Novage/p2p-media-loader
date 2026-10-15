@@ -461,4 +461,36 @@ describe("Peer.downloadSegment going on from bytes another source sent", () => {
     expect(data.slice(100).every((b) => b === 1)).toBe(true);
     expect(validate).toHaveBeenCalledTimes(1);
   });
+
+  it("closes a peer that sends more bytes than its size", () => {
+    const { peer, request, segmentRequest, command, deliver, closeConnection } =
+      connect(undefined);
+    peer.downloadSegment(request);
+    const { i, r } = segmentRequest();
+
+    command({ c: Command.PeerCommandType.SegmentData, i, r, s: 100 });
+    deliver(new Uint8Array(60));
+    deliver(new Uint8Array(60));
+
+    expect(closeConnection).toHaveBeenCalledTimes(1);
+    const [error] = closeConnection.mock.calls[0] as [{ type: string }];
+    expect(error.type).toBe("bytes-length-mismatch");
+    expect(request.loadedBytes).toBe(0);
+  });
+
+  it("closes a peer that says it sent every byte before it did", () => {
+    const { peer, request, segmentRequest, command, deliver, closeConnection } =
+      connect(undefined);
+    peer.downloadSegment(request);
+    const { i, r } = segmentRequest();
+
+    command({ c: Command.PeerCommandType.SegmentData, i, r, s: 100 });
+    deliver(new Uint8Array(60));
+    command({ c: Command.PeerCommandType.SegmentDataSendingCompleted, i, r });
+
+    expect(closeConnection).toHaveBeenCalledTimes(1);
+    const [error] = closeConnection.mock.calls[0] as [{ type: string }];
+    expect(error.type).toBe("bytes-length-mismatch");
+    expect(request.status).not.toBe("succeed");
+  });
 });
