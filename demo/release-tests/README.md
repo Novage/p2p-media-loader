@@ -40,17 +40,19 @@ the driver's own test code.
    `rt.clear()` removes them at the end of the run.
 
 **Do not edit a script that a page has loaded while a test runs.** Vite
-reloads the page, which stops the test. Edit between tests, then reload the
+reloads the page, which stops the test; formatting one with prettier counts
+as an edit. Edit between tests, then reload the
 tabs and install the probe again.
 
 ## The scripts
 
-| Script      | Test                  | Last run on | Notes                                                                                                                                                          |
-| ----------- | --------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `lib.js`    | all                   | `8f93cc0`   | Streams of verification.md, the probe, snapshots, `inAll`, results kept in `localStorage`, `settle` that waits for playback and a peer                         |
-| `matrix.js` | 2. Stream matrix      | `8f93cc0`   | `smokeSteps()`: one VOD and one live stream per protocol on every engine; `fullSteps()`: the whole matrix                                                      |
-| `faults.js` | 10. Network faults    | `8f93cc0`   | Wrappers of fetch, XMLHttpRequest and WebSocket; segment 404, 503 and no answer, manifest errors, slow network, trackers dropped or unreachable; `runNoWebRtc` |
-| `joins.js`  | 7. Simultaneous joins | `8f93cc0`   | Time until every tab holds a peer after a common swarm change; glare lines when the tracker logger is on                                                       |
+| Script      | Test                   | Last run on | Notes                                                                                                                                                                                |
+| ----------- | ---------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `lib.js`    | all                    | `8f93cc0`   | Streams of verification.md, the probe, snapshots, `inAll`, results kept in `localStorage`, `settle` that waits for playback and a peer                                               |
+| `matrix.js` | 2. Stream matrix       | `8f93cc0`   | `smokeSteps()`: one VOD and one live stream per protocol on every engine; `fullSteps()`: the whole matrix                                                                            |
+| `faults.js` | 10. Network faults     | `8f93cc0`   | Wrappers of fetch, XMLHttpRequest and WebSocket; segment 404, 503 and no answer, one manifest error, slow network, trackers dropped or unreachable; `runNoWebRtc` (run on `06367ea`) |
+| `joins.js`  | 7. Simultaneous joins  | `8f93cc0`   | Time until every tab holds a peer after a common swarm change; glare lines when the tracker logger is on                                                                             |
+| `peers.js`  | 8. Three to five peers | `06367ea`   | Measures only; the browser driver opens and closes the tabs. `start`, `mark` before each event, `since` after it; HTTP downloads per segment one tab holds                           |
 
 Tests 3, 4, 5, 6, 9, 11, 13 and 14 were last run on 13 October 2026 from
 scripts pasted into the page, before this folder existed. Write their modules

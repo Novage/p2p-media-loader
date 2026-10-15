@@ -195,10 +195,11 @@ The tests themselves are in
 - **Fourth run of Part 1, 12–15 October 2026, partial.** Tests 1–6, 9, 12, 14,
   16, 17 and 19 passed on `35d766f` and `96f3f78`, and 13 up to the Clappr DASH
   wrapper; test 18's findings were fixed in `2d85c26`. On `8f93cc0`, in one
-  hour: test 1, a smoke run of the stream matrix, test 10 and test 7 passed.
-  Not run: 8, 11, 15 (the last release is not wire-compatible), and Safari.
-  Its findings are the items above; the startup requests it found judged by a
-  stale buffer were fixed by `67ba5c2`. The scripts it ran are in
+  hour: test 1, a smoke run of the stream matrix, test 10 and test 7 passed;
+  on `06367ea`, test 8 and the page without WebRTC. Not run: 11, 15 (the
+  last release is not wire-compatible), and Safari. Its findings are the
+  items above; the startup requests it found judged by a stale buffer were
+  fixed by `67ba5c2`. The scripts it ran are in
   [demo/release-tests/](demo/release-tests/).
 - **Third run of Part 1, 10–12 October 2026, complete**, for the
   request-based urgency. Every test passed in Chrome; the stream matrix,
