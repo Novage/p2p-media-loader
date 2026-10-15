@@ -186,6 +186,7 @@ export class DashJsP2PEngine {
       core: this.core,
       onManifestProcessed: this.applyLivePlacement,
       release: this.releasePlayer,
+      reportPlayback: () => this.playback.report(),
     });
     player.extend(
       "XHRLoader",

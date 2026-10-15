@@ -34,14 +34,21 @@ function setup(loadable: boolean, extraConfig: Record<string, unknown> = {}) {
     loader: FakeDefaultLoader,
     ...extraConfig,
   } as unknown as HlsConfig;
-  const loader = new FragmentLoaderBase(config, core as unknown as Core);
+  const order: string[] = [];
+  core.loadSegment.mockImplementation(() => {
+    order.push("request");
+    return Promise.resolve({ data, bandwidth: 8_000_000 });
+  });
+  const loader = new FragmentLoaderBase(config, core as unknown as Core, () =>
+    order.push("report"),
+  );
   const callbacks = {
     onSuccess: vi.fn(),
     onError: vi.fn(),
     onProgress: vi.fn(),
     onAbort: vi.fn(),
   } as unknown as LoaderCallbacks<LoaderContext>;
-  return { core, loader, callbacks, data };
+  return { core, loader, callbacks, data, order };
 }
 
 const context = (rangeStart?: number, rangeEnd?: number) =>
@@ -69,6 +76,22 @@ describe("HLS.js fragment loader", () => {
     // to HLS.js as it is — which is free to transfer it to its worker. The
     // core's guarantee is covered by its own tests.
     expect(response.data).toBe(data);
+  });
+
+  it("reports the player's buffer just before it asks the core", () => {
+    // HLS.js asks right after it appends a fragment; no media element event
+    // has told the core of that append.
+    const { loader, callbacks, order } = setup(true);
+    loader.load(context(), loaderConfig, callbacks);
+
+    expect(order).toEqual(["report", "request"]);
+  });
+
+  it("reports nothing for a fragment it leaves to HLS.js", () => {
+    const { loader, callbacks, order } = setup(false);
+    loader.load(context(), loaderConfig, callbacks);
+
+    expect(order).toEqual([]);
   });
 
   it("passes a fragment without a range as a plain URL", () => {

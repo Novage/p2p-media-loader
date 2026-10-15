@@ -88,6 +88,20 @@ The tests themselves are in
   HTTP work evenly (294 and 284 segments) and made no backup fetch. It may
   need conditions that test did not have: more than two peers, clocks that
   differ between machines, or a network that delays one peer's MPD refreshes.
+- **A playhead just before the first buffered range counts as no buffer.**
+  `getBufferAhead` takes only the range that contains the playhead. At the
+  start of the MPEG-TS mux VOD in HLS.js, the first range began 13 ms after
+  the playhead, so while the player was paused before it started, the core
+  counted 0 s where 10 s was buffered; HLS.js moves the playhead into the
+  range at `play()`. In 40 s of sampling every 50 ms, only 2 of 777 samples
+  had the playhead outside every range, both at startup, and no tab (HLS.js
+  VOD and live, Shaka on bbb) had more than one range. The first one or two
+  requests are then urgent, which they mostly are anyway; the result changes
+  only when one segment is longer than the urgency threshold. If a player
+  shows small gaps between ranges during playback, the fix is to accept a
+  playhead up to 0.1 s before a range and to join ranges 0.1 s or less
+  apart: HLS.js jumps such gaps (`maxBufferHole`), and Shaka and dash.js
+  jump larger ones.
 
 ## Explained: not a defect in P2P Media Loader
 

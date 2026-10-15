@@ -27,14 +27,26 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   #createDefaultLoader: () => Loader<LoaderContext>;
   #defaultLoader?: Loader<LoaderContext>;
   #core: Core;
+  readonly #reportPlayback: () => void;
   #response?: SegmentResponse;
   #request?: { url: string; byteRange?: ByteRange };
   readonly #ofAnotherPlayer: boolean;
 
   readonly #diagnosticsToken = diagnostics?.open("HlsFragmentLoader");
 
-  constructor(config: HlsConfig, core: Core) {
+  /**
+   * @param reportPlayback - Reports the player's buffer to the core now. Called
+   * just before each segment request: HLS.js asks for the next fragment right
+   * after it appends one, and no media element event has reported the
+   * append yet.
+   */
+  constructor(
+    config: HlsConfig,
+    core: Core,
+    reportPlayback: () => void = () => undefined,
+  ) {
     this.#core = core;
+    this.#reportPlayback = reportPlayback;
     this.#ofAnotherPlayer = isSecondaryPlayer(config);
     this.#createDefaultLoader = () => new config.loader(config);
     this.stats = {
@@ -127,6 +139,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       this.#handleError(error);
     };
 
+    this.#reportPlayback();
     this.#core.loadSegment(context.url, { byteRange }).then(onSuccess, onError);
   }
 

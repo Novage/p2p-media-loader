@@ -643,13 +643,13 @@ export class HlsJsP2PEngine {
   };
 
   private createFragmentLoaderClass() {
-    const { core } = this;
+    const { core, playback } = this;
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const engine = this;
 
     return class FragmentLoader extends FragmentLoaderBase {
       constructor(config: HlsConfig) {
-        super(config, core);
+        super(config, core, () => playback.report());
       }
 
       static getEngine() {

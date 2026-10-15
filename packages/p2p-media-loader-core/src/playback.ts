@@ -106,6 +106,14 @@ export type MediaElementPlaybackTracker = {
    * a new one.
    */
   watch(media: HTMLMediaElement | undefined): void;
+  /**
+   * Reports the watched element's playback now; nothing when none is
+   * watched. An adapter calls this just before it hands a segment request
+   * to the core. A player asks for the next segment right after it appends
+   * one, and no media element event reports an append, so without it the
+   * core would judge the request by a buffer one segment short.
+   */
+  report(): void;
   /** Stops watching. Safe to call more than once. */
   stop(): void;
 };
@@ -148,5 +156,11 @@ export function trackMediaElementPlayback(
     watchToken = diagnostics?.open("MediaElementWatch");
   };
 
-  return { watch, stop: () => watch(undefined) };
+  return {
+    watch,
+    report: () => {
+      if (watched) report(getPlaybackStateFromMediaElement(watched));
+    },
+    stop: () => watch(undefined),
+  };
 }

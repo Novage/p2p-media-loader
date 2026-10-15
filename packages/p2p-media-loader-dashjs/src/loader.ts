@@ -31,6 +31,12 @@ export type LoaderBinding = {
    * gives back what it wrote to the player before the new one reads it.
    */
   release?: () => void;
+  /**
+   * Reports the player's buffer to the core now. Called just before each
+   * segment request: dash.js asks for the next segment right after it
+   * appends one, and no media element event has reported the append yet.
+   */
+  reportPlayback?: () => void;
 };
 
 const SEGMENT_TYPES: ReadonlySet<string> = new Set([
@@ -172,6 +178,7 @@ export class RequestRouter {
         type === REQUEST_TYPE.MEDIA_SEGMENT &&
         core.isSegmentLoadable(url, byteRange)
       ) {
+        binding.reportPlayback?.();
         this.serve(core, request, response, byteRange);
         return true;
       }

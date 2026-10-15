@@ -84,9 +84,16 @@ function setup(options: { loadable?: boolean; index?: boolean } = {}) {
     abort: vi.fn(),
   };
   const onManifestProcessed = vi.fn();
+  /** What the loader did, in order: report the buffer, request a segment. */
+  const order: string[] = [];
+  core.loadSegment.mockImplementation(() => {
+    order.push("request");
+    return Promise.resolve({ data: segmentData, bandwidth: 8_000_000 });
+  });
   const binding = {
     core: core as unknown as Core,
     onManifestProcessed,
+    reportPlayback: () => order.push("report"),
   };
   // The engine bound to the player, looked up per request: undefined stands
   // for an engine that has let the player go.
@@ -106,6 +113,7 @@ function setup(options: { loadable?: boolean; index?: boolean } = {}) {
     segmentData,
     onManifestProcessed,
     unbind,
+    order,
   };
 }
 
@@ -196,6 +204,28 @@ describe("dash.js XHRLoader extension", () => {
     loader.load(request, response);
 
     expect(onManifestProcessed).toHaveBeenCalledWith(processedIndex);
+  });
+
+  it("reports the player's buffer just before it asks the core for a segment", () => {
+    // dash.js asks right after it appends a segment; no media element event
+    // has told the core of that append.
+    const { loader, order } = setup({ loadable: true });
+    const { request, response } = makeRequest("MediaSegment", SEGMENT_URL, {
+      Range: "bytes=0-699",
+    });
+    loader.load(request, response);
+
+    expect(order).toEqual(["report", "request"]);
+  });
+
+  it("reports nothing for a segment it leaves to dash.js", () => {
+    const { loader, order } = setup({ loadable: false });
+    const { request, response } = makeRequest("MediaSegment", SEGMENT_URL, {
+      Range: "bytes=0-699",
+    });
+    loader.load(request, response);
+
+    expect(order).toEqual([]);
   });
 
   it("serves a known media segment through the core with a download-time trace dash.js can measure", async () => {

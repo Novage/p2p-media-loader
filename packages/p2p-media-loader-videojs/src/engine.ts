@@ -248,6 +248,7 @@ export class VideoJsP2PEngine {
       player,
       this.videojs,
       this.placement.update,
+      () => this.playback.report(),
     );
     registry.add(this.router);
     this.retainedXhr = firstManifestHooks.retain(this.videojs);

@@ -123,6 +123,31 @@ describe("trackMediaElementPlayback", () => {
     expect(reported).toEqual(Array<number>(8).fill(15));
   });
 
+  it("reports the buffer now on request, with no event for it", () => {
+    // The player appended a segment and asks for the next one; no event has
+    // reported the append.
+    const { media } = fakeMedia();
+    const reported: number[] = [];
+    const tracker = trackMediaElementPlayback((state) =>
+      reported.push(state.bufferAhead),
+    );
+    tracker.report();
+    expect(reported).toEqual([]);
+
+    tracker.watch(media);
+    (media as { buffered: TimeRanges }).buffered = {
+      length: 1,
+      start: () => 0,
+      end: () => 35,
+    } as TimeRanges;
+    tracker.report();
+    expect(reported).toEqual([25]);
+
+    tracker.stop();
+    tracker.report();
+    expect(reported).toEqual([25]);
+  });
+
   it("stops reporting, and stops twice without complaint", () => {
     const { media, fire, count } = fakeMedia();
     const report = vi.fn();

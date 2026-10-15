@@ -33,6 +33,7 @@ export class Loader {
     private readonly onManifestProcessed?: (
       manifest: ProcessedManifest,
     ) => void,
+    private readonly reportPlayback: () => void = () => undefined,
   ) {
     this.source = currentSource();
   }
@@ -139,6 +140,7 @@ export class Loader {
     let aborted = false;
     const loadSegment = async (): Promise<Response> => {
       try {
+        this.reportPlayback();
         const { data, bandwidth } = await this.core.loadSegment(segmentUrl, {
           byteRange,
         });

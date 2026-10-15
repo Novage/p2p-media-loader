@@ -88,12 +88,19 @@ function setup(loadable = true, fetchSupported = true) {
   /** The presentation playing now, as the engine reports it. */
   let source: object | undefined = {};
   /** As Shaka does, a loader per request — built when the request is sent. */
+  /** What the loader did, in order: report the buffer, request a segment. */
+  const order: string[] = [];
+  core.loadSegment.mockImplementation(() => {
+    order.push("request");
+    return Promise.resolve({ data, bandwidth: 1_000_000 });
+  });
   const makeLoader = () =>
     new Loader(
       shaka,
       core as unknown as Core,
       () => source,
       onManifestProcessed,
+      () => order.push("report"),
     );
   const loader = makeLoader();
   /** The engine letting the player go. */
@@ -115,6 +122,7 @@ function setup(loadable = true, fetchSupported = true) {
     data,
     processed,
     onManifestProcessed,
+    order,
   };
 }
 
@@ -275,6 +283,15 @@ describe("Shaka loading handler", () => {
     expect(parse).not.toHaveBeenCalled();
     expect(response.data).toBe(data);
     expect(response.uri).toBe(url);
+  });
+
+  it("reports the player's buffer just before it asks the core for a segment", async () => {
+    // Shaka asks right after it appends a segment; no media element event
+    // has told the core of that append.
+    const { loader, order } = setup(true);
+    await loader.load(url, request(), RequestType.SEGMENT).promise;
+
+    expect(order).toEqual(["report", "request"]);
   });
 
   it("tells Shaka a download time in milliseconds derived from the core's bandwidth hint, never 0", async () => {

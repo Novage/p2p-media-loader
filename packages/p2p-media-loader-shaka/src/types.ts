@@ -24,6 +24,12 @@ export type P2PMLShakaData = {
    * the next load rather than the one that fetched it.
    */
   onManifestProcessed: (manifest: ProcessedManifest) => void;
+  /**
+   * Reports the player's buffer to the core now. Called just before each
+   * segment request: Shaka asks for the next segment right after it appends
+   * one, and no media element event has reported the append yet.
+   */
+  reportPlayback: () => void;
 };
 
 export type HookedRequest = shaka.extern.Request & {

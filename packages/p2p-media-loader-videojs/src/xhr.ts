@@ -201,6 +201,12 @@ export class RequestRouter {
     private readonly onManifestProcessed?: (
       manifest: ProcessedManifest,
     ) => void,
+    /**
+     * Reports the player's buffer to the core now. Called just before each
+     * segment request: VHS asks for the next segment right after it appends
+     * one, and no media element event has reported the append yet.
+     */
+    private readonly reportPlayback: () => void = () => undefined,
   ) {}
 
   /** Puts this player's hooks on the xhr function of its current VHS handler. */
@@ -437,7 +443,13 @@ export class RequestRouter {
     if (!this.core.isSegmentLoadable(uri, byteRange)) return options;
     return {
       ...options,
-      xhr: new ServedRequest(this.core, uri, byteRange, this.bandwidth),
+      xhr: new ServedRequest(
+        this.core,
+        uri,
+        byteRange,
+        this.bandwidth,
+        this.reportPlayback,
+      ),
     };
   };
 
@@ -599,17 +611,20 @@ class ServedRequest implements VhsRequest {
   readonly #url: string;
   readonly #byteRange: ByteRange;
   readonly #estimate: () => number | undefined;
+  readonly #reportPlayback: () => void;
 
   constructor(
     core: Core,
     url: string,
     byteRange: ByteRange,
     estimate: () => number | undefined,
+    reportPlayback: () => void,
   ) {
     this.#core = core;
     this.#url = url;
     this.#byteRange = byteRange;
     this.#estimate = estimate;
+    this.#reportPlayback = reportPlayback;
   }
 
   /**
@@ -643,6 +658,7 @@ class ServedRequest implements VhsRequest {
   send() {
     if (this.sent) return;
     this.sent = true;
+    this.#reportPlayback();
     this.#core
       .loadSegment(this.#url, { byteRange: this.#byteRange })
       .then(({ data, bandwidth }) => {

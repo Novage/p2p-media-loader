@@ -296,6 +296,9 @@ export class ShakaP2PEngine {
           currentSource: () =>
             this.bound === bound ? bound?.source : undefined,
           onManifestProcessed: (manifest) => bound?.sizeFrom(manifest),
+          reportPlayback: () => {
+            if (this.bound === bound) this.playback.report();
+          },
         };
         this.requestFilter = (requestType, request) => {
           (request as HookedRequest).p2pml = p2pml;
@@ -421,6 +424,7 @@ export class ShakaP2PEngine {
         p2pml.core,
         p2pml.currentSource,
         p2pml.onManifestProcessed,
+        p2pml.reportPlayback,
       );
       return loader.load(...args);
     };

@@ -79,6 +79,14 @@ Without it, a frozen report of a full buffer would keep a request waiting for
 a buffer that is long gone. A paused report (`rate` 0) does not age: a paused
 player consumes nothing. The next report replaces it.
 
+The age of a report does not cover what the player added since. While it fills
+its buffer, a player asks for the next segment right after it appends one, and
+no media element event reports an append; a paused player sends no
+`timeupdate` at all. So each browser adapter also reports just before it hands
+a segment request to the core (`MediaElementPlaybackTracker.report`). Without
+that, the core would judge each request of the fill with about one segment too
+little, and call urgent a request that is not.
+
 ### One buffer for all streams
 
 `bufferAhead` is one number, and a presentation with separate audio has two

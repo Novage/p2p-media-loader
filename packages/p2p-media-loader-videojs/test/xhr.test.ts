@@ -242,12 +242,25 @@ function setup(options: { loadable?: boolean; index?: boolean } = {}) {
     destroy: vi.fn(),
   };
 
+  /** What the router did, in order: report the buffer, request a segment. */
+  const order: string[] = [];
+  core.loadSegment.mockImplementation(() => {
+    order.push("request");
+    return Promise.resolve({ data: segmentData, bandwidth: 8_000_000 });
+  });
   const registry = new RouterRegistry();
-  const router = new RequestRouter(core as unknown as Core, player, videojs);
+  const router = new RequestRouter(
+    core as unknown as Core,
+    player,
+    videojs,
+    undefined,
+    () => order.push("report"),
+  );
   registry.add(router);
   const hooks = new FirstManifestHooks(registry);
 
   return {
+    order,
     router,
     registry,
     hooks,
@@ -499,6 +512,22 @@ describe("a player's own VHS hooks", () => {
     request({ uri: MEDIA, requestType: "hls-playlist" });
     respond(404, "not found");
     expect(core.processManifest).toHaveBeenCalledTimes(3);
+  });
+
+  it("reports the player's buffer just before it asks the core for a segment", async () => {
+    // VHS asks right after it appends a segment; no media element event has
+    // told the core of that append.
+    const { router, request, order } = setup({ loadable: true });
+    router.ensureTopLevelManifest();
+    request({
+      uri: SEGMENT,
+      requestType: "segment",
+      responseType: "arraybuffer",
+      headers: { Range: "bytes=0-699" },
+    });
+    await flush();
+
+    expect(order).toEqual(["report", "request"]);
   });
 
   it("serves a known segment through the core and keeps the bandwidth it reports", async () => {

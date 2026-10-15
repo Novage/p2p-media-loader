@@ -144,8 +144,11 @@ if (core.isSegmentLoadable(url, byteRange)) {
 Playback is reported as `{ bufferAhead, rate }` through `core.updatePlayback`,
 and every integration must report it.
 `trackMediaElementPlayback((state) => core.updatePlayback(state)).watch(media)`
-reports it from a media element after every event that can change it.
-`getPlaybackStateFromMediaElement(media)` gives one state. The core uses the
+reports it from a media element after every event that can change it. Call
+the tracker's `report()` just before each `core.loadSegment`: a player asks
+for the next segment right after it appends one, and no media element event
+reports that append. `getPlaybackStateFromMediaElement(media)` gives one
+state. The core uses the
 buffer to decide whether each request is urgent. It takes a player that has not
 reported as one with nothing buffered, so an integration that never reports
 still plays, but fetches over HTTP every segment the storage cannot serve (see
