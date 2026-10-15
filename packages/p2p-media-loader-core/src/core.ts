@@ -68,14 +68,29 @@ import { SegmentStorage } from "./segment-storage/index.js";
 import { WebTorrentSocketPool } from "./webtorrent/webtorrent-socket-pool/index.js";
 
 /**
- * Config keys a major release renamed, with their new names. The config merge
- * keeps only known keys, so an old one would vanish without a word; a caller
- * in plain JavaScript, or with a config object that is not a literal, gets no
- * compile error for it. Each is reported instead, and never carried over:
- * the meaning of a renamed key can change with it.
+ * Config keys a major release renamed or removed, each with its counter and
+ * the reason it is ignored. The config merge keeps only known keys, so an old
+ * one would vanish without a word; a caller in plain JavaScript, or with a
+ * config object that is not a literal, gets no compile error for it. Each is
+ * reported instead, and never carried over: the meaning of a renamed key can
+ * change with it.
  */
-const RENAMED_CONFIG_KEYS: Readonly<Record<string, string>> = {
-  highDemandTimeWindow: "urgentBufferThreshold",
+const OBSOLETE_CONFIG_KEYS: Readonly<
+  Record<
+    string,
+    { counter: "Config:renamed-key" | "Config:removed-key"; reason: string }
+  >
+> = {
+  highDemandTimeWindow: {
+    counter: "Config:renamed-key",
+    reason:
+      'it is renamed "urgentBufferThreshold", and its meaning changed. Choose a value for "urgentBufferThreshold"',
+  },
+  validateHTTPSegment: {
+    counter: "Config:removed-key",
+    reason:
+      "it is removed. HTTP is trusted. A download that holds a peer's bytes is validated with validateP2PSegment, whichever source finishes it",
+  },
 };
 
 /** Core class for managing media streams loading via P2P. */
@@ -126,7 +141,6 @@ export class Core {
       ],
     },
     validateP2PSegment: undefined,
-    validateHTTPSegment: undefined,
     httpRequestSetup: undefined,
     swarmId: undefined,
     streamSwarmIdBuilder: undefined,
@@ -172,8 +186,8 @@ export class Core {
   private readonly webTorrentSocketPool = new WebTorrentSocketPool();
   /** Whether the missing WebRTC has been logged and counted already. */
   private webRtcMissingReported = false;
-  /** The renamed config keys this core has reported, each once. */
-  private readonly reportedRenamedKeys = new Set<string>();
+  /** The renamed or removed config keys this core has reported, each once. */
+  private readonly reportedObsoleteKeys = new Set<string>();
   private readonly logger = debug("p2pml-core:core");
   private readonly socketPoolLogger = debug(
     "p2pml-core:webtorrent-socket-pool",
@@ -233,7 +247,7 @@ export class Core {
    * const core = new Core();
    */
   constructor(config?: Partial<CoreConfig>) {
-    this.reportRenamedConfigKeys(config);
+    this.reportObsoleteConfigKeys(config);
     const filteredConfig = filterUndefinedProps(config ?? {});
 
     this.commonCoreConfig = mergeAndFilterConfig<CommonCoreConfig>({
@@ -306,7 +320,7 @@ export class Core {
    * core.applyDynamicConfig(dynamicConfig);
    */
   applyDynamicConfig(dynamicConfig: DynamicCoreConfig) {
-    this.reportRenamedConfigKeys(dynamicConfig);
+    this.reportObsoleteConfigKeys(dynamicConfig);
     const { mainStream, secondaryStream } = dynamicConfig;
 
     const mainStreamConfigCopy = deepCopy(this.mainStreamConfig);
@@ -327,11 +341,12 @@ export class Core {
   }
 
   /**
-   * Warns once for each renamed key a config still names, at its top level
-   * or in `mainStream` or `secondaryStream`: the key is ignored, and the
-   * integrator has to choose a value for the new one.
+   * Warns once for each renamed or removed key a config still names, at its
+   * top level or in `mainStream` or `secondaryStream`: the key is ignored.
+   * For a renamed key the integrator has to choose a value for the new one;
+   * for a removed one, the warning says what replaces it.
    */
-  private reportRenamedConfigKeys(config: unknown) {
+  private reportObsoleteConfigKeys(config: unknown) {
     if (typeof config !== "object" || config === null) return;
     const levels = [config as Record<string, unknown>];
     for (const key of ["mainStream", "secondaryStream"]) {
@@ -341,16 +356,16 @@ export class Core {
       }
     }
     for (const level of levels) {
-      for (const oldKey of Object.keys(RENAMED_CONFIG_KEYS)) {
-        if (!(oldKey in level) || this.reportedRenamedKeys.has(oldKey)) {
+      for (const oldKey of Object.keys(OBSOLETE_CONFIG_KEYS)) {
+        if (!(oldKey in level) || this.reportedObsoleteKeys.has(oldKey)) {
           continue;
         }
-        const newKey = RENAMED_CONFIG_KEYS[oldKey];
-        this.reportedRenamedKeys.add(oldKey);
-        diagnostics?.count("Config:renamed-key");
+        const { counter, reason } = OBSOLETE_CONFIG_KEYS[oldKey];
+        this.reportedObsoleteKeys.add(oldKey);
+        diagnostics?.count(counter);
         // eslint-disable-next-line no-console
         console.warn(
-          `[p2p-media-loader] The config key "${oldKey}" is ignored: it is renamed "${newKey}", and its meaning changed. Choose a value for "${newKey}"; see https://github.com/Novage/p2p-media-loader/blob/main/MIGRATION.md`,
+          `[p2p-media-loader] The config key "${oldKey}" is ignored: ${reason}; see https://github.com/Novage/p2p-media-loader/blob/main/MIGRATION.md`,
         );
       }
     }

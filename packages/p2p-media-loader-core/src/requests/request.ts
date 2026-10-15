@@ -4,6 +4,7 @@ import { BandwidthCalculators, SegmentWithStream } from "../internal-types.js";
 import type { BandwidthDownload } from "../bandwidth-calculator.js";
 import {
   CoreEventMap,
+  PeerErrorType,
   RequestError,
   RequestAbortErrorType,
   RequestErrorType,
@@ -28,9 +29,20 @@ export type LoadProgress = {
  */
 export type AttemptTag = "peer-after-http-failure";
 
+/**
+ * Why a peer's data was found wrong: its segment failed `validateP2PSegment`,
+ * or its size was contradicted. The peer is closed with this error type.
+ */
+export type PeerDataFault = Extract<
+  PeerErrorType,
+  "validation-failed" | "bytes-length-mismatch"
+>;
+
 type HttpRequestAttempt = {
   downloadSource: "http";
   tag?: AttemptTag;
+  /** Completes from the bytes held, with no network request. */
+  fromHeldBytes?: true;
   error?: RequestError;
 };
 
@@ -38,6 +50,8 @@ type P2PRequestAttempt = {
   downloadSource: "p2p";
   peerId: string;
   tag?: AttemptTag;
+  /** Completes from the bytes held, with no network request. */
+  fromHeldBytes?: true;
   error?: RequestError;
 };
 
@@ -55,13 +69,35 @@ export type RequestControls = Readonly<{
 
 type OmitEncapsulated<T extends RequestAttempt> = Omit<
   T,
-  "error" | "errorTimestamp" | "tag"
+  "error" | "errorTimestamp"
 >;
 type StartRequestParameters =
   OmitEncapsulated<HttpRequestAttempt> | OmitEncapsulated<P2PRequestAttempt>;
 
 export type RequestStatus =
   "not-started" | "loading" | "succeed" | "failed" | "aborted";
+
+/**
+ * Whether an HTTP attempt failed because of a peer's bytes or size that it
+ * went on from, not because of the origin.
+ */
+export function failedOnPeerData(attempt: {
+  readonly error: { readonly type: string };
+}): boolean {
+  return (
+    attempt.error.type === "p2p-segment-validation-failed" ||
+    attempt.error.type === "p2p-segment-size-mismatch"
+  );
+}
+
+/**
+ * The size of a segment with a byte range. Without one the size is unknown
+ * until a response gives it.
+ */
+function sizeFromByteRange(segment: SegmentWithStream): number | undefined {
+  const { byteRange } = segment;
+  return byteRange ? byteRange.end - byteRange.start + 1 : undefined;
+}
 
 function mapSegmentWithStreamToSegment(segment: SegmentWithStream): Segment {
   return {
@@ -80,7 +116,25 @@ export class Request {
   private finalData?: ArrayBuffer;
   private bytes: Uint8Array[] = [];
   private _loadedBytes = 0;
+  /**
+   * The peers whose bytes are held, by id. Bytes from HTTP, a trusted source,
+   * are not listed.
+   */
+  private readonly bytesFromPeers = new Set<string>();
+  /**
+   * The latest peer that sent some of the bytes held. HTTP bytes do not
+   * change it, on purpose: a download that holds a peer's bytes is that
+   * peer's, however many HTTP bytes follow, and completes and is validated
+   * as the peer's (see `tryCompleteByLoadedBytes`).
+   */
+  private latestPeerWithBytes?: string;
   private _totalBytes?: number;
+  /**
+   * The peer whose message gave `_totalBytes`; `undefined` where the size
+   * came from the segment's byte range or from HTTP, both trusted, or is not
+   * known.
+   */
+  private totalBytesPeer?: string;
   private _status: RequestStatus = "not-started";
   private progress?: LoadProgress;
   /** The attempt under way, as the shared bandwidth calculators measure it. */
@@ -113,11 +167,7 @@ export class Request {
     this.onSegmentStart = eventTarget.getEventDispatcher("onSegmentStart");
     this.onSegmentLoaded = eventTarget.getEventDispatcher("onSegmentLoaded");
 
-    const { byteRange } = this.segment;
-    if (byteRange) {
-      const { end, start } = byteRange;
-      this._totalBytes = end - start + 1;
-    }
+    this._totalBytes = sizeFromByteRange(this.segment);
     this.notReceivingBytesTimeout = new Timeout(this.abortOnTimeout);
 
     const { type } = this.segment.stream;
@@ -125,10 +175,55 @@ export class Request {
   }
 
   clearLoadedBytes() {
+    this.endKept("cleared");
     this._loadedBytes = 0;
     this.bytes = [];
-    this._totalBytes = undefined;
+    this.bytesFromPeers.clear();
+    this.latestPeerWithBytes = undefined;
+    // A segment's byte range gives its size whatever bytes are held; without
+    // it, every later HTTP attempt would fail its Content-Range check.
+    this._totalBytes = sizeFromByteRange(this.segment);
+    this.totalBytesPeer = undefined;
     this.finalData = undefined;
+  }
+
+  /**
+   * The peer this download belongs to: the one whose bytes it holds. Bytes
+   * from HTTP are trusted and give it no owner. `undefined` also where bytes
+   * from more than one peer are held, which happens only when nothing
+   * validates peers' bytes (see `dropBytesFromOtherPeers`).
+   */
+  get peerOwner(): string | undefined {
+    if (this.bytesFromPeers.size !== 1) return undefined;
+    return this.bytesFromPeers.values().next().value;
+  }
+
+  /** Whether a peer sent some of the bytes held. */
+  get hasBytesFromPeers(): boolean {
+    return this.bytesFromPeers.size > 0;
+  }
+
+  /** Whether `peerId` sent some of the bytes held. */
+  hasBytesFrom(peerId: string): boolean {
+    return this.bytesFromPeers.has(peerId);
+  }
+
+  /**
+   * Clears the bytes held if any of them came from a peer other than
+   * `peerId`, which is about to go on with the download. A download belongs
+   * to the peer whose bytes it holds, and the validation of the whole
+   * segment blames that peer: its connection is closed. So a peer must not
+   * go on from another peer's bytes. Bytes from HTTP are trusted and kept.
+   */
+  dropBytesFromOtherPeers(peerId: string) {
+    for (const from of this.bytesFromPeers) {
+      if (from === peerId) continue;
+      this.logger(
+        `${this.segment.externalId}: ${this._loadedBytes} bytes dropped, some from peer ${from}; peer ${peerId} validates the whole segment`,
+      );
+      this.clearLoadedBytes();
+      return;
+    }
   }
 
   get status() {
@@ -137,6 +232,55 @@ export class Request {
 
   /** The download attempt under way: open from `loading` until it settles. */
   private downloadToken?: DiagnosticsToken;
+  /**
+   * Stopped with bytes in hand and kept to go on from them: its bytes are
+   * held outside the segment storage until it is resumed, its bytes are
+   * cleared, or it is let go.
+   */
+  private kept = false;
+  private keptToken?: DiagnosticsToken;
+
+  /**
+   * Keeps this stopped request to go on from its bytes.
+   *
+   * @returns Whether it was not kept before.
+   */
+  keep(): boolean {
+    if (this.kept) return false;
+    this.kept = true;
+    this.keptToken = diagnostics?.open(
+      "PartialRequest",
+      String(this.segment.externalId),
+    );
+    return true;
+  }
+
+  /**
+   * Ends what `keep` started, and says how: resumed by a new attempt, its
+   * bytes cleared, let go as its segment left the queue or as more were kept
+   * than there are slots, or destroyed with its loader.
+   */
+  endKept(
+    cause:
+      "resumed" | "cleared" | "left-queue" | "dropped-over-limit" | "destroyed",
+  ) {
+    if (!this.kept) return;
+    this.kept = false;
+    diagnostics?.close(this.keptToken, cause);
+    this.keptToken = undefined;
+    if (cause !== "destroyed") diagnostics?.count(`PartialRequest:${cause}`);
+  }
+
+  /**
+   * Whether the attempt under way completes from the bytes held: it uses no
+   * link and no peer, and only waits for `validateP2PSegment`. Stopping it
+   * would only start the same validation again.
+   */
+  get isCompletingFromHeldBytes(): boolean {
+    return (
+      this._status === "loading" && this.currentAttempt?.fromHeldBytes === true
+    );
+  }
 
   /** The tag of the attempt under way, if it has one. */
   get attemptTag(): AttemptTag | undefined {
@@ -146,18 +290,6 @@ export class Request {
   /** The tag of the last attempt, under way or ended, if it has one. */
   get lastAttemptTag(): AttemptTag | undefined {
     return this.currentAttempt?.tag;
-  }
-
-  /**
-   * Tags the attempt under way with why it was started. The tag stays with
-   * the attempt: a failed attempt keeps it in `failedAttempts`.
-   */
-  tagAttempt(tag: AttemptTag) {
-    if (this._status !== "loading" || !this.currentAttempt) return;
-    this.currentAttempt.tag = tag;
-    this.logger(
-      `${this.currentAttempt.downloadSource} ${this.segment.externalId} is the ${tag} attempt`,
-    );
   }
 
   private setStatus(status: RequestStatus) {
@@ -224,16 +356,44 @@ export class Request {
     this._isHandledByProcessQueue = true;
   }
 
+  /**
+   * Sets the total size, as the attempt under way learned it: from a peer's
+   * message, or from HTTP's headers. Which one is recorded, since a size a
+   * peer gave can be wrong (`totalBytesFromPeer`).
+   */
   setTotalBytes(value: number) {
     if (this._totalBytes !== undefined) {
       throw new Error("Request total bytes value is already set");
     }
     this._totalBytes = value;
+    this.totalBytesPeer =
+      this.currentAttempt?.downloadSource === "p2p"
+        ? this.currentAttempt.peerId
+        : undefined;
+  }
+
+  /** The peer that gave the total size, if a peer did. */
+  get totalBytesFromPeer(): string | undefined {
+    return this.totalBytesPeer;
+  }
+
+  /**
+   * HTTP's answer agreed with the total size: the size is HTTP's now, and a
+   * peer that gives another one later is the one at fault.
+   */
+  confirmTotalBytes() {
+    this.totalBytesPeer = undefined;
   }
 
   /**
    * Checks if all bytes are already loaded and, if so, starts, validates,
    * and completes the request without making a network request.
+   *
+   * The attempt is the bytes' own, whichever loader calls this: HTTP's for
+   * HTTP bytes only, which are trusted and not validated; otherwise the
+   * owning peer's (the latest peer that sent bytes, where several did with
+   * nothing to validate them), validated with `validateP2PSegment`. A failure blames
+   * that peer through `onPeerBytesRejected`.
    *
    * Handles three cases:
    * - loadedBytes === totalBytes: start → validate → complete (returns true)
@@ -247,32 +407,54 @@ export class Request {
    * false if caller should proceed with a normal download.
    */
   tryCompleteByLoadedBytes(
-    requestData: StartRequestParameters,
+    tag: AttemptTag | undefined,
     controls: {
       notReceivingBytesTimeoutMs?: number;
       firstByteTimeoutMs?: number;
       onAbort: (errorType: RequestError<RequestAbortErrorType>) => void;
     },
-    validate:
+    validateP2PSegment:
       | ((
           url: string,
           byteRange: Segment["byteRange"],
           data: ArrayBuffer,
         ) => Promise<boolean>)
       | undefined,
-    validationErrorType: RequestErrorType,
+    onPeerBytesRejected: (peerId: string, cause: PeerDataFault) => void,
   ): boolean {
     if (!this._totalBytes) return false;
 
     if (this._loadedBytes > this._totalBytes) {
       this.logger(
-        `${requestData.downloadSource} ${this.segment.externalId} loaded bytes overflow: ${this._loadedBytes} > ${this._totalBytes}, clearing`,
+        `${this.segment.externalId} loaded bytes overflow: ${this._loadedBytes} > ${this._totalBytes}, clearing`,
       );
       this.clearLoadedBytes();
       return false;
     }
 
     if (this._loadedBytes !== this._totalBytes) return false;
+
+    const peerId = this.latestPeerWithBytes;
+    const requestData: StartRequestParameters =
+      peerId === undefined
+        ? { downloadSource: "http", tag, fromHeldBytes: true }
+        : { downloadSource: "p2p", peerId, tag, fromHeldBytes: true };
+    const owner = this.peerOwner;
+    const validate =
+      peerId === undefined || validateP2PSegment === undefined
+        ? undefined
+        : async (...args: Parameters<typeof validateP2PSegment>) => {
+            let isValid: boolean;
+            try {
+              isValid = await validateP2PSegment(...args);
+            } catch {
+              isValid = false;
+            }
+            if (!isValid && owner !== undefined) {
+              onPeerBytesRejected(owner, "validation-failed");
+            }
+            return isValid;
+          };
 
     // Start synchronously so the request is immediately in "loading" status.
     const requestControls = this.start(requestData, controls);
@@ -286,7 +468,7 @@ export class Request {
         requestData.downloadSource,
         requestControls,
         validate,
-        validationErrorType,
+        "p2p-segment-validation-failed",
       );
     } else {
       requestControls.completeOnSuccess();
@@ -369,6 +551,7 @@ export class Request {
       );
     }
 
+    this.endKept("resumed");
     this.setStatus("loading");
     this.currentAttempt = { ...requestData };
     this.downloadToken = diagnostics?.open(
@@ -480,14 +663,18 @@ export class Request {
     this.handleFailure(error);
   };
 
-  private failWithError = (error: RequestError) => {
+  /**
+   * @param faultPeerId - For an HTTP attempt that failed on a peer's bytes or
+   * size it went on from: that peer, which `onSegmentError` names.
+   */
+  private failWithError = (error: RequestError, faultPeerId?: string) => {
     this.throwErrorIfNotLoadingStatus();
     if (!this.currentAttempt) return;
 
-    this.handleFailure(error);
+    this.handleFailure(error, faultPeerId);
   };
 
-  private handleFailure = (error: RequestError) => {
+  private handleFailure = (error: RequestError, faultPeerId?: string) => {
     if (!this.currentAttempt) return;
 
     this.setStatus("failed");
@@ -505,7 +692,7 @@ export class Request {
       peerId:
         this.currentAttempt.downloadSource === "p2p"
           ? this.currentAttempt.peerId
-          : undefined,
+          : faultPeerId,
       infoHash: this.infoHash,
       streamType: this.segment.stream.type,
     });
@@ -553,6 +740,10 @@ export class Request {
     }
 
     this.bytes.push(chunk);
+    if (this.currentAttempt.downloadSource === "p2p") {
+      this.bytesFromPeers.add(this.currentAttempt.peerId);
+      this.latestPeerWithBytes = this.currentAttempt.peerId;
+    }
     this.progress.lastLoadedChunkTimestamp = performance.now();
     this.progress.loadedBytes += byteLength;
     this._loadedBytes += byteLength;
@@ -598,9 +789,17 @@ class FailedRequestAttempts {
     this.attempts.push(attempt);
   }
 
+  /**
+   * The HTTP attempts that failed. One that failed on a peer's bytes or size
+   * it went on from is not counted: the fault was the peer's, and HTTP's
+   * attempts are the request's last resort.
+   */
   get httpAttemptsCount() {
     return this.attempts.reduce(
-      (sum, attempt) => (attempt.downloadSource === "http" ? sum + 1 : sum),
+      (sum, attempt) =>
+        attempt.downloadSource === "http" && !failedOnPeerData(attempt)
+          ? sum + 1
+          : sum,
       0,
     );
   }

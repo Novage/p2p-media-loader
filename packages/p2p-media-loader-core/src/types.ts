@@ -165,7 +165,6 @@ export type DynamicStreamProperties =
   | "httpErrorRetries"
   | "p2pErrorRetries"
   | "validateP2PSegment"
-  | "validateHTTPSegment"
   | "httpRequestSetup"
   | "isP2PDisabled"
   | "isP2PUploadDisabled"
@@ -635,6 +634,14 @@ export type StreamConfig = {
 
   /**
    * An optional function to validate a P2P segment before fully integrating it into the playback buffer.
+   *
+   * A download that holds a peer's bytes belongs to that peer, whichever
+   * source finishes it: one that HTTP goes on from is validated with this
+   * function too, and a failure closes the connection to that peer. A peer
+   * does not go on from another peer's bytes; it starts again from byte 0.
+   * HTTP is trusted: a download of HTTP bytes only is not validated, and a
+   * peer that goes on from HTTP bytes takes on the download.
+   *
    * @param url The URL of the segment to validate.
    * @param byteRange The optional byte range of the segment.
    * @param data The downloaded segment data.
@@ -646,24 +653,6 @@ export type StreamConfig = {
    * ```
    */
   validateP2PSegment?: (
-    url: string,
-    byteRange: ByteRange | undefined,
-    data: ArrayBuffer,
-  ) => Promise<boolean>;
-
-  /**
-   * An optional function to validate an HTTP segment before fully integrating it into the playback buffer.
-   * @param url The URL of the segment to validate.
-   * @param byteRange The optional byte range of the segment.
-   * @param data The downloaded segment data.
-   * @returns A promise that resolves to a boolean indicating whether the segment is valid.
-   *
-   * @default
-   * ```typescript
-   * validateHTTPSegment: undefined
-   * ```
-   */
-  validateHTTPSegment?: (
     url: string,
     byteRange: ByteRange | undefined,
     data: ArrayBuffer,
@@ -839,7 +828,10 @@ export type SegmentEventDetails = {
   /** The source of the download. */
   downloadSource: DownloadSource;
 
-  /** The peer ID, if the segment is downloaded from a peer. */
+  /**
+   * The peer the segment is downloaded from. For an HTTP attempt that failed
+   * on a peer's data (see `SegmentErrorDetails`), that peer.
+   */
   peerId: string | undefined;
 
   /** The info hash of the swarm that the segment belongs to. */
@@ -854,7 +846,15 @@ export type SegmentStartDetails = SegmentEventDetails;
 
 /** Represents details about a segment error event. */
 export type SegmentErrorDetails = SegmentEventDetails & {
-  /** The error that occurred during the segment download. */
+  /**
+   * The error that occurred during the segment download.
+   *
+   * With `downloadSource: "http"`, the type `p2p-segment-validation-failed`
+   * or `p2p-segment-size-mismatch` means that the origin is not at fault: the
+   * HTTP attempt went on from a peer's bytes, and they failed
+   * `validateP2PSegment`, or HTTP gave another size than that peer did.
+   * `peerId` names that peer, and its connection is closed.
+   */
   error: RequestError;
 };
 
@@ -1238,16 +1238,28 @@ export type CoreEventMap = {
 /** Defines the types of errors that can occur during a request abortion process. */
 export type RequestAbortErrorType = "abort" | "bytes-receiving-timeout";
 
-/** Defines the types of errors specific to HTTP requests. */
+/**
+ * Defines the types of errors specific to HTTP requests. An HTTP attempt can
+ * also fail with `p2p-segment-validation-failed` or
+ * `p2p-segment-size-mismatch`, on a peer's data it went on from; see
+ * `SegmentErrorDetails`.
+ */
 export type HttpRequestErrorType =
-  | "http-error"
-  | "http-bytes-mismatch"
-  | "http-unexpected-status-code"
-  | "http-segment-validation-failed";
+  "http-error" | "http-bytes-mismatch" | "http-unexpected-status-code";
 
 /** Defines the types of errors specific to peer-to-peer requests. */
 export type PeerRequestErrorType =
-  "peer-segment-absent" | "peer-closed" | "p2p-segment-validation-failed";
+  | "peer-segment-absent"
+  | "peer-closed"
+  | "p2p-segment-validation-failed"
+  /** HTTP gave another size than the peer whose bytes it went on from. */
+  | "p2p-segment-size-mismatch"
+  /**
+   * A peer gave another size than another peer whose bytes it went on from.
+   * Nothing tells which is right; neither is closed, and the next attempt
+   * starts at byte 0.
+   */
+  | "p2p-segment-size-conflict";
 
 /** Enumerates all possible request error types, including HTTP and peer-related errors. */
 export type RequestErrorType =

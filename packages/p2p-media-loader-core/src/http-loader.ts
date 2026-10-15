@@ -1,10 +1,6 @@
+import { CoreConfig, CoreEventMap, RequestError } from "./types.js";
 import {
-  CoreConfig,
-  CoreEventMap,
-  RequestError,
-  HttpRequestErrorType,
-} from "./types.js";
-import {
+  PeerDataFault,
   Request as SegmentRequest,
   RequestControls,
 } from "./requests/request.js";
@@ -19,11 +15,13 @@ type HttpConfig = Pick<
   | "httpNotReceivingBytesTimeoutMs"
   | "httpFirstByteTimeoutMs"
   | "httpRequestSetup"
-  | "validateHTTPSegment"
+  | "validateP2PSegment"
 >;
 
 export class HttpRequestExecutor {
   private readonly abortController = new SafeAbortController();
+  /** The peer whose bytes or size this attempt failed on, if one did. */
+  private faultPeerId?: string;
   private expectedBytesLength?: number;
   private requestByteRange?: { start: number; end?: number };
   private readonly onChunkDownloaded: CoreEventMap["onChunkDownloaded"];
@@ -37,12 +35,20 @@ export class HttpRequestExecutor {
    * `"high"` for a segment its player has requested, `"low"` for prefetch.
    * A browser without fetch priorities ignores it; a request built by
    * `httpRequestSetup` keeps its own.
+   * @param onPeerBytesRejected - Called with the peer whose bytes this
+   * download went on from, when they prove wrong, and why: the whole segment
+   * failed `validateP2PSegment`, or HTTP gave another size. The caller closes
+   * the connection to that peer with that cause.
    */
   constructor(
     private readonly request: SegmentRequest,
     private readonly httpConfig: HttpConfig,
     eventTarget: EventTarget<CoreEventMap>,
     private readonly priority: RequestPriority,
+    private readonly onPeerBytesRejected: (
+      peerId: string,
+      cause: PeerDataFault,
+    ) => void = () => undefined,
   ) {
     this.onChunkDownloaded =
       eventTarget.getEventDispatcher("onChunkDownloaded");
@@ -59,11 +65,13 @@ export class HttpRequestExecutor {
       firstByteTimeoutMs: this.httpConfig.httpFirstByteTimeoutMs,
     };
 
+    // All the bytes held: completed as the source that sent them. A peer's
+    // are validated as that peer's; a failure closes it.
     const completed = this.request.tryCompleteByLoadedBytes(
-      { downloadSource: "http" },
+      undefined,
       startControls,
-      this.httpConfig.validateHTTPSegment,
-      "http-segment-validation-failed",
+      this.httpConfig.validateP2PSegment,
+      this.onPeerBytesRejected,
     );
 
     if (completed) return;
@@ -210,6 +218,19 @@ export class HttpRequestExecutor {
       // without throwing an error. We must verify that we received the full segment.
       // If truncated, we throw without clearing loaded bytes to allow the next
       // download attempt to resume from the current offset using HTTP Range requests.
+      const sizePeer = this.request.totalBytesFromPeer;
+      if (
+        sizePeer !== undefined &&
+        this.request.totalBytes !== undefined &&
+        this.request.loadedBytes > this.request.totalBytes
+      ) {
+        // More than the size a peer gave: that peer's size was wrong.
+        throw this.rejectPeer(
+          sizePeer,
+          "p2p-segment-size-mismatch",
+          "HTTP sent more than its size",
+        );
+      }
       if (
         this.request.totalBytes !== undefined &&
         this.request.loadedBytes !== this.request.totalBytes
@@ -232,19 +253,22 @@ export class HttpRequestExecutor {
         );
       }
 
-      const isValid = await this.request.validateData(
-        this.httpConfig.validateHTTPSegment,
-      );
-
-      if (this.isAborted()) {
-        throw new DOMException("Request aborted", "AbortError");
-      }
-
-      if (!isValid) {
-        this.request.clearLoadedBytes();
-        throw new RequestError<"http-segment-validation-failed">(
-          "http-segment-validation-failed",
+      // HTTP is trusted: only a download that went on from a peer's bytes
+      // is validated, as that peer's.
+      if (this.isPeersDownload()) {
+        const isValid = await this.request.validateData(
+          this.httpConfig.validateP2PSegment,
         );
+        if (this.isAborted()) {
+          throw new DOMException("Request aborted", "AbortError");
+        }
+        if (!isValid) {
+          throw this.rejectPeer(
+            this.request.peerOwner,
+            "p2p-segment-validation-failed",
+            "the segment failed validation",
+          );
+        }
       }
 
       requestControls.completeOnSuccess();
@@ -266,6 +290,17 @@ export class HttpRequestExecutor {
   private handleResponseHeaders(response: Response) {
     if (!response.ok) {
       if (response.status === 406 || response.status === 416) {
+        const sizePeer =
+          this.request.totalBytesFromPeer ?? this.request.peerOwner;
+        if (response.status === 416 && sizePeer !== undefined) {
+          // The bytes held go past the end of the segment HTTP has: the
+          // peer that gave the size, or sent them, was wrong.
+          throw this.rejectPeer(
+            sizePeer,
+            "p2p-segment-size-mismatch",
+            "more bytes than HTTP has",
+          );
+        }
         this.request.clearLoadedBytes();
         throw new RequestError<"http-bytes-mismatch">(
           "http-bytes-mismatch",
@@ -292,43 +327,132 @@ export class HttpRequestExecutor {
           );
         }
         const contentLengthHeader = response.headers.get("Content-Length");
+        const isLengthChecked =
+          !!contentLengthHeader && this.expectedBytesLength !== undefined;
         if (
-          contentLengthHeader &&
-          this.expectedBytesLength !== undefined &&
-          this.expectedBytesLength !== +contentLengthHeader
+          isLengthChecked &&
+          this.expectedBytesLength !== Number(contentLengthHeader)
         ) {
-          this.request.clearLoadedBytes();
-          throw new RequestError("http-bytes-mismatch", response.statusText);
+          throw this.sizeMismatch(response);
         }
+        let isSizeChecked = isLengthChecked;
 
         const contentRangeHeader = response.headers.get("Content-Range");
         const contentRange = contentRangeHeader
           ? parseContentRangeHeader(contentRangeHeader)
           : undefined;
         if (contentRange) {
-          const { from, to } = contentRange;
+          const { from, to, total } = contentRange;
           const responseExpectedBytesLength =
             to !== undefined && from !== undefined ? to - from + 1 : undefined;
+          // The total is the file's: the segment's own size only where it
+          // has no byte range.
+          const isTotalChecked =
+            !this.request.segment.byteRange &&
+            total !== undefined &&
+            this.request.totalBytes !== undefined;
+          const isRangeLengthChecked =
+            responseExpectedBytesLength !== undefined &&
+            this.expectedBytesLength !== undefined;
 
           if (
-            (responseExpectedBytesLength !== undefined &&
+            (isRangeLengthChecked &&
               this.expectedBytesLength !== responseExpectedBytesLength) ||
+            (isTotalChecked && total !== this.request.totalBytes) ||
             (from !== undefined && requestByteRange.start !== from) ||
             (to !== undefined &&
               requestByteRange.end !== undefined &&
               requestByteRange.end !== to)
           ) {
-            this.request.clearLoadedBytes();
-            throw new RequestError("http-bytes-mismatch", response.statusText);
+            throw this.sizeMismatch(response);
+          }
+          isSizeChecked ||= isRangeLengthChecked || isTotalChecked;
+          // A request that goes on from bytes of unknown size learns it here,
+          // so a body cut short is still found.
+          if (total !== undefined && this.request.totalBytes === undefined) {
+            this.request.setTotalBytes(total);
           }
         }
+        // HTTP checked the size and agrees with it: the size is HTTP's now.
+        if (isSizeChecked) this.request.confirmTotalBytes();
       }
     }
 
-    if (response.status === 200 && this.request.totalBytes === undefined) {
+    if (response.status === 200) {
+      // A 200 is HTTP's whole answer, and no bytes are held by now. It drops
+      // a size a peer gave — a failed peer download can leave one behind with
+      // no bytes — and judges no peer: a peer is judged only on bytes it sent.
+      if (this.request.totalBytesFromPeer !== undefined) {
+        this.request.clearLoadedBytes();
+      }
+      // With Content-Encoding, Content-Length is the encoded length, and the
+      // body fetch gives is the decoded one: it is not the segment's size. A
+      // cross-origin response shows the header only if the server exposes it.
       const contentLengthHeader = response.headers.get("Content-Length");
-      if (contentLengthHeader) this.request.setTotalBytes(+contentLengthHeader);
+      const encoding = response.headers.get("Content-Encoding")?.trim();
+      const isEncoded = !!encoding && encoding.toLowerCase() !== "identity";
+      if (
+        contentLengthHeader &&
+        !isEncoded &&
+        this.request.totalBytes === undefined
+      ) {
+        this.request.setTotalBytes(+contentLengthHeader);
+      }
     }
+  }
+
+  /**
+   * Whether this download is a peer's: a peer sent some of the bytes held,
+   * and `validateP2PSegment` is set. It is validated as the peer's, whichever
+   * source finishes it.
+   */
+  private isPeersDownload(): boolean {
+    return (
+      this.httpConfig.validateP2PSegment !== undefined &&
+      this.request.hasBytesFromPeers
+    );
+  }
+
+  /**
+   * Clears the bytes held and tells the caller of the peer at fault. The
+   * attempt fails as that peer's fault: it does not spend one of the
+   * request's HTTP attempts.
+   */
+  private rejectPeer(
+    peerId: string | undefined,
+    type: "p2p-segment-validation-failed" | "p2p-segment-size-mismatch",
+    reason: string,
+  ) {
+    this.request.clearLoadedBytes();
+    if (peerId !== undefined) {
+      this.onPeerBytesRejected(
+        peerId,
+        type === "p2p-segment-validation-failed"
+          ? "validation-failed"
+          : "bytes-length-mismatch",
+      );
+    }
+    this.faultPeerId = peerId;
+    return new RequestError(type, `peer ${peerId ?? "?"}: ${reason}`);
+  }
+
+  /**
+   * HTTP gives another size than expected. HTTP is the truth: where a peer
+   * gave the size, that peer was wrong, with or without a validator. Where
+   * the size came from HTTP itself or from the byte range, it is HTTP's
+   * failure.
+   */
+  private sizeMismatch(response: Response) {
+    const sizePeer = this.request.totalBytesFromPeer;
+    if (sizePeer !== undefined) {
+      return this.rejectPeer(
+        sizePeer,
+        "p2p-segment-size-mismatch",
+        "HTTP has another size",
+      );
+    }
+    this.request.clearLoadedBytes();
+    return new RequestError("http-bytes-mismatch", response.statusText);
   }
 
   private handleError(error: unknown, requestControls: RequestControls) {
@@ -339,10 +463,10 @@ export class HttpRequestExecutor {
     if (error instanceof Error) {
       const httpLoaderError =
         error instanceof RequestError
-          ? (error as RequestError<HttpRequestErrorType>)
+          ? (error as RequestError)
           : new RequestError("http-error", error.message);
 
-      requestControls.failWithError(httpLoaderError);
+      requestControls.failWithError(httpLoaderError, this.faultPeerId);
     }
   }
 }

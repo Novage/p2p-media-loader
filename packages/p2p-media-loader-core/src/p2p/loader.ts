@@ -3,6 +3,7 @@ import { Peer } from "./peer.js";
 import { CoreEventMap, PeerError, StreamConfig } from "../types.js";
 import { SegmentWithStream, StreamWithSegments } from "../internal-types.js";
 import { RequestsContainer } from "../requests/request-container.js";
+import { AttemptTag, PeerDataFault } from "../requests/request.js";
 import { WebTorrentManager } from "../webtorrent/webtorrent-manager/index.js";
 import { WebTorrentSocketPool } from "../webtorrent/webtorrent-socket-pool/index.js";
 import * as StreamUtils from "../utils/stream.js";
@@ -222,8 +223,15 @@ export class P2PLoader {
     }
   };
 
-  /** @returns Whether a peer started to download `segment`. */
-  downloadSegment(segment: SegmentWithStream): boolean {
+  /**
+   * Starts downloading `segment` from a peer that has all of it and sends
+   * nothing else. `tag` says why the attempt was started.
+   *
+   * @returns Whether an attempt started. One that started can already have
+   * settled — failed, as on a channel that is closing, or succeeded from
+   * bytes held — which the request's status shows.
+   */
+  downloadSegment(segment: SegmentWithStream, tag?: AttemptTag): boolean {
     const peersWithSegment: Peer[] = [];
     for (const peer of this.#peersMap.values()) {
       if (
@@ -239,8 +247,7 @@ export class P2PLoader {
     const selectedPeer = selectPeerForDownload(peersWithSegment);
 
     const request = this.#requests.getOrCreateRequest(segment);
-    selectedPeer.downloadSegment(request);
-    return true;
+    return selectedPeer.downloadSegment(request, tag);
   }
 
   /**
@@ -498,6 +505,25 @@ export class P2PLoader {
     );
   };
 
+  /**
+   * Closes the connection to a peer whose data an HTTP download found wrong,
+   * with the same error type as when its own download finds it: its bytes
+   * failed validation, or HTTP contradicted the size it gave.
+   */
+  closePeerWithBadData(peerId: string, cause: PeerDataFault) {
+    this.#peersMap
+      .get(peerId)
+      ?.destroy(
+        false,
+        new PeerError(
+          cause,
+          cause === "validation-failed"
+            ? "Its bytes failed validation in a download HTTP finished"
+            : "HTTP contradicted the size it gave",
+        ),
+      );
+  }
+
   /** A segment of this swarm was delivered, over HTTP or P2P. */
   noteDownloadedBytes(bytes: number) {
     this.#downloadedBytes += bytes;
@@ -531,7 +557,9 @@ export class P2PLoader {
 /**
  * The segment whose download must stop so that a peer holding all of
  * `segment` can send it: none where such a peer is free, or where no peer
- * holds it; otherwise the download of the first such peer, all of them busy.
+ * holds it; otherwise, all of them busy, the download furthest ahead, as
+ * `abortFurthestDownloadFor` chooses. A nearer one is likely the next segment
+ * the player asks for, and stopped, its request could become urgent in turn.
  */
 export function segmentToStopFor(
   peers: Iterable<
@@ -546,7 +574,9 @@ export function segmentToStopFor(
     if (peer.getSegmentStatus(segment) !== "loaded") continue;
     const downloading = peer.downloadingSegment;
     if (!downloading) return undefined;
-    busySegment ??= downloading;
+    if (!busySegment || downloading.startTime > busySegment.startTime) {
+      busySegment = downloading;
+    }
   }
   return busySegment;
 }

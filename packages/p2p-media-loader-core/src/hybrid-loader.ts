@@ -13,7 +13,7 @@ import {
 import { P2PLoadersContainer } from "./p2p/loaders-container.js";
 import { RequestsContainer } from "./requests/request-container.js";
 import { EngineRequest } from "./requests/engine-request.js";
-import type { Request } from "./requests/request.js";
+import { failedOnPeerData, type Request } from "./requests/request.js";
 import * as QueueUtils from "./utils/queue.js";
 import * as LoggerUtils from "./utils/logger.js";
 import * as Utils from "./utils/utils.js";
@@ -57,6 +57,10 @@ export class HybridLoader {
   private readonly segmentBytesByStream = new Map<string, number>();
   private initialHttpDelayTimeoutId?: number;
   private isProcessQueueMicrotaskCreated = false;
+  /** A pass scheduled by `requestProcessQueueMicrotask` is running. */
+  private isPassRunning = false;
+  /** A request settled during the running pass: one more pass follows. */
+  private isPassRequestedDuringPass = false;
   /** The urgency threshold last logged, so the log says when it moves. */
   private loggedThreshold?: { threshold: number; source: string };
   private destroyed = false;
@@ -66,11 +70,6 @@ export class HybridLoader {
    */
   private readingFromStorage?: EngineRequest;
   private readonly createdAt = performance.now();
-  /**
-   * The engine request that was not urgent when it arrived, while it waits:
-   * counted once more if it becomes urgent before it is served.
-   */
-  private waitingNotUrgent?: EngineRequest;
   /** Downloads a yield left to finish, so that each is counted once. */
   private readonly keptForUrgent = new WeakSet<Request>();
 
@@ -241,10 +240,14 @@ export class HybridLoader {
 
       this.judgeUrgencyOnArrival(engineRequest);
 
-      // If the engine explicitly requests a segment that previously failed during
-      // background pre-fetching, clear its error history so it can be retried.
+      // The player's request starts with no failed attempts, whatever the
+      // prefetch did: its failures would leave it fewer HTTP attempts, or
+      // none, and no P2P attempt — a kept request is never rejected, so the
+      // player would wait for them to expire, and one still loading would be
+      // rejected as soon as it failed. The attempt under way is not among
+      // them, and its tag stays with it.
       const request = this.requests.get(segment);
-      if (request?.status === "failed") {
+      if (request) {
         request.failedAttempts.clear();
       }
     } catch (error) {
@@ -261,6 +264,14 @@ export class HybridLoader {
 
   private requestProcessQueueMicrotask = (force = true) => {
     if (this.destroyed) return;
+    if (this.isPassRunning) {
+      // A request settled during the pass — a peer that completes or fails
+      // a download at once. The pass handled the settled requests before
+      // it started that download, so the request would wait for some other
+      // event to start a pass: one more pass follows this one.
+      if (force) this.isPassRequestedDuringPass = true;
+      return;
+    }
     const now = performance.now();
     if (
       (!force &&
@@ -270,22 +281,57 @@ export class HybridLoader {
     ) {
       return;
     }
+    this.schedulePass(false);
+  };
 
+  /**
+   * Runs a pass in a microtask. A request that settles during it gets one
+   * more pass, but a pass run for that reason gets none: a peer whose channel
+   * is closing can fail a download in every pass, and passes that each ask
+   * for the next would block the page. A request that succeeded, and that no
+   * pass has handled, always gets one: the player may be waiting for it, and
+   * successes cannot repeat without end, since a pass stores and removes
+   * each one.
+   */
+  private schedulePass(isAfterPass: boolean) {
     this.isProcessQueueMicrotaskCreated = true;
+    const now = performance.now();
     Utils.queueMicrotask(() => {
+      let isPassRequested: boolean;
       try {
         // A request settling schedules a pass; an adapter tearing the core
         // down in the same task destroys this loader before it runs. The
         // pass would otherwise reach a storage and P2P loaders already torn
         // down — an integrator's storage that released its backend throws.
         if (this.destroyed) return;
+        this.isPassRunning = true;
         this.processQueue();
         this.lastQueueProcessingTimeStamp = now;
       } finally {
+        this.isPassRunning = false;
         this.isProcessQueueMicrotaskCreated = false;
+        isPassRequested = this.isPassRequestedDuringPass;
+        this.isPassRequestedDuringPass = false;
       }
+      if (!isPassRequested) return;
+      if (isAfterPass && !this.hasUnhandledSuccess()) {
+        diagnostics?.count("QueuePass:after-settle:limited");
+        return;
+      }
+      diagnostics?.count("QueuePass:after-settle");
+      this.schedulePass(true);
     });
-  };
+  }
+
+  /** Whether a request succeeded that no pass has handled yet. */
+  private hasUnhandledSuccess(): boolean {
+    for (const request of this.requests.items()) {
+      if (request.status === "succeed" && !request.isHandledByProcessQueue) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   /** @returns Whether a segment was stored, which moves the storage usage. */
   private processRequests(
@@ -413,12 +459,11 @@ export class HybridLoader {
             request.loadedBytes > 0 &&
             queueSegmentIds.has(segment.runtimeId)
           ) {
-            if (!isHandledByProcessQueue) {
-              diagnostics?.count("PartialRequest:kept");
-            }
+            if (request.keep()) diagnostics?.count("PartialRequest:kept");
             partials.push(request);
             break;
           }
+          request.endKept("left-queue");
           this.requests.remove(request);
           break;
       }
@@ -448,8 +493,8 @@ export class HybridLoader {
     if (partials.length <= limit) return;
     partials.sort((a, b) => a.segment.startTime - b.segment.startTime);
     for (const request of partials.slice(limit)) {
+      request.endKept("dropped-over-limit");
       this.requests.remove(request);
-      diagnostics?.count("PartialRequest:dropped-over-limit");
     }
   }
 
@@ -512,12 +557,16 @@ export class HybridLoader {
    * The player's request, judged by its urgency. See
    * specs/playback-contract.md, "Urgency".
    *
-   * - Urgent: over HTTP at once, taking a slot from the HTTP download
-   *   furthest ahead where none is free, and moving a P2P download of it to
-   *   HTTP. With no peer connected it is fetched the same way: nobody can
-   *   give the segment, and no election runs. After an HTTP attempt fails,
-   *   one attempt goes to a peer that has it before HTTP again
-   *   (`tryPeerAfterHttpFailure`).
+   * - Urgent: over HTTP at once, with the link to itself: every other HTTP
+   *   download of this loader stops, except one about to finish
+   *   (`yieldHttpPrefetchTo`), so with kept downloads more than
+   *   `simultaneousHttpDownloads` can run. A P2P download of it moves to
+   *   HTTP. After an HTTP attempt fails, one attempt goes to a peer that has
+   *   it before HTTP again (`tryPeerAfterHttpFailure`).
+   * - Not urgent, with no peer connected, or one the storage answered with
+   *   no bytes: over HTTP at once, in a free slot or one taken from the HTTP
+   *   download furthest ahead (`freeSlotFor`). Nobody can give the segment,
+   *   and no election runs. Nothing else stops.
    * - Not urgent: from a peer that has it. If none has it, the election
    *   decides who fetches it over HTTP (`prefetchThroughHttp`), or it waits;
    *   the buffer drains while it waits, and it becomes urgent in time.
@@ -537,8 +586,8 @@ export class HybridLoader {
     const { segment } = engineRequest;
     const request = this.requests.get(segment);
     const urgent = this.isUrgent();
-    if (urgent && this.waitingNotUrgent === engineRequest) {
-      this.waitingNotUrgent = undefined;
+    if (urgent && engineRequest.waitingNotUrgent) {
+      engineRequest.waitingNotUrgent = false;
       diagnostics?.count("SegmentRequest:became-urgent");
       this.logger(
         `became urgent: ${LoggerUtils.getSegmentString(segment)} (buffer ${this.playbackTracker.bufferAhead().toFixed(2)}s)`,
@@ -553,6 +602,8 @@ export class HybridLoader {
 
     if (request?.status === "loading") {
       if (!urgent) return;
+      // Completing from the bytes held: no link to give, nothing to move.
+      if (request.isCompletingFromHeldBytes) return;
       if (request.downloadSource === "http") {
         // Already coming over HTTP — perhaps fetched as the owner's prefetch
         // before it was urgent: it has the link to itself from now on.
@@ -568,6 +619,15 @@ export class HybridLoader {
       return;
     }
     if (request?.status === "succeed") return;
+
+    // Every byte is held already — an attempt failed or stopped after its
+    // last chunk: complete from them, as the source that sent them, before
+    // any source is chosen. Otherwise a P2P attempt would be counted, and a
+    // download stopped to free a peer, for bytes HTTP had sent.
+    if (request && this.completeFromHeldBytes(request)) {
+      diagnostics?.count("SegmentRequest:completed-from-held-bytes");
+      return;
+    }
 
     if (urgent && canLoadThroughHttp) {
       if (request && this.tryPeerAfterHttpFailure(request)) return;
@@ -589,8 +649,9 @@ export class HybridLoader {
     // request that must start now takes a slot from prefetch to do so.
     if (
       p2pLoader.isSegmentLoadingOrLoadedBySomeone(segment) &&
-      (this.requests.executingP2PCount < simultaneousP2PDownloads ||
-        (startNow && this.abortFurthestDownloadFor(segment, "p2p")))
+      (startNow
+        ? this.freeSlotFor(segment, "p2p")
+        : this.requests.executingP2PCount < simultaneousP2PDownloads)
     ) {
       this.loadThroughP2P(segment);
     }
@@ -619,12 +680,18 @@ export class HybridLoader {
     if (
       request.status !== "failed" ||
       failedAttempts.lastAttempt?.downloadSource !== "http" ||
+      // Failed on a peer's bytes or size, not at the origin: HTTP goes on
+      // at once.
+      failedOnPeerData(failedAttempts.lastAttempt) ||
       failedAttempts.hasTag("peer-after-http-failure")
     ) {
       return false;
     }
-    // Each way this ends is counted once: a request whose attempt does not
-    // start goes on to HTTP at once, so it is not judged here again.
+    // Each way this ends is counted. A request whose attempt does not start
+    // goes on to HTTP at once, and is judged again only after that attempt
+    // fails too: a peer may have the segment by then, and the request gets
+    // its attempt. So `:no-peer` and `:no-free-peer` count HTTP failures,
+    // not requests.
     const { segment } = request;
     const p2pLoader = this.p2pLoaders.currentLoader;
     if (!p2pLoader.isSegmentLoadedBySomeone(segment)) {
@@ -636,16 +703,23 @@ export class HybridLoader {
     }
     if (
       !this.freeSlotFor(segment, "p2p") ||
-      !p2pLoader.downloadSegment(segment)
+      !p2pLoader.downloadSegment(segment, "peer-after-http-failure")
     ) {
       diagnostics?.count("SegmentRequest:peer-after-http-failure:no-free-peer");
       return false;
     }
-    request.tagAttempt("peer-after-http-failure");
     diagnostics?.count("SegmentRequest:peer-after-http-failure");
     this.logger(
       `HTTP failed for the urgent ${LoggerUtils.getSegmentString(segment)}; trying a peer that has it`,
     );
+    // A peer whose channel is closing fails the attempt at once. This pass
+    // has handled the settled requests already, and a request that settles
+    // during a pass starts no other: HTTP goes on now, and the failure is
+    // counted here.
+    if (failedAttempts.hasTag("peer-after-http-failure")) {
+      diagnostics?.count("SegmentRequest:peer-after-http-failure:failed");
+      return false;
+    }
     return true;
   }
 
@@ -661,14 +735,8 @@ export class HybridLoader {
    */
   private yieldHttpPrefetchTo(segment: SegmentWithStream) {
     let stopped = false;
-    for (const request of this.requests.items()) {
-      if (
-        request.downloadSource !== "http" ||
-        request.status !== "loading" ||
-        request.segment === segment
-      ) {
-        continue;
-      }
+    for (const request of this.requests.loadingHttpRequests()) {
+      if (request.segment === segment) continue;
       // One about to finish keeps going: stopped, its segment would be
       // missing from the store when the player asks for it next, and that
       // request would be urgent in turn.
@@ -748,7 +816,7 @@ export class HybridLoader {
     diagnostics?.count(
       urgent ? "SegmentRequest:urgent" : "SegmentRequest:not-urgent",
     );
-    this.waitingNotUrgent = urgent ? undefined : engineRequest;
+    engineRequest.waitingNotUrgent = !urgent;
     this.logger(
       `${urgent ? "urgent" : "not urgent"}: ${LoggerUtils.getSegmentString(engineRequest.segment)} (buffer ${this.playbackTracker.bufferAhead().toFixed(2)}s, threshold ${this.urgentBufferThreshold().toFixed(2)}s)`,
     );
@@ -767,6 +835,23 @@ export class HybridLoader {
   }
 
   /**
+   * Completes `request` from the bytes it holds, if it holds all of them: as
+   * HTTP's, with no validation, for HTTP bytes only; as the owning peer's,
+   * validated, for a peer's — a failure closes that peer.
+   *
+   * @returns Whether the request was complete and is being completed.
+   */
+  private completeFromHeldBytes(request: Request): boolean {
+    return request.tryCompleteByLoadedBytes(
+      undefined,
+      { onAbort: () => undefined },
+      this.config.validateP2PSegment,
+      (peerId, cause) =>
+        this.p2pLoaders.closePeer(request.segment.stream, peerId, cause),
+    );
+  }
+
+  /**
    * @param priority - `"high"` for a segment the player has requested, so
    * that the browser serves it before prefetch where it can: on HTTP/2 and
    * HTTP/3 it gets the bandwidth first, and on any protocol it leaves the
@@ -782,6 +867,10 @@ export class HybridLoader {
       this.config,
       this.eventTarget,
       priority,
+      // A peer whose bytes this download went on from, found wrong once
+      // HTTP finished it: its connection is closed, as for its own download.
+      (peerId, cause) =>
+        this.p2pLoaders.closePeer(segment.stream, peerId, cause),
     );
     executor.execute();
     this.p2pLoaders.currentLoader.broadcastAnnouncement();
@@ -974,9 +1063,11 @@ export class HybridLoader {
   ): boolean {
     let furthest: Request | undefined;
     for (const request of this.requests.items()) {
+      // One completing from the bytes held frees no peer and no link.
       if (
         request.downloadSource !== source ||
         request.status !== "loading" ||
+        request.isCompletingFromHeldBytes ||
         request.segment === segment
       ) {
         continue;
@@ -1170,7 +1261,7 @@ export class HybridLoader {
     const request = this.engineRequest;
     const becameUrgent =
       request?.status === "pending" &&
-      this.waitingNotUrgent === request &&
+      request.waitingNotUrgent &&
       this.isUrgent();
     this.requestProcessQueueMicrotask(becameUrgent || rateChanged);
   }

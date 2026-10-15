@@ -147,10 +147,10 @@ declare module "mpd-parser" {
   ): MpdPlaylist;
 
   /**
-   * The DOM step of `parse`, exported by mpd-parser for custom pipelines.
-   * Throws on malformed XML.
+   * The DOM step of `parse`, exported by mpd-parser for custom pipelines:
+   * the `MPD` element itself, not the document around it. Throws on
+   * malformed XML.
    */
-  /** The `MPD` element itself, not the document around it. */
   export function stringToMpdXml(manifestString: string): Element;
   /**
    * The remaining steps of `parse`, exported by mpd-parser for custom

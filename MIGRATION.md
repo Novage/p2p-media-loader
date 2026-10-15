@@ -176,6 +176,16 @@ URL for HLS, the Representation id for DASH. The `onStreamRegistrationError`
 event keeps its shape; it fires once per failing stream, only for
 `streamSwarmIdBuilder` failures.
 
+### `validateHTTPSegment` is removed
+
+HTTP is trusted: a failed check cannot ban an origin, and a retry rarely
+helps. `validateP2PSegment` now covers every download that holds a peer's
+bytes, whichever source finishes it: HTTP that goes on from a peer's bytes
+validates the whole segment as that peer's, and a failure closes the
+connection to that peer. The error type `http-segment-validation-failed` is
+removed with it. A config that still names `validateHTTPSegment` gets a
+console warning, and the key is ignored.
+
 ### HTTP timeouts
 
 `httpNotReceivingBytesTimeoutMs` (3 s by default) now counts from the

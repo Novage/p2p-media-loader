@@ -211,6 +211,7 @@ the groups and the cases a reader of a snapshot must know.
   announce dropped because its socket was lost while it gathered offers
   (`TrackerAnnounce:socket-lost`), a config
   key a release renamed (`Config:renamed-key`, once for each core and key),
+  a config key a release removed (`Config:removed-key`, the same way),
   registry
   misses, evictions by reason, closed peers by cause, parses of the
   player's manifests by result (`ManifestParse`), and clock synchronizations
@@ -224,12 +225,26 @@ the groups and the cases a reader of a snapshot must know.
   request gets after its HTTP attempt fails is counted too
   (`SegmentRequest:peer-after-http-failure`), with how it ended (`:served`,
   `:failed`, `:aborted`) or why it did not start (`:no-peer`, no peer holds
-  the whole segment; `:no-free-peer`, no peer or slot is free), and each
+  the whole segment; `:no-free-peer`, no peer or slot is free; both count
+  each HTTP failure after which it could not start, so one request can count
+  more than once), and each
   download stopped to free a peer for it (`Prefetch:peer-freed-for-urgent`).
+  A player's request that already holds every byte, after an attempt that
+  failed or stopped after its last chunk, is completed from them before any
+  source is chosen (`SegmentRequest:completed-from-held-bytes`).
   So is each download stopped
   with bytes in hand that is kept to go on from them (`PartialRequest:kept`),
-  and each one let go because more were kept than there are download slots
-  (`PartialRequest:dropped-over-limit`). The Video.js adapter
+  and how each kept one ends: resumed by a new attempt
+  (`PartialRequest:resumed`), its bytes cleared for a source that validates
+  (`PartialRequest:cleared`), let go as its segment left the queue
+  (`PartialRequest:left-queue`), or let go because more were kept than there
+  are download slots (`PartialRequest:dropped-over-limit`). Each kept one is
+  also a `PartialRequest` record, open until it ends or its loader is
+  destroyed. Each queue pass run again because a
+  request settled during the pass is counted (`QueuePass:after-settle`), and
+  each one not run because the pass before was such a pass
+  (`QueuePass:after-settle:limited`) — unless a request succeeded that no pass
+  has handled, which always gets one more pass. The Video.js adapter
   counts each live delay it writes (`VhsPlacement:applied`) and each VHS it
   cannot place (`VhsPlacement:unavailable`); the HLS.js adapter, each live
   delay it writes (`HlsPlacement:applied`) and each main playlist it leaves to

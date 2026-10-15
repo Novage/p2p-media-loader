@@ -178,16 +178,53 @@ paused player that asks for media wants its first frame.
   under way moves to HTTP. Where HTTP is not allowed — during `httpDownloadInitialTimeoutMs`, or once
   the request's HTTP attempts are spent — it is taken from a peer that has it,
   and takes a P2P slot from prefetch the same way.
+
+  With `validateP2PSegment` set, a download belongs to the peer whose bytes it
+  holds, whichever source finishes it. HTTP is trusted: a download of HTTP bytes
+  only belongs to no peer and is not validated, and a peer that goes on from
+  HTTP bytes takes on the download. HTTP that goes on from a peer's bytes keeps
+  them, and validates the whole segment as that peer's. A download that already
+  holds every byte completes with no request, as the source that sent them,
+  whichever source was chosen next: as HTTP's, with no validation, for HTTP
+  bytes only; as the owning peer's, validated, for a peer's. An urgent request
+  that completes this way is left to finish: it uses no link, and moving it
+  would only start the validation again. If the segment fails, or HTTP gives another
+  size than the peer did, the bytes are cleared and the connection to that peer
+  is closed; the attempt does not count against `httpErrorRetries`, and the
+  request goes back to HTTP at once, with no P2P attempt. A peer does not go on
+  from another peer's bytes: it starts again from byte 0, since it would take
+  the blame for them. Without `validateP2PSegment`, every download goes on from
+  the bytes held, whoever sent them.
+
+  The request also records who gave its total size: the byte range, HTTP or a
+  peer. With or without a validator, HTTP is the truth: if HTTP gives another
+  size than a peer did (`Content-Length`, `Content-Range`, a `416`, or a longer
+  body), that peer is closed, the bytes are cleared, and the attempt fails as
+  `p2p-segment-size-mismatch`, which does not count against `httpErrorRetries`.
+  On a `200` the bytes are gone already and the body is the whole segment, so
+  the download goes on: it drops a size a peer gave and judges no peer, since
+  a peer is judged only on bytes it sent. Its `Content-Length` is the size,
+  unless the answer has a `Content-Encoding`, where it is the compressed
+  length.
+  A `206` that agrees with the size makes it HTTP's: from then on, a peer that
+  gives another size is the one at fault. For a segment without a byte range,
+  the total in `Content-Range` is compared too. A size from HTTP or the byte
+  range that HTTP then contradicts is HTTP's own failure. A peer whose size contradicts HTTP's or the byte range's is closed; bytes held that it did not send are kept. A
+  peer whose size differs from another peer's is not: nothing tells which one is
+  right, so the transfer is stopped, the bytes and the size are cleared, and the
+  attempt fails as `p2p-segment-size-conflict`; the next one starts at byte 0.
+
 - **An urgent request whose HTTP attempt fails** goes once to a peer that has
   all of the segment, and then to HTTP again. Without this, an origin that
   fails holds the player through every HTTP attempt and the player's own
   retries while a peer has the segment. The P2P attempt comes only between
   two HTTP attempts: one attempt per request, and only while an HTTP attempt
   remains after it, so the last attempt is always HTTP. If every peer that
-  has the segment is downloading something else, one of them stops that
-  download. A peer that is still downloading the segment is not asked. If the
+  has the segment is downloading something else, the one whose download is
+  furthest ahead stops it. A peer that is still downloading the segment is not asked. If the
   peer fails too, the player waits at most `p2pNotReceivingBytesTimeoutMs`
-  longer than without P2P. The player's next request for the segment starts
+  longer than without P2P; a peer that fails it at once, because its channel
+  is closing, sends it back to HTTP at once. The player's next request for the segment starts
   with no failed attempts, and has its own P2P attempt. The attempt is marked
   as such: a P2P download that prefetch started, even after a failed HTTP
   prefetch of the segment, is not it, and moves to HTTP as above. A player that

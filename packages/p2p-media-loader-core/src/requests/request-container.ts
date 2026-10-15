@@ -14,8 +14,8 @@ export class RequestsContainer {
 
   get executingHttpCount() {
     let count = 0;
-    for (const request of this.httpRequests()) {
-      if (request.status === "loading") count++;
+    for (const request of this.requests.values()) {
+      if (isHttpDownloadUnderWay(request)) count++;
     }
     return count;
   }
@@ -55,19 +55,10 @@ export class RequestsContainer {
     return this.requests.values();
   }
 
-  *httpRequests(): Generator<Request, void> {
-    for (const request of this.requests.values()) {
-      if (request.downloadSource === "http") yield request;
-    }
-  }
-
-  /**
-   * The HTTP downloads under way. A request keeps its source after its
-   * attempt ends, so `httpRequests()` also yields stopped and failed ones.
-   */
+  /** The HTTP downloads under way (`isHttpDownloadUnderWay`). */
   *loadingHttpRequests(): Generator<Request, void> {
-    for (const request of this.httpRequests()) {
-      if (request.status === "loading") yield request;
+    for (const request of this.requests.values()) {
+      if (isHttpDownloadUnderWay(request)) yield request;
     }
   }
 
@@ -79,9 +70,18 @@ export class RequestsContainer {
 
   destroy() {
     for (const request of this.requests.values()) {
+      request.endKept("destroyed");
       if (request.status !== "loading") continue;
       request.cancel();
     }
     this.requests.clear();
   }
+}
+
+/**
+ * An HTTP download under way: what slots, announcements and the yield count
+ * as one. A request keeps its source after its attempt ends.
+ */
+function isHttpDownloadUnderWay(request: Request): boolean {
+  return request.downloadSource === "http" && request.status === "loading";
 }

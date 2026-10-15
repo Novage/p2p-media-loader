@@ -1,4 +1,5 @@
 import { P2PLoader } from "./loader.js";
+import type { PeerDataFault } from "../requests/request.js";
 import debug from "debug";
 import {
   CoreEventMap,
@@ -151,6 +152,17 @@ export class P2PLoadersContainer {
    */
   noteDownloadedBytes(stream: Stream, bytes: number) {
     this.#loaders.get(stream.runtimeId)?.loader.noteDownloadedBytes(bytes);
+  }
+
+  /**
+   * Closes the connection to a peer of `stream`'s swarm whose data an HTTP
+   * download found wrong, with that cause. Nothing where the peer or the
+   * loader is gone.
+   */
+  closePeer(stream: Stream, peerId: string, cause: PeerDataFault) {
+    this.#loaders
+      .get(stream.runtimeId)
+      ?.loader.closePeerWithBadData(peerId, cause);
   }
 
   destroy() {

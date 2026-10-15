@@ -1,6 +1,6 @@
 import { diagnostics, type DiagnosticsToken } from "../diagnostics.js";
 import debug from "debug";
-import { Request, RequestControls } from "../requests/request.js";
+import { AttemptTag, Request, RequestControls } from "../requests/request.js";
 import {
   CoreEventMap,
   PeerRequestErrorType,
@@ -186,10 +186,23 @@ export class Peer {
           if (request.totalBytes === undefined) {
             request.setTotalBytes(request.loadedBytes + command.s);
           } else if (request.totalBytes - request.loadedBytes !== command.s) {
-            this.#destroyOnPeerError(
-              "bytes-length-mismatch",
-              "Peer response bytes length mismatch",
-            );
+            const sizeFrom = request.totalBytesFromPeer;
+            if (sizeFrom !== undefined && sizeFrom !== this.id) {
+              // Another peer gave the size, and the two disagree: nothing
+              // tells which one is right. Neither is closed; the bytes and
+              // the size are dropped, and the next attempt starts at 0.
+              this.#sendCancelSegmentRequestCommand(request.segment, requestId);
+              request.clearLoadedBytes();
+              this.#cancelSegmentDownloading("p2p-segment-size-conflict");
+            } else {
+              // HTTP or the byte range gave the size, or this peer did: this
+              // peer is wrong. Bytes it did not send are kept.
+              this.#destroyOnPeerError(
+                "bytes-length-mismatch",
+                "Peer response bytes length mismatch",
+                request.hasBytesFrom(this.id),
+              );
+            }
           }
         }
         break;
@@ -301,24 +314,40 @@ export class Peer {
     controls.addLoadedChunk(chunk);
   };
 
-  downloadSegment(segmentRequest: Request) {
-    if (this.#isDestroyed) return;
+  /**
+   * Starts downloading the request's segment from this peer. `tag` says why
+   * the attempt was started; it is set as the attempt starts, so it stays
+   * with an attempt that settles at once.
+   *
+   * @returns Whether the attempt started. A destroyed peer starts none.
+   */
+  downloadSegment(segmentRequest: Request, tag?: AttemptTag): boolean {
+    if (this.#isDestroyed) return false;
     if (this.#downloadingContext) {
       throw new Error("Some segment already is downloading");
     }
+    if (this.#peerConfig.validateP2PSegment) {
+      segmentRequest.dropBytesFromOtherPeers(this.id);
+    }
 
+    // All the bytes held: completed as the source that sent them, which with
+    // a validator is this peer or HTTP, since another peer's are dropped.
     const completed = segmentRequest.tryCompleteByLoadedBytes(
-      { downloadSource: "p2p", peerId: this.id },
+      tag,
       {
         notReceivingBytesTimeoutMs:
           this.#peerConfig.p2pNotReceivingBytesTimeoutMs,
         onAbort: () => void 0,
       },
       this.#peerConfig.validateP2PSegment,
-      "p2p-segment-validation-failed",
+      (peerId, cause) => {
+        if (peerId === this.id) {
+          this.#destroyOnPeerError(cause, "P2P segment validation failed");
+        }
+      },
     );
 
-    if (completed) return;
+    if (completed) return true;
 
     this.#bandwidthDownload = this.#bandwidthCalculator.startLoading();
     this.#nextRequestId = (this.#nextRequestId + 1) % 1000000000;
@@ -327,7 +356,7 @@ export class Peer {
       requestId: this.#nextRequestId,
       isSegmentDataCommandReceived: false,
       controls: segmentRequest.start(
-        { downloadSource: "p2p", peerId: this.id },
+        { downloadSource: "p2p", peerId: this.id, tag },
         {
           notReceivingBytesTimeoutMs:
             this.#peerConfig.p2pNotReceivingBytesTimeoutMs,
@@ -381,6 +410,7 @@ export class Peer {
     if (!this.#sendCommand(command)) {
       this.#cancelSegmentDownloading("peer-closed");
     }
+    return true;
   }
 
   /** Resolves with the bytes sent: all of `data` when the upload completed, 0 otherwise. */
@@ -430,8 +460,12 @@ export class Peer {
     }
   }
 
-  #destroyOnPeerError(type: PeerErrorType, message: string) {
-    this.#downloadingContext?.request.clearLoadedBytes();
+  /**
+   * @param clearBytes - Whether the bytes held go with this peer: they do
+   * unless none of them came from it, as when its first message is wrong.
+   */
+  #destroyOnPeerError(type: PeerErrorType, message: string, clearBytes = true) {
+    if (clearBytes) this.#downloadingContext?.request.clearLoadedBytes();
     const error = new PeerError(type, message);
     this.#cancelSegmentDownloading("peer-closed", error);
     this.destroy(false, error);
@@ -449,7 +483,12 @@ export class Peer {
     controls.failWithError(error);
     this.#stopBandwidthDownload();
 
-    if (type !== "peer-segment-absent") {
+    // Neither an absent segment nor a size another peer gave says anything
+    // about this peer's link.
+    if (
+      type !== "peer-segment-absent" &&
+      type !== "p2p-segment-size-conflict"
+    ) {
       this.#bandwidthCalculator.clear();
       this.#cachedDownloadBandwidth.timestamp = 0;
       this.#logger(`cleared bandwidth history due to ${error.type}`);

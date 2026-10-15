@@ -254,6 +254,19 @@ throughout.
 
 ### Removed
 
+- `validateHTTPSegment`, and the error type `http-segment-validation-failed`.
+  HTTP is trusted, and `validateP2PSegment` now validates every download that
+  holds a peer's bytes, also one that HTTP finishes: a failure closes the
+  connection to that peer and does not count against `httpErrorRetries`. A
+  config that still names the key gets a console warning. See
+  [MIGRATION.md](MIGRATION.md). Two peer error types are new:
+  `p2p-segment-size-mismatch`, when HTTP gives another size than the peer
+  whose bytes it went on from (that peer is closed, with or without a
+  validator), and `p2p-segment-size-conflict`, when two peers give different
+  sizes (neither is closed, and the next attempt starts at byte 0). An HTTP
+  attempt can fail with `p2p-segment-validation-failed` or
+  `p2p-segment-size-mismatch`: the origin is not at fault, and
+  `onSegmentError` names the peer in `peerId`.
 - `Core.addStreamIfNoneExists`, `updateStream`, `getStreamSegmentRuntimeIds`,
   `setIsLive` and `setActiveLevelBitrate` — streams, segments and liveness all
   come from the manifest now. `setManifestResponseUrl` is optional: the first
@@ -271,6 +284,23 @@ throughout.
 
 These predate 5.0.0 and affect 4.x deployments as well.
 
+- A segment served with `Content-Encoding` (`gzip`, `br`) failed every HTTP
+  download: the compressed `Content-Length` was taken as its size, so the
+  decoded body failed as a truncation. It is no longer taken as the size where
+  the page sees the header; a cross-origin server must expose
+  `Content-Encoding` for that (see [KNOWN-ISSUES.md](KNOWN-ISSUES.md)).
+- An HTTP download that went on from bytes of unknown total size — the first
+  answer had no `Content-Length`, as with chunked or compressed transfer —
+  always failed: the `Content-Range` check compared the answer's length with
+  nothing, cleared the bytes and spent an HTTP attempt. The check now runs
+  only when a size is expected, and the total is taken from `Content-Range`,
+  so a resumed body cut short is still found.
+- A segment with a byte range (single-file fMP4 HLS, DASH `SegmentBase`)
+  could not load over HTTP again once its bytes were cleared — after a failed
+  validation, a `406` or `416` answer, or a length mismatch. The clear also
+  forgot the segment's size, so each later answer failed the `Content-Range`
+  check, and on VOD the player's request failed after its retries. The size
+  from the byte range now stays.
 - An HTTP response refused on its headers — an error status, or a whole file
   sent with `200` for a byte range — was never read or cancelled, so its
   connection stayed busy until the browser collected the response. An

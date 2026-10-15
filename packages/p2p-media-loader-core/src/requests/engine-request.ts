@@ -5,6 +5,12 @@ import { EngineCallbacks, SegmentWithStream } from "../internal-types.js";
 export class EngineRequest {
   private _status: "pending" | "succeed" | "failed" | "aborted" = "pending";
   private _shouldBeStartedImmediately = false;
+  /**
+   * Not urgent when it arrived, and not urgent since: counted once more if it
+   * becomes urgent before it is served. The flag is on the request, so the
+   * loader holds no reference to a request that has settled.
+   */
+  waitingNotUrgent = false;
 
   /** Open until the request settles: one never settled is a player left waiting. */
   private readonly diagnosticsToken: DiagnosticsToken | undefined;

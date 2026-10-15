@@ -120,3 +120,33 @@ describe("renamed config keys", () => {
     expect(warn).not.toHaveBeenCalled();
   });
 });
+
+describe("removed config keys", () => {
+  debug.enable("p2pml:diagnostics");
+  compiledLedger?.snapshot();
+  debug.disable();
+  const count = () =>
+    compiledLedger?.snapshot()?.counters["Config:removed-key"] ?? 0;
+
+  let warn: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  });
+  afterEach(() => {
+    warn.mockRestore();
+  });
+
+  it("warns once for validateHTTPSegment, and says what replaces it", () => {
+    const before = count();
+    const core = new Core({
+      validateHTTPSegment: () => Promise.resolve(true),
+    } as Partial<CoreConfig>);
+    core.applyDynamicConfig({
+      mainStream: { validateHTTPSegment: () => Promise.resolve(true) },
+    } as DynamicCoreConfig);
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain("validateP2PSegment");
+    expect(count()).toBe(before + 1);
+  });
+});

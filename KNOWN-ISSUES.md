@@ -58,6 +58,18 @@ The tests themselves are in
 - **In a 60-minute run both tabs stalled twice at the same moments**, with a
   missing segment in both buffers. Most likely the origin; not proven.
 
+- **A compressed cross-origin segment fails over HTTP.** With
+  `Content-Encoding` (`gzip`, `br`), `Content-Length` is the compressed length,
+  and the body `fetch` gives is the decoded one. The HTTP loader does not take
+  such a `Content-Length` as the segment's size, but it can tell only where the
+  page sees `Content-Encoding`: same origin, or a server that lists it in
+  `Access-Control-Expose-Headers`. A cross-origin server that does not expose
+  it gets the compressed length taken as the size, so each download fails at
+  its end as a truncation (`http-bytes-mismatch`) and spends an HTTP attempt;
+  this was so in 4.x too. Media segments are seldom compressed, since the media
+  in them already is. Not trusting `Content-Length` on a `200` at all would fix
+  it, and leave a body cut short to the browser's own errors.
+
 ## Watch: seen once, not reproduced
 
 - **Shaka on bbb at rate 2 stopped for about 2 minutes**: one segment was

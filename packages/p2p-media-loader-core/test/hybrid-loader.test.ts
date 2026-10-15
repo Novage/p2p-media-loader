@@ -6,6 +6,7 @@ import type {
   StreamWithSegments,
 } from "../src/internal-types.js";
 import type { CoreEventMap, StreamConfig } from "../src/types.js";
+import type { AttemptTag } from "../src/requests/request.js";
 import type { SegmentStorage } from "../src/segment-storage/index.js";
 
 /**
@@ -42,8 +43,26 @@ const fakes = vi.hoisted(() => {
     freePeerStops: false,
     /** Whether the fake `downloadSegment` finds no peer free to send. */
     p2pRefuses: false,
+    /** Whether the peer's channel is closing: its attempt fails at once. */
+    p2pFailsAtOnce: false,
+    /** Whether the request holds all bytes: its attempt succeeds at once. */
+    p2pCompletesAtOnce: false,
+    /** Segments whose P2P attempt settles at once, and how. */
+    p2pAtOnce: new Map<string, "fail" | "succeed">(),
+    /** Called as each P2P attempt starts, before it can settle. */
+    onP2PStart: undefined as ((id: string) => void) | undefined,
     /** How many times the loader asked to announce its segments. */
     broadcasts: 0,
+    /** Each HTTP download's way to report a peer's data as wrong. */
+    httpRejectPeer: new Map<
+      string,
+      (
+        peerId: string,
+        cause: "validation-failed" | "bytes-length-mismatch",
+      ) => void
+    >(),
+    /** Peers the loader asked to close: [stream, peer id, cause]. */
+    closedPeers: [] as [string, string, string][],
   };
   class FakeP2PLoader {
     get connectedPeerCount() {
@@ -63,16 +82,24 @@ const fakes = vi.hoisted(() => {
     broadcastAnnouncement() {
       state.broadcasts++;
     }
-    downloadSegment(segment: SegmentWithStream) {
+    downloadSegment(segment: SegmentWithStream, tag?: AttemptTag) {
       if (state.p2pRefuses) return false;
       state.p2pStarted.push(segment.runtimeId);
       const controls = state.requests
         .getOrCreateRequest(segment)
         .start(
-          { downloadSource: "p2p", peerId: "peer-0" },
+          { downloadSource: "p2p", peerId: "peer-0", tag },
           { onAbort: () => state.p2pAborted.push(segment.runtimeId) },
         );
       state.p2pControls.set(segment.runtimeId, controls as never);
+      state.onP2PStart?.(segment.runtimeId);
+      const atOnce = state.p2pAtOnce.get(segment.runtimeId);
+      if (atOnce === "fail" || (!atOnce && state.p2pFailsAtOnce)) {
+        controls.failWithError(new RequestError("peer-closed"));
+      } else if (atOnce === "succeed" || state.p2pCompletesAtOnce) {
+        controls.addLoadedChunk(new Uint8Array(16));
+        controls.completeOnSuccess();
+      }
       return true;
     }
     freePeerFor(segment: SegmentWithStream) {
@@ -92,6 +119,9 @@ const fakes = vi.hoisted(() => {
     noteDownloadedBytes(stream: { runtimeId: string }, bytes: number) {
       state.downloaded.push([stream.runtimeId, bytes]);
     }
+    closePeer(stream: { runtimeId: string }, peerId: string, cause: string) {
+      state.closedPeers.push([stream.runtimeId, peerId, cause]);
+    }
     destroy() {}
   }
   class FakeHttpRequestExecutor {
@@ -106,11 +136,16 @@ const fakes = vi.hoisted(() => {
       _config: unknown,
       _eventTarget: unknown,
       private readonly priority: string,
+      private readonly onPeerBytesRejected: (
+        peerId: string,
+        cause: "validation-failed" | "bytes-length-mismatch",
+      ) => void,
     ) {}
     execute() {
       const id = this.request.segment.runtimeId;
       state.httpStarted.push(id);
       state.httpPriority.set(id, this.priority);
+      state.httpRejectPeer.set(id, this.onPeerBytesRejected);
       const controls = this.request.start(
         { downloadSource: "http" },
         { onAbort: () => state.httpAborted.push(id) },
@@ -557,6 +592,11 @@ describe("HybridLoader: urgency", () => {
 
     expect(state.p2pAborted).toEqual(["seg-0"]);
     expect(state.httpStarted).toContain("seg-0");
+    expect(count("SegmentRequest:became-urgent")).toBe(became + 1);
+
+    // A later pass — forced here by a rate change — counts it no more.
+    loader.updatePlayback({ bufferAhead: 1, rate: 2 });
+    await flush();
     expect(count("SegmentRequest:became-urgent")).toBe(became + 1);
     loader.destroy();
   });
@@ -1134,6 +1174,8 @@ describe("HybridLoader: a peer after a failed HTTP attempt", () => {
     state.p2pStarted.length = 0;
     state.p2pAborted.length = 0;
     state.peerFreedFor.length = 0;
+    state.p2pFailsAtOnce = false;
+    state.closedPeers.length = 0;
     state.httpControls.clear();
     state.p2pControls.clear();
   });
@@ -1196,6 +1238,134 @@ describe("HybridLoader: a peer after a failed HTTP attempt", () => {
     expect(callbacks.onError.mock.calls[0][0]).toMatchObject({
       type: "failed",
     });
+    loader.destroy();
+  });
+
+  it.each([
+    "p2p-segment-validation-failed",
+    "p2p-segment-size-mismatch",
+  ] as const)(
+    "goes back to HTTP at once, and spends no retry, when HTTP failed with %s",
+    async (type) => {
+      // The HTTP attempt went on from a peer's bytes, and they proved wrong:
+      // the origin did not fail, so the request gets no P2P attempt.
+      fakes.state.loadedBySomeone.add("seg-0");
+      const { loader, segment, callbacks, state, status } = setup({
+        httpErrorRetries: 1,
+      });
+      await loader.loadSegment(segment(0), callbacks);
+      await flush();
+
+      state.httpControls.get("seg-0")!.failWithError(new RequestError(type));
+      await flush();
+
+      expect(state.p2pStarted).toEqual([]);
+      expect(httpOf("seg-0")).toEqual(["seg-0", "seg-0"]);
+      expect(status(0)).toBe("loading");
+      expect(callbacks.onError).not.toHaveBeenCalled();
+      loader.destroy();
+    },
+  );
+
+  it("closes a peer whose bytes an HTTP download found wrong", async () => {
+    const { loader, segment, callbacks, state } = setup();
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+
+    state.httpRejectPeer.get("seg-0")!(
+      "-PM0400-owner",
+      "bytes-length-mismatch",
+    );
+
+    expect(state.closedPeers).toEqual([
+      [segment(0).stream.runtimeId, "-PM0400-owner", "bytes-length-mismatch"],
+    ]);
+    loader.destroy();
+  });
+
+  it("gives the player's request its own attempts when it joins a prefetch still loading", async () => {
+    // The prefetch of segment 0 failed twice, and its third HTTP attempt is
+    // loading when the player asks for it. Its failures are not the
+    // player's: when that attempt fails too, the request gets its P2P
+    // attempt, and is not rejected.
+    fakes.state.loadedBySomeone.add("seg-0");
+    const { loader, segment, callbacks, startLoading, state } = setup({
+      httpErrorRetries: 3,
+    });
+    for (let i = 0; i < 2; i++) {
+      startLoading(0, "http").failWithError(httpError());
+    }
+    const third = startLoading(0, "http");
+    expect(
+      state.requests.get(segment(0))!.failedAttempts.httpAttemptsCount,
+    ).toBe(2);
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+    third.failWithError(httpError());
+    await flush();
+
+    expect(callbacks.onError).not.toHaveBeenCalled();
+    expect(state.p2pStarted).toEqual(["seg-0"]);
+    loader.destroy();
+  });
+
+  it("completes from the bytes held when the HTTP attempt failed after its last one", async () => {
+    // Every byte came over HTTP; the attempt then failed before its end. No
+    // peer is asked, and no download is stopped to free one.
+    fakes.state.loadedBySomeone.add("seg-0");
+    const tried = count("SegmentRequest:peer-after-http-failure");
+    const completed = count("SegmentRequest:completed-from-held-bytes");
+    const { loader, segment, callbacks, startLoading, state } = setup();
+    const http = startLoading(0, "http");
+    state.requests.get(segment(0))!.setTotalBytes(16);
+    http.addLoadedChunk(new Uint8Array(16));
+    http.failWithError(httpError());
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+
+    expect(callbacks.onSuccess).toHaveBeenCalledTimes(1);
+    expect(state.p2pStarted).toEqual([]);
+    expect(state.peerFreedFor).toEqual([]);
+    expect(count("SegmentRequest:peer-after-http-failure")).toBe(tried);
+    expect(count("SegmentRequest:completed-from-held-bytes")).toBe(
+      completed + 1,
+    );
+    loader.destroy();
+  });
+
+  it("leaves alone an urgent request that completes from a peer's bytes while it validates", async () => {
+    // Moving it to HTTP would only start the same validation again; with a
+    // slow validator and frequent passes it would never end.
+    let finishValidation: (isValid: boolean) => void = () => undefined;
+    const validateP2PSegment = vi.fn(
+      () => new Promise<boolean>((resolve) => (finishValidation = resolve)),
+    );
+    const { loader, segment, callbacks, state } = setup({ validateP2PSegment });
+    const peer = state.requests
+      .getOrCreateRequest(segment(0))
+      .start(
+        { downloadSource: "p2p", peerId: "peer-x" },
+        { onAbort: () => undefined },
+      );
+    state.requests.get(segment(0))!.setTotalBytes(16);
+    peer.addLoadedChunk(new Uint8Array(16));
+    state.requests.get(segment(0))!.cancel();
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+    expect(state.requests.get(segment(0))!.isCompletingFromHeldBytes).toBe(
+      true,
+    );
+    loader.updatePlayback({ bufferAhead: 0, rate: 2 }); // a forced pass
+    await flush();
+
+    expect(httpOf("seg-0")).toEqual([]);
+    expect(validateP2PSegment).toHaveBeenCalledTimes(1);
+    finishValidation(true);
+    await flush();
+    expect(callbacks.onSuccess).toHaveBeenCalledTimes(1);
     loader.destroy();
   });
 
@@ -1391,6 +1561,34 @@ describe("HybridLoader: a download stopped with bytes in hand", () => {
     loader.destroy();
   });
 
+  it("gives the player's request its own attempts on a kept download", async () => {
+    // The prefetch of segment 5 failed every HTTP attempt, and a peer's
+    // download of it was then stopped with bytes. With no peer holding it
+    // now, the old failures left no way to load it and nothing rejected the
+    // request: the player waited for them to expire.
+    const { loader, segment, callbacks, startLoading, status, state } = setup({
+      httpErrorRetries: 3,
+    });
+    for (let i = 0; i < 3; i++) {
+      startLoading(5, "http").failWithError(
+        new RequestError("http-error", "503"),
+      );
+    }
+    startLoading(5, "p2p").addLoadedChunk(chunk());
+    const kept = state.requests.get(segment(5))!;
+    kept.cancel();
+    expect(kept.failedAttempts.httpAttemptsCount).toBe(3);
+
+    await loader.loadSegment(segment(5), callbacks);
+    await flush();
+
+    expect(state.httpStarted).toContain("seg-5");
+    expect(status(5)).toBe("loading");
+    expect(state.requests.get(segment(5))).toBe(kept);
+    expect(kept.loadedBytes).toBe(100);
+    loader.destroy();
+  });
+
   it("removes a stopped download once its segment leaves the queue", async () => {
     const { loader, segment, callbacks, state } = setup({
       simultaneousHttpDownloads: 3,
@@ -1437,6 +1635,82 @@ describe("HybridLoader: a download stopped with bytes in hand", () => {
     expect(state.requests.get(segment(7))).toBeUndefined();
     expect(count("PartialRequest:dropped-over-limit")).toBe(dropped + 1);
     loader.destroy();
+  });
+
+  // A kept download holds its bytes outside the storage: the ledger shows it
+  // as a PartialRequest record until it goes on, is cleared or is let go.
+  const livePartials = () => ledger.snapshot()?.live.PartialRequest ?? 0;
+  /** Segment 5, stopped with 100 bytes and kept by the next pass. */
+  async function keptPartial() {
+    const t = setup({ simultaneousHttpDownloads: 3 });
+    t.startLoading(5, "http").addLoadedChunk(chunk());
+    t.state.requests.get(t.segment(5))!.cancel();
+    await t.loader.loadSegment(t.segment(4), t.callbacks);
+    await flush();
+    expect(t.status(5)).toBe("aborted");
+    return t;
+  }
+
+  it("closes the record of a kept download when it goes on", async () => {
+    const before = livePartials();
+    const resumed = count("PartialRequest:resumed");
+    const { loader, segment } = await keptPartial();
+    expect(livePartials()).toBe(before + 1);
+
+    await loader.loadSegment(segment(5), {
+      onSuccess: vi.fn(),
+      onError: vi.fn(),
+    });
+    await flush();
+
+    expect(livePartials()).toBe(before);
+    expect(count("PartialRequest:resumed")).toBe(resumed + 1);
+    loader.destroy();
+  });
+
+  it("closes the record of a kept download when its segment leaves the queue", async () => {
+    const before = livePartials();
+    const left = count("PartialRequest:left-queue");
+    const { loader, segment, callbacks, state } = await keptPartial();
+
+    await loader.loadSegment(segment(20), callbacks);
+    await flush();
+
+    expect(state.requests.get(segment(5))).toBeUndefined();
+    expect(livePartials()).toBe(before);
+    expect(count("PartialRequest:left-queue")).toBe(left + 1);
+    loader.destroy();
+  });
+
+  it("closes the record of a kept download whose bytes are cleared", async () => {
+    // A source with a validator does not go on from another peer's bytes.
+    const before = livePartials();
+    const cleared = count("PartialRequest:cleared");
+    const { loader, segment, state } = await keptPartial();
+
+    state.requests.get(segment(5))!.clearLoadedBytes();
+
+    expect(livePartials()).toBe(before);
+    expect(count("PartialRequest:cleared")).toBe(cleared + 1);
+    loader.destroy();
+  });
+
+  it("closes the records of kept downloads let go over the limit, or destroyed", async () => {
+    const before = livePartials();
+    const { loader, segment, callbacks, state } = setup();
+    for (const i of [7, 5, 6]) {
+      state.requests
+        .getOrCreateRequest(segment(i))
+        .start({ downloadSource: "http" }, { onAbort: () => undefined })
+        .addLoadedChunk(chunk());
+      state.requests.get(segment(i))!.cancel();
+    }
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+    expect(livePartials()).toBe(before + 2);
+
+    loader.destroy();
+    expect(livePartials()).toBe(before);
   });
 
   it("announces at once when an urgent request already on HTTP stops other downloads", async () => {
@@ -1665,6 +1939,7 @@ describe("HybridLoader: counting how the P2P attempt after an HTTP failure goes"
     state.p2pStarted.length = 0;
     state.freePeerStops = false;
     state.p2pRefuses = false;
+    state.p2pFailsAtOnce = false;
     state.httpControls.clear();
     state.p2pControls.clear();
   });
@@ -1725,6 +2000,29 @@ describe("HybridLoader: counting how the P2P attempt after an HTTP failure goes"
     loader.destroy();
   });
 
+  it("goes on over HTTP at once when the peer fails the attempt at once", async () => {
+    // The peer's channel is closing: the attempt fails before downloadSegment
+    // returns, in a pass that has handled the settled requests already.
+    fakes.state.loadedBySomeone.add("seg-0");
+    fakes.state.p2pFailsAtOnce = true;
+    const before = counts();
+    const { loader, state } = await afterHttpFailure();
+
+    expect(state.p2pStarted).toEqual(["seg-0"]);
+    expect(state.httpStarted.filter((id) => id === "seg-0")).toHaveLength(2);
+    expect(delta(before)).toEqual({ failed: 1 });
+
+    // The attempt kept its tag: the next HTTP failure gets no second one.
+    state.p2pFailsAtOnce = false;
+    state.httpControls
+      .get("seg-0")!
+      .failWithError(new RequestError("http-error", "503"));
+    await flush();
+    expect(state.p2pStarted).toEqual(["seg-0"]);
+    expect(state.httpStarted.filter((id) => id === "seg-0")).toHaveLength(3);
+    loader.destroy();
+  });
+
   it("counts an attempt the peer fails, once", async () => {
     fakes.state.loadedBySomeone.add("seg-0");
     const before = counts();
@@ -1779,6 +2077,93 @@ describe("HybridLoader: counting how the P2P attempt after an HTTP failure goes"
     const { loader } = await afterHttpFailure();
 
     expect(delta(before)).toEqual({ freed: 1 });
+    loader.destroy();
+  });
+});
+
+describe("HybridLoader: a request that settles during a pass", () => {
+  beforeEach(() => {
+    vi.stubGlobal("window", globalThis);
+    const { state } = fakes;
+    state.peerCount = 1;
+    state.loadedBySomeone.clear();
+    state.httpStarted.length = 0;
+    state.p2pStarted.length = 0;
+    state.p2pRefuses = false;
+    state.p2pFailsAtOnce = false;
+    state.p2pCompletesAtOnce = false;
+    state.p2pAtOnce.clear();
+    state.onP2PStart = undefined;
+    state.httpControls.clear();
+    state.p2pControls.clear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("delivers a segment that a peer sends at once, with no other event", async () => {
+    // The pass handles the settled requests before it starts the player's
+    // download, so the download that succeeds at once is handled by the one
+    // more pass that follows.
+    fakes.state.p2pCompletesAtOnce = true;
+    const { loader, segment, callbacks, state } = setup();
+    loader.updatePlayback({ bufferAhead: 10, rate: 1 });
+    await flush();
+    // The peer has it from now on: no prefetch took it before the player.
+    state.loadedBySomeone.add("seg-1");
+    const after = count("QueuePass:after-settle");
+
+    await loader.loadSegment(segment(1), callbacks);
+    await flush();
+
+    expect(state.p2pStarted).toEqual(["seg-1"]);
+    expect(callbacks.onSuccess).toHaveBeenCalledTimes(1);
+    expect(count("QueuePass:after-settle")).toBe(after + 1);
+    loader.destroy();
+  });
+
+  it("handles a success in a follow-up pass, though failures there get no more passes", async () => {
+    // Segment 3 fails at once in every pass, which limits the passes. When
+    // it first starts, a peer gets segment 2, which then succeeds at once in
+    // the follow-up pass: a request the player may be waiting for.
+    const { loader, segment, state } = setup();
+    loader.updatePlayback({ bufferAhead: 10, rate: 1 });
+    await flush();
+    state.loadedBySomeone.add("seg-3");
+    state.p2pAtOnce.set("seg-3", "fail");
+    state.onP2PStart = (id) => {
+      if (id !== "seg-3") return;
+      state.loadedBySomeone.add("seg-2");
+      state.p2pAtOnce.set("seg-2", "succeed");
+    };
+
+    loader.updatePlayback({ bufferAhead: 10, rate: 2 });
+    await flush();
+
+    expect(state.p2pStarted).toContain("seg-2");
+    // Handled — stored and removed — with no other event.
+    expect(state.requests.get(segment(2))).toBeUndefined();
+    loader.destroy();
+  });
+
+  it("runs one more pass, not more, when a download fails at once in each pass", async () => {
+    // A peer whose channel is closing fails the prefetch in every pass.
+    // Each pass asking for the next would never end.
+    fakes.state.loadedBySomeone.add("seg-2");
+    fakes.state.p2pFailsAtOnce = true;
+    const { loader, state } = setup();
+    loader.updatePlayback({ bufferAhead: 10, rate: 1 });
+    await flush();
+    const after = count("QueuePass:after-settle");
+    const limited = count("QueuePass:after-settle:limited");
+    const started = state.p2pStarted.length;
+
+    loader.updatePlayback({ bufferAhead: 10, rate: 2 });
+    await flush();
+
+    expect(state.p2pStarted.length - started).toBe(2);
+    expect(count("QueuePass:after-settle")).toBe(after + 1);
+    expect(count("QueuePass:after-settle:limited")).toBe(limited + 1);
     loader.destroy();
   });
 });
