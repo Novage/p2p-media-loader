@@ -58,6 +58,6 @@
   },
   "devDependencies": {
     "hls.js": "^1.7.3",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.4"
   }
 }

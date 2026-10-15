@@ -47,9 +47,9 @@
     "clean:build": "rimraf lib dist build p2p-media-loader-demo-*.tgz"
   },
   "dependencies": {
-    "@videojs/dash-video": "10.0.1",
-    "@videojs/hlsjs-video": "10.0.1",
-    "@videojs/react": "10.0.1",
+    "@videojs/dash-video": "10.1.0",
+    "@videojs/hlsjs-video": "10.1.0",
+    "@videojs/react": "10.1.0",
     "d3": "^7.9.0",
     "dashjs": "^5.2.1",
     "dplayer": "^1.27.1",
@@ -72,8 +72,8 @@
     "cpy-cli": "^7.0.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "peerDependencies": {
     "react": ">=16",
