@@ -283,6 +283,10 @@ export function probeSummary() {
     // judged urgent although the element's buffer was above the threshold
     urgentWithBuffer: U.urg.filter((x) => x.u && x.el != null && x.el > x.thr)
       .length,
+    // each with the time from the step's start, to place it in the step
+    urgentWithBufferSample: U.urg
+      .filter((x) => x.u && x.el != null && x.el > x.thr)
+      .slice(0, 4),
     // judged not urgent although the buffer was below the threshold
     notUrgentLow: U.urg.filter((x) => !x.u && x.core < x.thr).length,
     misses: U.miss.length,
@@ -324,7 +328,11 @@ export function stepRows(after, before, extra = {}) {
       http: d["Download:http:succeed"] ?? 0,
       p2p: d["Download:p2p:succeed"] ?? 0,
       failures: Object.fromEntries(
-        Object.entries(d).filter(([k]) => /fail|abort|Miss/i.test(k)),
+        // peer closes beside failures: a P2P failure with no peer closed is
+        // the unexpected one (specs/diagnostics.md, "Reading a snapshot")
+        Object.entries(d).filter(([k]) =>
+          /fail|abort|Miss|PeerClosed/i.test(k),
+        ),
       ),
       leaked: (b.open ?? []).filter((t) => a.open.includes(t)),
       anomalies: a.anomalies,
