@@ -186,7 +186,7 @@ export class Peer {
           if (request.totalBytes === undefined) {
             request.setTotalBytes(request.loadedBytes + command.s);
           } else if (request.totalBytes - request.loadedBytes !== command.s) {
-            const sizeFrom = request.totalBytesFromPeer;
+            const sizeFrom = request.heldBytes.sizePeer;
             if (sizeFrom !== undefined && sizeFrom !== this.id) {
               // Another peer gave the size, and the two disagree: nothing
               // tells which one is right. Neither is closed; the bytes and
@@ -200,7 +200,7 @@ export class Peer {
               this.#destroyOnPeerError(
                 "bytes-length-mismatch",
                 "Peer response bytes length mismatch",
-                request.hasBytesFrom(this.id),
+                request.heldBytes.hasBytesFrom(this.id),
               );
             }
           }

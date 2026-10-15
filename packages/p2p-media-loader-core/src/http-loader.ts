@@ -218,7 +218,7 @@ export class HttpRequestExecutor {
       // without throwing an error. We must verify that we received the full segment.
       // If truncated, we throw without clearing loaded bytes to allow the next
       // download attempt to resume from the current offset using HTTP Range requests.
-      const sizePeer = this.request.totalBytesFromPeer;
+      const { sizePeer } = this.request.heldBytes;
       if (
         sizePeer !== undefined &&
         this.request.totalBytes !== undefined &&
@@ -264,7 +264,7 @@ export class HttpRequestExecutor {
         }
         if (!isValid) {
           throw this.rejectPeer(
-            this.request.peerOwner,
+            this.request.heldBytes.owner,
             "p2p-segment-validation-failed",
             "the segment failed validation",
           );
@@ -290,8 +290,7 @@ export class HttpRequestExecutor {
   private handleResponseHeaders(response: Response) {
     if (!response.ok) {
       if (response.status === 406 || response.status === 416) {
-        const sizePeer =
-          this.request.totalBytesFromPeer ?? this.request.peerOwner;
+        const sizePeer = this.request.heldBytes.peerForExcessBytes;
         if (response.status === 416 && sizePeer !== undefined) {
           // The bytes held go past the end of the segment HTTP has: the
           // peer that gave the size, or sent them, was wrong.
@@ -382,7 +381,7 @@ export class HttpRequestExecutor {
       // A 200 is HTTP's whole answer, and no bytes are held by now. It drops
       // a size a peer gave — a failed peer download can leave one behind with
       // no bytes — and judges no peer: a peer is judged only on bytes it sent.
-      if (this.request.totalBytesFromPeer !== undefined) {
+      if (this.request.heldBytes.sizePeer !== undefined) {
         this.request.clearLoadedBytes();
       }
       // With Content-Encoding, Content-Length is the encoded length, and the
@@ -409,7 +408,7 @@ export class HttpRequestExecutor {
   private isPeersDownload(): boolean {
     return (
       this.httpConfig.validateP2PSegment !== undefined &&
-      this.request.hasBytesFromPeers
+      this.request.heldBytes.hasPeerBytes
     );
   }
 
@@ -443,7 +442,7 @@ export class HttpRequestExecutor {
    * failure.
    */
   private sizeMismatch(response: Response) {
-    const sizePeer = this.request.totalBytesFromPeer;
+    const { sizePeer } = this.request.heldBytes;
     if (sizePeer !== undefined) {
       return this.rejectPeer(
         sizePeer,

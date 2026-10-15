@@ -10,7 +10,11 @@ import {
   RequestErrorType,
   Segment,
 } from "../types.js";
-import * as Utils from "../utils/utils.js";
+import {
+  HeldBytes,
+  type ByteSource,
+  type HeldBytesView,
+} from "./held-bytes.js";
 import { EventTarget } from "../utils/event-target.js";
 
 export type LoadProgress = {
@@ -113,28 +117,8 @@ function mapSegmentWithStreamToSegment(segment: SegmentWithStream): Segment {
 export class Request {
   private currentAttempt?: RequestAttempt;
   private _failedAttempts = new FailedRequestAttempts();
-  private finalData?: ArrayBuffer;
-  private bytes: Uint8Array[] = [];
-  private _loadedBytes = 0;
-  /**
-   * The peers whose bytes are held, by id. Bytes from HTTP, a trusted source,
-   * are not listed.
-   */
-  private readonly bytesFromPeers = new Set<string>();
-  /**
-   * The latest peer that sent some of the bytes held. HTTP bytes do not
-   * change it, on purpose: a download that holds a peer's bytes is that
-   * peer's, however many HTTP bytes follow, and completes and is validated
-   * as the peer's (see `tryCompleteByLoadedBytes`).
-   */
-  private latestPeerWithBytes?: string;
-  private _totalBytes?: number;
-  /**
-   * The peer whose message gave `_totalBytes`; `undefined` where the size
-   * came from the segment's byte range or from HTTP, both trusted, or is not
-   * known.
-   */
-  private totalBytesPeer?: string;
+  /** The bytes held, with who sent them, and the size, with who gave it. */
+  private readonly held: HeldBytes;
   private _status: RequestStatus = "not-started";
   private progress?: LoadProgress;
   /** The attempt under way, as the shared bandwidth calculators measure it. */
@@ -167,7 +151,7 @@ export class Request {
     this.onSegmentStart = eventTarget.getEventDispatcher("onSegmentStart");
     this.onSegmentLoaded = eventTarget.getEventDispatcher("onSegmentLoaded");
 
-    this._totalBytes = sizeFromByteRange(this.segment);
+    this.held = new HeldBytes(sizeFromByteRange(this.segment));
     this.notReceivingBytesTimeout = new Timeout(this.abortOnTimeout);
 
     const { type } = this.segment.stream;
@@ -176,54 +160,26 @@ export class Request {
 
   clearLoadedBytes() {
     this.endKept("cleared");
-    this._loadedBytes = 0;
-    this.bytes = [];
-    this.bytesFromPeers.clear();
-    this.latestPeerWithBytes = undefined;
-    // A segment's byte range gives its size whatever bytes are held; without
-    // it, every later HTTP attempt would fail its Content-Range check.
-    this._totalBytes = sizeFromByteRange(this.segment);
-    this.totalBytesPeer = undefined;
-    this.finalData = undefined;
+    this.held.clear();
   }
 
-  /**
-   * The peer this download belongs to: the one whose bytes it holds. Bytes
-   * from HTTP are trusted and give it no owner. `undefined` also where bytes
-   * from more than one peer are held, which happens only when nothing
-   * validates peers' bytes (see `dropBytesFromOtherPeers`).
-   */
-  get peerOwner(): string | undefined {
-    if (this.bytesFromPeers.size !== 1) return undefined;
-    return this.bytesFromPeers.values().next().value;
-  }
-
-  /** Whether a peer sent some of the bytes held. */
-  get hasBytesFromPeers(): boolean {
-    return this.bytesFromPeers.size > 0;
-  }
-
-  /** Whether `peerId` sent some of the bytes held. */
-  hasBytesFrom(peerId: string): boolean {
-    return this.bytesFromPeers.has(peerId);
+  /** The bytes held and the size, for the rules that read them. */
+  get heldBytes(): HeldBytesView {
+    return this.held;
   }
 
   /**
    * Clears the bytes held if any of them came from a peer other than
-   * `peerId`, which is about to go on with the download. A download belongs
-   * to the peer whose bytes it holds, and the validation of the whole
-   * segment blames that peer: its connection is closed. So a peer must not
-   * go on from another peer's bytes. Bytes from HTTP are trusted and kept.
+   * `peerId`, which is about to go on with the download and validate it
+   * (`HeldBytes.otherPeerThan`). Bytes from HTTP are trusted and kept.
    */
   dropBytesFromOtherPeers(peerId: string) {
-    for (const from of this.bytesFromPeers) {
-      if (from === peerId) continue;
-      this.logger(
-        `${this.segment.externalId}: ${this._loadedBytes} bytes dropped, some from peer ${from}; peer ${peerId} validates the whole segment`,
-      );
-      this.clearLoadedBytes();
-      return;
-    }
+    const other = this.held.otherPeerThan(peerId);
+    if (other === undefined) return;
+    this.logger(
+      `${this.segment.externalId}: ${this.held.length} bytes dropped, some from peer ${other}; peer ${peerId} validates the whole segment`,
+    );
+    this.clearLoadedBytes();
   }
 
   get status() {
@@ -313,11 +269,11 @@ export class Request {
   }
 
   get loadedBytes() {
-    return this._loadedBytes;
+    return this.held.length;
   }
 
   get totalBytes(): number | undefined {
-    return this._totalBytes;
+    return this.held.size;
   }
 
   /**
@@ -329,19 +285,19 @@ export class Request {
   get secondsToComplete(): number | undefined {
     const { progress } = this;
     if (this._status !== "loading" || !progress) return undefined;
-    if (this._totalBytes === undefined || progress.loadedBytes === 0) {
+    const total = this.held.size;
+    if (total === undefined || progress.loadedBytes === 0) {
       return undefined;
     }
     const since = progress.responseTimestamp ?? progress.startTimestamp;
     const elapsed = (performance.now() - since) / 1000;
     if (elapsed < 0.1) return undefined;
-    const remaining = Math.max(0, this._totalBytes - this._loadedBytes);
+    const remaining = Math.max(0, total - this.held.length);
     return remaining / (progress.loadedBytes / elapsed);
   }
 
   get data(): ArrayBuffer {
-    this.finalData ??= Utils.joinChunks(this.bytes).buffer;
-    return this.finalData;
+    return this.held.data;
   }
 
   get failedAttempts() {
@@ -362,19 +318,12 @@ export class Request {
    * peer gave can be wrong (`totalBytesFromPeer`).
    */
   setTotalBytes(value: number) {
-    if (this._totalBytes !== undefined) {
-      throw new Error("Request total bytes value is already set");
-    }
-    this._totalBytes = value;
-    this.totalBytesPeer =
-      this.currentAttempt?.downloadSource === "p2p"
-        ? this.currentAttempt.peerId
-        : undefined;
+    this.held.setSize(value, this.attemptSource());
   }
 
   /** The peer that gave the total size, if a peer did. */
   get totalBytesFromPeer(): string | undefined {
-    return this.totalBytesPeer;
+    return this.held.sizePeer;
   }
 
   /**
@@ -382,7 +331,14 @@ export class Request {
    * peer that gives another one later is the one at fault.
    */
   confirmTotalBytes() {
-    this.totalBytesPeer = undefined;
+    this.held.confirmSize();
+  }
+
+  /** The source of the attempt under way, or HTTP with none. */
+  private attemptSource(): ByteSource {
+    return this.currentAttempt?.downloadSource === "p2p"
+      ? { downloadSource: "p2p", peerId: this.currentAttempt.peerId }
+      : { downloadSource: "http" };
   }
 
   /**
@@ -422,26 +378,25 @@ export class Request {
       | undefined,
     onPeerBytesRejected: (peerId: string, cause: PeerDataFault) => void,
   ): boolean {
-    if (!this._totalBytes) return false;
-
-    if (this._loadedBytes > this._totalBytes) {
+    const { held } = this;
+    if (held.isOverflow) {
       this.logger(
-        `${this.segment.externalId} loaded bytes overflow: ${this._loadedBytes} > ${this._totalBytes}, clearing`,
+        `${this.segment.externalId} loaded bytes overflow: ${held.length} > ${held.size}, clearing`,
       );
       this.clearLoadedBytes();
       return false;
     }
+    if (!held.isComplete) return false;
 
-    if (this._loadedBytes !== this._totalBytes) return false;
-
-    const peerId = this.latestPeerWithBytes;
-    const requestData: StartRequestParameters =
-      peerId === undefined
-        ? { downloadSource: "http", tag, fromHeldBytes: true }
-        : { downloadSource: "p2p", peerId, tag, fromHeldBytes: true };
-    const owner = this.peerOwner;
+    const source = held.completionSource;
+    const requestData: StartRequestParameters = {
+      ...source,
+      tag,
+      fromHeldBytes: true,
+    };
+    const { owner } = held;
     const validate =
-      peerId === undefined || validateP2PSegment === undefined
+      source.downloadSource === "http" || validateP2PSegment === undefined
         ? undefined
         : async (...args: Parameters<typeof validateP2PSegment>) => {
             let isValid: boolean;
@@ -559,7 +514,7 @@ export class Request {
       String(this.segment.externalId),
     );
     this.progress = {
-      startFromByte: this._loadedBytes,
+      startFromByte: this.held.length,
       loadedBytes: 0,
       startTimestamp: performance.now(),
     };
@@ -708,7 +663,7 @@ export class Request {
     this.manageBandwidthCalculatorsState("stop");
     this.notReceivingBytesTimeout.clear();
     this.setStatus("succeed");
-    this._totalBytes = this._loadedBytes;
+    this.held.settleSize();
     this.onSegmentLoaded({
       segment: mapSegmentWithStreamToSegment(this.segment),
       bytesLength: this.data.byteLength,
@@ -739,14 +694,9 @@ export class Request {
       if (downloads.http) httpBC.addBytes(downloads.http, byteLength);
     }
 
-    this.bytes.push(chunk);
-    if (this.currentAttempt.downloadSource === "p2p") {
-      this.bytesFromPeers.add(this.currentAttempt.peerId);
-      this.latestPeerWithBytes = this.currentAttempt.peerId;
-    }
+    this.held.add(chunk, this.attemptSource());
     this.progress.lastLoadedChunkTimestamp = performance.now();
     this.progress.loadedBytes += byteLength;
-    this._loadedBytes += byteLength;
   };
 
   private throwErrorIfNotLoadingStatus() {
