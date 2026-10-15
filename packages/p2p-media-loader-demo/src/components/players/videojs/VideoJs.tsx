@@ -29,11 +29,14 @@ export const VideoJs = ({
     // Video.js replaces the element it is given, so it gets one of its own.
     const videoElement = document.createElement("video");
     videoElement.className = "video-js vjs-default-skin";
-    videoElement.style.width = "100%";
-    videoElement.style.aspectRatio = "16 / 9";
     containerRef.current.appendChild(videoElement);
 
     const player = videojs(videoElement, {
+      // Sized by Video.js: the container's width at 16:9. Left to size
+      // itself, a player takes the height of the video it plays — 480 px for
+      // 480p — whatever the width CSS gives it.
+      fluid: true,
+      aspectRatio: "16:9",
       controls: true,
       autoplay: true,
       muted: true,
