@@ -150,6 +150,10 @@ export const P2PVideoDemo = ({
     () => ({
       announceTrackers: trackers,
       swarmId: queryParams.swarmId === "" ? undefined : queryParams.swarmId,
+      // Holds HTTP back for the first 3 s of a stream, so that the peers met
+      // in that time can serve its first segments. A player that finds no
+      // peer starts up to 3 s later than it would alone.
+      httpDownloadInitialTimeoutMs: 3000,
     }),
     [trackers, queryParams.swarmId],
   );
