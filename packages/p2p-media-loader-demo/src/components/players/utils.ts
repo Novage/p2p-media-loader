@@ -1,9 +1,11 @@
 import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 import { PlayerEvents } from "./../../types";
 import { ShakaP2PEngine } from "p2p-media-loader-shaka";
+import { DashJsP2PEngine } from "p2p-media-loader-dashjs";
+import { VideoJsP2PEngine } from "p2p-media-loader-videojs";
 
 type UIEventsProps = PlayerEvents & {
-  engine: HlsJsP2PEngine | ShakaP2PEngine;
+  engine: HlsJsP2PEngine | ShakaP2PEngine | DashJsP2PEngine | VideoJsP2PEngine;
 };
 
 export const subscribeToUiEvents = ({

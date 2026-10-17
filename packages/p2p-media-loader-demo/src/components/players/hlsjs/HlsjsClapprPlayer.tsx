@@ -7,8 +7,8 @@ import Hls from "hls.js";
 import { useScripts } from "../../../hooks/useScripts";
 
 const SCRIPTS = [
-  "https://cdn.jsdelivr.net/npm/@clappr/player@~0/dist/clappr.min.js",
-  "https://cdn.jsdelivr.net/gh/clappr/clappr-level-selector-plugin@~0/dist/level-selector.min.js",
+  "https://cdn.jsdelivr.net/npm/@clappr/player@~0.14/dist/clappr.min.js",
+  "https://cdn.jsdelivr.net/npm/@clappr/level-selector@~1/dist/level-selector.min.js",
 ];
 
 export const HlsjsClapprPlayer = ({
@@ -73,7 +73,6 @@ export const HlsjsClapprPlayer = ({
     onPeerConnect,
     onPeerClose,
     streamUrl,
-    
   ]);
 
   return Hls.isSupported() ? (

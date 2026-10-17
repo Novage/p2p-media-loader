@@ -3,7 +3,8 @@ packages:
   - "demo"
 
 allowBuilds:
-  core-js: true
+  core-js: false
 
 minimumReleaseAgeExclude:
   - '@rolldown/binding-openharmony-arm64@1.2.8'
+  - shaka-player@5.2.13

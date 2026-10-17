@@ -4,8 +4,6 @@ Table of contents:
 
 - [What is tracker?](#what-is-tracker)
 - [Don't use public trackers in production](#dont-use-public-trackers-in-production)
-- [How to achieve better P2P ratio for live streams?](#how-to-achieve-better-p2p-ratio-for-live-streams)
-- [How to achieve better P2P ratio for VOD streams?](#how-to-achieve-better-p2p-ratio-for-vod-streams)
 - [What are the requirements to share a stream over P2P?](#what-are-the-requirements-to-share-a-stream-over-p2p)
 - [Is it possible to have 100% P2P ratio?](#is-it-possible-to-have-100-p2p-ratio)
 - [What happens if there are no peers on a stream?](#what-happens-if-there-are-no-peers-on-a-stream)
@@ -22,6 +20,7 @@ Few [public trackers](https://openwebtorrent.com/) are configured in the library
 
 Any compatible WebTorrent tracker works for `P2P Media Loader`:
 
+- [wt-tracker-rust](https://github.com/Novage/wt-tracker-rust) (recommended) - multi-core WebTorrent tracker by Novage written in Rust, a port of wt-tracker that runs `wss://tracker.novage.com.ua`. A 2-core Oracle Cloud **Free** Tier Ampere A1 instance can serve ~100k peers (one WebSocket connection per peer; estimated).
 - [Aquatic](https://github.com/greatest-ape/aquatic) - A high-performance BitTorrent tracker written in Rust.
 - [wt-tracker](https://github.com/Novage/wt-tracker) - high-performance WebTorrent tracker by Novage that uses [uWebSockets.js](https://github.com/uNetworking/uWebSockets.js) for I/O.
 - [bittorrent-tracker](https://github.com/webtorrent/bittorrent-tracker) - tracker from WebTorrent project that uses Node.js I/O
@@ -38,8 +37,8 @@ That is why they can't be used in production environments. Consider running your
 The requirements to share a stream over P2P are:
 
 - The stream should have the same swarm ID on all the peers. Swarm ID is equal to the stream manifest URL without query parameters by default. If a stream URL is not the same for different peers you can set the swarm ID manually [using configuration](#how-to-manually-set-swarm-id).
-- The manifest should have the same number of variants (i.e. qualities) in the same order on all the peers. URLs of the variant playlists don't matter.
-- Variants should consist of the same segments under the same sequence numbers (see #EXT-X-MEDIA-SEQUENCE for HLS) on all the peers. URLs of the segments don't matter.
+- Every peer's manifest should describe each quality with the same properties: codecs, resolution, frame rate, video range, language, channels and name. Those are what a stream's swarm is derived from. Neither the order of the variants nor the URLs of the variant playlists matter.
+- Variants should consist of the same segments at the same positions on all the peers - the same media sequence numbers for HLS (see #EXT-X-MEDIA-SEQUENCE), the same presentation times for MPEG-DASH. URLs of the segments don't matter.
 
 ## Is it possible to have 100% P2P ratio?
 
@@ -93,7 +92,7 @@ const hls = new HlsWithP2P({
       },
     },
     onHlsJsCreated(hls) {
-      // Subscribe to P2P engine and Hls.js events here
+      // Subscribe to P2P engine and HLS.js events here
       hls.p2pEngine.addEventListener("onSegmentLoaded", (details) => {
         console.log("Segment Loaded:", details);
       });
@@ -124,7 +123,7 @@ const hls = new HlsWithP2P({
       swarmId: "https://somecdn.com/mystream_12345.m3u8", // any unique string
     },
     onHlsJsCreated(hls) {
-      // Subscribe to P2P engine and Hls.js events here
+      // Subscribe to P2P engine and HLS.js events here
       hls.p2pEngine.addEventListener("onSegmentLoaded", (details) => {
         console.log("Segment Loaded:", details);
       });
@@ -135,7 +134,7 @@ const hls = new HlsWithP2P({
 
 ## How to see that P2P is actually working?
 
-The easiest way is to subscribe to P2P [events](https://novage.github.io/p2p-media-loader/docs/v4.0/types/p2p-media-loader-core.CoreEventMap.html) and log them:
+The easiest way is to subscribe to P2P [events](https://novage.github.io/p2p-media-loader/docs/v5.0/types/p2p-media-loader-core.p2p-media-loader-core.CoreEventMap.html) and log them:
 
 ```javascript
 const engine = new HlsJsP2PEngine();
@@ -162,8 +161,16 @@ Open few P2P enabled players with the same stream so they can connect.
 
 ## How to debug?
 
-To enable ALL debugging type in browser's console `localStorage.debug = 'p2pml-core:*'` and reload the webpage.
+The library logs through the [`debug`](https://www.npmjs.com/package/debug) package. Type the namespaces in the browser's console, separated by commas, and reload the webpage:
 
-To enable specific logs use filtering like `localStorage.debug = 'p2pml-core:peer'`.
+```js
+localStorage.debug = "p2pml-core:*,p2pml-hlsjs:*";
+```
 
-Check the source code for all the possible log types.
+| Namespace                                                             | Logs                                                             |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `p2pml-core:*`                                                        | The core: requests, downloads, peers, trackers, manifests, clock |
+| `p2pml-hlsjs:*`, `p2pml-shaka:*`, `p2pml-dashjs:*`, `p2pml-videojs:*` | Each player integration                                          |
+| `p2pml:diagnostics`                                                   | Turns the diagnostics ledger on, and logs its anomalies (README) |
+
+To narrow the output, name one logger, for example `localStorage.debug = 'p2pml-core:peer'`. Check the source code for all the possible log types.

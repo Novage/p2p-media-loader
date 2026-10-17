@@ -14,6 +14,9 @@
     <h1>P2P Media Loader IIFE Bundle Test</h1>
     <video id="video" width="640" controls autoplay></video>
 
+    <h2>Downloaded segments</h2>
+    <ol id="segment-log"></ol>
+
     <script>
       const manifestUri = "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8";
 
@@ -28,6 +31,24 @@
           const hls = new HlsWithP2P();
 
           hls.attachMedia(video);
+
+          // Every segment the core finished downloading, appended to the page
+          // with where it came from: "http" or "p2p" (with the peer's id).
+          const segmentLog = document.getElementById("segment-log");
+          hls.p2pEngine.addEventListener("onSegmentLoaded", (details) => {
+            const { segment, downloadSource, peerId, bytesLength } = details;
+            const item = document.createElement("li");
+            const source =
+              downloadSource === "p2p" ? `p2p from ${peerId}` : downloadSource;
+            // The file name tells quality levels apart: each level numbers its
+            // own segments, so one externalId recurs after a quality switch.
+            const fileName = new URL(segment.url).pathname.split("/").pop();
+            item.textContent =
+              `${details.streamType} segment ${segment.externalId} ${fileName} ` +
+              `(${segment.startTime.toFixed(1)}s–${segment.endTime.toFixed(1)}s, ` +
+              `${(bytesLength / 1024).toFixed(0)} KiB) — ${source}`;
+            segmentLog.appendChild(item);
+          });
           hls.on(Hls.Events.ERROR, function (event, data) {
             console.error("Error code", data.details, "object", data);
           });

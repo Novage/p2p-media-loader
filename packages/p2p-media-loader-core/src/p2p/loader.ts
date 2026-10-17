@@ -1,7 +1,9 @@
+import { diagnostics, type DiagnosticsToken } from "../diagnostics.js";
 import { Peer } from "./peer.js";
 import { CoreEventMap, PeerError, StreamConfig } from "../types.js";
 import { SegmentWithStream, StreamWithSegments } from "../internal-types.js";
 import { RequestsContainer } from "../requests/request-container.js";
+import { AttemptTag, PeerDataFault } from "../requests/request.js";
 import { WebTorrentManager } from "../webtorrent/webtorrent-manager/index.js";
 import { WebTorrentSocketPool } from "../webtorrent/webtorrent-socket-pool/index.js";
 import * as StreamUtils from "../utils/stream.js";
@@ -19,6 +21,13 @@ export class P2PLoader {
   readonly #webtorrentManager: WebTorrentManager;
   readonly #peersMap = new Map<string, Peer>();
   #isAnnounceMicrotaskCreated = false;
+  /**
+   * Bytes moved in this swarm since this loader joined it, reported to the
+   * trackers. Complete transfers only: a segment when it is delivered, an
+   * upload when its last byte is sent.
+   */
+  #downloadedBytes = 0;
+  #uploadedBytes = 0;
   readonly #webtorrentManagerLogger = debug("p2pml-core:webtorrent-manager");
   readonly #churnLogger = debug("p2pml-core:churn-cleanup");
 
@@ -29,6 +38,8 @@ export class P2PLoader {
   readonly #webTorrentSocketPool: WebTorrentSocketPool;
   readonly #eventTarget: EventTarget<EventTargetMap>;
   readonly #onSegmentAnnouncement: () => void;
+  readonly #diagnosticsToken: DiagnosticsToken | undefined;
+  readonly #unprobePeers: (() => void) | undefined;
   #churnCleanupTimeoutId?: ReturnType<typeof setTimeout>;
 
   readonly #onPeerConnect: CoreEventMap["onPeerConnect"];
@@ -78,6 +89,10 @@ export class P2PLoader {
       offerTimeout: () => this.#config.webRtcOfferTimeoutMs,
       iceGatheringTimeout: () => this.#config.webRtcIceGatheringTimeoutMs,
       connectionTimeout: () => this.#config.webRtcConnectionTimeoutMs,
+      transferredBytes: () => ({
+        uploaded: this.#uploadedBytes,
+        downloaded: this.#downloadedBytes,
+      }),
     });
 
     this.#webtorrentManager.addEventListener(
@@ -136,6 +151,16 @@ export class P2PLoader {
     );
 
     this.#webtorrentManager.start();
+    // Must equal the manager's PeersHeld: a peer held there and not wrapped
+    // here is connected and never used.
+    this.#unprobePeers = diagnostics?.probe(
+      `PeersWrapped:${this.#stream.infoHash.slice(0, 8)}`,
+      () => this.#peersMap.size,
+    );
+    this.#diagnosticsToken = diagnostics?.open(
+      "P2PLoader",
+      this.#stream.streamSwarmId.slice(-12),
+    );
 
     this.#churnCleanupTimeoutId = setTimeout(
       this.#churnCleanup,
@@ -198,7 +223,15 @@ export class P2PLoader {
     }
   };
 
-  downloadSegment(segment: SegmentWithStream) {
+  /**
+   * Starts downloading `segment` from a peer that has all of it and sends
+   * nothing else. `tag` says why the attempt was started.
+   *
+   * @returns Whether an attempt started. One that started can already have
+   * settled — failed, as on a channel that is closing, or succeeded from
+   * bytes held — which the request's status shows.
+   */
+  downloadSegment(segment: SegmentWithStream, tag?: AttemptTag): boolean {
     const peersWithSegment: Peer[] = [];
     for (const peer of this.#peersMap.values()) {
       if (
@@ -209,12 +242,29 @@ export class P2PLoader {
       }
     }
 
-    if (peersWithSegment.length === 0) return;
+    if (peersWithSegment.length === 0) return false;
 
     const selectedPeer = selectPeerForDownload(peersWithSegment);
 
     const request = this.#requests.getOrCreateRequest(segment);
-    selectedPeer.downloadSegment(request);
+    return selectedPeer.downloadSegment(request, tag);
+  }
+
+  /**
+   * Makes a peer that has all of `segment` free to send it: where every such
+   * peer downloads something else, the download of one of them stops. A peer
+   * downloads one segment at a time, and in a small swarm the one peer that
+   * has the segment is often busy with prefetch.
+   *
+   * @returns Whether a download was stopped.
+   */
+  freePeerFor(segment: SegmentWithStream): boolean {
+    const toStop = segmentToStopFor(this.#peersMap.values(), segment);
+    if (!toStop) return false;
+    const request = this.#requests.get(toStop);
+    if (request?.status !== "loading") return false;
+    request.cancel();
+    return true;
   }
 
   isSegmentLoadingOrLoadedBySomeone(segment: SegmentWithStream): boolean {
@@ -229,6 +279,10 @@ export class P2PLoader {
       if (peer.getSegmentStatus(segment) === "loaded") return true;
     }
     return false;
+  }
+
+  get connectedPeerIds(): IterableIterator<string> {
+    return this.#peersMap.keys();
   }
 
   get connectedPeerCount() {
@@ -248,7 +302,9 @@ export class P2PLoader {
     );
     const httpLoading: number[] = [];
 
-    for (const request of this.#requests.httpRequests()) {
+    // Only downloads under way: a stopped or failed one announced as loading
+    // makes peers wait for a segment that nobody is fetching.
+    for (const request of this.#requests.loadingHttpRequests()) {
       const segment = this.#stream.segments.get(request.segment.runtimeId);
       if (!segment) continue;
 
@@ -425,11 +481,22 @@ export class P2PLoader {
     const peerClosedWhileAwait = !this.#peersMap.has(peer.id);
     if (peerClosedWhileAwait) return;
 
-    if (!segmentData) {
+    if (!segmentData || segmentData.byteLength === 0) {
+      if (segmentData) {
+        // Storage handed back a segment with no bytes. Core owns what it
+        // stores and never lets a consumer touch it, so this can only be a
+        // storage implementation that does not — most likely one whose buffer
+        // was detached by a player transmuxing it. Say the segment is absent
+        // rather than pass the defect on, and say so loudly: silently seeding
+        // nothing looks exactly like having no peers.
+        this.#webtorrentManagerLogger(
+          `refusing to upload empty segment ${segmentExternalId} to peer ${peer.id}: segment storage returned no bytes`,
+        );
+      }
       peer.sendSegmentAbsentCommand(segmentExternalId, requestId);
       return;
     }
-    await peer.uploadSegmentData(
+    this.#uploadedBytes += await peer.uploadSegmentData(
       segment,
       requestId,
       byteFrom !== undefined
@@ -438,7 +505,33 @@ export class P2PLoader {
     );
   };
 
+  /**
+   * Closes the connection to a peer whose data an HTTP download found wrong,
+   * with the same error type as when its own download finds it: its bytes
+   * failed validation, or HTTP contradicted the size it gave.
+   */
+  closePeerWithBadData(peerId: string, cause: PeerDataFault) {
+    this.#peersMap
+      .get(peerId)
+      ?.destroy(
+        false,
+        new PeerError(
+          cause,
+          cause === "validation-failed"
+            ? "Its bytes failed validation in a download HTTP finished"
+            : "HTTP contradicted the size it gave",
+        ),
+      );
+  }
+
+  /** A segment of this swarm was delivered, over HTTP or P2P. */
+  noteDownloadedBytes(bytes: number) {
+    this.#downloadedBytes += bytes;
+  }
+
   destroy() {
+    diagnostics?.close(this.#diagnosticsToken, "destroyed");
+    this.#unprobePeers?.();
     clearTimeout(this.#churnCleanupTimeoutId);
     this.#churnCleanupTimeoutId = undefined;
 
@@ -461,7 +554,34 @@ export class P2PLoader {
   }
 }
 
-export function selectPeerForDownload(peersWithSegment: Peer[]): Peer {
+/**
+ * The segment whose download must stop so that a peer holding all of
+ * `segment` can send it: none where such a peer is free, or where no peer
+ * holds it; otherwise, all of them busy, the download furthest ahead, as
+ * `abortFurthestDownloadFor` chooses. A nearer one is likely the next segment
+ * the player asks for, and stopped, its request could become urgent in turn.
+ */
+export function segmentToStopFor(
+  peers: Iterable<
+    Pick<Peer, "getSegmentStatus"> & {
+      readonly downloadingSegment: SegmentWithStream | undefined;
+    }
+  >,
+  segment: SegmentWithStream,
+): SegmentWithStream | undefined {
+  let busySegment: SegmentWithStream | undefined;
+  for (const peer of peers) {
+    if (peer.getSegmentStatus(segment) !== "loaded") continue;
+    const downloading = peer.downloadingSegment;
+    if (!downloading) return undefined;
+    if (!busySegment || downloading.startTime > busySegment.startTime) {
+      busySegment = downloading;
+    }
+  }
+  return busySegment;
+}
+
+function selectPeerForDownload(peersWithSegment: Peer[]): Peer {
   if (peersWithSegment.length === 1) {
     return peersWithSegment[0];
   }
