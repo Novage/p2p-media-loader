@@ -493,7 +493,11 @@ Clappr's. For each:
   range resolves to, is npm's `latest` (`npm view <package> dist-tags`). A
   newer version on another tag, such as `next-8`, does not count. An older
   major is a finding unless the demo says why where it loads it, as for
-  Clappr's Shaka 4, which its DASH plugin requires.
+  Clappr's Shaka 4, which its DASH plugin requires. Video.js 8 and Video.js
+  10 are two players under one package name, `video.js`: Video.js 8 plays
+  through its own MSE engine, VHS, which the Video.js adapter targets, and
+  Video.js 10 through HLS.js or dash.js. The demo plays both, so Video.js 8
+  is judged against `latest-8`, and Video.js 10 against `latest`.
 - **Not deprecated.** `npm view <package>@<version> deprecated` is empty.
 - **From its current home.** The source repository is not archived (GitHub
   API, `archived`). A package that moved is loaded from where it moved to,
