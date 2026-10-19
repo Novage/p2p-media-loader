@@ -26,6 +26,12 @@ function ahead(v) {
   return 0;
 }
 
+/** The element's dropped and total frames since it loaded. */
+function quality(v) {
+  const q = v.getVideoPlaybackQuality?.();
+  return q ? [q.droppedVideoFrames, q.totalVideoFrames] : null;
+}
+
 /** Sets this tab's rate and starts a sampler of its own for the phase. */
 export function startPhase(rate) {
   const v = video();
@@ -39,6 +45,8 @@ export function startPhase(rate) {
     waiting: 0,
     minAhead: Infinity,
     rates: new Set(),
+    heights: new Set(),
+    frames0: quality(v),
     counters: window.__p2pmlDiagnostics?.snapshot().counters ?? {},
   };
   window.__rateP = P;
@@ -52,6 +60,7 @@ export function startPhase(rate) {
   window.__rateTimer = setInterval(() => {
     P.minAhead = Math.min(P.minAhead, ahead(v));
     P.rates.add(v.playbackRate);
+    P.heights.add(v.videoHeight);
   }, 1000);
   return { me: P.me, rate: P.rate };
 }
@@ -77,10 +86,13 @@ export function endPhase() {
     failures: Object.fromEntries(
       Object.entries(d).filter(([k]) => /fail|Miss/i.test(k)),
     ),
+    // the phase's own frames, dropped and total: the element counts from
+    // its load, so a share read after a 2× phase would carry it
     frames: (() => {
-      const q = v.getVideoPlaybackQuality?.();
-      return q ? [q.droppedVideoFrames, q.totalVideoFrames] : null;
+      const q = quality(v);
+      return q && P.frames0 ? [q[0] - P.frames0[0], q[1] - P.frames0[1]] : null;
     })(),
+    heights: [...P.heights],
     anomalies: window.__p2pmlDiagnostics?.snapshot().anomalies.length ?? 0,
   };
 }
@@ -158,7 +170,7 @@ export function summarize(entries) {
         ph.tabs
           .map(
             (t) =>
-              `r${t.rate}${t.rates.length > 1 ? JSON.stringify(t.rates) : ""} x${t.speed} w${t.waiting} min${t.minAhead} rs${t.rs} e${t.err} http${t.http}/p2p${t.p2p} f${JSON.stringify(t.failures)} an${t.anomalies}`,
+              `r${t.rate}${t.rates.length > 1 ? JSON.stringify(t.rates) : ""} x${t.speed} w${t.waiting} min${t.minAhead} rs${t.rs} e${t.err} http${t.http}/p2p${t.p2p} f${JSON.stringify(t.failures)} an${t.anomalies} drop${t.frames && t.frames[1] ? ((100 * t.frames[0]) / t.frames[1]).toFixed(1) : "?"}% ${t.heights?.join("/")}p`,
           )
           .join(" | "),
     ),
