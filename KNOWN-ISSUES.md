@@ -33,6 +33,25 @@ The tests themselves are in
   probably because the STUN servers did not answer, so each offer and answer
   waited the full 5 s gathering timeout. Every test ran on one machine; Part 2,
   on real networks, judges this.
+- **A new swarm's offers wait the full 5 s ICE gathering timeout on a Linux
+  host with IPv6 enabled on a network that gives it no IPv6.** Such a host
+  keeps a link-local IPv6 address and has no IPv6 route; glibc counts the
+  link-local address, so `getaddrinfo` returns IPv6 addresses even with
+  `AI_ADDRCONFIG`. `stun.l.google.com`, the first of the default
+  `rtcConfig.iceServers`, has one. Chrome gets the server-reflexive candidate
+  from its IPv4 address in about 20 ms, but never completes gathering,
+  waiting on the IPv6 one. Each offer then goes out 5.04 s after the
+  "started" announce, so two tabs that join a rendition together hold a peer
+  5.0–6.0 s after their players switch (release test 6, HLS.js, dash.js and
+  Video.js 8, 19 October). An answer does not wait. Only time is lost, on
+  every swarm join; WebTorrent's own client waits the same way. With IPv6
+  disabled on the same host's interface, `getaddrinfo` returned only the IPv4
+  address, gathering completed in 123–160 ms, offers went out 159–166 ms after
+  the announce, and the tabs held a peer at once; a Mac on the same network
+  had no delay. A user fixes it by giving the host working IPv6 or disabling
+  IPv6 on its interface. Ending the wait in the client once the servers'
+  candidates are in is proposed, with the measurement that decides it, in
+  [specs/proposals/ice-gathering-early-end.md](specs/proposals/ice-gathering-early-end.md).
 - **The yield to an urgent request works for each stream type.** Video and
   audio have separate loaders. An urgent video request stops the other HTTP
   downloads of the video loader only, and the audio loader's prefetch goes
