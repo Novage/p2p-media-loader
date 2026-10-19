@@ -727,6 +727,24 @@ export class Request {
   }
 }
 
+/** The wait before the first HTTP retry; each further one waits twice as long. */
+const HTTP_RETRY_WAIT_MS = 1000;
+/**
+ * How long after its last failure a request's failed attempts are cleared
+ * (`clearIfStale`), which gives a prefetch that spent its HTTP attempts new
+ * ones. This value and the cap below are stated in the `httpErrorRetries`
+ * doc (types.ts), specs/playback-contract.md ("Urgency") and the CHANGELOG:
+ * a change here changes them too.
+ */
+const FAILED_ATTEMPTS_CLEAR_INTERVAL = 60000;
+/**
+ * The longest wait: half the clear interval. A wait as long as the interval
+ * would end after the attempts it counts are cleared, and `httpErrorRetries`
+ * would never be reached; the other half leaves room for the timer that
+ * starts the retry.
+ */
+const HTTP_RETRY_MAX_WAIT_MS = FAILED_ATTEMPTS_CLEAR_INTERVAL / 2;
+
 class FailedRequestAttempts {
   private attempts: FailedAttempt[] = [];
 
@@ -735,18 +753,38 @@ class FailedRequestAttempts {
   }
 
   /**
-   * The HTTP attempts that failed. One that failed on a peer's bytes or size
-   * it went on from is not counted: the fault was the peer's, and HTTP's
-   * attempts are the request's last resort.
+   * The HTTP attempts that failed at the origin, oldest first. One that
+   * failed on a peer's bytes or size it went on from is not among them: the
+   * fault was the peer's, and HTTP's attempts are the request's last resort.
+   * The limit of attempts and the wait between them both count these.
    */
-  get httpAttemptsCount() {
-    return this.attempts.reduce(
-      (sum, attempt) =>
-        attempt.downloadSource === "http" && !failedOnPeerData(attempt)
-          ? sum + 1
-          : sum,
-      0,
+  private originHttpFailures(): FailedAttempt[] {
+    return this.attempts.filter(
+      (attempt) =>
+        attempt.downloadSource === "http" && !failedOnPeerData(attempt),
     );
+  }
+
+  /** The HTTP attempts that failed at the origin. */
+  get httpAttemptsCount() {
+    return this.originHttpFailures().length;
+  }
+
+  /**
+   * When the next HTTP attempt may start: the last origin failure, plus a
+   * wait of 1 s that doubles with each such failure, up to 30 s.
+   * `undefined` with none.
+   * An origin that just failed is often still failing; attempts spread out
+   * reach it after a short outage, and leave a peer time to send the segment.
+   */
+  get httpRetryAt(): number | undefined {
+    const failures = this.originHttpFailures();
+    if (failures.length === 0) return undefined;
+    const wait = Math.min(
+      HTTP_RETRY_WAIT_MS * 2 ** (failures.length - 1),
+      HTTP_RETRY_MAX_WAIT_MS,
+    );
+    return failures[failures.length - 1].error.timestamp + wait;
   }
 
   get p2pAttemptsCount() {
@@ -767,6 +805,23 @@ class FailedRequestAttempts {
 
   clear() {
     this.attempts = [];
+  }
+
+  /**
+   * Clears the failed attempts once `FAILED_ATTEMPTS_CLEAR_INTERVAL` has
+   * passed since the last one, of any kind. That is never before the last
+   * origin failure that `httpRetryAt` counts from, so a capped wait always
+   * ends first.
+   *
+   * @returns Whether it cleared them.
+   */
+  clearIfStale(now: number): boolean {
+    const last = this.lastAttempt;
+    if (!last || now - last.error.timestamp <= FAILED_ATTEMPTS_CLEAR_INTERVAL) {
+      return false;
+    }
+    this.clear();
+    return true;
   }
 }
 

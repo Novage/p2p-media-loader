@@ -251,6 +251,25 @@ const flushMicrotasks = async () => {
   for (let i = 0; i < 8; i++) await Promise.resolve();
 };
 
+/** The first segment after segment 0 that this peer ranks `rank` for, against `peer-0`. */
+const segmentRanked = (rank: number) =>
+  Array.from({ length: 20 }, (_, i) => i + 1).find(
+    (i) => rankForSegment("me", ["peer-0"], i) === rank,
+  )!;
+
+/**
+ * The loaders `setup` made and no test has destroyed yet. A test that fails
+ * before its own `destroy()` would leave its loader's prefetch timer running
+ * into later tests; an `afterEach` destroys what is left here.
+ */
+const liveLoaders = new Set<HybridLoader>();
+const destroyLiveLoaders = () => {
+  for (const loader of liveLoaders) loader.destroy();
+};
+// Every block: a loader a failed test leaves alive must not run into the
+// next test.
+afterEach(destroyLiveLoaders);
+
 function setup(
   configOverrides: Partial<StreamConfig> = {},
   storage: SegmentStorage = emptyStorage,
@@ -286,6 +305,12 @@ function setup(
     new EventTarget<CoreEventMap>(),
     "me",
   );
+  // Once only: a second destroy() would close the loader's record again.
+  const destroy = loader.destroy.bind(loader);
+  liveLoaders.add(loader);
+  loader.destroy = () => {
+    if (liveLoaders.delete(loader)) destroy();
+  };
   const { state } = fakes;
   const callbacks = { onSuccess: vi.fn(), onError: vi.fn() };
   /** A download the queue started on an earlier pass. */
@@ -1813,6 +1838,328 @@ describe("HybridLoader: a download about to finish when a request is urgent", ()
   });
 });
 
+describe("HybridLoader: the start-of-stream wait for peers", () => {
+  // `httpDownloadInitialTimeoutMs` holds every HTTP start back, the
+  // player's urgent request and the owner's prefetch alike.
+  let clock = 0;
+  beforeEach(() => {
+    vi.stubGlobal("window", globalThis);
+    vi.useFakeTimers();
+    clock = 0;
+    vi.spyOn(performance, "now").mockImplementation(() => clock);
+    const { state } = fakes;
+    state.peerCount = 1;
+    state.loadedBySomeone.clear();
+    state.httpStarted.length = 0;
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  const owned = segmentRanked(0);
+  const WAIT = {
+    httpDownloadInitialTimeoutMs: 3000,
+    simultaneousHttpDownloads: 10,
+  };
+  /** Moves the clock and the timers to `ms`, reporting `bufferAhead`. */
+  async function at(loader: HybridLoader, ms: number, bufferAhead?: number) {
+    if (bufferAhead !== undefined) {
+      loader.updatePlayback({ bufferAhead, rate: 1 });
+    }
+    vi.advanceTimersByTime(ms - clock);
+    clock = ms;
+    await flushMicrotasks();
+  }
+
+  it("holds the player's urgent request until the wait is over", async () => {
+    const { loader, segment, callbacks, state } = setup(WAIT);
+    // No report: the request is urgent.
+    await loader.loadSegment(segment(0), callbacks);
+    await flushMicrotasks();
+
+    await at(loader, 2999);
+    expect(state.httpStarted).toEqual([]);
+    await at(loader, 3000);
+    expect(state.httpStarted).toContain("seg-0");
+    loader.destroy();
+  });
+
+  it("holds the owner's prefetch until the wait is over", async () => {
+    // Segment 0 comes from the peer and the buffer is full: the player's
+    // request takes no link, and only the election fetches over HTTP.
+    fakes.state.loadedBySomeone.add("seg-0");
+    const { loader, segment, callbacks, state } = setup(WAIT);
+    loader.updatePlayback({ bufferAhead: 10, rate: 1 });
+    await loader.loadSegment(segment(0), callbacks);
+    await flushMicrotasks();
+
+    await at(loader, 2999, 10);
+    expect(state.httpStarted).toEqual([]);
+    await at(loader, 3000, 10);
+    expect(state.httpStarted).toContain(`seg-${owned}`);
+    loader.destroy();
+  });
+});
+
+describe("HybridLoader: the wait between HTTP retries", () => {
+  // An origin that just failed is often still failing. A retry waits 1 s,
+  // then twice as long after each failure, unless the player's request is
+  // urgent; a peer may send the segment meanwhile.
+  let clock = 0;
+  beforeEach(() => {
+    vi.stubGlobal("window", globalThis);
+    clock = 0;
+    vi.spyOn(performance, "now").mockImplementation(() => clock);
+    const { state } = fakes;
+    state.peerCount = 0;
+    state.loadedBySomeone.clear();
+    state.httpStarted.length = 0;
+    state.p2pStarted.length = 0;
+    state.httpControls.clear();
+    state.p2pControls.clear();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  // A segment this peer owns against `peer-0`, ahead of segment 0.
+  const owned = segmentRanked(0);
+  const started = (id: string) =>
+    fakes.state.httpStarted.filter((started) => started === id).length;
+  const failHttp = async (id: string) => {
+    fakes.state.httpControls
+      .get(id)!
+      .failWithError(new RequestError("http-error", "503"));
+    await flush();
+  };
+  /** The peer download of `id` sends its bytes and succeeds. */
+  const servePeer = async (id: string) => {
+    const controls = fakes.state.p2pControls.get(id)!;
+    controls.addLoadedChunk(new Uint8Array(16));
+    controls.completeOnSuccess();
+    await flush();
+  };
+  /** Moves the clock, and runs a pass as a playlist refresh does. */
+  const passAt = async (
+    { loader, segment }: Pick<ReturnType<typeof setup>, "loader" | "segment">,
+    ms: number,
+  ) => {
+    clock = ms;
+    loader.updatePlayback({ bufferAhead: 10, rate: 1 });
+    loader.updateStream(segment(0).stream);
+    await flush();
+  };
+
+  /** The owner's prefetch of `owned`, started and still loading. */
+  async function prefetching(overrides: Partial<StreamConfig> = {}) {
+    fakes.state.peerCount = 1;
+    // Segment 0 comes from the peer, so that the player's request does not
+    // take the link.
+    fakes.state.loadedBySomeone.add("seg-0");
+    const t = setup({
+      simultaneousHttpDownloads: 10,
+      simultaneousP2PDownloads: 3,
+      ...overrides,
+    });
+    t.loader.updatePlayback({ bufferAhead: 10, rate: 1 });
+    await t.loader.loadSegment(t.segment(0), t.callbacks);
+    await flush();
+    expect(started(`seg-${owned}`)).toBe(1);
+    return { ...t, at: (ms: number) => passAt(t, ms) };
+  }
+
+  it("spreads the owner's HTTP retries: 1 s, then 2 s", async () => {
+    const afterWait = count("HttpRetry:after-wait");
+    const { loader, at } = await prefetching();
+
+    await failHttp(`seg-${owned}`);
+    expect(started(`seg-${owned}`)).toBe(1);
+    await at(999);
+    expect(started(`seg-${owned}`)).toBe(1);
+    await at(1000);
+    expect(started(`seg-${owned}`)).toBe(2);
+
+    await failHttp(`seg-${owned}`);
+    await at(2999);
+    expect(started(`seg-${owned}`)).toBe(2);
+    await at(3000);
+    expect(started(`seg-${owned}`)).toBe(3);
+    expect(count("HttpRetry:after-wait")).toBe(afterWait + 2);
+    loader.destroy();
+  });
+
+  it("takes the segment from a peer that gets it during the wait", async () => {
+    const servedByPeer = count("HttpRetry:served-by-peer");
+    const { loader, at, state } = await prefetching();
+    await failHttp(`seg-${owned}`);
+
+    state.loadedBySomeone.add(`seg-${owned}`);
+    await at(500);
+    expect(state.p2pStarted).toContain(`seg-${owned}`);
+    await servePeer(`seg-${owned}`);
+
+    await at(1000);
+    expect(started(`seg-${owned}`)).toBe(1);
+    expect(count("HttpRetry:served-by-peer")).toBe(servedByPeer + 1);
+    loader.destroy();
+  });
+
+  it("holds a backup's HTTP retry too", async () => {
+    // A slow link brings the backup's deadline at once, while the buffer is
+    // well above the urgency threshold: the request is not urgent.
+    const backup = segmentRanked(1);
+    fakes.state.peerCount = 1;
+    const { loader, segment, callbacks, bandwidth } = setup(
+      { simultaneousHttpDownloads: 10 },
+      emptyStorage,
+      undefined,
+      backup,
+    );
+    const download = bandwidth.http.startLoading(clock - 1000);
+    bandwidth.http.addBytes(download, 20_000);
+    bandwidth.http.stopLoading(download, clock);
+    const at = (ms: number) => passAt({ loader, segment }, ms);
+    loader.updatePlayback({ bufferAhead: 10, rate: 1 });
+    await loader.loadSegment(segment(backup), callbacks);
+    await flush();
+    expect(started(`seg-${backup}`)).toBe(1);
+
+    await failHttp(`seg-${backup}`);
+    await at(999);
+    expect(started(`seg-${backup}`)).toBe(1);
+    await at(1000);
+    expect(started(`seg-${backup}`)).toBe(2);
+    loader.destroy();
+  });
+
+  it("does not hold the player's request for a segment whose prefetch just failed", async () => {
+    // The player's request starts with no failed attempts, so the wait the
+    // prefetch started is gone, and its first attempt is no retry.
+    const urgent = count("HttpRetry:urgent");
+    const afterWait = count("HttpRetry:after-wait");
+    const { loader, segment, callbacks } = await prefetching();
+    await failHttp(`seg-${owned}`);
+
+    clock = 200;
+    loader.updatePlayback({ bufferAhead: 10, rate: 1 });
+    await loader.loadSegment(segment(owned), callbacks);
+    await flush();
+
+    expect(started(`seg-${owned}`)).toBe(2);
+    expect(count("HttpRetry:urgent")).toBe(urgent);
+    expect(count("HttpRetry:after-wait")).toBe(afterWait);
+    loader.destroy();
+  });
+
+  it("gives a prefetch new HTTP attempts 60 s after its last failure", async () => {
+    // One attempt only: after the 503 the prefetch has none left.
+    const { loader, at } = await prefetching({ httpErrorRetries: 1 });
+    await failHttp(`seg-${owned}`);
+
+    await at(30_000);
+    expect(started(`seg-${owned}`)).toBe(1);
+    await at(60_001);
+    expect(started(`seg-${owned}`)).toBe(2);
+    loader.destroy();
+  });
+
+  it("counts no peer's send after the HTTP attempts are spent", async () => {
+    // No HTTP retry was coming: the wait had no part in it.
+    const servedByPeer = count("HttpRetry:served-by-peer");
+    const { loader, at, state } = await prefetching({ httpErrorRetries: 1 });
+    await failHttp(`seg-${owned}`);
+
+    state.loadedBySomeone.add(`seg-${owned}`);
+    await at(500);
+    await servePeer(`seg-${owned}`);
+
+    expect(count("HttpRetry:served-by-peer")).toBe(servedByPeer);
+    loader.destroy();
+  });
+
+  it("counts the urgent request's own peer attempt only as that", async () => {
+    // An urgent request does not wait; its P2P attempt after an HTTP failure
+    // has counters of its own.
+    const servedByPeer = count("HttpRetry:served-by-peer");
+    const served = count("SegmentRequest:peer-after-http-failure:served");
+    fakes.state.peerCount = 1;
+    fakes.state.loadedBySomeone.add("seg-0");
+    const { loader, segment, callbacks, state } = setup();
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+    await failHttp("seg-0");
+    await servePeer("seg-0");
+
+    expect(count("SegmentRequest:peer-after-http-failure:served")).toBe(
+      served + 1,
+    );
+    expect(count("HttpRetry:served-by-peer")).toBe(servedByPeer);
+    loader.destroy();
+  });
+
+  it("counts an urgent request's retry as urgent, also after a slow peer attempt", async () => {
+    // The peer attempt between the two HTTP attempts outlasts the 1 s wait;
+    // the request still never waited.
+    const urgent = count("HttpRetry:urgent");
+    const afterWait = count("HttpRetry:after-wait");
+    fakes.state.peerCount = 1;
+    fakes.state.loadedBySomeone.add("seg-0");
+    const { loader, segment, callbacks, state } = setup();
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+    await failHttp("seg-0");
+    expect(state.p2pStarted).toContain("seg-0");
+
+    clock = 1500;
+    state.p2pControls
+      .get("seg-0")!
+      .failWithError(new RequestError("bytes-receiving-timeout"));
+    await flush();
+
+    expect(started("seg-0")).toBe(2);
+    expect(count("HttpRetry:urgent")).toBe(urgent + 1);
+    expect(count("HttpRetry:after-wait")).toBe(afterWait);
+    loader.destroy();
+  });
+
+  it("does not hold an urgent request: its retry goes at once", async () => {
+    const urgent = count("HttpRetry:urgent");
+    // No report: the request is urgent, and no peer has the segment.
+    const { loader, segment, callbacks } = setup();
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+
+    await failHttp("seg-0");
+
+    expect(started("seg-0")).toBe(2);
+    expect(count("HttpRetry:urgent")).toBe(urgent + 1);
+    loader.destroy();
+  });
+
+  it("holds a request that is not urgent, with no peer to wait for", async () => {
+    const { loader, segment, callbacks } = setup();
+    loader.updatePlayback({ bufferAhead: 10, rate: 1 });
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+    expect(started("seg-0")).toBe(1);
+
+    await failHttp("seg-0");
+    expect(started("seg-0")).toBe(1);
+
+    clock = 1000;
+    loader.updatePlayback({ bufferAhead: 9, rate: 1 });
+    // A pass, as the prefetch timer or a playlist refresh runs one.
+    loader.updateStream(segment(0).stream);
+    await flush();
+    expect(started("seg-0")).toBe(2);
+    expect(callbacks.onError).not.toHaveBeenCalled();
+    loader.destroy();
+  });
+});
+
 describe("HybridLoader: a nearly full storage", () => {
   beforeEach(() => {
     vi.stubGlobal("window", globalThis);
@@ -1833,9 +2180,7 @@ describe("HybridLoader: a nearly full storage", () => {
     getUsage: () => ({ totalCapacity: 100, usedCapacity: 98 }),
   } as unknown as SegmentStorage;
   // A segment this peer owns against `peer-0`, after the first.
-  const owned = Array.from({ length: 20 }, (_, i) => i + 1).find(
-    (i) => rankForSegment("me", ["peer-0"], i) === 0,
-  )!;
+  const owned = segmentRanked(0);
 
   it("prefetches nothing the player has not asked for", async () => {
     const { loader, segment, state } = setup(

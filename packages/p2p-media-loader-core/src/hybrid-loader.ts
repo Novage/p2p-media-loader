@@ -32,7 +32,6 @@ import { WebTorrentSocketPool } from "./webtorrent/webtorrent-socket-pool/index.
 import { PlaybackTracker } from "./playback-tracker.js";
 import type { PlaybackState } from "./playback.js";
 
-const FAILED_ATTEMPTS_CLEAR_INTERVAL = 60000;
 const PEER_UPDATE_LATENCY = 1000;
 /** Weight of the newest sample in the running estimate of a stream's segment size. */
 const SEGMENT_BYTES_EWMA_ALPHA = 0.3;
@@ -371,8 +370,21 @@ export class HybridLoader {
 
         case "succeed": {
           if (!type) break;
+          const httpFailures = request.failedAttempts.httpAttemptsCount;
           if (request.lastAttemptTag === "peer-after-http-failure") {
+            // The urgent request's own attempt, which does not wait.
             diagnostics?.count("SegmentRequest:peer-after-http-failure:served");
+          } else if (
+            type === "p2p" &&
+            httpFailures > 0 &&
+            httpFailures < httpErrorRetries
+          ) {
+            // A peer sent the segment after an origin failure, while an HTTP
+            // attempt was still allowed: an upper bound of what the wait
+            // gave it time for, since the election may have given the retry
+            // to another peer meanwhile. Not after the HTTP attempts are
+            // spent.
+            diagnostics?.count("HttpRetry:served-by-peer");
           }
           if (type === "http") {
             this.p2pLoaders.currentLoader.broadcastAnnouncement();
@@ -469,13 +481,7 @@ export class HybridLoader {
       }
 
       request.markHandledByProcessQueue();
-      const { lastAttempt } = request.failedAttempts;
-      if (
-        lastAttempt &&
-        now - lastAttempt.error.timestamp > FAILED_ATTEMPTS_CLEAR_INTERVAL
-      ) {
-        request.failedAttempts.clear();
-      }
+      request.failedAttempts.clearIfStale(now);
     }
     this.limitPartialRequests(partials);
     return stored;
@@ -507,25 +513,20 @@ export class HybridLoader {
     } = this.generateQueue();
     const stored = this.processRequests(queueSegmentIds, queueDownloadRatio);
 
-    const { simultaneousP2PDownloads, httpDownloadInitialTimeoutMs } =
-      this.config;
+    const { simultaneousP2PDownloads } = this.config;
 
-    const timeSinceStart = performance.now() - this.createdAt;
-    const isInitialHttpWait =
-      httpDownloadInitialTimeoutMs > 0 &&
-      timeSinceStart < httpDownloadInitialTimeoutMs;
-
-    if (isInitialHttpWait) {
+    const initialHttpWaitLeftMs = this.initialHttpWaitLeftMs();
+    if (initialHttpWaitLeftMs > 0) {
       this.initialHttpDelayTimeoutId ??= window.setTimeout(() => {
         if (this.destroyed) {
           diagnostics?.anomaly("HybridLoader initial HTTP delay after destroy");
         }
         this.initialHttpDelayTimeoutId = undefined;
         this.requestProcessQueueMicrotask();
-      }, httpDownloadInitialTimeoutMs - timeSinceStart);
+      }, initialHttpWaitLeftMs);
     }
 
-    this.processEngineRequest(isInitialHttpWait);
+    this.processEngineRequest();
 
     // Prefetch over P2P: a segment in the P2P window from any peer that has
     // it. Nothing in the queue is urgent; HTTP prefetching is the owner's
@@ -544,13 +545,13 @@ export class HybridLoader {
     // were stored; where any was, the brake on prefetching reads it afresh.
     // Exact for the memory storage, which stores synchronously; a custom
     // storage that writes asynchronously may not have landed the bytes yet,
-    // and the brake then reads what it would have read anyway.
-    if (!isInitialHttpWait) {
-      this.prefetchThroughHttp(
-        queue,
-        stored ? undefined : availableStorageCapacityPercent,
-      );
-    }
+    // and the brake then reads what it would have read anyway. During the
+    // start-of-stream wait it returns at once, before it measures the
+    // storage.
+    this.prefetchThroughHttp(
+      queue,
+      stored ? undefined : availableStorageCapacityPercent,
+    );
   }
 
   /**
@@ -570,8 +571,12 @@ export class HybridLoader {
    * - Not urgent: from a peer that has it. If none has it, the election
    *   decides who fetches it over HTTP (`prefetchThroughHttp`), or it waits;
    *   the buffer drains while it waits, and it becomes urgent in time.
+   *
+   * After an HTTP failure of the request, its next HTTP attempt waits
+   * (`isHttpRetryWaiting`) unless the request is urgent; meanwhile a peer
+   * that has it sends it. That holds the HTTP-at-once cases above too.
    */
-  private processEngineRequest(isInitialHttpWait: boolean) {
+  private processEngineRequest() {
     const { engineRequest } = this;
     // Not while the storage is answering it: the request is this loader's
     // from before the read so that an abort meanwhile finds it, and a
@@ -594,11 +599,9 @@ export class HybridLoader {
       );
     }
 
-    const { simultaneousP2PDownloads, httpErrorRetries } = this.config;
+    const { simultaneousP2PDownloads } = this.config;
     const p2pLoader = this.p2pLoaders.currentLoader;
-    const canLoadThroughHttp =
-      !isInitialHttpWait &&
-      (request?.failedAttempts.httpAttemptsCount ?? 0) < httpErrorRetries;
+    const canLoadThroughHttp = this.canStartHttp(request, urgent);
 
     if (request?.status === "loading") {
       if (!urgent) return;
@@ -614,7 +617,7 @@ export class HybridLoader {
       ) {
         request.cancel();
         this.yieldHttpPrefetchTo(segment);
-        this.loadThroughHttp(segment, "high");
+        this.loadThroughHttp(segment, "high", urgent);
       }
       return;
     }
@@ -632,7 +635,7 @@ export class HybridLoader {
     if (urgent && canLoadThroughHttp) {
       if (request && this.tryPeerAfterHttpFailure(request)) return;
       this.yieldHttpPrefetchTo(segment);
-      this.loadThroughHttp(segment, "high");
+      this.loadThroughHttp(segment, "high", urgent);
       return;
     }
     const startNow =
@@ -640,13 +643,14 @@ export class HybridLoader {
       p2pLoader.connectedPeerCount === 0 ||
       engineRequest.shouldBeStartedImmediately;
     if (startNow && canLoadThroughHttp && this.freeSlotFor(segment, "http")) {
-      this.loadThroughHttp(segment, "high");
+      this.loadThroughHttp(segment, "high", urgent);
       return;
     }
 
-    // Not urgent, or no HTTP for it — before the initial HTTP delay ends, or
-    // once its HTTP attempts are spent: from a peer that has it. Only a
-    // request that must start now takes a slot from prefetch to do so.
+    // Not urgent, or no HTTP for it — before the initial HTTP delay ends,
+    // while an HTTP retry waits, or once its HTTP attempts are spent: from a
+    // peer that has it. Only a request that must start now takes a slot from
+    // prefetch to do so.
     if (
       p2pLoader.isSegmentLoadingOrLoadedBySomeone(segment) &&
       (startNow
@@ -856,12 +860,20 @@ export class HybridLoader {
    * that the browser serves it before prefetch where it can: on HTTP/2 and
    * HTTP/3 it gets the bandwidth first, and on any protocol it leaves the
    * browser's queue for the host first. `"low"` for prefetch.
+   * @param urgent - Whether the player's request is urgent, so that its
+   * retry skipped the wait (`canStartHttp`).
    */
   private loadThroughHttp(
     segment: SegmentWithStream,
     priority: RequestPriority,
+    urgent: boolean,
   ) {
     const request = this.requests.getOrCreateRequest(segment);
+    if (request.failedAttempts.httpAttemptsCount > 0) {
+      // By the reason, not the clock: the player's urgent request never
+      // waits, though a P2P attempt before this retry can outlast the wait.
+      diagnostics?.count(urgent ? "HttpRetry:urgent" : "HttpRetry:after-wait");
+    }
     const executor = new HttpRequestExecutor(
       request,
       this.config,
@@ -874,6 +886,50 @@ export class HybridLoader {
     );
     executor.execute();
     this.p2pLoaders.currentLoader.broadcastAnnouncement();
+  }
+
+  /**
+   * Whether an HTTP attempt may start for the request now, as far as the
+   * request goes: not during the start-of-stream wait, not once its HTTP
+   * attempts are spent (`httpErrorRetries`), and not while a retry waits
+   * unless the request is urgent — its buffer has no time left to wait with.
+   * Every HTTP start of a request asks this; free slots, the link an urgent
+   * request holds and the election are each caller's own.
+   */
+  private canStartHttp(request: Request | undefined, urgent: boolean): boolean {
+    return (
+      !this.isInitialHttpWait() &&
+      (request?.failedAttempts.httpAttemptsCount ?? 0) <
+        this.config.httpErrorRetries &&
+      (urgent || !this.isHttpRetryWaiting(request))
+    );
+  }
+
+  /**
+   * Whether HTTP is still held back at the start of the stream, for
+   * `httpDownloadInitialTimeoutMs`, so that the peers met in that time can
+   * serve the first segments.
+   */
+  private isInitialHttpWait(): boolean {
+    return this.initialHttpWaitLeftMs() > 0;
+  }
+
+  /** How long the start-of-stream wait has left: zero or less once it is over. */
+  private initialHttpWaitLeftMs(): number {
+    return (
+      this.config.httpDownloadInitialTimeoutMs -
+      (performance.now() - this.createdAt)
+    );
+  }
+
+  /**
+   * Whether the request's next HTTP attempt must still wait after an HTTP
+   * failure (`httpRetryAt`). A queue pass, or the prefetch timer every one to
+   * two seconds, starts it once the wait is over.
+   */
+  private isHttpRetryWaiting(request: Request | undefined): boolean {
+    const retryAt = request?.failedAttempts.httpRetryAt;
+    return retryAt !== undefined && performance.now() < retryAt;
   }
 
   private loadThroughP2P(segment: SegmentWithStream) {
@@ -904,12 +960,9 @@ export class HybridLoader {
     queue?: readonly QueueItem[],
     capacityPercent?: number,
   ) {
-    const { httpDownloadInitialTimeoutMs } = this.config;
-    const isInitialHttpWait =
-      httpDownloadInitialTimeoutMs > 0 &&
-      performance.now() - this.createdAt < httpDownloadInitialTimeoutMs;
-
-    if (isInitialHttpWait) return;
+    // Nothing may start during the start-of-stream wait (`canStartHttp`):
+    // return before the storage is measured.
+    if (this.isInitialHttpWait()) return;
     // An urgent request has the link to itself while it downloads.
     if (this.isUrgentRequestOnHttp()) return;
 
@@ -932,7 +985,7 @@ export class HybridLoader {
     const onlyRequested = availableStorageCapacityPercent <= 10;
     if (onlyRequested && requested === undefined) return;
 
-    const { simultaneousHttpDownloads, httpErrorRetries } = this.config;
+    const { simultaneousHttpDownloads } = this.config;
     const peerIds = Array.from(p2pLoader.connectedPeerIds);
     const { http } = this.bandwidthCalculators;
     const measuredBandwidth = Math.max(
@@ -964,14 +1017,12 @@ export class HybridLoader {
         continue;
       }
       const request = this.requests.get(segment);
-      if (
-        request &&
-        (request.status === "loading" ||
-          request.status === "succeed" ||
-          request.failedAttempts.httpAttemptsCount >= httpErrorRetries)
-      ) {
+      if (request?.status === "loading" || request?.status === "succeed") {
         continue;
       }
+      // The election never skips a retry's wait: an urgent request is the
+      // player's path, `processEngineRequest`.
+      if (!this.canStartHttp(request, false)) continue;
 
       const rank = ElectionUtils.rankForSegment(
         this.peerId,
@@ -1008,6 +1059,7 @@ export class HybridLoader {
       this.loadThroughHttp(
         segment,
         segment.runtimeId === requested ? "high" : "low",
+        false,
       );
     }
   }

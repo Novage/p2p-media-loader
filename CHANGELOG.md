@@ -125,6 +125,12 @@ throughout.
   hold the player through every HTTP attempt while a peer has the segment.
   See [`specs/playback-contract.md`](specs/playback-contract.md), "Urgency",
   and [`specs/prefetch.md`](specs/prefetch.md), "Backups".
+- **HTTP retries wait.** In 4.x a failed HTTP download was tried again at once,
+  so a short burst of 5xx answers spent every `httpErrorRetries` attempt within
+  milliseconds. A retry now waits 1 s, and twice as long after each further
+  failure up to 30 s (1 s and 2 s with the default of 3 attempts), unless the
+  player's request is urgent, and a peer that gets the segment meanwhile sends
+  it.
 - **A live player is placed as deep in the live window as the window allows**,
   by one rule shared across the adapters, so the segments between a peer's
   buffer and the live edge are as many as possible for peers to exchange.

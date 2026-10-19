@@ -499,7 +499,10 @@ export type StreamConfig = {
   httpFirstByteTimeoutMs: number;
 
   /**
-   * The number of retries allowed following an HTTP error.
+   * The number of HTTP attempts a request gets, the first included: `3` is one attempt and
+   * two retries, and `1` allows no retry. A failure on a peer's data does not count.
+   * A retry waits 1 s after the first failure and twice as long after each next one, up to 30 s,
+   * unless the player's request is urgent; a peer may send the segment meanwhile.
    *
    * @default
    * ```typescript

@@ -230,11 +230,31 @@ paused player that asks for media wants its first frame.
   prefetch of the segment, is not it, and moves to HTTP as above. A player that
   aborts and asks again while the attempt runs keeps it, and gets no second
   one.
+
+- **HTTP retries wait, except an urgent request's.** After an HTTP failure,
+  the next HTTP attempt of the segment waits 1 s, then twice as long after
+  each further failure, up to 30 s: 1 s and 2 s with the default of three
+  attempts. The limit keeps the wait below the 60 s after which a request's
+  failed attempts are cleared, so that `httpErrorRetries` is reached. That
+  covers the owner's prefetch, a backup's fetch, and a player's request that
+  is not urgent, also with no peer connected. An origin that just failed is
+  often still failing: attempts spread out reach it after a short outage,
+  where attempts made at once would spend `httpErrorRetries` in a moment. A
+  peer that gets the segment during the wait sends it, and no HTTP attempt
+  follows. Only an urgent request does not wait: its buffer has no time to
+  wait with. A failure on a peer's bytes or size starts no wait, since the
+  origin was not at fault. The wait needs no timer of its own: a queue pass,
+  or the prefetch timer every one to two seconds, starts the attempt once the
+  wait is over. A player's request starts with no failed attempts, whatever
+  the prefetch left, so a wait that a failed prefetch started does not hold
+  it: not its first request after that failure, and not its retries, whose
+  timing is the player's. Only the request's own failures make it wait.
 - **A request that is not urgent** is fetched from a peer that has the
   segment. If no peer has it, the election decides who fetches it over HTTP
   ([prefetch.md](prefetch.md)). Otherwise it waits.
 - **With no peer connected**, a request is fetched over HTTP at once. Nobody
-  can give the segment, and no election runs.
+  can give the segment, and no election runs. After an HTTP failure, its
+  retry waits as above until the request is urgent.
 
 Core judges a waiting request again on every report and on the prefetch timer
 ([prefetch.md](prefetch.md), "Backups"). The buffer drains while the request

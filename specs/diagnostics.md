@@ -228,7 +228,16 @@ the groups and the cases a reader of a snapshot must know.
   request settled during the pass is counted (`QueuePass:after-settle`), and
   each one not run because the pass before was such a pass
   (`QueuePass:after-settle:limited`) — unless a request succeeded that no pass
-  has handled, which always gets one more pass. The Video.js adapter
+  has handled, which always gets one more pass. Each HTTP retry is counted
+  by why it started: a retry of the player's urgent request, which never
+  waits (`HttpRetry:urgent`), or of any other request, after its wait
+  (`HttpRetry:after-wait`); and each segment a peer sent after an origin
+  failure while an HTTP attempt was still allowed
+  (`HttpRetry:served-by-peer`) — not after the HTTP attempts are spent, and
+  not an urgent request's own P2P attempt. It is an upper bound of what the
+  wait gained: it does not ask whether this peer would have made the HTTP
+  retry, which the election may have given to another peer meanwhile. The
+  Video.js adapter
   counts each live delay it writes (`VhsPlacement:applied`) and each VHS it
   cannot place (`VhsPlacement:unavailable`); the HLS.js adapter, each live
   delay it writes (`HlsPlacement:applied`) and each main playlist it leaves to
