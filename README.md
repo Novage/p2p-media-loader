@@ -27,7 +27,7 @@ This library makes it possible to build large-scale P2P mesh networks — often 
 
 ## Related Software
 
-- [wt-tracker-rust](https://github.com/Novage/wt-tracker-rust) (recommended): a multi-core WebTorrent tracker in Rust, a port of wt-tracker that runs `wss://tracker.novage.com.ua`. A 2-core Oracle Cloud **Free** Tier Ampere A1 instance can serve ~100k peers (one WebSocket connection per peer; estimated).
+- [wt-tracker-rust](https://github.com/Novage/wt-tracker-rust) (recommended): a multi-core WebTorrent tracker in Rust, a port of wt-tracker that runs `wss://tracker.novage.com.ua`. A 2-core Oracle Cloud **Free** Tier Ampere A1 instance can serve more than 200k peers, about 120k on average within the free monthly traffic (one WebSocket connection per peer).
 - [wt-tracker](https://github.com/Novage/wt-tracker): a high-performance WebTorrent tracker for Node.js using [µWebSockets.js](https://github.com/uNetworking/uWebSockets.js).
 - [Aquatic](https://github.com/greatest-ape/aquatic): a high-performance WebTorrent and BitTorrent tracker written in Rust.
 - [bittorrent-tracker](https://github.com/webtorrent/bittorrent-tracker): official WebTorrent tracker implementation for Node.js.
