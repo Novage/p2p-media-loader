@@ -99,6 +99,14 @@ above:
 - every wait ended by the servers' candidates; none timed out, and no anomaly
   was recorded.
 
+The early end sent every candidate the host had. With the default servers, the
+offer held one IPv4 host candidate and one IPv4 server-reflexive candidate in
+each case: after the full 5 s wait, with gathering still open at 6 s; at the
+prototype's early end; and after gathering completed, in 123–160 ms, with IPv6
+disabled on the interface. The IPv6 attempt the browser waited on gave no
+candidate. This is one interface and two STUN servers that report one public
+address; it does not show the risk below on a host with more.
+
 Its unit tests used a connection whose gathering never completes, with
 candidates emitted at chosen times: an offer 500 ms after a server-reflexive
 candidate and not before; a TURN configuration waiting for the relay candidate;
