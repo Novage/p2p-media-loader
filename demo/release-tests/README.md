@@ -54,7 +54,7 @@ tabs and install the probe again.
 | `peers.js`     | 8. Three to five peers | `06367ea`   | Measures only; the browser driver opens and closes the tabs. `start`, `mark` before each event, `since` after it; HTTP downloads per segment one tab holds                                                                                                                                                                                                                                                                                                                                                                              |
 | `pause.js`     | 3. Pause               | `59335dd`   | One step per engine and stream type (live, DVR, VOD); A pauses 40 s while B plays; on DVR, A seeks to the middle of the window first. Storage sampled every 10 s of the pause. Its rows compare snapshots within a step, so they show no leak column                                                                                                                                                                                                                                                                                    |
 | `rate.js`      | 5. Playback rate       | `59335dd`   | A at 2 and B at 1, both at 2, A at 1.5, 0.5 and 1, a seek at 2; each tab samples its own speed, `waiting` events and buffer ahead; `frames` are the phase's own, dropped and total, with the renditions it played (`heights`)                                                                                                                                                                                                                                                                                                           |
-| `quality.js`   | 6. Quality switches    | `59335dd`   | Uses `select.quality-selector`. Tabs share a rendition when a `PeersHeld:<swarm>` probe holds a peer in both: the old rendition's P2P loader stays open for `p2pInactiveLoaderDestroyTimeoutMs` by design, so comparing loader lists reads about 30 s too long                                                                                                                                                                                                                                                                          |
+| `quality.js`   | 6. Quality switches    | `78d7016`   | Uses `select.quality-selector` and needs `p2pml-core:p2p-loaders-container` and `p2pml-core:tracker` in `localStorage.debug`. `swarmRow` names the rendition a tab plays (its current loader, from the log) and the `PeersHeld` key of its swarm, `computeInfoHash` of its stream swarm ID; `switchStep` samples both tabs every second and gives `bothMs`, `apartPeers` and `backMs`. A switch back reuses the old rendition's loader while it is open (`p2pInactiveLoaderDestroyTimeoutMs`)                                           |
 | `lifecycle.js` | 9. Lifecycle           | `59335dd`   | 20 changes of stream or player 0.6–1.8 s apart, then the last stream; open records by kind before and after. Two players on one page are not scripted                                                                                                                                                                                                                                                                                                                                                                                   |
 | `config.js`    | 12. Configuration      | `59335dd`   | Needs the temporary demo edit of test 12 (`p2p=0`, `upload=0`, `hook=1`; the hook counts its calls in `window.__hookCalls`); per-tab `swarmId`, P2P off, upload off in B, the hook, the IndexedDB example                                                                                                                                                                                                                                                                                                                               |
 
@@ -98,10 +98,14 @@ the next time they run.
 - Shaka on a live stream whose window the pause outlives jumps into the
   window on resume and rebuffers for 4–5 s, with P2P or without it (the
   control of test 3): it is the player's, not a stall of the core.
-- A P2P loader is recorded by its stream swarm (`P2PLoader <id>`), a peer by
-  the info hash (`PeersHeld:<hash>`); nothing in the snapshot maps one to
-  the other, so a test that asks "do both tabs hold a peer in this
-  rendition" cannot yet name the rendition.
+- A P2P loader is recorded by the end of its stream swarm ID
+  (`P2PLoader <id>`), a peer by the start of the info hash
+  (`PeersHeld:<hash>`). Compare tabs by the swarm of the rendition each
+  plays (`quality.js`, `swarmRow`), not by which swarms are shared: a loader
+  of a rendition no tab plays any more closes after its grace period and
+  takes its peer with it. Counting shared swarms read that as a switch back
+  that never rejoined; on 19 October the tabs rejoined in 15 ms on HLS.js
+  and in 2.0 s on Video.js 8.
 - Dropped frames at 2× are the screen's, not the core's: a 60 Hz screen
   shows at most 60 frames a second, so 60 fps content at 2× drops half of
   its frames, and 30 fps content at 2× a few percent. On 19 October HLS.js
