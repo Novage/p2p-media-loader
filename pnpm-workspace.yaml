@@ -7,4 +7,4 @@ allowBuilds:
 
 minimumReleaseAgeExclude:
   - '@rolldown/binding-openharmony-arm64@1.2.8'
-  - shaka-player@5.2.13
+  - shaka-player@5.3.1

@@ -61,7 +61,7 @@
     "p2p-media-loader-hlsjs": "workspace:*",
     "p2p-media-loader-shaka": "workspace:*",
     "p2p-media-loader-videojs": "workspace:*",
-    "shaka-player": "^5.2.13",
+    "shaka-player": "^5.3.1",
     "video.js": "^8.24.1"
   },
   "devDependencies": {
