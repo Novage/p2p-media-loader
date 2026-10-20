@@ -85,8 +85,28 @@ export function go(params) {
   return true;
 }
 
-export function play() {
-  return h().play();
+/**
+ * Plays with sound through the driver, and muted where the browser refuses
+ * sound without a click: Safari does, also in a visible window.
+ */
+export async function play() {
+  h().play();
+  const v = video();
+  if (!v) return false;
+  // a play that waits for data resolves late; only a refusal matters here
+  const refused = await Promise.race([
+    v.play().then(
+      () => false,
+      (e) => e?.name === "NotAllowedError",
+    ),
+    sleep(2000).then(() => false),
+  ]);
+  // Safari can refuse after the wait, which leaves the video paused
+  if (refused || v.paused) {
+    v.muted = true;
+    v.play().catch(() => undefined);
+  }
+  return !v.paused;
 }
 
 /** The id the driver gave this tab. */

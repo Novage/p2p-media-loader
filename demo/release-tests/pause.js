@@ -8,6 +8,7 @@ import {
   background,
   inAll,
   load,
+  play,
   settle,
   sleep,
   state,
@@ -91,7 +92,7 @@ export function run({
       }
       const s1 = await inAll(count, "state");
       const tPaused = video().currentTime;
-      await window.__h.play();
+      await play();
       await sleep(15000);
       const s2 = await inAll(count, "readTab");
       const w = await inAll(count, "waiting", [], "pause.js");
