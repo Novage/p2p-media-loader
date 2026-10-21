@@ -5,33 +5,33 @@ import { diagnostics as compiledLedger } from "../src/diagnostics.js";
 import type { CoreConfig, DynamicCoreConfig } from "../src/types.js";
 
 describe("swarm identity config", () => {
-  it("passes streamSwarmIdBuilder from the constructor config to both streams", () => {
+  it("passes streamIdBuilder from the constructor config to both streams", () => {
     const builder = () => "key";
-    const core = new Core({ streamSwarmIdBuilder: builder });
+    const core = new Core({ streamIdBuilder: builder });
 
     const config = core.getConfig();
-    expect(config.mainStream.streamSwarmIdBuilder).toBe(builder);
-    expect(config.secondaryStream.streamSwarmIdBuilder).toBe(builder);
+    expect(config.mainStream.streamIdBuilder).toBe(builder);
+    expect(config.secondaryStream.streamIdBuilder).toBe(builder);
   });
 
-  it("passes per-stream streamSwarmIdBuilder from the constructor config", () => {
+  it("passes per-stream streamIdBuilder from the constructor config", () => {
     const mainBuilder = () => "main-key";
     const secondaryBuilder = () => "secondary-key";
     const core = new Core({
-      mainStream: { streamSwarmIdBuilder: mainBuilder },
-      secondaryStream: { streamSwarmIdBuilder: secondaryBuilder },
+      mainStream: { streamIdBuilder: mainBuilder },
+      secondaryStream: { streamIdBuilder: secondaryBuilder },
     });
 
     const config = core.getConfig();
-    expect(config.mainStream.streamSwarmIdBuilder).toBe(mainBuilder);
-    expect(config.secondaryStream.streamSwarmIdBuilder).toBe(secondaryBuilder);
+    expect(config.mainStream.streamIdBuilder).toBe(mainBuilder);
+    expect(config.secondaryStream.streamIdBuilder).toBe(secondaryBuilder);
   });
 
-  it("ignores swarmId and streamSwarmIdBuilder in dynamic config updates", () => {
+  it("ignores swarmId and streamIdBuilder in dynamic config updates", () => {
     const builder = () => "key";
     const core = new Core({
       swarmId: "initial-swarm",
-      streamSwarmIdBuilder: builder,
+      streamIdBuilder: builder,
     });
 
     // Plain-JS callers can pass properties excluded from DynamicCoreConfig.
@@ -39,19 +39,19 @@ describe("swarm identity config", () => {
       urgentBufferThreshold: 30,
       mainStream: {
         swarmId: "hijacked-swarm",
-        streamSwarmIdBuilder: () => "hijacked-key",
+        streamIdBuilder: () => "hijacked-key",
         p2pDownloadTimeWindow: 9000,
       },
       swarmId: "hijacked-swarm",
-      streamSwarmIdBuilder: () => "hijacked-key",
+      streamIdBuilder: () => "hijacked-key",
     } as DynamicCoreConfig);
 
     const config = core.getConfig();
     // Static-only properties are untouched...
     expect(config.mainStream.swarmId).toBe("initial-swarm");
-    expect(config.mainStream.streamSwarmIdBuilder).toBe(builder);
+    expect(config.mainStream.streamIdBuilder).toBe(builder);
     expect(config.secondaryStream.swarmId).toBe("initial-swarm");
-    expect(config.secondaryStream.streamSwarmIdBuilder).toBe(builder);
+    expect(config.secondaryStream.streamIdBuilder).toBe(builder);
     // ...while sibling dynamic properties still apply.
     expect(config.mainStream.urgentBufferThreshold).toBe(30);
     expect(config.mainStream.p2pDownloadTimeWindow).toBe(9000);
@@ -91,6 +91,25 @@ describe("renamed config keys", () => {
     expect(count()).toBe(before + 1);
     // Never carried over: its meaning changed.
     expect(core.getConfig().mainStream.urgentBufferThreshold).toBeUndefined();
+  });
+
+  it.each([
+    ["the top level", { streamSwarmIdBuilder: () => "tenant-a" }],
+    ["mainStream", { mainStream: { streamSwarmIdBuilder: () => "tenant-a" } }],
+    [
+      "secondaryStream",
+      { secondaryStream: { streamSwarmIdBuilder: () => "tenant-a" } },
+    ],
+  ])("warns once for streamSwarmIdBuilder at %s", (_level, config) => {
+    const before = count();
+    const core = new Core(withOldKey(config));
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain("streamIdBuilder");
+    expect(count()).toBe(before + 1);
+    // Never carried over: it returned a whole stream swarm ID.
+    expect(core.getConfig().mainStream.streamIdBuilder).toBeUndefined();
+    expect(core.getConfig().secondaryStream.streamIdBuilder).toBeUndefined();
   });
 
   it("warns once for each core, also when a dynamic config names it again", () => {

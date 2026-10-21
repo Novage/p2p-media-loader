@@ -207,8 +207,8 @@ function createStream(
     type: "main",
     properties: { bitrate: 1_000_000 },
     swarmId: "https://cdn.example/v/master.m3u8",
-    identityHash: `id-${rendition}`,
-    streamSwarmId: `v3-swarm-main-id-${rendition}`,
+    streamId: `main-${rendition}`,
+    streamSwarmId: `v3-swarm-main-${rendition}`,
     infoHash: "hash",
     segments: new Map<string, SegmentWithStream>(),
   } as StreamWithSegments;

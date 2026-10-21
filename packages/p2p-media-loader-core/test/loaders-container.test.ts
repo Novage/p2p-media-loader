@@ -12,6 +12,7 @@ import type {
 } from "../src/index.js";
 import type { StreamWithSegments } from "../src/internal-types.js";
 import debug from "debug";
+import { buildStreamSwarmId, computeInfoHash } from "../src/stream-identity.js";
 import { diagnostics as compiledLedger } from "../src/diagnostics.js";
 
 // Absent only in a prebuilt bundle; the tests run on the source.
@@ -70,7 +71,7 @@ function stream(id: string): StreamWithSegments {
     swarmId: "swarm",
     streamSwarmId: `swarm-${id}`,
     infoHash: `info-${id}`,
-    identityHash: id,
+    streamId: id,
     segments: new Map(),
   } as unknown as StreamWithSegments;
 }
@@ -157,6 +158,40 @@ describe("P2PLoadersContainer switching streams", () => {
     // Still current, and still holding its socket: not current and destroyed.
     expect(container.currentLoader).toBe(first);
     expect(sockets[0].closed).toBe(false);
+  });
+
+  it("labels each loader's record by its infohash key and stream ID", () => {
+    // Two DASH @ids with one tail: the end of their swarm IDs is the same.
+    const swarm = "https://cdn.example/dash/manifest.mpd";
+    const dash = (atId: string) => {
+      const streamId = `main-${atId}`;
+      const streamSwarmId = buildStreamSwarmId(swarm, streamId);
+      return {
+        ...stream(atId),
+        streamId,
+        streamSwarmId,
+        infoHash: computeInfoHash(streamSwarmId),
+      } as StreamWithSegments;
+    };
+    const hd = dash("1080p_avc_main_profile_track");
+    const sd = dash("720p_avc_main_profile_track");
+    const { container, stored } = setup();
+    // Something stored keeps each previous loader open for its grace period.
+    stored.push(1);
+    container.changeCurrentLoader(hd);
+    container.changeCurrentLoader(sd);
+
+    // Read as the release scripts read it: the detail after the token.
+    const labels = (diagnostics.snapshot()?.open ?? [])
+      .filter((t) => t.startsWith("P2PLoader"))
+      .map((t) => t.split(" ")[1]);
+    expect(labels).toContain(
+      `${hd.infoHash.slice(0, 8)}:main-1080p_avc_main_profile_track`,
+    );
+    expect(labels).toContain(
+      `${sd.infoHash.slice(0, 8)}:main-720p_avc_main_profile_track`,
+    );
+    container.destroy();
   });
 
   it("changes nothing when switched to the stream already current", () => {

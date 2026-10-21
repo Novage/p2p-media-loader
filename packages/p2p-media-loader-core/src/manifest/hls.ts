@@ -29,8 +29,13 @@ import {
 
 /**
  * HLS tokenizer over m3u8-parser. Produces `ParsedManifest`; interprets
- * nothing. The one thing added on top of the library is `CHANNELS` on
- * `EXT-X-MEDIA`, which m3u8-parser drops and which feeds audio identity.
+ * nothing. Two things are added on top of the library from the master's text:
+ * `CHANNELS` on `EXT-X-MEDIA`, which m3u8-parser drops, and the order of the
+ * renditions in a group, which its name-keyed object can lose.
+ *
+ * A master's streams get their default stream IDs here: the type and the
+ * index among the master's streams of that type (`main0`, `secondary1`). See
+ * specs/segment-identity.md, "HLS: the stream's place in the master".
  *
  * Only video and audio are streams. A master's subtitle renditions and
  * I-frame playlists are not, and are reported by URL instead so that the
@@ -63,8 +68,8 @@ export const hlsManifestParser: ManifestParser = {
 /**
  * Every playlist a master names with a URI that is not one of its streams:
  * I-frame playlists, subtitle renditions, and the renditions of any group no
- * variant references — nothing plays those, and declared they would carry an
- * identity made of a name alone. One rule for all of them: a URI a declared
+ * variant references — nothing plays those, and declared they would take an
+ * index from a stream that plays. One rule for all of them: a URI a declared
  * stream already has is that stream's, however else the master labels it.
  * Closed captions ride inside the variants and name no playlist.
  */
@@ -102,13 +107,17 @@ function masterStreams(
   url: string,
 ): Pick<ParsedManifest, "streams" | "excludedPlaylists"> {
   const streams: ParsedStream[] = [];
-  const channelsByGroupAndName = scanAudioChannels(text);
+  const mediaTags = scanMediaTags(text);
+  const counts = { main: 0, secondary: 0 };
+  const declare = (stream: Omit<ParsedStream, "streamId" | "index">) => {
+    const index = counts[stream.type]++;
+    streams.push({ ...stream, streamId: `${stream.type}${index}`, index });
+  };
 
   // Alternate audio renditions inherit codecs from the variants that reference
   // their group, the way HLS.js assigns `audioCodec` to an audio track. A
   // group no variant references is no stream at all; see `excludedPlaylists`.
-  const audioGroups = new Set<string>();
-  const audioCodecsByGroup = new Map<string, string>();
+  const audioCodecsByGroup = new Map<string, string | undefined>();
   // Alternate video renditions inherit everything from the first variant that
   // references their group. RFC 8216 requires every rendition to match the
   // resolution of each variant referencing the group, so a master that reuses
@@ -119,48 +128,69 @@ function masterStreams(
   for (const playlist of manifest.playlists ?? []) {
     const a = playlist.attributes;
     const attributes = variantAttributes(a);
-    const key = resolveUrl(playlist.uri, url);
-    keys.add(key);
-    streams.push({
-      key,
-      type: "main",
-      properties: videoStreamProperties(attributes),
-      indexSource: { kind: "manifest" },
-    });
     const audio = audioCodecs(a.CODECS);
-    if (a.AUDIO) audioGroups.add(a.AUDIO);
-    if (a.AUDIO && audio && !audioCodecsByGroup.has(a.AUDIO)) {
+    if (a.AUDIO && audioCodecsByGroup.get(a.AUDIO) === undefined) {
       audioCodecsByGroup.set(a.AUDIO, audio);
     }
     if (a.VIDEO && !videoAttributesByGroup.has(a.VIDEO)) {
       videoAttributesByGroup.set(a.VIDEO, attributes);
     }
+    const key = resolveUrl(playlist.uri, url);
+    // One playlist listed under several EXT-X-STREAM-INF, one per audio
+    // group, is one stream; the first listing declares it. Copies of a
+    // rendition under other URIs — for each CDN or pathway — are streams of
+    // their own.
+    if (keys.has(key)) continue;
+    keys.add(key);
+    declare({
+      key,
+      type: "main",
+      properties: videoStreamProperties(attributes),
+      indexSource: { kind: "manifest" },
+    });
   }
 
-  streams.push(
-    ...videoRenditionStreams(manifest, url, videoAttributesByGroup, keys),
-  );
+  const videoGroups = manifest.mediaGroups?.VIDEO ?? {};
+  for (const [groupId, attributes] of videoAttributesByGroup) {
+    const renditions = videoGroups[groupId] ?? {};
+    for (const name of mediaTags.namesInOrder("VIDEO", groupId, renditions)) {
+      const rendition = renditions[name];
+      // A rendition without a URI is the variant itself; nothing to load.
+      if (!rendition.uri) continue;
+      const key = resolveUrl(rendition.uri, url);
+      if (keys.has(key)) continue;
+      keys.add(key);
+      declare({
+        key,
+        type: "main",
+        properties: videoRenditionProperties(attributes, {
+          name,
+          language: rendition.language,
+        }),
+        indexSource: { kind: "manifest" },
+      });
+    }
+  }
 
-  const groups = manifest.mediaGroups?.AUDIO ?? {};
-  for (const groupId of Object.keys(groups)) {
-    if (!audioGroups.has(groupId)) continue;
-    const renditions = groups[groupId];
-    for (const name of Object.keys(renditions)) {
+  const audioGroups = manifest.mediaGroups?.AUDIO ?? {};
+  for (const [groupId, codecs] of audioCodecsByGroup) {
+    const renditions = audioGroups[groupId] ?? {};
+    for (const name of mediaTags.namesInOrder("AUDIO", groupId, renditions)) {
       const rendition = renditions[name];
       // A rendition without a URI is muxed into the variants; nothing to load.
       if (!rendition.uri) continue;
       const key = resolveUrl(rendition.uri, url);
-      // A URI a variant or a video rendition already has is malformed; the
-      // stream declared first keeps it.
+      // An audio-only master may name a variant's own playlist as a
+      // rendition of its group: that is the variant, declared already.
       if (keys.has(key)) continue;
       keys.add(key);
-      streams.push({
+      declare({
         key,
         type: "secondary",
         properties: audioStreamProperties({
-          codecs: audioCodecsByGroup.get(groupId),
+          codecs,
           language: rendition.language,
-          channels: channelsByGroupAndName.get(`${groupId} ${name}`),
+          channels: mediaTags.channels.get(`${groupId} ${name}`),
           name,
         }),
         indexSource: { kind: "manifest" },
@@ -180,46 +210,6 @@ function variantAttributes(a: M3u8PlaylistAttributes): VideoAttributes {
     frameRate: a["FRAME-RATE"],
     videoRange: a["VIDEO-RANGE"],
   };
-}
-
-/**
- * Alternate video renditions — camera angles — with a playlist of their own,
- * one main stream each. RFC 8216 gives a rendition the characteristics of the
- * variant that references its group, and Shaka, the one player here that
- * plays them, builds its video stream from exactly those, so the variant's
- * attributes are the rendition's identity, told from the variant by `NAME`.
- * A rendition whose URI is a variant's own is that variant, and one without a
- * URI is muxed into it: neither is a stream of its own. `keys` holds every
- * stream declared so far, and every rendition declared here is added to it.
- */
-function videoRenditionStreams(
-  manifest: M3u8Manifest,
-  url: string,
-  attributesByGroup: ReadonlyMap<string, VideoAttributes>,
-  keys: Set<string>,
-): ParsedStream[] {
-  const streams: ParsedStream[] = [];
-  const groups = manifest.mediaGroups?.VIDEO ?? {};
-  for (const [groupId, attributes] of attributesByGroup) {
-    const renditions = groups[groupId] ?? {};
-    for (const name of Object.keys(renditions)) {
-      const rendition = renditions[name];
-      if (!rendition.uri) continue;
-      const key = resolveUrl(rendition.uri, url);
-      if (keys.has(key)) continue;
-      keys.add(key);
-      streams.push({
-        key,
-        type: "main",
-        properties: videoRenditionProperties(attributes, {
-          name,
-          language: rendition.language,
-        }),
-        indexSource: { kind: "manifest" },
-      });
-    }
-  }
-  return streams;
 }
 
 function mediaStream(manifest: M3u8Manifest, url: string): ParsedStream {
@@ -265,24 +255,46 @@ function mediaStream(manifest: M3u8Manifest, url: string): ParsedStream {
 }
 
 /**
- * `CHANNELS` per `(GROUP-ID, NAME)` from the raw `EXT-X-MEDIA` lines.
- * m3u8-parser does not retain the attribute, and HLS.js does, so without this
- * the two would hash audio renditions differently.
+ * Reads what m3u8-parser does not keep from the master's `EXT-X-MEDIA` tags:
+ * `CHANNELS` of each audio rendition, keyed by `${GROUP-ID} ${NAME}`, and the
+ * order of the renditions in each group. m3u8-parser keys a group's
+ * renditions by `NAME` in an object, and an object lists integer-like keys
+ * (`NAME="1"`) before the others and in numeric order, not in the master's.
  */
-function scanAudioChannels(text: string): Map<string, string> {
-  const result = new Map<string, string>();
+function scanMediaTags(text: string) {
+  const channels = new Map<string, string>();
+  const names = new Map<string, string[]>();
   for (const line of text.split(/\r?\n/)) {
     if (!line.startsWith("#EXT-X-MEDIA:")) continue;
     const attrs = parseAttributeList(line.slice("#EXT-X-MEDIA:".length));
-    if (attrs.get("TYPE") !== "AUDIO") continue;
+    const type = attrs.get("TYPE");
     const groupId = attrs.get("GROUP-ID");
     const name = attrs.get("NAME");
-    const channels = attrs.get("CHANNELS");
-    if (groupId && name && channels) {
-      result.set(`${groupId} ${name}`, channels);
+    if (!type || groupId === undefined || name === undefined) continue;
+    const group = `${type} ${groupId}`;
+    names.set(group, [...(names.get(group) ?? []), name]);
+    const channelCount = attrs.get("CHANNELS");
+    if (type === "AUDIO" && channelCount) {
+      channels.set(`${groupId} ${name}`, channelCount);
     }
   }
-  return result;
+  return {
+    channels,
+    /** The names of a group's renditions in the master's order. */
+    namesInOrder(
+      type: "AUDIO" | "VIDEO",
+      groupId: string,
+      renditions: object,
+    ): string[] {
+      const ordered = new Set(
+        (names.get(`${type} ${groupId}`) ?? []).filter((name) =>
+          Object.prototype.hasOwnProperty.call(renditions, name),
+        ),
+      );
+      for (const name of Object.keys(renditions)) ordered.add(name);
+      return Array.from(ordered);
+    },
+  };
 }
 
 /** RFC 8216 attribute list: `KEY=VALUE,KEY="quoted, value"`. */

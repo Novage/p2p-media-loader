@@ -80,7 +80,7 @@ throughout.
   traffic to duplicate fetches.
 - **New core API**: `processManifest`, `isSegmentIndex`, `processSegmentIndex`,
   `updatePlayback` with `getPlaybackStateFromMediaElement`,
-  `byteRangeFromRangeHeader`, `identityProperties`, and the
+  `byteRangeFromRangeHeader`, and the
   `onSegmentRegistryMiss` event for a segment request the registry did not know.
 - **Manifest parsers are selected statically**, through
   `CoreConfig.manifestParsers` and the `p2p-media-loader-core/hls` and
@@ -172,9 +172,30 @@ throughout.
   judges each segment by its own type's position. See
   [`specs/playback-contract.md`](specs/playback-contract.md), "What the segment
   store receives".
-- **`bitrate` enters a stream's identity only where a manifest needs it** to
-  tell two same-type streams apart. An origin that recomputes `BANDWIDTH` per
-  request no longer splits a rendition's swarm.
+- **A stream's swarm is named by its place in the manifest**, not by a hash
+  of its properties: for HLS its type and its index among the master's
+  streams of that type (`main0`, `secondary1`), for DASH its type and its
+  Representation `@id` (`main-video-720`). A server predicts every infohash
+  from the stream IDs alone, to ask a tracker for each quality's statistics.
+  An origin may rewrite a master's attributes per request: Akamai's live
+  packager publishes the encoder's current `BANDWIDTH`, and on a channel that
+  alternates programmes the current programme's `FRAME-RATE`, 24 or 25. A
+  hash of them split one rendition's viewers into two swarms by when each
+  started; the index does not change. An MPD's ad period whose Representation
+  matched the content's in all but bitrate gave the content a second swarm
+  after the break; the `@id` does not change. See
+  [`specs/segment-identity.md`](specs/segment-identity.md), "Stream identity".
+- **`streamSwarmIdBuilder` is now `streamIdBuilder`**, and returns only the
+  stream ID; the core adds the protocol version and the `swarmId`. It receives
+  the default stream ID, the HLS index and every stream of the manifest, for a
+  master that lists its streams in another order for each request or viewer.
+  `Stream.identityHash` is `Stream.streamId`, `buildStreamSwarmId` takes
+  `(swarmId, streamId)`, and `computeStreamIdentityHash` and
+  `computeStreamSwarmId` are removed. The core no longer compares two streams
+  that get one stream swarm ID: a builder must give each stream of the
+  content its own ID, and `onStreamRegistrationError` reports only a builder
+  that returns no usable ID. See
+  [`MIGRATION.md`](MIGRATION.md).
 - **ESM bundles of the engine packages import the core and its parsers by bare
   specifier.** A page's import map needs an entry for each, all pointing at one
   core bundle; a missing entry fails at module resolution rather than silently.
@@ -212,16 +233,13 @@ throughout.
   master to be ignored. An MPD's text, thumbnail and trick-mode
   `AdaptationSet`s are left out where it is read. The segments of subtitles
   and trick play are still recognised, so a player's request for one loads
-  over HTTP without counting as a registry miss. Leaving a trick-mode set out
-  also changes the identity of a video rung it matched in codecs and
-  resolution, since `bitrate` no longer has to tell the two apart. See
+  over HTTP without counting as a registry miss. See
   [`specs/manifest-registry.md`](specs/manifest-registry.md).
 - **HLS alternate video renditions are declared streams.** An
   `EXT-X-MEDIA TYPE=VIDEO` rendition with a playlist of its own — a camera
-  angle, which Shaka plays — registers as a main stream identified by its
-  variant's attributes and its own `NAME`, and is shared. It used to register
-  anonymously when its playlist arrived, and never shared. Variants' identity
-  is unchanged. See [`specs/segment-identity.md`](specs/segment-identity.md).
+  angle, which Shaka plays — registers as a main stream, counted after the
+  variants, and is shared. It used to register anonymously when its playlist
+  arrived, and never shared. See [`specs/segment-identity.md`](specs/segment-identity.md).
 
 - **The Shaka engine turns Shaka's own segment prefetch off**
   (`streaming.segmentPrefetchLimit` 0 on a Shaka that has it) and gives it back

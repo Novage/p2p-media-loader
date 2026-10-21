@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { hlsManifestParser } from "../src/manifest/hls.js";
-import { computeStreamIdentityHash } from "../src/index.js";
 import {
   HLS_LIVE_LL,
   HLS_LIVE_NO_PDT_REFRESH_1,
@@ -16,8 +15,6 @@ import {
 } from "./fixtures/index.js";
 
 const BASE = "https://cdn.example/live/master.m3u8";
-
-const MISSING_METADATA_IDENTITY_HASH = "UYnLxGhQilEV4D0HbCx+kRv0ZF0=";
 
 describe("hlsManifestParser: master playlist", () => {
   const parsed = hlsManifestParser.parse(HLS_MASTER_WITH_AUDIO, BASE);
@@ -38,7 +35,7 @@ describe("hlsManifestParser: master playlist", () => {
   });
 
   it("reads a variant's properties as the manifest states them", () => {
-    // These feed identity unnormalized, so the exact values matter.
+    // A streamIdBuilder reads them unnormalized, so the exact values matter.
     expect(main[0].properties).toMatchObject({
       bitrate: 4521000,
       codecs: "avc1.64002a",
@@ -58,22 +55,17 @@ describe("hlsManifestParser: master playlist", () => {
   });
 
   it("keeps a variant's metadata when it declares no usable bandwidth", () => {
-    // Bandwidth is the one attribute an origin recomputes per request, which
-    // is why identity drops it. A resolution and a codec string are read the
-    // same by every peer whether it is there or not, and they are what tells
-    // this variant from the others.
+    // A resolution and a codec string are read the same by every peer
+    // whether BANDWIDTH is there or not.
     expect(main[1].properties).toMatchObject({
       bitrate: 0,
       codecs: "avc1.4d401f",
       width: 640,
       height: 360,
     });
-    expect(computeStreamIdentityHash(main[1].properties)).not.toBe(
-      MISSING_METADATA_IDENTITY_HASH,
-    );
   });
 
-  it("identifies a variant declaring nothing at all by nothing at all", () => {
+  it("gives a variant declaring nothing at all its place in the master", () => {
     const master = `#EXTM3U
 #EXT-X-STREAM-INF:BANDWIDTH=1000000,CODECS="avc1.64002a",RESOLUTION=1920x1080
 hi.m3u8
@@ -91,9 +83,7 @@ bare.m3u8
       frameRate: undefined,
       videoRange: undefined,
     });
-    expect(computeStreamIdentityHash(bare.properties)).toBe(
-      MISSING_METADATA_IDENTITY_HASH,
-    );
+    expect(bare).toMatchObject({ streamId: "main1", index: 1 });
   });
 
   it("declares alternate audio renditions with CHANNELS m3u8-parser drops", () => {
@@ -260,8 +250,8 @@ describe("hlsManifestParser: alternate video renditions", () => {
   });
 
   it("excludes the renditions of a group no variant references", () => {
-    // Nothing plays them, and declared they would be identified by a name
-    // alone; their playlists register nothing if they ever arrive.
+    // Nothing plays them, and declared they would take an index; their
+    // playlists register nothing if they ever arrive.
     const master = `#EXTM3U
 #EXT-X-MEDIA:TYPE=VIDEO,GROUP-ID="orphan",NAME="Wide",URI="orphan/wide.m3u8"
 #EXT-X-MEDIA:TYPE=VIDEO,GROUP-ID="cam",NAME="Wide",URI="cam/wide.m3u8"
@@ -314,8 +304,8 @@ describe("hlsManifestParser: alternate video renditions", () => {
 1080p.m3u8
 `;
     const parsed = hlsManifestParser.parse(master, BASE);
-    expect(parsed.streams.map((s) => [s.key, s.type])).toEqual([
-      ["https://cdn.example/live/1080p.m3u8", "main"],
+    expect(parsed.streams.map((s) => [s.key, s.type, s.streamId])).toEqual([
+      ["https://cdn.example/live/1080p.m3u8", "main", "main0"],
     ]);
   });
 
@@ -330,6 +320,154 @@ describe("hlsManifestParser: alternate video renditions", () => {
     expect(parsed.streams.every((s) => s.properties.name === undefined)).toBe(
       true,
     );
+  });
+});
+
+describe("hlsManifestParser: the default stream ID", () => {
+  const ids = (master: string) =>
+    hlsManifestParser
+      .parse(master, BASE)
+      .streams.map((s) => [s.key.replace(/^.*\//, ""), s.streamId, s.index]);
+
+  it("numbers each type's streams from 0, in the order of the master", () => {
+    expect(ids(HLS_MASTER_WITH_AUDIO)).toEqual([
+      ["index.m3u8", "main0", 0],
+      ["index.m3u8", "main1", 1],
+      ["index.m3u8", "secondary0", 0],
+      ["index.m3u8", "secondary1", 1],
+    ]);
+  });
+
+  it("does not sort the variants: the master's order is the index", () => {
+    expect(
+      ids(`#EXTM3U
+#EXT-X-STREAM-INF:BANDWIDTH=2500000,RESOLUTION=1280x720
+720p.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=800000,RESOLUTION=640x360
+360p.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=5000000,RESOLUTION=1920x1080
+1080p.m3u8
+`),
+    ).toEqual([
+      ["720p.m3u8", "main0", 0],
+      ["360p.m3u8", "main1", 1],
+      ["1080p.m3u8", "main2", 2],
+    ]);
+  });
+
+  it("counts a playlist listed under several variants once, at its first listing", () => {
+    // One video playlist per audio group: two EXT-X-STREAM-INF, one stream.
+    expect(
+      ids(`#EXTM3U
+#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aac",NAME="English",URI="aac/en.m3u8"
+#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="ec3",NAME="English",URI="ec3/en.m3u8"
+#EXT-X-STREAM-INF:BANDWIDTH=2600000,CODECS="avc1.64001f,mp4a.40.2",RESOLUTION=1280x720,AUDIO="aac"
+720p.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=2900000,CODECS="avc1.64001f,ec-3",RESOLUTION=1280x720,AUDIO="ec3"
+720p.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=900000,CODECS="avc1.64001e,mp4a.40.2",RESOLUTION=640x360,AUDIO="aac"
+360p.m3u8
+`),
+    ).toEqual([
+      ["720p.m3u8", "main0", 0],
+      ["360p.m3u8", "main1", 1],
+      ["en.m3u8", "secondary0", 0],
+      ["en.m3u8", "secondary1", 1],
+    ]);
+  });
+
+  it("numbers audio groups in the order the variants first reference them", () => {
+    const parsed = hlsManifestParser.parse(
+      `#EXTM3U
+#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="late",NAME="English",URI="late/en.m3u8"
+#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="early",NAME="English",URI="early/en.m3u8"
+#EXT-X-STREAM-INF:BANDWIDTH=900000,CODECS="avc1.64001e,mp4a.40.2",AUDIO="early"
+a.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=2600000,CODECS="avc1.64001f,mp4a.40.2",AUDIO="late"
+b.m3u8
+`,
+      BASE,
+    );
+    expect(
+      parsed.streams
+        .filter((s) => s.type === "secondary")
+        .map((s) => [s.key, s.streamId]),
+    ).toEqual([
+      ["https://cdn.example/live/early/en.m3u8", "secondary0"],
+      ["https://cdn.example/live/late/en.m3u8", "secondary1"],
+    ]);
+  });
+
+  it("keeps the master's order of renditions with numeric names", () => {
+    // m3u8-parser keys a group's renditions by NAME in an object, which lists
+    // integer-like keys in numeric order.
+    expect(
+      ids(`#EXTM3U
+#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aud",NAME="2",URI="two.m3u8"
+#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aud",NAME="1",URI="one.m3u8"
+#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aud",NAME="Main",URI="main.m3u8"
+#EXT-X-STREAM-INF:BANDWIDTH=900000,CODECS="avc1.64001e,mp4a.40.2",AUDIO="aud"
+v.m3u8
+`),
+    ).toEqual([
+      ["v.m3u8", "main0", 0],
+      ["two.m3u8", "secondary0", 0],
+      ["one.m3u8", "secondary1", 1],
+      ["main.m3u8", "secondary2", 2],
+    ]);
+  });
+
+  it("keeps an audio-only variant's audio codecs, its only codec", () => {
+    const [aac, heAac] = hlsManifestParser.parse(
+      `#EXTM3U
+#EXT-X-STREAM-INF:BANDWIDTH=128000,CODECS="mp4a.40.2"
+aac-128.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=64000,CODECS="mp4a.40.5"
+aac-64.m3u8
+`,
+      BASE,
+    ).streams;
+    expect(aac.properties.codecs).toBe("mp4a.40.2");
+    expect(heAac.properties.codecs).toBe("mp4a.40.5");
+  });
+
+  it("numbers an audio-only master's variants as main streams", () => {
+    expect(
+      ids(`#EXTM3U
+#EXT-X-STREAM-INF:BANDWIDTH=128000,CODECS="mp4a.40.2"
+aac-128.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=64000,CODECS="mp4a.40.5"
+aac-64.m3u8
+`),
+    ).toEqual([
+      ["aac-128.m3u8", "main0", 0],
+      ["aac-64.m3u8", "main1", 1],
+    ]);
+  });
+
+  it("leaves I-frame playlists, subtitles and renditions with no URI out of the count", () => {
+    expect(
+      ids(`#EXTM3U
+#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="English",URI="subs/en.m3u8"
+#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aud",NAME="Muxed"
+#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aud",NAME="Commentary",URI="commentary.m3u8"
+#EXT-X-I-FRAME-STREAM-INF:BANDWIDTH=100000,URI="iframes.m3u8"
+#EXT-X-STREAM-INF:BANDWIDTH=900000,CODECS="avc1.64001e,mp4a.40.2",AUDIO="aud",SUBTITLES="subs"
+v.m3u8
+`),
+    ).toEqual([
+      ["v.m3u8", "main0", 0],
+      ["commentary.m3u8", "secondary0", 0],
+    ]);
+  });
+
+  it("gives a media playlist no stream ID: it cannot know its place", () => {
+    const [stream] = hlsManifestParser.parse(
+      HLS_MEDIA_VOD_BYTERANGE,
+      "https://cdn.example/vod/index.m3u8",
+    ).streams;
+    expect(stream.streamId).toBeUndefined();
+    expect(stream.index).toBeUndefined();
   });
 });
 

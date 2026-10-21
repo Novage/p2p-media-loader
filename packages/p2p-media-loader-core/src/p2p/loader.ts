@@ -157,9 +157,11 @@ export class P2PLoader {
       `PeersWrapped:${this.#stream.infoHash.slice(0, 8)}`,
       () => this.#peersMap.size,
     );
+    // The PeersHeld key and the stream ID: the swarm ID's end is a URL and
+    // a stream ID, which several streams can end alike.
     this.#diagnosticsToken = diagnostics?.open(
       "P2PLoader",
-      this.#stream.streamSwarmId.slice(-12),
+      `${this.#stream.infoHash.slice(0, 8)}:${this.#stream.streamId}`,
     );
 
     this.#churnCleanupTimeoutId = setTimeout(

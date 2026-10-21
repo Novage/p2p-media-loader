@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { dashManifestParser } from "../src/manifest/dash.js";
 import { ManifestRegistry } from "../src/manifest/registry.js";
-import { computeStreamIdentityHash } from "../src/index.js";
 import {
   ANGEL_ONE_MPD_URL,
   BBB_MPD_URL,
@@ -247,19 +246,25 @@ describe("dashManifestParser", () => {
     ).toEqual([]);
   });
 
-  it("identifies a rung without bitrate once the trick-mode set that matched it is gone", () => {
-    // The trick-mode Representation shares codecs and resolution with the
-    // 720p rung. Counted as a stream it would have forced bitrate into the
-    // rung's identity; left out, the rung hashes without it — the derivation
-    // every 5.0.0 peer must make, whichever packager wrote the MPD.
+  it("names each Representation by its type and @id", () => {
+    const parsed = dashManifestParser.parse(
+      DASH_WITH_TEXT_IMAGE_AND_TRICK_MODE,
+      URL,
+    );
+    expect(parsed.streams.map((s) => [s.streamId, s.index])).toEqual([
+      ["main-video-720p", undefined],
+      ["secondary-audio-en", undefined],
+    ]);
+  });
+
+  it("gives one @id in two periods one stream and one ID", () => {
+    // An ad break and the content after it: the content's Representation
+    // keeps its swarm across the break.
     const registry = new ManifestRegistry();
-    registry.apply(
-      dashManifestParser.parse(DASH_WITH_TEXT_IMAGE_AND_TRICK_MODE, URL),
-    );
-    const rung = registry.getStream("video-720p")!;
-    expect(rung.identityHash).toBe(
-      computeStreamIdentityHash({ ...rung.properties, bitrate: undefined }),
-    );
+    registry.apply(dashManifestParser.parse(DASH_MULTI_PERIOD, URL));
+    expect(registry.getStreams().map((s) => [s.key, s.streamId])).toEqual([
+      ["v0", "main-v0"],
+    ]);
   });
 
   it("leaves a trick-mode set out of a live presentation too", () => {
@@ -349,8 +354,8 @@ describe("dashManifestParser: real manifests", () => {
 
     const audio = parsed.streams[10];
     expect(audio.type).toBe("secondary");
-    // Audio identity carries no bitrate, exactly as the engines' extractors
-    // build it; the Representation id is the rendition's stable name.
+    // An audio rendition's bitrate is 0, as players report it; the
+    // Representation id is the rendition's stable name.
     expect(audio.properties).toMatchObject({
       bitrate: 0,
       codecs: "mp4a.40.5",

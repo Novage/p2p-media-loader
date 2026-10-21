@@ -38,9 +38,10 @@ export function pick(index) {
 
 // ---------------------------------------------------------------------------
 // Which swarm is which rendition. A `P2PLoader` record names a stream by the
-// end of its stream swarm ID, a `PeersHeld:<key>` probe by the start of its
-// info hash, `computeInfoHash(streamSwarmId)`; the loaders container's log
-// names the current loader by `<type>-<identityHash>`. These helpers keep that
+// start of its info hash and its stream ID (`<key>:main0`), a
+// `PeersHeld:<key>` probe by the same start of its info hash,
+// `computeInfoHash(streamSwarmId)`; the loaders container's log
+// names the current loader by its stream ID (`main0`). These helpers keep that
 // log and compute each loader's probe key, so a sample says how many peers a
 // tab holds in the swarm of the rendition it plays.
 // ---------------------------------------------------------------------------
@@ -89,7 +90,7 @@ export const logSince = (at) => ({
   lines: (window.__QL ?? []).filter((x) => x.at >= at),
 });
 
-/** `<type>-<identityHash>` of this tab's current P2P loader, from the log. */
+/** The stream ID of this tab's current P2P loader, from the log. */
 export function currentStream() {
   const L = window.__QL ?? [];
   for (let i = L.length - 1; i >= 0; i--) {
@@ -113,13 +114,12 @@ async function streamIdentity() {
   return identity;
 }
 
-/** The `PeersHeld` key of a `<type>-<identityHash>` stream in this tab. */
+/** The `PeersHeld` key of the stream with this stream ID in this tab. */
 export async function swarmKey(stream) {
   const id = await streamIdentity();
   const swarmId = new URLSearchParams(window.location.search).get("swarmId");
   if (!id || !stream || !swarmId) return null;
-  const [type, ...rest] = stream.split("-");
-  const streamSwarmId = id.buildStreamSwarmId(swarmId, type, rest.join("-"));
+  const streamSwarmId = id.buildStreamSwarmId(swarmId, stream);
   return id.computeInfoHash(streamSwarmId).slice(0, 8);
 }
 

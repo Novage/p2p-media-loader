@@ -89,10 +89,10 @@ own.
 ## The peer protocol is a contract
 
 `PEER_PROTOCOL_VERSION` appears in every stream swarm ID. Any change to how
-`identityHash` or `externalId` is derived — including changes that look
-cosmetic, such as a different codec-string normalization or a different segment
-numbering base — makes peers unable to find each other and **requires bumping
-the version**.
+the default `streamId` or `externalId` is derived — including changes that look
+cosmetic, such as a different count of a master's streams or a different
+segment numbering base — makes peers unable to find each other and **requires
+bumping the version**.
 
 Identity is frozen by golden vectors in the core test suite. Those vectors are
 the wire format, not expectations to be refreshed when they fail. A change that

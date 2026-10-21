@@ -29,7 +29,7 @@ browser.
 ## Why this makes cross-platform swarms possible
 
 Mobile clients run **the same core**. The manifest parse is identical, so
-`externalId` and `identityHash` are identical, so a browser peer and a mobile
+`externalId` and `streamId` are identical, so a browser peer and a mobile
 peer are in the same swarm by construction — not by two implementations agreeing
 on a specification.
 

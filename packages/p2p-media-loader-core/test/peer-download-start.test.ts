@@ -16,7 +16,7 @@ const stream = {
   type: "main",
   properties: { bitrate: 1_000_000 },
   swarmId: "https://cdn.example/v/master.m3u8",
-  streamSwarmId: "v3-swarm-main-id",
+  streamSwarmId: "v3-swarm-main0",
   segments: new Map(),
 } as unknown as StreamWithSegments;
 

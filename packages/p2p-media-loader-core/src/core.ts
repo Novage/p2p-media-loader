@@ -49,11 +49,7 @@ import {
   pickLiveTarget,
   type LiveDelay,
 } from "./live-delay.js";
-import {
-  buildStreamSwarmId,
-  computeInfoHash,
-  PEER_PROTOCOL_VERSION,
-} from "./stream-identity.js";
+import { buildStreamSwarmId, computeInfoHash } from "./stream-identity.js";
 import { BandwidthCalculator } from "./bandwidth-calculator.js";
 import { SegmentMemoryStorage } from "./segment-storage/segment-memory-storage.js";
 import { EventTarget } from "./utils/event-target.js";
@@ -85,6 +81,11 @@ const OBSOLETE_CONFIG_KEYS: Readonly<
     counter: "Config:renamed-key",
     reason:
       'it is renamed "urgentBufferThreshold", and its meaning changed. Choose a value for "urgentBufferThreshold"',
+  },
+  streamSwarmIdBuilder: {
+    counter: "Config:renamed-key",
+    reason:
+      'it is renamed "streamIdBuilder", which returns only the stream ID; the core adds the protocol version and the swarm ID. A prefix such as a tenant moves to the stream ID: streamIdBuilder: ({ defaultStreamId }) => `tenant-a-${defaultStreamId}`',
   },
   validateHTTPSegment: {
     counter: "Config:removed-key",
@@ -143,7 +144,7 @@ export class Core {
     validateP2PSegment: undefined,
     httpRequestSetup: undefined,
     swarmId: undefined,
-    streamSwarmIdBuilder: undefined,
+    streamIdBuilder: undefined,
     p2pMaxPeers: 50,
     p2pChurnMaxPeersMultiplier: 1.5,
     p2pChurnCleanupIntervalMs: 30000,
@@ -861,10 +862,10 @@ export class Core {
 
   /**
    * Registers a stream the manifest registry produced, computing its identity
-   * (`swarmId`, `identityHash`, `streamSwarmId`, `infoHash`) exactly once.
+   * (`swarmId`, `streamId`, `streamSwarmId`, `infoHash`) exactly once.
    *
-   * Never throws: a stream that fails to register (an invalid or colliding
-   * custom stream swarm ID) stays unknown to the core — its segments load
+   * Never throws: a stream that fails to register (an invalid custom stream
+   * ID) stays unknown to the core — its segments load
    * through the player's default path without P2P — and the failure is
    * reported once via the `onStreamRegistrationError` event.
    */
@@ -873,8 +874,11 @@ export class Core {
   ): StreamWithSegments | undefined {
     const properties = Object.freeze({ ...registryStream.properties });
     try {
-      return this.addStream(registryStream, properties);
+      const stream = this.addStream(registryStream, properties);
+      diagnostics?.count("StreamRegistration:added");
+      return stream;
     } catch (error) {
+      diagnostics?.count("StreamRegistration:failed");
       this.failedStreamKeys.add(registryStream.key);
       this.logger(
         "failed to register stream %s: %O",
@@ -907,60 +911,35 @@ export class Core {
       );
     }
 
-    // Computed by the registry from the whole manifest: bitrate is part of it
-    // only where the manifest needs it to tell same-type streams apart.
-    const { identityHash } = stream;
-
-    let streamSwarmId = buildStreamSwarmId(swarmId, stream.type, identityHash);
-    if (config.streamSwarmIdBuilder) {
-      const customStreamSwarmId = config.streamSwarmIdBuilder({
+    let { streamId } = stream;
+    if (config.streamIdBuilder) {
+      const customStreamId = config.streamIdBuilder({
         swarmId,
         runtimeId: stream.key,
         streamType: stream.type,
         properties,
-        identityHash,
-        defaultStreamSwarmId: streamSwarmId,
-        peerProtocolVersion: PEER_PROTOCOL_VERSION,
+        defaultStreamId: stream.streamId,
+        index: stream.index,
+        manifest: stream.manifest,
       });
 
-      if (customStreamSwarmId !== undefined) {
-        if (
-          typeof customStreamSwarmId !== "string" ||
-          customStreamSwarmId === ""
-        ) {
+      if (customStreamId !== undefined) {
+        if (typeof customStreamId !== "string" || customStreamId === "") {
           throw new Error(
-            "streamSwarmIdBuilder must return a non-empty string or undefined",
+            "streamIdBuilder must return a non-empty string or undefined",
           );
         }
-        streamSwarmId = customStreamSwarmId;
+        streamId = customStreamId;
       }
     }
-
-    for (const registered of this.streams.values()) {
-      if (registered.streamSwarmId !== streamSwarmId) continue;
-      // Sharing a stream swarm ID is only legitimate for streams with the same
-      // default identity (e.g. the same rendition served from multiple CDNs).
-      // A stream's identity is the whole (swarmId, type, identityHash) tuple —
-      // identityHash alone excludes type and swarmId, so comparing it is not
-      // enough. If any part differs, a custom builder has merged distinct
-      // streams into one swarm and peers would exchange wrong-stream segments.
-      if (
-        registered.swarmId !== swarmId ||
-        registered.type !== stream.type ||
-        registered.identityHash !== identityHash
-      ) {
-        throw new Error(
-          `streamSwarmIdBuilder produced the same stream swarm ID ("${streamSwarmId}") for streams with different identities. Peers of these streams would exchange segments of the wrong stream.`,
-        );
-      }
-    }
+    const streamSwarmId = buildStreamSwarmId(swarmId, streamId);
 
     const registeredStream: StreamWithSegments = {
       runtimeId: stream.key,
       type: stream.type,
       properties,
       swarmId,
-      identityHash,
+      streamId,
       streamSwarmId,
       infoHash: computeInfoHash(streamSwarmId),
       segments: new Map<string, SegmentWithStream>(),
@@ -1152,8 +1131,8 @@ export class Core {
   }
 
   /**
-   * A stream no manifest identified carries the identity every unidentified
-   * stream of its type carries — the hash of nothing — so it is the same
+   * A stream no manifest identified carries the stream ID every unidentified
+   * stream of its type carries — its type alone, `main` — so it is the same
    * swarm for all of them. That is right for a media playlist loaded on its
    * own, which is the whole stream: every viewer of that URL plays the same
    * bytes. It is wrong as soon as another stream of that type is registered
@@ -1386,8 +1365,8 @@ export class Core {
 
   private stripStaticOnlyProps<T extends object>(
     config: T,
-  ): Omit<T, "swarmId" | "streamSwarmIdBuilder"> {
-    if (!("swarmId" in config) && !("streamSwarmIdBuilder" in config)) {
+  ): Omit<T, "swarmId" | "streamIdBuilder"> {
+    if (!("swarmId" in config) && !("streamIdBuilder" in config)) {
       return config;
     }
 
@@ -1395,15 +1374,15 @@ export class Core {
     // plain-JS callers can still pass them — signal instead of silently
     // ignoring the update.
     this.logger(
-      "swarmId and streamSwarmIdBuilder cannot be changed at runtime; ignoring them in the dynamic configuration update",
+      "swarmId and streamIdBuilder cannot be changed at runtime; ignoring them in the dynamic configuration update",
     );
 
     const sanitized = { ...config } as T & {
       swarmId?: unknown;
-      streamSwarmIdBuilder?: unknown;
+      streamIdBuilder?: unknown;
     };
     delete sanitized.swarmId;
-    delete sanitized.streamSwarmIdBuilder;
+    delete sanitized.streamIdBuilder;
     return sanitized;
   }
 

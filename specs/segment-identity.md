@@ -7,16 +7,19 @@ derivation that is sensible but player-specific does not.
 
 ## Stream identity
 
-A stream's swarm membership is derived from its manifest properties — codecs,
-resolution, frame rate, video range, language, channels, name, and where needed
-bitrate — hashed into an `identityHash`. Streams with equal properties are the
-same stream to every peer, regardless of the player in use or the stream's
-position in the manifest.
+A stream's swarm is named by the content's `swarmId` and the stream's own
+`streamId`, which tells it from the content's other streams:
 
 ```
-streamSwarmId = `${PEER_PROTOCOL_VERSION}-${swarmId}-${type}-${identityHash}`
+streamSwarmId = `${PEER_PROTOCOL_VERSION}-${swarmId}-${streamId}`
 infoHash      = derived from streamSwarmId, announced to trackers
 ```
+
+Every peer derives both from the manifest, so every peer playing the same
+stream names the same swarm, whatever its player. A server can derive them from
+the same manifest, before any peer joins — to allowlist the infohashes on a
+private tracker, or to ask a tracker for the statistics of each quality. The
+core exports the helpers for that (`p2p-media-loader-core/server`).
 
 `swarmId` is the configured value or, if unset, the URL of the first manifest
 with its **entire query string discarded** — the URL that was asked for where
@@ -25,7 +28,6 @@ answer each of them from a different one — a session-scoped parameter such as 
 would otherwise place each viewer in a swarm of one. This is stricter than the
 normalization applied to segment registry keys, deliberately so; see
 [manifest-registry.md](manifest-registry.md#why-swarm-id-is-normalized-differently).
-A `streamSwarmIdBuilder` may override the composition.
 
 **A configured `swarmId` is the integration's own identifier for the content** —
 the key it already has for it, a database row id, an asset id — not another
@@ -44,64 +46,227 @@ master between them, register a stream the manifest identified nothing about
 stream is shareable, and the two would then be one swarm exchanging segments of
 different renditions by number.
 
-The value is read once, when a stream is registered, and never re-read.
+**One master URL, query aside, must give every viewer the same streams.** The
+default `swarmId` discards the query, and a stream ID names a stream only among
+the streams of its own master, so two masters with different streams under one
+`swarmId` put different renditions in one swarm. An origin that gives different
+streams under one URL — an A/B test of the ladder, a query parameter that
+selects the streams, renditions filtered by device or region — needs a
+different `swarmId` for each set of streams: the content's identifier with the
+group, the query value or the device class added. Viewers of different sets
+then share no swarm, and each index names one rendition.
 
-Because core parses the manifest itself, the properties feeding `identityHash`
-are read from the manifest rather than from a player's representation of it.
-Every peer hashes the same input, so nothing is normalized: a codec string, a
-frame rate, a language tag is hashed as the manifest wrote it. Normalization
-would exist only to reconcile what different players report for one rendition,
-and with one parser there is nothing to reconcile.
+The `swarmId` and the stream IDs are read once, when a stream is registered,
+and never re-read.
 
-**Bitrate is part of a stream's identity only where the manifest needs it.**
-Bandwidth is the one attribute an origin may recompute on every request: some
-live packagers (Akamai's, for one) publish the encoder's current output as
-`BANDWIDTH`, so two viewers who fetched the master seconds apart read different
-values for the same rendition and, were it hashed, would never meet. Core
-therefore hashes each stream without its bitrate unless another stream of the
-same type in the same manifest would then be indistinguishable — a ladder with
-two rungs at one resolution and codec — in which case those streams, and only
-those, keep it. The decision is a function of the manifest alone, so every peer
-makes the same one; `identityProperties` implements it and is exported for a
-server reproducing the hash. A ladder whose rungs share a resolution _and_ whose
-origin recomputes bandwidth is the one case left unsolved, and it is the one
-where no manifest attribute short of the rendition URL tells the rungs apart.
+### HLS: the stream's place in the master
 
-**A missing attribute says nothing about the others.** A variant that declares
-no `BANDWIDTH` is malformed — the attribute is required — but its resolution
-and codec string are still read the same way by every peer, so they still tell
-it from the other variants and they are still hashed. Only bandwidth is
-special, and only because an origin may recompute it. A stream whose manifest
-gives it nothing to be identified by hashes the empty identity, which every
-such stream shares; [manifest-registry.md](manifest-registry.md) says when one
-of those may be shared.
+**An HLS stream's `streamId` is its type and its index among the master's
+streams of that type: `main0`, `main1`, …, `secondary0`, …** The index counts
+the streams the core registers, in the order of the master:
 
-Two of those inputs need stating for DASH, because a player's own model gives
-different answers:
+- `main`: first the variants (`EXT-X-STREAM-INF`), in the order they appear;
+  then the alternate video renditions (`EXT-X-MEDIA TYPE=VIDEO` with a URI),
+  group by group, in the order the variants first reference the groups, and
+  within a group in the order of the master. A player plays a variant or a rendition, never
+  both, so they are streams of one type.
+- `secondary`: the audio renditions with a URI (`EXT-X-MEDIA TYPE=AUDIO`) of
+  the groups a variant references, group by group in the same order.
+- **A playlist URI counts once, at its first appearance.** A master may list
+  one video playlist under several `EXT-X-STREAM-INF`, one per audio group; it
+  is one stream, with one index.
+- I-frame playlists, subtitle renditions, renditions without a URI and groups
+  no variant references are not streams, and count for no type.
 
-- **`bitrate` is the Representation's own `@bandwidth`.** For a video stream
-  that is the video bit rate alone. A player that pairs video and audio into
-  variants reports their sum, which makes a video stream's identity depend on
-  which audio track the viewer chose — two viewers of the same video with
-  different audio would not share it. The manifest value is independent of that
-  choice. (HLS `BANDWIDTH` already covers the whole variant by specification, so
-  the two protocols differ here on purpose; they never share a swarm.)
-- **An audio rendition's `name` is its Representation `@id`**, the one stable,
-  manifest-given name it has. A `label` is optional, and a parser may synthesise
-  one from language and role. `channels` is read from
-  `AudioChannelConfiguration` under the MPEG scheme
-  (`urn:mpeg:dash:23003:3:audio_channel_configuration:2011`), whose value is a
-  plain count; vendor schemes encode channel masks and are left unset rather than
-  guessed.
+**A media playlist with no master is `main`**, with no index. It cannot know
+its place among streams it has not seen, and an index would make it the
+master's first variant: an anonymous stream would then share a swarm with one
+declared stream of another viewer, whose rendition it may not be. See
+[manifest-registry.md](manifest-registry.md) for when an anonymous stream is
+shared.
 
-One needs stating for HLS. **An alternate video rendition** (`EXT-X-MEDIA
-TYPE=VIDEO` with a URI) is identified by the attributes of the variant that
-references its group — bitrate, codecs, resolution, frame rate, video range,
-exactly as the variant is — plus the rendition's own `NAME` and `LANGUAGE`.
-RFC 8216 makes the variant's characteristics the rendition's, and `NAME` is
-what tells the two apart, so neither ever forces `bitrate` into the other. The
-variant carries no name or language of its own, so its identity is the same
-whether or not a group refers to it.
+**Audio only.** The type follows the master's structure, not the media's
+content: a variant is `main` whatever it carries, and an `EXT-X-MEDIA` audio
+rendition is `secondary`. An audio-only stream therefore takes one of three
+forms:
+
+- **Variants only** — each `EXT-X-STREAM-INF` an audio playlist, with an
+  audio `CODECS` and no `RESOLUTION`: the variants are `main0`, `main1`, … in
+  the order of the master, and there is no `secondary` stream. A player plays
+  the chosen variant as its main stream.
+- **Variants with an audio group** — the variants reference an `AUDIO` group
+  whose renditions have URIs: the variants are `main` and the renditions
+  `secondary`, counted as above. A rendition whose URI is a variant's own is
+  that variant, and is counted once, as `main`; the group's other renditions
+  are `secondary`.
+- **A single audio media playlist**, with no master: `main`, as any media
+  playlist without one.
+
+The same audio playlist can therefore be `main0` in one master, `secondary0`
+in another, and `main` played alone. That is right: the two masters are two contents with
+two `swarmId`s, and a stream ID only tells a stream from the other streams of
+its own master.
+
+**The index is the master's order as the core parses it, not a player's.** A
+player's own list of qualities is no stable basis: HLS.js, for one, sorts its
+levels by bitrate. The core reads the master text itself, so every peer, and a
+server reading the same master, counts the same way.
+
+**No attribute enters the default `streamId`.** An origin may rewrite a
+master's attributes from one request to the next. Akamai's live packager
+publishes the encoder's current output as `BANDWIDTH`, and a channel that
+alternates programmes publishes the current programme's `FRAME-RATE` — 24 for
+one programme and 25 for the other — although RFC 8216 defines both over the
+whole variant stream. A player reads the master once, when it starts, so a
+stream identity hashed from such attributes splits a swarm by when each viewer
+started. The position of a variant in the master does not change with them; a
+master with one variant is `main0` whatever it states.
+
+**When the index is the wrong default,** a `streamIdBuilder` (below) gives the
+streams IDs of the integration's own:
+
+- **A master that shuffles its variants** on every request: the same rendition
+  has another index for each viewer. A builder returns an ID made of the
+  properties that tell the streams apart — codecs, resolution, name,
+  language, channels, as in the `streamIdBuilder` example of the API
+  documentation — or whatever the integration's own catalogue calls the
+  quality. Height alone gives every audio rendition one ID, and every rung
+  at one height.
+- **A master that differs per viewer** — filtered by device or region, a
+  variant left out for some viewers, an A/B test: the indexes shift between
+  viewers, and one index names different renditions for them. Their peers
+  then exchange segments of the wrong rendition, which the player cannot
+  decode: the default fails with wrong bytes here, not with "no P2P". A
+  different `swarmId` for each set of streams fixes it (above); a builder is
+  the other way.
+- **Redundant variants**, one rendition listed twice for failover between two
+  CDNs, and **content steering**, one rendition listed for each pathway: they
+  get two indexes and two swarms. A failover is rare, but a steering server
+  divides the viewers between pathways all the time, so with two equal
+  pathways each rendition has two half-size swarms (KNOWN-ISSUES.md). A
+  builder can give the copies one ID (below).
+- **A variant added or removed during a live stream:** a viewer who starts
+  afterwards counts differently from one who started before. One viewer is
+  hit too where its core processes the master again: a variant inserted
+  before the others takes the index, and so the stream ID and the segment
+  store, of the variant that had it, and the player gets the old variant's
+  stored segments for the new one. HLS.js and Shaka read an HLS master once,
+  so only an integration that calls `processManifest` with a re-fetched master
+  gets there.
+
+### DASH: the Representation's `@id`
+
+**A DASH stream's `streamId` is its type and its Representation's `@id`:
+`main-<@id>` for video, `secondary-<@id>` for audio.** Text, image and
+trick-mode AdaptationSets are not streams.
+
+- **`@id` is mandatory and unique within a Period** (ISO/IEC 23009-1), so two
+  Representations that play at the same time never share an ID.
+- **No attribute enters it.** `@bandwidth`, `@frameRate` and the codecs string
+  may change from one Period to the next, or from one refresh of a live MPD
+  to the next; the `@id` does not change with them.
+- **The order of the Representations does not matter**, so an MPD that lists
+  them in another order on each request gives the same IDs.
+- **It is what the parser joins Periods on.** `mpd-parser` merges a
+  Representation's segments across Periods by its `@id`, and the core's stream
+  is that merged Representation, so one core stream is one swarm.
+
+**Across Periods.** A Period is a span of the presentation timeline: content,
+an ad break, content again. What its Representations are called decides the
+streams:
+
+- **The same `@id`s in several Periods** — content before and after an ad
+  break, or an ad that reuses the content's `@id`s: one stream and one swarm
+  throughout. Its segments are told apart by their presentation time, which
+  runs on across Periods (see "Segment identity"), so the content's segments
+  and the ad's never share an `externalId`.
+- **Other `@id`s** — an ad break with Representations of its own: other
+  streams and other swarms. A player that moves into the ad moves to those
+  streams, as it would in a quality switch, and back to the content's streams
+  after it.
+
+The type stays in the ID although an `@id` is unique among all the
+AdaptationSets of a Period: it gives DASH the form HLS has, and it keeps video
+and audio apart in a tracker's statistics where a packager reuses an `@id` for
+another type in another Period. A server reads the `@id`s from its own MPD.
+
+**When `@id` is the wrong default,** a `streamIdBuilder` gives the streams IDs
+of the integration's own:
+
+- **`@id`s generated anew for every Period**, such as `p123_video_720`: each
+  Period is a new swarm, and P2P starts again at every Period change. A
+  builder can map them to stable IDs, by height for example.
+- **`@id`s that differ per viewer**, in an MPD made for each session.
+- **Ads that differ per viewer under the content's `@id`s:** viewers who get
+  different ads hold different bytes at one presentation time in one swarm. A
+  builder must keep the ads' Representations apart, or the integration must
+  give each session its own `swarmId`.
+
+An MPD whose Representations have no `@id` is invalid, and `mpd-parser` merges
+them into one playlist; it is not supported.
+
+### A custom stream ID
+
+A `streamIdBuilder` returns the `streamId` of each stream the core registers;
+the core composes the swarm ID around it, so a custom ID always carries
+`PEER_PROTOCOL_VERSION` and the content's `swarmId`. It receives what a peer
+knows of the stream when it registers it:
+
+- `swarmId`, and the stream's type;
+- its key: the media playlist URL for HLS, the Representation `@id` for DASH. A
+  URL can differ from viewer to viewer — a CDN host, a signed path or query —
+  so a builder uses only a part every viewer has alike, such as an unsigned
+  file name, which can tell apart two rungs that differ only in a bitrate the
+  origin rewrites;
+- its properties, as the core reads them from the manifest (below);
+- the default `streamId`: `main0` for HLS, `main-<@id>` for DASH, `main` for
+  a media playlist with no master;
+- for an HLS stream, its index within its type, as defined above;
+- the manifest's URL and its streams, each with its key, type, default
+  `streamId` and properties.
+
+Returning `undefined` keeps the default. A builder must return the same ID on
+every peer for the same stream — it must not read anything a peer has of its
+own, such as a playlist URL with a CDN host or a signed path — and a server
+predicting the infohash applies the same function to the same manifest. **It
+must return a different ID for each different stream of the content.** The
+core does not check it: two streams with one ID are one swarm, and their peers
+exchange segments of the wrong stream. One rendition listed twice — in two
+masters under one configured `swarmId`, or for each CDN in one master — may
+take one ID, and then shares one swarm and one segment store: viewers on the
+two copies exchange segments, and a segment one copy fetched serves a request
+for the other. A viewer that fails over from one copy to the other holds both
+copies' P2P loaders, which announce one infohash, for
+`p2pInactiveLoaderDestroyTimeoutMs`; that overlap is not tested (see
+KNOWN-ISSUES.md). Like
+`swarmId`, the builder is read once per stream and cannot be changed at
+runtime.
+
+A builder that returns something other than a non-empty string or
+`undefined`, or throws, fails the stream's registration: the stream is
+reported through `onStreamRegistrationError` and plays without P2P.
+
+**The properties a builder receives** are read from the manifest, not from a
+player's model of it, and are passed as the manifest wrote them: a codecs
+string, a frame rate, a language tag are not normalized. Where a player's own
+model gives other answers:
+
+- **HLS: a variant's `codecs` are its video codecs**; the audio codecs belong
+  to the audio rendition. An audio-only variant, with no video codec, has its
+  audio codecs.
+- **HLS: an alternate video rendition** (`EXT-X-MEDIA TYPE=VIDEO` with a URI)
+  has the attributes of the variant that references its group — bitrate,
+  codecs, resolution, frame rate, video range — plus its own `NAME` and
+  `LANGUAGE`. RFC 8216 makes the variant's characteristics the rendition's.
+- **DASH: `bitrate` is the Representation's own `@bandwidth`.** For a video
+  stream that is the video bit rate alone; a player that pairs video and
+  audio into variants reports their sum.
+- **DASH: an audio stream's `name` is its Representation `@id`**, the one
+  stable, manifest-given name it has; a `label` is optional, and a parser may
+  synthesise one. `channels` is read from `AudioChannelConfiguration` under
+  the MPEG scheme (`urn:mpeg:dash:23003:3:audio_channel_configuration:2011`),
+  whose value is a plain count; vendor schemes encode channel masks and are
+  left unset rather than guessed.
 
 ## Segment identity
 
@@ -239,11 +404,18 @@ DASH bucket — is in a swarm of its own by construction, since the version sits
 in every stream swarm ID. That is the intended outcome and not a defect: two
 derivations that disagree must not be allowed to meet.
 
-**Any change to how `identityHash` or `externalId` is derived requires bumping
-it.** This includes changes that look cosmetic: a different normalization of a
+**Any change to how a `streamId` or an `externalId` is derived requires
+bumping it.** This includes changes that look cosmetic: a different normalization of a
 codec string, a different rounding of a frame rate, a different base for a
 segment number. Peers cannot negotiate identity — they can only agree or fail to
 find each other.
+
+**A pre-release is the exception.** A derivation that changes between
+pre-releases of one major version, before any stable release carried it, keeps
+the version: no deployment depends on a pre-release, so nothing is lost when a
+pre-release peer and a release peer do not meet. The 5.0.0 pre-releases hashed
+the stream's properties under `v3`; 5.0.0 names streams by their place in the
+manifest under the same `v3`.
 
 Identity derivation is frozen by golden vectors in the core test suite. Those
 vectors are not expectations to be updated when the code changes; they are the

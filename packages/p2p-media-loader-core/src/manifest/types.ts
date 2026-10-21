@@ -81,10 +81,29 @@ export type ParsedStream = {
   /** Stream type. Alternate audio renditions are `"secondary"`; every other stream is `"main"`. */
   readonly type: StreamType;
   /**
-   * The stream's properties, read from the manifest and not normalized. The
-   * core derives the stream's identity from them; see `StreamProperties`.
+   * The stream's properties, read from the manifest and not normalized. They
+   * do not enter the default stream ID; a `streamIdBuilder` receives them.
    */
   readonly properties: StreamProperties;
+  /**
+   * The stream's default ID among the content's streams: HLS `main0`,
+   * `secondary1` (the type and `index`), DASH `main-<@id>`,
+   * `secondary-<@id>`. Set by a manifest that declares the stream among
+   * others — an HLS master, an MPD. Absent from a media playlist, which
+   * cannot know its place. See specs/segment-identity.md.
+   *
+   * A custom parser must set it on every stream a manifest declares among
+   * others. A stream without it is anonymous: its ID is its type alone, and
+   * it is shared only where it is the only stream of its type in its swarm,
+   * so a parser that leaves it out turns P2P off for every stream of a
+   * ladder, with no error.
+   */
+  readonly streamId?: string;
+  /**
+   * HLS: the stream's index among the master's streams of its type — the
+   * number in `streamId`. Absent for DASH and for a media playlist.
+   */
+  readonly index?: number;
   /**
    * Segments, when this manifest carries them. An HLS master declares
    * streams without segments; a media playlist carries segments for one
@@ -229,6 +248,10 @@ export type ManifestParser = {
    * May throw on malformed input; the core treats that as "no change". The
    * core parses a manifest that reports a `clock` again as time passes, with
    * the same text and a later `context.now`.
+   *
+   * Each stream a manifest declares among others carries its default
+   * `streamId` (see `ParsedStream.streamId`); a stream without one is shared
+   * only where it is alone of its type.
    */
   parse(
     text: string,

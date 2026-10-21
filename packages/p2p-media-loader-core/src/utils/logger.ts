@@ -2,7 +2,7 @@ import { Stream } from "../types.js";
 import { SegmentWithStream } from "../internal-types.js";
 
 export function getStreamString(stream: Stream) {
-  return `${stream.type}-${stream.identityHash}`;
+  return stream.streamId;
 }
 
 export function getSegmentString(segment: SegmentWithStream) {

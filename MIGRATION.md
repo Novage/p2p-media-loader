@@ -10,10 +10,11 @@ peers on different players share one swarm. The design is documented in
 `specs/`.
 
 **Wire compatibility:** none with v4. `externalId` is now the HLS media
-sequence number or the DASH presentation time in 100 ms units, and
-`identityHash` hashes the manifest's properties as written — the v4
-normalization is gone, and `bitrate` counts only where a manifest needs it to
-tell two same-type streams apart, so an origin that recomputes `BANDWIDTH` per
+sequence number or the DASH presentation time in 100 ms units, and a stream's
+swarm is named by its place in the manifest rather than by a hash of its
+properties: for HLS its type and its index among the master's streams of that
+type (`main0`, `secondary1`), for DASH its type and its Representation `@id`
+(`main-video-720`). An origin that rewrites `BANDWIDTH` or `FRAME-RATE` per
 request no longer splits a rendition's swarm. The peer protocol version is
 `v3` and v5 peers form separate swarms from v4 peers.
 Roll a deployment over in one step; mixed versions do not exchange segments,
@@ -173,8 +174,54 @@ still plays, but fetches over HTTP every segment the storage cannot serve (see
 
 `Stream.runtimeId` is now the manifest-derived stream key: the media playlist
 URL for HLS, the Representation id for DASH. The `onStreamRegistrationError`
-event keeps its shape; it fires once per failing stream, only for
-`streamSwarmIdBuilder` failures.
+event keeps its shape; it fires once per failing stream, only for a
+`streamIdBuilder` that returned no usable ID or threw. Two streams that get one
+stream swarm ID no longer fail: the builder must give each stream its own ID.
+
+### Stream identity: `streamIdBuilder`
+
+The stream part of the stream swarm ID is now a stream ID taken from the
+manifest, and the builder returns only that part. The core composes
+`` `${PEER_PROTOCOL_VERSION}-${swarmId}-${streamId}` `` itself.
+
+| v4                                                          | v5                                                         |
+| ----------------------------------------------------------- | ---------------------------------------------------------- |
+| `StreamConfig.streamSwarmIdBuilder` → stream swarm ID       | `StreamConfig.streamIdBuilder` → stream ID, or `undefined` |
+| `StreamSwarmIdBuilderContext`                               | `StreamIdBuilderContext`                                   |
+| context `identityHash`, `defaultStreamSwarmId`              | context `defaultStreamId`, `index`, `manifest`             |
+| context `peerProtocolVersion`                               | removed                                                    |
+| `Stream.identityHash`                                       | `Stream.streamId`                                          |
+| `computeStreamIdentityHash(properties)`                     | removed — no property enters the default stream ID         |
+| `computeStreamSwarmId({ swarmId, streamType, properties })` | removed — `buildStreamSwarmId(swarmId, streamId)`          |
+| `buildStreamSwarmId(swarmId, streamType, identityHash)`     | `buildStreamSwarmId(swarmId, streamId)`                    |
+
+A config that still sets `streamSwarmIdBuilder` is not carried over: the core
+ignores it, writes a `console.warn` and counts `Config:renamed-key`.
+
+A builder that only wrapped the default, such as
+`` ({ defaultStreamSwarmId }) => `tenant-a-${defaultStreamSwarmId}` ``,
+becomes `` ({ defaultStreamId }) => `tenant-a-${defaultStreamId}` ``: each
+source keeps its own swarm, named by its URL, with the prefix. Do not move the
+prefix into `swarmId`: an engine keeps one core, and so one `swarmId`, for
+every source it plays, so `swarmId: "tenant-a"` would put every video's
+`main0` in one swarm.
+
+A server predicts the default infohashes from the manifest it serves:
+
+```typescript
+import {
+  buildStreamSwarmId,
+  computeInfoHash,
+} from "p2p-media-loader-core/server";
+
+// The second variant of an HLS master.
+const infoHash = computeInfoHash(buildStreamSwarmId(swarmId, "main1"));
+```
+
+Configure a `streamIdBuilder` where the index is the wrong default: an HLS
+master that lists its streams in another order for each request or each
+viewer, a live master that adds or removes a variant, or DASH `@id`s that
+differ from viewer to viewer. See `specs/segment-identity.md`.
 
 ### `validateHTTPSegment` is removed
 
@@ -266,7 +313,9 @@ the position of its own type, as the bundled storage does (see
   receives the synchronized time as `context.now`, and a parser whose segment
   list follows from the clock reports it as `ParsedManifest.clock`
   (`ManifestClock`, `UtcTimingSource`). A parser that ignores both keeps
-  working.
+  working. It must set `ParsedStream.streamId` on each stream a manifest
+  declares among others: a stream without it is anonymous, and is shared
+  only where it is the only stream of its type.
 - An **integration** toolkit for whoever writes a player adapter:
   `liveDelayFor`, `liveDelayForSegments`, `liveDelayFromWindow`,
   `playerBufferFor`, `maxLiveLatencyFor`, `urgentBufferThresholdFor`,
@@ -286,10 +335,6 @@ the position of its own type, as the bundled storage does (see
   segments of subtitles and trick play, are recognised and never reported.
 - `byteRangeFromRangeHeader(header)` — converts a `Range: bytes=a-b` header to
   the inclusive `ByteRange` the lookup methods take.
-- `identityProperties(streams)` — the identity input for every stream a
-  manifest declares, with `bitrate` kept only where two same-type streams would
-  otherwise be indistinguishable. Exported from the main entry and from
-  `p2p-media-loader-core/server`, so a server reproduces the client's choice.
 - Bundles: `p2p-media-loader-core.es.min.js` carries both parsers;
   `-hls` and `-dash` variants carry one.
 - `httpFirstByteTimeoutMs` stream option — see "HTTP timeouts" above.

@@ -196,7 +196,9 @@ the groups and the cases a reader of a snapshot must know.
   (`TrackerAnnounce:socket-lost`), a config
   key a release renamed (`Config:renamed-key`, once for each core and key),
   a config key a release removed (`Config:removed-key`, the same way),
-  registry
+  each stream the core registers (`StreamRegistration:added`) and each that
+  fails to register (`StreamRegistration:failed`: a `streamIdBuilder` that
+  returned no usable ID or threw — see specs/segment-identity.md), registry
   misses, evictions by reason, closed peers by cause, parses of the
   player's manifests by result (`ManifestParse`), and clock synchronizations
   and re-parses by result. Each player request that the store cannot serve is

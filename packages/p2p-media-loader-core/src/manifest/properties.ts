@@ -6,9 +6,9 @@ import { parseCodecs } from "@videojs/vhs-utils/es/codecs.js";
 import type { StreamProperties } from "../types.js";
 
 /**
- * Stream properties from manifest attributes. These feed `identityHash`
- * unnormalized, so what is read here is what every peer hashes; the golden
- * vectors in the core tests pin the results.
+ * Stream properties from manifest attributes, unnormalized. They do not enter
+ * the default stream ID; a `streamIdBuilder` receives them, so what is read
+ * here is what every peer's builder reads.
  */
 
 export type VideoAttributes = {
@@ -50,15 +50,16 @@ export function audioCodecs(codecs: string | undefined): string | undefined {
 
 /**
  * A variant's properties, each as the manifest states it. A missing
- * `BANDWIDTH` says nothing about the rest: bandwidth is the one attribute an
- * origin recomputes per request, which is why identity drops it, and a
- * resolution or a codec string is read the same by every peer whether it is
- * there or not. See specs/segment-identity.md.
+ * `BANDWIDTH` says nothing about the rest: a resolution or a codec string is
+ * read the same by every peer whether it is there or not. See
+ * specs/segment-identity.md.
  */
 export function videoStreamProperties(a: VideoAttributes): StreamProperties {
   return {
     bitrate: a.bandwidth ?? 0,
-    codecs: videoCodecs(a.codecs),
+    // An audio-only variant has no video codec; its audio codecs are then
+    // what tells it from the others.
+    codecs: videoCodecs(a.codecs) ?? audioCodecs(a.codecs),
     width: a.width,
     height: a.height,
     frameRate: a.frameRate,
@@ -70,8 +71,7 @@ export function videoStreamProperties(a: VideoAttributes): StreamProperties {
  * An alternate video rendition — a camera angle with a playlist of its own.
  * RFC 8216 gives it the characteristics of the variant that references its
  * group, so the variant's attributes are its properties, and the rendition's
- * own `NAME` and `LANGUAGE` are what tell it from the variant. The variant
- * carries neither, so its identity is untouched by the group.
+ * own `NAME` and `LANGUAGE` are what tell it from the variant.
  */
 export function videoRenditionProperties(
   a: VideoAttributes,

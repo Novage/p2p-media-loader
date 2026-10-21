@@ -122,14 +122,14 @@ video/1080p/index.m3u8?t=${token}
     const registry = new ManifestRegistry();
     registry.apply(hls(master("1"), MASTER));
     registry.apply(hls(HLS_MEDIA_VOD_BYTERANGE, `${MEDIA_1080}?t=1`));
-    const identity = registry.getStream(`${MEDIA_1080}?t=1`)!.identityHash;
+    expect(registry.getStream(`${MEDIA_1080}?t=1`)!.streamId).toBe("main0");
 
     registry.apply(hls(master("2"), MASTER));
     registry.apply(hls(HLS_MEDIA_VOD_BYTERANGE, `${MEDIA_1080}?t=2`));
 
     expect(registry.getStreams()).toHaveLength(1);
     const stream = registry.getStream(`${MEDIA_1080}?t=1`)!;
-    expect(stream.identityHash).toBe(identity);
+    expect(stream.streamId).toBe("main0");
     expect(stream.segments.size).toBe(3);
   });
 
@@ -343,12 +343,13 @@ video/1080p/index.m3u8
     // change it. The master's declaration attaches to the stream all the same.
     const registry = new ManifestRegistry();
     registry.apply(hls(HLS_MEDIA_VOD_BYTERANGE, MEDIA_1080));
-    const anonymous = registry.getStream(MEDIA_1080)!.identityHash;
+    expect(registry.getStream(MEDIA_1080)!.streamId).toBe("main");
 
     registry.apply(hls(HLS_MASTER_WITH_AUDIO, MASTER));
     const stream = registry.getStream(MEDIA_1080)!;
     expect(stream.identified).toBe(false);
-    expect(stream.identityHash).toBe(anonymous);
+    expect(stream.streamId).toBe("main");
+    expect(stream.manifest).toBeUndefined();
     expect(stream.type).toBe("main");
     expect(stream.segments.size).toBe(3);
     expect(registry.getStreams()).toHaveLength(4);
@@ -357,19 +358,30 @@ video/1080p/index.m3u8
   it("keeps the identity the first master gave, whatever a later one says", () => {
     const registry = new ManifestRegistry();
     registry.apply(hls(HLS_MASTER_WITH_AUDIO, MASTER));
-    const identity = registry.getStream(MEDIA_1080)!.identityHash;
+    expect(registry.getStream(MEDIA_1080)!.streamId).toBe("main0");
 
-    // A live packager republishing its master with another BANDWIDTH must not
-    // move a playing stream to a swarm with no peers in it.
+    // A live packager republishing its master with a variant added before
+    // this one, and another BANDWIDTH, must not move a playing stream to a
+    // swarm with no peers in it.
     const republished = HLS_MASTER_WITH_AUDIO.replace(
-      "BANDWIDTH=4521000",
-      "BANDWIDTH=4498000",
+      "#EXT-X-STREAM-INF:BANDWIDTH=4521000",
+      `#EXT-X-STREAM-INF:BANDWIDTH=9000000,CODECS="avc1.640033,mp4a.40.2",RESOLUTION=3840x2160,AUDIO="aud"
+video/2160p/index.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=4498000`,
     );
     registry.apply(hls(republished, MASTER));
 
     const stream = registry.getStream(MEDIA_1080)!;
-    expect(stream.identityHash).toBe(identity);
+    expect(stream.streamId).toBe("main0");
+    expect(stream.index).toBe(0);
+    expect(stream.manifest?.streams).toHaveLength(4);
     expect(stream.properties.bitrate).toBe(4521000);
+    // The new variant is first in the master that declared it: `main0` too.
+    // A master that changes its order needs a streamIdBuilder.
+    expect(
+      registry.getStream("https://cdn.example/live/video/2160p/index.m3u8")
+        ?.streamId,
+    ).toBe("main0");
   });
 
   it("uses the media sequence number as externalId", () => {

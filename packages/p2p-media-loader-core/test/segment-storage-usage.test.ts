@@ -5,7 +5,7 @@ import type { StreamConfig } from "../src/types.js";
 
 const MiB = 1048576;
 const SEGMENT_BYTES = MiB / 4;
-const STREAM_SWARM_ID = "v3-swarm-main-hash";
+const STREAM_SWARM_ID = "v3-swarm-main0";
 const SWARM_ID = "https://cdn.example/v/master.m3u8";
 
 async function initStorage(streamConfig: Partial<StreamConfig> = {}) {
@@ -207,7 +207,7 @@ describe("SegmentMemoryStorage positions by stream type", () => {
     // judged by video's position, they were evicted and fetched again, over
     // and over.
     const storage = await initStorage();
-    const AUDIO = "v3-swarm-secondary-hash";
+    const AUDIO = "v3-swarm-secondary0";
     const store = async (
       streamSwarmId: string,
       type: "main" | "secondary",

@@ -10,6 +10,39 @@ The tests themselves are in
 
 ## Open
 
+- **HLS content steering splits a rendition into one swarm per pathway.** A
+  steered master lists each rendition once for each pathway (`PATHWAY-ID`),
+  under a different URI, and the core counts a playlist once only where its
+  URI repeats exactly: the 1080p of pathway A is `main0` and that of pathway B
+  `main2`, two swarms. A steering server divides the viewers between the
+  pathways all the time, so with two equal pathways about half of the P2P
+  share is lost; redundant variants for failover split the same way, but only
+  after a failover. Playback is not affected. Not fixed because counting the
+  index within each pathway is right only if every pathway lists the same
+  renditions in the same order, which is not checked; where it does not hold,
+  that count would give wrong bytes. An integrator can join the pathways with a
+  `streamIdBuilder` that names each rendition by its properties (see the
+  overlap after a switch below). Older than the stream ID change: pathway
+  clones (`PATHWAY-CLONES` in the steering manifest) give media playlist URLs
+  the master never named, so their streams are anonymous and get no P2P
+  beside other streams.
+- **One rendition under two playlist URLs and one stream ID: a failover has
+  an untested 30 s overlap.** A `streamIdBuilder` may give one ID to one
+  rendition listed twice, for two CDNs; one master under a configured
+  `swarmId` fetched from two CDNs gives both copies `main0` without a builder.
+  The core keys its P2P loaders by playlist URL, so a player that fails over
+  from one copy to the other in one core holds a loader for each, and keeps
+  the old one for `p2pInactiveLoaderDestroyTimeoutMs` (30 s) when segments of
+  it are stored. The two loaders announce one infohash with one peer ID on one
+  tracker socket, and each tracker client then processes the other's offers
+  and answers: a client ignores only messages of another infohash. The likely
+  effect is extra offers and refused answers until the old loader closes, not
+  a playback error. Not observed; found by reading the code
+  (`p2p/loaders-container.ts`, `webtorrent-client/index.ts`). Not fixed
+  because a failover between copies is rare, and HLS.js and Shaka play the
+  first copy until it fails. A test needs a master with redundant variants and
+  a forced failure of the first copy.
+
 - **Video.js 10 without `autoplay` plays about 10 s from the live edge and
   gets almost no P2P.** Without `autoplay`, Video.js 10.0.1 seeks once at the
   first `play` to the end of the seekable range less the playlist's
@@ -179,6 +212,30 @@ The tests themselves are in
   Shaka's team does not test on so old a browser.
 
 ## Decided: kept by design
+
+- **An HLS stream ID is its index in the master, so two viewers who get
+  different masters from one URL share swarms of different renditions.** An
+  origin that filters renditions by device — HEVC 2160p only for Safari, say
+  — gives Safari's HEVC 2160p and Chrome's AVC 1080p the same `main0`, and
+  their peers exchange segments of the wrong rendition: a decode error, not
+  "no P2P". The same holds for an A/B test of the ladder and a variant added
+  during a live stream. The index is kept because an origin may rewrite a
+  master's attributes per request (Akamai's `BANDWIDTH` and `FRAME-RATE`),
+  and because a server predicts every infohash from the index alone. One
+  master URL, query aside, must give every viewer the same streams. Where it
+  does not — an A/B test, a query parameter that selects the streams, device
+  filtering — the integrator configures a different `swarmId` for each set of
+  streams. A live master that adds or removes a variant needs a
+  `streamIdBuilder`, since its URL and its viewers stay the same. Without one
+  it also misleads a single viewer whose core processes the master again: a
+  variant inserted before the others takes the stream ID of the variant that
+  had its index, and with it that variant's segment store, so the player gets
+  the old variant's stored segments for the new one. Only an integration that
+  calls `processManifest` with a re-fetched master gets there; HLS.js and
+  Shaka read an HLS master once, and a new DASH Representation has a new
+  `@id`. See
+  [specs/segment-identity.md](specs/segment-identity.md), "HLS: the stream's
+  place in the master".
 
 - **No retry after a failed WebRTC handshake**, and no reconnect of a dropped
   peer. Two peers then stay apart until the tracker's next announce, up to

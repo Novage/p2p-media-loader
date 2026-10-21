@@ -1216,65 +1216,72 @@ pair it with the P2P Media Loader IIFE bundle, which targets ES2015.
 
 ## Predicting swarm infohashes on a server
 
-Each stream (media quality) is downloaded through its own P2P swarm, identified on trackers by an **infohash**. The infohash is the hash of the **stream swarm ID** — a string derived from the swarm ID, the stream type, and the stream's identity hash (a hash of its manifest properties — codecs, resolution, frame rate, video range, language, channels, name — with bitrate included only where the manifest needs it to tell two streams of the same type apart).
+Each stream (media quality) is downloaded through its own P2P swarm, identified on trackers by an **infohash**. The infohash is the hash of the **stream swarm ID**, `` `${PEER_PROTOCOL_VERSION}-${swarmId}-${streamId}` ``. The `swarmId` is the configured one, or the URL the player requested the master manifest at, without its query string. The `streamId` tells the stream from the content's other streams, and by default comes from its place in the manifest:
 
-A server can compute the exact infohashes clients will announce — for example, to allowlist them on a private tracker. The Node-safe helpers are exported from the `p2p-media-loader-core/server` subpath (Node.js 16+). The package is published as ESM only — from a CommonJS project, load it with a dynamic `import()` (or `require()` on Node.js 20.17+):
+- **HLS:** the stream's type and its index among the master's streams of that type, in the order of the master. The variants are `main0`, `main1`, …, then the alternate video renditions with a playlist of their own; the audio renditions with a playlist of their own are `secondary0`, `secondary1`, …. A playlist listed under several variants counts once. A media playlist played with no master is `main`.
+- **DASH:** the stream's type and its Representation `@id`: `main-video-720`, `secondary-audio-en`.
+
+No attribute of the stream — bitrate, frame rate, codecs — enters the default `streamId`, so an origin that rewrites them per request does not split a swarm. See [`specs/segment-identity.md`](specs/segment-identity.md), "Stream identity", for the exact rule.
+
+A server can compute the exact infohashes clients will announce — for example, to ask a tracker for the statistics of each quality, or to allowlist them on a private tracker. The Node-safe helpers are exported from the `p2p-media-loader-core/server` subpath (Node.js 16+). The package is published as ESM only — from a CommonJS project, load it with a dynamic `import()` (or `require()` on Node.js 20.17+):
 
 ```typescript
 import {
-  identityProperties,
-  computeStreamSwarmId,
+  buildStreamSwarmId,
   computeInfoHash,
 } from "p2p-media-loader-core/server";
 
-// With the default client configuration. `streams` lists every variant and
-// rendition of the master manifest, with the properties exactly as the
-// manifest states them (see specs/segment-identity.md for which those are per
-// protocol) — the client does not normalize them. `identityProperties` applies
-// the client's rule for bitrate: it is dropped unless another stream of the
-// same type would otherwise be indistinguishable, so an origin that recomputes
-// BANDWIDTH per request does not split a swarm.
-const inputs = identityProperties(streams); // streams: { type, properties }[]
-const infoHashes = streams.map((stream, i) =>
-  computeInfoHash(
-    computeStreamSwarmId({
-      swarmId, // the configured swarmId, or the URL the player requested the master manifest at, without its query string
-      streamType: stream.type,
-      properties: inputs[i],
-    }),
-  ),
+// With the default client configuration, for an HLS master with three
+// variants and two audio renditions.
+const streamIds = ["main0", "main1", "main2", "secondary0", "secondary1"];
+const infoHashes = streamIds.map((streamId) =>
+  computeInfoHash(buildStreamSwarmId(swarmId, streamId)),
 );
 
 // The tracker allowlist entries (hex of the announced 20-byte ASCII string):
 const allowlist = infoHashes.map((h) => Buffer.from(h, "utf8").toString("hex"));
 ```
 
-For full control, configure a custom `streamSwarmIdBuilder` on the client and apply `computeInfoHash` to the same string on the server. This way the infohash depends only on values the server authors itself, here the video's ID and the stream properties of the manifest it publishes:
+**One master URL must give every viewer the same streams.** The default `swarmId` discards the query, so an origin that gives different streams under one URL — an A/B test of the ladder, a query parameter that selects the streams, renditions filtered by device — puts different renditions in one swarm, and peers exchange segments of the wrong one. Configure a different `swarmId` for each set of streams, for example the content's identifier with the A/B group or the device class added.
+
+**When the default is wrong** in other ways, configure a `streamIdBuilder` on the client. The index is the wrong default for an HLS master that lists its streams in another order for each request or each viewer, or one that adds or removes a variant during a live stream: viewers then count differently, and one index names different streams for them. The `@id` is the wrong default for DASH `@id`s that differ from viewer to viewer. The builder returns the stream ID, and the server applies the same rule to the manifest it publishes:
 
 ```typescript
 import type { CoreConfig } from "p2p-media-loader-core";
 import {
+  buildStreamSwarmId,
   computeInfoHash,
-  computeStreamIdentityHash,
-  identityProperties,
+  type StreamProperties,
+  type StreamType,
 } from "p2p-media-loader-core/server";
 
-// Client: the engine's `core` configuration
+// One function for the client and the server, so that both build one ID. A
+// master that shuffles its variants: name each stream by what it carries.
+const streamIdOf = (streamType: StreamType, p: StreamProperties) =>
+  [streamType, p.codecs, p.width, p.height, p.name, p.language, p.channels]
+    .map((value) => value ?? "")
+    .join("-");
+
+// Client: the engine's `core` configuration.
 const config: CoreConfig = {
   swarmId: videoUuid,
-  streamSwarmIdBuilder: ({ swarmId, streamType, identityHash }) =>
-    `my-app-${swarmId}-${streamType}-${identityHash}`,
+  streamIdBuilder: ({ streamType, properties }) =>
+    streamIdOf(streamType, properties),
 };
 
-// Server: `streams` lists the manifest's streams, as in the example above
-const inputs = identityProperties(streams);
-const infoHashes = streams.map((stream, i) =>
-  computeInfoHash(
-    `my-app-${videoUuid}-${stream.type}-${computeStreamIdentityHash(inputs[i])}`,
+// Server: each stream's properties as the client reads them from the master —
+// a variant's video codecs only, for one (see specs/segment-identity.md, "The
+// properties a builder receives").
+const infoHash = computeInfoHash(
+  buildStreamSwarmId(
+    videoUuid,
+    streamIdOf("main", { codecs: "avc1.64001f", width: 1280, height: 720 }),
   ),
 );
 ```
 
-The stream swarm ID must be deterministic and identical across all peers of a swarm, and **every distinct stream must map to a distinct ID**. The example uses the stream's `identityHash` because it is both: it hashes the stream's properties from the manifest, with `bitrate` only where two streams of the same type need it to be told apart. A builder that composes the ID from properties itself faces the same choice: resolution alone collides on ladders with several bitrates at the same resolution, while `bitrate` splits a swarm where an origin recomputes it per request, as some live packagers do. Two different streams resolving to the same ID fail to register (reported through the `onStreamRegistrationError` core event) and play without P2P. The builder cannot be changed at runtime. Clients can also observe each registered stream's computed identity through the `onStreamAdded` core event.
+Streams equal in all of these values — two rungs that differ only in bitrate, say — would get one ID. Tell them apart by something every viewer reads alike, such as an unsigned file name in the playlist URL (`runtimeId`), or keep the default for that master.
 
-The builder context also provides `defaultStreamSwarmId` — the ID the default derivation would produce — which is guaranteed unique per stream and convenient as a base for custom IDs (e.g. `` `${tenant}-${defaultStreamSwarmId}` ``; reproduce it server-side with `computeStreamSwarmId` or compose it with `buildStreamSwarmId(swarmId, streamType, identityHash)`).
+The builder receives the stream's `runtimeId` (the media playlist URL for HLS, the Representation id for DASH; a URL can differ from viewer to viewer, so use only a part they share), its type and properties, its `defaultStreamId`, its HLS `index`, and the `manifest` that declared it — its URL and every stream with key, type, default stream ID and properties — so that it can tell what the ID must be unique among. It returns `undefined` to keep the default.
+
+The stream ID must be deterministic and identical across all peers of a swarm, and **every distinct stream must map to a distinct ID**. Build it from properties every viewer reads alike — not `bitrate`, which an origin may recompute per request — and from enough of them: resolution alone collides on ladders with several bitrates at the same resolution. The core does not check this: two different streams with one ID are one swarm, and their peers exchange segments of the wrong stream. One rendition listed twice, for two CDNs, may take one ID: viewers on the two copies then share one swarm. A failover from one copy to the other in one player is not tested with a shared ID (see `KNOWN-ISSUES.md`). A builder that returns no usable ID fails the stream's registration (reported through the `onStreamRegistrationError` core event), and the stream plays without P2P. The builder cannot be changed at runtime. Clients can also observe each registered stream's `streamId` and `infoHash` through the `onStreamAdded` core event.

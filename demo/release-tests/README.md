@@ -109,9 +109,9 @@ existed. Write its module from the spec the next time it runs.
 - Shaka on a live stream whose window the pause outlives jumps into the
   window on resume and rebuffers for 4–5 s, with P2P or without it (the
   control of test 3): it is the player's, not a stall of the core.
-- A P2P loader is recorded by the end of its stream swarm ID
-  (`P2PLoader <id>`), a peer by the start of the info hash
-  (`PeersHeld:<hash>`). Compare tabs by the swarm of the rendition each
+- A P2P loader is recorded by the start of its info hash and its stream ID
+  (`P2PLoader <hash>:<streamId>`), the peers of its swarm by the same start
+  of the info hash (`PeersHeld:<hash>`). Compare tabs by the swarm of the rendition each
   plays (`quality.js`, `swarmRow`), not by which swarms are shared: a loader
   of a rendition no tab plays any more closes after its grace period and
   takes its peer with it. Counting shared swarms read that as a switch back

@@ -1,4 +1,9 @@
-import type { ByteRange, StreamProperties, StreamType } from "../types.js";
+import type {
+  ByteRange,
+  ManifestStreamInfo,
+  StreamProperties,
+  StreamType,
+} from "../types.js";
 import type {
   ParsedManifest,
   ParsedSegment,
@@ -6,10 +11,6 @@ import type {
   SegmentIndexSource,
   SegmentLocation,
 } from "./types.js";
-import {
-  computeStreamIdentityHash,
-  identityProperties,
-} from "../stream-identity.js";
 import {
   fileOfSegmentKey,
   normalizeUrl,
@@ -42,13 +43,28 @@ export type RegistryStream = {
   readonly key: string;
   readonly type: StreamType;
   readonly properties: StreamProperties;
-  readonly identityHash: string;
+  /**
+   * The stream's default ID: the one the manifest that declared it gave it
+   * (`main0`, `main-<@id>`), or its type alone (`main`) for a media playlist
+   * that reached the registry without the master that names it. See
+   * specs/segment-identity.md.
+   */
+  readonly streamId: string;
+  /** HLS: the stream's index among its master's streams of its type. */
+  readonly index?: number;
+  /**
+   * The manifest that declared the stream, as a `streamIdBuilder` sees it.
+   * Absent for a stream no manifest declared.
+   */
+  readonly manifest?: {
+    readonly url: string;
+    readonly streams: readonly ManifestStreamInfo[];
+  };
   /**
    * Whether a manifest ever told this stream apart from another. False for a
    * media playlist that reached the registry without the master that names
-   * it: its identity is the empty one every such stream computes, so it can
-   * only be shared where it is the only stream of its type. See
-   * specs/segment-identity.md.
+   * it: its ID is the one every such stream gets, so it can only be shared
+   * where it is the only stream of its type. See specs/segment-identity.md.
    */
   readonly identified: boolean;
   readonly indexSource: SegmentIndexSource;
@@ -177,15 +193,23 @@ export class ManifestRegistry {
         nonStreamSegmentsOf(manifest.nonStreamSegments),
       );
     }
-    // Bitrate enters a stream's identity only where this manifest needs it to
-    // tell same-type streams apart; see specs/segment-identity.md. Hashing
-    // every stream is work a refresh that registers nothing new never needs,
-    // so it is done for the first stream this manifest registers, if any.
-    let identity: StreamProperties[] | undefined;
-    const identityOf = (i: number) =>
-      (identity ??= identityProperties(manifest.streams))[i];
+    // What a `streamIdBuilder` sees of the manifest that declared a stream.
+    // Only a refresh that registers a new stream needs it, so it is built for
+    // the first stream this manifest registers, if any.
+    let declaration: RegistryStream["manifest"];
+    const declarationOf = () =>
+      (declaration ??= {
+        url: manifest.requestedUrl ?? manifest.url,
+        streams: manifest.streams.map((s) => ({
+          runtimeId: s.key,
+          streamType: s.type,
+          defaultStreamId: s.streamId ?? s.type,
+          index: s.index,
+          properties: s.properties,
+        })),
+      });
 
-    for (const [i, parsed] of manifest.streams.entries()) {
+    for (const parsed of manifest.streams) {
       const key = this.resolveStreamKey(parsed, manifest);
       if (key === undefined) {
         ignored.push(parsed.key);
@@ -198,7 +222,7 @@ export class ManifestRegistry {
         );
         continue;
       }
-      const stream = this.upsertStream(key, parsed, () => identityOf(i));
+      const stream = this.upsertStream(key, parsed, declarationOf);
       if (!parsed.segments) {
         // A stream whose segments live in an external index is still reported
         // — how live it is, and what it holds so far — so a caller learns of
@@ -329,31 +353,35 @@ export class ManifestRegistry {
   private upsertStream(
     key: string,
     parsed: ParsedStream,
-    identityInput: () => StreamProperties,
+    declarationOf: () => RegistryStream["manifest"],
   ): MutableStream {
     const existing = this.streams.get(key);
 
     // The first manifest to register a stream decides its identity and its
     // type, and nothing changes them afterwards: a stream's identity is its
-    // swarm, and a live packager republishing its master — a changed
-    // BANDWIDTH is enough — would otherwise move a playing stream to a swarm
-    // with no peers in it. A media playlist processed before its master
+    // swarm, and a live packager republishing its master with a variant
+    // added or removed would otherwise move a playing stream to a swarm with
+    // no peers in it. A media playlist processed before its master
     // registers an anonymous stream, and the master arriving later does not
     // identify it: no player produces that order (the master is the first
     // manifest a player fetches, and the adapters are in the path from the
     // start), and it is not supported. See specs/manifest-registry.md.
     const carriesIdentity = !existing;
+    // Only a manifest that declares the stream among others gives it an ID.
+    const declared = parsed.streamId !== undefined;
+    const declaration =
+      carriesIdentity && declared ? declarationOf() : undefined;
 
     const stream: MutableStream = {
       key,
       type: existing?.type ?? parsed.type,
       properties: carriesIdentity ? parsed.properties : existing.properties,
-      identityHash: carriesIdentity
-        ? computeStreamIdentityHash(identityInput())
-        : existing.identityHash,
-      identified: carriesIdentity
-        ? identifies(identityInput())
-        : existing.identified,
+      streamId: carriesIdentity
+        ? (parsed.streamId ?? parsed.type)
+        : existing.streamId,
+      index: carriesIdentity ? parsed.index : existing.index,
+      manifest: carriesIdentity ? declaration : existing.manifest,
+      identified: carriesIdentity ? declared : existing.identified,
       indexSource: parsed.indexSource,
       initSegments: parsed.initSegments?.length
         ? parsed.initSegments
@@ -612,18 +640,6 @@ function externalIdOf(
   return protocol === "dash"
     ? Math.round((s.presentationTime ?? 0) * 10)
     : s.sequence;
-}
-
-/**
- * Whether an identity input says anything at all. Every absent property is
- * present and undefined, so counting keys would make the empty identity — the
- * one a media playlist with no master computes — look like an identity of its
- * own.
- */
-function identifies(properties: StreamProperties): boolean {
-  return Object.keys(properties).some(
-    (key) => properties[key as keyof StreamProperties] !== undefined,
-  );
 }
 
 /** A stream's current state, with nothing added or removed. */

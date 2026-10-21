@@ -50,9 +50,6 @@ export {
   type LiveDelay,
 } from "./live-delay.js";
 export {
-  computeStreamIdentityHash,
-  identityProperties,
-  computeStreamSwarmId,
   buildStreamSwarmId,
   computeInfoHash,
   PEER_PROTOCOL_VERSION,

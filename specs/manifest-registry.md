@@ -87,8 +87,8 @@ are kept: a player that chose a subtitle track keeps refreshing its playlist
 under the name the master it read gave it, whatever a re-fetched master calls
 it now, and the list grows under rotated paths exactly as the streams do
 (below). The renditions of a group no variant references, audio or video, are
-on the list too: nothing plays them, and declared they would carry an identity
-made of a name alone. One rule covers the whole list: a URI a declared stream
+on the list too: nothing plays them, and declared they would take an index
+from a stream that plays. One rule covers the whole list: a URI a declared stream
 already has is that stream's, however else the master labels it, so a
 malformed master never puts one URL on both sides. A URL the master gives to
 both a variant and a subtitle rendition,
@@ -120,8 +120,8 @@ refresh.
 
 A stream's identity and type are decided by the first manifest that registers
 it, and never change afterwards: that identity is its swarm, and a live
-packager republishing its master with another `BANDWIDTH` would otherwise move
-a playing stream into a swarm with no peers in it. A media playlist processed
+packager republishing its master with a variant added before it would otherwise
+move a playing stream into a swarm with no peers in it. A media playlist processed
 before its master is not a supported order. No player produces it — the master
 is the first manifest a player fetches, and every adapter is in the loading
 path from the start — so it can only come from an integrator calling
@@ -143,8 +143,8 @@ That is accepted: telling a token apart from a variant parameter would need a
 list of token names, and players re-fetch an HLS master rarely or never.
 
 **An anonymous stream is shared only where it is the only stream of its type in
-its swarm.** It carries the identity every unidentified stream of its type
-carries — the hash of nothing — which is exactly right for a media playlist
+its swarm.** It carries the stream ID every unidentified stream of its type
+carries — `main`, its type alone — which is exactly right for a media playlist
 that is the whole stream, since every viewer of that URL plays the same bytes.
 It is wrong the moment another stream of that type is registered beside it,
 which means a rendition whose media playlist could not be matched to the master

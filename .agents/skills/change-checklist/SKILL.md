@@ -76,7 +76,7 @@ added or why nothing was needed:
 
 ## The peer protocol
 
-A change to how `identityHash` or `externalId` is derived is a protocol
+A change to how the default `streamId` or `externalId` is derived is a protocol
 change, however small it looks: see AGENTS.md, "The peer protocol is a
 contract", and [segment-identity.md](../../../specs/segment-identity.md). The
 golden vectors are the wire format: a change that breaks them bumps

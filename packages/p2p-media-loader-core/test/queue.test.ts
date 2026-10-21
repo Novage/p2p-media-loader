@@ -16,8 +16,8 @@ function createStream(): StreamWithSegments {
     type: "main",
     properties: { bitrate: 1_000_000 },
     swarmId: "https://cdn.example/v/master.mpd",
-    identityHash: "id",
-    streamSwarmId: "v3-swarm-main-id",
+    streamId: "id",
+    streamSwarmId: "v3-swarm-main0",
     infoHash: "hash",
     segments: new Map<string, SegmentWithStream>(),
   } as StreamWithSegments;

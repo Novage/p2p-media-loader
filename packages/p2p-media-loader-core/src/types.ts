@@ -53,23 +53,23 @@ export type Segment = {
 
 /**
  * Raw stream properties as the core read them from the manifest's variant or
- * rendition metadata. They define the stream's identity: streams with equal
- * properties are the same stream to every peer. `bitrate` counts only where
- * the manifest needs it to tell two same-type streams apart (see
+ * rendition metadata. They do not enter the default stream ID; a
+ * `streamIdBuilder` receives them to build an ID of its own (see
  * specs/segment-identity.md).
  */
 export type StreamProperties = {
   /**
    * Bits per second: the HLS variant's `BANDWIDTH`, or the DASH
-   * Representation's `@bandwidth`. An audio rendition has 0. Hashed only
-   * where the manifest needs it to tell two same-type streams apart (see
-   * `identityProperties`).
+   * Representation's `@bandwidth`. An audio rendition has 0. An origin may
+   * recompute it on every request.
    */
   bitrate?: number | null;
   /**
    * The codec string from the manifest, not normalized. A video stream keeps
-   * only its video codecs from a mixed `CODECS` list. An HLS audio rendition
-   * takes the audio codecs of the first variant that refers to its group.
+   * only its video codecs from a mixed `CODECS` list; an HLS audio-only
+   * variant, with no video codec, keeps its audio codecs. An HLS audio
+   * rendition takes the audio codecs of the first variant that refers to its
+   * group.
    */
   codecs?: string | null;
   /** Video width in pixels: HLS `RESOLUTION`, or DASH `@width`. */
@@ -121,15 +121,18 @@ export type Stream = {
   readonly swarmId: string;
 
   /**
-   * Stream identity hash derived from the stream properties as read from the
-   * manifest. The same for all peers regardless of the player in use.
+   * What tells the stream from the content's other streams: by default, for
+   * HLS its type and its index among the master's streams of that type
+   * (`main0`), for DASH its type and Representation `@id` (`main-video-720`);
+   * or what a `streamIdBuilder` returned. The same for all peers regardless
+   * of the player in use. See specs/segment-identity.md.
    */
-  readonly identityHash: string;
+  readonly streamId: string;
 
   /**
-   * The pre-hash string that defines which P2P swarm the stream belongs to.
-   * By default `${peerProtocolVersion}-${swarmId}-${type}-${identityHash}`;
-   * a custom `streamSwarmIdBuilder` may override it. Computed once at registration.
+   * The pre-hash string that defines which P2P swarm the stream belongs to:
+   * `${peerProtocolVersion}-${swarmId}-${streamId}`. Computed once at
+   * registration.
    */
   readonly streamSwarmId: string;
 
@@ -181,7 +184,7 @@ export type DynamicStreamProperties =
 /**
  * Represents a dynamically modifiable configuration, allowing updates to selected CoreConfig properties at runtime.
  *
- * Note that `swarmId` and `streamSwarmIdBuilder` cannot be changed at runtime:
+ * Note that `swarmId` and `streamIdBuilder` cannot be changed at runtime:
  * stream identity is derived from them once, when a stream is registered.
  * Of the common settings, `segmentMemoryStorageLimit` and
  * `customSegmentStorageFactory` take effect from the next segment storage the
@@ -566,6 +569,13 @@ export type StreamConfig = {
    * the same content, for example a per-viewer host or a token in the path
    * (see specs/segment-identity.md).
    *
+   * Set it also when one URL gives viewers different streams — an A/B test of
+   * the ladder, a query parameter that selects the streams, renditions
+   * filtered by device: give each set of streams its own `swarmId`. A stream
+   * ID names a stream only among the streams of its own manifest, so two
+   * manifests with different streams under one `swarmId` put different
+   * renditions in one swarm, and peers exchange segments of the wrong one.
+   *
    * The natural value is the identifier the surrounding system already has for
    * the content — a database row key, an asset id — rather than another URL:
    * it only has to be the same for every viewer of that content and unique to
@@ -583,39 +593,40 @@ export type StreamConfig = {
   swarmId?: string;
 
   /**
-   * An optional function that builds a custom stream swarm ID.
-   * The stream swarm ID is hashed into the infohash announced to trackers
-   * (`infoHash = computeInfoHash(streamSwarmId)`), so it fully defines which
-   * swarm the stream's peers join.
+   * An optional function that builds a custom stream ID: the part of the
+   * stream swarm ID that tells the stream from the content's other streams.
+   * The core composes `` `${peerProtocolVersion}-${swarmId}-${streamId}` ``
+   * from it and hashes that into the infohash announced to trackers.
    *
-   * Use it to make infohashes predictable on a server: build the ID from
-   * values the server knows (e.g. swarm ID, stream type, resolution), then
-   * compute the same infohash server-side with `computeInfoHash` from
-   * `p2p-media-loader-core/server` — for example, to allowlist the hashes
-   * on a private tracker.
+   * The default stream ID comes from the manifest: for HLS the stream's type
+   * and its index among the master's streams of that type (`main0`,
+   * `secondary1`), for DASH the type and the Representation `@id`
+   * (`main-video-720`). A server predicts it with `buildStreamSwarmId` and
+   * `computeInfoHash` from `p2p-media-loader-core/server`. Use a builder
+   * where that default is wrong: an HLS master that lists its streams in a
+   * different order on each request or for each viewer, or DASH `@id`s that
+   * differ from viewer to viewer. See specs/segment-identity.md.
    *
    * The function must be deterministic and identical across all peers of the
    * swarm, and every distinct stream must map to a distinct ID: peers whose
-   * streams resolve to the same infohash exchange segments with each other, and
-   * registering two different streams with the same ID fails the registration
-   * (reported via the `onStreamRegistrationError` event). Include enough
-   * properties to guarantee uniqueness — resolution alone collides on ladders
-   * with several bitrates at the same resolution. If in doubt, incorporate the
-   * `identityHash` from the context (reproduce it server-side with
-   * `computeStreamIdentityHash`).
+   * streams resolve to the same infohash exchange segments with each other,
+   * and the core does not check it. Build the ID from
+   * properties every viewer reads alike — not `bitrate`, which an origin may
+   * recompute on every request — and include enough of them to tell the
+   * streams apart: resolution alone collides on ladders with several bitrates
+   * at the same resolution. `context.manifest.streams` shows the streams the
+   * ID must be unique among.
    *
    * Called once per stream at registration. This property cannot be changed
    * at runtime.
    *
-   * @param context - The stream identity data the ID may be built from,
-   * including the ready-made `defaultStreamSwarmId`.
-   * @returns The stream swarm ID, or `undefined` to use the default
-   * derivation (`` `${peerProtocolVersion}-${swarmId}-${streamType}-${identityHash}` ``,
-   * provided as `context.defaultStreamSwarmId`).
+   * @param context - The stream's type, properties, default stream ID and
+   * place in the manifest.
+   * @returns The stream ID, or `undefined` to use `context.defaultStreamId`.
    *
    * @default
    * ```typescript
-   * streamSwarmIdBuilder: undefined
+   * streamIdBuilder: undefined
    * ```
    *
    * @example
@@ -623,17 +634,18 @@ export type StreamConfig = {
    * import type { CoreConfig } from "p2p-media-loader-core";
    *
    * const config: CoreConfig = {
-   *   // From properties every viewer reads alike — not `bitrate`, which an
-   *   // origin may recompute on every request. Streams of one type that match
-   *   // on all of these need `identityHash` instead.
-   *   streamSwarmIdBuilder: ({ swarmId, streamType, properties: p }) =>
-   *     `my-app-${swarmId}-${streamType}-${p.codecs ?? ""}-${p.height ?? 0}-${p.frameRate ?? ""}-${p.language ?? ""}`,
+   *   // A master that shuffles its variants: name each by what it carries.
+   *   // Streams equal in all of these — two rungs that differ only in
+   *   // bitrate — would get one ID: tell them apart by something every
+   *   // viewer reads alike, such as an unsigned file name in `runtimeId`.
+   *   streamIdBuilder: ({ streamType, properties: p }) =>
+   *     [streamType, p.codecs, p.width, p.height, p.name, p.language, p.channels]
+   *       .map((value) => value ?? "")
+   *       .join("-"),
    * };
    * ```
    */
-  streamSwarmIdBuilder?: (
-    context: StreamSwarmIdBuilderContext,
-  ) => string | undefined;
+  streamIdBuilder?: (context: StreamIdBuilderContext) => string | undefined;
 
   /**
    * An optional function to validate a P2P segment before fully integrating it into the playback buffer.
@@ -778,19 +790,49 @@ export type StreamConfig = {
   webRtcConnectionTimeoutMs: number;
 };
 
-/** The stream identity data passed to a custom `streamSwarmIdBuilder`. */
-export type StreamSwarmIdBuilderContext = {
+/** A stream of the manifest, as `StreamIdBuilderContext.manifest` lists it. */
+export type ManifestStreamInfo = {
+  /**
+   * The stream's key in this manifest: the media playlist URL for HLS, the
+   * Representation id for DASH. See `StreamIdBuilderContext.runtimeId`.
+   */
+  runtimeId: string;
+
+  /** Stream type. */
+  streamType: StreamType;
+
+  /**
+   * The stream ID the core derives from the manifest: `main0` for HLS,
+   * `main-<@id>` for DASH.
+   */
+  defaultStreamId: string;
+
+  /**
+   * HLS only: the stream's index among the master's streams of its type.
+   * `undefined` for DASH.
+   */
+  index: number | undefined;
+
+  /** Raw stream properties from the manifest. */
+  properties: Readonly<StreamProperties>;
+};
+
+/** The stream identity data passed to a custom `streamIdBuilder`. */
+export type StreamIdBuilderContext = {
   /**
    * The swarm ID of the stream: the configured `swarmId` or, if unset, the
    * URL of the first manifest that registered a stream — the URL that was
-   * requested, where the adapter reports it — with its query string discarded.
+   * requested, where the adapter reports it — with its query string
+   * discarded. The core adds it to the stream swarm ID; do not repeat it in
+   * the stream ID.
    */
   swarmId: string;
 
   /**
    * The stream key (`Stream.runtimeId`): the media playlist URL for HLS, the
-   * Representation id for DASH. A playlist URL may differ from peer to peer
-   * (CDN host, signed path) — avoid using it in the ID.
+   * Representation id for DASH. A playlist URL may differ from viewer to
+   * viewer (CDN host, signed path or query) — use only a part every viewer
+   * has alike, such as an unsigned file name.
    */
   runtimeId: string;
 
@@ -800,18 +842,31 @@ export type StreamSwarmIdBuilderContext = {
   /** Raw stream properties from the manifest. */
   properties: Readonly<StreamProperties>;
 
-  /** Stream identity hash derived from the manifest's stream properties. The same for all peers. */
-  identityHash: string;
+  /**
+   * The stream ID the core uses if the builder returns `undefined`: for HLS
+   * `main0`, `secondary1`, for DASH `main-<@id>`, `secondary-<@id>`, and
+   * `main` for a media playlist the core found no master for.
+   */
+  defaultStreamId: string;
 
   /**
-   * The stream swarm ID the default derivation would produce:
-   * `${peerProtocolVersion}-${swarmId}-${streamType}-${identityHash}`.
-   * Useful as a base for custom IDs, e.g. `` `${tenant}-${defaultStreamSwarmId}` ``.
+   * HLS only: the stream's index among the master's streams of its type.
+   * `undefined` for DASH and for a media playlist with no master.
    */
-  defaultStreamSwarmId: string;
+  index: number | undefined;
 
-  /** Version of the peer swarm protocol used in the default stream swarm ID derivation. */
-  peerProtocolVersion: string;
+  /**
+   * The manifest that declared the stream: its URL and all its streams in
+   * the order the core reads them (for HLS, the order of the indexes).
+   * `undefined` for a media playlist with no master. The URL may differ from
+   * viewer to viewer (CDN host, signed query) — avoid it in the ID.
+   */
+  manifest:
+    | {
+        readonly url: string;
+        readonly streams: readonly Readonly<ManifestStreamInfo>[];
+      }
+    | undefined;
 };
 
 /**
@@ -1100,11 +1155,12 @@ export type CoreEventMap = {
 
   /**
    * Invoked when a stream fails to register in the Core: a custom
-   * `streamSwarmIdBuilder` returned an invalid or colliding stream swarm ID.
+   * `streamIdBuilder` returned an invalid stream ID (not a non-empty string
+   * or `undefined`), or threw.
    * The stream stays unknown to the core — its segments load through the
    * player's default path without P2P; other streams are unaffected.
    *
-   * Subscribe to surface `streamSwarmIdBuilder` misconfigurations: without a
+   * Subscribe to surface `streamIdBuilder` misconfigurations: without a
    * listener the failure is only visible in debug logs.
    *
    * @param params - Contains the failed registration and the error.

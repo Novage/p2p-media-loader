@@ -559,6 +559,12 @@ function toStream(
     // The representation id is the only stable per-stream name an MPD offers.
     key: playlist.attributes.NAME ?? playlist.resolvedUri,
     type,
+    // The same id in every period is one stream, as mpd-parser merges it. An
+    // MPD with no ids is invalid, and its stream stays anonymous.
+    streamId:
+      playlist.attributes.NAME === undefined
+        ? undefined
+        : `${type}-${playlist.attributes.NAME}`,
     properties: properties(playlist.attributes),
     // A `SegmentBase` representation lists none, and says nothing about the
     // ones its index holds: an empty list would be read as "these are all the
