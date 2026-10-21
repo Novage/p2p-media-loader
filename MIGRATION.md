@@ -1,5 +1,348 @@
 # Migration Guide
 
+## v4 → v5
+
+v5 makes the core parse HLS and MPEG-DASH manifests itself. A player
+integration no longer describes streams or segments to the core: it hands the
+core every manifest the player fetches, routes segment requests through it, and
+reports playback state. Segment identity is derived from the manifest, so
+peers on different players share one swarm. The design is documented in
+`specs/`.
+
+**Wire compatibility:** none with v4. `externalId` is now the HLS media
+sequence number or the DASH presentation time in 100 ms units, and a stream's
+swarm is named by its place in the manifest rather than by a hash of its
+properties: for HLS its type and its index among the master's streams of that
+type (`main0`, `secondary1`), for DASH its type and its Representation `@id`
+(`main-video-720`). An origin that rewrites `BANDWIDTH` or `FRAME-RATE` per
+request no longer splits a rendition's swarm. The peer protocol version is
+`v3` and v5 peers form separate swarms from v4 peers.
+Roll a deployment over in one step; mixed versions do not exchange segments,
+and every stream still plays over HTTP.
+
+### Bundled engines
+
+`p2p-media-loader-hlsjs` and `p2p-media-loader-shaka` keep their public API.
+`ShakaP2PEngine.registerPlugins` now registers only the networking schemes;
+Shaka's own manifest parsers are no longer replaced. npm and IIFE consumers
+have nothing to change in their code. `p2p-media-loader-shaka` works with
+Shaka Player 5, and with Shaka Player 4, which the demo loads for Clappr's
+DASH plugin; where the two name a setting differently, the adapter reads
+Shaka's major version. As before, it declares no peer dependency on Shaka.
+
+The HLS.js engine now plays a low-latency HLS stream by its full segments:
+`getConfigForHlsJs()` carries `lowLatencyMode: false`, which the mixin
+applies unless the integrator set `lowLatencyMode` themselves, and which an
+integration that spreads that config into its own overrides by setting
+`lowLatencyMode` after the spread. The core does not share partial segments.
+
+**ESM bundles from a CDN need two or three more import map entries.** The
+engine's `dist/*.es.js` imports the core _and_ its manifest parsers by bare
+specifier; map every one of them to the same core bundle, the one carrying the
+parsers the engine needs:
+
+```json
+{
+  "imports": {
+    "p2p-media-loader-core": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core-hls.es.min.js",
+    "p2p-media-loader-core/hls": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^5/dist/p2p-media-loader-core-hls.es.min.js",
+    "p2p-media-loader-hlsjs": "https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@^5/dist/p2p-media-loader-hlsjs.es.min.js"
+  }
+}
+```
+
+For Shaka map `p2p-media-loader-core`, `p2p-media-loader-core/hls` and
+`p2p-media-loader-core/dash` to `p2p-media-loader-core.es.min.js`, which
+carries both parsers. A missing entry fails at module resolution rather than
+silently; see `specs/packaging.md`.
+
+A player built on HLS.js decides on its own whether to use HLS.js or the
+browser's own HLS playback, and native playback bypasses P2P. Safari reports
+native HLS support, and so does recent Chrome; MediaElement, for one, prefers
+it by default and needs `renderers: ["native_hls", "html5"]` to use HLS.js
+first. The README says so under "Key Features".
+
+DASH `SegmentBase` streams keep their segment list in a `sidx` box inside the
+media file; the core reads it from the response the player fetches, so these
+streams share like any other. WebM representations index with an EBML `Cues`
+element instead, which the core does not read; they play without P2P.
+
+### New package: `p2p-media-loader-dashjs`
+
+dash.js gets an adapter of its own. `DashJsP2PEngine` replaces the player's
+`XHRLoader` through `player.extend` when bound, so call `bindPlayer(player)`
+before `player.initialize()`. Its bundles follow the same import map rule as
+the other engines: map `p2p-media-loader-core` and `p2p-media-loader-core/dash`
+to `p2p-media-loader-core-dash.es.min.js`. Low-latency DASH, which dash.js
+loads through `FetchLoader`, plays through the player without P2P.
+
+### New package: `p2p-media-loader-videojs`
+
+Video.js gets an adapter too. `new VideoJsP2PEngine({ core }, videojs)` plus
+`engine.bindPlayer(player)` attaches one engine to one player, through the
+request and response hooks VHS gives that player; bind it before the player
+loads a source. `VideoJsP2PEngine.registerPlugins(videojs)` is optional and
+only registers a `p2pMediaLoader` plugin, so that `player.p2pMediaLoader({ core })`
+attaches an engine as well. HLS and MPEG-DASH
+both play through VHS, so its bundles map `p2p-media-loader-core`,
+`p2p-media-loader-core/hls` and `p2p-media-loader-core/dash` to
+`p2p-media-loader-core.es.min.js`. On Safari and iOS VHS stands aside unless
+`overrideNative` is set, and nothing is shared there.
+
+On live, the adapter places Video.js as the other engines are placed: deep in
+the live window, with a forward buffer a segment short of that delay, so peers
+have time to fetch each segment before the player asks for it. VHS has no
+setting for either, so the adapter writes the delay as
+`suggestedPresentationDelay` on the manifest VHS parsed and caps that player's
+buffer goal; nothing page-wide changes. VHS ends its seekable range at the same
+delay, so a viewer cannot seek nearer the live edge than the placement. The
+adapter also plays a low-latency HLS stream by its full segments (VHS's
+`llhls: false`) unless the integrator set `llhls` themselves: the core does not
+share partial segments.
+
+### Custom integrations
+
+A custom integration must supply the manifest parsers for the protocols its
+player plays and hand every manifest response to the core:
+
+```typescript
+import { Core } from "p2p-media-loader-core";
+import { hlsManifestParser } from "p2p-media-loader-core/hls";
+import { dashManifestParser } from "p2p-media-loader-core/dash";
+
+const core = new Core({
+  manifestParsers: [hlsManifestParser, dashManifestParser],
+});
+
+// in the player's manifest loader, for every response:
+core.processManifest({
+  url: response.url, // where the response came from; URIs resolve against it
+  requestedUrl: request.url, // what was asked for, where a redirect differs
+  data: response.data,
+});
+```
+
+Segment requests are resolved by URL and byte range rather than by a
+runtime identifier the integration composed. The v4 half below is the code
+being replaced, and does not compile against v5:
+
+```typescript
+// v4
+const id = byteRange ? `${url}|${byteRange.start}-${byteRange.end}` : url;
+if (core.hasSegment(id) && core.isSegmentLoadable(id)) {
+  core.loadSegment(id, { onSuccess, onError });
+}
+
+// v5
+if (core.isSegmentLoadable(url, byteRange)) {
+  const { data, bandwidth } = await core.loadSegment(url, {
+    byteRange,
+    signal,
+  });
+}
+```
+
+Playback is reported as `{ bufferAhead, rate }` through `core.updatePlayback`,
+and every integration must report it.
+`trackMediaElementPlayback((state) => core.updatePlayback(state)).watch(media)`
+reports it from a media element after every event that can change it. Call
+the tracker's `report()` just before each `core.loadSegment`: a player asks
+for the next segment right after it appends one, and no media element event
+reports that append. `getPlaybackStateFromMediaElement(media)` gives one
+state. The core uses the
+buffer to decide whether each request is urgent. It takes a player that has not
+reported as one with nothing buffered, so an integration that never reports
+still plays, but fetches over HTTP every segment the storage cannot serve (see
+`specs/playback-contract.md`).
+
+### Removed from `Core`
+
+| v4                                         | v5                                                      |
+| ------------------------------------------ | ------------------------------------------------------- |
+| `addStreamIfNoneExists(stream)`            | removed — streams come from `processManifest`           |
+| `updateStream(id, add, remove)`            | removed — segments come from `processManifest`          |
+| `getStreamSegmentRuntimeIds(id)`           | removed                                                 |
+| `setIsLive(isLive)`                        | removed — derived from the manifest                     |
+| `setActiveLevelBitrate(bitrate)`           | removed — follows from the requested segment            |
+| `hasSegment(runtimeId)`                    | `hasSegment(url, byteRange?)`                           |
+| `isSegmentLoadable(runtimeId)`             | `isSegmentLoadable(url, byteRange?)`                    |
+| `loadSegment(runtimeId, callbacks)`        | `loadSegment(url, { byteRange?, signal? })` → `Promise` |
+| `abortSegmentLoading(runtimeId)`           | `abortSegmentLoading(url, byteRange?)`                  |
+| `Core<TStream>` generic                    | `Core` — streams carry no integration-specific fields   |
+| `StreamRegistration`, `EngineCallbacks`    | removed                                                 |
+| `setManifestResponseUrl(url)` _(required)_ | optional — the first manifest names the swarm           |
+
+`Stream.runtimeId` is now the manifest-derived stream key: the media playlist
+URL for HLS, the Representation id for DASH. The `onStreamRegistrationError`
+event keeps its shape; it fires once per failing stream, only for a
+`streamIdBuilder` that returned no usable ID or threw. Two streams that get one
+stream swarm ID no longer fail: the builder must give each stream its own ID.
+
+### Stream identity: `streamIdBuilder`
+
+The stream part of the stream swarm ID is now a stream ID taken from the
+manifest, and the builder returns only that part. The core composes
+`` `${PEER_PROTOCOL_VERSION}-${swarmId}-${streamId}` `` itself.
+
+| v4                                                          | v5                                                         |
+| ----------------------------------------------------------- | ---------------------------------------------------------- |
+| `StreamConfig.streamSwarmIdBuilder` → stream swarm ID       | `StreamConfig.streamIdBuilder` → stream ID, or `undefined` |
+| `StreamSwarmIdBuilderContext`                               | `StreamIdBuilderContext`                                   |
+| context `identityHash`, `defaultStreamSwarmId`              | context `defaultStreamId`, `index`, `manifest`             |
+| context `peerProtocolVersion`                               | removed                                                    |
+| `Stream.identityHash`                                       | `Stream.streamId`                                          |
+| `computeStreamIdentityHash(properties)`                     | removed — no property enters the default stream ID         |
+| `computeStreamSwarmId({ swarmId, streamType, properties })` | removed — `buildStreamSwarmId(swarmId, streamId)`          |
+| `buildStreamSwarmId(swarmId, streamType, identityHash)`     | `buildStreamSwarmId(swarmId, streamId)`                    |
+
+A config that still sets `streamSwarmIdBuilder` is not carried over: the core
+ignores it, writes a `console.warn` and counts `Config:renamed-key`.
+
+A builder that only wrapped the default, such as
+`` ({ defaultStreamSwarmId }) => `tenant-a-${defaultStreamSwarmId}` ``,
+becomes `` ({ defaultStreamId }) => `tenant-a-${defaultStreamId}` ``: each
+source keeps its own swarm, named by its URL, with the prefix. Do not move the
+prefix into `swarmId`: an engine keeps one core, and so one `swarmId`, for
+every source it plays, so `swarmId: "tenant-a"` would put every video's
+`main0` in one swarm.
+
+A server predicts the default infohashes from the manifest it serves:
+
+```typescript
+import {
+  buildStreamSwarmId,
+  computeInfoHash,
+} from "p2p-media-loader-core/server";
+
+// The second variant of an HLS master.
+const infoHash = computeInfoHash(buildStreamSwarmId(swarmId, "main1"));
+```
+
+Configure a `streamIdBuilder` where the index is the wrong default: an HLS
+master that lists its streams in another order for each request or each
+viewer, a live master that adds or removes a variant, or DASH `@id`s that
+differ from viewer to viewer. See `specs/segment-identity.md`.
+
+### `validateHTTPSegment` is removed
+
+HTTP is trusted: a failed check cannot ban an origin, and a retry rarely
+helps. `validateP2PSegment` now covers every download that holds a peer's
+bytes, whichever source finishes it: HTTP that goes on from a peer's bytes
+validates the whole segment as that peer's, and a failure closes the
+connection to that peer. The error type `http-segment-validation-failed` is
+removed with it. A config that still names `validateHTTPSegment` gets a
+console warning, and the key is ignored.
+
+### HTTP timeouts
+
+`httpNotReceivingBytesTimeoutMs` (3 s by default) now counts from the
+response's headers, and then from each chunk of the body. In v4 it counted
+from the start of the request, so an answer that took more than 3 s to start —
+a slow network, a new connection, a CDN filling its cache — was aborted as a
+stalled transfer and tried again. The wait for the headers now has a limit of
+its own, `httpFirstByteTimeoutMs`, 10 s by default. A deployment that raised
+`httpNotReceivingBytesTimeoutMs` in v4 to let slow first answers through can
+set it back, and set `httpFirstByteTimeoutMs` instead.
+
+### `highDemandTimeWindow` is now `urgentBufferThreshold`
+
+`StreamConfig.highDemandTimeWindow` is renamed `urgentBufferThreshold`, and its
+meaning changes. In v4 it was a window ahead of the playhead: every segment
+inside it was fetched over HTTP at once, whether the player had asked for it or
+not. In v5 it is the buffer below which a request the player has made is
+urgent: an urgent request is fetched over HTTP at once, and a request made with
+more buffer waits for a peer while the buffer drains. The threshold scales
+with the playback rate: at rate 2, a request is urgent while the buffer is
+below twice the threshold. Nothing the player has not asked for is ever
+urgent, so a player with P2P is never slower than without it, on the same
+player parameters (see `specs/playback-contract.md`, "Urgency").
+
+It is `number | undefined` and defaults to `undefined`, which derives the
+threshold: 15 s on VOD, and on live half of what the player buffers, from the
+live window (see `specs/playback-contract.md`, "The urgency threshold"). Code
+that reads `getConfig().mainStream.urgentBufferThreshold` as a number must
+handle `undefined`.
+
+**Setting a number does not reproduce v4**, and on a live stream it should be
+left unset. In v4 the number sized both the core's urgent window and the
+player's forward buffer, which is why the two collided; in v5 the buffer
+follows the live window's geometry, so on live the configured number is capped
+at half the player's buffer: up to that it is the threshold, above or below
+the derived one, and past it the threshold is half the buffer. A threshold
+past that would make every request urgent and leave the election nothing.
+Carrying v4's `highDemandTimeWindow: 15` onto a short live window as
+`urgentBufferThreshold: 15` therefore buys nothing: it is capped to the value
+the core derives anyway. Off live the number is still the threshold.
+
+A config that still names `highDemandTimeWindow` — in plain JavaScript, or in
+an object TypeScript does not check as a literal — is not carried over, since
+the meaning changed. The core ignores the key and writes one console warning
+for each core that sees it, at the top level or in `mainStream` or
+`secondaryStream`.
+
+A **custom `SegmentStorage`** is handed the same value: `initialize` receives
+the configured stream configurations, so
+`mainStreamConfig.urgentBufferThreshold` is `undefined` unless an integrator
+set one. A storage that carried over the v4 retention rule
+`position <= highDemandTimeWindow + endTime` fails to compile, since the
+property is gone; rewritten as `position <= urgentBufferThreshold + endTime`,
+it fails silently at runtime — `undefined + endTime` is `NaN`, and
+`position <= NaN` is false — and drops every segment behind the position.
+Measure retention in the segment's own length instead, as the bundled storage
+now does: on live it keeps three segment lengths behind the position, and at
+least 15 s, independent of any configured value; off live it lets segments
+behind the position go only when it reaches its memory limit. Where the
+effective threshold is genuinely wanted, `urgentBufferThresholdFor` is
+exported.
+
+The position a storage is told through
+`onPlaybackUpdated(position, rate, streamType)` is the start of the segment the
+player requested last, on the manifest timeline: where the player's buffer
+ends, not where its playhead is. Each stream type has a position of its own,
+and the new third argument says whose it is. A storage that keeps one position
+for both types evicts the segments of the stream that lags while that stream
+still prefetches them, and fetches them again in a loop; judge each segment by
+the position of its own type, as the bundled storage does (see
+`specs/playback-contract.md`, "What the segment store receives").
+
+### New APIs
+
+- `CoreConfig.manifestParsers` and the `p2p-media-loader-core/hls` and
+  `p2p-media-loader-core/dash` subpaths.
+- For a custom manifest parser: `ManifestParser.parse(text, url, context?)`
+  receives the synchronized time as `context.now`, and a parser whose segment
+  list follows from the clock reports it as `ParsedManifest.clock`
+  (`ManifestClock`, `UtcTimingSource`). A parser that ignores both keeps
+  working. It must set `ParsedStream.streamId` on each stream a manifest
+  declares among others: a stream without it is anonymous, and is shared
+  only where it is the only stream of its type.
+- An **integration** toolkit for whoever writes a player adapter:
+  `liveDelayFor`, `liveDelayForSegments`, `liveDelayFromWindow`,
+  `playerBufferFor`, `maxLiveLatencyFor`, `urgentBufferThresholdFor`,
+  `INITIAL_LIVE_DELAY`, `DEFAULT_URGENT_BUFFER_THRESHOLD` and
+  `trackMediaElementPlayback` — the live window geometry the core schedules
+  by, which every adapter sizes the player's buffer with, and the
+  media-element tracking they share. An
+  integrator using one of the bundled adapters needs none of it.
+- `Core.processManifest({ url, requestedUrl?, data, protocol? })`, returning what the
+  manifest described per stream.
+- `Core.isSegmentIndex(url, byteRange?)` and
+  `Core.processSegmentIndex({ url, byteRange?, data })` — a DASH
+  `SegmentBase` stream's `sidx` index, recognised and read from the response
+  the player fetched.
+- `onSegmentRegistryMiss` core event — a segment request the registry did not
+  know, which the player then loaded itself. Initialization segments, and the
+  segments of subtitles and trick play, are recognised and never reported.
+- `byteRangeFromRangeHeader(header)` — converts a `Range: bytes=a-b` header to
+  the inclusive `ByteRange` the lookup methods take.
+- Bundles: `p2p-media-loader-core.es.min.js` carries both parsers;
+  `-hls` and `-dash` variants carry one.
+- `httpFirstByteTimeoutMs` stream option — see "HTTP timeouts" above.
+- For integrators who bundle the npm packages themselves:
+  `p2p-media-loader-core/shims/xmldom`, the browser's `DOMParser`, to alias
+  `@xmldom/xmldom` to, and the `__P2PML_DIAGNOSTICS__` define, which removes
+  the diagnostics ledger. The README's "Reduce the Bundle Size" shows both.
+
 ## v3 → v4
 
 v4 moves stream identity derivation from the player integrations into the core.
@@ -14,7 +357,7 @@ swarms with v3 peers. No infohash changes unless you configure the new
 ### `Stream` type
 
 `Stream.index` is replaced by `Stream.identityHash`, and streams now carry
-their full computed identity:
+their full computed identity. The 4.x type:
 
 ```typescript
 type Stream = {
@@ -31,7 +374,9 @@ type Stream = {
 ### `Core.addStreamIfNoneExists`
 
 Custom integrations no longer compute the stream identifier. Pass the raw
-properties instead; identity fields are computed by the core:
+properties instead; identity fields are computed by the core. Both halves are
+pre-v5 code: v5 removed `addStreamIfNoneExists` (see "Removed from `Core`"
+above).
 
 ```typescript
 // v3
@@ -59,8 +404,8 @@ reported via the `onStreamRegistrationError` event.
 
 ### Renamed / removed exports
 
-| v3                                            | v4                                                          |
-| --------------------------------------------- | ----------------------------------------------------------- |
+| v3                                             | v4                                                          |
+| ---------------------------------------------- | ----------------------------------------------------------- |
 | `generateStreamShortId(props)`                 | `computeStreamIdentityHash(properties)`                     |
 | `GenerateStreamShortIdProps`                   | `StreamProperties`                                          |
 | `Stream.index`                                 | `Stream.identityHash`                                       |
@@ -119,9 +464,10 @@ checks of segment runtime IDs).
 ### Tightened read-only types
 
 - `ByteRange.start`/`ByteRange.end` are now `readonly`.
-- `SegmentResponse.data` may reference the buffer the core keeps in segment
-  storage for P2P upload: treat it as read-only and copy it (`data.slice(0)`)
-  before transferring it to a worker.
+- `SegmentResponse.data` is the caller's own copy of the segment, never the
+  buffer the core keeps in segment storage for P2P upload. It may be modified,
+  and transferred to a worker the way players transmux; an integration that
+  cloned it before doing so no longer needs to.
 
 ### `SegmentStorage` interface
 
@@ -130,6 +476,12 @@ signatures, including `setSegmentChangeCallback`. The value passed is
 `Stream.streamSwarmId` (format unchanged from the v3 `streamSwarmId`), so custom
 storage implementations keep working — only parameter names and documentation
 changed.
+
+A new optional method, `onSegmentsRemoved(swarmId, streamSwarmId, segmentIds)`,
+tells a storage which segments a live window has moved past. Nothing can
+request them again, so a storage may drop them at once. Without it, a storage
+keeps them until its own rules let them go — which, behind a paused player's
+frozen position, can be indefinitely.
 
 ### Runtime configuration
 

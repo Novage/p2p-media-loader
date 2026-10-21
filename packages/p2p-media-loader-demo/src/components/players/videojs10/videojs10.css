@@ -1,0 +1,6 @@
+/* The v10 skin fills its container (`height: 100%`) and clips to it, so the
+   container has to have a height of its own. */
+.videojs10-player {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+}

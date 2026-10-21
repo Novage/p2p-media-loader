@@ -1,0 +1,96 @@
+<!doctype html>
+<html>
+  <head>
+    <title>HLS.js with P2P Media Loader (ES modules)</title>
+
+    <!-- HLS.js and P2P Media Loader as ES modules. The engine's bundle imports
+         only the core, which the import map resolves; HLS.js is imported by
+         this page. -->
+    <script type="importmap">
+      {
+        "imports": {
+          "hls.js": "https://cdn.jsdelivr.net/npm/hls.js@~1/dist/hls.mjs",
+          "p2p-media-loader-core": "./core/p2p-media-loader-core-hls.es.min.js",
+          "p2p-media-loader-core/hls": "./core/p2p-media-loader-core-hls.es.min.js",
+          "p2p-media-loader-hlsjs": "./hlsjs/p2p-media-loader-hlsjs.es.min.js"
+        }
+      }
+    </script>
+
+    <script type="module">
+      import Hls from "hls.js";
+      import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
+
+      const streamUrl =
+        "https://hls-harbor-livepush.akamaized.net/live_cdn/nsqIStpj8PaG-Ev/emcQJ0pGpremocy/index.m3u8";
+
+      // HLS.js with the P2P engine mixed in: every instance made from it
+      // loads its segments through P2P Media Loader.
+      const HlsWithP2P = HlsJsP2PEngine.injectMixin(Hls);
+
+      // Two players on one page, each with its own engine and peer: they
+      // share segments with each other, and with any other viewer of the
+      // same stream.
+      for (const container of document.querySelectorAll(".player")) {
+        const video = container.querySelector("video");
+        const stats = container.querySelector(".stats");
+
+        if (!Hls.isSupported()) {
+          stats.textContent = "HLS.js is not supported in this browser.";
+          continue;
+        }
+
+        const totals = { http: 0, p2p: 0 };
+
+        const hls = new HlsWithP2P({
+          startLevel: 0, // example of an HLS.js config parameter
+
+          // ... other HLS.js config parameters go here
+
+          // example of the P2P engine config section
+          p2p: {
+            onHlsJsCreated: (hls) => {
+              // Subscribe to P2P engine and HLS.js events here
+              console.log(
+                "HLS.js engine with P2P mixin created",
+                hls.p2pEngine.getConfig(),
+                hls.config,
+              );
+              hls.p2pEngine.addEventListener(
+                "onSegmentLoaded",
+                ({ downloadSource }) => {
+                  totals[downloadSource === "p2p" ? "p2p" : "http"]++;
+                  stats.textContent = `Segments: ${totals.http} over HTTP, ${totals.p2p} over P2P`;
+                },
+              );
+            },
+            core: {
+              swarmId: "custom swarm ID for stream 2000341",
+            },
+          },
+        });
+
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          console.error("Error code", data.details, "object", data);
+        });
+
+        hls.attachMedia(video);
+        hls.loadSource(streamUrl);
+      }
+    </script>
+  </head>
+
+  <body>
+    <h1>HLS.js with P2P Media Loader (ES modules)</h1>
+    <div style="width: 600px">
+      <div class="player">
+        <video controls muted autoplay playsinline style="width: 100%"></video>
+        <p class="stats"></p>
+      </div>
+      <div class="player">
+        <video controls muted autoplay playsinline style="width: 100%"></video>
+        <p class="stats"></p>
+      </div>
+    </div>
+  </body>
+</html>

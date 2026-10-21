@@ -5,7 +5,7 @@ export function App() {
   return (
     <P2PVideoDemo
       streamUrl={
-        "https://fcc3ddae59ed.us-west-2.playback.live-video.net/api/video/v1/us-west-2.893648527354.channel.DmumNckWFTqz.m3u8"
+        "https://hls-harbor-livepush.akamaized.net/live_cdn/nsqIStpj8PaG-Ev/emcQJ0pGpremocy/index.m3u8"
       }
       debugToolsEnabled={false}
     />

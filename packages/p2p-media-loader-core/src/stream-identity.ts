@@ -1,112 +1,31 @@
-import type { StreamProperties, StreamType } from "./types.js";
 import { sha1 } from "./utils/hash.js";
 
 /**
  * Version of the peer swarm protocol. Included in every stream swarm ID, so peers
  * with incompatible protocols never join the same swarm.
  *
- * Changing the identity derivation in any way requires bumping this version.
+ * Changing how a stream ID or a segment ID is derived in any way requires
+ * bumping this version. See specs/segment-identity.md.
  */
-export const PEER_PROTOCOL_VERSION = "v2";
+export const PEER_PROTOCOL_VERSION = "v3";
 
 /**
- * Computes a stable, unique identity hash for a stream based on its properties.
- * The result is identical for all peers regardless of the player in use or the
- * stream's position in the manifest.
+ * Builds a stream swarm ID: the pre-hash string that names a stream's P2P
+ * swarm. Its hash is the infohash announced to trackers (see
+ * {@link computeInfoHash}).
  *
- * Uses a SHA-1 hash of the normalized properties, encoded to standard Base64.
+ * The `streamId` tells the stream from the content's other streams. By
+ * default the core derives it from the manifest — for HLS the stream's type
+ * and its index among the master's streams of that type (`main0`,
+ * `secondary1`), for DASH the type and the Representation `@id`
+ * (`main-video-720`) — or a `streamIdBuilder` returns it. See
+ * specs/segment-identity.md.
  *
- * This function is environment-agnostic and can be used on a server (Node.js 16+)
- * to reproduce the identity hash a client computes for the same stream.
+ * Environment-agnostic: run it on a server (Node.js 16+) to predict the swarm
+ * ID, and with {@link computeInfoHash} the infohash, that a client announces.
  */
-export function computeStreamIdentityHash({
-  bitrate,
-  codecs,
-  width,
-  height,
-  language,
-  channels,
-  name,
-  frameRate,
-  videoRange,
-}: StreamProperties): string {
-  const normalizedCodecs = codecs
-    ? codecs
-        .split(",")
-        .map((c: string) => {
-          c = c.trim().toLowerCase();
-          // Normalize decimal RFC 4281 avc1 codecs to hex (e.g., avc1.66.30 -> avc1.42001e)
-          const parts = c.split(".");
-          if (
-            parts.length === 3 &&
-            (parts[0] === "avc1" || parts[0] === "avc")
-          ) {
-            const profile = parseInt(parts[1], 10);
-            const level = parseInt(parts[2], 10);
-            if (
-              !isNaN(profile) &&
-              !isNaN(level) &&
-              parts[1] === profile.toString() &&
-              parts[2] === level.toString()
-            ) {
-              const profileHex = `00${profile.toString(16)}`.slice(-2);
-              const levelHex = `00${level.toString(16)}`.slice(-2);
-              c = `${parts[0]}.${profileHex}00${levelHex}`;
-            }
-          }
-          return c;
-        })
-        .sort()
-        .join(",")
-    : "";
-  const normalizedLanguage =
-    language && language !== "und" ? language.slice(0, 2).toLowerCase() : "";
-  const normalizedChannels = channels ? channels.toString().split("/")[0] : "";
-  const normalizedName = name ? name.toLowerCase().trim() : "";
-
-  // Normalize frame rates to eliminate trailing zeros (e.g. "30.000" -> "30")
-  const normalizedFrameRate =
-    frameRate && !isNaN(Number(frameRate)) ? Number(frameRate).toString() : "";
-
-  const normalizedVideoRange = videoRange
-    ? videoRange.toUpperCase().trim()
-    : "";
-
-  const str = `${bitrate ?? 0}-${normalizedCodecs}-${width ?? ""}-${height ?? ""}-${normalizedLanguage}-${normalizedChannels}-${normalizedName}-${normalizedFrameRate}-${normalizedVideoRange}`;
-
-  return btoa(sha1(str));
-}
-
-/**
- * Builds the default stream swarm ID from its components. The stream swarm ID is the
- * pre-hash string that defines which P2P swarm a stream belongs to;
- * its hash is the infohash announced to trackers (see {@link computeInfoHash}).
- */
-export function buildStreamSwarmId(
-  swarmId: string,
-  streamType: StreamType,
-  identityHash: string,
-): string {
-  return `${PEER_PROTOCOL_VERSION}-${swarmId}-${streamType}-${identityHash}`;
-}
-
-/**
- * Computes the default stream swarm ID for a stream from its raw properties.
- *
- * This is the derivation a client with no `streamSwarmIdBuilder` configured uses.
- * Run it on a server (Node.js 16+) to predict a stream's swarm ID — and, via
- * {@link computeInfoHash}, the exact infohash the client announces to trackers.
- */
-export function computeStreamSwarmId(options: {
-  swarmId: string;
-  streamType: StreamType;
-  properties: StreamProperties;
-}): string {
-  return buildStreamSwarmId(
-    options.swarmId,
-    options.streamType,
-    computeStreamIdentityHash(options.properties),
-  );
+export function buildStreamSwarmId(swarmId: string, streamId: string): string {
+  return `${PEER_PROTOCOL_VERSION}-${swarmId}-${streamId}`;
 }
 
 /**

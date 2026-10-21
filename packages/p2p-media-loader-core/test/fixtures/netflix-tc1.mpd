@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MPD xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns="urn:mpeg:dash:schema:mpd:2011"
+  xsi:schemaLocation="urn:mpeg:dash:schema:mpd:2011 DASH-MPD.xsd"
+  type="static"
+  mediaPresentationDuration="PT654S"
+  minBufferTime="PT4S"
+  profiles="http://dashif.org/guidelines/dash264,urn:mpeg:dash:profile:isoff-on-demand:2011">
+
+  <BaseURL>http://dash.edgesuite.net/dash264/TestCases/1a/netflix/</BaseURL>
+  <Period>
+    <!-- English Audio -->
+    <AdaptationSet mimeType="audio/mp4" codecs="mp4a.40.5" lang="en" subsegmentAlignment="true" subsegmentStartsWithSAP="1">
+      <Representation id="1" bandwidth="72000">
+        <BaseURL>ElephantsDream_AAC48K_064.mp4.dash</BaseURL>
+	<SegmentBase indexRange="871-11131">
+            <Initialization range="0-870"/>
+        </SegmentBase>
+      </Representation>
+    </AdaptationSet>
+    <!-- Video -->
+    <AdaptationSet mimeType="video/mp4" codecs="avc1.42401E" subsegmentAlignment="true" subsegmentStartsWithSAP="1" contentType='video' maxWidth="480" maxHeight="360" maxFrameRate="24" par="4:3">
+      <Representation id="2" bandwidth="150000" width="480" height="360" frameRate="24" sar="1:1">
+        <BaseURL>ElephantsDream_H264BPL30_0100.264.dash</BaseURL>
+	<SegmentBase indexRange="984-11244">
+            <Initialization range="0-983"/>
+        </SegmentBase>
+      </Representation>
+      <Representation id="3" bandwidth="250000" width="480" height="360" frameRate="24" sar="1:1">
+        <BaseURL>ElephantsDream_H264BPL30_0175.264.dash</BaseURL>
+	<SegmentBase indexRange="984-11245">
+            <Initialization range="0-983"/>
+        </SegmentBase>
+      </Representation>
+      <Representation id="4" bandwidth="350000" width="480" height="360" frameRate="24" sar="1:1">
+        <BaseURL>ElephantsDream_H264BPL30_0250.264.dash</BaseURL>
+	<SegmentBase indexRange="984-11245">
+            <Initialization range="0-983"/>
+        </SegmentBase>
+      </Representation>
+      <Representation id="5" bandwidth="750000" width="480" height="360" frameRate="24" sar="1:1">
+        <BaseURL>ElephantsDream_H264BPL30_0500.264.dash</BaseURL>
+	<SegmentBase indexRange="985-11245">
+            <Initialization range="0-984"/>
+        </SegmentBase>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>
+

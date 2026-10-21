@@ -1,4 +1,5 @@
 import { SegmentStorage } from "./segment-storage/index.js";
+import type { ManifestParser } from "./manifest/types.js";
 
 /** Represents the types of streams available, either primary (main) or secondary. */
 export type StreamType = "main" | "secondary";
@@ -13,10 +14,18 @@ export type ByteRange = {
 
 /** Describes a media segment with its unique identifiers, location, and timing information. */
 export type Segment = {
-  /** A runtime identifier for the segment that includes URL and byte range from its manifest. */
+  /**
+   * The registry key: the segment's absolute URL, with telemetry query
+   * parameters (`CMCD`) removed, followed by `|start-end` when a byte range
+   * applies. Local to this process, never on the wire.
+   */
   readonly runtimeId: string;
 
-  /** A unique identifier for the segment in its stream, used for P2P communications: sequence number for HLS or playtime for MPEG-DASH. */
+  /**
+   * The segment's identity within its stream, as sent to peers: the media
+   * sequence number for HLS, the presentation time in 100 ms units for
+   * MPEG-DASH. See specs/segment-identity.md.
+   */
   readonly externalId: number;
 
   /** The URL from which the segment can be downloaded. */
@@ -25,57 +34,105 @@ export type Segment = {
   /** An optional property specifying the range of bytes that represent the segment. */
   readonly byteRange?: ByteRange;
 
-  /** The start time of the segment in seconds, relative to the beginning of the stream. */
+  /**
+   * Start of the segment, in seconds, on the stream's manifest timeline.
+   *
+   * The timeline is whatever the manifest provides — wall-clock time from
+   * `EXT-X-PROGRAM-DATE-TIME`, presentation time for DASH (which counts from
+   * the MPD's availability start, often 1970 for live), or a zero-based
+   * anchor on the media sequence when HLS carries no date tags. Its zero
+   * point is arbitrary: only differences between values of the same stream
+   * carry meaning. Never compare it with the media element's `currentTime`.
+   * See specs/manifest-registry.md, "Timeline stability".
+   */
   readonly startTime: number;
 
-  /** The end time of the segment in seconds, relative to the beginning of the stream. */
+  /** End of the segment, in seconds, on the same timeline as `startTime`. */
   readonly endTime: number;
 };
 
 /**
- * Raw stream properties extracted from the manifest's variant or rendition
- * metadata. They define the stream's identity: streams with equal normalized
- * properties are treated as the same stream by all peers.
+ * Raw stream properties as the core read them from the manifest's variant or
+ * rendition metadata. They do not enter the default stream ID; a
+ * `streamIdBuilder` receives them to build an ID of its own (see
+ * specs/segment-identity.md).
  */
 export type StreamProperties = {
+  /**
+   * Bits per second: the HLS variant's `BANDWIDTH`, or the DASH
+   * Representation's `@bandwidth`. An audio rendition has 0. An origin may
+   * recompute it on every request.
+   */
   bitrate?: number | null;
+  /**
+   * The codec string from the manifest, not normalized. A video stream keeps
+   * only its video codecs from a mixed `CODECS` list; an HLS audio-only
+   * variant, with no video codec, keeps its audio codecs. An HLS audio
+   * rendition takes the audio codecs of the first variant that refers to its
+   * group.
+   */
   codecs?: string | null;
+  /** Video width in pixels: HLS `RESOLUTION`, or DASH `@width`. */
   width?: number | null;
+  /** Video height in pixels: HLS `RESOLUTION`, or DASH `@height`. */
   height?: number | null;
+  /**
+   * The language tag as the manifest writes it: an HLS rendition's
+   * `LANGUAGE`, or the DASH `@lang` of an audio stream.
+   */
   language?: string | null;
+  /**
+   * The audio channels: an HLS rendition's `CHANNELS`, or the DASH
+   * `AudioChannelConfiguration` value under the MPEG scheme. Not set for a
+   * vendor scheme, because its value is not a plain count.
+   */
   channels?: string | number | null;
+  /**
+   * An HLS rendition's `NAME`, or a DASH audio Representation's `@id`. It is
+   * what tells an alternate rendition apart from the variant it copies.
+   */
   name?: string | null;
+  /** Video frame rate as the manifest states it: HLS `FRAME-RATE`, or DASH `@frameRate`. */
   frameRate?: number | string | null;
+  /** HLS `VIDEO-RANGE` (for example `SDR` or `PQ`). The DASH parser does not set it. */
   videoRange?: string | null;
 };
 
 /** Represents a media stream with various defining characteristics. */
 export type Stream = {
-  /** Runtime identifier of the stream from an engine. May differ from peer to peer. */
+  /**
+   * The manifest-derived stream key: the media playlist URL for HLS, the
+   * Representation id for DASH. Local to this process, never on the wire.
+   */
   readonly runtimeId: string;
 
   /** Stream type. */
   readonly type: StreamType;
 
-  /** Raw stream properties from the manifest, provided by the player integration. */
+  /** Raw stream properties as the core read them from the manifest. */
   readonly properties: Readonly<StreamProperties>;
 
   /**
    * The swarm ID the stream was registered with: the configured `swarmId`
-   * or, if not set, the manifest response URL. Resolved once at registration.
+   * or, if not set, the URL of the first manifest that registered a stream —
+   * the URL that was requested, where the adapter reports it — with its query
+   * string discarded. Resolved once at registration.
    */
   readonly swarmId: string;
 
   /**
-   * Stream identity hash derived from the normalized stream properties.
-   * The same for all peers regardless of the player in use.
+   * What tells the stream from the content's other streams: by default, for
+   * HLS its type and its index among the master's streams of that type
+   * (`main0`), for DASH its type and Representation `@id` (`main-video-720`);
+   * or what a `streamIdBuilder` returned. The same for all peers regardless
+   * of the player in use. See specs/segment-identity.md.
    */
-  readonly identityHash: string;
+  readonly streamId: string;
 
   /**
-   * The pre-hash string that defines which P2P swarm the stream belongs to.
-   * By default `${peerProtocolVersion}-${swarmId}-${type}-${identityHash}`;
-   * a custom `streamSwarmIdBuilder` may override it. Computed once at registration.
+   * The pre-hash string that defines which P2P swarm the stream belongs to:
+   * `${peerProtocolVersion}-${swarmId}-${streamId}`. Computed once at
+   * registration.
    */
   readonly streamSwarmId: string;
 
@@ -87,16 +144,6 @@ export type Stream = {
   readonly infoHash: string;
 };
 
-/**
- * The stream data a player integration passes to `Core.addStreamIfNoneExists`.
- * The identity fields (`swarmId`, `identityHash`, `streamSwarmId`, `infoHash`)
- * are computed by the Core at registration.
- */
-export type StreamRegistration<TStream extends Stream = Stream> = Omit<
-  TStream,
-  "swarmId" | "identityHash" | "streamSwarmId" | "infoHash"
->;
-
 /** Represents a defined Core configuration with specific settings for the main and secondary streams. */
 export type DefinedCoreConfig = CommonCoreConfig & {
   /** Configuration for the main stream. */
@@ -107,7 +154,7 @@ export type DefinedCoreConfig = CommonCoreConfig & {
 
 /** Represents a set of properties that can be dynamically modified at runtime. */
 export type DynamicStreamProperties =
-  | "highDemandTimeWindow"
+  | "urgentBufferThreshold"
   | "httpDownloadInitialTimeoutMs"
   | "httpDownloadTimeWindow"
   | "p2pDownloadTimeWindow"
@@ -117,10 +164,10 @@ export type DynamicStreamProperties =
   | "p2pNotReceivingBytesTimeoutMs"
   | "p2pInactiveLoaderDestroyTimeoutMs"
   | "httpNotReceivingBytesTimeoutMs"
+  | "httpFirstByteTimeoutMs"
   | "httpErrorRetries"
   | "p2pErrorRetries"
   | "validateP2PSegment"
-  | "validateHTTPSegment"
   | "httpRequestSetup"
   | "isP2PDisabled"
   | "isP2PUploadDisabled"
@@ -137,21 +184,25 @@ export type DynamicStreamProperties =
 /**
  * Represents a dynamically modifiable configuration, allowing updates to selected CoreConfig properties at runtime.
  *
- * Note that `swarmId` and `streamSwarmIdBuilder` cannot be changed at runtime:
+ * Note that `swarmId` and `streamIdBuilder` cannot be changed at runtime:
  * stream identity is derived from them once, when a stream is registered.
+ * Of the common settings, `segmentMemoryStorageLimit` and
+ * `customSegmentStorageFactory` take effect from the next segment storage the
+ * core creates — on the first segment request, or the first after `destroy()`
+ * — and `trackerClientVersionPrefix` not at all.
  *
  * @example
  * ```typescript
+ * import type { DynamicCoreConfig } from "p2p-media-loader-core";
+ *
  * const dynamicConfig: DynamicCoreConfig = {
- *   core: {
- *     cachedSegmentsCount: 200,
- *   },
+ *   isP2PUploadDisabled: true, // stop uploading to peers
  *   mainStream: {
- *     highDemandTimeWindow: 20,
+ *     urgentBufferThreshold: 20,
  *     p2pDownloadTimeWindow: 6000,
  *   },
  *   secondaryStream: {
- *     highDemandTimeWindow: 10,
+ *     urgentBufferThreshold: 10,
  *     p2pDownloadTimeWindow: 3000,
  *   }
  * };
@@ -189,11 +240,18 @@ export type CommonCoreConfig = {
    *    - Android WebView: 1024 MiB
    *    - iOS WebView: 1024 MiB
    *
+   * Read when the segment storage is created, on the first segment request
+   * and the first after `Core.destroy()`: a change through
+   * `applyDynamicConfig` applies from the next storage, not to the one in use.
    */
   segmentMemoryStorageLimit: number | undefined;
 
   /**
-   * An optional custom storage factory for the segment storage.
+   * An optional custom storage factory for the segment storage. Called on
+   * the first segment request, and again on the first after `Core.destroy()`;
+   * `isLive` is derived from the manifests processed so far (see
+   * specs/manifest-registry.md, "Live detection"). A change through
+   * `applyDynamicConfig` applies from the next call, not to the storage in use.
    *
    * @default
    * ```typescript
@@ -204,6 +262,9 @@ export type CommonCoreConfig = {
 
   /**
    * The prefix to use for the WebTorrent client version during tracker communications.
+   *
+   * Read once, when the core is constructed: a change through
+   * `applyDynamicConfig` has no effect.
    *
    * @default
    * ```typescript
@@ -220,8 +281,10 @@ export type CommonCoreConfig = {
  * @example Configuration for basic video stream
  *
  * ```typescript
+ * import type { CoreConfig } from "p2p-media-loader-core";
+ *
  * const config: CoreConfig = {
- *  highDemandTimeWindow: 15,
+ *  urgentBufferThreshold: 15,
  *  httpDownloadTimeWindow: 3000,
  *  p2pDownloadTimeWindow: 6000,
  *  swarmId: "custom swarm ID for video stream",
@@ -231,9 +294,11 @@ export type CommonCoreConfig = {
  * @example Configuration for advanced video stream
  *
  * ```typescript
+ * import type { CoreConfig } from "p2p-media-loader-core";
+ *
  * const config: CoreConfig = {
  *  // Configuration for both streams
- *  highDemandTimeWindow: 20,
+ *  urgentBufferThreshold: 20,
  *  httpDownloadTimeWindow: 3000,
  *  p2pDownloadTimeWindow: 6000,
  *  mainStream: {
@@ -253,6 +318,19 @@ export type CoreConfig = Partial<StreamConfig> &
     mainStream?: Partial<StreamConfig>;
     /** Optional configuration for the secondary stream. */
     secondaryStream?: Partial<StreamConfig>;
+    /**
+     * Manifest parsers the core may use, selected statically by the
+     * integration so a bundle carries only the protocols it plays:
+     *
+     * ```ts
+     * import { hlsManifestParser } from "p2p-media-loader-core/hls";
+     * new Core({ manifestParsers: [hlsManifestParser] });
+     * ```
+     *
+     * Not part of the merged configuration returned by `getConfig()`.
+     * See specs/packaging.md.
+     */
+    manifestParsers?: readonly ManifestParser[];
   };
 
 /** Configuration options for the Core functionality, including network and processing parameters. */
@@ -277,19 +355,37 @@ export type StreamConfig = {
    */
   isP2PDisabled: boolean;
   /**
-   * Defines the duration of the time window (in seconds) during which segments are preemptively loaded to ensure smooth playback.
-   * This window prioritizes the fetching of media segments that will be played imminently.
+   * The buffer (in seconds) below which a player request is urgent. An urgent
+   * request is fetched over HTTP at once; a request made with more buffer
+   * than this waits for P2P while the buffer drains. Nothing but a player
+   * request is ever urgent.
    *
    * @default
    * ```typescript
-   * highDemandTimeWindow: 15
+   * urgentBufferThreshold: undefined
    * ```
+   *
+   * - When `undefined`, the threshold is derived: 15 seconds on VOD, and on a
+   *   live stream half of what the player buffers ahead of the playhead —
+   *   at least one segment, at most 15 seconds — so that the rest of the
+   *   buffer is the time peers have to fill the player's requests (see
+   *   specs/playback-contract.md, "The urgency threshold").
+   * - A number is the threshold on VOD. On live it is capped at half the
+   *   player's buffer, which the live window's geometry sizes and no
+   *   configuration here changes: up to that cap the number is the threshold
+   *   as given — above the derived value or below a segment alike — and past
+   *   it the cap is. A threshold as high as that buffer would make every
+   *   request urgent, leaving nothing for peers; `isP2PDisabled` is how to
+   *   ask for that deliberately.
+   * - The threshold scales with the playback rate: a request is urgent when
+   *   the buffer is below the threshold times the last non-zero rate the
+   *   player reported (1 before any), so at 2× it takes twice the buffer.
    */
-  highDemandTimeWindow: number;
+  urgentBufferThreshold: number | undefined;
 
   /**
-   * Defines the time window (in seconds) for HTTP segment downloads. This property specifies the duration
-   * over which media segments are preemptively fetched using HTTP requests.
+   * Defines the time window (in seconds) for HTTP segment downloads. This property specifies the duration,
+   * from the segment the player requested last, over which media segments are preemptively fetched using HTTP requests.
    *
    * To achieve a higher P2P ratio, it is recommended to set `httpDownloadTimeWindow` lower than `p2pDownloadTimeWindow`.
    *
@@ -318,7 +414,7 @@ export type StreamConfig = {
   httpDownloadInitialTimeoutMs: number;
 
   /**
-   * Defines the time window (in seconds) dedicated to preemptively fetching media segments via Peer-to-Peer (P2P) downloads.
+   * Defines the time window (in seconds), from the segment the player requested last, dedicated to preemptively fetching media segments via Peer-to-Peer (P2P) downloads.
    * This duration determines how much content is downloaded in advance via P2P connections to ensure smooth playback and reduce reliance on HTTP downloads.
    *
    * To achieve a higher P2P ratio, it is recommended to set this time window higher than `httpDownloadTimeWindow` to maximize P2P usage.
@@ -381,7 +477,9 @@ export type StreamConfig = {
   p2pInactiveLoaderDestroyTimeoutMs: number;
 
   /**
-   * The timeout duration (in milliseconds) for not receiving bytes from an HTTP download.
+   * The timeout duration (in milliseconds) for not receiving bytes from an HTTP download,
+   * counted from the response's headers and then from each chunk of its body. The wait for
+   * the headers has a limit of its own, `httpFirstByteTimeoutMs`.
    *
    * @default
    * ```typescript
@@ -391,7 +489,23 @@ export type StreamConfig = {
   httpNotReceivingBytesTimeoutMs: number;
 
   /**
-   * The number of retries allowed following an HTTP error.
+   * The timeout duration (in milliseconds) for an HTTP download to receive the response's
+   * headers, counted from the start of the request. A connection made at page start, a slow
+   * network, or a CDN filling its cache can take seconds to answer, and an answer that has
+   * not started is not a transfer that stalled.
+   *
+   * @default
+   * ```typescript
+   * httpFirstByteTimeoutMs: 10000
+   * ```
+   */
+  httpFirstByteTimeoutMs: number;
+
+  /**
+   * The number of HTTP attempts a request gets, the first included: `3` is one attempt and
+   * two retries, and `1` allows no retry. A failure on a peer's data does not count.
+   * A retry waits 1 s after the first failure and twice as long after each next one, up to 30 s,
+   * unless the player's request is urgent; a peer may send the segment meanwhile.
    *
    * @default
    * ```typescript
@@ -412,9 +526,7 @@ export type StreamConfig = {
 
   /**
    * A list of URLs to the WebTorrent trackers used for announcing and discovering peers (i.e., WebRTC signaling).
-   *
-   * WARNING: In the Safari browser, only the first tracker will be utilized. Safari has known issues with multiple trackers,
-   * which can lead to problems sending SDP messages during WebRTC signaling.
+   * The stream is announced to every tracker in the list.
    *
    * @default
    * The default trackers used are:
@@ -450,7 +562,25 @@ export type StreamConfig = {
 
   /**
    * An optional unique identifier for the swarm, used to isolate peer pools by media stream.
-   * If left undefined, the manifest URL will be used as the swarm ID.
+   * If left undefined, the URL of the first manifest that registers a stream —
+   * the URL the player requested, before any redirect, where the adapter
+   * reports it, as every bundled adapter does — names the swarm, with its
+   * query string discarded. Set it when that URL differs between viewers of
+   * the same content, for example a per-viewer host or a token in the path
+   * (see specs/segment-identity.md).
+   *
+   * Set it also when one URL gives viewers different streams — an A/B test of
+   * the ladder, a query parameter that selects the streams, renditions
+   * filtered by device: give each set of streams its own `swarmId`. A stream
+   * ID names a stream only among the streams of its own manifest, so two
+   * manifests with different streams under one `swarmId` put different
+   * renditions in one swarm, and peers exchange segments of the wrong one.
+   *
+   * The natural value is the identifier the surrounding system already has for
+   * the content — a database row key, an asset id — rather than another URL:
+   * it only has to be the same for every viewer of that content and unique to
+   * it. It names the whole set of streams the manifest declares, so a
+   * deployment that configures one should hand the core the master or the MPD.
    *
    * This property cannot be changed at runtime: stream identity is derived
    * from it once, when a stream is registered.
@@ -463,54 +593,70 @@ export type StreamConfig = {
   swarmId?: string;
 
   /**
-   * An optional function that builds a custom stream swarm ID.
-   * The stream swarm ID is hashed into the infohash announced to trackers
-   * (`infoHash = computeInfoHash(streamSwarmId)`), so it fully defines which
-   * swarm the stream's peers join.
+   * An optional function that builds a custom stream ID: the part of the
+   * stream swarm ID that tells the stream from the content's other streams.
+   * The core composes `` `${peerProtocolVersion}-${swarmId}-${streamId}` ``
+   * from it and hashes that into the infohash announced to trackers.
    *
-   * Use it to make infohashes predictable on a server: build the ID from
-   * values the server knows (e.g. swarm ID, stream type, resolution), then
-   * compute the same infohash server-side with `computeInfoHash` from
-   * `p2p-media-loader-core/server` — for example, to allowlist the hashes
-   * on a private tracker.
+   * The default stream ID comes from the manifest: for HLS the stream's type
+   * and its index among the master's streams of that type (`main0`,
+   * `secondary1`), for DASH the type and the Representation `@id`
+   * (`main-video-720`). A server predicts it with `buildStreamSwarmId` and
+   * `computeInfoHash` from `p2p-media-loader-core/server`. Use a builder
+   * where that default is wrong: an HLS master that lists its streams in a
+   * different order on each request or for each viewer, or DASH `@id`s that
+   * differ from viewer to viewer. See specs/segment-identity.md.
    *
    * The function must be deterministic and identical across all peers of the
    * swarm, and every distinct stream must map to a distinct ID: peers whose
-   * streams resolve to the same infohash exchange segments with each other, and
-   * registering two different streams with the same ID fails the registration
-   * (reported via the `onStreamRegistrationError` event). Include enough
-   * properties to guarantee uniqueness — resolution alone collides on ladders
-   * with several bitrates at the same resolution. If in doubt, incorporate the
-   * `identityHash` from the context (reproduce it server-side with
-   * `computeStreamIdentityHash`).
+   * streams resolve to the same infohash exchange segments with each other,
+   * and the core does not check it. Build the ID from
+   * properties every viewer reads alike — not `bitrate`, which an origin may
+   * recompute on every request — and include enough of them to tell the
+   * streams apart: resolution alone collides on ladders with several bitrates
+   * at the same resolution. `context.manifest.streams` shows the streams the
+   * ID must be unique among.
    *
    * Called once per stream at registration. This property cannot be changed
    * at runtime.
    *
-   * @param context - The stream identity data the ID may be built from,
-   * including the ready-made `defaultStreamSwarmId`.
-   * @returns The stream swarm ID, or `undefined` to use the default
-   * derivation (`` `${peerProtocolVersion}-${swarmId}-${streamType}-${identityHash}` ``,
-   * provided as `context.defaultStreamSwarmId`).
+   * @param context - The stream's type, properties, default stream ID and
+   * place in the manifest.
+   * @returns The stream ID, or `undefined` to use `context.defaultStreamId`.
    *
    * @default
    * ```typescript
-   * streamSwarmIdBuilder: undefined
+   * streamIdBuilder: undefined
    * ```
    *
    * @example
    * ```typescript
-   * // Include bitrate: resolution alone collides on multi-bitrate ladders.
-   * streamSwarmIdBuilder: ({ swarmId, streamType, properties }) =>
-   *   `my-app-${swarmId}-${streamType}-${properties.height ?? 0}-${properties.bitrate ?? 0}`,
+   * import type { CoreConfig } from "p2p-media-loader-core";
+   *
+   * const config: CoreConfig = {
+   *   // A master that shuffles its variants: name each by what it carries.
+   *   // Streams equal in all of these — two rungs that differ only in
+   *   // bitrate — would get one ID: tell them apart by something every
+   *   // viewer reads alike, such as an unsigned file name in `runtimeId`.
+   *   streamIdBuilder: ({ streamType, properties: p }) =>
+   *     [streamType, p.codecs, p.width, p.height, p.name, p.language, p.channels]
+   *       .map((value) => value ?? "")
+   *       .join("-"),
+   * };
    * ```
    */
-  streamSwarmIdBuilder?: (
-    context: StreamSwarmIdBuilderContext,
-  ) => string | undefined;
+  streamIdBuilder?: (context: StreamIdBuilderContext) => string | undefined;
 
   /**
    * An optional function to validate a P2P segment before fully integrating it into the playback buffer.
+   *
+   * A download that holds a peer's bytes belongs to that peer, whichever
+   * source finishes it: one that HTTP goes on from is validated with this
+   * function too, and a failure closes the connection to that peer. A peer
+   * does not go on from another peer's bytes; it starts again from byte 0.
+   * HTTP is trusted: a download of HTTP bytes only is not validated, and a
+   * peer that goes on from HTTP bytes takes on the download.
+   *
    * @param url The URL of the segment to validate.
    * @param byteRange The optional byte range of the segment.
    * @param data The downloaded segment data.
@@ -522,24 +668,6 @@ export type StreamConfig = {
    * ```
    */
   validateP2PSegment?: (
-    url: string,
-    byteRange: ByteRange | undefined,
-    data: ArrayBuffer,
-  ) => Promise<boolean>;
-
-  /**
-   * An optional function to validate an HTTP segment before fully integrating it into the playback buffer.
-   * @param url The URL of the segment to validate.
-   * @param byteRange The optional byte range of the segment.
-   * @param data The downloaded segment data.
-   * @returns A promise that resolves to a boolean indicating whether the segment is valid.
-   *
-   * @default
-   * ```typescript
-   * validateHTTPSegment: undefined
-   * ```
-   */
-  validateHTTPSegment?: (
     url: string,
     byteRange: ByteRange | undefined,
     data: ArrayBuffer,
@@ -592,6 +720,7 @@ export type StreamConfig = {
   /**
    * The interval (in milliseconds) at which the background churning process evaluates and prunes the worst-performing
    * peers if the total connection count exceeds `p2pMaxPeers`.
+   * A value below 1000 is treated as 1000.
    *
    * @default
    * ```typescript
@@ -615,6 +744,11 @@ export type StreamConfig = {
   /**
    * The number of WebRTC offers to generate and send to the tracker per announce request.
    * This controls how aggressively the client attempts to discover new peers.
+   * It is the most offers an announce sends. The tracker gives each offer to a
+   * different peer. So the client sends one offer for each other peer that the
+   * tracker counts. When it is alone in a new swarm, its first announces send
+   * none, and each periodic announce sends at least one. A peer at its peer
+   * limit sends no offers, and neither does a value of 0.
    *
    * @default
    * ```typescript
@@ -645,6 +779,8 @@ export type StreamConfig = {
 
   /**
    * The maximum duration (in milliseconds) to wait for the actual RTCDataChannel to open after signaling has completed.
+   * A peer that answers an offer waits 5 seconds more: its wait starts when it
+   * sends the answer, before the tracker delivers it to the other peer.
    *
    * @default
    * ```typescript
@@ -654,12 +790,50 @@ export type StreamConfig = {
   webRtcConnectionTimeoutMs: number;
 };
 
-/** The stream identity data passed to a custom `streamSwarmIdBuilder`. */
-export type StreamSwarmIdBuilderContext = {
-  /** The swarm ID of the stream: the configured `swarmId` or the manifest response URL. */
+/** A stream of the manifest, as `StreamIdBuilderContext.manifest` lists it. */
+export type ManifestStreamInfo = {
+  /**
+   * The stream's key in this manifest: the media playlist URL for HLS, the
+   * Representation id for DASH. See `StreamIdBuilderContext.runtimeId`.
+   */
+  runtimeId: string;
+
+  /** Stream type. */
+  streamType: StreamType;
+
+  /**
+   * The stream ID the core derives from the manifest: `main0` for HLS,
+   * `main-<@id>` for DASH.
+   */
+  defaultStreamId: string;
+
+  /**
+   * HLS only: the stream's index among the master's streams of its type.
+   * `undefined` for DASH.
+   */
+  index: number | undefined;
+
+  /** Raw stream properties from the manifest. */
+  properties: Readonly<StreamProperties>;
+};
+
+/** The stream identity data passed to a custom `streamIdBuilder`. */
+export type StreamIdBuilderContext = {
+  /**
+   * The swarm ID of the stream: the configured `swarmId` or, if unset, the
+   * URL of the first manifest that registered a stream — the URL that was
+   * requested, where the adapter reports it — with its query string
+   * discarded. The core adds it to the stream swarm ID; do not repeat it in
+   * the stream ID.
+   */
   swarmId: string;
 
-  /** Runtime identifier of the stream from the engine. May differ from peer to peer — avoid using it in the ID. */
+  /**
+   * The stream key (`Stream.runtimeId`): the media playlist URL for HLS, the
+   * Representation id for DASH. A playlist URL may differ from viewer to
+   * viewer (CDN host, signed path or query) — use only a part every viewer
+   * has alike, such as an unsigned file name.
+   */
   runtimeId: string;
 
   /** Stream type. */
@@ -668,18 +842,31 @@ export type StreamSwarmIdBuilderContext = {
   /** Raw stream properties from the manifest. */
   properties: Readonly<StreamProperties>;
 
-  /** Stream identity hash derived from the normalized stream properties. The same for all peers. */
-  identityHash: string;
+  /**
+   * The stream ID the core uses if the builder returns `undefined`: for HLS
+   * `main0`, `secondary1`, for DASH `main-<@id>`, `secondary-<@id>`, and
+   * `main` for a media playlist the core found no master for.
+   */
+  defaultStreamId: string;
 
   /**
-   * The stream swarm ID the default derivation would produce:
-   * `${peerProtocolVersion}-${swarmId}-${streamType}-${identityHash}`.
-   * Useful as a base for custom IDs, e.g. `` `${tenant}-${defaultStreamSwarmId}` ``.
+   * HLS only: the stream's index among the master's streams of its type.
+   * `undefined` for DASH and for a media playlist with no master.
    */
-  defaultStreamSwarmId: string;
+  index: number | undefined;
 
-  /** Version of the peer swarm protocol used in the default stream swarm ID derivation. */
-  peerProtocolVersion: string;
+  /**
+   * The manifest that declared the stream: its URL and all its streams in
+   * the order the core reads them (for HLS, the order of the indexes).
+   * `undefined` for a media playlist with no master. The URL may differ from
+   * viewer to viewer (CDN host, signed query) — avoid it in the ID.
+   */
+  manifest:
+    | {
+        readonly url: string;
+        readonly streams: readonly Readonly<ManifestStreamInfo>[];
+      }
+    | undefined;
 };
 
 /**
@@ -699,7 +886,10 @@ export type SegmentEventDetails = {
   /** The source of the download. */
   downloadSource: DownloadSource;
 
-  /** The peer ID, if the segment is downloaded from a peer. */
+  /**
+   * The peer the segment is downloaded from. For an HTTP attempt that failed
+   * on a peer's data (see `SegmentErrorDetails`), that peer.
+   */
   peerId: string | undefined;
 
   /** The info hash of the swarm that the segment belongs to. */
@@ -714,7 +904,15 @@ export type SegmentStartDetails = SegmentEventDetails;
 
 /** Represents details about a segment error event. */
 export type SegmentErrorDetails = SegmentEventDetails & {
-  /** The error that occurred during the segment download. */
+  /**
+   * The error that occurred during the segment download.
+   *
+   * With `downloadSource: "http"`, the type `p2p-segment-validation-failed`
+   * or `p2p-segment-size-mismatch` means that the origin is not at fault: the
+   * HTTP attempt went on from a peer's bytes, and they failed
+   * `validateP2PSegment`, or HTTP gave another size than that peer did.
+   * `peerId` names that peer, and its connection is closed.
+   */
   error: RequestError;
 };
 
@@ -760,9 +958,18 @@ export type PeerErrorType =
  * any library error regardless of its specific class.
  */
 export abstract class TypedError<T extends string> extends Error {
+  /**
+   * The error that caused this one, if any — for example the `PeerError`
+   * behind a `"peer-closed"` `RequestError`. Set by the constructor, because
+   * `ErrorOptions.cause` is not available before ES2022.
+   */
   readonly cause?: unknown;
 
   constructor(
+    /**
+     * Machine-readable kind of the error. Switch on it to handle each case;
+     * the `message` is for people, not for code.
+     */
     readonly type: T,
     message?: string,
     cause?: unknown,
@@ -775,6 +982,7 @@ export abstract class TypedError<T extends string> extends Error {
 
 /** Represents an error that occurred during a peer connection. */
 export class PeerError extends TypedError<PeerErrorType> {
+  /** Always `"PeerError"`; logs and stack traces show it in place of the generic `"Error"`. */
   readonly name = "PeerError";
 }
 
@@ -789,6 +997,7 @@ export type PeerWarningType = "timeout-strike";
 
 /** Represents a warning that occurred during a peer connection. */
 export class PeerWarning extends TypedError<PeerWarningType> {
+  /** Always `"PeerWarning"`; logs and stack traces show it in place of the generic `"Error"`. */
   readonly name = "PeerWarning";
 }
 
@@ -826,6 +1035,7 @@ export type TrackerErrorType =
 
 /** Represents an error that occurred during a tracker request. */
 export class TrackerError extends TypedError<TrackerErrorType> {
+  /** Always `"TrackerError"`; logs and stack traces show it in place of the generic `"Error"`. */
   readonly name = "TrackerError";
 }
 
@@ -834,6 +1044,7 @@ export type TrackerWarningType = "tracker-response" | "offer-failed";
 
 /** Represents a warning that occurred during a tracker request. */
 export class TrackerWarning extends TypedError<TrackerWarningType> {
+  /** Always `"TrackerWarning"`; logs and stack traces show it in place of the generic `"Error"`. */
   readonly name = "TrackerWarning";
 }
 
@@ -842,6 +1053,7 @@ export type PeerConnectErrorType = "connection-failed";
 
 /** Represents an error that occurred while establishing a peer connection. */
 export class PeerConnectError extends TypedError<PeerConnectErrorType> {
+  /** Always `"PeerConnectError"`; logs and stack traces show it in place of the generic `"Error"`. */
   readonly name = "PeerConnectError";
 }
 
@@ -853,13 +1065,13 @@ export type PeerConnectErrorDetails = PeerDetails & {
 
 /** Represents the details of a stream registration failure. */
 export type StreamRegistrationErrorDetails = {
-  /** Runtime identifier of the stream that failed to register. */
+  /** Key of the stream that failed to register (see `Stream.runtimeId`). */
   runtimeId: string;
 
   /** Stream type. */
   streamType: StreamType;
 
-  /** Raw stream properties the integration passed for the stream. */
+  /** Raw stream properties the core read from the manifest. */
   properties: Readonly<StreamProperties>;
 
   /** The error that caused the registration to fail. */
@@ -867,7 +1079,7 @@ export type StreamRegistrationErrorDetails = {
 };
 
 /** Represents the details about a registered stream. */
-export type StreamAddedDetails<TStream extends Stream = Stream> = {
+export type StreamAddedDetails = {
   /**
    * The registered stream with its computed identity.
    *
@@ -875,7 +1087,56 @@ export type StreamAddedDetails<TStream extends Stream = Stream> = {
    * stream state. The identity fields never change after registration, so
    * the snapshot stays accurate for the stream's lifetime.
    */
-  stream: TStream;
+  stream: Stream;
+};
+
+/**
+ * What a processed manifest described, for each stream it listed segments
+ * for. A master playlist lists none and yields no entries; a media playlist
+ * yields one; an MPD yields one per Representation.
+ */
+export type ProcessedStream = {
+  /** The stream key (see `Stream.runtimeId`). */
+  readonly key: string;
+  /** Stream type. */
+  readonly type: StreamType;
+  /**
+   * Whether the stream is live. The built-in parsers say so for an HLS
+   * playlist with no `EXT-X-ENDLIST` and no `EXT-X-PLAYLIST-TYPE:VOD`, and
+   * for a dynamic MPD.
+   */
+  readonly isLive: boolean;
+  /** Start of the earliest listed segment on the stream's manifest timeline. */
+  readonly start: number;
+  /** End of the latest listed segment on the same timeline. */
+  readonly end: number;
+  /** How many segments the core now holds for the stream. `start` and `end` are 0 when this is 0. */
+  readonly segmentCount: number;
+  /**
+   * The live window the manifest declares, in seconds, where the span from
+   * `start` to `end` is not a stable measure of it — a DASH
+   * `SegmentTemplate@duration`, whose span changes by a segment with the
+   * moment of the parse. `liveDelayFor` sizes a placement from it.
+   */
+  readonly declaredWindow?: number;
+};
+
+/** The outcome of `Core.processManifest` for a manifest a parser accepted. */
+export type ProcessedManifest = {
+  /** One entry for each stream described; see `ProcessedStream` for which streams appear. */
+  readonly streams: readonly ProcessedStream[];
+};
+
+/**
+ * A segment request the registry could not resolve. See
+ * specs/manifest-registry.md, "Divergence between core and the player".
+ */
+export type SegmentRegistryMissDetails = {
+  /** The URL the player requested. */
+  url: string;
+
+  /** The byte range the player requested, if any. */
+  byteRange?: ByteRange;
 };
 
 /**
@@ -888,27 +1149,37 @@ export type CoreEventMap = {
    * The stream carries its computed identity, including the infohash
    * announced to trackers for its swarm.
    *
-   * The event map is not generic, so the stream is typed as the base
-   * `Stream`. Consumers of a `Core<TStream>` receive their extended stream
-   * at runtime and may narrow via `StreamAddedDetails<TStream>`.
-   *
    * @param params - Contains the registered stream.
    */
   onStreamAdded: (params: StreamAddedDetails) => void;
 
   /**
-   * Invoked when a stream fails to register in the Core: the swarm ID is
-   * unresolvable, or a custom `streamSwarmIdBuilder` returned an invalid or
-   * colliding stream swarm ID. The stream stays unknown to the core — its
-   * segments load through the player's default path without P2P; other
-   * streams are unaffected.
+   * Invoked when a stream fails to register in the Core: a custom
+   * `streamIdBuilder` returned an invalid stream ID (not a non-empty string
+   * or `undefined`), or threw.
+   * The stream stays unknown to the core — its segments load through the
+   * player's default path without P2P; other streams are unaffected.
    *
-   * Subscribe to surface `streamSwarmIdBuilder` misconfigurations: without a
+   * Subscribe to surface `streamIdBuilder` misconfigurations: without a
    * listener the failure is only visible in debug logs.
    *
    * @param params - Contains the failed registration and the error.
    */
   onStreamRegistrationError: (params: StreamRegistrationErrorDetails) => void;
+
+  /**
+   * Invoked when the player requests a segment the registry does not know.
+   * The request falls back to the player's own loader and plays without P2P;
+   * this event makes the disagreement between the core's manifest parse and
+   * the player's observable rather than silent. Initialization segments,
+   * external segment indexes (a DASH `SegmentBase` stream's `sidx` range),
+   * the segments of subtitles and trick play, and DASH segments too short for
+   * an ID of their own (they start and end in one 100 ms unit) are
+   * recognised and never reported.
+   *
+   * @param params - The URL and byte range that missed.
+   */
+  onSegmentRegistryMiss: (params: SegmentRegistryMissDetails) => void;
 
   /**
    * Invoked when a segment is fully downloaded and available for use.
@@ -997,8 +1268,8 @@ export type CoreEventMap = {
   /**
    * Called when a chunk of data has been successfully uploaded to a peer.
    *
-   * @param bytesLength - The length of the segment in bytes.
-   * @param peerId - The peer ID, if the segment was downloaded from a peer
+   * @param bytesLength - The size of the uploaded chunk in bytes.
+   * @param peerId - The ID of the peer the chunk was uploaded to.
    * @param streamType - The type of stream that the chunk belongs to.
    * @param infoHash - The info hash of the swarm that the chunk belongs to.
    */
@@ -1027,16 +1298,28 @@ export type CoreEventMap = {
 /** Defines the types of errors that can occur during a request abortion process. */
 export type RequestAbortErrorType = "abort" | "bytes-receiving-timeout";
 
-/** Defines the types of errors specific to HTTP requests. */
+/**
+ * Defines the types of errors specific to HTTP requests. An HTTP attempt can
+ * also fail with `p2p-segment-validation-failed` or
+ * `p2p-segment-size-mismatch`, on a peer's data it went on from; see
+ * `SegmentErrorDetails`.
+ */
 export type HttpRequestErrorType =
-  | "http-error"
-  | "http-bytes-mismatch"
-  | "http-unexpected-status-code"
-  | "http-segment-validation-failed";
+  "http-error" | "http-bytes-mismatch" | "http-unexpected-status-code";
 
 /** Defines the types of errors specific to peer-to-peer requests. */
 export type PeerRequestErrorType =
-  "peer-segment-absent" | "peer-closed" | "p2p-segment-validation-failed";
+  | "peer-segment-absent"
+  | "peer-closed"
+  | "p2p-segment-validation-failed"
+  /** HTTP gave another size than the peer whose bytes it went on from. */
+  | "p2p-segment-size-mismatch"
+  /**
+   * A peer gave another size than another peer whose bytes it went on from.
+   * Nothing tells which is right; neither is closed, and the next attempt
+   * starts at byte 0.
+   */
+  | "p2p-segment-size-conflict";
 
 /** Enumerates all possible request error types, including HTTP and peer-related errors. */
 export type RequestErrorType =
@@ -1049,6 +1332,7 @@ export type RequestErrorType =
 export class RequestError<
   T extends RequestErrorType = RequestErrorType,
 > extends TypedError<T> {
+  /** Always `"RequestError"`; logs and stack traces show it in place of the generic `"Error"`. */
   readonly name = "RequestError";
 
   /** Error timestamp. */
@@ -1071,32 +1355,19 @@ export type SegmentResponse = {
   /**
    * Segment data as an ArrayBuffer.
    *
-   * May reference the same buffer the core keeps in segment storage for P2P
-   * upload. Treat it as read-only and never transfer it to a worker — copy it
-   * first (e.g. `data.slice(0)`), otherwise peers receive corrupted segments.
+   * The caller's own copy, never the buffer the core keeps in segment storage
+   * for P2P upload. It may be modified, and transferred to a worker the way
+   * players transmux — doing so detaches it here and leaves what peers are
+   * served untouched.
    */
   data: ArrayBuffer;
 
-  /** Measured bandwidth for the segment download, in bytes per second. */
+  /** Measured bandwidth for the segment download, in bits per second. */
   bandwidth: number;
 };
 
 /** Custom error class for errors that occur during core network requests. */
 export class CoreRequestError extends TypedError<"failed" | "aborted"> {
+  /** Always `"CoreRequestError"`; logs and stack traces show it in place of the generic `"Error"`. */
   readonly name = "CoreRequestError";
 }
-
-/** Callbacks for handling the success or failure of an engine operation. */
-export type EngineCallbacks = {
-  /**
-   * Called when the operation is successful.
-   * @param response - The response from the successful operation.
-   */
-  onSuccess: (response: SegmentResponse) => void;
-
-  /**
-   * Called when the operation encounters an error.
-   * @param reason - The error encountered during the operation.
-   */
-  onError: (reason: CoreRequestError) => void;
-};
