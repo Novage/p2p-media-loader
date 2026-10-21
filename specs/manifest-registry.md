@@ -507,6 +507,14 @@ next refresh. That is correct: it is no longer live.
   and passed through. See below.
 - **Initialization segments** (`EXT-X-MAP`, DASH `Initialization`) — recognised
   and deliberately passed through. See below.
+- **DASH segments too short for an ID of their own**, which start and end in
+  one 100 ms unit — recognised and passed through. Each parse that lists
+  segments says them afresh. See
+  [segment-identity.md](segment-identity.md), "A segment too short for an ID
+  of its own is not shared".
+- **DASH segments outside their period**, which `mpd-parser` lists past a live
+  period's end — not media of the stream, and left out. A request for one is a
+  registry miss.
 - **Segments behind an external index that has not arrived** (DASH
   `SegmentBase`) — the stream is registered when the MPD is parsed; its segments
   are added when the player fetches the index, which it does before requesting

@@ -39,7 +39,18 @@ throughout.
   period's segment for the next one's request, and dash.js stalled at each
   period change. See
   [`specs/segment-identity.md`](specs/segment-identity.md), "Where a numbered
-  template's segment sits on that timeline".
+  template's segment sits on that timeline". A DASH segment that starts and
+  ends in one 100 ms unit, such as the 10.7 ms tail of angel-one's English
+  audio, has the ID of the next segment, so it is not shared: the player loads
+  it over HTTP, and `Segment:unshared-too-short` counts it. Before, the store
+  and the peers could give one of the two segments for the other. Each DASH
+  segment is clipped to its period, which ends at its `Period@duration` or the
+  next period's start: the parser listed a live period's numbered segments
+  past that end, the last one inside with a full template duration, and a
+  period's first segment can start before the period. Where one
+  Representation spans both periods, those segments took the IDs of the
+  neighbouring period's segments, which the core's prefetch could store and
+  then serve for them. The segments past the end are left out.
 - **The HLS.js and Shaka integrations need much less of their players' APIs.**
   Neither describes streams or segments any more, so neither decorates a
   manifest parser nor reads its player's internal representation of the stream.

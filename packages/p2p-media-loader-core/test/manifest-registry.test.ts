@@ -4,6 +4,7 @@ import { hlsManifestParser } from "../src/manifest/hls.js";
 import { dashManifestParser } from "../src/manifest/dash.js";
 import { Core } from "../src/index.js";
 import type { SidxBox } from "../src/manifest/mp4-sidx.js";
+import { segmentKey } from "../src/manifest/url-key.js";
 import {
   DASH_SEGMENT_BASE,
   DASH_SEGMENT_TEMPLATE,
@@ -19,6 +20,7 @@ import {
   IVS_MASTER_URL,
   MUX_720P_URL,
   MUX_MASTER_URL,
+  dashStreamOfTimes,
   readFixture,
 } from "./fixtures/index.js";
 
@@ -574,6 +576,109 @@ s103.ts
     expect(segments.map((s) => s.startTime)).toEqual([
       0, 6, 12, 18, 24, 30, 36,
     ]);
+  });
+});
+
+describe("ManifestRegistry: DASH segments too short for an ID", () => {
+  const dash = dashStreamOfTimes;
+  const ids = (registry: ManifestRegistry) =>
+    Array.from(registry.getStream("v")?.segments.values() ?? []).map(
+      (segment) => segment.externalId,
+    );
+
+  it("leaves out a segment that starts and ends in one 100 ms unit", () => {
+    // A 40 ms segment at an ad splice: its ID, 40, would be the next one's.
+    const registry = new ManifestRegistry();
+    registry.apply(
+      dash([
+        [0, 4],
+        [4, 0.04],
+        [4.04, 3.96],
+      ]),
+    );
+    expect(ids(registry)).toEqual([0, 40]);
+    const short = registry.getStream("v")?.segments;
+    expect(
+      Array.from(short?.values() ?? []).map((segment) => segment.url),
+    ).toEqual([
+      "https://cdn.example/dash/v-0.m4s",
+      "https://cdn.example/dash/v-2.m4s",
+    ]);
+    // Recognised and passed through, like a segment of subtitles.
+    expect(
+      registry.isPassThroughSegment(
+        segmentKey("https://cdn.example/dash/v-1.m4s", undefined),
+      ),
+    ).toBe(true);
+  });
+
+  it("shares a segment shorter than 100 ms that spans a unit boundary", () => {
+    // 59.93–59.99 s: units 599 and 600, an ID of its own.
+    const registry = new ManifestRegistry();
+    registry.apply(
+      dash([
+        [59.9, 0.03],
+        [59.93, 0.06],
+        [59.99, 4],
+      ]),
+    );
+    expect(ids(registry)).toEqual([599, 600]);
+  });
+
+  it("leaves out a 100 ms segment whose start and end round into one unit", () => {
+    // 4.05 s × 10 is 40.5, which rounds to 41; its end, 4.05 + 0.1, is
+    // 41.4999… × 10 and rounds to 41 too, as does the next segment's start.
+    // A rule of "100 ms or longer is shared" would give both ID 41.
+    const end = 4.05 + 0.1;
+    const registry = new ManifestRegistry();
+    registry.apply(
+      dash([
+        [4.05, 0.1],
+        [end, 4],
+      ]),
+    );
+    expect(ids(registry)).toEqual([41]);
+  });
+
+  it("forgets the segments it left out when the window moves on", () => {
+    const registry = new ManifestRegistry();
+    registry.apply(
+      dash([
+        [0, 4],
+        [4, 0.04],
+      ]),
+    );
+    const key = segmentKey("https://cdn.example/dash/v-1.m4s", undefined);
+    expect(registry.isPassThroughSegment(key)).toBe(true);
+    registry.apply(dash([[8, 4]]));
+    expect(registry.isPassThroughSegment(key)).toBe(false);
+  });
+
+  it("gives every shared segment its own ID, whatever the durations", () => {
+    // Times as the parser computes them, each on its own: the period start
+    // plus an integer time over the timescale. Durations from one tick to
+    // 4 s, many of them short. A fixed generator, so a failure repeats.
+    let seed = 7;
+    const next = () => (seed = (seed * 48271) % 2147483647) / 2147483647;
+    for (const timescale of [600, 12800, 24000, 44100, 90000]) {
+      const periodStart = 0.1;
+      const times: [number, number][] = [];
+      let t = Math.floor(next() * 1e9);
+      for (let i = 0; i < 3000; i++) {
+        const pick = next();
+        const ticks =
+          pick < 0.4
+            ? Math.ceil((next() * timescale) / 10)
+            : Math.ceil(next() * 4 * timescale);
+        times.push([periodStart + t / timescale, ticks / timescale]);
+        t += ticks;
+      }
+      const registry = new ManifestRegistry();
+      registry.apply(dash(times));
+      const shared = ids(registry);
+      expect(new Set(shared).size).toBe(shared.length);
+      expect(shared.length).toBeGreaterThan(1500);
+    }
   });
 });
 

@@ -19,6 +19,7 @@ import {
   stripQuery,
 } from "./url-key.js";
 import type { SidxBox } from "./mp4-sidx.js";
+import { diagnostics } from "../diagnostics.js";
 
 /**
  * The manifest-derived registry: every stream and segment the core knows,
@@ -85,6 +86,11 @@ type MutableStream = Omit<RegistryStream, "segments"> & {
   segments: Map<string, RegistrySegment>;
   /** HLS without PDT: start time of every sequence number laid out so far. */
   timeline: Map<number, number>;
+  /**
+   * DASH segments the latest parse listed and the stream does not share, by
+   * segment key: too short to have an ID of their own (see `sharesId`).
+   */
+  unshared: Set<string>;
 };
 
 /** One per stream the manifest listed segments for, changed or not. */
@@ -265,15 +271,21 @@ export class ManifestRegistry {
   }
 
   /**
-   * Whether this key is a segment a manifest lists outside any stream: one
-   * of a subtitle or I-frame playlist, or of a DASH text AdaptationSet or
-   * trick-mode Representation. Like an initialization segment, it is
-   * recognised and passed through; see specs/manifest-registry.md.
+   * Whether this key is a segment the core recognises and does not share,
+   * so that a request for it passes through without a registry miss, like
+   * one for an initialization segment. Two kinds: a segment a manifest lists
+   * outside any stream — of a subtitle or I-frame playlist, or of a DASH text
+   * AdaptationSet or trick-mode Representation — and a DASH segment of a
+   * stream that is too short for an ID of its own (`sharesId`). See
+   * specs/manifest-registry.md.
    */
-  isNonStreamSegment(key: string): boolean {
+  isPassThroughSegment(key: string): boolean {
     const file = fileOfSegmentKey(key);
     for (const { ranges, files } of this.nonStreamSegments.values()) {
       if (ranges.has(key) || files.has(file)) return true;
+    }
+    for (const stream of this.streams.values()) {
+      if (stream.unshared.has(key)) return true;
     }
     return false;
   }
@@ -394,6 +406,7 @@ export class ManifestRegistry {
         : existing?.declaredWindow,
       segments: existing?.segments ?? new Map<string, RegistrySegment>(),
       timeline: existing?.timeline ?? new Map<number, number>(),
+      unshared: existing?.unshared ?? new Set<string>(),
     };
     this.streams.set(key, stream);
     return stream;
@@ -505,11 +518,19 @@ export class ManifestRegistry {
     protocol: ParsedManifest["protocol"],
   ): RegistryUpdate {
     const next = new Map<string, RegistrySegment>();
+    const unshared = new Set<string>();
     const times = this.layoutTimeline(stream, segments, protocol);
 
     segments.forEach((s, i) => {
       const key = segmentKey(s.url, s.byteRange);
       const startTime = times[i];
+      if (protocol === "dash" && !sharesId(s)) {
+        if (!stream.unshared.has(key)) {
+          diagnostics?.count("Segment:unshared-too-short");
+        }
+        unshared.add(key);
+        return;
+      }
       next.set(key, {
         key,
         url: s.url,
@@ -519,6 +540,25 @@ export class ManifestRegistry {
         endTime: startTime + s.duration,
       });
     });
+
+    // Every segment a stream shares has an ID of its own: the store and the
+    // peers know a segment by it, so a repeat is a defect in how IDs are
+    // made. Reported when one of the two is new, once, since a live refresh
+    // lists the same segments again and again. Only while the ledger records:
+    // the bundles, where it is compiled out, leave the whole check out.
+    if (diagnostics?.isOn()) {
+      const owners = new Map<number, string>();
+      for (const [key, segment] of next) {
+        const owner = owners.get(segment.externalId);
+        if (owner === undefined) {
+          owners.set(segment.externalId, key);
+        } else if (!stream.segments.has(key) || !stream.segments.has(owner)) {
+          diagnostics.anomaly(
+            `Registry segments ${shortKey(owner)} and ${shortKey(key)} of stream ${shortKey(stream.key)} share ID ${segment.externalId}`,
+          );
+        }
+      }
+    }
 
     let added = 0;
     let removed = 0;
@@ -532,6 +572,8 @@ export class ManifestRegistry {
       if (!stream.segments.has(key)) added++;
       stream.segments.set(key, segment);
     }
+    // Like the segment list, the parse that lists them says them afresh.
+    stream.unshared = unshared;
 
     return { ...describe(stream), added, removed };
   }
@@ -635,11 +677,61 @@ function externalIdOf(
 ): number {
   // See specs/segment-identity.md: HLS media sequence is canonical; a DASH
   // segment number is not available in every addressing mode, so DASH uses
-  // presentation time in 100 ms units — fine enough to separate any real
-  // segments, coarse enough to keep peer announcements compact.
-  return protocol === "dash"
-    ? Math.round((s.presentationTime ?? 0) * 10)
-    : s.sequence;
+  // presentation time in 100 ms units — fine enough to separate real
+  // segments, coarse enough to keep peer announcements compact. A segment
+  // too short for a unit of its own is not shared (`sharesId`).
+  return protocol === "dash" ? dashUnitOf(s.presentationTime ?? 0) : s.sequence;
+}
+
+/**
+ * A presentation time in the 100 ms units of a DASH segment ID, rounded:
+ * the one rounding both the ID and `sharesId` use, which the uniqueness of
+ * the IDs rests on. `margin`, in units, is taken off before rounding.
+ */
+function dashUnitOf(seconds: number, margin = 0): number {
+  return Math.round(seconds * 10 - margin);
+}
+
+/**
+ * How far past a unit boundary, in 100 ms units, a segment's end must be for
+ * the next segment's start to round above it: 0.1 ms. The parser computes
+ * each start on its own, as `periodStart + t / timescale`, so the next start
+ * and this end can differ in their last bits, and at a `.5` boundary round
+ * to different units. That difference is below 1e-5 units even at epoch-scale
+ * live times.
+ */
+const UNIT_BOUNDARY_MARGIN = 0.001;
+
+/**
+ * Whether a DASH segment has an ID no other segment of its stream can have:
+ * its end is clearly in a later 100 ms unit than its start. A segment that
+ * starts and ends in one unit has the ID of the segment after it. Such a
+ * segment is usually shorter than 100 ms, at an ad splice or a period end,
+ * but the rule reads the units, not the duration. The store and the peers
+ * know a segment by its ID, so they would give one segment for the other.
+ * Each peer decides from the segment alone, so every peer leaves out the same
+ * ones. See specs/segment-identity.md.
+ */
+function sharesId(s: ParsedSegment): boolean {
+  // No length to judge: the whole file of a `SegmentBase` stream with no
+  // index range, in a live MPD or one with no duration. It is its stream's
+  // only segment, so its ID is its own.
+  if (!Number.isFinite(s.duration)) return true;
+  const start = s.presentationTime ?? 0;
+  return (
+    dashUnitOf(start + s.duration, UNIT_BOUNDARY_MARGIN) > dashUnitOf(start)
+  );
+}
+
+/**
+ * A segment or stream key as a record may show it: the file name of its URL,
+ * without the path or the query, which can carry a viewer's signed token,
+ * and the byte range, if any.
+ */
+function shortKey(key: string): string {
+  const file = fileOfSegmentKey(key);
+  const range = key.slice(file.length);
+  return (stripQuery(file).split("/").pop() ?? file) + range;
 }
 
 /** A stream's current state, with nothing added or removed. */

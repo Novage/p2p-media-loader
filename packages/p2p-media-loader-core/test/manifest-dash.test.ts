@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { dashManifestParser } from "../src/manifest/dash.js";
 import { ManifestRegistry } from "../src/manifest/registry.js";
+import { segmentKey } from "../src/manifest/url-key.js";
 import {
   ANGEL_ONE_MPD_URL,
   BBB_MPD_URL,
@@ -265,6 +266,272 @@ describe("dashManifestParser", () => {
     expect(registry.getStreams().map((s) => [s.key, s.streamId])).toEqual([
       ["v0", "main-v0"],
     ]);
+  });
+
+  it("cuts a live period's segments at the next period's start", () => {
+    // mpd-parser lists p0's numbered segments up to the present, past p1's
+    // start at 60.03 s, and gives a-16 (60.00–60.03 s) a full 4 s.
+    const mpd = `<?xml version="1.0" encoding="UTF-8"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" profiles="urn:mpeg:dash:profile:isoff-live:2011" type="dynamic" availabilityStartTime="1970-01-01T00:00:00Z" minimumUpdatePeriod="PT2S" timeShiftBufferDepth="PT120S" minBufferTime="PT2S">
+  <Period id="p0" start="PT0S">
+    <AdaptationSet mimeType="video/mp4">
+      <Representation id="v" bandwidth="1000000" codecs="avc1.4d401f">
+        <SegmentTemplate media="a-$Number$.m4s" initialization="a-init.mp4" duration="4" timescale="1" startNumber="1"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+  <Period id="p1" start="PT60.03S">
+    <AdaptationSet mimeType="video/mp4">
+      <Representation id="v" bandwidth="1000000" codecs="avc1.4d401f">
+        <SegmentTemplate media="b-$Number$.m4s" initialization="b-init.mp4" duration="4" timescale="1" startNumber="1"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>`;
+    const parsed = dashManifestParser.parse(mpd, URL, { now: 80_000 });
+    const tail = parsed.streams[0].segments?.filter(
+      (s) => (s.presentationTime ?? 0) >= 56,
+    );
+    expect(
+      tail?.map((s) => [
+        s.url.split("/").pop(),
+        s.presentationTime,
+        Math.round(s.duration * 1000) / 1000,
+      ]),
+    ).toEqual([
+      ["a-15.m4s", 56, 4],
+      ["a-16.m4s", 60, 0.03],
+      ["b-1.m4s", 60.03, 4],
+      ["b-2.m4s", 64.03, 4],
+      ["b-3.m4s", 68.03, 4],
+      ["b-4.m4s", 72.03, 4],
+    ]);
+
+    // The 30 ms tail has no ID of its own; every shared segment has one.
+    const registry = new ManifestRegistry();
+    registry.apply(parsed);
+    const ids = Array.from(registry.getStream("v")?.segments.values() ?? [])
+      .filter((s) => s.startTime >= 56)
+      .map((s) => [s.url.split("/").pop(), s.externalId]);
+    expect(ids).toEqual([
+      ["a-15.m4s", 560],
+      ["b-1.m4s", 600],
+      ["b-2.m4s", 640],
+      ["b-3.m4s", 680],
+      ["b-4.m4s", 720],
+    ]);
+  });
+
+  it("leaves out a short segment whose end and the next start round apart", () => {
+    // The 134-tick segment starts at 2328.53953125 s. Its end, computed as
+    // start + duration, is 2328.55: 23285.5 rounds up, to a unit of its own.
+    // The parser computes the next start on its own, 2328.5499999999997,
+    // which rounds to 23285: the short segment's ID.
+    const mpd = `<?xml version="1.0" encoding="UTF-8"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" profiles="urn:mpeg:dash:profile:isoff-live:2011" type="static" mediaPresentationDuration="PT2400S" minBufferTime="PT2S">
+  <Period id="p0" start="PT0.1S">
+    <AdaptationSet mimeType="video/mp4">
+      <Representation id="v" bandwidth="1000000" codecs="avc1.4d401f">
+        <SegmentTemplate media="v-$Time$.m4s" initialization="v-init.mp4" timescale="12800">
+          <SegmentTimeline>
+            <S t="29791226" d="12800"/>
+            <S d="134"/>
+            <S d="12800"/>
+          </SegmentTimeline>
+        </SegmentTemplate>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>`;
+    const registry = new ManifestRegistry();
+    registry.apply(dashManifestParser.parse(mpd, URL));
+    const segments = Array.from(
+      registry.getStream("v")?.segments.values() ?? [],
+    );
+    expect(segments.map((s) => s.url.split("/").pop())).toEqual([
+      "v-29791226.m4s",
+      "v-29804160.m4s",
+    ]);
+    const ids = segments.map((s) => s.externalId);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("keeps the whole file of a live SegmentBase stream with no index range", () => {
+    // The parser gives that one segment no duration: nothing to judge its
+    // ID by, and it is its stream's only segment.
+    const mpd = `<?xml version="1.0" encoding="UTF-8"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" profiles="urn:mpeg:dash:profile:isoff-on-demand:2011" type="dynamic" availabilityStartTime="1970-01-01T00:00:00Z" minBufferTime="PT2S">
+  <Period id="p0" start="PT0S">
+    <AdaptationSet mimeType="video/mp4">
+      <Representation id="v" bandwidth="1000000" codecs="avc1.4d401f">
+        <BaseURL>v.mp4</BaseURL>
+        <SegmentBase><Initialization range="0-799"/></SegmentBase>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>`;
+    const registry = new ManifestRegistry();
+    registry.apply(dashManifestParser.parse(mpd, URL, { now: 80_000 }));
+    const [segment] = registry.getStream("v")?.segments.values() ?? [];
+    expect(segment).toMatchObject({ externalId: 0, startTime: 0 });
+  });
+
+  it("clips a segment that starts before its period to the period start", () => {
+    // p1's first segment starts at 59.92 s, before p1 at 60.03 s (S@t below
+    // presentationTimeOffset). p0's 59.90 s segment, cut at 60.03 s, keeps
+    // unit 599; clipped, p1's first takes 600, not 599 too. p0's 61.8 s
+    // segment lies after p0 and is left out.
+    const mpd = `<?xml version="1.0" encoding="UTF-8"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" profiles="urn:mpeg:dash:profile:isoff-live:2011" type="static" mediaPresentationDuration="PT70S" minBufferTime="PT2S">
+  <Period id="p0" start="PT0S">
+    <AdaptationSet mimeType="video/mp4">
+      <Representation id="v" bandwidth="1000000" codecs="avc1.4d401f">
+        <SegmentTemplate media="a-$Time$.m4s" initialization="a-init.mp4" timescale="1000">
+          <SegmentTimeline>
+            <S t="57900" d="2000"/>
+            <S d="1900"/>
+            <S d="2000"/>
+          </SegmentTimeline>
+        </SegmentTemplate>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+  <Period id="p1" start="PT60.03S">
+    <AdaptationSet mimeType="video/mp4">
+      <Representation id="v" bandwidth="1000000" codecs="avc1.4d401f">
+        <SegmentTemplate media="b-$Time$.m4s" initialization="b-init.mp4" timescale="1000" presentationTimeOffset="60030">
+          <SegmentTimeline>
+            <S t="59920" d="2000" r="2"/>
+          </SegmentTimeline>
+        </SegmentTemplate>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>`;
+    const parsed = dashManifestParser.parse(mpd, URL);
+    const registry = new ManifestRegistry();
+    registry.apply(parsed);
+    const ids = Array.from(registry.getStream("v")?.segments.values() ?? [])
+      .filter((s) => s.startTime >= 59)
+      .map((s) => [s.url.split("/").pop(), s.externalId]);
+    expect(ids).toEqual([
+      ["a-59900.m4s", 599],
+      ["b-59920.m4s", 600],
+      // 60.03 s + (61920 − 60030) / 1000 = 61.92 s.
+      ["b-61920.m4s", 619],
+      ["b-63920.m4s", 639],
+    ]);
+  });
+
+  it("leaves out a segment that starts at the next period's start, in float", () => {
+    // 2.002 s segments from 10.01 s, and p1 on their grid at 60.06 s. The
+    // parser puts a-26 at 60.059999999999995, a few float steps below p1's
+    // start: no media of p0, not a 7e-15 s sliver of it.
+    const mpd = `<?xml version="1.0" encoding="UTF-8"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" profiles="urn:mpeg:dash:profile:isoff-live:2011" type="dynamic" availabilityStartTime="1970-01-01T00:00:00Z" minimumUpdatePeriod="PT2S" timeShiftBufferDepth="PT120S" minBufferTime="PT2S">
+  <Period id="p0" start="PT10.01S">
+    <AdaptationSet mimeType="video/mp4">
+      <Representation id="v" bandwidth="1000000" codecs="avc1.4d401f">
+        <SegmentTemplate media="a-$Number$.m4s" initialization="a-init.mp4" duration="60060" timescale="30000" startNumber="1"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+  <Period id="p1" start="PT60.06S">
+    <AdaptationSet mimeType="video/mp4">
+      <Representation id="v" bandwidth="1000000" codecs="avc1.4d401f">
+        <SegmentTemplate media="b-$Number$.m4s" initialization="b-init.mp4" duration="60060" timescale="30000" startNumber="1"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>`;
+    const [stream] = dashManifestParser.parse(mpd, URL, {
+      now: 80_000,
+    }).streams;
+    const urls = (stream.segments ?? []).map((s) => s.url.split("/").pop());
+    expect(urls).toContain("a-25.m4s");
+    expect(urls).not.toContain("a-26.m4s");
+    expect((stream.segments ?? []).every((s) => s.duration > 0.001)).toBe(true);
+  });
+
+  it("leaves out a segment that ends at its period start, in float", () => {
+    // Period at 10.01 s, presentationTimeOffset 128128 at 12800 per second.
+    // The first S ends there, but the parser's start, 10.01 − 1.0010156 s,
+    // plus the duration is 1.8e-15 s past 10.01: no media of the period, not
+    // a sliver of it.
+    const mpd = `<?xml version="1.0" encoding="UTF-8"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" profiles="urn:mpeg:dash:profile:isoff-live:2011" type="static" mediaPresentationDuration="PT60S" minBufferTime="PT2S">
+  <Period id="p0" start="PT10.01S">
+    <AdaptationSet mimeType="video/mp4">
+      <Representation id="v" bandwidth="1000000" codecs="avc1.4d401f">
+        <SegmentTemplate media="v-$Time$.m4s" initialization="v-init.mp4" timescale="12800" presentationTimeOffset="128128">
+          <SegmentTimeline>
+            <S t="115315" d="12813" r="2"/>
+          </SegmentTimeline>
+        </SegmentTemplate>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>`;
+    const [stream] = dashManifestParser.parse(mpd, URL).streams;
+    expect((stream.segments ?? []).map((s) => s.url.split("/").pop())).toEqual([
+      "v-128128.m4s",
+      "v-140941.m4s",
+    ]);
+  });
+
+  it("leaves out a segment that ends at or before its period start", () => {
+    // The period starts at 60 s (presentationTimeOffset 60000): the first S
+    // ends at 59 s and the second at 60 s, no media of the period.
+    const mpd = `<?xml version="1.0" encoding="UTF-8"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" profiles="urn:mpeg:dash:profile:isoff-live:2011" type="static" mediaPresentationDuration="PT70S" minBufferTime="PT2S">
+  <Period id="p0" start="PT60S">
+    <AdaptationSet mimeType="video/mp4">
+      <Representation id="v" bandwidth="1000000" codecs="avc1.4d401f">
+        <SegmentTemplate media="v-$Time$.m4s" initialization="v-init.mp4" timescale="1000" presentationTimeOffset="60000">
+          <SegmentTimeline>
+            <S t="57000" d="2000"/>
+            <S d="1000"/>
+            <S d="2000" r="1"/>
+          </SegmentTimeline>
+        </SegmentTemplate>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>`;
+    const [stream] = dashManifestParser.parse(mpd, URL).streams;
+    expect(
+      stream.segments?.map((s) => [s.url.split("/").pop(), s.presentationTime]),
+    ).toEqual([
+      ["v-60000.m4s", 60],
+      ["v-62000.m4s", 62],
+    ]);
+  });
+
+  it("ends a live period at its Period@duration before the next one is listed", () => {
+    // p0 is the last period the MPD lists, and says it ends at 60.03 s: a-16
+    // (60.00 s) has 30 ms, no ID of its own; a-17 and later are past the end
+    // and left out.
+    const mpd = `<?xml version="1.0" encoding="UTF-8"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" profiles="urn:mpeg:dash:profile:isoff-live:2011" type="dynamic" availabilityStartTime="1970-01-01T00:00:00Z" minimumUpdatePeriod="PT2S" timeShiftBufferDepth="PT120S" minBufferTime="PT2S">
+  <Period id="p0" start="PT0S" duration="PT60.03S">
+    <AdaptationSet mimeType="video/mp4">
+      <Representation id="v" bandwidth="1000000" codecs="avc1.4d401f">
+        <SegmentTemplate media="a-$Number$.m4s" initialization="a-init.mp4" duration="4" timescale="1" startNumber="1"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>`;
+    const registry = new ManifestRegistry();
+    registry.apply(dashManifestParser.parse(mpd, URL, { now: 80_000 }));
+    const urls = Array.from(
+      registry.getStream("v")?.segments.values() ?? [],
+    ).map((s) => s.url.split("/").pop());
+    expect(urls.slice(-2)).toEqual(["a-14.m4s", "a-15.m4s"]);
+    expect(
+      registry.isPassThroughSegment(
+        segmentKey("https://cdn.example/dash/a-16.m4s"),
+      ),
+    ).toBe(true);
   });
 
   it("leaves a trick-mode set out of a live presentation too", () => {

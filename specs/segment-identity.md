@@ -326,6 +326,78 @@ six bytes, consecutive segments are 20 apart, a dozen share a group, and the
 announcement is a few dozen bytes. Finer units buy nothing and cost every peer
 upstream bandwidth on every announcement.
 
+**A segment too short for an ID of its own is not shared.** A segment whose
+start and end fall in one 100 ms unit — whose `Math.round(start * 10)` equals
+`Math.round(end * 10 - 0.001)` — has the ID of the segment that starts at its
+end.
+Packagers make such segments: a tail of a few milliseconds at the end of a
+period or an ad splice (angel-one's English audio ends on a 10.7 ms
+subsegment). The store and the peers know a segment only by stream and ID,
+so both would give one segment's bytes for the other. Such a segment is left
+out of its stream and passed through like a segment of subtitles: the player
+loads it over HTTP, with no registry miss, and `Segment:unshared-too-short`
+counts it once.
+
+The rule reads the segment alone, so every peer leaves out the same segments
+whatever window of a live stream it has seen; a rule that kept the first of
+two equal IDs would keep different ones on peers that joined at different
+times. And it keeps the IDs of the shared segments unique where each segment
+starts where the one before it ends: a shared segment's ID is below the unit
+its end rounds to, where the next segment starts, so the IDs rise strictly. A
+rule on duration — "shorter than 100 ms" — would not keep them unique: a 100 ms
+segment at 4.05 s rounds 40.5 to 41, and its floating-point end, 41.4999…, to
+41 too, the next segment's ID. Some segments shorter than 100 ms cross a unit
+boundary and keep an ID of their own.
+
+The end must be past a unit boundary by a margin, 0.001 units (0.1 ms), because
+the parser computes the next segment's start on its own, as the period start
+plus a time over the timescale: that start and this segment's end can differ in
+their last bits, and at a `.5` boundary round to two units. A 10.5 ms segment
+at 2328.5395 s ends at 2328.55, which rounds up to a unit of its own, while the
+next start, 2328.5499999999997, rounds down to the short segment's ID. Float
+error in a presentation time is far below the margin, even at epoch-scale live
+times; a segment whose end falls within the margin above a boundary is left out
+too, at the cost of one HTTP load.
+
+Segments a manifest lists for neighbouring periods do not overlap, because the
+parser clips each segment to its period (below). The subsegments of a
+`SegmentBase` index are not clipped (see KNOWN-ISSUES.md), and segments that
+overlap inside one period, which no valid manifest has, can still share an
+ID. A repeated ID among a stream's
+shared segments is a defect in how IDs are made, and the registry records it
+as an anomaly, once for each pair.
+
+A segment with no duration — the whole file of a `SegmentBase` stream with no
+index range, in a live MPD or one with no duration — has nothing to judge, and
+is its stream's only segment, so its ID is its own: it is shared.
+
+The rule needs each segment's true extent, so the DASH parser first clips every
+segment to its period. A period ends at its `Period@duration`, or at the next
+period's start, whichever comes first. `mpd-parser` lists a live period's
+numbered segments (`SegmentTemplate@duration`) up to the present, past that
+end, and gives the last one inside the period its full template duration. And a
+period's first segment may start before the period, where its `S@t` is below
+the `presentationTimeOffset`. Unclipped, a 30 ms tail before a splice would
+pass as a 4 s segment with the next period's first ID, the segments after it
+would take the IDs of the next period's segments wherever one Representation
+spans both, and an early first segment would take the ID of the previous
+period's tail. A segment that starts before its period starts at the period
+start, and takes its ID from there; one that runs past the end is shortened to
+end there; one wholly outside its period is no media of the stream, and is
+left out. A player that reads the same list and requests a segment left out
+gets a registry miss, and loads it over HTTP.
+
+A start or end within 0.1 ms of a period boundary counts as on it: the parser
+computes a segment's start from the period start and the timescale, and
+`Period@start` apart, so a segment that starts at the next period's start can
+land a few float steps below it, and one that ends at its period's start a
+few steps above it.
+
+A live period with no `Period@duration` has no known end until the MPD lists
+the next period. A tail listed before that is shared with its template
+duration, and can lose its ID to the next period's first segment once the next
+period appears; see KNOWN-ISSUES.md.
+
 Presentation time is measured on the presentation timeline, not relative to a
 period, so a multi-period presentation does not restart identities at each
 period boundary.

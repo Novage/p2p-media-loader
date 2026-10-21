@@ -676,7 +676,7 @@ export class Core {
     if (
       segment ||
       this.manifestRegistry.isInitSegment(key) ||
-      this.manifestRegistry.isNonStreamSegment(key) ||
+      this.manifestRegistry.isPassThroughSegment(key) ||
       !this.clockedManifest.reparseForMiss()
     ) {
       return segment;
@@ -1072,9 +1072,10 @@ export class Core {
    * A request for a URL the registry does not know is reported through the
    * `onSegmentRegistryMiss` event, so a disagreement between the core's parse
    * and the player's is observable. Initialization segments, external segment
-   * indexes (see `isSegmentIndex`), and the segments of subtitles and trick
-   * play are recognised and passed through without a report; they are never
-   * shared.
+   * indexes (see `isSegmentIndex`), the segments of subtitles and trick play,
+   * and DASH segments too short for an ID of their own (they start and end in
+   * one 100 ms unit) are recognised and passed through without a report; they
+   * are never shared.
    *
    * @param url - The URL the player is about to request.
    * @param byteRange - Its byte range, when the segment is a range of a file.
@@ -1083,12 +1084,12 @@ export class Core {
     const key = segmentKey(url, byteRange);
     const segment = this.findSegment(key);
     if (!segment) {
-      // Initialization segments, external indexes and the segments of
-      // subtitles and trick play are recognised and passed through
-      // knowingly; only an unknown URL is a miss.
+      // Initialization segments, external indexes, the segments of subtitles
+      // and trick play, and DASH segments too short for an ID are recognised
+      // and passed through knowingly; only an unknown URL is a miss.
       if (
         !this.manifestRegistry.isInitSegment(key) &&
-        !this.manifestRegistry.isNonStreamSegment(key) &&
+        !this.manifestRegistry.isPassThroughSegment(key) &&
         !this.isSegmentIndex(url, byteRange)
       ) {
         // Logged as well as dispatched: a miss makes the segment load without

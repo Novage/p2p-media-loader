@@ -168,6 +168,8 @@ declare module "mpd-parser" {
       availabilityStartTime?: number;
       /** Seconds from the availability start. */
       periodStart?: number;
+      /** `Period@duration` in seconds, where the MPD gives one. */
+      periodDuration?: number;
       /** Seconds. */
       timeShiftBufferDepth?: number;
       /** Seconds. */

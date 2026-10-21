@@ -1173,8 +1173,9 @@ export type CoreEventMap = {
    * this event makes the disagreement between the core's manifest parse and
    * the player's observable rather than silent. Initialization segments,
    * external segment indexes (a DASH `SegmentBase` stream's `sidx` range),
-   * and the segments of subtitles and trick play are recognised and never
-   * reported.
+   * the segments of subtitles and trick play, and DASH segments too short for
+   * an ID of their own (they start and end in one 100 ms unit) are
+   * recognised and never reported.
    *
    * @param params - The URL and byte range that missed.
    */

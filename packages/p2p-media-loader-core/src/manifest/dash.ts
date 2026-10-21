@@ -77,6 +77,7 @@ export const dashManifestParser: ManifestParser = {
     });
     const { isLive, channelsByRepresentation, trickModeRepresentations } =
       readMpd(mpd);
+    const periodEndOf = periodEnds(inherited.representationInfo);
     const isTrickMode = (playlist: MpdPlaylist) =>
       playlist.attributes.NAME !== undefined &&
       trickModeRepresentations.has(playlist.attributes.NAME);
@@ -88,7 +89,9 @@ export const dashManifestParser: ManifestParser = {
         nonStream.push(playlist);
         continue;
       }
-      streams.push(toStream(playlist, "main", isLive, videoProperties));
+      streams.push(
+        toStream(playlist, "main", isLive, periodEndOf, videoProperties),
+      );
     }
     const groups = manifest.mediaGroups.AUDIO ?? {};
     for (const groupId of Object.keys(groups)) {
@@ -101,7 +104,7 @@ export const dashManifestParser: ManifestParser = {
             continue;
           }
           streams.push(
-            toStream(playlist, "secondary", isLive, (a) =>
+            toStream(playlist, "secondary", isLive, periodEndOf, (a) =>
               audioStreamProperties({
                 codecs: a.CODECS,
                 language: rendition.language,
@@ -502,10 +505,47 @@ function videoProperties(a: MpdPlaylist["attributes"]): StreamProperties {
   });
 }
 
+/**
+ * Where the period that starts at a given time ends: at its
+ * `Period@duration`, or at the start of the next period the MPD lists,
+ * whichever comes first; nowhere for a last period with no duration.
+ */
+function periodEnds(
+  representations: readonly MpdRepresentationInfo[],
+): (periodStart: number) => number | undefined {
+  const durations = new Map<number, number>();
+  for (const { attributes } of representations) {
+    const { periodStart = 0, periodDuration } = attributes;
+    if (periodDuration !== undefined) {
+      durations.set(periodStart, periodDuration);
+    }
+  }
+  const starts = Array.from(
+    new Set(representations.map((info) => info.attributes.periodStart ?? 0)),
+  ).sort((a, b) => a - b);
+  return (periodStart) => {
+    const next = starts.find((start) => start > periodStart);
+    const duration = durations.get(periodStart);
+    const own = duration === undefined ? undefined : periodStart + duration;
+    if (next === undefined) return own;
+    return own === undefined ? next : Math.min(next, own);
+  };
+}
+
+/**
+ * How close to a period boundary, in seconds, a segment's start or end counts
+ * as on it: 0.1 ms. mpd-parser computes a segment's start from the period
+ * start and the timescale, and `Period@start` is parsed apart, so a segment
+ * that starts at the next period's start can land a few float steps below
+ * it. No real segment is this short.
+ */
+const PERIOD_BOUNDARY_TOLERANCE = 0.0001;
+
 function toStream(
   playlist: MpdPlaylist,
   type: StreamType,
   isLive: boolean,
+  periodEndOf: (periodStart: number) => number | undefined,
   properties: (a: MpdPlaylist["attributes"]) => StreamProperties,
 ): ParsedStream {
   const { sidx } = playlist;
@@ -527,13 +567,51 @@ function toStream(
       }
     : { kind: "manifest" };
 
-  const segments: ParsedSegment[] = playlist.segments.map((s) => ({
-    url: s.resolvedUri,
-    byteRange: byteRangeFromOffsetLength(s.byterange),
-    duration: s.duration,
-    sequence: s.number,
-    presentationTime: s.presentationTime,
-  }));
+  // Each segment is clipped to its period. mpd-parser lists a live period's
+  // numbered segments up to the present, past the period's end, and gives
+  // the last one inside it its full template duration; and a period's first
+  // segment may start before the period (`S@t` below
+  // `presentationTimeOffset`). Outside its period a segment overlaps the
+  // neighbouring period's segments and would take their IDs where one
+  // Representation spans both, and only its true length inside the period
+  // decides whether it has an ID of its own. A segment wholly outside is not
+  // media of the stream, and is left out. See specs/segment-identity.md.
+  const segments: ParsedSegment[] = [];
+  for (const s of playlist.segments) {
+    // mpd-parser gives the whole file of a `SegmentBase` stream with no index
+    // range no period start: there is nothing to clip it to.
+    const periodStart = Number.isFinite(s.timeline) ? s.timeline : undefined;
+    if (
+      periodStart !== undefined &&
+      s.presentationTime + s.duration <= periodStart + PERIOD_BOUNDARY_TOLERANCE
+    ) {
+      continue;
+    }
+    const start =
+      periodStart === undefined
+        ? s.presentationTime
+        : Math.max(s.presentationTime, periodStart);
+    const periodEnd =
+      periodStart === undefined ? undefined : periodEndOf(periodStart);
+    if (
+      periodEnd !== undefined &&
+      start >= periodEnd - PERIOD_BOUNDARY_TOLERANCE
+    ) {
+      continue;
+    }
+    let { duration } = s;
+    if (start > s.presentationTime) duration -= start - s.presentationTime;
+    if (periodEnd !== undefined) {
+      duration = Math.min(duration, periodEnd - start);
+    }
+    segments.push({
+      url: s.resolvedUri,
+      byteRange: byteRangeFromOffsetLength(s.byterange),
+      duration,
+      sequence: s.number,
+      presentationTime: start,
+    });
+  }
 
   // A SegmentBase representation lists no segments; its init segment hangs
   // off the index reference instead. A representation spanning periods lists

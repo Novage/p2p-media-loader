@@ -10,6 +10,42 @@ The tests themselves are in
 
 ## Open
 
+- **A live DASH period with no `Period@duration` can give its tail's ID to the
+  next period when the next period is published late.** Until the MPD lists the
+  next period, the core knows no end for the last one, and `mpd-parser` gives
+  its last segment a full template duration. A 30 ms tail before a splice is
+  then shared as a 4 s segment with the ID of the next period's first segment,
+  and can be stored. When the next period appears, the tail is left out and
+  the next period's first segment takes that ID; the core releases stored
+  segments by ID, and the ID is still listed, so the stored tail can be served
+  for it. It needs the packager to publish the new period after the tail is
+  listed: `mpd-parser` lists a live segment only once its nominal end has
+  passed, 4 s after the splice here, and players need the new period to play
+  it. Not fixed because releasing a stored segment whenever its key changes
+  would drop every stored segment on a CDN that signs each refresh anew,
+  which the release by ID exists for. Telling the two apart by start time
+  works for DASH, where a re-signed segment keeps its presentation time, but
+  not for HLS, whose start times come from `PROGRAM-DATE-TIME`, which some
+  packagers move by milliseconds between refreshes; a tolerance wide enough
+  for that would not tell the 60.00 s tail from the 60.03 s segment after it.
+  The fix to make if this is observed: the registry sees the tail's own key
+  move from the shared segments to the unshared ones on the refresh that
+  adds the next period, which a re-signed URL does not do, so it can report
+  that ID for the core to release even though the next segment lists it.
+  Found in review, not observed.
+- **The subsegments of a DASH `SegmentBase` index are not clipped to their
+  period.** The parser clips the segments a manifest lists to their period,
+  but a `SegmentBase` stream's segments come from its `sidx` box, laid out
+  from the period start, and every reference is kept. Where one file serves
+  one Representation in several periods — main content split around an ad,
+  with `presentationTimeOffset` and `Period@duration` — the first period's
+  index describes media past that period's end. Its subsegments then overlap
+  the next periods' segments and, where one Representation spans them, share
+  their IDs. Not fixed because the layout is rare, as each period of a
+  `SegmentBase` stream normally has files of its own, and a fix needs the
+  period end carried through the index source. The duplicate-ID anomaly
+  reports it. Found in review, not observed.
+
 - **HLS content steering splits a rendition into one swarm per pathway.** A
   steered master lists each rendition once for each pathway (`PATHWAY-ID`),
   under a different URI, and the core counts a playlist once only where its

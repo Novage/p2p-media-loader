@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { Core } from "../src/core.js";
 import { dashManifestParser } from "../src/manifest/dash.js";
 import { hlsManifestParser } from "../src/manifest/hls.js";
+import { parseSidx } from "../src/manifest/mp4-sidx.js";
 import {
   ANGEL_ONE_AUDIO_EN_URL,
   ANGEL_ONE_MPD_URL,
@@ -70,10 +71,20 @@ describe("external segment index (SegmentBase)", () => {
       type: "secondary",
       isLive: false,
       start: 0,
-      segmentCount: 16,
+      segmentCount: 15,
     });
-    // Fifteen ~4.01 s subsegments and a 512-sample tail: 60.021 s.
-    expect(resolved?.[0].end).toBeCloseTo(60.021, 3);
+    // Fifteen ~4 s subsegments, to 60.0107 s. The 512-sample tail after them,
+    // 60.0107–60.0213 s, starts and ends in one 100 ms unit: no ID of its own,
+    // so it is not shared, and its request passes through without a miss.
+    expect(resolved?.[0].end).toBeCloseTo(60.0107, 3);
+    const box = parseSidx(readBinaryFixture("angel-one-audio-en.sidx"));
+    const sizes = box?.references.map((r) => r.referencedSize) ?? [];
+    const tailStart = 1010 + sizes.slice(0, 15).reduce((a, b) => a + b, 0);
+    const tail = { start: tailStart, end: tailStart + sizes[15] - 1 };
+    const onMiss = vi.fn();
+    core.addEventListener("onSegmentRegistryMiss", onMiss);
+    expect(core.isSegmentLoadable(ANGEL_ONE_AUDIO_EN_URL, tail)).toBe(false);
+    expect(onMiss).not.toHaveBeenCalled();
 
     // Subsegments follow each other from the end of the index (firstOffset 0).
     expect(
@@ -111,8 +122,9 @@ describe("external segment index (SegmentBase)", () => {
     const ids = Array.from(segments?.values() ?? []).map((s) => s.externalId);
     // 4.0107 s per subsegment → 40.107 per step, rounded.
     expect(ids.slice(0, 4)).toEqual([0, 40, 80, 120]);
-    expect(ids[15]).toBe(600);
-    expect(ids).toHaveLength(16);
+    // The ~10 ms tail at 60.0107 s has no ID of its own and is left out.
+    expect(ids[14]).toBe(560);
+    expect(ids).toHaveLength(15);
   });
 
   it("resolves a wider fetch that carries init and index together, and ignores junk", () => {
@@ -131,7 +143,7 @@ describe("external segment index (SegmentBase)", () => {
     });
     expect(
       processed?.streams.find((stream) => stream.segmentCount > 0),
-    ).toMatchObject({ segmentCount: 16 });
+    ).toMatchObject({ segmentCount: 15 });
 
     expect(
       core.processSegmentIndex({

@@ -146,6 +146,16 @@ const ledgerApi = {
     };
   },
 
+  /**
+   * Whether the ledger records. For a check that costs more than a call and
+   * exists only to record: run it only when this is true.
+   */
+  isOn(): boolean {
+    // Read without deciding: the first record decides, so a page or a test
+    // that enables the namespace before it still gets a ledger.
+    return ledger === undefined ? debug.enabled(NAMESPACE) : ledger !== null;
+  },
+
   /** Records a state that must not occur. */
   anomaly(message: string): void {
     const state = active();

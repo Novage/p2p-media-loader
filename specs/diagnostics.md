@@ -61,7 +61,10 @@ installs no global, and holds no reference.
 The `tsc` output in `lib/`, which bundler consumers use, contains the ledger:
 `tsc` replaces no constants. There the cost when off is one check per call, and
 a call occurs once per resource, request or result, never per byte or per
-data-channel chunk. The prebuilt `dist/` bundles contain none of it. Each Vite
+data-channel chunk. A check that costs more than a call and exists only to
+record — the registry's search for two segments with one ID — runs only when
+`diagnostics?.isOn()` is true, which asks without deciding: the first record
+still decides whether the ledger is on. The prebuilt `dist/` bundles contain none of it. Each Vite
 build defines `__P2PML_DIAGNOSTICS__` as `false`, which makes `diagnostics`
 `undefined`, and the minifier then removes every `diagnostics?.…` call with
 its arguments ([packaging.md](packaging.md)). A page that loads a `dist/`
@@ -198,8 +201,10 @@ the groups and the cases a reader of a snapshot must know.
   a config key a release removed (`Config:removed-key`, the same way),
   each stream the core registers (`StreamRegistration:added`) and each that
   fails to register (`StreamRegistration:failed`: a `streamIdBuilder` that
-  returned no usable ID or threw — see specs/segment-identity.md), registry
-  misses, evictions by reason, closed peers by cause, parses of the
+  returned no usable ID or threw — see specs/segment-identity.md), each DASH
+  segment left out of its stream because it starts and ends in one 100 ms
+  unit (`Segment:unshared-too-short`, once for each segment, however often a
+  refresh lists it), registry misses, evictions by reason, closed peers by cause, parses of the
   player's manifests by result (`ManifestParse`), and clock synchronizations
   and re-parses by result. Each player request that the store cannot serve is
   counted by its urgency when it arrives (`SegmentRequest:urgent` and
@@ -259,7 +264,10 @@ the groups and the cases a reader of a snapshot must know.
   (`BandwidthCalculator:<name> loading after destroy`). Either is a download
   its owner lost track of: its bytes go uncounted, or the calculator counts it
   as loading for ever and every estimate after it runs slow. A download
-  `clear()` removed is not reported.
+  `clear()` removed is not reported. Two segments a stream shares with one ID
+  (`Registry segments <a> and <b> of stream <s> share ID <n>`, file names
+  only, once for each pair): the store and the peers would give one for the
+  other, so IDs are made wrong somewhere; see segment-identity.md.
 
 A record is only kept where the owner's release is certain. An object that
 its player can drop without a release — an HLS.js playlist loader whose load

@@ -1,3 +1,5 @@
+import type { ParsedManifest } from "../../src/manifest/types.js";
+
 /**
  * Hand-written manifests covering structures the real snapshots in this
  * directory do not: alternate audio with CHANNELS, subtitle and caption
@@ -458,3 +460,31 @@ export const DASH_OPEN_TIMELINE_MIXED = `<?xml version="1.0" encoding="UTF-8"?>
     </AdaptationSet>
   </Period>
 </MPD>`;
+
+/**
+ * A live DASH presentation of one stream, `v`, whose segments start and last
+ * as given, in seconds, at `v-<index>.m4s`: segments as a parser hands them
+ * to the registry, for the rules that read their times.
+ */
+export const dashStreamOfTimes = (
+  times: readonly (readonly [number, number])[],
+): ParsedManifest => ({
+  protocol: "dash",
+  url: "https://cdn.example/dash/manifest.mpd",
+  streams: [
+    {
+      key: "v",
+      type: "main",
+      streamId: "main-v",
+      properties: { bitrate: 0 },
+      indexSource: { kind: "manifest" },
+      isLive: true,
+      segments: times.map(([presentationTime, duration], i) => ({
+        url: `https://cdn.example/dash/v-${i}.m4s`,
+        duration,
+        sequence: i,
+        presentationTime,
+      })),
+    },
+  ],
+});
