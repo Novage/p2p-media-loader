@@ -47,13 +47,13 @@
     "clean:build": "rimraf lib dist build p2p-media-loader-demo-*.tgz"
   },
   "dependencies": {
-    "@videojs/dash-video": "10.1.0",
-    "@videojs/hlsjs-video": "10.1.0",
-    "@videojs/react": "10.1.0",
-    "d3": "^7.9.0",
-    "dashjs": "^5.2.1",
+    "@videojs/dash-video": "10.3.0",
+    "@videojs/hlsjs-video": "10.3.0",
+    "@videojs/react": "10.3.0",
+    "d3": "^7.9.2",
+    "dashjs": "^5.3.0",
     "dplayer": "^1.27.1",
-    "hls.js": "^1.7.3",
+    "hls.js": "^1.7.4",
     "mediaelement": "^7.1.0",
     "openplayerjs": "^2.14.12",
     "p2p-media-loader-core": "workspace:*",
@@ -61,8 +61,8 @@
     "p2p-media-loader-hlsjs": "workspace:*",
     "p2p-media-loader-shaka": "workspace:*",
     "p2p-media-loader-videojs": "workspace:*",
-    "shaka-player": "^5.3.1",
-    "video.js": "^8.24.1"
+    "shaka-player": "^5.3.4",
+    "video.js": "^8.24.2"
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",

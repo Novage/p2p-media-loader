@@ -79,22 +79,6 @@ The tests themselves are in
   first copy until it fails. A test needs a master with redundant variants and
   a forced failure of the first copy.
 
-- **Video.js 10 without `autoplay` plays about 10 s from the live edge and
-  gets almost no P2P.** Without `autoplay`, Video.js 10.0.1 seeks once at the
-  first `play` to the end of the seekable range less the playlist's
-  `HOLD-BACK`, or less three target durations. It ignores HLS.js's live
-  position, which the engine sets, and the adapter cannot see or stop the
-  seek. Two peers on the USP DVR stream (3 s segments): with `autoplay`, they
-  played 55–56 s from the edge and took 34 of 72 segments over P2P; without
-  it, 10–12 s from the edge, every request was urgent, and 2 of 62 came over
-  P2P. On a low-latency playlist, the same seek uses `PART-HOLD-BACK` with
-  `lowLatencyMode` off, and moved the player to 2.17 s from the edge, where
-  HLS.js's own position was 5.75 s. The demo sets `autoplay`, and
-  [specs/player-adapters.md](specs/player-adapters.md) tells integrators to.
-  The fix belongs in Video.js, and is proposed in
-  [videojs/video.js#9409](https://github.com/videojs/video.js/pull/9409):
-  seek to HLS.js's `liveSyncPosition`. Tested in this demo, it kept two peers
-  57–61 s from the edge with 31 of 64 segments over P2P.
 - **Peers sometimes lose their connection** in a test, and with no retry by
   design a short test then ends without a peer. A rerun of release test 7
   with the tracker log made 40 joins, each with a peer within 15 s, and no

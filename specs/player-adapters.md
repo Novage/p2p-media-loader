@@ -292,14 +292,18 @@ the playlist loader, by which time the adapter has its instance. Playback
 should be pinned to MSE (`preferPlayback`): native HLS on Safari would bypass
 HLS.js and with it the core. The demo's `videojs10_hls` player is this.
 
-v10 runs its own HLS.js, 1.6.7 in v10.0.1, which is why the delay is set
-before HLS.js reads the playlist (above). And on a live stream, when the video
-element has no `autoplay`, v10 seeks once at the first `play` to the end of
-the seekable range less the playlist's `HOLD-BACK`, or less three target
-durations: its own live edge, which does not read HLS.js's latency, and so
-places the player near the edge again. That is v10's choice, not one the
-adapter can see; an integration that wants the player placed for P2P sets
-`autoplay` on the element, as the demo does.
+v10 runs its own HLS.js — 1.6.7 in v10.0.1, 1.7.3 in v10.3.0 — which is why
+the delay is set before HLS.js reads the playlist (above). And on a live
+stream, when the video element has no `autoplay`, v10 seeks once at the first
+`play`. From v10.3.0 it seeks to HLS.js's `liveSyncPosition`, the position the
+engine sets, and only when the player is behind it, so the player is placed for
+P2P with `autoplay` or without it: two peers on the USP DVR stream played
+59–61 s from the edge without it, and took about half of their segments over
+P2P. Before v10.3.0 it seeks to the end of the seekable range less the
+playlist's `HOLD-BACK`, or less three target durations, which places the player
+near the edge again; the adapter cannot see or stop that seek, and an
+integration on such a version sets `autoplay` on the element, as the demo
+does.
 
 **Hosted in a player built on HLS.js.** MediaElement, Clappr, OpenPlayer and
 players like them choose between HLS.js and the browser's own HLS playback
