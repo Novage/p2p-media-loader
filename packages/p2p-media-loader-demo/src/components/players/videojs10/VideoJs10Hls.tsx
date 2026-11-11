@@ -98,6 +98,11 @@ const P2PHlsVideo = ({
       src: streamUrl,
       // Native HLS on Safari would bypass HLS.js, and with it the core.
       preferPlayback: PlaybackTypes.MSE,
+      // Video.js 10 caps the rendition by the size the player is rendered
+      // at, so in a small window it picks a lower one than raw HLS.js does
+      // and shares with none of them: a rendition is a swarm. Every engine
+      // in this demo chooses on bandwidth alone.
+      capRenditionToPlayerSize: false,
       engine: { hlsJs: engine.getConfigForHlsJs() as P2PLoaders },
     });
   });
