@@ -27,6 +27,35 @@ export const subscribeToUiEvents = ({
   }
 };
 
+/**
+ * While the quality selector is on Auto, its first option names the quality
+ * on screen: "Auto (720p)". The height comes from the video element, so the
+ * label changes when the new quality plays, not when the player starts to
+ * download it. Returns a function that updates the label, for after the
+ * options are rebuilt, and one that removes the listeners.
+ */
+export const showPlayingQuality = (
+  select: HTMLSelectElement,
+  video: HTMLVideoElement,
+  autoValue: string,
+) => {
+  const update = () => {
+    const auto = select.options.item(0);
+    if (!auto) return;
+    auto.text =
+      select.value === autoValue && video.videoHeight
+        ? `Auto (${video.videoHeight}p)`
+        : "Auto";
+  };
+  video.addEventListener("resize", update);
+  select.addEventListener("change", update);
+  const dispose = () => {
+    video.removeEventListener("resize", update);
+    select.removeEventListener("change", update);
+  };
+  return { update, dispose };
+};
+
 interface VideoElementsOptions {
   videoId?: string;
   videoClassName?: string;

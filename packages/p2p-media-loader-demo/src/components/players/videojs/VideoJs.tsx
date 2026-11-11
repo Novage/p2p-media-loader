@@ -8,7 +8,7 @@ import {
   type VideoJsTechLike,
 } from "p2p-media-loader-videojs";
 import { PlayerProps } from "../../../types";
-import { subscribeToUiEvents } from "../utils";
+import { showPlayingQuality, subscribeToUiEvents } from "../utils";
 
 const AUTO_QUALITY = "auto";
 
@@ -68,6 +68,12 @@ export const VideoJs = ({
     engine.bindPlayer(player);
 
     const qualityElement = qualityRef.current;
+    // Video.js keeps the element it was given as its tech's video element.
+    const playingQuality = showPlayingQuality(
+      qualityElement,
+      videoElement,
+      AUTO_QUALITY,
+    );
     const representations = () =>
       (
         player.tech(true) as unknown as VideoJsTechLike
@@ -137,6 +143,7 @@ export const VideoJs = ({
       }
       qualityElement.value = chosen;
       applyChoice();
+      playingQuality.update();
     };
     const onQualityChange = () => {
       chosen = qualityElement.value;
@@ -162,6 +169,7 @@ export const VideoJs = ({
         player.off(event, updateQualityOptions);
       }
       qualityElement.removeEventListener("change", onQualityChange);
+      playingQuality.dispose();
       engine.destroy();
       player.dispose();
     };

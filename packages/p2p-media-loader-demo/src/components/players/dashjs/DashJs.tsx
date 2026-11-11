@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { MediaPlayer, type MediaPlayerClass } from "dashjs";
 import { DashJsP2PEngine } from "p2p-media-loader-dashjs";
 import { PlayerProps } from "../../../types";
-import { subscribeToUiEvents } from "../utils";
+import { showPlayingQuality, subscribeToUiEvents } from "../utils";
 
 const AUTO_QUALITY = "auto";
 
@@ -33,6 +33,11 @@ export const DashJs = ({
     });
 
     const qualityElement = qualityRef.current;
+    const playingQuality = showPlayingQuality(
+      qualityElement,
+      videoRef.current,
+      AUTO_QUALITY,
+    );
     const updateQualityOptions = () => {
       const representations = player.getRepresentationsByType("video");
       if (representations.length < 2) {
@@ -46,6 +51,7 @@ export const DashJs = ({
         const label = `${r.height}p (${Math.round(r.bandwidth / 1000)}k)`;
         qualityElement.add(new Option(label, r.id));
       }
+      playingQuality.update();
     };
     const onQualityChange = () => {
       const auto = qualityElement.value === AUTO_QUALITY;
@@ -69,6 +75,7 @@ export const DashJs = ({
 
     return () => {
       qualityElement.removeEventListener("change", onQualityChange);
+      playingQuality.dispose();
       player.off("streamInitialized", updateQualityOptions);
       engine.destroy();
       player.reset();
