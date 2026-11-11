@@ -199,8 +199,11 @@ of the integration's own:
 - **`@id`s that differ per viewer**, in an MPD made for each session.
 - **Ads that differ per viewer under the content's `@id`s:** viewers who get
   different ads hold different bytes at one presentation time in one swarm. A
-  builder must keep the ads' Representations apart, or the integration must
-  give each session its own `swarmId`.
+  builder must keep the ads' Representations apart, or a `segmentFilter` must
+  keep the ad segments off P2P, or the integration must give each session
+  its own `swarmId`. Where ads of different lengths shift the content's
+  presentation times, only a `swarmId` for each session helps: the content
+  segments then have different IDs per viewer.
 
 An MPD whose Representations have no `@id` is invalid, and `mpd-parser` merges
 them into one playlist; it is not supported.

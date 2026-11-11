@@ -6,8 +6,10 @@ import {
   Parser,
   type M3u8Manifest,
   type M3u8PlaylistAttributes,
+  type M3u8Segment,
 } from "m3u8-parser";
 import type {
+  HlsSegmentMarkers,
   ManifestParser,
   ParsedManifest,
   ParsedSegment,
@@ -52,6 +54,12 @@ export const hlsManifestParser: ManifestParser = {
 
   parse(text, url) {
     const parser = new Parser();
+    // m3u8-parser reads `#EXT-X-CUE-OUT` and `#EXT-X-CUE-OUT-CONT` only with a
+    // value after a colon; packagers also write them bare.
+    parser.addTagMapper({
+      expression: /^#EXT-X-CUE-OUT(-CONT)?$/,
+      map: (line) => `${line}:`,
+    });
     parser.push(text);
     parser.end();
     const { manifest } = parser;
@@ -212,24 +220,42 @@ function variantAttributes(a: M3u8PlaylistAttributes): VideoAttributes {
   };
 }
 
+/**
+ * The tags before a segment that can mark an ad break, or `undefined` where
+ * there are none. A cue's value can be empty (`#EXT-X-CUE-IN`), so presence
+ * is told by `undefined`, not by truth.
+ */
+function markersOf(s: M3u8Segment): HlsSegmentMarkers | undefined {
+  const { discontinuity = false, cueOut, cueOutCont, cueIn } = s;
+  if (
+    !discontinuity &&
+    cueOut === undefined &&
+    cueOutCont === undefined &&
+    cueIn === undefined
+  ) {
+    return undefined;
+  }
+  return { discontinuity, cueOut, cueOutCont, cueIn };
+}
+
 function mediaStream(manifest: M3u8Manifest, url: string): ParsedStream {
   const mediaSequence = manifest.mediaSequence ?? 0;
+  const parsedSegments = manifest.segments ?? [];
 
   // Partial segments and preload hints are present on the parse but are never
   // emitted: nothing at the live edge is shareable.
-  const segments: ParsedSegment[] = (manifest.segments ?? []).map(
-    (s, index) => ({
-      url: resolveUrl(s.uri, url),
-      byteRange: byteRangeFromOffsetLength(s.byterange),
-      duration: s.duration,
-      sequence: mediaSequence + index,
-      programDateTime: s.programDateTime,
-    }),
-  );
+  const segments: ParsedSegment[] = parsedSegments.map((s, index) => ({
+    url: resolveUrl(s.uri, url),
+    byteRange: byteRangeFromOffsetLength(s.byterange),
+    duration: s.duration,
+    sequence: mediaSequence + index,
+    programDateTime: s.programDateTime,
+    hls: markersOf(s),
+  }));
 
   // The parser hands every segment a map applies to the same object, so each
   // is resolved once rather than once per segment.
-  const maps = new Set((manifest.segments ?? []).map((s) => s.map));
+  const maps = new Set(parsedSegments.map((s) => s.map));
   const initSegments: ParsedInitSegment[] = [];
   for (const map of maps) {
     if (!map) continue;

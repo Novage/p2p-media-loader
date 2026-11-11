@@ -90,12 +90,12 @@ export interface SegmentStorage {
   ): Promise<void>;
 
   /**
-   * Tells the storage that segments of a stream are no longer listed by the
-   * stream's manifest: a live window has moved past them. Nothing can request
-   * such a segment again — the core matches every request through the
-   * segments the manifests list, and a peer asks only for what its own
-   * manifest lists — so a storage may drop it at once, wherever the position
-   * is. That is what keeps the storage of a paused live player bounded by the
+   * Tells the storage that segments left a stream: its manifest no longer
+   * lists them, as when a live window has moved past them, or its
+   * `segmentFilter` now keeps them off P2P. While they stay so, nothing can
+   * request them — the core matches every request through the segments of
+   * its streams, and a peer asks only for what its own stream holds — so a
+   * storage may drop them at once, wherever the position is. That is what keeps the storage of a paused live player bounded by the
    * window while the player goes on fetching its share for its peers.
    *
    * Optional. A storage without it keeps such segments until its own rules

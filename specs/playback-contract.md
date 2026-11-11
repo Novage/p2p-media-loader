@@ -436,11 +436,12 @@ which is sized for requests and can be as short as one segment. Both values
 sit on the manifest timeline, which is what keeps the comparison valid, and is
 why neither of them is `video.currentTime`.
 
-The store is also told, through `onSegmentsRemoved`, when a refreshed manifest
-no longer lists segments of a stream: a live window has moved past them.
-Nothing can request such a segment again. The core matches every request
-through the segments the manifests list, and a peer asks only for what its own
-manifest lists, so a stored copy can never be served. The store may drop it at
+The store is also told, through `onSegmentsRemoved`, when segments leave a
+stream: a refreshed manifest no longer lists them, as when a live window has
+moved past them, or a `segmentFilter` now keeps them off P2P. While they stay
+so, nothing can request such a segment. The core matches every request
+through the segments of its streams, and a peer asks only for what its own
+stream holds, so a stored copy can never be served. The store may drop it at
 once, wherever the position is, and the bundled one does. The trailing window
 alone is not enough for a paused player: its position does not move, so every
 segment ends after it, and on a live stream with peers the core goes on

@@ -27,6 +27,31 @@ describe("swarm identity config", () => {
     expect(config.secondaryStream.streamIdBuilder).toBe(secondaryBuilder);
   });
 
+  it("passes segmentFilter to both streams, or to one", () => {
+    const filter = () => true;
+    const both = new Core({ segmentFilter: filter }).getConfig();
+    expect(both.mainStream.segmentFilter).toBe(filter);
+    expect(both.secondaryStream.segmentFilter).toBe(filter);
+
+    const mainOnly = new Core({
+      mainStream: { segmentFilter: filter },
+    }).getConfig();
+    expect(mainOnly.mainStream.segmentFilter).toBe(filter);
+    expect(mainOnly.secondaryStream.segmentFilter).toBeUndefined();
+  });
+
+  it("ignores segmentFilter in dynamic config updates", () => {
+    const filter = () => true;
+    const core = new Core({ segmentFilter: filter });
+    core.applyDynamicConfig({
+      segmentFilter: () => false,
+      mainStream: { segmentFilter: () => false },
+    } as DynamicCoreConfig);
+    const config = core.getConfig();
+    expect(config.mainStream.segmentFilter).toBe(filter);
+    expect(config.secondaryStream.segmentFilter).toBe(filter);
+  });
+
   it("ignores swarmId and streamIdBuilder in dynamic config updates", () => {
     const builder = () => "key";
     const core = new Core({

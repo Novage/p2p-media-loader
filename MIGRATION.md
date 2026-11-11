@@ -338,6 +338,11 @@ the position of its own type, as the bundled storage does (see
 - Bundles: `p2p-media-loader-core.es.min.js` carries both parsers;
   `-hls` and `-dash` variants carry one.
 - `httpFirstByteTimeoutMs` stream option — see "HTTP timeouts" above.
+- `segmentFilter` stream option — keeps chosen segments, such as personalised
+  ads, off P2P; the player loads them itself. It receives the segment's URL,
+  byte range, stream, times, and the HLS and DASH markers of an ad break
+  (`HlsSegmentMarkers`, `DashSegmentMarkers`). See "Keeping segments off P2P"
+  in the API documentation.
 - For integrators who bundle the npm packages themselves:
   `p2p-media-loader-core/shims/xmldom`, the browser's `DOMParser`, to alias
   `@xmldom/xmldom` to, and the `__P2PML_DIAGNOSTICS__` define, which removes

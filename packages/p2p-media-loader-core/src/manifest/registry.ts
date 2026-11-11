@@ -1,6 +1,8 @@
+import debug from "debug";
 import type {
   ByteRange,
   ManifestStreamInfo,
+  SegmentFilterContext,
   StreamProperties,
   StreamType,
 } from "../types.js";
@@ -38,6 +40,13 @@ type RegistrySegment = {
   readonly externalId: number;
   readonly startTime: number;
   readonly endTime: number;
+  /**
+   * False for a segment the `segmentFilter` keeps off P2P. It is part of the
+   * stream all the same — its timeline, its live window, its segment count —
+   * but the core does not take it into its streams: the player loads it over
+   * HTTP.
+   */
+  readonly shared: boolean;
 };
 
 export type RegistryStream = {
@@ -146,6 +155,16 @@ function nonStreamSegmentsOf(
 
 export class ManifestRegistry {
   private readonly streams = new Map<string, MutableStream>();
+  private readonly logger = debug("p2pml-core:registry");
+
+  /**
+   * @param segmentFilter - Decides whether a segment is shared, each time a
+   * manifest lists it; a segment it keeps off P2P is passed through. The core
+   * passes the stream type's `segmentFilter`.
+   */
+  constructor(
+    private readonly segmentFilter?: (context: SegmentFilterContext) => boolean,
+  ) {}
   /**
    * Playlists a master named as carrying no video or audio — subtitle
    * renditions, I-frame playlists — by URL with the query stripped. A media
@@ -273,11 +292,11 @@ export class ManifestRegistry {
   /**
    * Whether this key is a segment the core recognises and does not share,
    * so that a request for it passes through without a registry miss, like
-   * one for an initialization segment. Two kinds: a segment a manifest lists
+   * one for an initialization segment. Three kinds: a segment a manifest lists
    * outside any stream — of a subtitle or I-frame playlist, or of a DASH text
-   * AdaptationSet or trick-mode Representation — and a DASH segment of a
-   * stream that is too short for an ID of its own (`sharesId`). See
-   * specs/manifest-registry.md.
+   * AdaptationSet or trick-mode Representation — a DASH segment of a stream
+   * that is too short for an ID of its own (`sharesId`), and a segment the
+   * `segmentFilter` keeps off P2P. See specs/manifest-registry.md.
    */
   isPassThroughSegment(key: string): boolean {
     const file = fileOfSegmentKey(key);
@@ -285,7 +304,12 @@ export class ManifestRegistry {
       if (ranges.has(key) || files.has(file)) return true;
     }
     for (const stream of this.streams.values()) {
-      if (stream.unshared.has(key)) return true;
+      if (
+        stream.unshared.has(key) ||
+        stream.segments.get(key)?.shared === false
+      ) {
+        return true;
+      }
     }
     return false;
   }
@@ -335,6 +359,7 @@ export class ManifestRegistry {
       // offset is applied; that is an identity decision, recorded in
       // specs/segment-identity.md, and changing it is a protocol bump.
       let presentationTime = source.periodStart;
+      const dash = { periodStart: source.periodStart };
       for (const reference of sidx.references) {
         const duration = reference.subsegmentDuration / sidx.timescale;
         // A reference to a subordinate index is not a segment, but its bytes
@@ -350,6 +375,7 @@ export class ManifestRegistry {
           duration,
           sequence: segments.length,
           presentationTime,
+          dash,
         });
         start += reference.referencedSize;
         presentationTime += duration;
@@ -523,25 +549,34 @@ export class ManifestRegistry {
 
     segments.forEach((s, i) => {
       const key = segmentKey(s.url, s.byteRange);
-      const startTime = times[i];
       if (protocol === "dash" && !sharesId(s)) {
-        if (!stream.unshared.has(key)) {
+        if (!stream.unshared.has(key) && !unshared.has(key)) {
           diagnostics?.count("Segment:unshared-too-short");
         }
         unshared.add(key);
+        next.delete(key);
         return;
       }
+      if (unshared.has(key)) return;
+      const startTime = times[i];
+      const endTime = startTime + s.duration;
+      // A key listed twice is shared only if no listing keeps it off P2P;
+      // its last listing is where it sits.
+      const listedOff = next.get(key)?.shared === false;
+      const noted = listedOff || stream.segments.get(key)?.shared === false;
+      const passes = this.passesFilter(stream, s, noted, startTime, endTime);
       next.set(key, {
         key,
         url: s.url,
         byteRange: s.byteRange,
         externalId: externalIdOf(s, protocol),
         startTime,
-        endTime: startTime + s.duration,
+        endTime,
+        shared: passes && !listedOff,
       });
     });
 
-    // Every segment a stream shares has an ID of its own: the store and the
+    // Every segment of a stream has an ID of its own: the store and the
     // peers know a segment by it, so a repeat is a defect in how IDs are
     // made. Reported when one of the two is new, once, since a live refresh
     // lists the same segments again and again. Only while the ledger records:
@@ -576,6 +611,43 @@ export class ManifestRegistry {
     stream.unshared = unshared;
 
     return { ...describe(stream), added, removed };
+  }
+
+  /**
+   * Whether the integrator's filter lets a segment be shared. It is asked
+   * each time a manifest lists the segment, and decides from the segment
+   * alone. A throw keeps the segment off P2P: a bug in the filter must not
+   * stop the manifest from being read. The counters and the log note a
+   * segment once, when it first goes off P2P.
+   */
+  private passesFilter(
+    stream: MutableStream,
+    s: ParsedSegment,
+    noted: boolean,
+    startTime: number,
+    endTime: number,
+  ): boolean {
+    if (!this.segmentFilter) return true;
+    try {
+      const shared = this.segmentFilter({
+        streamType: stream.type,
+        runtimeId: stream.key,
+        url: s.url,
+        byteRange: s.byteRange,
+        startTime,
+        endTime,
+        hls: s.hls,
+        dash: s.dash,
+      });
+      if (!shared && !noted) diagnostics?.count("Segment:filtered");
+      return shared;
+    } catch (error) {
+      if (!noted) {
+        diagnostics?.count("Segment:filter-failed");
+        this.logger("segmentFilter failed for %s: %O", s.url, error);
+      }
+      return false;
+    }
   }
 
   /**

@@ -18,6 +18,8 @@ export { runAll } from "./run-all.js";
 export * from "./types.js";
 export * from "./playback.js";
 export type {
+  DashSegmentMarkers,
+  HlsSegmentMarkers,
   ManifestClock,
   ManifestParseContext,
   ManifestParser,

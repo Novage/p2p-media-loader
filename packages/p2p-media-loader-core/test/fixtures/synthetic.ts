@@ -488,3 +488,9 @@ export const dashStreamOfTimes = (
     },
   ],
 });
+
+/** `dashStreamOfTimes` with `count` segments of 4 s each, from 0. */
+export const dashStreamOfCount = (count: number): ParsedManifest =>
+  dashStreamOfTimes(
+    Array.from({ length: count }, (_, i) => [i * 4, 4] as const),
+  );

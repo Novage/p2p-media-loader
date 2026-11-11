@@ -48,6 +48,33 @@ export type ParsedSegment = {
   readonly programDateTime?: number;
   /** DASH presentation time in seconds; stable across refreshes. */
   readonly presentationTime?: number;
+  /** HLS: the tags before the segment that can mark an ad break. */
+  readonly hls?: HlsSegmentMarkers;
+  /** DASH: the period the segment belongs to. */
+  readonly dash?: DashSegmentMarkers;
+};
+
+/**
+ * The tags before an HLS segment that can mark an ad break, as the playlist
+ * writes them. A cue's value is the text after the tag's colon, and empty
+ * where the tag has none: a bare `#EXT-X-CUE-IN` gives `cueIn: ""`. The core
+ * interprets none of them; a `segmentFilter` may.
+ */
+export type HlsSegmentMarkers = {
+  /** `EXT-X-DISCONTINUITY` before the segment. */
+  readonly discontinuity: boolean;
+  /** `EXT-X-CUE-OUT`: an ad break starts here. */
+  readonly cueOut?: string;
+  /** `EXT-X-CUE-OUT-CONT`: inside an ad break. */
+  readonly cueOutCont?: string;
+  /** `EXT-X-CUE-IN`: the ad break ended before this segment. */
+  readonly cueIn?: string;
+};
+
+/** The DASH period a segment belongs to. */
+export type DashSegmentMarkers = {
+  /** Where the period starts on the presentation timeline, in seconds. */
+  readonly periodStart: number;
 };
 
 /** Where a segment is: its URL, and its byte range where it is part of a file. */

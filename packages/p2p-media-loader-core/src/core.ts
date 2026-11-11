@@ -94,6 +94,18 @@ const OBSOLETE_CONFIG_KEYS: Readonly<
   },
 };
 
+/**
+ * Stream config keys that cannot change at runtime: stream identity, read
+ * once when a stream is registered, and the segment filter, read once when
+ * the registry is made.
+ */
+const STATIC_ONLY_KEYS = [
+  "swarmId",
+  "streamIdBuilder",
+  "segmentFilter",
+] as const;
+type StaticOnlyKey = (typeof STATIC_ONLY_KEYS)[number];
+
 /** Core class for managing media streams loading via P2P. */
 export class Core {
   /**
@@ -145,6 +157,7 @@ export class Core {
     httpRequestSetup: undefined,
     swarmId: undefined,
     streamIdBuilder: undefined,
+    segmentFilter: undefined,
     p2pMaxPeers: 50,
     p2pChurnMaxPeersMultiplier: 1.5,
     p2pChurnCleanupIntervalMs: 30000,
@@ -214,7 +227,7 @@ export class Core {
     aborted: boolean;
   }>();
   private readonly manifestParsers: readonly ManifestParser[];
-  private manifestRegistry = new ManifestRegistry();
+  private manifestRegistry: ManifestRegistry;
   private readonly manifestLogger = debug("p2pml-core:manifest");
   private readonly registryMissLogger = debug("p2pml-core:registry-miss");
   /**
@@ -267,6 +280,7 @@ export class Core {
       baseConfig: filteredConfig,
       specificStreamConfig: filteredConfig.secondaryStream,
     });
+    this.manifestRegistry = this.createManifestRegistry();
 
     this.peerId = generatePeerId(
       this.commonCoreConfig.trackerClientVersionPrefix,
@@ -759,13 +773,17 @@ export class Core {
     // its window.
     const left = new Set<number>();
     for (const [key, segment] of stream.segments) {
-      if (!registryStream.segments.has(key)) {
+      if (!registryStream.segments.get(key)?.shared) {
         stream.segments.delete(key);
         left.add(segment.externalId);
         changed = true;
       }
     }
     for (const [key, segment] of registryStream.segments) {
+      // A segment the segmentFilter keeps off P2P is the player's alone: it
+      // is never downloaded, stored or announced, and leaves storage if it
+      // was there.
+      if (!segment.shared) continue;
       left.delete(segment.externalId);
       if (stream.segments.has(key)) continue;
       stream.segments.set(key, {
@@ -806,11 +824,13 @@ export class Core {
   }
 
   /**
-   * Whether a segment request resolves against the registry.
+   * Whether a segment request resolves against the core's streams.
    *
    * @param url - The URL the player is about to request.
    * @param byteRange - Its byte range, when the segment is a range of a file.
-   * @returns `true` if the registry knows the segment, otherwise `false`.
+   * @returns `true` if a stream of the core holds the segment, otherwise
+   * `false`; a segment the core passes through, such as one a
+   * `segmentFilter` keeps off P2P, is not held.
    */
   hasSegment(url: string, byteRange?: ByteRange): boolean {
     return !!StreamUtils.getSegmentFromStreamsMap(
@@ -1073,9 +1093,9 @@ export class Core {
    * `onSegmentRegistryMiss` event, so a disagreement between the core's parse
    * and the player's is observable. Initialization segments, external segment
    * indexes (see `isSegmentIndex`), the segments of subtitles and trick play,
-   * and DASH segments too short for an ID of their own (they start and end in
-   * one 100 ms unit) are recognised and passed through without a report; they
-   * are never shared.
+   * DASH segments too short for an ID of their own (they start and end in one
+   * 100 ms unit), and segments a `segmentFilter` keeps off P2P are recognised
+   * and passed through without a report; they are never shared.
    *
    * @param url - The URL the player is about to request.
    * @param byteRange - Its byte range, when the segment is a range of a file.
@@ -1084,9 +1104,9 @@ export class Core {
     const key = segmentKey(url, byteRange);
     const segment = this.findSegment(key);
     if (!segment) {
-      // Initialization segments, external indexes, the segments of subtitles
-      // and trick play, and DASH segments too short for an ID are recognised
-      // and passed through knowingly; only an unknown URL is a miss.
+      // A key the registry recognises (isInitSegment, isPassThroughSegment)
+      // or an external index passes through knowingly; only an unknown URL
+      // is a miss.
       if (
         !this.manifestRegistry.isInitSegment(key) &&
         !this.manifestRegistry.isPassThroughSegment(key) &&
@@ -1189,7 +1209,7 @@ export class Core {
     // Nothing that was waiting for the old segment storage may go on to load
     // against the new one.
     for (const starting of this.startingRequests) starting.aborted = true;
-    this.manifestRegistry = new ManifestRegistry();
+    this.manifestRegistry = this.createManifestRegistry();
     // The next source names its own time sources and keeps its own list.
     this.clockedManifest.reset();
     this.streams.clear();
@@ -1342,9 +1362,10 @@ export class Core {
     mainStream?: Partial<StreamConfig>,
     secondaryStream?: Partial<StreamConfig>,
   ) {
-    // Stream identity is derived from these properties once, at stream
-    // registration; changing them at runtime would silently desynchronize
-    // the announced swarms from the registered streams.
+    // Stream identity is decided once, at stream registration, and the
+    // segment filter is read once, when the registry is made; changing them
+    // at runtime would silently desynchronize the announced swarms from the
+    // registered streams.
     const sanitizedDynamicConfig = this.stripStaticOnlyProps(dynamicConfig);
     const sanitizedMainStream =
       mainStream && this.stripStaticOnlyProps(mainStream);
@@ -1366,25 +1387,38 @@ export class Core {
 
   private stripStaticOnlyProps<T extends object>(
     config: T,
-  ): Omit<T, "swarmId" | "streamIdBuilder"> {
-    if (!("swarmId" in config) && !("streamIdBuilder" in config)) {
-      return config;
-    }
+  ): Omit<T, StaticOnlyKey> {
+    const passed = STATIC_ONLY_KEYS.filter((key) => key in config);
+    if (!passed.length) return config;
 
     // TypeScript excludes these properties from DynamicCoreConfig, but
     // plain-JS callers can still pass them — signal instead of silently
     // ignoring the update.
     this.logger(
-      "swarmId and streamIdBuilder cannot be changed at runtime; ignoring them in the dynamic configuration update",
+      `${passed.join(", ")} cannot be changed at runtime; ignoring them in the dynamic configuration update`,
     );
 
-    const sanitized = { ...config } as T & {
-      swarmId?: unknown;
-      streamIdBuilder?: unknown;
-    };
+    const sanitized = { ...config } as T &
+      Partial<Record<StaticOnlyKey, unknown>>;
     delete sanitized.swarmId;
     delete sanitized.streamIdBuilder;
+    delete sanitized.segmentFilter;
     return sanitized;
+  }
+
+  /**
+   * A registry that asks each stream type's `segmentFilter` whether a
+   * segment is shared; with no filter configured, a registry that asks
+   * nothing. `segmentFilter` cannot change at runtime.
+   */
+  private createManifestRegistry(): ManifestRegistry {
+    const main = this.mainStreamConfig.segmentFilter;
+    const secondary = this.secondaryStreamConfig.segmentFilter;
+    if (!main && !secondary) return new ManifestRegistry();
+    return new ManifestRegistry((context) => {
+      const filter = context.streamType === "main" ? main : secondary;
+      return filter ? filter(context) : true;
+    });
   }
 
   private destroyStreamLoader(streamType: StreamType) {

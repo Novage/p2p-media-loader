@@ -98,6 +98,16 @@ describe("dashManifestParser", () => {
     expect(video.segments?.map((s) => s.duration)).toEqual([4, 4, 4, 3.5]);
   });
 
+  it("gives each segment its period's start", () => {
+    const [stream] = dashManifestParser.parse(DASH_MULTI_PERIOD, URL).streams;
+    expect(stream.segments?.map((s) => s.dash)).toEqual([
+      { periodStart: 0 },
+      { periodStart: 0 },
+      { periodStart: 20 },
+      { periodStart: 20 },
+    ]);
+  });
+
   it("keeps presentation time global across periods", () => {
     // Identity must not restart at a period boundary; see segment-identity.md.
     const [video] = dashManifestParser.parse(DASH_MULTI_PERIOD, URL).streams;

@@ -19,6 +19,7 @@ node_modules
 /packages/*/dist-ssr
 *.local
 *.tgz
+*.tsbuildinfo
 
 # Editor directories and files
 .vscode/*

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ManifestRegistry } from "../src/manifest/registry.js";
 import { hlsManifestParser } from "../src/manifest/hls.js";
 import { dashManifestParser } from "../src/manifest/dash.js";
-import { Core } from "../src/index.js";
+import { Core, type SegmentFilterContext } from "../src/index.js";
 import type { SidxBox } from "../src/manifest/mp4-sidx.js";
 import { segmentKey } from "../src/manifest/url-key.js";
 import {
@@ -10,6 +10,7 @@ import {
   DASH_SEGMENT_TEMPLATE,
   DASH_WITH_TEXT_IMAGE_AND_TRICK_MODE,
   ANGEL_ONE_MPD_URL,
+  DASH_MULTI_PERIOD,
   HLS_LIVE_NO_PDT_REFRESH_1,
   HLS_LIVE_NO_PDT_REFRESH_2,
   HLS_MASTER_WITH_AUDIO,
@@ -20,6 +21,7 @@ import {
   IVS_MASTER_URL,
   MUX_720P_URL,
   MUX_MASTER_URL,
+  dashStreamOfCount,
   dashStreamOfTimes,
   readFixture,
 } from "./fixtures/index.js";
@@ -576,6 +578,219 @@ s103.ts
     expect(segments.map((s) => s.startTime)).toEqual([
       0, 6, 12, 18, 24, 30, 36,
     ]);
+  });
+});
+
+describe("ManifestRegistry: segmentFilter", () => {
+  const urls = (registry: ManifestRegistry, key = "v") =>
+    Array.from(registry.getStream(key)?.segments.values() ?? [])
+      .filter((segment) => segment.shared)
+      .map((segment) => segment.url.split("/").pop());
+  const v = (i: number) => `https://cdn.example/dash/v-${i}.m4s`;
+
+  it("passes through a segment the filter keeps off P2P", () => {
+    const registry = new ManifestRegistry(({ url }) => url !== v(1));
+    const { updates } = registry.apply(dashStreamOfCount(3));
+    expect(urls(registry)).toEqual(["v-0.m4s", "v-2.m4s"]);
+    // It is part of the stream all the same: the live window a player is
+    // placed by counts it.
+    expect(updates[0]).toMatchObject({ start: 0, end: 12, segmentCount: 3 });
+    expect(registry.isPassThroughSegment(segmentKey(v(1)))).toBe(true);
+    expect(registry.isPassThroughSegment(segmentKey(v(0)))).toBe(false);
+  });
+
+  it("asks each time a manifest lists a segment, and follows a changed answer", () => {
+    // A stateless filter: the core keeps no decision, so a segment whose
+    // facts change is judged anew.
+    let rejected = v(1);
+    const filter = vi.fn(({ url }: SegmentFilterContext) => url !== rejected);
+    const registry = new ManifestRegistry(filter);
+    registry.apply(dashStreamOfCount(3));
+    expect(urls(registry)).toEqual(["v-0.m4s", "v-2.m4s"]);
+    rejected = v(2);
+    registry.apply(dashStreamOfCount(3));
+    expect(filter).toHaveBeenCalledTimes(6);
+    expect(urls(registry)).toEqual(["v-0.m4s", "v-1.m4s"]);
+  });
+
+  it("keeps a segment listed twice off P2P when one listing is rejected", () => {
+    // A slate repeated in and after a break; either listing can be the
+    // rejected one.
+    const media = `#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-TARGETDURATION:4
+#EXT-X-MEDIA-SEQUENCE:0
+#EXTINF:4,
+c0.ts
+#EXT-X-CUE-OUT:4
+#EXTINF:4,
+slate.ts
+#EXT-X-CUE-IN
+#EXTINF:4,
+slate.ts
+`;
+    const refresh = `#EXTM3U
+#EXT-X-TARGETDURATION:4
+#EXT-X-MEDIA-SEQUENCE:10
+#EXTINF:4,
+s10.ts
+`;
+    const slate = new URL("slate.ts", MEDIA_1080).href;
+    for (const filter of [
+      ({ hls }: SegmentFilterContext) => hls?.cueOut === undefined,
+      ({ hls }: SegmentFilterContext) => hls?.cueIn === undefined,
+    ]) {
+      const registry = new ManifestRegistry(filter);
+      registry.apply(hls(media, MEDIA_1080));
+      const [stream] = registry.getStreams();
+      expect(urls(registry, MEDIA_1080)).toEqual(["c0.ts"]);
+      expect(registry.isPassThroughSegment(segmentKey(slate))).toBe(true);
+
+      // With no PDT and no sequence in common, the refresh lays out from
+      // the last listing's end: the slate after the break, 8 to 12 s.
+      registry.apply(hls(refresh, MEDIA_1080));
+      expect(Array.from(stream.segments.values(), (s) => s.startTime)).toEqual([
+        12,
+      ]);
+    }
+  });
+
+  it("keeps a segment off P2P when the filter throws", () => {
+    const registry = new ManifestRegistry(() => {
+      throw new Error("broken filter");
+    });
+    registry.apply(dashStreamOfCount(2));
+    expect(urls(registry)).toEqual([]);
+    expect(registry.isPassThroughSegment(segmentKey(v(0)))).toBe(true);
+  });
+
+  it("tells the filter what the manifest says of the segment", () => {
+    const contexts: SegmentFilterContext[] = [];
+    const capture = (context: SegmentFilterContext) => {
+      contexts.push(context);
+      return true;
+    };
+    const registry = new ManifestRegistry(capture);
+    registry.apply(hls(HLS_MEDIA_VOD_BYTERANGE, MEDIA_1080));
+    expect(contexts).toEqual([
+      {
+        streamType: "main",
+        runtimeId: MEDIA_1080,
+        url: "https://cdn.example/live/video/1080p/media.mp4",
+        byteRange: { start: 600, end: 1599 },
+        startTime: 0,
+        endTime: 6,
+        hls: undefined,
+        dash: undefined,
+      },
+      expect.objectContaining({ startTime: 6, endTime: 12 }),
+      expect.objectContaining({
+        startTime: 12,
+        endTime: 16,
+        byteRange: { start: 2800, end: 3599 },
+        hls: expect.objectContaining({ discontinuity: true }),
+      }),
+    ]);
+
+    contexts.length = 0;
+    const dash = new ManifestRegistry(capture);
+    dash.apply(
+      dashManifestParser.parse(
+        DASH_MULTI_PERIOD,
+        "https://cdn.example/dash/manifest.mpd",
+      ),
+    );
+    expect(contexts.map((c) => c.dash)).toEqual([
+      { periodStart: 0 },
+      { periodStart: 0 },
+      { periodStart: 20 },
+      { periodStart: 20 },
+    ]);
+  });
+});
+
+describe("ManifestRegistry: segmentFilter, across refreshes", () => {
+  const playlist = (first: number, count: number) =>
+    [
+      "#EXTM3U",
+      "#EXT-X-TARGETDURATION:4",
+      `#EXT-X-MEDIA-SEQUENCE:${first}`,
+      ...Array.from({ length: count }, (_, i) => [
+        "#EXTINF:4,",
+        `s${first + i}.ts`,
+      ]).flat(),
+    ].join("\n");
+
+  it("asks again about another file at an ID it has judged", () => {
+    // An ad period published late, on the grid of the content period it
+    // replaces: its segments take the content's IDs, not its decisions.
+    const registry = new ManifestRegistry(({ url }) => !url.includes("/ad-"));
+    registry.apply(dashStreamOfCount(2));
+    const ads = dashStreamOfCount(2);
+    registry.apply({
+      ...ads,
+      streams: ads.streams.map((stream) => ({
+        ...stream,
+        segments: stream.segments?.map((segment) => ({
+          ...segment,
+          url: segment.url.replace("/v-", "/ad-"),
+        })),
+      })),
+    });
+    const segments = [...(registry.getStream("v")?.segments.values() ?? [])];
+    expect(segments.map((segment) => segment.shared)).toEqual([false, false]);
+  });
+
+  it("lays a refresh after a gap out from a filtered last segment", () => {
+    // HLS without PDT: with no sequence number in common, the next refresh
+    // goes on from the end of the last one, which the filter kept off P2P.
+    const registry = new ManifestRegistry(({ url }) => !url.includes("s13.ts"));
+    registry.apply(hls(playlist(10, 4), MEDIA_1080));
+    registry.apply(hls(playlist(20, 2), MEDIA_1080));
+    const [first] = registry.getStream(MEDIA_1080)?.segments.values() ?? [];
+    expect(first).toMatchObject({ externalId: 20, startTime: 16 });
+  });
+
+  it("shares a segment that was too short for an ID and is not any more", () => {
+    // A live period whose end moved later: v-1 first had 40 ms, then 4 s.
+    const registry = new ManifestRegistry(() => true);
+    registry.apply(
+      dashStreamOfTimes([
+        [0, 4],
+        [4, 0.04],
+      ]),
+    );
+    registry.apply(
+      dashStreamOfTimes([
+        [0, 4],
+        [4, 4],
+      ]),
+    );
+    expect(registry.getStream("v")?.segments.size).toBe(2);
+  });
+
+  it("tells the filter the period start of a SegmentBase subsegment", () => {
+    const contexts: SegmentFilterContext[] = [];
+    const registry = new ManifestRegistry((context) => {
+      contexts.push(context);
+      return true;
+    });
+    registry.apply(dashManifestParser.parse(DASH_SEGMENT_BASE, MASTER));
+    registry.resolveExternalIndex(
+      "https://cdn.example/live/video.mp4",
+      { start: 700, end: 1500 },
+      {
+        boxOffset: 0,
+        boxSize: 100,
+        timescale: 1,
+        earliestPresentationTime: 0,
+        firstOffset: 0,
+        references: [
+          { referenceType: 0, referencedSize: 500, subsegmentDuration: 2 },
+        ],
+      },
+    );
+    expect(contexts.map((c) => c.dash)).toEqual([{ periodStart: 0 }]);
   });
 });
 

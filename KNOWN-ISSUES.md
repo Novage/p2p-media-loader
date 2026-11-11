@@ -10,6 +10,25 @@ The tests themselves are in
 
 ## Open
 
+- **A segment that a `segmentFilter` accepts again goes to the end of its
+  stream's list in the core.** The core keeps a stream's segments in the
+  order they were added. The registry keeps a rejected segment in its place,
+  but the core takes it into its stream only when the filter accepts it, and
+  then adds it after the live edge. The download queue then reaches it last,
+  or, when the player requests it, holds it alone. That segment gets less
+  P2P; no wrong bytes are served. Not fixed: it needs a filter whose answer
+  for one segment changes, and keeping the order needs the core's list
+  rebuilt. Found in review.
+
+- **A DASH period that starts where a zero-duration period starts loses its
+  segments.** The parser keys each period's duration by its start. A period
+  with `duration="PT0S"` before a period at the same start gives that period
+  an end equal to its start, and the clip removes all its segments. The
+  player loads them itself, with a registry miss for each. Not fixed: the
+  periods must be matched to their own Representations, not by start, which
+  needs mpd-parser's calculation of period starts. The case needs a
+  zero-duration period that has Representations. Found in review.
+
 - **A live DASH period with no `Period@duration` can give its tail's ID to the
   next period when the next period is published late.** Until the MPD lists the
   next period, the core knows no end for the last one, and `mpd-parser` gives

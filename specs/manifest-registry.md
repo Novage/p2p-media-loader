@@ -515,6 +515,18 @@ next refresh. That is correct: it is no longer live.
 - **DASH segments outside their period**, which `mpd-parser` lists past a live
   period's end — not media of the stream, and left out. A request for one is a
   registry miss.
+- **Segments the integrator's `segmentFilter` keeps off P2P** — personalised
+  ads, say — recognised and passed through. The registry asks the stream
+  type's filter each time a manifest lists a segment, with what the manifest
+  says of the segment: URL, byte range, stream, times, the HLS tags that can
+  mark an ad break, and the DASH period start. It keeps no decision, so the
+  filter decides from the segment alone, and a segment whose facts change is
+  judged anew. A throw keeps the segment off P2P too. The registry keeps a
+  rejected segment in its stream, marked as not shared: it is part of the
+  stream's timeline, live window and segment count as without a filter. The
+  core does not take it into its own stream, so the downloader, the storage
+  and the peers never see it; a segment the filter starts to reject leaves
+  the core's stream and its storage.
 - **Segments behind an external index that has not arrived** (DASH
   `SegmentBase`) — the stream is registered when the MPD is parsed; its segments
   are added when the player fetches the index, which it does before requesting

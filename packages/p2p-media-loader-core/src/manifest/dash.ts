@@ -610,6 +610,7 @@ function toStream(
       duration,
       sequence: s.number,
       presentationTime: start,
+      dash: periodStart === undefined ? undefined : { periodStart },
     });
   }
 

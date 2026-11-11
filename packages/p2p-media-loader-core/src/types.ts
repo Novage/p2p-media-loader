@@ -1,5 +1,9 @@
 import { SegmentStorage } from "./segment-storage/index.js";
-import type { ManifestParser } from "./manifest/types.js";
+import type {
+  DashSegmentMarkers,
+  HlsSegmentMarkers,
+  ManifestParser,
+} from "./manifest/types.js";
 
 /** Represents the types of streams available, either primary (main) or secondary. */
 export type StreamType = "main" | "secondary";
@@ -184,8 +188,10 @@ export type DynamicStreamProperties =
 /**
  * Represents a dynamically modifiable configuration, allowing updates to selected CoreConfig properties at runtime.
  *
- * Note that `swarmId` and `streamIdBuilder` cannot be changed at runtime:
- * stream identity is derived from them once, when a stream is registered.
+ * Note that `swarmId`, `streamIdBuilder` and `segmentFilter` cannot be
+ * changed at runtime: stream identity is decided once, when a stream is
+ * registered, and the filter that decides whether a segment is shared is
+ * the one the core was made with.
  * Of the common settings, `segmentMemoryStorageLimit` and
  * `customSegmentStorageFactory` take effect from the next segment storage the
  * core creates — on the first segment request, or the first after `destroy()`
@@ -648,6 +654,50 @@ export type StreamConfig = {
   streamIdBuilder?: (context: StreamIdBuilderContext) => string | undefined;
 
   /**
+   * An optional function that keeps chosen segments off P2P, such as
+   * personalised ads that a server inserts into a shared playlist. The core
+   * does not download a segment it rejects and never uploads it. The player
+   * loads it itself over HTTP, and no registry miss is reported.
+   *
+   * It receives what the core read about the segment from the manifest: its
+   * URL, byte range, stream and times. It also receives the tags that can
+   * mark an ad break: HLS `EXT-X-DISCONTINUITY`, `EXT-X-CUE-OUT`,
+   * `EXT-X-CUE-OUT-CONT` and `EXT-X-CUE-IN`, and the DASH period start.
+   * `true` shares the segment, and `false` keeps it off P2P. A throw keeps
+   * the segment off P2P too.
+   *
+   * It must be synchronous, and decide from the segment alone. It is asked
+   * each time a manifest lists the segment; the core keeps no decision, so a
+   * segment whose facts change is judged anew. Every peer of a swarm must
+   * decide the same way: a segment one peer shares and another does not is
+   * only shared less.
+   *
+   * A filter keeps ads off P2P; it does not make personalised playlists safe
+   * to share. Ads of different lengths can shift the content's sequence
+   * numbers or times for different viewers. Then the content segments have
+   * different IDs per viewer. One master URL must give every viewer the same
+   * streams (see specs/segment-identity.md).
+   *
+   * This property cannot be changed at runtime.
+   *
+   * @default
+   * ```typescript
+   * segmentFilter: undefined
+   * ```
+   *
+   * @example
+   * ```typescript
+   * import type { CoreConfig } from "p2p-media-loader-core";
+   *
+   * const config: CoreConfig = {
+   *   // Ads served from their own path stay off P2P.
+   *   segmentFilter: ({ url }) => !new URL(url).pathname.startsWith("/ads/"),
+   * };
+   * ```
+   */
+  segmentFilter?: (context: SegmentFilterContext) => boolean;
+
+  /**
    * An optional function to validate a P2P segment before fully integrating it into the playback buffer.
    *
    * A download that holds a peer's bytes belongs to that peer, whichever
@@ -788,6 +838,47 @@ export type StreamConfig = {
    * ```
    */
   webRtcConnectionTimeoutMs: number;
+};
+
+/** What a `segmentFilter` receives about a segment. */
+export type SegmentFilterContext = {
+  /** The type of the segment's stream. */
+  streamType: StreamType;
+
+  /**
+   * The stream key (`Stream.runtimeId`): the media playlist URL for HLS, the
+   * Representation id for DASH.
+   */
+  runtimeId: string;
+
+  /** The segment's URL, as the player will request it. */
+  url: string;
+
+  /** The segment's bytes within `url`, where it is part of a larger file. */
+  byteRange: ByteRange | undefined;
+
+  /**
+   * Where the segment starts on the stream's timeline, in seconds. For DASH
+   * and for HLS with `EXT-X-PROGRAM-DATE-TIME` every viewer has the same
+   * timeline; for HLS without it, the timeline starts where this viewer
+   * joined, so a filter that decides by time decides differently per viewer.
+   */
+  startTime: number;
+
+  /** Where the segment ends on the stream's timeline, in seconds; see `startTime`. */
+  endTime: number;
+
+  /**
+   * HLS: the tags before the segment that can mark an ad break, as written;
+   * `undefined` where there are none. Only `cueOut` and `cueOutCont` mark an
+   * ad segment by themselves. Some packagers mark a break with
+   * `EXT-X-CUE-OUT` and `EXT-X-CUE-IN` only; recognise their ads by URL.
+   * `EXT-X-DATERANGE` and `EXT-OATCLS-SCTE35` are not given.
+   */
+  hls: HlsSegmentMarkers | undefined;
+
+  /** DASH: where the segment's period starts, where known. */
+  dash: DashSegmentMarkers | undefined;
 };
 
 /** A stream of the manifest, as `StreamIdBuilderContext.manifest` lists it. */
@@ -1110,7 +1201,10 @@ export type ProcessedStream = {
   readonly start: number;
   /** End of the latest listed segment on the same timeline. */
   readonly end: number;
-  /** How many segments the core now holds for the stream. `start` and `end` are 0 when this is 0. */
+  /**
+   * How many segments the stream now lists, with those a `segmentFilter`
+   * keeps off P2P. `start` and `end` are 0 when this is 0.
+   */
   readonly segmentCount: number;
   /**
    * The live window the manifest declares, in seconds, where the span from
@@ -1173,9 +1267,9 @@ export type CoreEventMap = {
    * this event makes the disagreement between the core's manifest parse and
    * the player's observable rather than silent. Initialization segments,
    * external segment indexes (a DASH `SegmentBase` stream's `sidx` range),
-   * the segments of subtitles and trick play, and DASH segments too short for
-   * an ID of their own (they start and end in one 100 ms unit) are
-   * recognised and never reported.
+   * the segments of subtitles and trick play, DASH segments too short for an
+   * ID of their own (they start and end in one 100 ms unit), and segments a
+   * `segmentFilter` keeps off P2P are recognised and never reported.
    *
    * @param params - The URL and byte range that missed.
    */

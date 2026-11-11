@@ -354,7 +354,7 @@ To include **P2P Media Loader** in your project using npm, follow these steps:
 
      The cast is there because the project has two copies of dash.js: the
      one you installed, whose types the engine takes, and the one
-     `@videojs/dash-video` pins for itself (5.2.0 in Video.js 10.0.1).
+     `@videojs/dash-video` pins for itself (5.2.0 in Video.js 10.3.0).
      TypeScript does not accept one copy's player type as the other's. It is
      the same player either way.
 
@@ -980,11 +980,11 @@ The HLS.js and dash.js integrations therefore drive it directly, with no
     <!-- Video.js 10's media elements; pin the version you use -->
     <script
       type="module"
-      src="https://cdn.jsdelivr.net/npm/@videojs/cdn@10.0.1/media/hlsjs-video.js"
+      src="https://cdn.jsdelivr.net/npm/@videojs/cdn@10.3.0/media/hlsjs-video.js"
     ></script>
     <script
       type="module"
-      src="https://cdn.jsdelivr.net/npm/@videojs/cdn@10.0.1/media/dash-video.js"
+      src="https://cdn.jsdelivr.net/npm/@videojs/cdn@10.3.0/media/dash-video.js"
     ></script>
   </head>
   <body>
@@ -1285,3 +1285,27 @@ Streams equal in all of these values — two rungs that differ only in bitrate, 
 The builder receives the stream's `runtimeId` (the media playlist URL for HLS, the Representation id for DASH; a URL can differ from viewer to viewer, so use only a part they share), its type and properties, its `defaultStreamId`, its HLS `index`, and the `manifest` that declared it — its URL and every stream with key, type, default stream ID and properties — so that it can tell what the ID must be unique among. It returns `undefined` to keep the default.
 
 The stream ID must be deterministic and identical across all peers of a swarm, and **every distinct stream must map to a distinct ID**. Build it from properties every viewer reads alike — not `bitrate`, which an origin may recompute per request — and from enough of them: resolution alone collides on ladders with several bitrates at the same resolution. The core does not check this: two different streams with one ID are one swarm, and their peers exchange segments of the wrong stream. One rendition listed twice, for two CDNs, may take one ID: viewers on the two copies then share one swarm. A failover from one copy to the other in one player is not tested with a shared ID (see `KNOWN-ISSUES.md`). A builder that returns no usable ID fails the stream's registration (reported through the `onStreamRegistrationError` core event), and the stream plays without P2P. The builder cannot be changed at runtime. Clients can also observe each registered stream's `streamId` and `infoHash` through the `onStreamAdded` core event.
+
+## Keeping segments off P2P
+
+A `segmentFilter` keeps chosen segments off P2P: personalised ads that a server inserts into a shared playlist, for example, which one viewer must not receive from another. The core does not download a segment it rejects and never uploads it; the player loads it itself over HTTP. A segment rejected while its download is in flight can stay stored and announced until it leaves storage, but a peer that asks for it gets nothing. It is a stream option, like `streamIdBuilder`: set it at the top level for both stream types, or in `mainStream` or `secondaryStream` alone. It cannot be changed at runtime.
+
+The filter receives what the core read about the segment from the manifest: `url`, `byteRange`, `streamType`, `runtimeId` (the stream key), `startTime` and `endTime`, and the tags that can mark an ad break — for HLS, `hls.discontinuity` and the values of `EXT-X-CUE-OUT`, `EXT-X-CUE-OUT-CONT` and `EXT-X-CUE-IN` as written; for DASH, `dash.periodStart`, where the segment's period starts. It returns `true` to share the segment and `false` to keep it off P2P:
+
+```typescript
+import type { CoreConfig } from "p2p-media-loader-core";
+
+const config: CoreConfig = {
+  // Decide from the segment alone: an HLS ad segment marked by EXT-X-CUE-OUT
+  // or EXT-X-CUE-OUT-CONT, and HLS or DASH ads served from their own path,
+  // stay off P2P.
+  segmentFilter: ({ url, hls }) =>
+    hls?.cueOut === undefined &&
+    hls?.cueOutCont === undefined &&
+    !new URL(url).pathname.startsWith("/ads/"),
+};
+```
+
+The filter must be synchronous, and decide from the segment alone. It is asked each time a manifest lists a segment, and the core keeps no decision, so a segment whose facts change is judged anew. A filter that carries state from one segment to the next — "inside a break since the last EXT-X-CUE-OUT" — decides wrongly where a playlist window starts inside a break, where the player switches to another rendition, and where a stale copy of a playlist arrives from another CDN edge. A packager that marks a break with `EXT-X-CUE-OUT` and `EXT-X-CUE-IN` only, with no `EXT-X-CUE-OUT-CONT` on the segments between them, marks no ad segment but the first; for such a stream, keep the ads off P2P by their URL. The core does not give a DASH period's `id`: mpd-parser does not keep it. Recognise DASH ads by their URL, or by `dash.periodStart`. A filter that throws keeps the segment off P2P too. Every peer of a swarm should decide the same way; a segment one peer shares and another does not is only shared less. The diagnostics ledger counts the segments it keeps off P2P (`Segment:filtered`) and the segments for which it failed (`Segment:filter-failed`), each once for each URL and byte range, when the segment first goes off P2P.
+
+A filter keeps ads off P2P, but it does not make personalised playlists safe to share. Where ads of different lengths shift the content's media sequence numbers (HLS) or presentation times (DASH) for different viewers, the content segments themselves have different IDs per viewer, and peers exchange segments of the wrong content. One master URL must give every viewer the same streams; see [Predicting swarm infohashes on a server](#predicting-swarm-infohashes-on-a-server).

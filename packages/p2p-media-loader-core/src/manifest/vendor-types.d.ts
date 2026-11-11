@@ -20,6 +20,14 @@ declare module "m3u8-parser" {
     programDateTime?: number;
     timeline: number;
     map?: { uri: string; byterange?: M3u8ByteRange };
+    /** `EXT-X-DISCONTINUITY` before this segment. */
+    discontinuity?: boolean;
+    /** The value of an `EXT-X-CUE-OUT` before this segment; may be empty. */
+    cueOut?: string;
+    /** The value of an `EXT-X-CUE-OUT-CONT` before this segment; may be empty. */
+    cueOutCont?: string;
+    /** The value of an `EXT-X-CUE-IN` before this segment; may be empty. */
+    cueIn?: string;
   };
 
   export type M3u8PlaylistAttributes = {
@@ -69,6 +77,14 @@ declare module "m3u8-parser" {
     manifest: M3u8Manifest;
     push(chunk: string): void;
     end(): void;
+    /**
+     * Adds a line for each line that matches `expression`: the parser parses
+     * the original line and then the mapped one.
+     */
+    addTagMapper(mapper: {
+      expression: RegExp;
+      map: (line: string) => string;
+    }): void;
   }
 }
 

@@ -227,6 +227,57 @@ describe("stream registration from manifests", () => {
     );
   });
 
+  it("keeps the segments a stream's segmentFilter rejects off P2P, with no miss", () => {
+    // A filter on the main stream only: video stays off P2P, audio shares.
+    const onMiss = vi.fn();
+    const core = createCore({ mainStream: { segmentFilter: () => false } });
+    core.addEventListener("onSegmentRegistryMiss", onMiss);
+    const videoManifest = core.processManifest({
+      url: VIDEO_1080,
+      data: HLS_MEDIA_VOD_BYTERANGE,
+    });
+    const audioManifest = core.processManifest({
+      url: AUDIO_EN,
+      data: HLS_MEDIA_VOD_BYTERANGE,
+    });
+    const range = { start: 600, end: 1599 };
+
+    // The rejected segments are part of the stream all the same: what a
+    // player is placed by is as without a filter.
+    expect(videoManifest?.streams[0]).toMatchObject({
+      start: audioManifest?.streams[0].start,
+      end: audioManifest?.streams[0].end,
+      segmentCount: audioManifest?.streams[0].segmentCount,
+    });
+
+    const video = "https://example.com/hls/video/1080p/media.mp4";
+    expect(core.hasSegment(video, range)).toBe(false);
+    expect(core.isSegmentLoadable(video, range)).toBe(false);
+    expect(onMiss).not.toHaveBeenCalled();
+
+    const audio = "https://example.com/hls/audio/en/media.mp4";
+    expect(core.isSegmentLoadable(audio, range)).toBe(true);
+
+    // destroy() makes the registry again, with the same filter.
+    core.destroy();
+    core.processManifest({ url: MANIFEST_URL, data: HLS_MASTER_WITH_AUDIO });
+    core.processManifest({ url: VIDEO_1080, data: HLS_MEDIA_VOD_BYTERANGE });
+    expect(core.isSegmentLoadable(video, range)).toBe(false);
+  });
+
+  it("takes a segment off P2P when the segmentFilter starts to reject it", () => {
+    let rejected = false;
+    const core = createCore({ segmentFilter: () => !rejected });
+    core.processManifest({ url: VIDEO_1080, data: HLS_MEDIA_VOD_BYTERANGE });
+    const video = "https://example.com/hls/video/1080p/media.mp4";
+    const range = { start: 600, end: 1599 };
+    expect(core.isSegmentLoadable(video, range)).toBe(true);
+
+    rejected = true;
+    core.processManifest({ url: VIDEO_1080, data: HLS_MEDIA_VOD_BYTERANGE });
+    expect(core.isSegmentLoadable(video, range)).toBe(false);
+  });
+
   it("registers a stream only once and fires onStreamAdded once", () => {
     const core = new Core({ manifestParsers: [hlsManifestParser] });
     const onStreamAdded = vi.fn();

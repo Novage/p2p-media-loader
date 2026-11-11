@@ -20,6 +20,16 @@ throughout.
 
 ### Added
 
+- **A `segmentFilter` keeps chosen segments off P2P**, such as personalised
+  ads that a server inserts into a shared playlist, for every player and for
+  HLS and DASH. The core asks it about each segment, with what the manifest
+  says of the segment: URL, byte range, stream, times, the HLS
+  `EXT-X-DISCONTINUITY`, `EXT-X-CUE-OUT`, `EXT-X-CUE-OUT-CONT` and
+  `EXT-X-CUE-IN` tags, and the DASH period start. A segment it rejects is passed
+  through: the player loads it over HTTP, and the core does not download it
+  and never uploads it. A filter that throws keeps the segment off P2P. `Segment:filtered` and `Segment:filter-failed` count the outcomes.
+  Proposed for 4.x in
+  [#577](https://github.com/Novage/p2p-media-loader/pull/577).
 - **Smaller bundles for integrators who bundle the npm packages.** The core
   exports `p2p-media-loader-core/shims/xmldom`, the browser's `DOMParser`, to
   alias `@xmldom/xmldom` to in a browser build: about 23 KB gzipped less for

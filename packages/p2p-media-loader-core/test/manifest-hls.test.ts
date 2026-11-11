@@ -471,6 +471,95 @@ v.m3u8
   });
 });
 
+describe("hlsManifestParser: ad break markers", () => {
+  it("passes on the tags that can mark an ad break, as written", () => {
+    const [stream] = hlsManifestParser.parse(
+      `#EXTM3U
+#EXT-X-TARGETDURATION:4
+#EXT-X-MEDIA-SEQUENCE:10
+#EXTINF:4,
+c1.ts
+#EXT-X-CUE-OUT:8
+#EXT-X-DISCONTINUITY
+#EXTINF:4,
+ad1.ts
+#EXT-X-CUE-OUT-CONT:4/8
+#EXTINF:4,
+ad2.ts
+#EXT-X-CUE-IN
+#EXTINF:4,
+c2.ts
+`,
+      BASE,
+    ).streams;
+    expect(
+      stream.segments?.map((s) => [s.url.split("/").pop(), s.hls]),
+    ).toEqual([
+      ["c1.ts", undefined],
+      [
+        "ad1.ts",
+        {
+          discontinuity: true,
+          cueOut: "8",
+          cueOutCont: undefined,
+          cueIn: undefined,
+        },
+      ],
+      [
+        "ad2.ts",
+        {
+          discontinuity: false,
+          cueOut: undefined,
+          cueOutCont: "4/8",
+          cueIn: undefined,
+        },
+      ],
+      // A cue with no value is there all the same, also alone.
+      [
+        "c2.ts",
+        {
+          discontinuity: false,
+          cueOut: undefined,
+          cueOutCont: undefined,
+          cueIn: "",
+        },
+      ],
+    ]);
+  });
+
+  it("passes on EXT-X-CUE-OUT and EXT-X-CUE-OUT-CONT written with no value", () => {
+    const [stream] = hlsManifestParser.parse(
+      `#EXTM3U
+#EXT-X-TARGETDURATION:4
+#EXTINF:4,
+c1.ts
+#EXT-X-CUE-OUT
+#EXTINF:4,
+ad1.ts
+#EXT-X-CUE-OUT-CONT
+#EXTINF:4,
+ad2.ts
+#EXT-X-CUE-IN
+#EXTINF:4,
+c2.ts
+`,
+      BASE,
+    ).streams;
+    expect(
+      stream.segments?.map((s) => [
+        s.hls?.cueOut,
+        s.hls?.cueOutCont,
+        s.hls?.cueIn,
+      ]),
+    ).toEqual([
+      [undefined, undefined, undefined],
+      ["", undefined, undefined],
+      [undefined, "", undefined],
+      [undefined, undefined, ""],
+    ]);
+  });
+});
+
 describe("hlsManifestParser: media playlist", () => {
   it("emits segments with sequence numbers, byte ranges and the init segment", () => {
     const url = "https://cdn.example/vod/720p/index.m3u8";
@@ -508,6 +597,13 @@ describe("hlsManifestParser: media playlist", () => {
         duration: 4,
         sequence: 2,
         programDateTime: undefined,
+        // The EXT-X-DISCONTINUITY before it.
+        hls: {
+          discontinuity: true,
+          cueOut: undefined,
+          cueOutCont: undefined,
+          cueIn: undefined,
+        },
       },
     ]);
   });

@@ -203,9 +203,12 @@ the groups and the cases a reader of a snapshot must know.
   fails to register (`StreamRegistration:failed`: a `streamIdBuilder` that
   returned no usable ID or threw — see specs/segment-identity.md), each DASH
   segment left out of its stream because it starts and ends in one 100 ms
-  unit (`Segment:unshared-too-short`, once for each segment, however often a
-  refresh lists it), registry misses, evictions by reason, closed peers by cause, parses of the
-  player's manifests by result (`ManifestParse`), and clock synchronizations
+  unit (`Segment:unshared-too-short`), each segment a `segmentFilter` keeps
+  off P2P (`Segment:filtered`) and each for which it threw
+  (`Segment:filter-failed`) — these three once for each URL and byte
+  range, when it first goes off P2P (a URL with a new token is counted
+  again) — registry misses, evictions by reason, closed peers by cause,
+  parses of the player's manifests by result (`ManifestParse`), and clock synchronizations
   and re-parses by result. Each player request that the store cannot serve is
   counted by its urgency when it arrives (`SegmentRequest:urgent` and
   `:not-urgent`), and each one that waited and then became urgent
