@@ -8,17 +8,18 @@ are run against this matrix in the demo before they are considered done.
 
 ## The matrix
 
-| Protocol | Kind | Addressing                       | Stream                                                                                          | Exercises                                                                                                                                                                                                             |
-| -------- | ---- | -------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| HLS      | VOD  | media playlist, no PDT           | `https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8`                                             | media-sequence timeline anchor, `ENDLIST`, 10 s TS segments, multiple variants                                                                                                                                        |
-| HLS      | live | media playlist, PDT at the start | `https://hls-harbor-livepush.akamaized.net/live_cdn/nsqIStpj8PaG-Ev/emcQJ0pGpremocy/index.m3u8` | one 1080p variant, 5 s segments, a window of four segments: the tightest live window in the table; the demo's default for HLS players                                                                                 |
-| DASH     | VOD  | `SegmentTemplate` `$Number$`     | `https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd`                                     | presentation-time identity, many representations, separate audio                                                                                                                                                      |
-| DASH     | VOD  | `SegmentBase` (`sidx`)           | `https://storage.googleapis.com/shaka-demo-assets/angel-one/dash.mpd`                           | external segment index: MP4 renditions gain segments when the index arrives; WebM (VP9) renditions have a `Cues` index and play without P2P                                                                           |
-| DASH     | VOD  | `SegmentBase` (`sidx`)           | `https://dash.akamaized.net/dash264/TestCases/1a/netflix/exMPD_BIP_TC1.mpd`                     | external index on the main video too: four AVC renditions plus AAC, every `indexRange` holds a `sidx` followed by a `uuid` box with a non-zero `first_offset`, so segments must be anchored on the box, not the range |
-| DASH     | live | `SegmentTemplate` `$Number$`     | `https://livesim2.dashif.org/livesim2/testpic4_8s/Manifest.mpd`                                 | three video renditions (two at one resolution, told apart by bitrate) plus audio, 8 s segments, one-minute window; the demo's default for dash.js players                                                             |
-| DASH     | live | `SegmentTemplate` `$Number$`     | `https://livesim2.dashif.org/livesim2/testpic_2s/Manifest.mpd`                                  | `type="dynamic"`, MPD refresh, availability window                                                                                                                                                                    |
-| DASH     | live | `SegmentTimeline`                | `https://livesim2.dashif.org/livesim2/segtimeline_1/testpic_2s/Manifest.mpd`                    | explicit `S` timeline, `$Time$` addressing                                                                                                                                                                            |
-| HLS      | live | media playlist, DVR window       | `https://demo.unified-streaming.com/k8s/live/scte35.isml/.m3u8`                                 | a window of about ten minutes: a viewer who rewinds into it stays where they chose                                                                                                                                    |
+| Protocol | Kind | Addressing                           | Stream                                                                       | Exercises                                                                                                                                                                                                             |
+| -------- | ---- | ------------------------------------ | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| HLS      | VOD  | media playlist, no PDT               | `https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8`                          | media-sequence timeline anchor, `ENDLIST`, 10 s TS segments, multiple variants                                                                                                                                        |
+| HLS      | VOD  | media playlist, fMP4                 | `https://live.novage.workers.dev/bbb/vod.m3u8`                               | the live stream's segments as VOD: three variants, 6 s fMP4 segments, `EXT-X-PLAYLIST-TYPE:VOD`                                                                                                                       |
+| HLS      | live | media playlist, PDT on every segment | `https://live.novage.workers.dev/bbb/live.m3u8`                              | three variants (1080p, 720p, 360p), each with its audio, 6 s fMP4 segments, a 60 s window, a discontinuity at each loop of the content (every 10.5 minutes); the demo's default for HLS players                       |
+| DASH     | VOD  | `SegmentTemplate` `$Number$`         | `https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd`                  | presentation-time identity, many representations, separate audio                                                                                                                                                      |
+| DASH     | VOD  | `SegmentBase` (`sidx`)               | `https://storage.googleapis.com/shaka-demo-assets/angel-one/dash.mpd`        | external segment index: MP4 renditions gain segments when the index arrives; WebM (VP9) renditions have a `Cues` index and play without P2P                                                                           |
+| DASH     | VOD  | `SegmentBase` (`sidx`)               | `https://dash.akamaized.net/dash264/TestCases/1a/netflix/exMPD_BIP_TC1.mpd`  | external index on the main video too: four AVC renditions plus AAC, every `indexRange` holds a `sidx` followed by a `uuid` box with a non-zero `first_offset`, so segments must be anchored on the box, not the range |
+| DASH     | live | `SegmentTemplate` `$Number$`         | `https://livesim2.dashif.org/livesim2/testpic4_8s/Manifest.mpd`              | three video renditions (two at one resolution, told apart by bitrate) plus audio, 8 s segments, one-minute window; the demo's default for dash.js players                                                             |
+| DASH     | live | `SegmentTemplate` `$Number$`         | `https://livesim2.dashif.org/livesim2/testpic_2s/Manifest.mpd`               | `type="dynamic"`, MPD refresh, availability window                                                                                                                                                                    |
+| DASH     | live | `SegmentTimeline`                    | `https://livesim2.dashif.org/livesim2/segtimeline_1/testpic_2s/Manifest.mpd` | explicit `S` timeline, `$Time$` addressing                                                                                                                                                                            |
+| HLS      | live | media playlist, DVR window           | `https://demo.unified-streaming.com/k8s/live/scte35.isml/.m3u8`              | a window of about ten minutes: a viewer who rewinds into it stays where they chose                                                                                                                                    |
 
 Video.js plays every stream in the table except the two `SegmentBase` ones,
 neither of which VHS plays with P2P or without it. On the Netflix stream VHS
@@ -60,7 +61,7 @@ exercises one behaviour, on the engines that support it.
 
 | Case                                         | Stream                                                                                                          | Notes                                                                                                |
 | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Long run                                     | `https://hls-harbor-livepush.akamaized.net/live_cdn/nsqIStpj8PaG-Ev/emcQJ0pGpremocy/index.m3u8`                 | HLS live; no daily request limit, unlike `livesim2`                                                  |
+| Long run                                     | `https://live.novage.workers.dev/bbb/live.m3u8`                                                                 | HLS live; no per-IP daily request limit, unlike `livesim2`                                           |
 | Several periods                              | `https://livesim2.dashif.org/livesim2/periods_60/testpic_2s/Manifest.mpd`                                       | a new period every 60 s                                                                              |
 | A live stream that ends                      | `https://livesim2.dashif.org/livesim2/stop_<epoch seconds>/testpic_2s/Manifest.mpd`                             | the MPD becomes static at the stop time, with a duration counted from 1970                           |
 | Low-latency DASH                             | `https://livesim2.dashif.org/livesim2/chunkdur_1/ato_7/testpic4_8s/Manifest300.mpd`                             | chunked segments and `availabilityTimeOffset`                                                        |
@@ -170,10 +171,14 @@ day, which a day of two-tab live runs can reach; past it every request answers
 `429` and dash.js reports error 25, "manifest is not available". Its
 `/reqcount` says where the count stands and when it resets. The mux stream is a
 widely used public test asset.
-The Akamai live stream is a third party's live channel, and may stop as the
-Amazon IVS channel did: on 12 October 2026 the IVS channel answered `404`, and
-the Akamai stream replaced it. The Akamai stream carries
-`EXT-X-PROGRAM-DATE-TIME` only at the start of the playlist and has no signed
-rendition URLs. The IVS fixtures still cover `EXT-X-PROGRAM-DATE-TIME` on every
-segment in the unit tests. In a browser, any HLS live stream with both exercises
-those paths.
+The HLS live stream is the project's own: a Cloudflare Worker
+([Novage/live-test-streams](https://github.com/Novage/live-test-streams)) loops
+an encode of Big Buck Bunny as a live stream, with the time as its clock, so
+every viewer sees the same window. The Worker serves the live playlists, and
+Cloudflare serves the segments and the VOD playlists as static files. On the
+Worker's free plan, the live playlists of all viewers together get 100000
+requests a day, about 100 hours of one viewer; the VOD costs none. Third-party live channels
+stopped: the Amazon IVS channel answered `404` on 12 October 2026, and the
+Akamai channel that replaced it was no longer accessible in November 2026. The
+Akamai channel carried `EXT-X-PROGRAM-DATE-TIME` only at the start of the
+playlist; the unit fixtures still cover both forms.

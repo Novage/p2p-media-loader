@@ -2,8 +2,7 @@ import { describe, expect, it } from "vitest";
 import { hlsManifestParser } from "../src/manifest/hls.js";
 import { ManifestRegistry } from "../src/manifest/registry.js";
 
-const MASTER_URL =
-  "https://hls-harbor-livepush.akamaized.net/live_cdn/nsqIStpj8PaG-Ev/emcQJ0pGpremocy/index.m3u8";
+const MASTER_URL = "https://live.example/akamai/index.m3u8";
 
 /**
  * Akamai's live packager rewrites BANDWIDTH and AVERAGE-BANDWIDTH on every

@@ -16,7 +16,7 @@ import {
 
 /** The full matrix: every stream of verification.md on every engine for it. */
 export function fullSteps() {
-  const hls = [S.MUX, S.HLS_LIVE, S.DVR];
+  const hls = [S.MUX, S.HLS_VOD, S.HLS_LIVE, S.DVR];
   const dash = [S.BBB, S.ANGEL, S.NETFLIX, S.TP8, S.TP2, S.SEGTL];
   const steps = [];
   for (const u of hls) for (const p of HLS_ENGINES) steps.push({ p, u });

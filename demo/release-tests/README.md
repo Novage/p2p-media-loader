@@ -96,10 +96,10 @@ existed. Write its module from the spec the next time it runs.
 - A fault chance of 0.3–0.4 can inject nothing in a 30 s phase: a tab that
   gets most segments from its peer makes one or two HTTP requests. Check the
   fault count of each phase; `runSegmentFaults` uses 0.6.
-- Two peers on the 4×5 s Akamai stream need about 7.4 Mbit/s on one link.
-  On a slower link the run measures the network (timeouts, aborts, both tabs
-  stopped). Compare two builds on the DVR stream, where HLS.js chooses a
-  rendition that fits the link.
+- Two peers on the 1080p variant of the HLS live stream need about
+  6 Mbit/s on one link (3.1 Mbit/s each on average). On a slower link HLS.js
+  moves them to 720p or 360p: compare two builds only on samples of one
+  rendition.
 - Keep tab B as a same-origin iframe in tab A, fixed to the lower half of
   the page: both pages are then visible, and a reload of tab A removes it,
   so add it again after each reload.

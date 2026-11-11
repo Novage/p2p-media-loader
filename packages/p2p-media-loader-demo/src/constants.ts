@@ -19,8 +19,7 @@ export const PLAYERS = {
 } as const;
 // The live streams specs/verification.md lists. Every variant a master
 // advertises has to exist, or the player errors on startup.
-export const DEFAULT_STREAM =
-  "https://hls-harbor-livepush.akamaized.net/live_cdn/nsqIStpj8PaG-Ev/emcQJ0pGpremocy/index.m3u8";
+export const DEFAULT_STREAM = "https://live.novage.workers.dev/bbb/live.m3u8";
 // Three video renditions, so quality switching can be exercised on live DASH.
 const DEFAULT_DASH_STREAM =
   "https://livesim2.dashif.org/livesim2/testpic4_8s/Manifest.mpd";

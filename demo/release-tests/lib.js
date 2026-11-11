@@ -31,8 +31,8 @@ export const median = (values) => {
 export const STREAMS = {
   // HLS
   MUX: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
-  HLS_LIVE:
-    "https://hls-harbor-livepush.akamaized.net/live_cdn/nsqIStpj8PaG-Ev/emcQJ0pGpremocy/index.m3u8",
+  HLS_VOD: "https://live.novage.workers.dev/bbb/vod.m3u8",
+  HLS_LIVE: "https://live.novage.workers.dev/bbb/live.m3u8",
   DVR: "https://demo.unified-streaming.com/k8s/live/scte35.isml/.m3u8",
   // DASH
   BBB: "https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd",

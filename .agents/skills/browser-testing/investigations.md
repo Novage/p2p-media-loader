@@ -10,9 +10,10 @@ two tabs, a swarm of the check's own, visible pages, faults from
 How many copies of each segment the two peers took from the origin, and
 whether the election ran.
 
-- Use the tight HLS live stream of
-  [verification.md](../../../specs/verification.md) (four 5 s segments): it
-  leaves the least room, so a regression shows first.
+- Use the HLS live stream of
+  [verification.md](../../../specs/verification.md) (6 s segments, a 60 s
+  window). Its window leaves peers about 39 s; a regression in room shows
+  less sharply than on a window of a few segments.
 - Count HTTP downloads per segment over both tabs, from the hybrid loader's
   log (`p2pml-core:hybrid-loader-main`) or the ledger's download counters, and
   the "as owner" and "as backup #n" lines. Two peers that share well take
