@@ -28,13 +28,13 @@
     "globals": "^17.14.0",
     "jiti": "^2.7.0",
     "jscpd": "^5.4.3",
-    "knip": "^6.44.2",
-    "prettier": "^3.9.10",
+    "knip": "^6.45.1",
+    "prettier": "^3.10.1",
     "rimraf": "^6.1.4",
     "typedoc": "^0.28.20",
     "typedoc-material-theme": "^1.4.1",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.72.1",
-    "vite": "^8.3.6"
+    "typescript-eslint": "^8.72.2",
+    "vite": "^8.3.8"
   }
 }
