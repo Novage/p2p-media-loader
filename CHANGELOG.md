@@ -411,6 +411,12 @@ These predate 5.0.0 and affect 4.x deployments as well.
   d3-transition, whose import adds `transition()` to selections. The demo now
   imports d3-transition itself. A development server bundles nothing and
   showed no error.
+- The demo's chart legend showed the HTTP rate as the total download rate.
+  The total now adds the P2P rate.
+- The demo's chart divided the bytes of each sample by 1 second. A hidden tab
+  can run the timer once per minute, so the chart showed rates up to 60 times
+  too high. The chart now divides a late sample by the measured time since
+  the previous sample.
 
 ## 4.0.0
 
