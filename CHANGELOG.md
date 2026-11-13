@@ -405,6 +405,12 @@ These predate 5.0.0 and affect 4.x deployments as well.
   made the offer started only when the answer arrived. A slow tracker thus made
   the answering peer give up first, while the connection was still forming.
   The answering peer now waits 5 seconds more than `webRtcConnectionTimeoutMs`.
+- The demo's peer network chart stopped the demo in a production build with
+  d3 7.9.1 or later: `selection.transition is not a function`. That release
+  declares the `d3` package free of side effects, so the bundler dropped
+  d3-transition, whose import adds `transition()` to selections. The demo now
+  imports d3-transition itself. A development server bundles nothing and
+  showed no error.
 
 ## 4.0.0
 

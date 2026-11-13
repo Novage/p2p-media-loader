@@ -1,4 +1,9 @@
 import * as d3 from "d3";
+// `selection.transition()` exists only once d3-transition has patched the
+// selection prototype. The `d3` package declares itself free of side effects,
+// so a production bundler drops the d3-transition it re-exports when no named
+// export of it is used; importing it directly keeps the patch.
+import "d3-transition";
 
 export interface Node extends d3.SimulationNodeDatum {
   id: string;
