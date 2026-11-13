@@ -1,3 +1,4 @@
+import { diagnostics, type DiagnosticsToken } from "../../diagnostics.js";
 import { WebSocketClient } from "../websocket-client/index.js";
 import { EventTarget } from "../../utils/event-target.js";
 
@@ -8,6 +9,8 @@ export type WebTorrentSocketPoolEventMap = {
 type PoolEntry = {
   client: WebSocketClient;
   refCount: number;
+  /** The socket's record; see specs/diagnostics.md. */
+  token: DiagnosticsToken | undefined;
 };
 
 export class WebTorrentSocketPool {
@@ -40,7 +43,11 @@ export class WebTorrentSocketPool {
         this.#eventTarget.dispatchEvent("error", error, url);
       });
       client.connect();
-      entry = { client, refCount: 0 };
+      entry = {
+        client,
+        refCount: 0,
+        token: diagnostics?.open("TrackerSocket", url),
+      };
       this.#sockets.set(url, entry);
     }
 
@@ -67,17 +74,26 @@ export class WebTorrentSocketPool {
           if (currentEntry === entry) {
             this.#sockets.delete(url);
           }
+          diagnostics?.close(entry.token, "released");
           entry.client.dispose();
         }
       },
     };
   }
 
-  public destroy(): void {
-    this.#eventTarget.clear();
+  /**
+   * Closes every socket the pool holds, and leaves the pool usable. A core
+   * resets itself between sources and keeps its pool, so what it subscribed to
+   * once — its socket error log — has to outlast the reset; clearing the
+   * listeners here silenced that log for every source after the first.
+   * Loaders release their sockets before a core resets, so this normally finds
+   * none; it closes whatever one failed to release.
+   */
+  public closeAllSockets(): void {
     const entries = Array.from(this.#sockets.values());
     this.#sockets.clear();
     for (const entry of entries) {
+      diagnostics?.close(entry.token, "pool closed");
       try {
         entry.client.dispose();
       } catch (error) {

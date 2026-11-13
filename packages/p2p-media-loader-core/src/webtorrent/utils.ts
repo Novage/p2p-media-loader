@@ -1,7 +1,4 @@
-export function getRTCError(
-  event: Event,
-  fallbackMessage = "RTC error",
-): Error {
+function getRTCError(event: Event, fallbackMessage = "RTC error"): Error {
   const errorEvent = event as { error?: unknown };
   if (errorEvent.error instanceof Error) {
     return errorEvent.error;

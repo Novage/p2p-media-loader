@@ -5,10 +5,13 @@ import { COLORS } from "../../constants";
 import { ChartLegend } from "./ChartLegend";
 import { drawChart } from "./drawChart";
 
+const CHART_SAMPLE_COUNT = 120;
+const CHART_HEIGHT = 310;
+
 const generateInitialStackedData = () => {
-  const nowInSeconds = Math.floor(performance.now() / 1000);
-  return Array.from({ length: 120 }, (_, i) => ({
-    seconds: nowInSeconds - (120 - i),
+  const now = performance.now() / 1000;
+  return Array.from({ length: CHART_SAMPLE_COUNT }, (_, i) => ({
+    seconds: now - (CHART_SAMPLE_COUNT - 1 - i),
     httpDownloaded: 0,
     p2pDownloaded: 0,
     p2pUploaded: 0,
@@ -16,13 +19,39 @@ const generateInitialStackedData = () => {
 };
 
 const convertToMiB = (bytes: number) => bytes / 1024 / 1024;
-const convertToMbit = (bytes: number) => (bytes * 8) / 1_000_000;
+const convertToMbit = (bytes: number, seconds: number) =>
+  (bytes * 8) / 1_000_000 / seconds;
 
-const calculatePercentage = (part: number, total: number) => {
-  if (total === 0) {
-    return 0;
-  }
-  return ((part / total) * 100).toFixed(2);
+const calculatePercentage = (part: number, total: number) =>
+  total === 0 ? "0.00" : ((part / total) * 100).toFixed(2);
+
+const buildLegendItems = (
+  { httpDownloaded, p2pDownloaded, p2pUploaded }: DownloadStats,
+  unit: string,
+  showShare = false,
+) => {
+  const totalDownloaded = httpDownloaded + p2pDownloaded;
+  const share = (part: number) =>
+    showShare ? ` - ${calculatePercentage(part, totalDownloaded)}%` : "";
+
+  return [
+    {
+      color: COLORS.torchRed,
+      content: `Download - ${totalDownloaded.toFixed(2)} ${unit}`,
+    },
+    {
+      color: COLORS.yellow,
+      content: `- HTTP - ${httpDownloaded.toFixed(2)} ${unit}${share(httpDownloaded)}`,
+    },
+    {
+      color: COLORS.lightOrange,
+      content: `- P2P - ${p2pDownloaded.toFixed(2)} ${unit}${share(p2pDownloaded)}`,
+    },
+    {
+      color: COLORS.lightBlue,
+      content: `Upload P2P - ${p2pUploaded.toFixed(2)} ${unit}`,
+    },
+  ];
 };
 
 type StatsChartProps = {
@@ -34,43 +63,44 @@ export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
     generateInitialStackedData(),
   );
 
-  const [storedData, setStoredData] = useState({
-    totalDownloaded: 0,
+  const [totals, setTotals] = useState<DownloadStats>({
     httpDownloaded: 0,
     p2pDownloaded: 0,
     p2pUploaded: 0,
   });
 
-  const [svgDimensions, setSvgDimensions] = useState({
-    width: 0,
-    height: 0,
-  });
+  const [svgWidth, setSvgWidth] = useState(0);
 
   const svgRef = useRef<SVGSVGElement>(null);
   const svgContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    let lastTickMs = performance.now();
+
     const intervalID = setInterval(() => {
       const { httpDownloaded, p2pDownloaded, p2pUploaded } =
         downloadStatsRef.current;
+      // A hidden tab can run this timer much less often than each second. An
+      // early tick counts as 1 second, so a short interval makes no spike.
+      const tickMs = performance.now();
+      const elapsedSeconds = Math.max((tickMs - lastTickMs) / 1000, 1);
+      lastTickMs = tickMs;
 
-      setData((prevData: ChartsData[]) => {
-        const newData: ChartsData = {
-          seconds: Math.floor(performance.now() / 1000),
-          httpDownloaded: convertToMbit(httpDownloaded),
-          p2pDownloaded: convertToMbit(p2pDownloaded),
-          p2pUploaded: convertToMbit(p2pUploaded * -1),
-        };
-        return [...prevData.slice(1), newData];
-      });
+      setData((prevData: ChartsData[]) => [
+        ...prevData.slice(1),
+        {
+          seconds: tickMs / 1000,
+          httpDownloaded: convertToMbit(httpDownloaded, elapsedSeconds),
+          p2pDownloaded: convertToMbit(p2pDownloaded, elapsedSeconds),
+          p2pUploaded: convertToMbit(p2pUploaded, elapsedSeconds),
+        },
+      ]);
 
-      setStoredData((prevData) => ({
-        totalDownloaded:
-          prevData.totalDownloaded +
-          convertToMiB(httpDownloaded + p2pDownloaded),
-        httpDownloaded: prevData.httpDownloaded + convertToMiB(httpDownloaded),
-        p2pDownloaded: prevData.p2pDownloaded + convertToMiB(p2pDownloaded),
-        p2pUploaded: prevData.p2pUploaded + convertToMiB(p2pUploaded),
+      setTotals((prevTotals) => ({
+        httpDownloaded:
+          prevTotals.httpDownloaded + convertToMiB(httpDownloaded),
+        p2pDownloaded: prevTotals.p2pDownloaded + convertToMiB(p2pDownloaded),
+        p2pUploaded: prevTotals.p2pUploaded + convertToMiB(p2pUploaded),
       }));
 
       downloadStatsRef.current.httpDownloaded = 0;
@@ -84,18 +114,9 @@ export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
   }, [downloadStatsRef]);
 
   useEffect(() => {
-    const handleChartResize = (entries: ResizeObserverEntry[]) => {
-      const entry = entries[0];
-
-      const newDimensions = {
-        width: entry.contentRect.width,
-        height: 310,
-      };
-
-      setSvgDimensions(newDimensions);
-    };
-
-    const resizeObserver = new ResizeObserver(handleChartResize);
+    const resizeObserver = new ResizeObserver(([entry]) => {
+      setSvgWidth(entry.contentRect.width);
+    });
 
     if (svgContainerRef.current) {
       resizeObserver.observe(svgContainerRef.current);
@@ -107,62 +128,22 @@ export const DownloadStatsChart = ({ downloadStatsRef }: StatsChartProps) => {
   useEffect(() => {
     if (!svgRef.current) return;
 
-    const svg = drawChart(svgRef.current, data);
+    const svg = drawChart(svgRef.current, data, svgWidth, CHART_HEIGHT);
 
     return () => {
       svg.selectAll("*").remove();
     };
-  }, [data, svgDimensions]);
+  }, [data, svgWidth]);
 
   return (
     <div ref={svgContainerRef} className="chart-container">
       <div className="legend-container">
+        <ChartLegend legendItems={buildLegendItems(totals, "MiB", true)} />
         <ChartLegend
-          legendItems={[
-            {
-              color: COLORS.torchRed,
-              content: `Download - ${storedData.totalDownloaded.toFixed(2)} MiB `,
-            },
-            {
-              color: COLORS.yellow,
-              content: `- HTTP - ${storedData.httpDownloaded.toFixed(2)} MiB - ${calculatePercentage(storedData.httpDownloaded, storedData.totalDownloaded)}%`,
-            },
-            {
-              color: COLORS.lightOrange,
-              content: `- P2P - ${storedData.p2pDownloaded.toFixed(2)} MiB - ${calculatePercentage(storedData.p2pDownloaded, storedData.totalDownloaded)}%`,
-            },
-            {
-              color: COLORS.lightBlue,
-              content: `Upload P2P - ${storedData.p2pUploaded.toFixed(2)} MiB`,
-            },
-          ]}
-        />
-        <ChartLegend
-          legendItems={[
-            {
-              color: COLORS.torchRed,
-              content: `Download - ${data[data.length - 1].httpDownloaded.toFixed(2)} Mbit/s`,
-            },
-            {
-              color: COLORS.yellow,
-              content: `- HTTP - ${data[data.length - 1].httpDownloaded.toFixed(2)} Mbit/s`,
-            },
-            {
-              color: COLORS.lightOrange,
-              content: `- P2P - ${data[data.length - 1].p2pDownloaded.toFixed(2)} Mbit/s`,
-            },
-            {
-              color: COLORS.lightBlue,
-              content: `Upload P2P - ${(data[data.length - 1].p2pUploaded * -1).toFixed(2)} Mbit/s`,
-            },
-          ]}
+          legendItems={buildLegendItems(data[data.length - 1], "Mbit/s")}
         />
       </div>
-      <svg
-        ref={svgRef}
-        width={svgDimensions.width}
-        height={svgDimensions.height}
-      />
+      <svg ref={svgRef} width={svgWidth} height={CHART_HEIGHT} />
     </div>
   );
 };

@@ -1,5 +1,6 @@
+import { diagnostics, type DiagnosticsToken } from "../diagnostics.js";
 import debug from "debug";
-import { Request, RequestControls } from "../requests/request.js";
+import { AttemptTag, Request, RequestControls } from "../requests/request.js";
 import {
   CoreEventMap,
   PeerRequestErrorType,
@@ -12,7 +13,10 @@ import { SegmentWithStream } from "../internal-types.js";
 import * as Command from "./commands/index.js";
 import { PeerProtocol, PeerConfig } from "./peer-protocol.js";
 import { EventTarget } from "../utils/event-target.js";
-import { BandwidthCalculator } from "../bandwidth-calculator.js";
+import {
+  BandwidthCalculator,
+  type BandwidthDownload,
+} from "../bandwidth-calculator.js";
 const { PeerCommandType } = Command;
 type PeerEventHandlers = {
   onSegmentRequested: (
@@ -37,6 +41,8 @@ export class Peer {
   #httpLoadingSegments = new Set<number>();
   #consecutiveTimeouts = 0;
   readonly #bandwidthCalculator = new BandwidthCalculator();
+  /** The segment download under way, as the calculator measures it. */
+  #bandwidthDownload?: BandwidthDownload;
   #cachedDownloadBandwidth = { value: 0, timestamp: 0 };
   #logger = debug("p2pml-core:peer");
   #nextRequestId = 0;
@@ -45,6 +51,7 @@ export class Peer {
   readonly connectedAt = performance.now();
 
   readonly #closeConnection: (error?: PeerError) => void;
+  readonly #diagnosticsToken: DiagnosticsToken | undefined;
   readonly #eventHandlers: PeerEventHandlers;
   readonly #peerConfig: PeerConfig;
 
@@ -61,6 +68,7 @@ export class Peer {
     readonly eventTarget: EventTarget<CoreEventMap>,
   ) {
     this.#closeConnection = closeConnection;
+    this.#diagnosticsToken = diagnostics?.open("Peer", id.slice(-6));
     this.#eventHandlers = eventHandlers;
     this.#peerConfig = peerConfig;
 
@@ -111,7 +119,8 @@ export class Peer {
     const now = performance.now();
     // Cache the array iteration math for 1000ms to preserve O(1) hot path efficiency during rapid queue segment evaluations
     if (now - this.#cachedDownloadBandwidth.timestamp > 1000) {
-      // Uses a 15-second tracking window to calculate a moving average of the peer's throughput speed
+      // A window wide enough to span several segments, so one slow chunk does
+      // not make a good peer look unusable.
       this.#cachedDownloadBandwidth.value =
         this.#bandwidthCalculator.getBandwidthLoadingOnly(15);
       this.#cachedDownloadBandwidth.timestamp = now;
@@ -151,7 +160,7 @@ export class Peer {
           if (!this.#downloadingContext) break;
           if (this.#downloadingContext.isSegmentDataCommandReceived) break;
 
-          const { request, controls, requestId } = this.#downloadingContext;
+          const { request, requestId } = this.#downloadingContext;
           if (
             request.segment.externalId !== command.i ||
             requestId !== command.r
@@ -159,16 +168,41 @@ export class Peer {
             break;
           }
 
+          // A peer answering with a segment of no bytes at all. Accepting it
+          // would store an empty segment, announce it, and pass it on: one
+          // peer's defect becomes the swarm's. A peer that has nothing to
+          // send says so with SegmentAbsent. Zero is only meaningful as the
+          // remainder of a resumed transfer, where the bytes are already here.
+          if (command.s === 0 && request.loadedBytes === 0) {
+            this.#destroyOnPeerError(
+              "bytes-length-mismatch",
+              "Peer sent a segment of zero length",
+            );
+            break;
+          }
+
           this.#downloadingContext.isSegmentDataCommandReceived = true;
-          controls.firstBytesReceived();
 
           if (request.totalBytes === undefined) {
             request.setTotalBytes(request.loadedBytes + command.s);
           } else if (request.totalBytes - request.loadedBytes !== command.s) {
-            this.#destroyOnPeerError(
-              "bytes-length-mismatch",
-              "Peer response bytes length mismatch",
-            );
+            const sizeFrom = request.heldBytes.sizePeer;
+            if (sizeFrom !== undefined && sizeFrom !== this.id) {
+              // Another peer gave the size, and the two disagree: nothing
+              // tells which one is right. Neither is closed; the bytes and
+              // the size are dropped, and the next attempt starts at 0.
+              this.#sendCancelSegmentRequestCommand(request.segment, requestId);
+              request.clearLoadedBytes();
+              this.#cancelSegmentDownloading("p2p-segment-size-conflict");
+            } else {
+              // HTTP or the byte range gave the size, or this peer did: this
+              // peer is wrong. Bytes it did not send are kept.
+              this.#destroyOnPeerError(
+                "bytes-length-mismatch",
+                "Peer response bytes length mismatch",
+                request.heldBytes.hasBytesFrom(this.id),
+              );
+            }
           }
         }
         break;
@@ -191,9 +225,7 @@ export class Peer {
           return;
         }
 
-        const isWrongBytes = request.loadedBytes !== request.totalBytes;
-
-        if (isWrongBytes) {
+        if (!request.heldBytes.isComplete) {
           this.#destroyOnPeerError(
             "bytes-length-mismatch",
             "Peer response bytes length mismatch",
@@ -218,7 +250,7 @@ export class Peer {
 
         this.#consecutiveTimeouts = 0;
         controls.completeOnSuccess();
-        this.#bandwidthCalculator.stopLoading();
+        this.#stopBandwidthDownload();
         this.#downloadingContext = undefined;
         break;
       }
@@ -247,16 +279,18 @@ export class Peer {
     }
   };
 
+  #stopBandwidthDownload() {
+    if (!this.#bandwidthDownload) return;
+    this.#bandwidthCalculator.stopLoading(this.#bandwidthDownload);
+    this.#bandwidthDownload = undefined;
+  }
+
   #onSegmentChunkReceived = (chunk: Uint8Array) => {
     if (!this.#downloadingContext?.isSegmentDataCommandReceived) return;
 
     const { request, controls } = this.#downloadingContext;
 
-    const isOverflow =
-      request.totalBytes !== undefined &&
-      request.loadedBytes + chunk.byteLength > request.totalBytes;
-
-    if (isOverflow) {
+    if (request.heldBytes.wouldOverflowWith(chunk.byteLength)) {
       this.#destroyOnPeerError(
         "bytes-length-mismatch",
         "Peer response bytes length mismatch",
@@ -264,38 +298,59 @@ export class Peer {
       return;
     }
 
-    this.#bandwidthCalculator.addBytes(chunk.byteLength);
+    if (this.#bandwidthDownload) {
+      this.#bandwidthCalculator.addBytes(
+        this.#bandwidthDownload,
+        chunk.byteLength,
+      );
+    }
     this.#cachedDownloadBandwidth.timestamp = 0; // invalidate cache
     controls.addLoadedChunk(chunk);
   };
 
-  downloadSegment(segmentRequest: Request) {
-    if (this.#isDestroyed) return;
+  /**
+   * Starts downloading the request's segment from this peer. `tag` says why
+   * the attempt was started; it is set as the attempt starts, so it stays
+   * with an attempt that settles at once.
+   *
+   * @returns Whether the attempt started. A destroyed peer starts none.
+   */
+  downloadSegment(segmentRequest: Request, tag?: AttemptTag): boolean {
+    if (this.#isDestroyed) return false;
     if (this.#downloadingContext) {
       throw new Error("Some segment already is downloading");
     }
+    if (this.#peerConfig.validateP2PSegment) {
+      segmentRequest.dropBytesFromOtherPeers(this.id);
+    }
 
+    // All the bytes held: completed as the source that sent them, which with
+    // a validator is this peer or HTTP, since another peer's are dropped.
     const completed = segmentRequest.tryCompleteByLoadedBytes(
-      { downloadSource: "p2p", peerId: this.id },
+      tag,
       {
         notReceivingBytesTimeoutMs:
           this.#peerConfig.p2pNotReceivingBytesTimeoutMs,
         onAbort: () => void 0,
       },
       this.#peerConfig.validateP2PSegment,
-      "p2p-segment-validation-failed",
+      (peerId, cause) => {
+        if (peerId === this.id) {
+          this.#destroyOnPeerError(cause, "P2P segment validation failed");
+        }
+      },
     );
 
-    if (completed) return;
+    if (completed) return true;
 
-    this.#bandwidthCalculator.startLoading();
+    this.#bandwidthDownload = this.#bandwidthCalculator.startLoading();
     this.#nextRequestId = (this.#nextRequestId + 1) % 1000000000;
     this.#downloadingContext = {
       request: segmentRequest,
       requestId: this.#nextRequestId,
       isSegmentDataCommandReceived: false,
       controls: segmentRequest.start(
-        { downloadSource: "p2p", peerId: this.id },
+        { downloadSource: "p2p", peerId: this.id, tag },
         {
           notReceivingBytesTimeoutMs:
             this.#peerConfig.p2pNotReceivingBytesTimeoutMs,
@@ -311,7 +366,7 @@ export class Peer {
             }
             const { request, requestId } = this.#downloadingContext;
             this.#sendCancelSegmentRequestCommand(request.segment, requestId);
-            this.#bandwidthCalculator.stopLoading();
+            this.#stopBandwidthDownload();
             if (error.type !== "abort") {
               this.#bandwidthCalculator.clear();
               this.#cachedDownloadBandwidth.timestamp = 0;
@@ -349,21 +404,23 @@ export class Peer {
     if (!this.#sendCommand(command)) {
       this.#cancelSegmentDownloading("peer-closed");
     }
+    return true;
   }
 
+  /** Resolves with the bytes sent: all of `data` when the upload completed, 0 otherwise. */
   async uploadSegmentData(
     segment: SegmentWithStream,
     requestId: number,
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-arguments
     data: ArrayBuffer | ArrayBufferView<ArrayBuffer>,
-  ) {
-    if (this.#isDestroyed) return;
+  ): Promise<number> {
+    if (this.#isDestroyed) return 0;
 
     if (requestId !== this.#latestRequestedUploadRequestId) {
       this.#logger(
         `discarding obsolete upload request ${requestId} for segment ${segment.externalId}`,
       );
-      return;
+      return 0;
     }
 
     const { externalId } = segment;
@@ -376,7 +433,7 @@ export class Peer {
       r: requestId,
       s: data.byteLength,
     };
-    if (!this.#sendCommand(command)) return;
+    if (!this.#sendCommand(command)) return 0;
     try {
       await this.#peerProtocol.splitSegmentDataToChunksAndUploadAsync(
         data,
@@ -386,17 +443,23 @@ export class Peer {
         this.isDestroyed ||
         requestId !== this.#latestRequestedUploadRequestId
       ) {
-        return;
+        return 0;
       }
       this.#sendSegmentDataSendingCompletedCommand(segment, requestId);
       this.#logger(`segment ${externalId} has been sent to ${this.id}`);
+      return data.byteLength;
     } catch (error) {
       this.#logger(`cancel segment uploading ${externalId}: %O`, error);
+      return 0;
     }
   }
 
-  #destroyOnPeerError(type: PeerErrorType, message: string) {
-    this.#downloadingContext?.request.clearLoadedBytes();
+  /**
+   * @param clearBytes - Whether the bytes held go with this peer: they do
+   * unless none of them came from it, as when its first message is wrong.
+   */
+  #destroyOnPeerError(type: PeerErrorType, message: string, clearBytes = true) {
+    if (clearBytes) this.#downloadingContext?.request.clearLoadedBytes();
     const error = new PeerError(type, message);
     this.#cancelSegmentDownloading("peer-closed", error);
     this.destroy(false, error);
@@ -412,9 +475,14 @@ export class Peer {
     // Note: failWithError DOES NOT trigger the onAbort callback above.
     // We must manually clean up the peer's downloading context and bandwidth state.
     controls.failWithError(error);
-    this.#bandwidthCalculator.stopLoading();
+    this.#stopBandwidthDownload();
 
-    if (type !== "peer-segment-absent") {
+    // Neither an absent segment nor a size another peer gave says anything
+    // about this peer's link.
+    if (
+      type !== "peer-segment-absent" &&
+      type !== "p2p-segment-size-conflict"
+    ) {
       this.#bandwidthCalculator.clear();
       this.#cachedDownloadBandwidth.timestamp = 0;
       this.#logger(`cleared bandwidth history due to ${error.type}`);
@@ -468,6 +536,10 @@ export class Peer {
   destroy(isConnectionClosed = false, error?: PeerError) {
     if (this.#isDestroyed) return;
     this.#isDestroyed = true;
+    diagnostics?.close(this.#diagnosticsToken, "closed");
+    diagnostics?.count(
+      `PeerClosed:${isConnectionClosed ? "remote" : (error?.type ?? "local")}`,
+    );
 
     this.#cancelSegmentDownloading("peer-closed", error);
     this.#peerProtocol.destroy();

@@ -4,13 +4,17 @@ const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder("utf8");
 
 // restricted up to 16 item types (4 bits to type definition)
-export const enum SerializedItem {
-  Min = -1,
-  Int,
-  SimilarIntArray,
-  String,
-  Max,
-}
+// Plain numbers rather than an enum: a code is read from a byte.
+export const SerializedItem = {
+  Min: -1,
+  Int: 0,
+  SimilarIntArray: 1,
+  String: 2,
+  Max: 3,
+} as const;
+
+export type SerializedItem =
+  (typeof SerializedItem)[keyof typeof SerializedItem];
 
 export function getRequiredBytesForInt(num: number): number {
   if (num === 0) return 1;
@@ -60,7 +64,7 @@ export function serializeInt(num: number): Uint8Array {
 export function deserializeInt(bytes: Uint8Array) {
   if (bytes.length === 0) throw new Error("Buffer is too short");
   const metadata = bytes[0];
-  const code: SerializedItem = metadata >> 4;
+  const code = metadata >> 4;
   if (code !== SerializedItem.Int) {
     throw new Error(
       "Trying to deserialize integer with invalid serialized item code",
@@ -111,7 +115,7 @@ export function serializeUniqueSimilarIntArray(numbers: number[]) {
 export function deserializeUniqueSimilarIntArray(bytes: Uint8Array) {
   if (bytes.length < 2) throw new Error("Buffer is too short");
   const [codeByte, commonPartArraysAmount] = bytes;
-  const code: SerializedItem = codeByte >> 4;
+  const code = codeByte >> 4;
   if (code !== SerializedItem.SimilarIntArray) {
     throw new Error(
       "Trying to deserialize similar int array with invalid serialized item code",
@@ -161,7 +165,7 @@ export function serializeString(string: string) {
 export function deserializeString(bytes: Uint8Array) {
   if (bytes.length < 2) throw new Error("Buffer is too short");
   const [codeByte, lengthByte] = bytes;
-  const code: SerializedItem = codeByte >> 4;
+  const code = codeByte >> 4;
   if (code !== SerializedItem.String) {
     throw new Error(
       "Trying to deserialize bytes (sting) with invalid serialized item code.",

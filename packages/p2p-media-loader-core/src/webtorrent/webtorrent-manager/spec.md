@@ -64,25 +64,38 @@ When the Manager is destroyed, it calls `client.destroy()` on the `WebTorrentCli
 
 Because a user might be active on `wss://tracker1.com` and `wss://tracker2.com`, both trackers might send us the same remote `peer_id`.
 To adhere to the Single Source of Truth principle, the `WebTorrentManager` avoids managing a separate set of known peers. Instead, it checks its existing collections of connected and connecting peers.
-It passes a bound `#claimPeer` callback into every `WebTorrentClient` it creates:
+It passes a bound `#claimPeer` callback into every `WebTorrentClient` it creates. `#connectingPeers` maps each peer to the handshake that claimed it:
 
 ```typescript
-#claimPeer = (remotePeerId: string): boolean => {
+#claimPeer = (remotePeerId: string, handshake: PeerHandshake): boolean => {
   if (this.#destroyed) return false;
 
-  if (
-    this.#connectingPeers.has(remotePeerId) ||
-    this.#connectedPeers.has(remotePeerId)
-  ) {
-    return false;
+  const current = this.#connectingPeers.get(remotePeerId);
+  if (current && this.#settlesGlare(current, handshake, remotePeerId)) {
+    this.#connectingPeers.set(remotePeerId, handshake);
+    current.cancel();
+    return true;
   }
 
-  this.#connectingPeers.add(remotePeerId);
+  if (current || this.#connectedPeers.has(remotePeerId)) return false;
+
+  // ... the hard limit on peers ...
+  this.#connectingPeers.set(remotePeerId, handshake);
   return true;
 };
 ```
 
-_Note: If the WebRTC connection fails (e.g. ICE gathering timeout or data channel timeout), the `WebTorrentClient` emits a `peerConnectFailed` event, and the Manager automatically deletes the peer from `#connectingPeers` to allow future reconnection attempts. If the connection fails after being fully established, or the upper layer rejects the peer later, the upper layer must invoke the `close()` callback (provided in the `peerConnected` payload) to cleanly close the connection and remove it from the internal collections._
+### Glare
+
+Two peers that offer to each other at the same time — through different trackers, or the same one — can each answer the other's offer. Each then holds the other as answerer when the answer to its own offer arrives. If both refused that answer, each would wait on the handshake the other refused, and they would not connect until a later announce: up to the tracker's announce interval, often minutes.
+
+Both peers keep the handshake whose **offerer has the lower peer id**. A claim as offerer (an answer to our offer) replaces a claim as answerer only when our peer id is the lower one: the lower peer accepts the answer to its offer and cancels its own answering, and the higher peer refuses the answer and goes on answering. Both compare the same two ids, so both keep the same handshake.
+
+Every other duplicate is refused. A refused offer costs nothing: its sender only waits for an answer that never comes, and the offer expires.
+
+Only the handshake that holds the claim can complete or release it. A `peerConnectFailed` from a cancelled handshake is not forwarded upstream, and a cancelled handshake that connects regardless is closed.
+
+_Note: If the WebRTC connection fails (e.g. ICE gathering timeout or data channel timeout), the `WebTorrentClient` emits a `peerConnectFailed` event, and the Manager deletes the peer from `#connectingPeers` — if that handshake still holds the claim — to allow future reconnection attempts. If the connection fails after being fully established, or the upper layer rejects the peer later, the upper layer must invoke the `close()` callback (provided in the `peerConnected` payload) to cleanly close the connection and remove it from the internal collections._
 
 ### Peer Connection Lifecycle
 

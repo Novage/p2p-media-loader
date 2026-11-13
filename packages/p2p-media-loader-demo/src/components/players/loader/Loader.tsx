@@ -1,4 +1,3 @@
-// Loader.tsx
 import "./loader.css";
 
 export const Loader = () => {

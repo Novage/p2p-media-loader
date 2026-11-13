@@ -33,8 +33,6 @@
 .chart-legend .line {
   margin-right: 3px;
   margin-left: 4px;
-  border-radius: 2px;
-  clear: both;
   line-height: 140%;
   padding-right: 15px;
   display: flex;
@@ -42,14 +40,9 @@
 }
 
 .chart-legend .swatch {
-  display: inline-block;
   width: 8px;
   height: 8px;
-  border: 1px solid rgba(0, 0, 0, 0.2);
-}
-
-.chart-legend .line .swatch {
-  display: inline-block;
   margin-right: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
   border-radius: 2px;
 }

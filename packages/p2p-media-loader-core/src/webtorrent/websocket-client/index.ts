@@ -1,3 +1,4 @@
+import { diagnostics } from "../../diagnostics.js";
 import { EventTarget } from "../../utils/event-target.js";
 
 export type WebSocketClientEventMap = {
@@ -24,6 +25,7 @@ export class WebSocketClient {
   #state: WebSocketClientState = "disconnected";
   #ws: WebSocket | null = null;
   #backoffCount = 0;
+  #connectedAt: number | null = null;
   #reconnectTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   readonly #eventTarget = new EventTarget<WebSocketClientEventMap>();
@@ -119,7 +121,7 @@ export class WebSocketClient {
   #onOpen = (): void => {
     if (this.#state === "disposed") return;
     this.#state = "connected";
-    this.#backoffCount = 0;
+    this.#connectedAt = performance.now();
     this.#eventTarget.dispatchEvent("connected");
   };
 
@@ -151,6 +153,18 @@ export class WebSocketClient {
 
     this.#state = "reconnecting";
 
+    // The backoff is reset by a connection that lasted, not by one that was
+    // merely accepted: an overloaded tracker completes the handshake and
+    // closes at once, and resetting on open would answer that with a
+    // reconnect, an announce and a batch of offers every second, forever.
+    if (
+      this.#connectedAt !== null &&
+      performance.now() - this.#connectedAt >= this.#config.maxDelay
+    ) {
+      this.#backoffCount = 0;
+    }
+    this.#connectedAt = null;
+
     const baseDelay = Math.min(
       this.#config.initialDelay * Math.pow(2, this.#backoffCount),
       this.#config.maxDelay,
@@ -167,6 +181,9 @@ export class WebSocketClient {
     this.#reconnectTimeoutId = setTimeout(() => {
       if (this.#state !== "disposed") {
         this.connect();
+      } else {
+        // `dispose()` clears this timer; firing after it is a timer it missed.
+        diagnostics?.anomaly("WebSocketClient reconnect timer after dispose");
       }
     }, delay);
 

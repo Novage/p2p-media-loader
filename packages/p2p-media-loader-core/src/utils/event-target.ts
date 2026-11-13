@@ -1,3 +1,13 @@
+import debug from "debug";
+
+/**
+ * A listener that throws is swallowed below, so its failure leaves no trace in
+ * the state it was meant to build — a peer the manager holds but no loader
+ * ever wrapped, for one. The throw itself is logged here. Enable with
+ * localStorage.debug = "p2pml-core:listener-error".
+ */
+const listenerErrorLogger = debug("p2pml-core:listener-error");
+
 export class EventTarget<
   EventTypesMap extends Record<
     string,
@@ -34,8 +44,14 @@ export class EventTarget<
     for (const listener of listeners) {
       try {
         listener(a1, a2, a3, a4, a5);
-      } catch {
-        // Swallow user-land errors to protect internal invariants
+      } catch (error) {
+        // Swallowed to protect internal invariants: a listener is user-land
+        // code, and half the listeners of an event must still run.
+        listenerErrorLogger(
+          "a listener of %s threw: %O",
+          String(eventName),
+          error,
+        );
       }
     }
   }

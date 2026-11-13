@@ -33,30 +33,41 @@ export const HlsjsMediaElement = ({
     const prevHls = window.Hls;
     window.Hls = HlsJsP2PEngine.injectMixin(Hls);
 
-    // @ts-ignore
-    const player = new MediaElementPlayer(videoElement.id, {
-      iconSprite: "/mejs-controls.svg",
-      videoHeight: "100%",
-      hls: {
-        p2p: {
-          onHlsJsCreated: (hls: HlsWithP2PInstance<Hls>) => {
-            subscribeToUiEvents({
-              engine: hls.p2pEngine,
-              onPeerConnect,
-              onPeerClose,
-              onChunkDownloaded,
-              onChunkUploaded,
-            });
+    // One task later: in development React mounts, unmounts and mounts again,
+    // and a MediaElement player removed before its renderer has loaded still
+    // creates its engine afterwards, on a page it is no longer on.
+    let player: any;
+    const start = setTimeout(() => {
+      // @ts-ignore
+      player = new MediaElementPlayer(videoElement.id, {
+        iconSprite: "/mejs-controls.svg",
+        videoHeight: "100%",
+        // HLS.js first: by default MediaElement prefers the browser's own HLS
+        // playback wherever the browser reports it — Safari, and recent Chrome
+        // — which bypasses HLS.js and with it P2P.
+        renderers: ["native_hls", "html5"],
+        hls: {
+          p2p: {
+            onHlsJsCreated: (hls: HlsWithP2PInstance<Hls>) => {
+              subscribeToUiEvents({
+                engine: hls.p2pEngine,
+                onPeerConnect,
+                onPeerClose,
+                onChunkDownloaded,
+                onChunkUploaded,
+              });
+            },
+            core: coreOptions,
           },
-          core: coreOptions,
         },
-      },
-    });
+      });
 
-    player.setSrc(streamUrl);
-    player.load();
+      player.setSrc(streamUrl);
+      player.load();
+    }, 0);
 
     return () => {
+      clearTimeout(start);
       window.Hls = prevHls;
       player?.remove();
       videoContainer.remove();

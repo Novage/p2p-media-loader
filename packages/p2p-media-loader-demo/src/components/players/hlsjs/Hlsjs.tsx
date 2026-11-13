@@ -1,7 +1,7 @@
 import "./hlsjs.css";
 import { useEffect, useRef } from "react";
 import { PlayerProps } from "../../../types";
-import { subscribeToUiEvents } from "../utils";
+import { showPlayingQuality, subscribeToUiEvents } from "../utils";
 import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 import Hls from "hls.js";
 
@@ -39,6 +39,11 @@ export const HlsjsPlayer = ({
     hls.loadSource(streamUrl);
 
     const qualityElement = qualityRef.current;
+    const playingQuality = showPlayingQuality(
+      qualityElement,
+      videoRef.current,
+      "-1",
+    );
     const updateQualityOptions = () => {
       if (hls.levels.length < 2) {
         qualityElement.style.display = "none";
@@ -51,10 +56,14 @@ export const HlsjsPlayer = ({
           const label = `${level.height}p (${Math.round(level.bitrate / 1000)}k)`;
           qualityElement.add(new Option(label, index.toString()));
         });
+        playingQuality.update();
       }
     };
+    // nextLevel switches at the next fragment without flushing the buffer.
+    // currentLevel flushes it and resumes at the live edge, which leaves no
+    // segments ahead of the player's buffer for peers to fill.
     const onQualityChange = () =>
-      (hls.currentLevel = parseInt(qualityElement.value, 10));
+      (hls.nextLevel = parseInt(qualityElement.value, 10));
 
     qualityElement.addEventListener("change", onQualityChange);
     hls.on(Hls.Events.MANIFEST_PARSED, updateQualityOptions);
@@ -63,6 +72,7 @@ export const HlsjsPlayer = ({
       hls.off(Hls.Events.MANIFEST_PARSED, updateQualityOptions);
       hls.destroy();
       qualityElement.removeEventListener("change", onQualityChange);
+      playingQuality.dispose();
     };
   }, [
     onPeerConnect,

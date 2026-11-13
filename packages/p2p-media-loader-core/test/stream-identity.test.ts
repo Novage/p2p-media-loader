@@ -1,107 +1,171 @@
 import { describe, expect, it } from "vitest";
 import {
-  computeStreamIdentityHash,
   buildStreamSwarmId,
   computeInfoHash,
-  computeStreamSwarmId as computeStreamSwarmIdFromProperties,
   PEER_PROTOCOL_VERSION,
 } from "../src/stream-identity.js";
-import { StreamProperties, StreamType } from "../src/types.js";
 
-// Golden vectors freezing the v2 wire protocol. These literals were generated
-// by executing the implementation itself and MUST NOT change: any difference
-// splits every existing default swarm between client versions.
-// If a change to the derivation is ever intended, it requires a major version
-// bump AND a peer protocol version bump.
+// Golden vectors freezing the wire protocol. The infohashes were computed
+// with Node.js `crypto` apart from the implementation, and checked against it.
+// They MUST NOT change: any difference splits every existing default swarm
+// between client versions. If a change to the derivation is ever intended, it
+// requires a major version bump AND a peer protocol version bump — and a new
+// block of vectors, keeping the old ones as the record of what the previous
+// version produced. Between releases a derivation may change under one
+// version; its pre-release vectors are kept as a record too (AGENTS.md).
 
-const SWARM_ID = "https://example.com/hls/master.m3u8";
+const HLS_SWARM_ID = "https://example.com/hls/master.m3u8";
+const DASH_SWARM_ID = "https://example.com/dash/manifest.mpd";
 
-const computeIdentityHash = (props: StreamProperties) =>
-  computeStreamIdentityHash(props);
-
-const computeStreamSwarmId = (streamType: StreamType, identityHash: string) =>
-  buildStreamSwarmId(SWARM_ID, streamType, identityHash);
-
+/**
+ * v3: the stream ID is the stream's place in the manifest — for HLS its type
+ * and its index among the master's streams of that type, for DASH its type
+ * and its Representation `@id` — and no property of the stream enters it (see
+ * specs/segment-identity.md). The 5.0.0 pre-releases hashed the stream's
+ * properties under the same `v3`; no stable release did, so the version was
+ * not bumped for them (see "Version discipline" there).
+ */
 const GOLDEN_VECTORS = [
   {
-    name: "hls 1080p video variant",
-    props: {
-      bitrate: 4521000,
-      codecs: "avc1.64002a,mp4a.40.2",
-      width: 1920,
-      height: 1080,
-      frameRate: "29.970",
-      videoRange: "SDR",
-    },
-    streamType: "main" as StreamType,
-    identityHash: "mskAojmI+F5YyLLvSP3sdMO5nII=",
+    name: "hls first variant",
+    swarmId: HLS_SWARM_ID,
+    streamId: "main0",
+    streamSwarmId: "v3-https://example.com/hls/master.m3u8-main0",
+    infoHash: "W1b9WgA8SSH2c5Dblnh5",
+  },
+  {
+    name: "hls second variant",
+    swarmId: HLS_SWARM_ID,
+    streamId: "main1",
+    streamSwarmId: "v3-https://example.com/hls/master.m3u8-main1",
+    infoHash: "fvoqSv5iYPAR/cBJJimo",
+  },
+  {
+    name: "hls first audio rendition",
+    swarmId: HLS_SWARM_ID,
+    streamId: "secondary0",
+    streamSwarmId: "v3-https://example.com/hls/master.m3u8-secondary0",
+    infoHash: "MssY0aR7vJXFmU9Ltes7",
+  },
+  {
+    name: "hls media playlist with no master",
+    swarmId: HLS_SWARM_ID,
+    streamId: "main",
+    streamSwarmId: "v3-https://example.com/hls/master.m3u8-main",
+    infoHash: "jmr8dWoOf/ND+8KEuSRD",
+  },
+  {
+    name: "dash video Representation",
+    swarmId: DASH_SWARM_ID,
+    streamId: "main-video-720",
+    streamSwarmId: "v3-https://example.com/dash/manifest.mpd-main-video-720",
+    infoHash: "y03bo9XKhbkmOc+w4M1i",
+  },
+  {
+    name: "dash audio Representation",
+    swarmId: DASH_SWARM_ID,
+    streamId: "secondary-audio-en",
+    streamSwarmId:
+      "v3-https://example.com/dash/manifest.mpd-secondary-audio-en",
+    infoHash: "hbbm0kddUqYuAabcWNff",
+  },
+  {
+    name: "a swarm ID that is not ASCII is hashed as UTF-8",
+    swarmId: "https://example.com/vidéo/master.m3u8",
+    streamId: "main0",
+    streamSwarmId: "v3-https://example.com/vidéo/master.m3u8-main0",
+    infoHash: "2md7lrTf2S17B9sZBnnr",
+  },
+];
+
+/**
+ * The 5.0.0 pre-releases, also `v3`: the stream part was the hash of the
+ * stream's manifest properties, with `bitrate` only where the manifest needed
+ * it to tell two same-type streams apart. Kept as the record of what those
+ * peers announce; a release peer never derives these swarm IDs.
+ */
+const V3_ALPHA_VECTORS = [
+  {
+    // hls 1080p video variant, bitrate kept
+    streamSwarmId:
+      "v3-https://example.com/hls/master.m3u8-main-iNz0Nm5CRoj3CPnATwZbzOR36hg=",
+    infoHash: "jAztisioAey83yeI5VCy",
+  },
+  {
+    // hls 1080p video variant, bitrate dropped
+    streamSwarmId:
+      "v3-https://example.com/hls/master.m3u8-main-SwyTBJzxGFOXIbAZMJWKG3nnIwc=",
+    infoHash: "CS1X23XIwC3hMelxmX8z",
+  },
+  {
+    // hls alternate video rendition: variant attributes plus NAME and LANGUAGE
+    streamSwarmId:
+      "v3-https://example.com/hls/master.m3u8-main-u00IaR0vBHu1FYRTY6ngVZcd/gg=",
+    infoHash: "joEux5p8lWAcP8C0ak25",
+  },
+  {
+    // decimal RFC 4281 avc1 codec (hashed as written)
+    streamSwarmId:
+      "v3-https://example.com/hls/master.m3u8-main-rKuBJ2P4nH1VBYsYeEcZ8JUn3NI=",
+    infoHash: "uXQspfYQVGGZBRkck6tA",
+  },
+  {
+    // audio track
+    streamSwarmId:
+      "v3-https://example.com/hls/master.m3u8-secondary-GT17s2lVP9juJlJgLa8S/8amjhI=",
+    infoHash: "A6g5A9j7J9F2myVq+nOB",
+  },
+  {
+    // missing metadata (bitrate 0 only)
+    streamSwarmId:
+      "v3-https://example.com/hls/master.m3u8-main-UYnLxGhQilEV4D0HbCx+kRv0ZF0=",
+    infoHash: "s/SEXqQzSgMtVKrBDDMm",
+  },
+  {
+    // dash hdr video variant
+    streamSwarmId:
+      "v3-https://example.com/hls/master.m3u8-main-LWIaIik9Y/3BYajY+Nhh6FZBt70=",
+    infoHash: "8j/DDr/IBPiF9kRGBJRV",
+  },
+];
+
+/**
+ * v2: the protocol of 4.x, kept as the record of what those peers announce.
+ * The stream part was the hash of normalized properties.
+ */
+const V2_VECTORS = [
+  {
     streamSwarmId:
       "v2-https://example.com/hls/master.m3u8-main-mskAojmI+F5YyLLvSP3sdMO5nII=",
     infoHash: "aEnMPupzZeID9k+gkk5Y",
   },
   {
-    name: "decimal RFC 4281 avc1 codec (normalized to hex)",
-    props: { bitrate: 800000, codecs: "avc1.66.30", width: 640, height: 360 },
-    streamType: "main" as StreamType,
-    identityHash: "NCMJrr57E8a6HDMfQTyx2FBIVq8=",
     streamSwarmId:
       "v2-https://example.com/hls/master.m3u8-main-NCMJrr57E8a6HDMfQTyx2FBIVq8=",
     infoHash: "KyXU7oYavEYFE/jxdEBu",
   },
   {
-    name: "audio track",
-    props: {
-      bitrate: 0,
-      codecs: "mp4a.40.2",
-      language: "en-US",
-      channels: "2/0",
-      name: "English",
-    },
-    streamType: "secondary" as StreamType,
-    identityHash: "bdjQ1B4N2yrcTDHyU5j7iDGV9sY=",
     streamSwarmId:
       "v2-https://example.com/hls/master.m3u8-secondary-bdjQ1B4N2yrcTDHyU5j7iDGV9sY=",
     infoHash: "Brw7M7eJYTdtKRTVLdah",
   },
   {
-    name: "missing metadata (bitrate 0 only)",
-    props: { bitrate: 0 },
-    streamType: "main" as StreamType,
-    identityHash: "UYnLxGhQilEV4D0HbCx+kRv0ZF0=",
     streamSwarmId:
       "v2-https://example.com/hls/master.m3u8-main-UYnLxGhQilEV4D0HbCx+kRv0ZF0=",
     infoHash: "P78ZUY66tgmtYL6JoePW",
   },
   {
-    name: "dash hdr video variant",
-    props: {
-      bitrate: 6000000,
-      codecs: "hvc1.2.4.L153.B0",
-      width: 3840,
-      height: 2160,
-      frameRate: 25,
-      videoRange: "hlg",
-    },
-    streamType: "main" as StreamType,
-    identityHash: "xRZQlAX26agaIEVBIZ0SppKubi0=",
     streamSwarmId:
       "v2-https://example.com/hls/master.m3u8-main-xRZQlAX26agaIEVBIZ0SppKubi0=",
     infoHash: "HC9QZIUjD8lNeTcsspkz",
   },
 ];
 
-describe("stream identity golden vectors (v2 wire protocol)", () => {
+describe("stream identity golden vectors (v3 wire protocol)", () => {
   for (const vector of GOLDEN_VECTORS) {
     it(vector.name, () => {
-      const identityHash = computeIdentityHash(vector.props);
-      expect(identityHash).toBe(vector.identityHash);
-
-      const streamSwarmId = computeStreamSwarmId(
-        vector.streamType,
-        identityHash,
-      );
+      const streamSwarmId = buildStreamSwarmId(vector.swarmId, vector.streamId);
       expect(streamSwarmId).toBe(vector.streamSwarmId);
-
       expect(computeInfoHash(streamSwarmId)).toBe(vector.infoHash);
     });
   }
@@ -114,65 +178,38 @@ describe("stream identity golden vectors (v2 wire protocol)", () => {
     }
   });
 
-  it("composes the default stream swarm ID from raw properties", () => {
-    for (const vector of GOLDEN_VECTORS) {
-      expect(
-        computeStreamSwarmIdFromProperties({
-          swarmId: SWARM_ID,
-          streamType: vector.streamType,
-          properties: vector.props,
-        }),
-      ).toBe(vector.streamSwarmId);
-    }
-  });
-
-  it("uses peer protocol version v2", () => {
-    expect(PEER_PROTOCOL_VERSION).toBe("v2");
+  it("uses peer protocol version v3", () => {
+    expect(PEER_PROTOCOL_VERSION).toBe("v3");
   });
 });
 
-describe("stream identity normalization semantics", () => {
-  it("treats bitrate 0, undefined, and empty props as the same identity", () => {
-    const zero = computeIdentityHash({ bitrate: 0 });
-    expect(computeIdentityHash({})).toBe(zero);
-    expect(computeIdentityHash({ bitrate: undefined })).toBe(zero);
+describe("stream identity golden vectors (v2, historical)", () => {
+  it("v2 swarm IDs hash to the infohashes v2 peers announce", () => {
+    for (const vector of V2_VECTORS) {
+      expect(computeInfoHash(vector.streamSwarmId)).toBe(vector.infoHash);
+    }
   });
 
-  it("is insensitive to codec order and case", () => {
-    const base = computeIdentityHash({ codecs: "avc1.64002a,mp4a.40.2" });
-    expect(computeIdentityHash({ codecs: "mp4a.40.2,avc1.64002a" })).toBe(base);
-    expect(computeIdentityHash({ codecs: "AVC1.64002A,MP4A.40.2" })).toBe(base);
+  it("a v3 peer never joins a v2 swarm", () => {
+    const old = new Set(V2_VECTORS.map((vector) => vector.infoHash));
+    for (const vector of GOLDEN_VECTORS) {
+      expect(vector.streamSwarmId.startsWith("v3-")).toBe(true);
+      expect(old.has(vector.infoHash)).toBe(false);
+    }
+  });
+});
+
+describe("stream identity golden vectors (v3 pre-releases, historical)", () => {
+  it("their swarm IDs hash to the infohashes those peers announce", () => {
+    for (const vector of V3_ALPHA_VECTORS) {
+      expect(computeInfoHash(vector.streamSwarmId)).toBe(vector.infoHash);
+    }
   });
 
-  it("normalizes frame rate representations", () => {
-    const base = computeIdentityHash({ frameRate: 29.97 });
-    expect(computeIdentityHash({ frameRate: "29.970" })).toBe(base);
-  });
-
-  it("normalizes language to a two-letter lowercase code", () => {
-    const base = computeIdentityHash({ language: "en" });
-    expect(computeIdentityHash({ language: "en-US" })).toBe(base);
-    expect(computeIdentityHash({ language: "EN" })).toBe(base);
-    expect(computeIdentityHash({ language: "und" })).toBe(
-      computeIdentityHash({}),
-    );
-  });
-
-  it("normalizes channels to the count before the slash", () => {
-    const base = computeIdentityHash({ channels: 2 });
-    expect(computeIdentityHash({ channels: "2/0" })).toBe(base);
-    expect(computeIdentityHash({ channels: "2" })).toBe(base);
-  });
-
-  it("normalizes video range case", () => {
-    expect(computeIdentityHash({ videoRange: "hlg" })).toBe(
-      computeIdentityHash({ videoRange: "HLG" }),
-    );
-  });
-
-  it("normalizes name case and whitespace", () => {
-    expect(computeIdentityHash({ name: " English " })).toBe(
-      computeIdentityHash({ name: "english" }),
-    );
+  it("a release peer never joins a pre-release swarm", () => {
+    const old = new Set(V3_ALPHA_VECTORS.map((vector) => vector.infoHash));
+    for (const vector of GOLDEN_VECTORS) {
+      expect(old.has(vector.infoHash)).toBe(false);
+    }
   });
 });

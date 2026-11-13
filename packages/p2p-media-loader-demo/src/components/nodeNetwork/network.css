@@ -1,4 +1,15 @@
 .node-container {
-  position: relative;
   width: 100%;
+}
+
+.node-network circle:hover {
+  fill: #a9a9a9;
+}
+
+.node-network text {
+  font-family: sans-serif;
+  font-size: 12px;
+  text-anchor: middle;
+  /* A label must not block hover and drag on the circles under it. */
+  pointer-events: none;
 }

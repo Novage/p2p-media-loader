@@ -5,25 +5,20 @@ import {
   Link,
   updateGraph,
   Node,
-  prepareGroups,
   createSimulation,
+  centerSimulation,
 } from "./network";
 
 type GraphNetworkProps = {
   peers: string[];
 };
 
-const DEFAULT_PEER_ID = "You";
-const DEFAULT_NODE: Node = { id: DEFAULT_PEER_ID, isMain: true };
-const DEFAULT_GRAPH_DATA = {
-  nodes: [DEFAULT_NODE],
-  links: [] as Link[],
-};
+const MAIN_NODE: Node = { id: "You", isMain: true };
 
 export const NodeNetwork = ({ peers }: GraphNetworkProps) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const svgContainerRef = useRef<HTMLDivElement>(null);
-  const networkDataRef = useRef(DEFAULT_GRAPH_DATA);
+  const nodesRef = useRef<Node[]>([MAIN_NODE]);
   const simulationRef = useRef<d3.Simulation<Node, Link> | null>(null);
 
   const [svgDimensions, setSvgDimensions] = useState({
@@ -32,98 +27,47 @@ export const NodeNetwork = ({ peers }: GraphNetworkProps) => {
   });
 
   useEffect(() => {
-    if (!svgRef.current) return;
+    const svgElement = svgRef.current;
+    const svgContainer = svgContainerRef.current;
+    if (!svgElement || !svgContainer) return;
 
-    const handleResize = (entries: ResizeObserverEntry[]) => {
-      const entry = entries[0];
+    const simulation = createSimulation(svgElement);
+    simulationRef.current = simulation;
 
-      const newDimensions = {
-        width: entry.contentRect.width,
-        height: entry.contentRect.width > 380 ? 250 : 400,
-      };
+    const resizeObserver = new ResizeObserver(([entry]) => {
+      const { width } = entry.contentRect;
+      const height = width > 380 ? 250 : 400;
 
-      setSvgDimensions(newDimensions);
-
-      simulationRef.current?.stop();
-      simulationRef.current = createSimulation(
-        newDimensions.width,
-        newDimensions.height,
-      );
-
-      updateGraph(
-        networkDataRef.current.nodes,
-        networkDataRef.current.links,
-        simulationRef.current,
-        svgRef.current,
-      );
-    };
-
-    prepareGroups(svgRef.current);
-
-    const resizeObserver = new ResizeObserver(handleResize);
-
-    if (svgContainerRef.current) {
-      resizeObserver.observe(svgContainerRef.current);
-    }
+      setSvgDimensions({ width, height });
+      centerSimulation(simulation, width, height);
+    });
+    resizeObserver.observe(svgContainer);
 
     return () => {
       resizeObserver.disconnect();
+      simulation.stop();
     };
   }, []);
 
   useEffect(() => {
-    const allNodes = [
-      ...peers.map((peerId) => ({ id: peerId, isMain: false })),
-      DEFAULT_NODE,
-    ];
-
-    const allLinks = peers.map((peerId) => {
-      const target = allNodes.find((n) => n.id === peerId);
-
-      if (!target) throw new Error("Target node not found");
-
-      return {
-        source: DEFAULT_NODE,
-        target,
-        linkId: `${DEFAULT_PEER_ID}-${peerId}`,
-      };
-    });
-
-    const networkData = networkDataRef.current;
-
-    const nodesToAdd = allNodes.filter(
-      (an) => !networkData.nodes.find((n) => n.id === an.id),
+    // Keeps the existing node objects, so the nodes keep their positions.
+    const peerIds = new Set(peers);
+    const keptNodes = nodesRef.current.filter(
+      (node) => node.isMain || peerIds.has(node.id),
     );
-    const nodesToRemove = networkData.nodes.filter(
-      (n) => !allNodes.find((an) => an.id === n.id),
-    );
-    const linksToAdd = allLinks.filter(
-      (al) => !networkData.links.find((l) => l.linkId === al.linkId),
-    );
-    const linksToRemove = networkData.links.filter(
-      (l) => !allLinks.find((al) => al.linkId === l.linkId),
-    );
+    const keptIds = new Set(keptNodes.map((node) => node.id));
+    const addedNodes = [...peerIds]
+      .filter((peerId) => !keptIds.has(peerId))
+      .map((peerId) => ({ id: peerId, isMain: false }));
 
-    const updatedNodes = networkData.nodes.filter(
-      (n) => !nodesToRemove.find((rn) => rn.id === n.id),
-    );
-    const updatedLinks = networkData.links.filter(
-      (l) => !linksToRemove.find((rl) => rl.linkId === l.linkId),
-    );
+    const nodes = [...keptNodes, ...addedNodes];
+    nodesRef.current = nodes;
 
-    const newNetworkData = {
-      nodes: [...updatedNodes, ...nodesToAdd],
-      links: [...updatedLinks, ...linksToAdd],
-    };
+    const links = nodes
+      .filter((node) => !node.isMain)
+      .map((target) => ({ source: MAIN_NODE, target }));
 
-    networkDataRef.current = newNetworkData;
-
-    updateGraph(
-      newNetworkData.nodes,
-      newNetworkData.links,
-      simulationRef.current,
-      svgRef.current,
-    );
+    updateGraph(nodes, links, simulationRef.current, svgRef.current);
   }, [peers]);
 
   return (
@@ -133,7 +77,10 @@ export const NodeNetwork = ({ peers }: GraphNetworkProps) => {
         ref={svgRef}
         width={svgDimensions.width}
         height={svgDimensions.height}
-      />
+      >
+        <g className="links" />
+        <g className="nodes" />
+      </svg>
     </div>
   );
 };
