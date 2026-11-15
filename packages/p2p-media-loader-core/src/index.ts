@@ -56,4 +56,7 @@ export {
   computeInfoHash,
   PEER_PROTOCOL_VERSION,
 } from "./stream-identity.js";
-export { debug } from "debug";
+// A default import: Node cannot see `debug`'s named exports, which the
+// package makes at run time; bundlers can.
+import debug from "debug";
+export { debug };

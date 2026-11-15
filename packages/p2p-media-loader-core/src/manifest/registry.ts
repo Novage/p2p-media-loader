@@ -68,6 +68,7 @@ export type RegistryStream = {
    */
   readonly manifest?: {
     readonly url: string;
+    readonly text: string;
     readonly streams: readonly ManifestStreamInfo[];
   };
   /**
@@ -200,8 +201,11 @@ export class ManifestRegistry {
   /**
    * Applies one parsed manifest. Idempotent: re-applying an unchanged
    * manifest changes nothing and reports no updates.
+   *
+   * @param text - The manifest as fetched, which a `streamIdBuilder` reads
+   * for a stream this manifest declares.
    */
-  apply(manifest: ParsedManifest): RegistryApplyResult {
+  apply(manifest: ParsedManifest, text = ""): RegistryApplyResult {
     const updates: RegistryUpdate[] = [];
     const ignored: string[] = [];
     // Every master's word is kept: a player that chose a subtitle track keeps
@@ -225,6 +229,7 @@ export class ManifestRegistry {
     const declarationOf = () =>
       (declaration ??= {
         url: manifest.requestedUrl ?? manifest.url,
+        text,
         streams: manifest.streams.map((s) => ({
           runtimeId: s.key,
           streamType: s.type,

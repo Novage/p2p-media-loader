@@ -17,7 +17,6 @@ import type {
   ParsedInitSegment,
 } from "./types.js";
 import {
-  audioCodecs,
   audioStreamProperties,
   videoRenditionProperties,
   videoStreamProperties,
@@ -122,10 +121,9 @@ function masterStreams(
     streams.push({ ...stream, streamId: `${stream.type}${index}`, index });
   };
 
-  // Alternate audio renditions inherit codecs from the variants that reference
-  // their group, the way HLS.js assigns `audioCodec` to an audio track. A
-  // group no variant references is no stream at all; see `excludedPlaylists`.
-  const audioCodecsByGroup = new Map<string, string | undefined>();
+  // A group no variant references is no stream at all; see
+  // `excludedPlaylists`.
+  const referencedAudioGroups = new Set<string>();
   // Alternate video renditions inherit everything from the first variant that
   // references their group. RFC 8216 requires every rendition to match the
   // resolution of each variant referencing the group, so a master that reuses
@@ -136,10 +134,7 @@ function masterStreams(
   for (const playlist of manifest.playlists ?? []) {
     const a = playlist.attributes;
     const attributes = variantAttributes(a);
-    const audio = audioCodecs(a.CODECS);
-    if (a.AUDIO && audioCodecsByGroup.get(a.AUDIO) === undefined) {
-      audioCodecsByGroup.set(a.AUDIO, audio);
-    }
+    if (a.AUDIO) referencedAudioGroups.add(a.AUDIO);
     if (a.VIDEO && !videoAttributesByGroup.has(a.VIDEO)) {
       videoAttributesByGroup.set(a.VIDEO, attributes);
     }
@@ -181,7 +176,7 @@ function masterStreams(
   }
 
   const audioGroups = manifest.mediaGroups?.AUDIO ?? {};
-  for (const [groupId, codecs] of audioCodecsByGroup) {
+  for (const groupId of referencedAudioGroups) {
     const renditions = audioGroups[groupId] ?? {};
     for (const name of mediaTags.namesInOrder("AUDIO", groupId, renditions)) {
       const rendition = renditions[name];
@@ -196,7 +191,6 @@ function masterStreams(
         key,
         type: "secondary",
         properties: audioStreamProperties({
-          codecs,
           language: rendition.language,
           channels: mediaTags.channels.get(`${groupId} ${name}`),
           name,

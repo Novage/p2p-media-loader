@@ -99,9 +99,6 @@ importers:
       '@types/debug':
         specifier: ^4.1.13
         version: 4.1.13
-      '@videojs/vhs-utils':
-        specifier: ^4.1.3
-        version: 4.1.3
       debug:
         specifier: ^4.4.3
         version: 4.4.3

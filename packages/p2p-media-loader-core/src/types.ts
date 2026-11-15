@@ -69,11 +69,11 @@ export type StreamProperties = {
    */
   bitrate?: number | null;
   /**
-   * The codec string from the manifest, not normalized. A video stream keeps
-   * only its video codecs from a mixed `CODECS` list; an HLS audio-only
-   * variant, with no video codec, keeps its audio codecs. An HLS audio
-   * rendition takes the audio codecs of the first variant that refers to its
-   * group.
+   * The codec string as the manifest writes it, not normalized: an HLS
+   * variant's whole `CODECS` list, video and audio together, or a DASH
+   * Representation's `@codecs`. An HLS alternate video rendition has the
+   * codecs of the variant that refers to its group; an audio rendition's tag
+   * states none, so it has none.
    */
   codecs?: string | null;
   /** Video width in pixels: HLS `RESOLUTION`, or DASH `@width`. */
@@ -642,8 +642,10 @@ export type StreamConfig = {
    * const config: CoreConfig = {
    *   // A master that shuffles its variants: name each by what it carries.
    *   // Streams equal in all of these — two rungs that differ only in
-   *   // bitrate — would get one ID: tell them apart by something every
-   *   // viewer reads alike, such as an unsigned file name in `runtimeId`.
+   *   // bitrate, or HLS audio renditions of two groups alike in name,
+   *   // language and channels — would get one ID: tell them apart by
+   *   // something every viewer reads alike, such as an unsigned file name in
+   *   // `runtimeId` or a rendition's GROUP-ID in `manifest.text`.
    *   streamIdBuilder: ({ streamType, properties: p }) =>
    *     [streamType, p.codecs, p.width, p.height, p.name, p.language, p.channels]
    *       .map((value) => value ?? "")
@@ -947,14 +949,23 @@ export type StreamIdBuilderContext = {
   index: number | undefined;
 
   /**
-   * The manifest that declared the stream: its URL and all its streams in
-   * the order the core reads them (for HLS, the order of the indexes).
-   * `undefined` for a media playlist with no master. The URL may differ from
-   * viewer to viewer (CDN host, signed query) — avoid it in the ID.
+   * The manifest that declared the stream: its URL, its text, and all its
+   * streams in the order the core reads them (for HLS, the order of the
+   * indexes). `undefined` for a media playlist with no master. The URL may
+   * differ from viewer to viewer (CDN host, signed query) — avoid it in the
+   * ID.
    */
   manifest:
     | {
         readonly url: string;
+        /**
+         * The HLS master or the MPD as the player handed it to the core; the
+         * Shaka integration first removes an MPD's `PatchLocation`. A
+         * builder reads from it what the properties leave out, such as the `GROUP-ID` of an HLS
+         * audio rendition or the codecs of its group. Use only what every
+         * viewer gets alike: not a signed URL or a session token.
+         */
+        readonly text: string;
         readonly streams: readonly Readonly<ManifestStreamInfo>[];
       }
     | undefined;

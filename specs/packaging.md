@@ -70,6 +70,14 @@ lib/dash.js     →  "./dash"
 lib/server.js   →  "./server"
 ```
 
+The same files load in Node's own ES module loader, for a script, a test tool
+or a server that imports the package. Node finds the named exports of a
+CommonJS package only where it can see them in its source, and rejects an
+import with no file extension inside an ES module; a bundler does neither.
+`pnpm check:node`, run after the build in CI, loads each entry point of
+`publishConfig.exports` that way. It skips `./shims/xmldom`, which exists only
+for browser bundles.
+
 `src/index.ts` must import no parser. It is the entry a bundler consumer reaches
 through `"."`, and anything it imports becomes unconditional weight for every
 consumer regardless of which subpaths they use.

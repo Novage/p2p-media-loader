@@ -1270,19 +1270,44 @@ const config: CoreConfig = {
 };
 
 // Server: each stream's properties as the client reads them from the master —
-// a variant's video codecs only, for one (see specs/segment-identity.md, "The
+// a variant's whole CODECS list, for one (see specs/segment-identity.md, "The
 // properties a builder receives").
 const infoHash = computeInfoHash(
   buildStreamSwarmId(
     videoUuid,
-    streamIdOf("main", { codecs: "avc1.64001f", width: 1280, height: 720 }),
+    streamIdOf("main", {
+      codecs: "avc1.64001f,mp4a.40.2",
+      width: 1280,
+      height: 720,
+    }),
   ),
 );
 ```
 
-Streams equal in all of these values — two rungs that differ only in bitrate, say — would get one ID. Tell them apart by something every viewer reads alike, such as an unsigned file name in the playlist URL (`runtimeId`), or keep the default for that master.
+Streams equal in all of these values — two rungs that differ only in bitrate, say, or two HLS audio renditions in different groups that differ only in codec, since an audio rendition has no `codecs` — would get one ID. Tell them apart by something every viewer reads alike, such as an unsigned file name in the playlist URL (`runtimeId`) or an audio rendition's group in the manifest's text (below), or keep the default for that master.
 
-The builder receives the stream's `runtimeId` (the media playlist URL for HLS, the Representation id for DASH; a URL can differ from viewer to viewer, so use only a part they share), its type and properties, its `defaultStreamId`, its HLS `index`, and the `manifest` that declared it — its URL and every stream with key, type, default stream ID and properties — so that it can tell what the ID must be unique among. It returns `undefined` to keep the default.
+The builder receives the stream's `runtimeId` (the media playlist URL for HLS, the Representation id for DASH; a URL can differ from viewer to viewer, so use only a part they share), its type and properties, its `defaultStreamId`, its HLS `index`, and the `manifest` that declared it — its URL, its text, and every stream with key, type, default stream ID and properties — so that it can tell what the ID must be unique among. It returns `undefined` to keep the default.
+
+The properties are a summary; `manifest.text`, the HLS master or the MPD as it was fetched, has the rest — use from it only what every viewer gets alike, not a signed URL or a session token. An HLS audio rendition, for one, has no `codecs`: its tag states none, and the codecs of its group are in the `CODECS` of each `EXT-X-STREAM-INF` whose `AUDIO` names the group. A builder can read the rendition's `GROUP-ID`, and the group's codecs from the `EXT-X-STREAM-INF` lines that name it in the same way:
+
+```typescript
+import type { StreamIdBuilderContext } from "p2p-media-loader-core";
+
+// An HLS audio rendition's GROUP-ID, read from the master that declared it;
+// undefined for any other stream, a DASH one included.
+const audioGroupOf = ({ runtimeId, manifest }: StreamIdBuilderContext) => {
+  for (const line of manifest?.text.split(/\r?\n/) ?? []) {
+    if (!/^#EXT-X-MEDIA:(?:.*,)?TYPE=AUDIO(?:,|$)/.test(line)) continue;
+    const uri = /[:,]URI="([^"]*)"/.exec(line)?.[1];
+    // runtimeId is the URI resolved against the URL the master came from,
+    // which a redirect can make differ from manifest.url: compare its end.
+    if (uri && (runtimeId === uri || runtimeId.endsWith(`/${uri}`))) {
+      return /[:,]GROUP-ID="([^"]*)"/.exec(line)?.[1];
+    }
+  }
+  return undefined;
+};
+```
 
 The stream ID must be deterministic and identical across all peers of a swarm, and **every distinct stream must map to a distinct ID**. Build it from properties every viewer reads alike — not `bitrate`, which an origin may recompute per request — and from enough of them: resolution alone collides on ladders with several bitrates at the same resolution. The core does not check this: two different streams with one ID are one swarm, and their peers exchange segments of the wrong stream. One rendition listed twice, for two CDNs, may take one ID: viewers on the two copies then share one swarm. A failover from one copy to the other in one player is not tested with a shared ID (see `KNOWN-ISSUES.md`). A builder that returns no usable ID fails the stream's registration (reported through the `onStreamRegistrationError` core event), and the stream plays without P2P. The builder cannot be changed at runtime. Clients can also observe each registered stream's `streamId` and `infoHash` through the `onStreamAdded` core event.
 

@@ -149,6 +149,52 @@ describe("stream registration from manifests", () => {
       AUDIO_EN,
       AUDIO_DE,
     ]);
+    // And the master's text, for what the properties leave out.
+    expect(context.manifest?.text).toBe(HLS_MASTER_WITH_AUDIO);
+  });
+
+  it("lets a builder read an audio rendition's group from the master's text", () => {
+    // Two groups with renditions alike in NAME, LANGUAGE and CHANNELS, as in
+    // Apple's adv_dv_atmos master: only the group tells them apart. The
+    // reading is the one api_documentation.md shows.
+    const master = `#EXTM3U
+#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aac-lc",NAME="English",LANGUAGE="en",CHANNELS="2",URI="audio/lc/index.m3u8"
+#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aac-he",NAME="English",LANGUAGE="en",CHANNELS="2",URI="audio/he/index.m3u8"
+#EXT-X-STREAM-INF:BANDWIDTH=5000000,CODECS="avc1.640028,mp4a.40.2",AUDIO="aac-lc"
+video/1080p/index.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=1000000,CODECS="avc1.64001e,mp4a.40.5",AUDIO="aac-he"
+video/360p/index.m3u8
+`;
+    const audioGroupOf = ({ runtimeId, manifest }: StreamIdBuilderContext) => {
+      for (const line of manifest?.text.split(/\r?\n/) ?? []) {
+        if (!/^#EXT-X-MEDIA:(?:.*,)?TYPE=AUDIO(?:,|$)/.test(line)) continue;
+        const uri = /[:,]URI="([^"]*)"/.exec(line)?.[1];
+        if (uri && (runtimeId === uri || runtimeId.endsWith(`/${uri}`))) {
+          return /[:,]GROUP-ID="([^"]*)"/.exec(line)?.[1];
+        }
+      }
+      return undefined;
+    };
+    // A builder on the secondary stream type alone gets the text too.
+    const core = new Core({
+      manifestParsers: [hlsManifestParser],
+      secondaryStream: {
+        streamIdBuilder: (context) => `secondary-${audioGroupOf(context)}`,
+      },
+    });
+    // Redirected to another path: the stream keys resolve against where the
+    // master came from, and manifest.url is the URL asked for.
+    core.processManifest({
+      url: "https://edge.example/v/123/master.m3u8",
+      requestedUrl: MANIFEST_URL,
+      data: master,
+    });
+    expect(
+      core
+        .getStreams()
+        .filter((s) => s.type === "secondary")
+        .map((s) => s.streamId),
+    ).toEqual(["secondary-aac-lc", "secondary-aac-he"]);
   });
 
   it("falls back to the default derivation when the builder returns undefined", () => {

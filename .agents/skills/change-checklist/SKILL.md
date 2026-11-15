@@ -93,6 +93,9 @@ Run from the repository root, and fix every finding:
 - `npx prettier --check` on every changed file outside a package's `src/`:
   specs, AGENTS.md, the skills, the root documents, the demo's pages.
 - `pnpm knip` when the change adds, moves or removes an export.
+- `pnpm build`, then `pnpm check:node`, when the change adds or changes an
+  import of a package, or adds an entry point. Vitest transforms imports, so
+  only a run of the built `lib/` in Node finds an import that Node rejects.
 
 Leave the git index as you found it: do not stash, reset or rebuild it to get
 a baseline. For a baseline, use a worktree of the base commit in a scratch

@@ -230,12 +230,3 @@ declare module "mpd-parser" {
     eventStream?: unknown;
   }): ReturnType<typeof parse>;
 }
-
-declare module "@videojs/vhs-utils/es/codecs.js" {
-  export type ParsedCodec = {
-    type: string;
-    details: string;
-    mediaType: "video" | "audio" | "text" | "unknown";
-  };
-  export function parseCodecs(codecString?: string): ParsedCodec[];
-}

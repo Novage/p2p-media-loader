@@ -79,11 +79,11 @@
     "clean:build": "rimraf lib dist build p2p-media-loader-core-*.tgz",
     "type-check": "npx tsc --noEmit",
     "test": "vitest",
-    "test:ci": "vitest run"
+    "test:ci": "vitest run",
+    "check:node": "node scripts/check-node-import.mjs"
   },
   "dependencies": {
     "@types/debug": "^4.1.13",
-    "@videojs/vhs-utils": "^4.1.3",
     "debug": "^4.4.3",
     "m3u8-parser": "^7.2.1",
     "mpd-parser": "^1.4.1"

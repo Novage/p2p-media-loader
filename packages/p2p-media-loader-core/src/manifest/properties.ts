@@ -1,8 +1,3 @@
-// Ambient typings for untyped packages must travel with the modules that
-// import them, so other packages compiling these sources see them too.
-// eslint-disable-next-line @typescript-eslint/triple-slash-reference
-/// <reference path="./vendor-types.d.ts" />
-import { parseCodecs } from "@videojs/vhs-utils/es/codecs.js";
 import type { StreamProperties } from "../types.js";
 
 /**
@@ -27,27 +22,6 @@ export type AudioAttributes = {
   name?: string;
 };
 
-function codecsOfType(
-  codecs: string | undefined,
-  mediaType: "video" | "audio",
-): string | undefined {
-  if (!codecs) return undefined;
-  const matching = parseCodecs(codecs)
-    .filter((c) => c.mediaType === mediaType)
-    .map((c) => `${c.type}${c.details}`);
-  return matching.length ? matching.join(",") : undefined;
-}
-
-/** The video codecs out of a mixed `CODECS` list; audio and text are dropped. */
-function videoCodecs(codecs: string | undefined): string | undefined {
-  return codecsOfType(codecs, "video");
-}
-
-/** The audio codecs out of a mixed `CODECS` list. */
-export function audioCodecs(codecs: string | undefined): string | undefined {
-  return codecsOfType(codecs, "audio");
-}
-
 /**
  * A variant's properties, each as the manifest states it. A missing
  * `BANDWIDTH` says nothing about the rest: a resolution or a codec string is
@@ -57,9 +31,7 @@ export function audioCodecs(codecs: string | undefined): string | undefined {
 export function videoStreamProperties(a: VideoAttributes): StreamProperties {
   return {
     bitrate: a.bandwidth ?? 0,
-    // An audio-only variant has no video codec; its audio codecs are then
-    // what tells it from the others.
-    codecs: videoCodecs(a.codecs) ?? audioCodecs(a.codecs),
+    codecs: a.codecs,
     width: a.width,
     height: a.height,
     frameRate: a.frameRate,

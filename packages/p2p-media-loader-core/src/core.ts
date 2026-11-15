@@ -657,6 +657,12 @@ export class Core {
         requestedUrl !== undefined && requestedUrl !== url
           ? { ...parsed, requestedUrl }
           : parsed,
+        // Only a streamIdBuilder reads the text; without one, the registry
+        // need not keep each live MPD that declares new streams.
+        this.mainStreamConfig.streamIdBuilder ||
+          this.secondaryStreamConfig.streamIdBuilder
+          ? text
+          : undefined,
       );
     } catch (error) {
       this.manifestLogger("failed to parse %s: %O", url, error);

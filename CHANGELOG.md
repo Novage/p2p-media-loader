@@ -119,6 +119,17 @@ throughout.
 
 ### Changed
 
+- **An HLS stream's `codecs` property is the `CODECS` list as the manifest
+  writes it.** A variant's `codecs` is its whole list, video and audio
+  together, in place of its video codecs alone; an alternate audio rendition,
+  whose tag states no codecs, has none, in place of the audio codecs of the
+  variant that refers to its group. A DASH video stream's `codecs` is its
+  `@codecs` as written too, in place of the video codecs of a list that also
+  names audio. Properties do not enter the default stream
+  ID, so swarms do not change; only a `streamIdBuilder` that reads `codecs`
+  sees the difference, and it can read a rendition's group and the group's
+  codecs from the manifest's text. The core no longer depends on
+  `@videojs/vhs-utils`, and each prebuilt bundle is about 1.2 KB smaller.
 - **Segment requests are addressed by URL and byte range**, not by a runtime
   identifier the integration composed. `loadSegment(url, { byteRange?, signal? })`
   returns a promise; `hasSegment`, `isSegmentLoadable` and `abortSegmentLoading`
@@ -208,8 +219,9 @@ throughout.
   [`specs/segment-identity.md`](specs/segment-identity.md), "Stream identity".
 - **`streamSwarmIdBuilder` is now `streamIdBuilder`**, and returns only the
   stream ID; the core adds the protocol version and the `swarmId`. It receives
-  the default stream ID, the HLS index and every stream of the manifest, for a
-  master that lists its streams in another order for each request or viewer.
+  the default stream ID, the HLS index, every stream of the manifest and the
+  manifest's text, for a master that lists its streams in another order for
+  each request or viewer.
   `Stream.identityHash` is `Stream.streamId`, `buildStreamSwarmId` takes
   `(swarmId, streamId)`, and `computeStreamIdentityHash` and
   `computeStreamSwarmId` are removed. The core no longer compares two streams
@@ -329,6 +341,10 @@ throughout.
 
 These predate 5.0.0 and affect 4.x deployments as well.
 
+- The package's entry points (`lib/`) did not load in Node: the main entry
+  re-exported `debug` as a named export, which Node cannot find in that
+  CommonJS package. A script, a test tool or a server can now import the
+  core. `pnpm check:node` loads each entry point after the build, in CI too.
 - A segment served with `Content-Encoding` (`gzip`, `br`) failed every HTTP
   download: the compressed `Content-Length` was taken as its size, so the
   decoded body failed as a truncation. It is no longer taken as the size where

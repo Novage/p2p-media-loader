@@ -225,8 +225,9 @@ knows of the stream when it registers it:
 - the default `streamId`: `main0` for HLS, `main-<@id>` for DASH, `main` for
   a media playlist with no master;
 - for an HLS stream, its index within its type, as defined above;
-- the manifest's URL and its streams, each with its key, type, default
-  `streamId` and properties.
+- the manifest's URL, its text — the HLS master or the MPD as it was
+  fetched, for what the properties leave out — and its streams, each with its
+  key, type, default `streamId` and properties.
 
 Returning `undefined` keeps the default. A builder must return the same ID on
 every peer for the same stream — it must not read anything a peer has of its
@@ -254,9 +255,10 @@ player's model of it, and are passed as the manifest wrote them: a codecs
 string, a frame rate, a language tag are not normalized. Where a player's own
 model gives other answers:
 
-- **HLS: a variant's `codecs` are its video codecs**; the audio codecs belong
-  to the audio rendition. An audio-only variant, with no video codec, has its
-  audio codecs.
+- **HLS: a variant's `codecs` is its whole `CODECS` list**, video and audio
+  together, as the master writes it. An alternate audio rendition's tag
+  states no codecs, so the rendition has none; HLS.js gives it the audio
+  codecs of a variant that refers to its group.
 - **HLS: an alternate video rendition** (`EXT-X-MEDIA TYPE=VIDEO` with a URI)
   has the attributes of the variant that references its group — bitrate,
   codecs, resolution, frame rate, video range — plus its own `NAME` and

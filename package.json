@@ -17,7 +17,8 @@
     "jscpd": "jscpd",
     "dev": "pnpm --filter './demo' dev",
     "create-doc": "pnpm typedoc",
-    "test": "pnpm --recursive test:ci"
+    "test": "pnpm --recursive test:ci",
+    "check:node": "pnpm --filter p2p-media-loader-core check:node"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

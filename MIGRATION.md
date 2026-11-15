@@ -218,6 +218,15 @@ import {
 const infoHash = computeInfoHash(buildStreamSwarmId(swarmId, "main1"));
 ```
 
+A builder that reads `properties.codecs` of an HLS stream gets the `CODECS`
+list as the manifest writes it: a variant's whole list, video and audio
+together, and nothing for an alternate audio rendition. To use the video or
+the audio codecs alone, split the list in the builder. For an audio rendition,
+read its `GROUP-ID` from `context.manifest.text`, as the API documentation
+shows, and the codecs of the variants that name the group in the same way. A
+DASH video stream's `codecs` is its `@codecs` as written, too; before, the
+core kept only the video codecs of a list that also named audio.
+
 Configure a `streamIdBuilder` where the index is the wrong default: an HLS
 master that lists its streams in another order for each request or each
 viewer, a live master that adds or removes a variant, or DASH `@id`s that

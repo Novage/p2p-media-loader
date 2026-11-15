@@ -38,16 +38,12 @@ describe("hlsManifestParser: master playlist", () => {
     // A streamIdBuilder reads them unnormalized, so the exact values matter.
     expect(main[0].properties).toMatchObject({
       bitrate: 4521000,
-      codecs: "avc1.64002a",
+      codecs: "avc1.64002a,mp4a.40.2",
       width: 1920,
       height: 1080,
       videoRange: "SDR",
     });
     expect(Number(main[0].properties.frameRate)).toBe(29.97);
-  });
-
-  it("keeps only video codecs on a video stream", () => {
-    expect(main[0].properties.codecs).toBe("avc1.64002a");
   });
 
   it("prefers peak BANDWIDTH over AVERAGE-BANDWIDTH", () => {
@@ -59,7 +55,7 @@ describe("hlsManifestParser: master playlist", () => {
     // whether BANDWIDTH is there or not.
     expect(main[1].properties).toMatchObject({
       bitrate: 0,
-      codecs: "avc1.4d401f",
+      codecs: "avc1.4d401f,mp4a.40.2",
       width: 640,
       height: 360,
     });
@@ -91,9 +87,10 @@ bare.m3u8
       "https://cdn.example/live/audio/en/index.m3u8",
       "https://cdn.example/live/audio/de/index.m3u8",
     ]);
+    // The rendition's tag states no codecs.
     expect(audio[0].properties).toEqual({
       bitrate: 0,
-      codecs: "mp4a.40.2",
+      codecs: undefined,
       language: "en",
       channels: "2",
       name: "English",
@@ -112,7 +109,7 @@ v.m3u8
       .streams.filter((s) => s.type === "secondary");
     expect(rendition.properties).toEqual({
       bitrate: 0,
-      codecs: "mp4a.40.2",
+      codecs: undefined,
       language: "en-US",
       channels: "2/0",
       name: "English",
@@ -202,7 +199,7 @@ describe("hlsManifestParser: alternate video renditions", () => {
     const [variant, , wide] = parsed.streams;
     expect(wide.properties).toEqual({
       bitrate: 5000000,
-      codecs: "avc1.64002a",
+      codecs: "avc1.64002a,mp4a.40.2",
       width: 1920,
       height: 1080,
       frameRate: 30,
@@ -214,7 +211,7 @@ describe("hlsManifestParser: alternate video renditions", () => {
     // rendition's NAME and LANGUAGE are the rendition's, never the variant's.
     expect(variant.properties).toEqual({
       bitrate: 5000000,
-      codecs: "avc1.64002a",
+      codecs: "avc1.64002a,mp4a.40.2",
       width: 1920,
       height: 1080,
       frameRate: 30,
@@ -417,7 +414,7 @@ v.m3u8
     ]);
   });
 
-  it("keeps an audio-only variant's audio codecs, its only codec", () => {
+  it("keeps an audio-only variant's CODECS list", () => {
     const [aac, heAac] = hlsManifestParser.parse(
       `#EXTM3U
 #EXT-X-STREAM-INF:BANDWIDTH=128000,CODECS="mp4a.40.2"
@@ -662,7 +659,7 @@ describe("hlsManifestParser: real manifests", () => {
     expect(parsed.streams.every((s) => s.key.startsWith("https://"))).toBe(
       true,
     );
-    expect(parsed.streams[0].properties.codecs).toBe("avc1.4D401F");
+    expect(parsed.streams[0].properties.codecs).toBe("avc1.4D401F,mp4a.40.2");
   });
 
   it("parses the IVS live media playlist with PDT on every segment", () => {
