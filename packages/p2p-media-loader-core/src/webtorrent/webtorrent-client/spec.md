@@ -30,12 +30,14 @@ interface WebTorrentClientConfig {
   channelConfig?: RTCDataChannelInit; // Optional Data Channel overrides
   offerTimeout?: number; // Time (in ms) to keep unanswered offers before destroying them. Default: 50000 (50s).
   offersCount?: number; // Maximum number of offers to generate per announce interval. Default: 5.
-  connectionTimeout?: number; // Time (in ms) to wait for the data channel to open. Default: 15000 (15s).
+  connectionTimeout?: number; // Time (in ms) to wait for the data channel to open. The answerer waits 5 s more (see "Receiving Offers"). Default: 15000 (15s).
 
   // Callback invoked when a peer_id is discovered via an offer or answer.
   // Attempts to claim the peer to prevent duplicate connections.
   // Return true to accept and connect, false if the peer is already claimed/connected.
-  claimPeer?: (peerId: string) => boolean;
+  // `handshake` says whether we answer the peer's offer or it answered ours,
+  // and can cancel the exchange; see "Early Deduplication".
+  claimPeer?: (peerId: string, handshake: PeerHandshake) => boolean;
 
   // Callback invoked before every announce to determine if new offers should be generated.
   // Return false to stop generating offers (numwant: 0), while still answering incoming offers.
@@ -52,8 +54,11 @@ interface WebTorrentClientConfig {
 
 ### Events
 
-- `peerConnected` (payload: `{ peerId: string, connection: RTCPeerConnection, channel: RTCDataChannel }`): Fired when the peer finishes WebRTC signaling and its Data Channel is successfully opened. The Swarm Manager takes immediate ownership.
-- `peerConnectFailed` (payload: `{ peerId: string, error: string }`): Fired if WebRTC SDP negotiation fails or the data channel fails to open after a peer has been claimed (e.g., ICE gathering timeout or connection timeout), allowing the manager to release the claim.
+- `peerConnected` (payload: `{ peerId: string, connection: RTCPeerConnection, channel: RTCDataChannel, handshake: PeerHandshake }`): Fired when the peer finishes WebRTC signaling and its Data Channel is successfully opened. The Swarm Manager takes immediate ownership.
+- `peerConnectFailed` (payload: `{ peerId: string, error: PeerConnectError, handshake: PeerHandshake }`): Fired if WebRTC SDP negotiation fails, the data channel fails to open, or the handshake is cancelled, after a peer has been claimed (e.g., ICE gathering timeout or connection timeout), allowing the manager to release the claim.
+
+Both carry the `handshake` object that was passed to `claimPeer`, so the claimant can tell which of its exchanges with the peer ended.
+
 - `warning` (payload: `string`): Fired if the tracker returns a warning, or if the client encounters a local recoverable issue during signaling or offer/answer creation.
 - `error` (payload: `string`): Fired if the tracker returns an error, or if the underlying WebSocket encounters a failure.
 
@@ -67,6 +72,8 @@ Because the higher layer (e.g., Peer Manager) may spin up multiple `WebTorrentCl
 
 1. **When Receiving an Offer:** The tracker JSON includes the remote `peer_id`. The client immediately calls `claimPeer(peer_id)`. If it returns `false`, the client **ignores the JSON message entirely** and does not create an `RTCPeerConnection`.
 2. **When Receiving an Answer:** The tracker forwards an `answer` to a pending offer we sent. The JSON includes the remote `peer_id`. The client calls `claimPeer(peer_id)`. If it returns `false`, the client **immediately closes** the pending `RTCPeerConnection` and discards the answer.
+
+Each call passes a `PeerHandshake`: `{ role: "answerer" }` for an offer we answer, `{ role: "offerer" }` for an answer to our offer, and a `cancel()` that abandons the exchange. A cancelled exchange closes its `RTCPeerConnection` and ends with `peerConnectFailed`, like one that failed. The manager cancels one only to settle glare: two peers that answer each other's offers at once (see the WebTorrent Manager spec, "Glare").
 
 ### Message Validation
 
@@ -82,7 +89,16 @@ The client communicates via JSON messages over the `WebSocketClient`. Below is t
 
 #### 1. Announcing & Sending Offers (Client -> Tracker)
 
-Periodically (based on the tracker's `interval`), or when first connecting, the client sends an `announce` action. If the client wants to initiate connections (and `shouldGenerateOffers` returns `true`), it gathers ICE candidates and includes an array of `offers`. If `shouldGenerateOffers` returns `false`, it sends `"numwant": 0` and an empty `"offers": []` array to maintain presence in the swarm without incurring offer-generation overhead.
+Periodically (based on the tracker's `interval`), or when first connecting, the client sends an `announce` action. If the client wants to initiate connections (and `shouldGenerateOffers` returns `true`), it gathers ICE candidates and includes an array of `offers`, as many as the swarm calls for (below); the first announce of a connection carries none. If `shouldGenerateOffers` returns `false`, it sends `"numwant": 0` and an empty `"offers": []` array to maintain presence in the swarm without incurring offer-generation overhead.
+
+The number of offers follows the swarm. The tracker gives each offer to a different peer and drops the rest. An offer past the other peers only costs an `RTCPeerConnection` and its ICE gathering. Each announce reply carries `complete` and `incomplete`, which count this peer too, so the other peers are their sum less one. The client takes a count only from a reply with this swarm's `info_hash`: on a shared socket, a message without it can belong to another swarm. Both values must be whole numbers of 0 or more; a reply with other values counts as a reply without a count. The peers already connected count as well, since the tracker chooses the receivers.
+
+- **The first announce of a connection** (`event: "started"`) carries no offers. When its reply arrives, the client announces again with one offer for each other peer, up to `offersCount`. A peer alone sends nothing more: a peer that joins later offers to it. The count may not answer this client's own announce. On a shared socket, bittorrent-tracker first answers the `stopped` of a client that just left the same swarm, and that count does not include this peer. So a peer counted alone that gets a reply with other peers before its next announce sends one offer for each of them then. An offer from a peer ends this wait: that peer has found this one, and some trackers reply to the answer with a count that includes it. If the reply has no count, the client offers `offersCount` at once; if no reply arrives within 2 s, it offers `offersCount` then. If the tracker refuses the announce (`failure reason` with this swarm's `info_hash`), the client sends no offers; its periodic announces still go out. A lost socket starts this over: a new socket may reach a tracker that no longer counts this peer. An announce that still gathers its offers when the socket is lost drops them and sends nothing. So it cannot go out on the next socket before that socket's count. `TrackerAnnounce:socket-lost` counts these announces.
+- **A periodic announce** sends one offer for each other peer of the last count, up to `offersCount`, and at least one. The count is up to an interval old, and the one offer reaches a peer that joined since and whose own offers failed to connect.
+
+Two peers that join an empty swarm through one tracker at the same moment do not both offer. The tracker counts one of them first, and that one sends no offers. Through different trackers the order can differ, so both can offer. In a swarm that has other peers, both get a count above one and both offer, so the tracker can give the offer of each to the other. In these cases glare (see the WebTorrent Manager spec) can occur.
+
+A peer at its peer limit sends no second announce, whatever the count. Its periodic announces offer once it is below its limit. The counters `TrackerAnnounce:alone`, `:sized`, `:no-count`, `:peer-limit` and `:refused` record the result of each first announce. `TrackerAnnounce:alone-recounted` counts each alone count that a later count corrected. `TrackerAnnounce:offers-capped` counts each announce, first or periodic, that the count limited to fewer than `offersCount`.
 
 ```json
 {
@@ -90,8 +106,8 @@ Periodically (based on the tracker's `interval`), or when first connecting, the 
   "info_hash": "<20-character-binary-string>",
   "peer_id": "<20-character-binary-string>",
   "numwant": 5,
-  "uploaded": 0,
-  "downloaded": 0,
+  "uploaded": 1048576, // bytes sent to peers in this swarm since joining it
+  "downloaded": 3145728, // bytes of this swarm's segments delivered, over HTTP and P2P
   "event": "started", // "started", "completed", "stopped", or omitted
   "offers": [
     {
@@ -102,6 +118,14 @@ Periodically (based on the tracker's `interval`), or when first connecting, the 
   "trackerid": "<tracker-assigned-id>" // included if previously received from tracker
 }
 ```
+
+`uploaded` and `downloaded` are the swarm's totals since this peer joined it, read at each announce from `transferredBytes`; the `stopped` announce carries the final ones. The P2P loader counts complete transfers only: a segment when it is delivered, whether it came over HTTP, over P2P, or partly over each, and an upload when its last byte is sent, counting only the bytes sent. Peers exchange segments only inside one swarm, so every byte one peer uploads is a byte another peer downloads over P2P. A tracker can therefore compute, for each `info_hash`:
+
+- P2P bytes: the sum of `uploaded`;
+- all bytes: the sum of `downloaded`;
+- HTTP bytes: the difference, and the P2P share as P2P bytes over all bytes.
+
+The totals restart at 0 when a peer joins a swarm again (a new `started`). A tracker that sums them adds, for each peer, the growth since that peer's previous announce.
 
 #### 2. Tracker Announce Response (Tracker -> Client)
 
@@ -199,15 +223,15 @@ When generating offers, we do **not** know which peer will receive them. All off
 #### Receiving Offers
 
 1. The tracker sends an incoming `offer` originating from another peer. This payload **does** contain their `peer_id`.
-2. **Deduplication Check**: Call `claimPeer(peer_id)`. Abort if `false`.
+2. **Deduplication Check**: Call `claimPeer(peer_id, { role: "answerer", cancel })`. Abort if `false`.
 3. The client creates a new `RTCPeerConnection` and calls `setRemoteDescription`.
 4. It creates an SDP answer, waits for ICE gathering, and sends it back to the tracker.
-5. **Wait for Connection**: Signaling is complete. The client waits for the data channel to open, then emits the `peerConnected` event with `{ peerId, connection, channel }`. The client then hands off ownership of the connection.
+5. **Wait for Connection**: Signaling is complete. The client waits for the data channel to open, then emits the `peerConnected` event with `{ peerId, connection, channel }`. The client then hands off ownership of the connection. The answerer waits `connectionTimeout` plus 5 s. Its wait starts when it sends the answer, and the tracker must then deliver the answer to the offerer. The offerer's wait starts only when the answer arrives. Without the 5 s, a slow tracker makes the answerer give up first, while the connection is still forming.
 
 #### Receiving Answers
 
 1. The tracker forwards an `answer` SDP to an `offer_id` we previously sent. This payload now reveals the remote `peer_id`.
-2. **Deduplication Check**: We finally know who answered! Call `claimPeer(peer_id)`.
+2. **Deduplication Check**: We finally know who answered! Call `claimPeer(peer_id, { role: "offerer", cancel })`.
 3. If `claimPeer` returns `false` (we are already connected to them via another route), we look up the pending `RTCPeerConnection` by `offer_id`, immediately call `.close()`, clear the timeout, delete it, and abort.
 4. If `true`, the client applies `setRemoteDescription(answer)` to the pending connection and clears the timeout.
 5. **Wait for Connection**: Signaling is complete. The client removes the connection from `pendingOffers`, waits for the data channel to open, and emits the `peerConnected` event with `{ peerId, connection, channel }`.

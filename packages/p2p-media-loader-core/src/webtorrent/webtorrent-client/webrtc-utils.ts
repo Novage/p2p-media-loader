@@ -7,15 +7,26 @@ interface LegacyBrowserWindow extends Window {
   mozRTCSessionDescription?: typeof RTCSessionDescription;
 }
 
-// Since this library runs exclusively in the browser window context, we target
-// the global 'window' directly. We use a fallback to an empty object for SSR/testing environments.
+// `window`, not `globalThis`: the IIFE builds serve Chromium 49-era devices,
+// and `globalThis` only arrived in Chromium 71. A server render has no
+// `window`, and no WebRTC either.
 const win = (typeof window !== "undefined"
   ? window
   : {}) as unknown as LegacyBrowserWindow;
 
-export const PeerConnection = (win.RTCPeerConnection ??
+const peerConnection =
+  win.RTCPeerConnection ??
   win.webkitRTCPeerConnection ??
-  win.mozRTCPeerConnection) as unknown as typeof RTCPeerConnection;
+  win.mozRTCPeerConnection;
+
+/**
+ * Whether the page has WebRTC, under any of its names. Read when the module
+ * loads: a browser with WebRTC switched off has none from the start.
+ */
+export const isWebRtcAvailable = peerConnection !== undefined;
+
+export const PeerConnection =
+  peerConnection as unknown as typeof RTCPeerConnection;
 
 export const SessionDescription = (win.RTCSessionDescription ??
   win.webkitRTCSessionDescription ??

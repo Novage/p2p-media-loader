@@ -1,3 +1,4 @@
+import { diagnostics } from "../diagnostics.js";
 import { CommonCoreConfig, StreamConfig, StreamType } from "../types.js";
 import debug from "debug";
 import { SegmentStorage } from "./index.js";
@@ -8,13 +9,17 @@ import {
   getStorageItemId,
 } from "./utils.js";
 
+/**
+ * What the cache keeps per segment. The stream's type says which position the
+ * segment is judged against: its own stream's.
+ */
 type SegmentDataItem = {
   segmentId: number;
   streamSwarmId: string;
+  streamType: StreamType;
   data: ArrayBuffer;
   startTime: number;
   endTime: number;
-  streamType: StreamType;
 };
 
 type Playback = {
@@ -22,17 +27,26 @@ type Playback = {
   rate: number;
 };
 
-type LastRequestedSegmentInfo = {
-  streamSwarmId: string;
-  segmentId: number;
-  startTime: number;
-  endTime: number;
-  swarmId: string;
-  streamType: StreamType;
-  isLiveStream: boolean;
-};
-
 const BYTES_PER_MiB = 1048576;
+/**
+ * How far behind the position a live stream's segments are kept: three of
+ * their own lengths, and never less than {@link LIVE_TRAILING_MIN_SECONDS}.
+ *
+ * Three segments is what peers need of each other. The position is where a
+ * player's buffer ends, and peers at one placement request within a second or
+ * two of each other on one stream, so a peer a little behind another still
+ * finds the segment it wants held rather than having to fetch it again.
+ */
+const LIVE_TRAILING_SEGMENTS = 3;
+
+/**
+ * The floor under that window. On a stream of short segments three of them
+ * are a few seconds, less than peers' positions can differ by — a peer that
+ * started a little later, or stalled once — and a segment evicted early is
+ * one the peer behind fetches over HTTP instead. The few megabytes this keeps
+ * are nothing against a budget of gigabytes.
+ */
+const LIVE_TRAILING_MIN_SECONDS = 15;
 
 export class SegmentMemoryStorage implements SegmentStorage {
   private readonly userAgent = navigator.userAgent;
@@ -42,53 +56,69 @@ export class SegmentMemoryStorage implements SegmentStorage {
   private cache = new Map<string, SegmentDataItem>();
   private readonly logger: debug.Debugger;
   private coreConfig?: CommonCoreConfig;
-  private mainStreamConfig?: StreamConfig;
-  private secondaryStreamConfig?: StreamConfig;
-  private currentPlayback?: Playback;
-  private lastRequestedSegment?: LastRequestedSegmentInfo;
+  /**
+   * The latest position of each stream type: the start of the segment its
+   * player requested last. A segment is judged against its own type's
+   * position, which is where its own queue starts. One position for both
+   * would be the other stream's half the time: at the start of a live DASH
+   * stream dash.js fills video 12–20 s ahead of audio, and every video
+   * request evicted audio segments that the audio queue still prefetched, so
+   * it fetched them again, hundreds of times a minute. A type that stops
+   * requesting keeps its position; its loader stops fetching with it, so
+   * what that keeps is only what it already held.
+   */
+  private readonly positions = new Map<StreamType, Playback>();
+  /**
+   * Whether the stream the player last asked a segment of is live, which is
+   * what tells the retention rule to keep a trailing window. Undefined until
+   * the first request, when there is no position to measure anything against
+   * either.
+   */
+  private lastRequestedIsLive?: boolean;
   private segmentChangeCallback?: (streamSwarmId: string) => void;
+
+  /** Tells the probes of two storages on one page apart. */
+  private static probeSequence = 0;
+  private readonly unprobe: (() => void) | undefined;
 
   constructor() {
     this.logger = debug("p2pml-core:segment-memory-storage");
     this.logger.color = "RebeccaPurple";
+    this.unprobe = diagnostics?.probe(
+      `Storage#${++SegmentMemoryStorage.probeSequence}`,
+      () => ({
+        segments: this.cache.size,
+        MiB: +this.currentStorageUsage.toFixed(1),
+      }),
+    );
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async initialize(
     coreConfig: CommonCoreConfig,
-    mainStreamConfig: StreamConfig,
-    secondaryStreamConfig: StreamConfig,
+    _mainStreamConfig: StreamConfig,
+    _secondaryStreamConfig: StreamConfig,
   ) {
     this.coreConfig = coreConfig;
-    this.mainStreamConfig = mainStreamConfig;
-    this.secondaryStreamConfig = secondaryStreamConfig;
 
     this.setMemoryStorageLimit();
     this.logger("initialized");
   }
 
-  onPlaybackUpdated(position: number, rate: number) {
-    this.currentPlayback = { position, rate };
+  onPlaybackUpdated(position: number, rate: number, streamType: StreamType) {
+    this.positions.set(streamType, { position, rate });
   }
 
   onSegmentRequested(
-    swarmId: string,
-    streamSwarmId: string,
-    segmentId: number,
-    startTime: number,
-    endTime: number,
-    streamType: StreamType,
+    _swarmId: string,
+    _streamSwarmId: string,
+    _segmentId: number,
+    _startTime: number,
+    _endTime: number,
+    _streamType: StreamType,
     isLiveStream: boolean,
   ): void {
-    this.lastRequestedSegment = {
-      streamSwarmId,
-      segmentId,
-      startTime,
-      endTime,
-      swarmId,
-      streamType,
-      isLiveStream,
-    };
+    this.lastRequestedIsLive = isLiveStream;
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
@@ -105,13 +135,18 @@ export class SegmentMemoryStorage implements SegmentStorage {
     this.clear(isLiveStream, data.byteLength);
 
     const storageId = getStorageItemId(streamSwarmId, segmentId);
+    // Storing replaces, so what the entry held stops counting. The map is
+    // idempotent under a repeated store and the byte count has to be too.
+    const replaced = this.cache.get(storageId);
+    if (replaced) this.decreaseStorageUsage(replaced.data.byteLength);
+
     this.cache.set(storageId, {
       data,
       segmentId,
       streamSwarmId,
+      streamType,
       startTime,
       endTime,
-      streamType,
     });
     this.increaseStorageUsage(data.byteLength);
 
@@ -139,25 +174,52 @@ export class SegmentMemoryStorage implements SegmentStorage {
   }
 
   getUsage() {
-    if (!this.lastRequestedSegment || !this.currentPlayback) {
+    if (this.lastRequestedIsLive === undefined || !this.positions.size) {
       return {
         totalCapacity: this.segmentMemoryStorageLimit,
         usedCapacity: this.currentStorageUsage,
       };
     }
-    const playbackPosition = this.currentPlayback.position;
+    const isLiveStream = this.lastRequestedIsLive;
 
     let calculatedUsedCapacity = 0;
-    for (const { endTime, data } of this.cache.values()) {
-      if (playbackPosition > endTime) continue;
+    for (const segmentData of this.cache.values()) {
+      if (!this.isRetained(segmentData, isLiveStream)) continue;
 
-      calculatedUsedCapacity += data.byteLength;
+      calculatedUsedCapacity += segmentData.data.byteLength;
     }
 
     return {
       totalCapacity: this.segmentMemoryStorageLimit,
       usedCapacity: calculatedUsedCapacity / BYTES_PER_MiB,
     };
+  }
+
+  /**
+   * Drops segments their manifest stopped listing, whatever the position: no
+   * request can reach them again. Without this, a paused live player's
+   * storage would keep every segment that ends after its frozen position —
+   * each new one its peers fetch with it — until the storage brake stopped it.
+   */
+  onSegmentsRemoved(
+    _swarmId: string,
+    streamSwarmId: string,
+    segmentIds: readonly number[],
+  ) {
+    let removed = false;
+    for (const segmentId of segmentIds) {
+      const storageId = getStorageItemId(streamSwarmId, segmentId);
+      const item = this.cache.get(storageId);
+      if (!item) continue;
+      this.cache.delete(storageId);
+      this.decreaseStorageUsage(item.data.byteLength);
+      this.logger(
+        `Removed segment ${segmentId} from stream ${streamSwarmId}: no longer in its manifest`,
+      );
+      diagnostics?.count("Evicted:left-window");
+      removed = true;
+    }
+    if (removed) this.sendUpdatesToAffectedStreams(new Set([streamSwarmId]));
   }
 
   hasSegment(_swarmId: string, streamSwarmId: string, externalId: number) {
@@ -182,14 +244,7 @@ export class SegmentMemoryStorage implements SegmentStorage {
   }
 
   private clear(isLiveStream: boolean, newSegmentSize: number) {
-    if (
-      !this.currentPlayback ||
-      !this.mainStreamConfig ||
-      !this.secondaryStreamConfig ||
-      !this.coreConfig
-    ) {
-      return;
-    }
+    if (!this.positions.size || !this.coreConfig) return;
 
     const isMemoryLimitReached = this.isMemoryLimitReached(newSegmentSize);
 
@@ -204,19 +259,14 @@ export class SegmentMemoryStorage implements SegmentStorage {
       const { streamSwarmId, segmentId, data } = segmentData;
       const storageId = getStorageItemId(streamSwarmId, segmentId);
 
-      const shouldRemove = this.shouldRemoveSegment(
-        segmentData,
-        isLiveStream,
-        this.currentPlayback.position,
-      );
-
-      if (!shouldRemove) continue;
+      if (this.isRetained(segmentData, isLiveStream)) continue;
 
       this.cache.delete(storageId);
       affectedStreams.add(streamSwarmId);
       this.decreaseStorageUsage(data.byteLength);
 
       this.logger(`Removed segment ${segmentId} from stream ${streamSwarmId}`);
+      diagnostics?.count("Evicted:trailing-or-limit");
 
       if (!this.isMemoryLimitReached(newSegmentSize) && !isLiveStream) break;
     }
@@ -249,24 +299,37 @@ export class SegmentMemoryStorage implements SegmentStorage {
     });
   }
 
-  private shouldRemoveSegment(
+  /**
+   * Whether the cache has to keep this segment: everything from the position
+   * on — the start of the segment a player requested last — and on live a
+   * trailing window as well, so a peer a little behind this one — or a viewer
+   * who pauses or steps back — still finds it there. That window is the
+   * segment's own length a few times over, under a floor in seconds, and
+   * follows no configured value: the urgency threshold is sized for requests
+   * and can be as short as a single segment.
+   *
+   * Eviction frees what this refuses to keep and `getUsage` reports what it
+   * keeps as occupied, so the brake on prefetching is measured against the
+   * same rule that decides what can be freed. Reporting only the bytes from
+   * the position on would leave a live stream's retained trailing window
+   * invisible: unfreeable capacity that the brake would treat as free.
+   */
+  private isRetained(
     segmentData: SegmentDataItem,
     isLiveStream: boolean,
-    currentPlaybackPosition: number,
   ): boolean {
-    const { endTime, streamType } = segmentData;
-    const highDemandTimeWindow = this.getStreamTimeWindow(
-      streamType,
-      "highDemandTimeWindow",
+    const { startTime, endTime, streamType } = segmentData;
+    // A type with no position yet has had no request: nothing of it is
+    // behind anything.
+    const position = this.positions.get(streamType)?.position;
+    if (position === undefined || position <= endTime) return true;
+    if (!isLiveStream) return false;
+
+    const trailingWindow = Math.max(
+      LIVE_TRAILING_SEGMENTS * (endTime - startTime),
+      LIVE_TRAILING_MIN_SECONDS,
     );
-
-    if (currentPlaybackPosition <= endTime) return false;
-
-    if (isLiveStream) {
-      return currentPlaybackPosition > highDemandTimeWindow + endTime;
-    }
-
-    return true;
+    return position <= endTime + trailingWindow;
   }
 
   private increaseStorageUsage(segmentByteLength: number) {
@@ -291,19 +354,8 @@ export class SegmentMemoryStorage implements SegmentStorage {
     }
   }
 
-  private getStreamTimeWindow(
-    streamType: string,
-    configKey: "highDemandTimeWindow" | "httpDownloadTimeWindow",
-  ): number {
-    const config =
-      streamType === "main"
-        ? this.mainStreamConfig
-        : this.secondaryStreamConfig;
-
-    return config?.[configKey] ?? 0;
-  }
-
   public destroy() {
+    this.unprobe?.();
     this.cache.clear();
     this.segmentChangeCallback = undefined;
   }

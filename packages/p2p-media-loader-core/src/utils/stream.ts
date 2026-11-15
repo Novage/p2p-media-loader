@@ -7,14 +7,14 @@ import {
 import { P2PLoader } from "../p2p/loader.js";
 
 export type SegmentPlaybackStatuses = {
-  isHighDemand: boolean;
   isHttpDownloadable: boolean;
   isP2PDownloadable: boolean;
 };
 
+/** The two windows a queue pass prefetches by, in seconds. */
 export type PlaybackTimeWindowsConfig = Pick<
   StreamConfig,
-  "highDemandTimeWindow" | "httpDownloadTimeWindow" | "p2pDownloadTimeWindow"
+  "httpDownloadTimeWindow" | "p2pDownloadTimeWindow"
 >;
 
 export function getSegmentFromStreamsMap(
@@ -36,34 +36,13 @@ export function getSegmentFromStreamByExternalId(
   }
 }
 
-export function getSegmentAvgDuration(stream: StreamWithSegments) {
-  const { segments } = stream;
-  let sumDuration = 0;
-  const { size } = segments;
-  if (size === 0) return 0;
-  for (const segment of segments.values()) {
-    const duration = segment.endTime - segment.startTime;
-    sumDuration += duration;
-  }
-
-  return sumDuration / size;
-}
-
 function calculateTimeWindows(
   timeWindowsConfig: PlaybackTimeWindowsConfig,
   availableMemoryInPercent: number,
 ) {
-  const {
-    highDemandTimeWindow,
-    httpDownloadTimeWindow,
-    p2pDownloadTimeWindow,
-  } = timeWindowsConfig;
+  const { httpDownloadTimeWindow, p2pDownloadTimeWindow } = timeWindowsConfig;
 
-  const result = {
-    highDemandTimeWindow,
-    httpDownloadTimeWindow,
-    p2pDownloadTimeWindow,
-  };
+  const result = { httpDownloadTimeWindow, p2pDownloadTimeWindow };
 
   if (availableMemoryInPercent <= 5) {
     result.httpDownloadTimeWindow = 0;
@@ -82,18 +61,10 @@ export function getSegmentPlaybackStatuses(
   currentP2PLoader: P2PLoader,
   availableMemoryPercent: number,
 ): SegmentPlaybackStatuses {
-  const {
-    highDemandTimeWindow,
-    httpDownloadTimeWindow,
-    p2pDownloadTimeWindow,
-  } = calculateTimeWindows(timeWindowsConfig, availableMemoryPercent);
+  const { httpDownloadTimeWindow, p2pDownloadTimeWindow } =
+    calculateTimeWindows(timeWindowsConfig, availableMemoryPercent);
 
   return {
-    isHighDemand: isSegmentInTimeWindow(
-      segment,
-      playback,
-      highDemandTimeWindow,
-    ),
     isHttpDownloadable: isSegmentInTimeWindow(
       segment,
       playback,
@@ -105,13 +76,19 @@ export function getSegmentPlaybackStatuses(
   };
 }
 
-function isSegmentInTimeWindow(
-  segment: SegmentWithStream,
+/**
+ * Whether a segment lies in a window that starts at the position — the start
+ * of the segment the player requested last — and reaches `timeWindowLength`
+ * seconds of media ahead at the playback rate. Both sides are manifest time.
+ * See specs/playback-contract.md, "The time windows".
+ */
+export function isSegmentInTimeWindow(
+  segment: Pick<SegmentWithStream, "startTime" | "endTime">,
   playback: Playback,
   timeWindowLength: number,
-) {
-  const { startTime, endTime } = segment;
-  const { position, rate } = playback;
-  const rightMargin = position + timeWindowLength * rate;
-  return !(rightMargin < startTime || position > endTime);
+): boolean {
+  const start = segment.startTime - playback.position;
+  const end = segment.endTime - playback.position;
+  const rightMargin = timeWindowLength * playback.rate;
+  return !(rightMargin < start || 0 > end);
 }

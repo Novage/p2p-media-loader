@@ -10,7 +10,7 @@ import { Core } from "../src/core.js";
 
 test("override configs", () => {
   const coreConfig: CoreConfig = {
-    highDemandTimeWindow: 1200,
+    urgentBufferThreshold: 1200,
     httpDownloadTimeWindow: 0,
     mainStream: {
       simultaneousHttpDownloads: 3,
@@ -18,14 +18,14 @@ test("override configs", () => {
   };
 
   const override: CoreConfig = {
-    highDemandTimeWindow: undefined,
+    urgentBufferThreshold: undefined,
     secondaryStream: {
       simultaneousHttpDownloads: 5,
     },
   };
 
   const result: CoreConfig = {
-    highDemandTimeWindow: undefined,
+    urgentBufferThreshold: undefined,
     httpDownloadTimeWindow: 0,
     mainStream: {
       simultaneousHttpDownloads: 3,
@@ -45,7 +45,7 @@ test("override common config", () => {
     segmentMemoryStorageLimit: undefined,
     simultaneousHttpDownloads: 3,
     simultaneousP2PDownloads: 3,
-    highDemandTimeWindow: 15,
+    urgentBufferThreshold: 15,
     httpDownloadTimeWindow: 3000,
     p2pDownloadTimeWindow: 6000,
     webRtcMaxMessageSize: 64 * 1024 - 1,
@@ -88,7 +88,7 @@ test("override defined stream config", () => {
     httpDownloadInitialTimeoutMs: 3000,
     simultaneousHttpDownloads: 3,
     simultaneousP2PDownloads: 3,
-    highDemandTimeWindow: 15,
+    urgentBufferThreshold: 15,
     httpDownloadTimeWindow: 3000,
     p2pDownloadTimeWindow: 6000,
     webRtcMaxMessageSize: 64 * 1024 - 1,
@@ -117,7 +117,7 @@ test("override defined stream config", () => {
     isP2PUploadDisabled: false,
     isP2PDisabled: false,
     httpDownloadInitialTimeoutMs: 3000,
-    highDemandTimeWindow: 45,
+    urgentBufferThreshold: 45,
     httpDownloadTimeWindow: 5000,
     p2pDownloadTimeWindow: 10000,
     p2pNotReceivingBytesTimeoutMs: 2000,
@@ -142,7 +142,7 @@ test("override defined stream config", () => {
     httpDownloadInitialTimeoutMs: 3000,
     simultaneousHttpDownloads: 2,
     simultaneousP2PDownloads: 20,
-    highDemandTimeWindow: 45,
+    urgentBufferThreshold: 45,
     httpDownloadTimeWindow: 5000,
     p2pDownloadTimeWindow: 10000,
     webRtcMaxMessageSize: 64 * 1024 - 1,
@@ -180,7 +180,7 @@ test("filter undefined props", () => {
   const coreConfig: CoreConfig = {
     simultaneousHttpDownloads: 2,
     simultaneousP2PDownloads: 20,
-    highDemandTimeWindow: 45,
+    urgentBufferThreshold: 45,
     httpDownloadTimeWindow: 5000,
     p2pDownloadTimeWindow: 10000,
     webRtcMaxMessageSize: 64 * 1024 - 1,
@@ -202,7 +202,7 @@ test("filter undefined props", () => {
     mainStream: {
       simultaneousHttpDownloads: undefined,
       simultaneousP2PDownloads: undefined,
-      highDemandTimeWindow: undefined,
+      urgentBufferThreshold: undefined,
       httpDownloadTimeWindow: undefined,
       p2pDownloadTimeWindow: undefined,
     },
@@ -210,7 +210,7 @@ test("filter undefined props", () => {
       swarmId: "CUSTOM_SWARM_ID",
       simultaneousHttpDownloads: undefined,
       simultaneousP2PDownloads: undefined,
-      highDemandTimeWindow: undefined,
+      urgentBufferThreshold: undefined,
       httpDownloadTimeWindow: undefined,
       p2pDownloadTimeWindow: undefined,
     },
@@ -219,7 +219,7 @@ test("filter undefined props", () => {
   const result: CoreConfig = {
     simultaneousHttpDownloads: 2,
     simultaneousP2PDownloads: 20,
-    highDemandTimeWindow: 45,
+    urgentBufferThreshold: 45,
     httpDownloadTimeWindow: 5000,
     p2pDownloadTimeWindow: 10000,
     webRtcMaxMessageSize: 64 * 1024 - 1,

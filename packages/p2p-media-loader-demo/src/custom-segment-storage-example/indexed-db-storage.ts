@@ -59,7 +59,10 @@ export class IndexedDbStorage implements SegmentStorage {
   private secondaryStreamConfig?: StreamConfig;
   private cache = new Map<string, SegmentInfoItem>();
 
-  private currentPlayback?: Playback; // current playback position and rate
+  // The position the core reports: the start of the segment the player
+  // requested last, on the manifest timeline — where the player's buffer
+  // ends, not its playhead — and the playback rate.
+  private currentPlayback?: Playback;
   private lastRequestedSegment?: LastRequestedSegmentInfo; // details  about the last requested segment by the player
   private db: IndexedDbWrapper;
 

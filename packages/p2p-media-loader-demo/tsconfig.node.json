@@ -7,5 +7,9 @@
     "emitDeclarationOnly": true
   },
   "types": ["node"],
-  "include": ["eslint.config.ts", "../../eslint.common.config.ts", "../../eslint.common.react.config.ts"]
+  "include": [
+    "eslint.config.ts",
+    "../../eslint.common.config.ts",
+    "../../eslint.common.react.config.ts"
+  ]
 }

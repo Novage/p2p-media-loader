@@ -2,48 +2,48 @@ import { COLORS } from "../../constants";
 import { ChartsData } from "./../../types";
 import * as d3 from "d3";
 
-export const drawChart = (svgElement: SVGSVGElement, data: ChartsData[]) => {
+const DOWNLOAD_KEYS = ["httpDownloaded", "p2pDownloaded"] as const;
+
+const color = d3
+  .scaleOrdinal<string, string>()
+  .domain(DOWNLOAD_KEYS)
+  .range([COLORS.yellow, COLORS.lightOrange]);
+
+// The caller clears the SVG before each call. Thus this function draws all
+// elements again.
+export const drawChart = (
+  svgElement: SVGSVGElement,
+  data: ChartsData[],
+  svgWidth: number,
+  svgHeight: number,
+) => {
   const margin = { top: 20, right: 1, bottom: 30, left: 25 },
-    width = svgElement.clientWidth - margin.left - margin.right,
-    height = svgElement.clientHeight - margin.top - margin.bottom;
+    width = svgWidth - margin.left - margin.right,
+    height = svgHeight - margin.top - margin.bottom;
 
   const svg = d3.select(svgElement);
-  svg
-    .selectAll("g")
-    .data([null])
-    .enter()
+  const content = svg
     .append("g")
     .attr("transform", `translate(${margin.left},${margin.top})`);
 
   const downloadStatsStack = d3
     .stack<ChartsData, keyof ChartsData>()
-    .keys(["httpDownloaded", "p2pDownloaded"])(data);
+    .keys(DOWNLOAD_KEYS)(data);
 
   const maxDownloadValue = d3.max(downloadStatsStack, (stack) =>
     d3.max(stack, (d) => d[1]),
   );
-  const maxP2PUploadValue = d3.min(data, (d) => d.p2pUploaded);
-
-  const defaultDomain = [0, 1];
-  const extentDomain = d3.extent(data, (d) => d.seconds);
+  const maxP2PUploadValue = d3.max(data, (d) => d.p2pUploaded);
 
   const xScale = d3
     .scaleLinear()
-    .domain(
-      extentDomain.every((extent) => extent !== undefined)
-        ? extentDomain
-        : defaultDomain,
-    )
+    .domain([data[0].seconds, data[data.length - 1].seconds])
     .range([0, width]);
+  // The chart shows upload below zero. Thus the code negates upload values.
   const yScale = d3
     .scaleLinear()
-    .domain([maxP2PUploadValue ?? 0, maxDownloadValue ?? 1])
+    .domain([-(maxP2PUploadValue ?? 0), maxDownloadValue ?? 1])
     .range([height, 0]);
-
-  const color = d3
-    .scaleOrdinal()
-    .domain(["httpDownloaded", "p2pDownloaded"])
-    .range([COLORS.yellow, COLORS.lightOrange]);
 
   const downloadStatsArea = d3
     .area<d3.SeriesPoint<ChartsData>>()
@@ -51,26 +51,13 @@ export const drawChart = (svgElement: SVGSVGElement, data: ChartsData[]) => {
     .y0((d) => yScale(d[0]))
     .y1((d) => yScale(d[1]))
     .curve(d3.curveBasis);
-  const downloadStatsAreaLine = d3
-    .line<d3.SeriesPoint<ChartsData>>()
-    .x((d) => xScale(d.data.seconds))
-    .y((d) => yScale(d[1]))
-    .curve(d3.curveBasis);
 
   const p2pUploadArea = d3
     .area<ChartsData>()
     .x((d) => xScale(d.seconds))
     .y0(() => yScale(0))
-    .y1((d) => yScale(d.p2pUploaded))
+    .y1((d) => yScale(-d.p2pUploaded))
     .curve(d3.curveBasis);
-  const p2pUploadLineArea = d3
-    .line<ChartsData>()
-    .x((d) => xScale(d.seconds))
-    .y((d) => yScale(d.p2pUploaded))
-    .curve(d3.curveBasis);
-
-  const content = svg.select("g");
-  content.selectAll(".axis").remove();
 
   // Axes
   content
@@ -82,34 +69,29 @@ export const drawChart = (svgElement: SVGSVGElement, data: ChartsData[]) => {
         .axisBottom(xScale)
         .tickSize(-height)
         .tickFormat(() => ""),
-    )
-    .selectAll("line")
-    .attr("stroke", "#ddd")
-    .attr("stroke-dasharray", "2,2");
+    );
   content
     .append("g")
     .attr("class", "axis axis--y")
-    .call(d3.axisLeft(yScale).tickSize(-width).ticks(5))
-    .selectAll("line")
+    .call(d3.axisLeft(yScale).tickSize(-width).ticks(5));
+  content
+    .selectAll(".axis line")
     .attr("stroke", "#ddd")
     .attr("stroke-dasharray", "2,2");
 
   // Data layers
-  content.selectAll(".layer").remove();
   content
-    .selectAll(".p2p-upload-area")
-    .data([data])
-    .join("path")
+    .append("path")
+    .datum(data)
     .attr("class", "p2p-upload-area")
     .attr("d", p2pUploadArea)
     .style("fill", COLORS.lightBlue)
     .style("opacity", 0.7);
   content
-    .selectAll(".p2p-upload-line")
-    .data([data])
-    .join("path")
+    .append("path")
+    .datum(data)
     .attr("class", "p2p-upload-line")
-    .attr("d", p2pUploadLineArea)
+    .attr("d", p2pUploadArea.lineY1())
     .style("fill", "none")
     .style("stroke", "blue")
     .style("stroke-width", 2);
@@ -117,20 +99,19 @@ export const drawChart = (svgElement: SVGSVGElement, data: ChartsData[]) => {
   content
     .selectAll(".layer")
     .data(downloadStatsStack)
-    .enter()
-    .append("path")
+    .join("path")
     .attr("class", "layer")
     .attr("d", downloadStatsArea)
-    .style("fill", (_d, i) => color(i.toString()) as string)
+    .style("fill", (d) => color(d.key))
     .style("opacity", 0.7);
   content
     .selectAll(".line")
     .data(downloadStatsStack)
     .join("path")
     .attr("class", "line")
-    .attr("d", downloadStatsAreaLine)
+    .attr("d", downloadStatsArea.lineY1())
     .style("fill", "none")
-    .style("stroke", (_d, i) => color(i.toString()) as string)
+    .style("stroke", (d) => color(d.key))
     .style("stroke-width", 1.5);
 
   return svg;

@@ -10,6 +10,7 @@
   "include": [
     "vite.config.ts",
     "eslint.config.ts",
-    "../../eslint.common.config.ts"
+    "../../eslint.common.config.ts",
+    "../../vite.common.config.ts"
   ]
 }

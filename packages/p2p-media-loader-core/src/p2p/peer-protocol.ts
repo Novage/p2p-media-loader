@@ -51,11 +51,15 @@ export class PeerProtocol {
       eventTarget.getEventDispatcher("onChunkDownloaded");
     this.#onChunkUploaded = eventTarget.getEventDispatcher("onChunkUploaded");
 
-    if (channel.binaryType !== "arraybuffer") {
-      throw new Error(
-        `Expected binaryType "arraybuffer", got "${channel.binaryType}"`,
-      );
-    }
+    // The protocol reads every message as an ArrayBuffer, so it sets the
+    // channel to deliver them that way rather than refusing one that does
+    // not. The WebRTC specification initializes `binaryType` to
+    // "arraybuffer", but engines that predate that default — the client
+    // supports some — hand over a "blob" channel, and refusing it would leave
+    // the peer connected with nothing reading it. Setting it here is in time:
+    // the peer is built in the same task its channel opened in, before any
+    // message event can run.
+    channel.binaryType = "arraybuffer";
     channel.addEventListener("message", this.#onMessageReceived);
   }
 
