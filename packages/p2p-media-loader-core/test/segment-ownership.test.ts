@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { EngineRequest } from "../src/requests/engine-request.js";
 import type { SegmentWithStream } from "../src/internal-types.js";
-import type { SegmentResponse } from "../src/types.js";
+import type { SegmentResponse, StreamType } from "../src/types.js";
 
 /**
  * What core stores is what it seeds to peers, so nothing a player can reach
@@ -9,9 +9,8 @@ import type { SegmentResponse } from "../src/types.js";
  * worker, and a transfer detaches the buffer it came from.
  */
 
-const segment = { externalId: 1 } as SegmentWithStream;
-
-function deliver(data: ArrayBuffer) {
+function deliver(data: ArrayBuffer, type: StreamType = "main") {
+  const segment = { externalId: 1, stream: { type } } as SegmentWithStream;
   const onSuccess = vi.fn();
   const request = new EngineRequest(segment, {
     onSuccess,
@@ -40,5 +39,16 @@ describe("segment bytes handed to a player", () => {
     expect(delivered.data.byteLength).toBe(0);
     expect(stored.byteLength).toBe(4);
     expect(new Uint8Array(stored)).toEqual(new Uint8Array([1, 2, 3, 4]));
+  });
+});
+
+describe("the response to a segment request", () => {
+  it("gives the type of the segment's stream with its bandwidth", () => {
+    for (const type of ["main", "secondary"] as const) {
+      expect(deliver(new ArrayBuffer(4), type)).toMatchObject({
+        bandwidth: 1000,
+        streamType: type,
+      });
+    }
   });
 });

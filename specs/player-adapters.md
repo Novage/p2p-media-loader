@@ -118,6 +118,14 @@ Measured by chunks, a segment that came in one burst after a three-second wait
 read as gigabits per second, and dash.js, told its first segment took 49 ms,
 asked for 4K next and stalled on it.
 
+**The response's `streamType` says which stream type the `bandwidth` is for.**
+The core measures each stream type in its own way: for a stream with no
+bitrate in its manifest, such as an HLS audio rendition, it gives its download
+rate of the last 3 s, while it can give the main stream a figure from a longer
+window, which is lower on a slow network. A player that estimates its
+bandwidth from every segment it loads, such as Media3, counts the main stream
+only, as HLS.js does for its fragments.
+
 ## 3. Report playback state
 
 Push `{ bufferAhead, rate }` whenever it changes. Every adapter must report:

@@ -53,7 +53,11 @@ export class EngineRequest {
     this._status = "succeed";
     diagnostics?.close(this.diagnosticsToken, "succeed");
     diagnostics?.count("PlayerRequest:succeed");
-    this.engineCallbacks.onSuccess({ data: data.slice(0), bandwidth });
+    this.engineCallbacks.onSuccess({
+      data: data.slice(0),
+      bandwidth,
+      streamType: this.segment.stream.type,
+    });
   }
 
   reject() {

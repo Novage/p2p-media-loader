@@ -1469,6 +1469,13 @@ export type SegmentResponse = {
 
   /** Measured bandwidth for the segment download, in bits per second. */
   bandwidth: number;
+
+  /**
+   * The type of the segment's stream. The core measures `bandwidth` for each
+   * stream type in its own way: a player that estimates its bandwidth from
+   * every segment it loads counts the main stream only, as HLS.js does.
+   */
+  streamType: StreamType;
 };
 
 /** Custom error class for errors that occur during core network requests. */

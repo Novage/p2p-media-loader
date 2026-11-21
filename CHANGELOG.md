@@ -103,6 +103,11 @@ throughout.
   `updatePlayback` with `getPlaybackStateFromMediaElement`,
   `byteRangeFromRangeHeader`, and the
   `onSegmentRegistryMiss` event for a segment request the registry did not know.
+- **`SegmentResponse.streamType` gives the type of the segment's stream.**
+  The core measures the `bandwidth` of each stream type in its own way, and
+  can give an audio rendition more than the main stream. A player that
+  estimates its bandwidth from every segment it loads, such as Media3, needs
+  the type to count the main stream only, as HLS.js does.
 - **Manifest parsers are selected statically**, through
   `CoreConfig.manifestParsers` and the `p2p-media-loader-core/hls` and
   `p2p-media-loader-core/dash` subpaths, so a deployment carries only the
