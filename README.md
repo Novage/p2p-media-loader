@@ -13,7 +13,7 @@ This library makes it possible to build large-scale P2P mesh networks — often 
 - **Works Everywhere:**
   P2P Media Loader **supports all modern desktop and mobile browsers** — Chrome, Safari, Edge, Firefox, and Opera — across Windows, macOS, Android, iOS, iPadOS, and Linux. Check out our [guide](https://novage.com.ua/blog/setting-up-p2p-video-on-a-web-page-in-5-minutes-for-free) to set up P2P video in five minutes. You can also [embed](https://novage.com.ua/blog/integrate-p2p-video-streaming-into-mobile-application) it into **native iOS and Android** apps and use it with **native players**.
 - **No Setup Cost and No Server Software Needed:**
-  For smaller setups (1,000–2,000 simultaneous viewers), public trackers alone can handle peer connections. This means you **don’t need to install or maintain any additional server-side components** in many cases. **Free** alternatives are available for larger setups that can handle 100k simultaneous peers and above. Check our article on [running dedicated trackers](https://novage.com.ua/blog/p2p-video-delivery-for-up-to-100k-viewers-for-free).
+  For smaller setups (1,000–2,000 simultaneous viewers), public trackers alone can handle peer connections. This means you **don’t need to install or maintain any additional server-side components** in many cases. **Free** alternatives are available for larger setups that can handle 100k simultaneous peers and above. Check our article on [100k P2P video peers on the Oracle Cloud Always Free Tier](https://novage.com.ua/blog/100k-p2p-video-peers-on-the-oracle-cloud-always-free-tier).
 - **Reduced Load on Origin:**
   Offloading requests from the CDN or media server to peers eases the strain on centralized infrastructure, increasing system reliability.
 - **Significant Cost Savings:**
@@ -27,7 +27,7 @@ This library makes it possible to build large-scale P2P mesh networks — often 
 
 ## Related Software
 
-- [wt-tracker-rust](https://github.com/Novage/wt-tracker-rust) (recommended): a multi-core WebTorrent tracker in Rust, a port of wt-tracker that runs `wss://tracker.novage.com.ua`. A 2-core Oracle Cloud **Free** Tier Ampere A1 instance can serve more than 200k peers, about 120k on average within the free monthly traffic (one WebSocket connection per peer).
+- [wt-tracker-rust](https://github.com/Novage/wt-tracker-rust) (recommended): a multi-core WebTorrent tracker in Rust, a port of wt-tracker that runs `wss://tracker.novage.com.ua`. A 2-core Oracle Cloud **Free** Tier Ampere A1 instance can serve more than 200k peers, about 120k on average within the free monthly traffic (one WebSocket connection per peer); [the article](https://novage.com.ua/blog/100k-p2p-video-peers-on-the-oracle-cloud-always-free-tier) tells how.
 - [wt-tracker](https://github.com/Novage/wt-tracker): a high-performance WebTorrent tracker for Node.js using [µWebSockets.js](https://github.com/uNetworking/uWebSockets.js).
 - [Aquatic](https://github.com/greatest-ape/aquatic): a high-performance WebTorrent and BitTorrent tracker written in Rust.
 - [bittorrent-tracker](https://github.com/webtorrent/bittorrent-tracker): official WebTorrent tracker implementation for Node.js.
