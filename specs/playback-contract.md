@@ -394,11 +394,12 @@ size the player by. An audio playlist often carries a wider window than the
 video's, and a threshold derived from it would exceed the buffer the player
 actually holds.
 
-Off live, the adapters hold the player's buffer to the threshold. The player
-then asks for each segment with a buffer below the threshold, so each request
-is urgent when it is made. Nothing bounds a VOD stream ahead of the player, so
-the core prefetches beyond the player's buffer through the windows, and the
-player's requests are served from the store.
+Off live, nothing bounds the stream ahead of the player, so the core
+prefetches beyond the player's buffer through the windows, and the player's
+requests are served from the store. The adapters leave the player's own
+buffer there: a request made with more buffer than the threshold is not
+urgent, waits for a peer while the buffer drains, and goes over HTTP once the
+buffer is below the threshold.
 
 ## What the segment store receives
 

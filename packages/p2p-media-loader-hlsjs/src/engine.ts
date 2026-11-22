@@ -14,7 +14,6 @@ import {
   DynamicCoreConfig,
   debug,
   DefinedCoreConfig,
-  urgentBufferThresholdFor,
   liveDelayFor,
   liveDelayFromWindow,
   maxLiveLatencyFor,
@@ -406,33 +405,42 @@ export class HlsJsP2PEngine {
    * redundant with the one on length beside it.
    */
   private handleLevelUpdated = (event: string, data: LevelUpdatedData) => {
+    const hls = this.currentHlsInstance;
+    const { details } = data;
+    if (
+      !hls ||
+      details.fragments.length === 0 ||
+      details.fragments[0].type !== MAIN_LEVEL_TYPE
+    ) {
+      return;
+    }
+
+    // VOD keeps HLS.js's own buffer, and a ceiling left from a live source is
+    // given back, whatever the playlist's length: a request made above the
+    // urgency threshold waits for a peer, and the core prefetches ahead of
+    // the player.
+    if (!details.live) {
+      this.restoreForwardBuffer();
+      return;
+    }
+
     // Four segments is the narrowest live window worth placing: the buffer
     // sits a segment short of the delay, and the delay a segment inside the
     // tail, so with three there is nothing left between them for peers.
+    if (details.fragments.length < MIN_TUNABLE_FRAGMENTS) return;
+
+    // The buffer is measured from the live delay, so it is this engine's to
+    // size only where the delay is its own too.
+    const { userConfig } = hls;
     if (
-      this.currentHlsInstance &&
-      data.details.fragments.length >= MIN_TUNABLE_FRAGMENTS &&
-      data.details.fragments[0].type === MAIN_LEVEL_TYPE
+      userConfig.maxBufferLength === undefined &&
+      userConfig.maxMaxBufferLength === undefined &&
+      !setsLiveSync(userConfig)
     ) {
       // `EXT-X-TARGETDURATION` is an upper bound, on some streams several
       // times the real segment; the playlist's average is the segment.
-      const segment =
-        data.details.averagetargetduration ?? data.details.targetduration;
-
-      // A live buffer is measured from the live delay, so it is this
-      // engine's to size only where the delay is too. A VOD buffer is sized
-      // from the urgency threshold, whoever placed live streams.
-      const { userConfig } = this.currentHlsInstance;
-      if (
-        userConfig.maxBufferLength === undefined &&
-        userConfig.maxMaxBufferLength === undefined &&
-        !(data.details.live && setsLiveSync(userConfig))
-      ) {
-        this.updateMaxBufferLength(
-          segment,
-          data.details.live ? data.details.totalduration : undefined,
-        );
-      }
+      const segment = details.averagetargetduration ?? details.targetduration;
+      this.updateMaxBufferLength(segment, details.totalduration);
     }
   };
 
@@ -528,11 +536,7 @@ export class HlsJsP2PEngine {
    * that, in seconds. On a live window it is held a segment short of the live
    * delay, by the rule every adapter shares: the core sets its urgency
    * threshold at half of that buffer, and the other half is the time peers
-   * have to fill the player's requests before they become urgent. On VOD it
-   * is held to the urgency threshold, with
-   * a floor of two fragments for a player that could not otherwise keep
-   * going: the core's prefetch runs ahead of the player there whatever the
-   * player buffers, since nothing bounds the stream ahead.
+   * have to fill the player's requests before they become urgent.
    *
    * Each setting is a ceiling, not a target: what HLS.js or the integrator
    * holds below it is left alone, and the ceiling itself is never raised
@@ -540,33 +544,16 @@ export class HlsJsP2PEngine {
    * given back up to it as well as taken down.
    *
    * @param fragmentDuration - The playlist's average fragment length.
-   * @param liveWindow - The live window's length, or `undefined` off live.
+   * @param liveWindow - The live window's length.
    */
-  private updateMaxBufferLength(
-    fragmentDuration: number,
-    liveWindow: number | undefined,
-  ) {
-    if (!this.currentHlsInstance) return;
-
-    let p2pOptimalBufferLength: number;
-    if (liveWindow !== undefined && liveWindow > 0 && fragmentDuration > 0) {
-      p2pOptimalBufferLength = playerBufferFor({
-        delay: liveDelayFromWindow(liveWindow, fragmentDuration),
-        segment: fragmentDuration,
-      });
-    } else {
-      // What each stream's loader will actually judge by, not what was
-      // configured: a stream left unconfigured derives the default off live.
-      const { mainStream, secondaryStream } = this.core.getConfig();
-      p2pOptimalBufferLength = Math.max(
-        fragmentDuration * 2,
-        urgentBufferThresholdFor(mainStream.urgentBufferThreshold, undefined),
-        urgentBufferThresholdFor(
-          secondaryStream.urgentBufferThreshold,
-          undefined,
-        ),
-      );
+  private updateMaxBufferLength(fragmentDuration: number, liveWindow: number) {
+    if (!this.currentHlsInstance || !(liveWindow > 0 && fragmentDuration > 0)) {
+      return;
     }
+    const p2pOptimalBufferLength = playerBufferFor({
+      delay: liveDelayFromWindow(liveWindow, fragmentDuration),
+      segment: fragmentDuration,
+    });
 
     const { config } = this.currentHlsInstance;
     this.forwardBuffer ??= {

@@ -278,17 +278,6 @@ describe("HLS.js live window placement", () => {
     });
     expect(live.hls.config.maxBufferLength).toBe(30);
     expect(live.hls.config.maxMaxBufferLength).toBe(600);
-
-    // A VOD buffer is sized from the urgency threshold, not from a delay.
-    const vod = setup();
-    vod.hls.userConfig.liveSyncDuration = 10;
-    levelUpdated(vod.hls, {
-      live: false,
-      totalduration: 20,
-      averagetargetduration: 5,
-      fragments: 4,
-    });
-    expect(vod.hls.config.maxBufferLength).toBe(15);
   });
 
   it("tunes a four-segment playlist, the narrowest window with room in it", () => {
@@ -436,39 +425,36 @@ describe("HLS.js live window placement", () => {
     expect(hls.config.maxBufferLength).toBe(6);
   });
 
-  it("sizes the VOD buffer by the widest window either stream actually uses", () => {
-    // Only the main stream is configured; the secondary is left to derive,
-    // which off live is the 15 s default. A buffer sized by the configured
-    // number alone would make every audio request urgent.
-    const { hls } = setup({
-      core: { mainStream: { urgentBufferThreshold: 3 } },
-    });
+  it("leaves the VOD buffer to HLS.js", () => {
+    // Nothing bounds a VOD stream ahead of the player: a request made above
+    // the urgency threshold waits for a peer, and the core prefetches ahead.
+    const { hls } = setup({ core: { urgentBufferThreshold: 3 } });
     levelUpdated(hls, {
       live: false,
       totalduration: 600,
       averagetargetduration: 2,
     });
-    expect(hls.config.maxBufferLength).toBe(15);
+    expect(hls.config.maxBufferLength).toBe(30);
+    expect(hls.config.maxMaxBufferLength).toBe(600);
   });
 
-  it("holds the buffer to the urgency threshold off live", () => {
-    // VOD: the core prefetches ahead of the player however far it buffers,
-    // so the player is held to the threshold and the core does the rest.
+  it("gives back a live ceiling when the playlist is VOD", () => {
     const { hls } = setup();
     levelUpdated(hls, {
-      live: false,
-      totalduration: 600,
+      live: true,
+      totalduration: 28,
       averagetargetduration: 2,
     });
-    expect(hls.config.maxBufferLength).toBe(15);
-
-    const configured = setup({ core: { urgentBufferThreshold: 20 } });
-    levelUpdated(configured.hls, {
+    expect(hls.config.maxBufferLength).toBe(24);
+    // Also a playlist too short to place a live window in.
+    levelUpdated(hls, {
       live: false,
-      totalduration: 600,
+      totalduration: 6,
       averagetargetduration: 2,
+      fragments: 3,
     });
-    expect(configured.hls.config.maxBufferLength).toBe(20);
+    expect(hls.config.maxBufferLength).toBe(30);
+    expect(hls.config.maxMaxBufferLength).toBe(600);
   });
 
   it("never asks for more than a minute of latency, and leaves a DVR window to the viewer", () => {

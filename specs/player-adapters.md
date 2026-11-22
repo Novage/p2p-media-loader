@@ -237,19 +237,19 @@ left alone.
   `playerBufferFor` rule the core exports and every adapter applies. The core
   sets its urgency threshold at half of that buffer, and the other half is the
   time peers have to fill the player's requests before they become urgent
-  ([playback-contract.md](playback-contract.md), "The urgency threshold"). On
-  VOD they are held to the urgency threshold instead: nothing bounds the stream
-  ahead of the player there, so the core prefetches beyond the player's buffer
-  whatever its length, and the player is held to the threshold so that the
-  core does the rest. Both keys are ceilings kept by the rules above: HLS.js's own
-  defaults, or a lower value the integrator set, are never raised past, what
-  the adapter itself wrote is given back up when the window grows, and both are
-  put back as the instance held them when the engine lets it go. The VOD
-  ceiling is the higher of the two streams' effective thresholds, since either
-  stream's loader schedules by its own. The live ceiling is measured from the
-  live delay, so it is written only where the adapter places the player: an
-  integrator who configured any of the four live sync settings below keeps
-  HLS.js's own buffer on a live playlist, by rule 1 above.
+  ([playback-contract.md](playback-contract.md), "The urgency threshold"). Both
+  keys are ceilings kept by the rules above: HLS.js's own defaults, or a lower
+  value the integrator set, are never raised past, what the adapter itself
+  wrote is given back up when the window grows, and both are put back as the
+  instance held them when the engine lets it go, or when a playlist is VOD.
+  The ceiling is measured from the live delay, so it is written only where the
+  adapter places the player: an integrator who configured any of the four live
+  sync settings below keeps HLS.js's own buffer, by rule 1 above. On VOD the
+  buffer is HLS.js's own, as on the other adapters, which HLS.js grows past
+  `maxBufferLength` as far as `maxBufferSize` allows, up to
+  `maxMaxBufferLength` (600 s by default): nothing bounds the stream ahead of
+  the player, the core prefetches ahead of it through its own windows, and a
+  request made above the urgency threshold waits for a peer.
 - **Position in the live window.** Every segment between the player's buffer
   and the live edge is one peers can fetch for each other, so the player is
   placed as deep in the window as it can go: the target latency, set through
@@ -343,8 +343,8 @@ that call.
 
 The adapter's preload handling captures HLS.js's `maxBufferLength` when it
 first sees the instance and writes it back when the element starts playing,
-which undoes the engine's forward-buffer tuning until the next level update —
-on VOD, for the rest of the level. With `preload="auto"`, as the demo sets, the
+which undoes the engine's forward-buffer tuning until the next level update.
+With `preload="auto"`, as the demo sets, the
 limits are applied once up front and the tuning stands; an integration that
 keeps the adapter's default `preload="metadata"` should pass `maxBufferLength`
 in `source.engine.hlsJs` itself, which the engine then respects.

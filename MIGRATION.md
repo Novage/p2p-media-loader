@@ -281,7 +281,11 @@ the derived one, and past it the threshold is half the buffer. A threshold
 past that would make every request urgent and leave the election nothing.
 Carrying v4's `highDemandTimeWindow: 15` onto a short live window as
 `urgentBufferThreshold: 15` therefore buys nothing: it is capped to the value
-the core derives anyway. Off live the number is still the threshold.
+the core derives anyway. Off live the number is still the threshold, and it
+no longer sizes HLS.js's buffer: on VOD HLS.js keeps its own. HLS.js grows it
+past `maxBufferLength` as far as `maxBufferSize` allows at the level's bitrate,
+up to `maxMaxBufferLength`, 600 s by default. To hold it lower, set
+`maxMaxBufferLength` in the HLS.js config, with `maxBufferLength` no higher.
 
 A config that still names `highDemandTimeWindow` — in plain JavaScript, or in
 an object TypeScript does not check as a literal — is not carried over, since

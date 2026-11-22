@@ -194,7 +194,9 @@ throughout.
   alike, and hls.js tunes a four-segment playlist, the narrowest with
   room in it. An adapter sizes that buffer only where it also placed the
   player: an integrator who set the live delay — on hls.js any of the four
-  live sync settings — keeps the player's own buffer. On a four-segment live playlist, where the delay, the window and
+  live sync settings — keeps the player's own buffer. On VOD every adapter
+  leaves the player's own buffer, where the hls.js adapter of 4.x held it to
+  `highDemandTimeWindow`: a request made above the threshold waits for a peer. On a four-segment live playlist, where the delay, the window and
   the buffer all measured 15 s, two peers pulled 1.68 copies of each segment
   from the origin and no election ever ran. The memory storage keeps three
   trailing segments on live, under a floor of 15 s, instead of the window's
