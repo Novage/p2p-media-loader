@@ -246,7 +246,10 @@ left alone.
   the adapter itself wrote is given back up when the window grows, and both are
   put back as the instance held them when the engine lets it go. The VOD
   ceiling is the higher of the two streams' effective thresholds, since either
-  stream's loader schedules by its own.
+  stream's loader schedules by its own. The live ceiling is measured from the
+  live delay, so it is written only where the adapter places the player: an
+  integrator who configured any of the four live sync settings below keeps
+  HLS.js's own buffer on a live playlist, by rule 1 above.
 - **Position in the live window.** Every segment between the player's buffer
   and the live edge is one peers can fetch for each other, so the player is
   placed as deep in the window as it can go: the target latency, set through

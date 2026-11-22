@@ -264,6 +264,33 @@ describe("HLS.js live window placement", () => {
     expect(count("HlsPlacement:applied")).toBe(applied + 1);
   });
 
+  it("leaves the live buffer to an integrator who set the live sync", () => {
+    // The buffer is measured from the delay: against a delay the integrator
+    // chose, the one this engine would size it from is not where the player
+    // plays. Four 5 s segments would hold it to 10 s.
+    const live = setup();
+    live.hls.userConfig.liveSyncDuration = 10;
+    levelUpdated(live.hls, {
+      live: true,
+      totalduration: 20,
+      averagetargetduration: 5,
+      fragments: 4,
+    });
+    expect(live.hls.config.maxBufferLength).toBe(30);
+    expect(live.hls.config.maxMaxBufferLength).toBe(600);
+
+    // A VOD buffer is sized from the urgency threshold, not from a delay.
+    const vod = setup();
+    vod.hls.userConfig.liveSyncDuration = 10;
+    levelUpdated(vod.hls, {
+      live: false,
+      totalduration: 20,
+      averagetargetduration: 5,
+      fragments: 4,
+    });
+    expect(vod.hls.config.maxBufferLength).toBe(15);
+  });
+
   it("tunes a four-segment playlist, the narrowest window with room in it", () => {
     const { hls } = setup();
     // Four 5 s segments: the playhead 15 s behind the edge and the buffer

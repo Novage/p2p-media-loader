@@ -99,6 +99,16 @@ const FORWARD_BUFFER_KEYS = ["maxBufferLength", "maxMaxBufferLength"] as const;
 type ForwardBufferKey = (typeof FORWARD_BUFFER_KEYS)[number];
 
 /**
+ * Whether the integrator placed live streams themselves: any of the four
+ * live sync settings makes the live delay theirs.
+ */
+const setsLiveSync = (userConfig: Partial<HlsConfig>) =>
+  userConfig.liveSyncDuration !== undefined ||
+  userConfig.liveSyncDurationCount !== undefined ||
+  userConfig.liveMaxLatencyDuration !== undefined ||
+  userConfig.liveMaxLatencyDurationCount !== undefined;
+
+/**
  * Represents a Peer-to-Peer (P2P) engine for HLS (HTTP Live Streaming) to enhance media streaming efficiency.
  * This class integrates P2P technologies into HLS.js, enabling the distribution of media segments via a peer network
  * alongside traditional HTTP fetching. This reduces server bandwidth costs and improves scalability by sharing the load
@@ -409,10 +419,14 @@ export class HlsJsP2PEngine {
       const segment =
         data.details.averagetargetduration ?? data.details.targetduration;
 
+      // A live buffer is measured from the live delay, so it is this
+      // engine's to size only where the delay is too. A VOD buffer is sized
+      // from the urgency threshold, whoever placed live streams.
       const { userConfig } = this.currentHlsInstance;
       if (
         userConfig.maxBufferLength === undefined &&
-        userConfig.maxMaxBufferLength === undefined
+        userConfig.maxMaxBufferLength === undefined &&
+        !(data.details.live && setsLiveSync(userConfig))
       ) {
         this.updateMaxBufferLength(
           segment,
@@ -490,13 +504,7 @@ export class HlsJsP2PEngine {
     const differs = (current: number | undefined, next: number) =>
       current === undefined || Math.abs(current - next) >= tolerance;
 
-    const { userConfig } = hls;
-    if (
-      userConfig.liveSyncDuration !== undefined ||
-      userConfig.liveSyncDurationCount !== undefined ||
-      userConfig.liveMaxLatencyDuration !== undefined ||
-      userConfig.liveMaxLatencyDurationCount !== undefined
-    ) {
+    if (setsLiveSync(hls.userConfig)) {
       diagnostics?.count("HlsPlacement:integrator");
       return;
     }
