@@ -48,7 +48,8 @@ URL: never an error, never wrong bytes.
 The first manifest processed also names the swarm: unless a `swarmId` is
 configured or the integration has set the manifest response URL explicitly,
 the swarm ID is that manifest's URL with its query string discarded
-([segment-identity.md](segment-identity.md)). Every viewer of a stream fetches
+([segment-identity.md](segment-identity.md)). A `swarmId` function gets that
+URL, with and without its query, once for the source. Every viewer of a stream fetches
 the same master first, so this needs no coordination.
 
 The call is idempotent: re-processing an unchanged manifest produces no

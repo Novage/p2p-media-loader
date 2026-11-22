@@ -21,7 +21,8 @@
  * ```typescript
  * import { buildStreamSwarmId, computeInfoHash } from "p2p-media-loader-core/server";
  *
- * // swarmId: the configured swarmId, or the manifest URL without its query.
+ * // swarmId: the configured swarmId, what a configured swarmId function
+ * // returns for the master's URL, or that URL without its query.
  * const hls720p = computeInfoHash(buildStreamSwarmId(swarmId, "main1"));
  * const dashAudio = computeInfoHash(buildStreamSwarmId(swarmId, "secondary-audio-en"));
  * ```
@@ -42,4 +43,5 @@ export type {
   StreamIdBuilderContext,
   StreamProperties,
   StreamType,
+  SwarmIdContext,
 } from "./types.js";

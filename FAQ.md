@@ -132,6 +132,20 @@ const hls = new HlsWithP2P({
 });
 ```
 
+A string names every video the player plays. A player reused for several
+videos — a playlist, or the next item — gives each its own swarm with a
+function, which the core calls once for each source:
+
+```javascript
+const config = {
+  core: {
+    // The video's own identifier, from a URL such as /play/master.m3u8?id=42.
+    swarmId: ({ requestedUrl }) =>
+      `video-${new URL(requestedUrl).searchParams.get("id")}`,
+  },
+};
+```
+
 ## How to see that P2P is actually working?
 
 The easiest way is to subscribe to P2P [events](https://novage.github.io/p2p-media-loader/docs/v5.0/types/p2p-media-loader-core.p2p-media-loader-core.CoreEventMap.html) and log them:

@@ -202,9 +202,12 @@ A builder that only wrapped the default, such as
 `` ({ defaultStreamSwarmId }) => `tenant-a-${defaultStreamSwarmId}` ``,
 becomes `` ({ defaultStreamId }) => `tenant-a-${defaultStreamId}` ``: each
 source keeps its own swarm, named by its URL, with the prefix. Do not move the
-prefix into `swarmId`: an engine keeps one core, and so one `swarmId`, for
-every source it plays, so `swarmId: "tenant-a"` would put every video's
-`main0` in one swarm.
+prefix into a `swarmId` string: an engine keeps one core, and so one
+`swarmId`, for every source it plays, so `swarmId: "tenant-a"` would put every
+video's `main0` in one swarm. A `swarmId` function is called once for each
+source, with the URL that would name its swarm by default:
+`` ({ manifestUrl }) => `tenant-a-${videoIdOf(manifestUrl)}` `` gives each
+video its own swarm.
 
 A server predicts the default infohashes from the manifest it serves:
 

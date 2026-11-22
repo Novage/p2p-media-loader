@@ -35,6 +35,7 @@ import {
   StreamType,
   DynamicStreamConfig,
   ProcessedManifest,
+  SwarmIdContext,
 } from "./types.js";
 import {
   BandwidthCalculators,
@@ -170,6 +171,13 @@ export class Core {
 
   private readonly eventTarget = new EventTarget<CoreEventMap>();
   private manifestResponseUrl?: string;
+  /** The same URL with its query, for a `swarmId` function. */
+  private manifestRequestedUrl?: string;
+  /** What each `swarmId` function returned for the source playing. */
+  private readonly sourceSwarmIds = new Map<
+    (context: SwarmIdContext) => string,
+    string
+  >();
   /** Registered streams, keyed by the manifest-derived stream key. */
   private readonly streams = new Map<string, StreamWithSegments>();
   /** Stream keys whose registration failed; reported once, then left alone. */
@@ -474,6 +482,7 @@ export class Core {
    */
   setManifestResponseUrl(url: string): void {
     this.manifestResponseUrl = stripQuery(url);
+    this.manifestRequestedUrl = url;
   }
 
   /**
@@ -549,7 +558,8 @@ export class Core {
     // A manifest that registered nothing — an I-frame playlist handed over
     // before its master — is not the presentation's name.
     if (this.manifestRegistry.hasStreams()) {
-      this.manifestResponseUrl ??= stripQuery(requestedUrl ?? manifest.url);
+      this.manifestRequestedUrl ??= requestedUrl ?? manifest.url;
+      this.manifestResponseUrl ??= stripQuery(this.manifestRequestedUrl);
     }
 
     this.syncStreamsFromRegistry();
@@ -930,7 +940,28 @@ export class Core {
         ? this.mainStreamConfig
         : this.secondaryStreamConfig;
 
-    const swarmId = config.swarmId ?? this.manifestResponseUrl;
+    const { manifestResponseUrl } = this;
+    const configured = config.swarmId;
+    let swarmId: string | undefined;
+    if (typeof configured !== "function") {
+      swarmId = configured ?? manifestResponseUrl;
+    } else if (manifestResponseUrl !== undefined) {
+      // Once per source, and again for the next one: `destroy()` forgets
+      // both the answer and the URL that names the source. A stream that
+      // registers later in the source — a period added on a refresh — gets
+      // the answer the source's first stream got.
+      swarmId = this.sourceSwarmIds.get(configured);
+      if (swarmId === undefined) {
+        swarmId = configured({
+          manifestUrl: manifestResponseUrl,
+          requestedUrl: this.manifestRequestedUrl ?? manifestResponseUrl,
+        });
+        if (swarmId === "") {
+          throw new Error("swarmId must return a non-empty string");
+        }
+        this.sourceSwarmIds.set(configured, swarmId);
+      }
+    }
     if (swarmId === undefined) {
       throw new Error(
         "Failed to register stream: no swarmId is configured and no manifest has named the swarm.",
@@ -1200,7 +1231,8 @@ export class Core {
    * The core is left ready for the next source: the manifest registry and
    * the registered streams are emptied, and the swarm name the last source
    * gave — by `setManifestResponseUrl` or by its first manifest — is
-   * forgotten, so the next source names its own. A configured `swarmId` stays.
+   * forgotten, so the next source names its own. A configured `swarmId`
+   * string stays; a `swarmId` function names the next source again.
    * Every part is torn down even when one before it throws — an integrator's
    * own segment storage is free to — and the first failure is rethrown once
    * all have run.
@@ -1265,6 +1297,8 @@ export class Core {
     this.unprobeBandwidth = undefined;
     this.segmentStorage = undefined;
     this.manifestResponseUrl = undefined;
+    this.manifestRequestedUrl = undefined;
+    this.sourceSwarmIds.clear();
     this.streamDetails = { isLive: false, liveTarget: undefined };
     this.storageInitPromise = undefined;
     this.storageGeneration++;

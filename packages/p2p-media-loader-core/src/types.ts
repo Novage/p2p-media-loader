@@ -117,10 +117,11 @@ export type Stream = {
   readonly properties: Readonly<StreamProperties>;
 
   /**
-   * The swarm ID the stream was registered with: the configured `swarmId`
-   * or, if not set, the URL of the first manifest that registered a stream —
-   * the URL that was requested, where the adapter reports it — with its query
-   * string discarded. Resolved once at registration.
+   * The swarm ID the stream was registered with: the configured `swarmId`,
+   * what a `swarmId` function returned for this source, or, if not set, the
+   * URL of the first manifest that registered a stream — the URL that was
+   * requested, where the adapter reports it — with its query string
+   * discarded. Resolved once at registration.
    */
   readonly swarmId: string;
 
@@ -588,6 +589,15 @@ export type StreamConfig = {
    * it. It names the whole set of streams the manifest declares, so a
    * deployment that configures one should hand the core the master or the MPD.
    *
+   * A string names every source the core plays. A core that plays several
+   * videos — a playlist, or a player reused for the next item — gives each
+   * its own swarm with a function: the core calls it once for each source,
+   * when the source registers its first stream, with the source's manifest
+   * URL, and again for the next source after `destroy()`. It must give every
+   * viewer of the same content the same non-empty string; a throw or an empty
+   * string fails the stream's registration (`onStreamRegistrationError`), and
+   * the stream plays without P2P.
+   *
    * This property cannot be changed at runtime: stream identity is derived
    * from it once, when a stream is registered.
    *
@@ -595,8 +605,20 @@ export type StreamConfig = {
    * ```typescript
    * swarmId: undefined
    * ```
+   *
+   * @example
+   * ```typescript
+   * import type { CoreConfig } from "p2p-media-loader-core";
+   *
+   * const config: CoreConfig = {
+   *   // One player for a playlist: each video's own identifier, here the
+   *   // `id` of a URL such as /play/master.m3u8?id=42.
+   *   swarmId: ({ requestedUrl }) =>
+   *     `video-${new URL(requestedUrl).searchParams.get("id")}`,
+   * };
+   * ```
    */
-  swarmId?: string;
+  swarmId?: string | ((context: SwarmIdContext) => string);
 
   /**
    * An optional function that builds a custom stream ID: the part of the
@@ -910,14 +932,33 @@ export type ManifestStreamInfo = {
   properties: Readonly<StreamProperties>;
 };
 
+/** What a `swarmId` function receives about the source it names. */
+export type SwarmIdContext = {
+  /**
+   * The URL that names the source's swarm when no `swarmId` is configured:
+   * the URL of the first manifest that registered a stream — the URL that
+   * was requested, where the adapter reports it — with its query string
+   * discarded, or the one `setManifestResponseUrl` gave.
+   */
+  manifestUrl: string;
+
+  /**
+   * The same URL with its query string, for a source that only the query
+   * tells apart (`master.m3u8?id=42`). A query can also carry what differs
+   * from viewer to viewer — a token, a session — which must not enter the
+   * swarm ID: read only the part every viewer of the content shares.
+   */
+  requestedUrl: string;
+};
+
 /** The stream identity data passed to a custom `streamIdBuilder`. */
 export type StreamIdBuilderContext = {
   /**
-   * The swarm ID of the stream: the configured `swarmId` or, if unset, the
-   * URL of the first manifest that registered a stream — the URL that was
-   * requested, where the adapter reports it — with its query string
-   * discarded. The core adds it to the stream swarm ID; do not repeat it in
-   * the stream ID.
+   * The swarm ID of the stream: the configured `swarmId`, what a `swarmId`
+   * function returned for this source, or, if unset, the URL of the first
+   * manifest that registered a stream — the URL that was requested, where
+   * the adapter reports it — with its query string discarded. The core adds
+   * it to the stream swarm ID; do not repeat it in the stream ID.
    */
   swarmId: string;
 

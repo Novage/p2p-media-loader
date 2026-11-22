@@ -90,6 +90,83 @@ describe("stream registration from manifests", () => {
     expect(stream?.infoHash).toBe(computeInfoHash("v3-my-swarm-main0"));
   });
 
+  it("names each source's swarm with a swarmId function", () => {
+    // One player for a playlist: each video gets its own swarm, named for
+    // each source anew after destroy().
+    const videos: Record<string, string> = {
+      [MANIFEST_URL]: "video-1",
+      "https://example.com/hls/other/master.m3u8": "video-2",
+    };
+    const swarmId = vi.fn(({ manifestUrl }: { manifestUrl: string }) => {
+      return videos[manifestUrl];
+    });
+    const core = new Core({ manifestParsers: [hlsManifestParser], swarmId });
+    core.processManifest({
+      url: `${MANIFEST_URL}?token=abc`,
+      data: HLS_MASTER_WITH_AUDIO,
+    });
+    expect(core.getStream(VIDEO_1080)?.streamSwarmId).toBe("v3-video-1-main0");
+    expect(swarmId).toHaveBeenCalledWith({
+      manifestUrl: MANIFEST_URL,
+      requestedUrl: `${MANIFEST_URL}?token=abc`,
+    });
+
+    core.destroy();
+    const other = "https://example.com/hls/other/master.m3u8";
+    core.processManifest({ url: other, data: HLS_MASTER_WITH_AUDIO });
+    expect(
+      core.getStream("https://example.com/hls/other/video/1080p/index.m3u8")
+        ?.streamSwarmId,
+    ).toBe("v3-video-2-main0");
+  });
+
+  it("lets a swarmId function tell apart sources that only the query names", () => {
+    const core = new Core({
+      manifestParsers: [hlsManifestParser],
+      swarmId: ({ requestedUrl }) =>
+        `video-${new URL(requestedUrl).searchParams.get("id")}`,
+    });
+    const swarms = [];
+    for (const id of ["1", "2"]) {
+      core.processManifest({
+        url: `https://example.com/play/master.m3u8?id=${id}`,
+        data: HLS_MASTER_WITH_AUDIO,
+      });
+      swarms.push(core.getStreams()[0]?.swarmId);
+      core.destroy();
+    }
+    expect(swarms).toEqual(["video-1", "video-2"]);
+  });
+
+  it("asks a swarmId function once per source", () => {
+    // A function that reads the integrator's own state: every stream of the
+    // source gets the answer its first stream got, whatever came after.
+    let next = 0;
+    const swarmId = vi.fn(() => `item-${++next}`);
+    const core = new Core({ manifestParsers: [hlsManifestParser], swarmId });
+    core.processManifest({ url: MANIFEST_URL, data: HLS_MASTER_WITH_AUDIO });
+    expect(swarmId).toHaveBeenCalledTimes(1);
+    expect(new Set(core.getStreams().map((s) => s.swarmId))).toEqual(
+      new Set(["item-1"]),
+    );
+  });
+
+  it("fails the registration when a swarmId function throws or gives an empty string", () => {
+    for (const swarmId of [
+      () => {
+        throw new Error("no such video");
+      },
+      () => "",
+    ]) {
+      const onRegistrationError = vi.fn();
+      const core = new Core({ manifestParsers: [hlsManifestParser], swarmId });
+      core.addEventListener("onStreamRegistrationError", onRegistrationError);
+      core.processManifest({ url: MANIFEST_URL, data: HLS_MASTER_WITH_AUDIO });
+      expect(core.getStream(VIDEO_1080)).toBeUndefined();
+      expect(onRegistrationError).toHaveBeenCalled();
+    }
+  });
+
   it("composes the stream swarm ID from the streamIdBuilder output", () => {
     const contexts: StreamIdBuilderContext[] = [];
     const core = createCore({

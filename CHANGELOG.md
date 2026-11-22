@@ -20,6 +20,15 @@ throughout.
 
 ### Added
 
+- **`swarmId` can be a function, which names each source's swarm.** The
+  player integrations keep one core for a player, so a configured string
+  names every source it plays: a player reused for a playlist put every
+  video's `main0` in one swarm, where peers could exchange segments of the
+  wrong video. A function is called once for each source, with the URL that
+  would name its swarm by default, without and with its query, and again for
+  the next source after `destroy()`; it returns the content's identifier. A
+  throw or an empty string fails the stream's registration. The string form
+  is unchanged.
 - **A `segmentFilter` keeps chosen segments off P2P**, such as personalised
   ads that a server inserts into a shared playlist, for every player and for
   HLS and DASH. The core asks it about each segment, with what the manifest

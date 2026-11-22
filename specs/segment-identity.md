@@ -21,7 +21,8 @@ the same manifest, before any peer joins — to allowlist the infohashes on a
 private tracker, or to ask a tracker for the statistics of each quality. The
 core exports the helpers for that (`p2p-media-loader-core/server`).
 
-`swarmId` is the configured value or, if unset, the URL of the first manifest
+`swarmId` is the configured value, what a configured function returns for the
+source, or, if unset, the URL of the first manifest
 with its **entire query string discarded** — the URL that was asked for where
 an adapter reports one, since every viewer asks for the same URL and a CDN may
 answer each of them from a different one — a session-scoped parameter such as CMCD
@@ -36,6 +37,24 @@ content must resolve to the same value, and no other content may use it. That
 is what makes it worth configuring, since an identifier from the system that
 publishes the stream survives what a URL does not — a CDN migration, a
 per-viewer edge host, a signed path, a re-published manifest.
+
+**A configured string names every source the core plays.** The player
+integrations keep one core for a player, and `destroy()` between sources
+forgets the name the last source's URL gave, but not a configured string. A
+player that plays several videos — a playlist, or one player reused for the
+next item — would put every video's `main0` in one swarm, where peers exchange
+segments of the wrong video. Such an integration configures a function in
+place of the string: the core calls it with the URL that would name the
+source's swarm by default, and with the same URL with its query, for a source
+that only the query tells apart (`master.m3u8?id=42`). It is called once for
+each source, when its first stream registers, and every later stream of the
+source gets the same answer: a function that reads the integrator's own state
+— the playlist item playing — would otherwise name a stream that registers
+late, such as one of a period added on a refresh, after the next item. It
+returns the content's identifier; a throw or an empty string fails the
+stream's registration, and the stream plays without P2P. A server that
+predicts infohashes applies the same function to the URL of the master it
+publishes.
 
 It names a set of streams, not a rendition. Every viewer under one `swarmId`
 must be playing the same content, so an integration that configures one has to
