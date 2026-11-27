@@ -188,10 +188,17 @@ throughout.
   request of the player now costs the origin one request, as without P2P;
   prefetch still retries a segment it owns. The HLS.js adapter reports the
   status, so HLS.js retries by its own status rules: a 404 that it does not
-  retry is not retried. The other adapters report a core failure as before,
-  but a player with few retries of its own now tolerates less: Shaka's
-  default `retryParameters` make two attempts, so an origin that fails for
-  about 2 s fails the segment, where the core's retries used to last it out.
+  retry is not retried. The Shaka adapter reports the status as
+  `BAD_HTTP_STATUS`, as Shaka's own loader does: Shaka retries any status
+  alike, but an application reads it, and so does the `downloadfailed`
+  event, which had 0. Such an error has Shaka's data, `[uri, status, null,
+{}, requestType, uri]`, not the `CoreRequestError` in `data[1]`, which a
+  failure with no status still carries. The dash.js and Video.js 8 adapters
+  report a core
+  failure as before. A player with few retries of its own now tolerates
+  less: Shaka's default `retryParameters` make two attempts, so an origin
+  that fails for about 2 s fails the segment, where the core's retries used
+  to last it out.
   Raise `streaming.retryParameters` where that matters.
   `httpErrorRetries` applies to prefetch.
 - **Prefetch's HTTP retries wait.** In 4.x a failed HTTP download was tried

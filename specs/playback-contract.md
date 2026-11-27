@@ -229,9 +229,10 @@ paused player that asks for media wants its first frame.
   would its own load: each of its requests costs the origin one request, as
   without P2P. An adapter that reports the status lets the player apply its
   status rules too — the HLS.js adapter does, so a 404 that HLS.js does not
-  retry is not retried ([player-adapters.md](player-adapters.md)). Were the
-  core to retry as well, each of the player's
-  retries, which starts with no failed attempts, would get every core
+  retry is not retried, and the Shaka adapter does, for the applications
+  that read it ([player-adapters.md](player-adapters.md)). Were the core to
+  retry as well, each of the player's retries, which starts with no failed
+  attempts, would get every core
   attempt again: up to 21 origin requests for one fragment with HLS.js's
   defaults, where HLS.js alone makes 7. Without the P2P attempt, an origin
   that fails holds the player through its retries while a peer has the

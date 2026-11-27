@@ -22,8 +22,9 @@ const DEFAULT_DOWNLOAD_LATENCY = 10;
 /**
  * The status a core failure is reported with when it has no HTTP status to
  * give: a timeout, a network error, a refusal of a range the core asked for
- * itself, a peer's failure with HTTP off, or a storage fault (the cases of
- * `Core.loadSegment`'s `@throws`). HLS.js retries a fragment by its status,
+ * itself, a download that prefetch started before the player asked, a peer's
+ * failure with HTTP off, or a storage fault (the cases of
+ * `Core.loadSegment`'s `@throws` and `CoreRequestError.httpStatus`). HLS.js retries a fragment by its status,
  * and never one with none — status 0 reads as a CORS failure — so on a
  * stream of one rendition the first such failure would be fatal. A gateway
  * that could not get the segment from upstream is what the adapter is, and

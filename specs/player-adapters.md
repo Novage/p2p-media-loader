@@ -398,6 +398,15 @@ cares about sharing on live streams should prefer the latter.
   plays its first session at the pre-manifest delay.
 - Playback: the media element.
 
+A core failure with the status of the core's one HTTP attempt
+(`CoreRequestError.httpStatus`) is reported as Shaka's own loader reports a
+failed status: a recoverable `BAD_HTTP_STATUS`, the status in `data[1]`, where
+an application and the `downloadfailed` event read it. Shaka 5 retries every
+recoverable status alike: the status is for the application, not for retries.
+Any other failure is a recoverable
+`HTTP_ERROR` carrying the cause, and one Shaka aborted is its
+`OPERATION_ABORTED`.
+
 The live window is sized from a main stream once one has been seen, for as
 long as the source lasts. Loading another starts that over, and puts the
 player back to the delay a source begins from: a source with no main stream at

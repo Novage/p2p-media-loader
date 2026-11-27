@@ -158,24 +158,51 @@ export class Loader {
         };
       } catch (error) {
         // Shaka's networking engine retries and reports only its own error
-        // type, so a core failure is translated: the operation Shaka itself
-        // cancelled into its abort, anything else into a recoverable network
-        // error carrying the cause, which Shaka's retry parameters govern.
-        // That includes an abort Shaka did not ask for: the core keeps one
-        // request for each stream and aborts it when the player asks for
-        // another segment of that stream, as Shaka does when it prefetches
-        // ahead. Reported as Shaka's own abort, the segment would never be
-        // asked for again, and playback would wait at its hole for ever.
+        // type, so a core failure is translated. Anything but the operation
+        // Shaka itself cancelled becomes a recoverable network error, which
+        // Shaka's retry parameters govern.
         const { Error: ShakaError } = this.shaka.util;
+        const { RequestType } = this.shaka.net.NetworkingEngine;
+        if (aborted) {
+          throw new ShakaError(
+            ShakaError.Severity.RECOVERABLE,
+            ShakaError.Category.NETWORK,
+            ShakaError.Code.OPERATION_ABORTED,
+            segmentUrl,
+            error,
+            RequestType.SEGMENT,
+          );
+        }
+        // The status of the core's one HTTP attempt goes where Shaka's own
+        // loader puts a failed status: see specs/player-adapters.md.
+        const httpStatus =
+          error instanceof CoreRequestError ? error.httpStatus : undefined;
+        if (httpStatus !== undefined) {
+          throw new ShakaError(
+            ShakaError.Severity.RECOVERABLE,
+            ShakaError.Category.NETWORK,
+            ShakaError.Code.BAD_HTTP_STATUS,
+            segmentUrl,
+            httpStatus,
+            null,
+            {},
+            RequestType.SEGMENT,
+            segmentUrl,
+          );
+        }
+        // Any other failure carries the cause. That includes an abort Shaka
+        // did not ask for: the core keeps one request for each stream and
+        // aborts it when the player asks for another segment of that stream,
+        // as Shaka does when it prefetches ahead. Reported as Shaka's own
+        // abort, the segment would never be asked for again, and playback
+        // would wait at its hole for ever.
         throw new ShakaError(
           ShakaError.Severity.RECOVERABLE,
           ShakaError.Category.NETWORK,
-          aborted
-            ? ShakaError.Code.OPERATION_ABORTED
-            : ShakaError.Code.HTTP_ERROR,
+          ShakaError.Code.HTTP_ERROR,
           segmentUrl,
           error,
-          this.shaka.net.NetworkingEngine.RequestType.SEGMENT,
+          RequestType.SEGMENT,
         );
       }
     };
