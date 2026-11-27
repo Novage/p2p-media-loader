@@ -451,6 +451,38 @@ These predate 5.0.0 and affect 4.x deployments as well.
   can run the timer once per minute, so the chart showed rates up to 60 times
   too high. The chart now divides a late sample by the measured time since
   the previous sample.
+- A fragment the core failed to load ended a single-rendition HLS.js stream.
+  The adapter reported the failure with status 0, which HLS.js reads as a CORS
+  failure and never retries; with no other level to switch to, that is a
+  fatal `NETWORK_ERROR`, and an integration that recovers by building a new
+  HLS.js instance loses its peers with it. A core failure is now reported as
+  `502`, so `fragLoadPolicy.errorRetry` applies as it does without P2P.
+- A fragment the core stopped on its own — P2P turned off for the stream
+  through `applyDynamicConfig`, or the core destroyed — reached HLS.js as a
+  load error, though HLS.js never asked to stop it. HLS.js's own loader now
+  loads it (`HlsFragment:core-abort-to-hlsjs`).
+- A peer asked for a segment that had left its live window did not answer at
+  all. The requester waited `p2pNotReceivingBytesTimeoutMs`, failed the
+  attempt with `bytes-receiving-timeout` and counted a timeout against a
+  healthy peer, which `p2pErrorRetries` of them close. The peer now sends
+  `SegmentAbsent` (`SegmentAbsent:not-in-stream`). On a 4 × 6 s live window,
+  where a segment leaves the window every 6 s, a production audience of
+  ~4,000 peers saw 8.6 % of P2P downloads end in that timeout, from this and
+  from other causes.
+- A segment that arrived whole from a peer failed with
+  `bytes-receiving-timeout` when `validateP2PSegment` took longer than
+  `p2pNotReceivingBytesTimeoutMs`: the wait for bytes kept running while the
+  validator read bytes that were all held. It now stops when validation
+  starts, from a peer or on an HTTP download that went on from a peer's bytes.
+- `onChunkDownloaded` reported bytes a peer dropped: the rest of a transfer
+  already cancelled, or a chunk with no download to go to. P2P traffic summed
+  from it read high. Only bytes taken into a download are reported now
+  (`PeerChunk:dropped` counts the others).
+- The HLS.js engine left its live placement — `liveSyncDuration` and
+  `liveMaxLatencyDuration` — on an instance it let go, so a player that
+  outlived it kept a delay derived for a window nothing managed any more. It
+  is now given back with the forward buffer, while the instance still holds
+  what the engine wrote.
 
 ## 4.0.0
 

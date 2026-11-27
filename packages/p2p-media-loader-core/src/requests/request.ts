@@ -435,6 +435,10 @@ export class Request {
     ) => Promise<boolean>,
   ): Promise<boolean> {
     if (!validate) return true;
+    // Every byte is held: nothing more will arrive, so the wait for bytes is
+    // over. Left running, a validator slower than the receive timeout would
+    // fail a segment that arrived whole.
+    if (this._status === "loading") this.notReceivingBytesTimeout.clear();
     try {
       return await validate(
         this.segment.url,

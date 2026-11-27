@@ -1,4 +1,5 @@
 import debug from "debug";
+import { diagnostics } from "../diagnostics.js";
 import { CoreEventMap, StreamConfig, StreamType } from "../types.js";
 import * as Command from "./commands/index.js";
 import { EventTarget } from "../utils/event-target.js";
@@ -14,7 +15,8 @@ export type PeerConfig = Pick<
 
 export type PeerProtocolEventHandlers = {
   onCommandReceived: (command: Command.PeerCommand) => void;
-  onSegmentChunkReceived: (data: Uint8Array) => void;
+  /** @returns Whether the chunk was taken into the segment being downloaded. */
+  onSegmentChunkReceived: (data: Uint8Array) => boolean;
   onProtocolError: (error: unknown) => void;
 };
 
@@ -70,7 +72,13 @@ export class PeerProtocol {
       if (Command.isCommandChunk(data)) {
         this.#receivingCommandBytes(data);
       } else {
-        this.#eventHandlers.onSegmentChunkReceived(data);
+        // A chunk with no download to go to — the rest of a cancelled
+        // transfer, or one that overflowed — is dropped, so it is not counted
+        // as downloaded either.
+        if (!this.#eventHandlers.onSegmentChunkReceived(data)) {
+          diagnostics?.count("PeerChunk:dropped");
+          return;
+        }
         this.#onChunkDownloaded(
           data.byteLength,
           "p2p",

@@ -460,8 +460,11 @@ export class P2PLoader {
       this.#stream,
       segmentExternalId,
     );
-    if (!segment) return;
-    if (this.#config.isP2PUploadDisabled) {
+    // A segment that left the live window, or never was in it, is absent:
+    // said so, the requester moves on at once instead of waiting out its
+    // receive timeout and counting a strike against this peer.
+    if (!segment || this.#config.isP2PUploadDisabled) {
+      if (!segment) diagnostics?.count("SegmentAbsent:not-in-stream");
       peer.sendSegmentAbsentCommand(segmentExternalId, requestId);
       return;
     }
