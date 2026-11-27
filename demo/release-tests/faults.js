@@ -174,8 +174,9 @@ export function installFaults() {
 /**
  * How soon each segment request that got a 404 or 503 was followed by the
  * next request for the same segment: the same URL, and a byte range with the
- * same end (`rangeEnd`). HTTP retries wait 1 s, then twice as long, up to
- * 30 s, except for an urgent player request (specs/playback-contract.md,
+ * same end (`rangeEnd`). A prefetch's HTTP retries wait 1 s, then twice as
+ * long, up to 30 s; a player's request makes one HTTP attempt, and its retry
+ * is the player's, at the player's own delay (specs/playback-contract.md,
  * "Urgency"). Also the ledger's retry counters.
  *
  * @param marks - The tabs' `segMark` results from the start of the phase;
@@ -412,7 +413,9 @@ export function run({
  * Segment faults only, each phase sure to inject: a phase with no fault
  * first, whose stalls are the baseline of the stream and the machine, then a
  * phase per mode with the fault in tab A. For comparing two builds, run it
- * on each with the same arguments.
+ * on each with the same arguments. With `count: 1`, tab A plays alone: no
+ * peer and no prefetch, so every segment request is its player's, which is
+ * how to measure the origin requests a player's retries cost.
  */
 export function runSegmentFaults({
   count = 2,

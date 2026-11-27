@@ -94,7 +94,8 @@ The driver puts its helpers on `window.__h`:
 
 - **Every tab with the driver follows every command.** A tab left over from
   an earlier test silently joins the next one. Before each test, close every
-  driven tab that is not part of it, or reload it without `driver=1`.
+  driven tab that is not part of it, or reload it without `driver=1`. A run
+  in one tab (`all(code, 1)`) sends nothing to other tabs.
 - **Run long tests in the page.** A browser tool call times out after about
   45 s. `window.__bg(name, task)` runs the test inside tab A and keeps its log
   and result in `window.__R[name]`; read it in later calls of 40 s or less.

@@ -415,9 +415,10 @@ export async function load(count, params, settleMs = 5000) {
 
 /**
  * Waits until every tab plays and, unless `peers` is false, holds a peer; at
- * most `ms`. Returns the ms it took, or null.
+ * most `ms`. Returns the ms it took, or null. One tab has no peer to wait
+ * for, so `peers` is false by default for it.
  */
-export async function settle(count, ms = 30000, peers = true) {
+export async function settle(count, ms = 30000, peers = count > 1) {
   const t0 = performance.now();
   while (performance.now() - t0 < ms) {
     const rows = await inAll(count, "state");

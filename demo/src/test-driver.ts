@@ -155,6 +155,10 @@ const newId = () => Math.random().toString(36).slice(2);
  * with their replies: once `expect` have arrived, or after `ms`.
  */
 function others(code: string, expect: number, ms = 15000, to?: string[]) {
+  // A run in one tab expects no reply: waiting for one would hold every
+  // call for its whole timeout, and a driven tab left open would run code
+  // meant for this tab alone.
+  if (expect <= 0) return Promise.resolve<unknown[]>([]);
   return new Promise<unknown[]>((resolve) => {
     const id = newId();
     const entry = {
