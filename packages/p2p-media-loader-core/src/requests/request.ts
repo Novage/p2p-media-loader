@@ -409,10 +409,8 @@ export class Request {
     // Start synchronously so the request is immediately in "loading" status.
     const requestControls = this.start(requestData, controls);
 
-    // No network bytes will arrive in this path, so disable the timeout
-    // to prevent it from aborting the request during async validation.
-    this.notReceivingBytesTimeout.clear();
-
+    // No bytes arrive in this path: `validateData` or `completeOnSuccess`
+    // stops the receive timer.
     if (validate) {
       void this.validateAndComplete(
         requestData.downloadSource,

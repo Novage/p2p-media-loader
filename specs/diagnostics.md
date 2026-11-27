@@ -251,7 +251,8 @@ the groups and the cases a reader of a snapshot must know.
   delay it writes (`HlsPlacement:applied`) and each main playlist it leaves to
   the integrator's own live sync settings (`HlsPlacement:integrator`), and
   each fragment the core stopped on its own that it hands to HLS.js's loader
-  (`HlsFragment:core-abort-to-hlsjs`). A peer counts each request it answers
+  (`HlsFragment:core-abort-to-hlsjs`), and each one the core threw on
+  (`HlsFragment:core-throw-to-hlsjs`). A peer counts each request it answers
   with `SegmentAbsent` because the stream does not hold the segment
   (`SegmentAbsent:not-in-stream`), and each chunk of segment bytes it drops
   for want of a download to go to (`PeerChunk:dropped`), which

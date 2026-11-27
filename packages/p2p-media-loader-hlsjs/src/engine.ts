@@ -626,15 +626,7 @@ export class HlsJsP2PEngine {
   private restoreForwardBuffer = () => {
     const ledger = this.forwardBuffer;
     this.forwardBuffer = undefined;
-    const hls = this.currentHlsInstance;
-    if (!ledger || !hls) return;
-
-    for (const key of FORWARD_BUFFER_KEYS) {
-      const applied = ledger.applied[key];
-      if (applied === undefined || hls.config[key] !== applied) continue;
-      this.debug(`Giving ${key} back as ${ledger.held[key]}`);
-      hls.config[key] = ledger.held[key];
-    }
+    if (ledger) this.giveBack(FORWARD_BUFFER_KEYS, ledger);
   };
 
   /**
@@ -646,16 +638,30 @@ export class HlsJsP2PEngine {
   private restoreLiveSync = () => {
     const ledger = this.liveSync;
     this.liveSync = undefined;
-    const hls = this.currentHlsInstance;
-    if (!ledger || !hls) return;
-
-    for (const key of LIVE_SYNC_KEYS) {
-      const applied = ledger.applied[key];
-      if (applied === undefined || hls.config[key] !== applied) continue;
-      this.debug(`Giving ${key} back as ${ledger.held[key]}`);
-      hls.config[key] = ledger.held[key];
-    }
+    // HLS.js's `targetLatency` setter also sets a private flag that no
+    // public API resets: with the value given back, a playlist's HOLD-BACK
+    // is no longer used, and an unset `liveSyncDuration` falls back to
+    // `liveSyncDurationCount` target durations. Close to it, not the same.
+    if (ledger) this.giveBack(LIVE_SYNC_KEYS, ledger);
   };
+
+  /**
+   * Writes back each setting of a ledger as it was held before this engine
+   * wrote it, where the instance still holds what this engine wrote.
+   */
+  private giveBack<K extends ForwardBufferKey | LiveSyncKey>(
+    keys: readonly K[],
+    ledger: { held: Pick<HlsConfig, K>; applied: Partial<Record<K, number>> },
+  ) {
+    const config = this.currentHlsInstance?.config;
+    if (!config) return;
+    for (const key of keys) {
+      const applied = ledger.applied[key];
+      if (applied === undefined || config[key] !== applied) continue;
+      this.debug(`Giving ${key} back as ${ledger.held[key]}`);
+      config[key] = ledger.held[key];
+    }
+  }
 
   /**
    * Cleans up and releases all resources, and unregisters all event handlers.

@@ -484,7 +484,10 @@ These predate 5.0.0 and affect 4.x deployments as well.
 - A fragment the core stopped on its own — P2P turned off for the stream
   through `applyDynamicConfig`, or the core destroyed — reached HLS.js as a
   load error, though HLS.js never asked to stop it. HLS.js's own loader now
-  loads it (`HlsFragment:core-abort-to-hlsjs`).
+  loads it (`HlsFragment:core-abort-to-hlsjs`). So does a fragment the core
+  threw on, which reached HLS.js with status 0 and was never retried: a
+  segment the live window left while the segment storage started, or a
+  storage that failed to start (`HlsFragment:core-throw-to-hlsjs`).
 - A peer asked for a segment that had left its live window did not answer at
   all. The requester waited `p2pNotReceivingBytesTimeoutMs`, failed the
   attempt with `bytes-receiving-timeout` and counted a timeout against a
@@ -506,12 +509,13 @@ These predate 5.0.0 and affect 4.x deployments as well.
   `liveMaxLatencyDuration` — on an instance it let go, so a player that
   outlived it kept a delay derived for a window nothing managed any more. It
   is now given back with the forward buffer, while the instance still holds
-  what the engine wrote.
+  what the engine wrote; a value written from outside since is given back as
+  the integrator left it.
 - A download from a peer whose connection failed — `connection-lost` or
   `transport-error` — reached `onSegmentError` as `peer-closed` with no
   cause, though `onPeerError` received the fault. The `PeerError` is now the
   `cause` of that `peer-closed` error, as it already was for a peer the core
-  closed on a fault; a `peer-closed` error with no cause is an expected close.
+  closed on a fault.
 
 ## 4.0.0
 

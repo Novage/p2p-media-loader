@@ -738,6 +738,9 @@ export type StreamConfig = {
    * HTTP is trusted: a download of HTTP bytes only is not validated, and a
    * peer that goes on from HTTP bytes takes on the download.
    *
+   * The promise must settle: every byte is held while it runs, so no
+   * timeout ends the download, and the player waits for it.
+   *
    * @param url The URL of the segment to validate.
    * @param byteRange The optional byte range of the segment.
    * @param data The downloaded segment data.

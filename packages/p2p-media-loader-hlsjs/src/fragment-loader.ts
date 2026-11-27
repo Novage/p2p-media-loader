@@ -103,9 +103,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       this.#ofAnotherPlayer ||
       !this.#core.isSegmentLoadable(context.url, byteRange)
     ) {
-      this.#defaultLoader = this.#createDefaultLoader();
-      this.#defaultLoader.stats = this.stats;
-      this.#defaultLoader.load(context, config, callbacks);
+      this.#loadByDefaultLoader(context, config, callbacks);
       return;
     }
 
@@ -142,12 +140,13 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     };
 
     const onError = (error: unknown) => {
-      if (error instanceof CoreRequestError && error.type === "aborted") {
-        if (this.stats.aborted) return;
-        this.#loadByHlsJsAfterCoreAbort(context, config, callbacks);
+      // HLS.js aborted it, and has let it go.
+      if (this.stats.aborted) return;
+      if (error instanceof CoreRequestError && error.type === "failed") {
+        this.#handleError(error);
         return;
       }
-      this.#handleError(error);
+      this.#loadByHlsJsInstead(context, config, callbacks, error);
     };
 
     this.#reportPlayback();
@@ -155,40 +154,51 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   }
 
   /**
-   * The core stopped a fragment HLS.js never asked to stop: P2P was turned off
-   * for the stream, or the core was destroyed. HLS.js is still waiting for it,
-   * and an error would count against the fragment — on a stream of one
-   * rendition, a fatal one — so it is loaded by HLS.js's own loader instead,
-   * as a fragment the core does not serve is.
+   * The core gave the fragment up without failing it at the origin: it
+   * stopped a fragment HLS.js never asked to stop — P2P turned off for the
+   * stream, the core destroyed — or it threw — a segment the live window
+   * left while the storage started, a storage that failed to start. HLS.js
+   * is still waiting for it, and an error would count against the fragment
+   * — on a stream of one rendition, a fatal one — and send its retries to
+   * the same core. So it is loaded by HLS.js's own loader instead, as a
+   * fragment the core does not serve is.
    */
-  #loadByHlsJsAfterCoreAbort(
+  #loadByHlsJsInstead(
+    context: FragmentLoaderContext,
+    config: LoaderConfiguration,
+    callbacks: LoaderCallbacks<LoaderContext>,
+    error: unknown,
+  ) {
+    // Destroyed meanwhile: HLS.js has let the fragment go.
+    if (!this.#callbacks) return;
+    diagnostics?.count(
+      error instanceof CoreRequestError
+        ? "HlsFragment:core-abort-to-hlsjs"
+        : "HlsFragment:core-throw-to-hlsjs",
+    );
+    this.#request = undefined;
+    this.#loadByDefaultLoader(context, config, callbacks);
+  }
+
+  /** Loads the fragment by HLS.js's own loader, into this loader's stats. */
+  #loadByDefaultLoader(
     context: FragmentLoaderContext,
     config: LoaderConfiguration,
     callbacks: LoaderCallbacks<LoaderContext>,
   ) {
-    // Destroyed meanwhile: HLS.js has let the fragment go.
-    if (!this.#callbacks) return;
-    diagnostics?.count("HlsFragment:core-abort-to-hlsjs");
-    this.#request = undefined;
     this.#defaultLoader = this.#createDefaultLoader();
     this.#defaultLoader.stats = this.stats;
     this.#defaultLoader.load(context, config, callbacks);
   }
 
-  #handleError(thrownError: unknown) {
-    const error = { code: 0, text: "" };
-    if (
-      thrownError instanceof CoreRequestError &&
-      thrownError.type === "failed"
-    ) {
-      // The status of the core's one HTTP attempt, as HLS.js's own loader
-      // would report it: HLS.js retries by it, a 404 not at all. The core
-      // leaves the retries to HLS.js.
-      error.code = thrownError.httpStatus ?? CORE_FAILURE_STATUS;
-      error.text = thrownError.message;
-    } else if (thrownError instanceof Error) {
-      error.text = thrownError.message;
-    }
+  #handleError(failure: CoreRequestError) {
+    // The status of the core's one HTTP attempt, as HLS.js's own loader
+    // would report it: HLS.js retries by it, a 404 not at all. The core
+    // leaves the retries to HLS.js.
+    const error = {
+      code: failure.httpStatus ?? CORE_FAILURE_STATUS,
+      text: failure.message,
+    };
     this.#callbacks?.onError(error, this.context, null, this.stats);
   }
 

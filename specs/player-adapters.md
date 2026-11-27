@@ -213,7 +213,13 @@ one rendition the first such failure would be fatal. A fragment the core stops o
 its own — P2P turned off for its stream, or the core destroyed — is not one
 HLS.js asked to stop and is still waiting for, so it is handed to
 `config.loader`, as a fragment the core does not serve is, rather than
-reported as an error.
+reported as an error. So is a fragment the core throws on, with an error
+that is not a `CoreRequestError`: a segment the live window left while the
+segment storage started, or a storage that failed to start. Reported, it
+would send HLS.js's retries to the same core, though the origin works. This
+holds with `httpErrorRetries` 0 too: the core's settings govern its own
+downloads, and a fragment it gives up is the player's, as one it does not
+serve is.
 
 A player HLS.js builds beside the primary is not this presentation. An
 interstitial's ad break and trick-play I-frames each get a second `Hls`

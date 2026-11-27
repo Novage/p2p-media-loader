@@ -10,6 +10,28 @@ The tests themselves are in
 
 ## Open
 
+- **The HLS.js engine writes its live delay over one written from outside at
+  runtime.** An integrator who sets `hls.targetLatency` or
+  `liveMaxLatencyDuration` while a live stream plays — not in the config —
+  sees it replaced on the next playlist refresh that moves the target; rule 3
+  of [specs/player-adapters.md](specs/player-adapters.md), "Settings an
+  adapter writes", is met for the forward buffer only, and when the engine
+  lets the player go it gives back what the instance held before its first
+  write, not the outside value it wrote over. Not fixed: done right, an
+  outside write to either key makes both, and the forward buffer derived from
+  them, the integrator's, which needs state shared by the two updates; a
+  ceiling on each key alone left the threshold below the delay and sized the
+  buffer from a delay not in effect. A setting in the HLS.js config is kept,
+  as the rule says.
+- **A segment storage that fails on every read stops a single-rendition HLS.js
+  stream, though the origin works.** Such a failure reaches the player as a
+  `CoreRequestError` with no status, which the HLS.js adapter reports as
+  `502`; each HLS.js retry goes to the same core, and the last one is fatal.
+  A storage that fails to start is handled: the adapter hands those fragments
+  to HLS.js's own loader. Not fixed: telling a storage fault from a peer's
+  failure with HTTP off needs a failure class of its own in the public API.
+  It needs a custom storage that fails at runtime, such as an IndexedDB over
+  its quota.
 - **A segment that a `segmentFilter` accepts again goes to the end of its
   stream's list in the core.** The core keeps a stream's segments in the
   order they were added. The registry keeps a rejected segment in its place,

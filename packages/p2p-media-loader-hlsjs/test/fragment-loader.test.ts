@@ -176,6 +176,36 @@ describe("HLS.js fragment loader when the core does not deliver", () => {
     expect(response.text).toBe("timed out");
   });
 
+  it("hands a fragment the core threw on to HLS.js's loader", async () => {
+    // Core.loadSegment throws a plain Error for a segment the window left
+    // while the storage started, or a storage that failed to start. Each
+    // retry would go to the same core, though the origin may work.
+    const { core, loader, callbacks } = setup(true);
+    core.loadSegment.mockImplementation(() =>
+      Promise.reject(new Error("segment is not in the registry")),
+    );
+    loader.load(context(), loaderConfig, callbacks);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(callbacks.onError).not.toHaveBeenCalled();
+    expect(FakeDefaultLoader.instances).toHaveLength(1);
+    expect(FakeDefaultLoader.instances[0].load).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports nothing for a fragment HLS.js aborted before the core failed it", async () => {
+    const { core, loader, callbacks } = setup(true);
+    core.loadSegment.mockImplementation(() =>
+      Promise.reject(new CoreRequestError("failed")),
+    );
+    loader.load(context(), loaderConfig, callbacks);
+    loader.abort();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(callbacks.onError).not.toHaveBeenCalled();
+  });
+
   it.each([404, 503])(
     "reports a core failure with the %i the origin gave, as HLS.js's own loader would",
     async (status) => {

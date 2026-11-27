@@ -414,7 +414,7 @@ describe("HybridLoader: making room for an urgent request", () => {
 
   it("ends the request on a peer's failure when HTTP is off", async () => {
     // httpErrorRetries 0: no HTTP attempt will come, so the player is told,
-    // rather than left waiting for a peer that may never have the segment.
+    // rather than left waiting for another peer that may never have it.
     const { loader, segment, callbacks, state } = setup({
       httpErrorRetries: 0,
     });

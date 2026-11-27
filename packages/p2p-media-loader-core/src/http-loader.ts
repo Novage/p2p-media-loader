@@ -284,6 +284,10 @@ export class HttpRequestExecutor {
 
   private handleResponseHeaders(response: Response) {
     if (!response.ok) {
+      // A download that went on from bytes held sent a range of its own,
+      // which the player never asked for: its status is not the player's.
+      const resumed = this.request.loadedBytes !== 0;
+      const playerStatus = resumed ? undefined : response.status;
       if (response.status === 406 || response.status === 416) {
         const sizePeer = this.request.heldBytes.peerForExcessBytes;
         if (response.status === 416 && sizePeer !== undefined) {
@@ -295,23 +299,17 @@ export class HttpRequestExecutor {
             "more bytes than HTTP has",
           );
         }
-        // The status is the player's only for the range the player asked
-        // for: not for one this download went on from, with bytes held.
-        const status =
-          this.request.loadedBytes === 0 ? response.status : undefined;
         this.request.clearLoadedBytes();
         throw new RequestError<"http-bytes-mismatch">(
           "http-bytes-mismatch",
           response.statusText,
           undefined,
-          status,
+          playerStatus,
         );
       } else {
-        // A download that went on from bytes held sent a range of its own,
-        // which the player never asked for: its status is not the player's.
-        // A 4xx to that range refuses it, so the next attempt asks for the
-        // whole segment. A 408 or a 429 asks for a later try: the bytes stay.
-        const resumed = this.request.loadedBytes !== 0;
+        // A 4xx to a range of its own refuses it, so the next attempt asks
+        // for the whole segment. A 408 or a 429 asks for a later try: the
+        // bytes stay.
         const { status } = response;
         const refused = status < 500 && status !== 408 && status !== 429;
         if (resumed && refused) this.request.clearLoadedBytes();
@@ -319,7 +317,7 @@ export class HttpRequestExecutor {
           "http-error",
           response.statusText,
           undefined,
-          resumed ? undefined : status,
+          playerStatus,
         );
       }
     }
