@@ -97,6 +97,11 @@ const FORWARD_BUFFER_KEYS = ["maxBufferLength", "maxMaxBufferLength"] as const;
 
 type ForwardBufferKey = (typeof FORWARD_BUFFER_KEYS)[number];
 
+/** The two HLS.js settings that place the playhead behind the live edge. */
+const LIVE_SYNC_KEYS = ["liveSyncDuration", "liveMaxLatencyDuration"] as const;
+
+type LiveSyncKey = (typeof LIVE_SYNC_KEYS)[number];
+
 /**
  * Whether the integrator placed live streams themselves: any of the four
  * live sync settings makes the live delay theirs.
@@ -163,6 +168,15 @@ export class HlsJsP2PEngine {
   private forwardBuffer?: {
     held: Record<ForwardBufferKey, number>;
     applied: Partial<Record<ForwardBufferKey, number>>;
+  };
+  /**
+   * The live placement this engine wrote, and what the instance held before
+   * it did: given back when the engine lets the player go, as the forward
+   * buffer is, while the instance still holds what this engine wrote.
+   */
+  private liveSync?: {
+    held: Record<LiveSyncKey, number | undefined>;
+    applied: Partial<Record<LiveSyncKey, number>>;
   };
   private readonly debug = debug("p2pml-hlsjs:engine");
   /** This engine's handlers on the HLS.js instance; see specs/diagnostics.md. */
@@ -517,15 +531,25 @@ export class HlsJsP2PEngine {
       return;
     }
 
+    this.liveSync ??= {
+      held: {
+        liveSyncDuration: hls.config.liveSyncDuration,
+        liveMaxLatencyDuration: hls.config.liveMaxLatencyDuration,
+      },
+      applied: {},
+    };
+    const ledger = this.liveSync;
     let applied = false;
     if (differs(hls.config.liveSyncDuration, targetLatency)) {
       this.debug(`Setting targetLatency to ${targetLatency}`);
       hls.targetLatency = targetLatency;
+      ledger.applied.liveSyncDuration = targetLatency;
       applied = true;
     }
     if (differs(hls.config.liveMaxLatencyDuration, maxLatency)) {
       this.debug(`Setting liveMaxLatencyDuration to ${maxLatency}`);
       hls.config.liveMaxLatencyDuration = maxLatency;
+      ledger.applied.liveMaxLatencyDuration = maxLatency;
       applied = true;
     }
     if (applied) diagnostics?.count("HlsPlacement:applied");
@@ -614,6 +638,26 @@ export class HlsJsP2PEngine {
   };
 
   /**
+   * Gives the instance back the live placement it came with, by the forward
+   * buffer's rule: only what this engine wrote, and only while the instance
+   * still holds it. A target left behind would keep a player that outlives
+   * the engine at a delay derived for a window nothing manages any more.
+   */
+  private restoreLiveSync = () => {
+    const ledger = this.liveSync;
+    this.liveSync = undefined;
+    const hls = this.currentHlsInstance;
+    if (!ledger || !hls) return;
+
+    for (const key of LIVE_SYNC_KEYS) {
+      const applied = ledger.applied[key];
+      if (applied === undefined || hls.config[key] !== applied) continue;
+      this.debug(`Giving ${key} back as ${ledger.held[key]}`);
+      hls.config[key] = ledger.held[key];
+    }
+  };
+
+  /**
    * Cleans up and releases all resources, and unregisters all event handlers.
    * Runs by itself when the bound HLS.js instance is destroyed.
    *
@@ -631,6 +675,7 @@ export class HlsJsP2PEngine {
       this.destroyCore,
       () => this.updateHlsEventsHandlers("unregister"),
       this.restoreForwardBuffer,
+      this.restoreLiveSync,
       () => this.playback.stop(),
     ]);
     this.currentHlsInstance = undefined;

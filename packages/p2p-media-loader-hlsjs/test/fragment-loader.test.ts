@@ -6,7 +6,7 @@ import type {
   LoaderConfiguration,
   LoaderContext,
 } from "hls.js";
-import type { Core } from "p2p-media-loader-core";
+import { CoreRequestError, type Core } from "p2p-media-loader-core";
 import { FragmentLoaderBase } from "../src/fragment-loader.js";
 
 const URL = "https://cdn.example/vod/media.mp4";
@@ -137,6 +137,65 @@ describe("HLS.js fragment loader", () => {
     await Promise.resolve();
     expect(callbacks.onSuccess).not.toHaveBeenCalled();
     expect(callbacks.onProgress).not.toHaveBeenCalled();
+    expect(callbacks.onError).not.toHaveBeenCalled();
+  });
+});
+
+describe("HLS.js fragment loader when the core does not deliver", () => {
+  it("reports a core failure with a status HLS.js retries", async () => {
+    // HLS.js retries a fragment by its status and never one with none: status
+    // 0 reads as a CORS failure, which on a stream of one rendition is fatal.
+    const { core, loader, callbacks } = setup(true);
+    core.loadSegment.mockImplementation(() =>
+      Promise.reject(new CoreRequestError("failed")),
+    );
+    loader.load(context(), loaderConfig, callbacks);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(callbacks.onError).toHaveBeenCalledTimes(1);
+    const [response] = vi.mocked(callbacks.onError).mock.calls[0];
+    // HLS.js's retryForHttpStatus: anything but none and 4xx is retried.
+    expect(response.code).toBeGreaterThan(499);
+  });
+
+  it("hands a fragment the core stopped on its own to HLS.js's loader", async () => {
+    // P2P turned off for the stream, or the core destroyed, while HLS.js
+    // waited for the fragment: HLS.js never asked to stop it, and an error
+    // would count against the fragment.
+    const { core, loader, callbacks } = setup(true);
+    core.loadSegment.mockImplementation(() =>
+      Promise.reject(new CoreRequestError("aborted")),
+    );
+    const ctx = context(0, 100);
+    loader.load(ctx, loaderConfig, callbacks);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(callbacks.onError).not.toHaveBeenCalled();
+    expect(FakeDefaultLoader.instances).toHaveLength(1);
+    expect(FakeDefaultLoader.instances[0].load).toHaveBeenCalledWith(
+      ctx,
+      loaderConfig,
+      callbacks,
+    );
+
+    loader.abort();
+    expect(FakeDefaultLoader.instances[0].abort).toHaveBeenCalled();
+    expect(core.abortSegmentLoading).not.toHaveBeenCalled();
+  });
+
+  it("hands nothing on once HLS.js has let the fragment go", async () => {
+    const { core, loader, callbacks } = setup(true);
+    core.loadSegment.mockImplementation(() =>
+      Promise.reject(new CoreRequestError("aborted")),
+    );
+    loader.load(context(), loaderConfig, callbacks);
+    loader.destroy();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(FakeDefaultLoader.instances).toHaveLength(0);
     expect(callbacks.onError).not.toHaveBeenCalled();
   });
 });
