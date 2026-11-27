@@ -19,6 +19,17 @@ import { diagnostics } from "./diagnostics.js";
 
 const DEFAULT_DOWNLOAD_LATENCY = 10;
 
+/**
+ * The status a core failure is reported with. The core has no HTTP status to
+ * give: every source it tried failed. HLS.js retries a fragment by its
+ * status, and never one with none — status 0 reads as a CORS failure — so on
+ * a stream of one rendition the first core failure would be fatal. A gateway
+ * that could not get the segment from upstream is what the adapter is, and
+ * 502 is what HLS.js's own loader would report for that, so its
+ * `fragLoadPolicy.errorRetry` applies as it would without P2P.
+ */
+const CORE_FAILURE_STATUS = 502;
+
 export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
   context!: FragmentLoaderContext;
   config!: LoaderConfiguration | null;
@@ -129,11 +140,9 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     };
 
     const onError = (error: unknown) => {
-      if (
-        error instanceof CoreRequestError &&
-        error.type === "aborted" &&
-        this.stats.aborted
-      ) {
+      if (error instanceof CoreRequestError && error.type === "aborted") {
+        if (this.stats.aborted) return;
+        this.#loadByHlsJsAfterCoreAbort(context, config, callbacks);
         return;
       }
       this.#handleError(error);
@@ -141,6 +150,27 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
 
     this.#reportPlayback();
     this.#core.loadSegment(context.url, { byteRange }).then(onSuccess, onError);
+  }
+
+  /**
+   * The core stopped a fragment HLS.js never asked to stop: P2P was turned off
+   * for the stream, or the core was destroyed. HLS.js is still waiting for it,
+   * and an error would count against the fragment — on a stream of one
+   * rendition, a fatal one — so it is loaded by HLS.js's own loader instead,
+   * as a fragment the core does not serve is.
+   */
+  #loadByHlsJsAfterCoreAbort(
+    context: FragmentLoaderContext,
+    config: LoaderConfiguration,
+    callbacks: LoaderCallbacks<LoaderContext>,
+  ) {
+    // Destroyed meanwhile: HLS.js has let the fragment go.
+    if (!this.#callbacks) return;
+    diagnostics?.count("HlsFragment:core-abort-to-hlsjs");
+    this.#request = undefined;
+    this.#defaultLoader = this.#createDefaultLoader();
+    this.#defaultLoader.stats = this.stats;
+    this.#defaultLoader.load(context, config, callbacks);
   }
 
   #handleError(thrownError: unknown) {
@@ -151,6 +181,7 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
     ) {
       // A core failure carries no HTTP status of its own: every source it
       // tried failed, and HLS.js reads the text.
+      error.code = CORE_FAILURE_STATUS;
       error.text = thrownError.message;
     } else if (thrownError instanceof Error) {
       error.text = thrownError.message;

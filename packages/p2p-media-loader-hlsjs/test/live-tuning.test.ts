@@ -362,6 +362,43 @@ describe("HLS.js live window placement", () => {
     expect(hls.config.maxMaxBufferLength).toBe(600);
   });
 
+  it("gives the live placement back when it lets the player go", () => {
+    // The player outlives the engine — P2P turned off, or a second engine
+    // bound — and a target left behind holds it to a delay derived for a
+    // window nothing manages any more.
+    const { hls, engine } = setup();
+    levelUpdated(hls, {
+      live: true,
+      totalduration: 24,
+      averagetargetduration: 6,
+      fragments: 4,
+    });
+    expect(hls.config.liveSyncDuration).toBe(18);
+    expect(hls.config.liveMaxLatencyDuration).toBe(30);
+
+    engine.destroy();
+
+    expect(hls.config.liveSyncDuration).toBeUndefined();
+    expect(hls.config.liveMaxLatencyDuration).toBeUndefined();
+  });
+
+  it("leaves a live placement written from outside as it is when letting the player go", () => {
+    const { hls, engine } = setup();
+    levelUpdated(hls, {
+      live: true,
+      totalduration: 24,
+      averagetargetduration: 6,
+      fragments: 4,
+    });
+    // Their word, after this engine wrote its own.
+    hls.config.liveSyncDuration = 12;
+
+    engine.destroy();
+
+    expect(hls.config.liveSyncDuration).toBe(12);
+    expect(hls.config.liveMaxLatencyDuration).toBeUndefined();
+  });
+
   it("leaves a buffer written from outside as it is when letting the player go", () => {
     const { hls, engine } = setup();
     levelUpdated(hls, {

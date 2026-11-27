@@ -201,6 +201,16 @@ and an unset stream is not one to be skipped over but one using the default.
 - Segments: `fLoader`, falling back to `config.loader`.
 - Playback: the media element.
 
+A core failure is reported to HLS.js with status `502`, so HLS.js's
+`fragLoadPolicy.errorRetry` runs as it would for its own loader. The core has
+no status to give — every source it tried failed — and HLS.js retries no
+fragment without one: status 0 reads as a CORS failure, and on a stream of one
+rendition the first core failure would be fatal. A fragment the core stops on
+its own — P2P turned off for its stream, or the core destroyed — is not one
+HLS.js asked to stop and is still waiting for, so it is handed to
+`config.loader`, as a fragment the core does not serve is, rather than
+reported as an error.
+
 A player HLS.js builds beside the primary is not this presentation. An
 interstitial's ad break and trick-play I-frames each get a second `Hls`
 instance made from the primary's own config, so each carries these loaders and
@@ -270,7 +280,9 @@ left alone.
   both or neither: an integrator who configured any of HLS.js's four live sync
   settings has a target of their own, and a threshold written against ours
   could sit below it — a config HLS.js itself rejects — or mix its count-based
-  settings with a duration-based one.
+  settings with a duration-based one. Both are given back when the engine
+  lets the instance go, by rule 4 above: what the instance held before, while
+  it still holds what the adapter wrote.
 
   The delay is set from what the core made of each main playlist — a
   variant's, or a media playlist loaded as the manifest — in the adapter's
