@@ -483,6 +483,11 @@ These predate 5.0.0 and affect 4.x deployments as well.
   outlived it kept a delay derived for a window nothing managed any more. It
   is now given back with the forward buffer, while the instance still holds
   what the engine wrote.
+- A download from a peer whose connection failed — `connection-lost` or
+  `transport-error` — reached `onSegmentError` as `peer-closed` with no
+  cause, though `onPeerError` received the fault. The `PeerError` is now the
+  `cause` of that `peer-closed` error, as it already was for a peer the core
+  closed on a fault; a `peer-closed` error with no cause is an expected close.
 
 ## 4.0.0
 

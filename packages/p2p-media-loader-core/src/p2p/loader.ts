@@ -402,7 +402,9 @@ export class P2PLoader {
     if (!peer) return;
 
     this.#peersMap.delete(event.peerId);
-    peer.destroy(true);
+    // The fault, where there is one, becomes the cause of the "peer-closed"
+    // error of the download under way; an expected close has none.
+    peer.destroy(true, event.error);
 
     if (event.error) {
       this.#onPeerError({
