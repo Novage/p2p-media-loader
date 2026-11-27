@@ -130,6 +130,15 @@ throughout.
   tracker can compute each swarm's P2P and HTTP bytes and their ratio with no
   change to the protocol. See the WebTorrent client's
   [`spec.md`](packages/p2p-media-loader-core/src/webtorrent/webtorrent-client/spec.md).
+- **`CoreRequestError.httpStatus` and `RequestError.httpStatus`.** A failed
+  `loadSegment` carries the status of the HTTP response that failed it, and
+  its cause is that attempt's `RequestError`, for an integration to report to
+  its player as the player's own loader would; `onSegmentError` gives the
+  status of each refused response. Absent for a timeout, a network error, a
+  body of the wrong length, an answer to a range the core asked for to go on
+  from bytes it held, and an HTTP download that prefetch started before the
+  player asked: a live segment fetched as soon as the playlist lists it can
+  meet a 404 that the player's own, later request would not.
 
 ### Changed
 
@@ -166,17 +175,30 @@ throughout.
   player's first request at the new place is urgent because its buffer is
   empty there, and nothing at the place it left is urgent. Backups in the
   prefetch election act only on the segment their own player has requested.
-  When an urgent request's HTTP attempt fails, it goes once to a peer that
-  has the segment before HTTP again, so that an origin that fails does not
-  hold the player through every HTTP attempt while a peer has the segment.
   See [`specs/playback-contract.md`](specs/playback-contract.md), "Urgency",
   and [`specs/prefetch.md`](specs/prefetch.md), "Backups".
-- **HTTP retries wait.** In 4.x a failed HTTP download was tried again at once,
-  so a short burst of 5xx answers spent every `httpErrorRetries` attempt within
-  milliseconds. A retry now waits 1 s, and twice as long after each further
-  failure up to 30 s (1 s and 2 s with the default of 3 attempts), unless the
-  player's request is urgent, and a peer that gets the segment meanwhile sends
-  it.
+- **A player's request gets one HTTP attempt, and the player retries.** When
+  it fails at the origin, the request goes once to a peer that has the
+  segment, so that an origin that fails does not hold the player while a peer
+  has it, and then fails with a `CoreRequestError` that carries the HTTP
+  status. A core that retried as well would give each of the player's
+  retries, which starts with no failed attempts, every `httpErrorRetries`
+  attempt again: with HLS.js's default `fragLoadPolicy`, up to 21 origin
+  requests for one failing fragment, where HLS.js without P2P makes 7. Each
+  request of the player now costs the origin one request, as without P2P;
+  prefetch still retries a segment it owns. The HLS.js adapter reports the
+  status, so HLS.js retries by its own status rules: a 404 that it does not
+  retry is not retried. The other adapters report a core failure as before,
+  but a player with few retries of its own now tolerates less: Shaka's
+  default `retryParameters` make two attempts, so an origin that fails for
+  about 2 s fails the segment, where the core's retries used to last it out.
+  Raise `streaming.retryParameters` where that matters.
+  `httpErrorRetries` applies to prefetch.
+- **Prefetch's HTTP retries wait.** In 4.x a failed HTTP download was tried
+  again at once, so a short burst of 5xx answers spent every
+  `httpErrorRetries` attempt within milliseconds. A retry now waits 1 s, and
+  twice as long after each further failure up to 30 s (1 s and 2 s with the
+  default of 3 attempts), and a peer that gets the segment meanwhile sends it.
 - **A live player is placed as deep in the live window as the window allows**,
   by one rule shared across the adapters, so the segments between a peer's
   buffer and the live edge are as many as possible for peers to exchange.
@@ -455,8 +477,10 @@ These predate 5.0.0 and affect 4.x deployments as well.
   The adapter reported the failure with status 0, which HLS.js reads as a CORS
   failure and never retries; with no other level to switch to, that is a
   fatal `NETWORK_ERROR`, and an integration that recovers by building a new
-  HLS.js instance loses its peers with it. A core failure is now reported as
-  `502`, so `fragLoadPolicy.errorRetry` applies as it does without P2P.
+  HLS.js instance loses its peers with it. A core failure is now reported with
+  the HTTP status the origin gave, or as `502` where none came (a timeout, a
+  network error), so `fragLoadPolicy` decides the retry as it does without
+  P2P.
 - A fragment the core stopped on its own — P2P turned off for the stream
   through `applyDynamicConfig`, or the core destroyed — reached HLS.js as a
   load error, though HLS.js never asked to stop it. HLS.js's own loader now

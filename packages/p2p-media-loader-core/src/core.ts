@@ -1020,8 +1020,14 @@ export class Core {
    * @param options.signal - Aborts the request. Environments without
    * `AbortController` may call `abortSegmentLoading` instead.
    * @returns The segment bytes and the bandwidth they were fetched at.
-   * @throws {CoreRequestError} `"aborted"` when cancelled, `"failed"` when
-   * every source failed.
+   * @throws {CoreRequestError} `"aborted"` when cancelled. `"failed"` when the
+   * request's one HTTP attempt failed at the origin, after a peer that has the
+   * segment was tried where there was one; `httpStatus` is that response's
+   * status, for the player to retry by as it would its own load. The core
+   * makes no retry of its own for the request: a player, or an integration
+   * on its behalf, retries. It is also `"failed"`, with no `cause` and no
+   * `httpStatus`, when the segment storage throws, when the loader cannot
+   * start, or, with HTTP off (`httpErrorRetries` 0), when a peer fails it.
    * @throws {Error} If the segment is not in the registry; check
    * `isSegmentLoadable` first.
    * @throws What initializing the segment storage threw — a

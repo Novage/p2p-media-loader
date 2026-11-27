@@ -175,9 +175,9 @@ paused player that asks for media wants its first frame.
   stream's loader, and from its queue of requests for the host on any
   protocol. A browser without fetch priorities ignores them. P2P downloads go on: they are what P2P is for, and a peer's
   upload rarely fills a viewer's link. A P2P download of the request that is
-  under way moves to HTTP. Where HTTP is not allowed — during `httpDownloadInitialTimeoutMs`, or once
-  the request's HTTP attempts are spent — it is taken from a peer that has it,
-  and takes a P2P slot from prefetch the same way.
+  under way moves to HTTP. Where HTTP is not allowed — during `httpDownloadInitialTimeoutMs` — it is
+  taken from a peer that has it, and takes a P2P slot from prefetch the same
+  way.
 
   With `validateP2PSegment` set, a download belongs to the peer whose bytes it
   holds, whichever source finishes it. HTTP is trusted: a download of HTTP bytes
@@ -190,8 +190,9 @@ paused player that asks for media wants its first frame.
   that completes this way is left to finish: it uses no link, and moving it
   would only start the validation again. If the segment fails, or HTTP gives another
   size than the peer did, the bytes are cleared and the connection to that peer
-  is closed; the attempt does not count against `httpErrorRetries`, and the
-  request goes back to HTTP at once, with no P2P attempt. A peer does not go on
+  is closed; the origin did not fail, so the attempt does not count against
+  `httpErrorRetries` and does not end a player's request, and the request goes
+  back to HTTP at once, with no P2P attempt. A peer does not go on
   from another peer's bytes: it starts again from byte 0, since it would take
   the blame for them. Without `validateP2PSegment`, every download goes on from
   the bytes held, whoever sent them.
@@ -200,7 +201,7 @@ paused player that asks for media wants its first frame.
   peer. With or without a validator, HTTP is the truth: if HTTP gives another
   size than a peer did (`Content-Length`, `Content-Range`, a `416`, or a longer
   body), that peer is closed, the bytes are cleared, and the attempt fails as
-  `p2p-segment-size-mismatch`, which does not count against `httpErrorRetries`.
+  `p2p-segment-size-mismatch`, which is no origin failure either.
   On a `200` the bytes are gone already and the body is the whole segment, so
   the download goes on: it drops a size a peer gave and judges no peer, since
   a peer is judged only on bytes it sent. Its `Content-Length` is the size,
@@ -214,47 +215,62 @@ paused player that asks for media wants its first frame.
   right, so the transfer is stopped, the bytes and the size are cleared, and the
   attempt fails as `p2p-segment-size-conflict`; the next one starts at byte 0.
 
-- **An urgent request whose HTTP attempt fails** goes once to a peer that has
-  all of the segment, and then to HTTP again. Without this, an origin that
-  fails holds the player through every HTTP attempt and the player's own
-  retries while a peer has the segment. The P2P attempt comes only between
-  two HTTP attempts: one attempt per request, and only while an HTTP attempt
-  remains after it, so the last attempt is always HTTP. If every peer that
-  has the segment is downloading something else, the one whose download is
-  furthest ahead stops it. A peer that is still downloading the segment is not asked. If the
-  peer fails too, the player waits at most `p2pNotReceivingBytesTimeoutMs`
-  longer than without P2P; a peer that fails it at once, because its channel
-  is closing, sends it back to HTTP at once. The player's next request for the segment starts
-  with no failed attempts, and has its own P2P attempt. The attempt is marked
-  as such: a P2P download that prefetch started, even after a failed HTTP
-  prefetch of the segment, is not it, and moves to HTTP as above. A player that
-  aborts and asks again while the attempt runs keeps it, and gets no second
-  one.
+- **A player's request gets one HTTP attempt.** The attempt it joins counts:
+  an owner's prefetch, a backup's fetch or a paused download that was under
+  way when the player asked. When that attempt fails at the origin, the
+  request goes once to a peer that has all of the segment, whatever its
+  urgency, and then ends with a `CoreRequestError` whose cause is the HTTP
+  failure and whose `httpStatus` is the response's status, absent for a
+  timeout or a network error, for an answer to a range the core asked for to
+  go on from bytes it held, and for a download that prefetch started
+  before the player asked: a live segment fetched as soon as the playlist
+  lists it can meet a 404 at a CDN edge that the player's own, later request
+  would not, and a player does not retry a 404. The player retries by its own policy, as it
+  would its own load: each of its requests costs the origin one request, as
+  without P2P. An adapter that reports the status lets the player apply its
+  status rules too — the HLS.js adapter does, so a 404 that HLS.js does not
+  retry is not retried ([player-adapters.md](player-adapters.md)). Were the
+  core to retry as well, each of the player's
+  retries, which starts with no failed attempts, would get every core
+  attempt again: up to 21 origin requests for one fragment with HLS.js's
+  defaults, where HLS.js alone makes 7. Without the P2P attempt, an origin
+  that fails holds the player through its retries while a peer has the
+  segment. If every peer that has the segment is downloading something else,
+  the one whose download is furthest ahead stops it. A peer that is still
+  downloading the segment is not asked. If the peer fails too, the player
+  waits at most `p2pNotReceivingBytesTimeoutMs` longer than without P2P; a
+  peer that fails it at once, because its channel is closing, ends the
+  request at once, and so does no peer having the segment. The player's next
+  request for the segment starts with no failed attempts, and has its own
+  HTTP and P2P attempts. The P2P attempt is marked as such: a P2P download
+  that prefetch started, even after a failed HTTP prefetch of the segment, is
+  not it, and moves to HTTP as above. A player that aborts and asks again
+  while the attempt runs keeps it. A failure on a peer's bytes or size is not
+  the origin's and does not end the request. After the request ends, P2P
+  prefetch may take the segment from a peer, and HTTP prefetch may retry it
+  after its wait, for the player's next request.
 
-- **HTTP retries wait, except an urgent request's.** After an HTTP failure,
-  the next HTTP attempt of the segment waits 1 s, then twice as long after
-  each further failure, up to 30 s: 1 s and 2 s with the default of three
+- **Prefetch's HTTP retries wait.** After an HTTP failure, the owner's next
+  HTTP attempt of the segment waits 1 s, then twice as long after each
+  further failure, up to 30 s: 1 s and 2 s with the default of three
   attempts. The limit keeps the wait below the 60 s after which a request's
-  failed attempts are cleared, so that `httpErrorRetries` is reached. That
-  covers the owner's prefetch, a backup's fetch, and a player's request that
-  is not urgent, also with no peer connected. An origin that just failed is
-  often still failing: attempts spread out reach it after a short outage,
-  where attempts made at once would spend `httpErrorRetries` in a moment. A
-  peer that gets the segment during the wait sends it, and no HTTP attempt
-  follows. Only an urgent request does not wait: its buffer has no time to
-  wait with. A failure on a peer's bytes or size starts no wait, since the
-  origin was not at fault. The wait needs no timer of its own: a queue pass,
-  or the prefetch timer every one to two seconds, starts the attempt once the
-  wait is over. A player's request starts with no failed attempts, whatever
-  the prefetch left, so a wait that a failed prefetch started does not hold
-  it: not its first request after that failure, and not its retries, whose
-  timing is the player's. Only the request's own failures make it wait.
+  failed attempts are cleared, so that `httpErrorRetries` is reached. An
+  origin that just failed is often still failing: attempts spread out reach
+  it after a short outage, where attempts made at once would spend
+  `httpErrorRetries` in a moment. A peer that gets the segment during the
+  wait sends it, and no HTTP attempt follows. A failure on a peer's bytes or
+  size starts no wait, since the origin was not at fault. The wait needs no
+  timer of its own: a queue pass, or the prefetch timer every one to two
+  seconds, starts the attempt once the wait is over. A backup makes no retry:
+  it fetches only the segment its player asked for, so its attempt is that
+  request's one attempt. A player's request starts with no failed attempts,
+  whatever the prefetch left, so a wait that a failed prefetch started does
+  not hold it.
 - **A request that is not urgent** is fetched from a peer that has the
   segment. If no peer has it, the election decides who fetches it over HTTP
   ([prefetch.md](prefetch.md)). Otherwise it waits.
 - **With no peer connected**, a request is fetched over HTTP at once. Nobody
-  can give the segment, and no election runs. After an HTTP failure, its
-  retry waits as above until the request is urgent.
+  can give the segment, and no election runs.
 
 Core judges a waiting request again on every report and on the prefetch timer
 ([prefetch.md](prefetch.md), "Backups"). The buffer drains while the request
@@ -278,7 +294,10 @@ try to be faster than the player alone, for example by fetching over HTTP, for
 itself, segments its player has not asked for: that spends the HTTP bytes P2P
 exists to save. Such a segment comes over HTTP only through the election, once
 for the whole swarm ([prefetch.md](prefetch.md)). The one delay is the integrator's own choice: `httpDownloadInitialTimeoutMs`
-holds HTTP back at the start of a stream.
+holds HTTP back at the start of a stream. Nor does a player's request cost
+the origin more than without P2P: each gets one HTTP attempt, and its retries
+are the player's own. Prefetch is the swarm's, not the player's: the owner of
+a segment fetches it, and retries it, once for every peer.
 
 **A request inside the buffer.** For a request that continues the stream, the
 requested segment is at the end of the buffer, so `bufferAhead` is the time

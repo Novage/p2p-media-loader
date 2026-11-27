@@ -215,14 +215,13 @@ the groups and the cases a reader of a snapshot must know.
   (`SegmentRequest:became-urgent`), and each HTTP download stopped to give
   an urgent request the link (`Prefetch:yielded-to-urgent`), and each one
   left to finish because it was about to (`Prefetch:kept-for-urgent`), as in
-  specs/playback-contract.md, "Urgency". Each P2P attempt that an urgent
+  specs/playback-contract.md, "Urgency". Each P2P attempt that a player's
   request gets after its HTTP attempt fails is counted too
   (`SegmentRequest:peer-after-http-failure`), with how it ended (`:served`,
   `:failed`, `:aborted`) or why it did not start (`:no-peer`, no peer holds
-  the whole segment; `:no-free-peer`, no peer or slot is free; both count
-  each HTTP failure after which it could not start, so one request can count
-  more than once), and each
-  download stopped to free a peer for it (`Prefetch:peer-freed-for-urgent`).
+  the whole segment; `:no-free-peer`, no peer or slot is free; the request
+  then ends at once), and each download stopped to free a peer for it
+  (`Prefetch:peer-freed-for-player`).
   A player's request that already holds every byte, after an attempt that
   failed or stopped after its last chunk, is completed from them before any
   source is chosen (`SegmentRequest:completed-from-held-bytes`).
@@ -238,13 +237,12 @@ the groups and the cases a reader of a snapshot must know.
   request settled during the pass is counted (`QueuePass:after-settle`), and
   each one not run because the pass before was such a pass
   (`QueuePass:after-settle:limited`) — unless a request succeeded that no pass
-  has handled, which always gets one more pass. Each HTTP retry is counted
-  by why it started: a retry of the player's urgent request, which never
-  waits (`HttpRetry:urgent`), or of any other request, after its wait
-  (`HttpRetry:after-wait`); and each segment a peer sent after an origin
-  failure while an HTTP attempt was still allowed
-  (`HttpRetry:served-by-peer`) — not after the HTTP attempts are spent, and
-  not an urgent request's own P2P attempt. It is an upper bound of what the
+  has handled, which always gets one more pass. Each HTTP retry is counted,
+  after its wait (`HttpRetry:after-wait`): only prefetch retries, since a
+  player's request ends with its HTTP failure and the player retries. Each
+  segment a peer sent after an origin failure while an HTTP attempt was
+  still allowed is counted too (`HttpRetry:served-by-peer`) — not after the
+  HTTP attempts are spent, and not a player's request's own P2P attempt. It is an upper bound of what the
   wait gained: it does not ask whether this peer would have made the HTTP
   retry, which the election may have given to another peer meanwhile. The
   Video.js adapter

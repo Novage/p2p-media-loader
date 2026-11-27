@@ -20,10 +20,12 @@ import { diagnostics } from "./diagnostics.js";
 const DEFAULT_DOWNLOAD_LATENCY = 10;
 
 /**
- * The status a core failure is reported with. The core has no HTTP status to
- * give: every source it tried failed. HLS.js retries a fragment by its
- * status, and never one with none — status 0 reads as a CORS failure — so on
- * a stream of one rendition the first core failure would be fatal. A gateway
+ * The status a core failure is reported with when it has no HTTP status to
+ * give: a timeout, a network error, a refusal of a range the core asked for
+ * itself, a peer's failure with HTTP off, or a storage fault (the cases of
+ * `Core.loadSegment`'s `@throws`). HLS.js retries a fragment by its status,
+ * and never one with none — status 0 reads as a CORS failure — so on a
+ * stream of one rendition the first such failure would be fatal. A gateway
  * that could not get the segment from upstream is what the adapter is, and
  * 502 is what HLS.js's own loader would report for that, so its
  * `fragLoadPolicy.errorRetry` applies as it would without P2P.
@@ -179,9 +181,10 @@ export class FragmentLoaderBase implements Loader<FragmentLoaderContext> {
       thrownError instanceof CoreRequestError &&
       thrownError.type === "failed"
     ) {
-      // A core failure carries no HTTP status of its own: every source it
-      // tried failed, and HLS.js reads the text.
-      error.code = CORE_FAILURE_STATUS;
+      // The status of the core's one HTTP attempt, as HLS.js's own loader
+      // would report it: HLS.js retries by it, a 404 not at all. The core
+      // leaves the retries to HLS.js.
+      error.code = thrownError.httpStatus ?? CORE_FAILURE_STATUS;
       error.text = thrownError.message;
     } else if (thrownError instanceof Error) {
       error.text = thrownError.message;

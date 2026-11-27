@@ -142,6 +142,13 @@ if (core.isSegmentLoadable(url, byteRange)) {
 }
 ```
 
+`loadSegment` makes one HTTP attempt for a request, after which it tries a
+peer that has the segment and fails with a `CoreRequestError`. The core no
+longer retries a request the player waits for: retry it as the player would
+retry its own load, and report `error.httpStatus` to the player where it
+decides by status (absent for a timeout or a network error).
+`httpErrorRetries` now applies to prefetch only.
+
 Playback is reported as `{ bufferAhead, rate }` through `core.updatePlayback`,
 and every integration must report it.
 `trackMediaElementPlayback((state) => core.updatePlayback(state)).watch(media)`

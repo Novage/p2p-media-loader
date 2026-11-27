@@ -184,6 +184,16 @@ export class HybridLoader {
       this.engineRequest?.abort();
       this.engineRequest = engineRequest;
 
+      // The player's request starts with no failed attempts, whatever the
+      // prefetch did: the request ends with its own first origin failure,
+      // not an earlier one. The attempt under way is not among them, and its
+      // tag stays with it. Cleared before the storage is read, so that a
+      // failure of that attempt during the read stays the request's.
+      const underWay = this.requests.get(segment);
+      underWay?.failedAttempts.clear();
+      engineRequest.joinedHttpDownload =
+        underWay?.status === "loading" && underWay.downloadSource === "http";
+
       this.segmentStorage.onSegmentRequested(
         stream.swarmId,
         stream.streamSwarmId,
@@ -238,17 +248,6 @@ export class HybridLoader {
       }
 
       this.judgeUrgencyOnArrival(engineRequest);
-
-      // The player's request starts with no failed attempts, whatever the
-      // prefetch did: its failures would leave it fewer HTTP attempts, or
-      // none, and no P2P attempt — a kept request is never rejected, so the
-      // player would wait for them to expire, and one still loading would be
-      // rejected as soon as it failed. The attempt under way is not among
-      // them, and its tag stays with it.
-      const request = this.requests.get(segment);
-      if (request) {
-        request.failedAttempts.clear();
-      }
     } catch (error) {
       this.logger(
         `request failed for ${LoggerUtils.getSegmentString(segment)} in ${LoggerUtils.getStreamString(stream)}`,
@@ -372,7 +371,7 @@ export class HybridLoader {
           if (!type) break;
           const httpFailures = request.failedAttempts.httpAttemptsCount;
           if (request.lastAttemptTag === "peer-after-http-failure") {
-            // The urgent request's own attempt, which does not wait.
+            // The player's own attempt after its HTTP failure.
             diagnostics?.count("SegmentRequest:peer-after-http-failure:served");
           } else if (
             type === "p2p" &&
@@ -435,18 +434,13 @@ export class HybridLoader {
           ) {
             diagnostics?.count("SegmentRequest:peer-after-http-failure:failed");
           }
+          // The player's request is ended, or given its peer attempt, by
+          // `processEngineRequest`, later in this pass.
           if (
             !engineRequest &&
             !stream.segments.has(request.segment.runtimeId)
           ) {
             this.requests.remove(request);
-          }
-          if (
-            request.failedAttempts.httpAttemptsCount >= httpErrorRetries &&
-            engineRequest
-          ) {
-            this.engineRequest = undefined;
-            engineRequest.reject();
           }
           break;
 
@@ -562,8 +556,7 @@ export class HybridLoader {
    *   download of this loader stops, except one about to finish
    *   (`yieldHttpPrefetchTo`), so with kept downloads more than
    *   `simultaneousHttpDownloads` can run. A P2P download of it moves to
-   *   HTTP. After an HTTP attempt fails, one attempt goes to a peer that has
-   *   it before HTTP again (`tryPeerAfterHttpFailure`).
+   *   HTTP.
    * - Not urgent, with no peer connected, or one the storage answered with
    *   no bytes: over HTTP at once, in a free slot or one taken from the HTTP
    *   download furthest ahead (`freeSlotFor`). Nobody can give the segment,
@@ -572,9 +565,11 @@ export class HybridLoader {
    *   decides who fetches it over HTTP (`prefetchThroughHttp`), or it waits;
    *   the buffer drains while it waits, and it becomes urgent in time.
    *
-   * After an HTTP failure of the request, its next HTTP attempt waits
-   * (`isHttpRetryWaiting`) unless the request is urgent; meanwhile a peer
-   * that has it sends it. That holds the HTTP-at-once cases above too.
+   * The request gets one HTTP attempt, the one it joined included. After it
+   * fails at the origin, one attempt goes to a peer that has the segment
+   * (`tryPeerAfterHttpFailure`), whatever the urgency, and then the request
+   * ends with that failure: retrying is the player's, by its own policy, so
+   * each request of the player costs the origin one request, as without P2P.
    */
   private processEngineRequest() {
     const { engineRequest } = this;
@@ -601,7 +596,7 @@ export class HybridLoader {
 
     const { simultaneousP2PDownloads } = this.config;
     const p2pLoader = this.p2pLoaders.currentLoader;
-    const canLoadThroughHttp = this.canStartHttp(request, urgent);
+    const canLoadThroughHttp = this.canStartHttp(request);
 
     if (request?.status === "loading") {
       if (!urgent) return;
@@ -617,7 +612,7 @@ export class HybridLoader {
       ) {
         request.cancel();
         this.yieldHttpPrefetchTo(segment);
-        this.loadThroughHttp(segment, "high", urgent);
+        this.loadThroughHttp(segment, "high");
       }
       return;
     }
@@ -632,10 +627,33 @@ export class HybridLoader {
       return;
     }
 
+    // The origin failed it since the player asked — the player's arrival
+    // cleared older failures: a peer that has it gets one attempt, and then
+    // the request ends, with the failure the player retries by. Also when
+    // that attempt was stopped rather than failed: the request has had its
+    // one HTTP attempt.
+    const httpFailure = request?.failedAttempts.lastHttpFailure;
+    if (request && httpFailure) {
+      if (this.tryPeerAfterHttpFailure(request)) return;
+      this.engineRequest = undefined;
+      engineRequest.reject(httpFailure);
+      return;
+    }
+    // With HTTP off (`httpErrorRetries` 0), a failure from a peer since the
+    // player asked ends the request: it has no HTTP attempt to wait for.
+    if (
+      request?.status === "failed" &&
+      request.failedAttempts.lastAttempt &&
+      this.config.httpErrorRetries === 0
+    ) {
+      this.engineRequest = undefined;
+      engineRequest.reject();
+      return;
+    }
+
     if (urgent && canLoadThroughHttp) {
-      if (request && this.tryPeerAfterHttpFailure(request)) return;
       this.yieldHttpPrefetchTo(segment);
-      this.loadThroughHttp(segment, "high", urgent);
+      this.loadThroughHttp(segment, "high");
       return;
     }
     const startNow =
@@ -643,14 +661,13 @@ export class HybridLoader {
       p2pLoader.connectedPeerCount === 0 ||
       engineRequest.shouldBeStartedImmediately;
     if (startNow && canLoadThroughHttp && this.freeSlotFor(segment, "http")) {
-      this.loadThroughHttp(segment, "high", urgent);
+      this.loadThroughHttp(segment, "high");
       return;
     }
 
-    // Not urgent, or no HTTP for it — before the initial HTTP delay ends,
-    // while an HTTP retry waits, or once its HTTP attempts are spent: from a
-    // peer that has it. Only a request that must start now takes a slot from
-    // prefetch to do so.
+    // Not urgent, or no HTTP for it — before the initial HTTP delay ends, or
+    // with HTTP off: from a peer that has it. Only a request that must start
+    // now takes a slot from prefetch to do so.
     if (
       p2pLoader.isSegmentLoadingOrLoadedBySomeone(segment) &&
       (startNow
@@ -662,14 +679,13 @@ export class HybridLoader {
   }
 
   /**
-   * Gives a failed urgent request its one P2P attempt: after an HTTP attempt
-   * fails, a peer that has all of the segment sends it before HTTP is tried
-   * again. An origin that fails then does not hold the player through every
-   * HTTP attempt while a peer has the segment. One attempt per request, and
-   * only while an HTTP attempt remains after it: a peer that fails too
-   * delays the player by one P2P timeout at most, and the last attempt is
-   * HTTP. A peer that is still downloading the segment is not asked; it is
-   * the one most likely to fail. See specs/playback-contract.md, "Urgency".
+   * Gives a player's request whose HTTP attempt failed at the origin its one
+   * P2P attempt, before the request ends: a peer that has all of the segment
+   * sends it, and the player is not left to its retries while a peer has the
+   * segment. One attempt per request: a peer that fails too delays the
+   * player by one P2P timeout at most. A peer that is still downloading the
+   * segment is not asked; it is the one most likely to fail. See
+   * specs/playback-contract.md, "Urgency".
    *
    * The attempt is tagged, so an urgent pass knows it from a P2P prefetch,
    * which it moves to HTTP as any other: a P2P prefetch can follow a failed
@@ -684,18 +700,15 @@ export class HybridLoader {
     if (
       request.status !== "failed" ||
       failedAttempts.lastAttempt?.downloadSource !== "http" ||
-      // Failed on a peer's bytes or size, not at the origin: HTTP goes on
-      // at once.
+      // Failed on a peer's bytes or size, not at the origin: no peer
+      // attempt, and the request ends.
       failedOnPeerData(failedAttempts.lastAttempt) ||
       failedAttempts.hasTag("peer-after-http-failure")
     ) {
       return false;
     }
-    // Each way this ends is counted. A request whose attempt does not start
-    // goes on to HTTP at once, and is judged again only after that attempt
-    // fails too: a peer may have the segment by then, and the request gets
-    // its attempt. So `:no-peer` and `:no-free-peer` count HTTP failures,
-    // not requests.
+    // Each way this ends is counted; a request whose attempt does not start
+    // ends at once.
     const { segment } = request;
     const p2pLoader = this.p2pLoaders.currentLoader;
     if (!p2pLoader.isSegmentLoadedBySomeone(segment)) {
@@ -703,7 +716,7 @@ export class HybridLoader {
       return false;
     }
     if (p2pLoader.freePeerFor(segment)) {
-      diagnostics?.count("Prefetch:peer-freed-for-urgent");
+      diagnostics?.count("Prefetch:peer-freed-for-player");
     }
     if (
       !this.freeSlotFor(segment, "p2p") ||
@@ -714,12 +727,12 @@ export class HybridLoader {
     }
     diagnostics?.count("SegmentRequest:peer-after-http-failure");
     this.logger(
-      `HTTP failed for the urgent ${LoggerUtils.getSegmentString(segment)}; trying a peer that has it`,
+      `HTTP failed for the player's ${LoggerUtils.getSegmentString(segment)}; trying a peer that has it`,
     );
     // A peer whose channel is closing fails the attempt at once. This pass
     // has handled the settled requests already, and a request that settles
-    // during a pass starts no other: HTTP goes on now, and the failure is
-    // counted here.
+    // during a pass starts no other: the request ends now, and the failure
+    // is counted here.
     if (failedAttempts.hasTag("peer-after-http-failure")) {
       diagnostics?.count("SegmentRequest:peer-after-http-failure:failed");
       return false;
@@ -860,19 +873,19 @@ export class HybridLoader {
    * that the browser serves it before prefetch where it can: on HTTP/2 and
    * HTTP/3 it gets the bandwidth first, and on any protocol it leaves the
    * browser's queue for the host first. `"low"` for prefetch.
-   * @param urgent - Whether the player's request is urgent, so that its
-   * retry skipped the wait (`canStartHttp`).
    */
   private loadThroughHttp(
     segment: SegmentWithStream,
     priority: RequestPriority,
-    urgent: boolean,
   ) {
     const request = this.requests.getOrCreateRequest(segment);
+    // An attempt started now is the player's own: its status is the player's.
+    if (this.engineRequest?.segment === segment) {
+      this.engineRequest.joinedHttpDownload = false;
+    }
+    // Only prefetch retries: a player's request ends with its HTTP failure.
     if (request.failedAttempts.httpAttemptsCount > 0) {
-      // By the reason, not the clock: the player's urgent request never
-      // waits, though a P2P attempt before this retry can outlast the wait.
-      diagnostics?.count(urgent ? "HttpRetry:urgent" : "HttpRetry:after-wait");
+      diagnostics?.count("HttpRetry:after-wait");
     }
     const executor = new HttpRequestExecutor(
       request,
@@ -891,17 +904,18 @@ export class HybridLoader {
   /**
    * Whether an HTTP attempt may start for the request now, as far as the
    * request goes: not during the start-of-stream wait, not once its HTTP
-   * attempts are spent (`httpErrorRetries`), and not while a retry waits
-   * unless the request is urgent — its buffer has no time left to wait with.
-   * Every HTTP start of a request asks this; free slots, the link an urgent
-   * request holds and the election are each caller's own.
+   * attempts are spent (`httpErrorRetries`), and not while a retry waits.
+   * The wait and the limit above 1 are prefetch's: a player's request ends
+   * with its first origin failure, and starts with none; a limit of 0 keeps
+   * it off HTTP too. Every HTTP start of a request asks this; free slots, the
+   * link an urgent request holds and the election are each caller's own.
    */
-  private canStartHttp(request: Request | undefined, urgent: boolean): boolean {
+  private canStartHttp(request: Request | undefined): boolean {
     return (
       !this.isInitialHttpWait() &&
       (request?.failedAttempts.httpAttemptsCount ?? 0) <
         this.config.httpErrorRetries &&
-      (urgent || !this.isHttpRetryWaiting(request))
+      !this.isHttpRetryWaiting(request)
     );
   }
 
@@ -1020,9 +1034,7 @@ export class HybridLoader {
       if (request?.status === "loading" || request?.status === "succeed") {
         continue;
       }
-      // The election never skips a retry's wait: an urgent request is the
-      // player's path, `processEngineRequest`.
-      if (!this.canStartHttp(request, false)) continue;
+      if (!this.canStartHttp(request)) continue;
 
       const rank = ElectionUtils.rankForSegment(
         this.peerId,
@@ -1059,7 +1071,6 @@ export class HybridLoader {
       this.loadThroughHttp(
         segment,
         segment.runtimeId === requested ? "high" : "low",
-        false,
       );
     }
   }

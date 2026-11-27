@@ -201,11 +201,15 @@ and an unset stream is not one to be skipped over but one using the default.
 - Segments: `fLoader`, falling back to `config.loader`.
 - Playback: the media element.
 
-A core failure is reported to HLS.js with status `502`, so HLS.js's
-`fragLoadPolicy.errorRetry` runs as it would for its own loader. The core has
-no status to give — every source it tried failed — and HLS.js retries no
-fragment without one: status 0 reads as a CORS failure, and on a stream of one
-rendition the first core failure would be fatal. A fragment the core stops on
+A core failure is reported to HLS.js with the status of the core's one HTTP
+attempt (`CoreRequestError.httpStatus`), so HLS.js's `fragLoadPolicy` decides
+the retry as it would for its own loader: a 503 is retried, a 404 is not. The
+core makes no retry of its own for the request. A failure with no status — a
+timeout, a network error, a refusal of a range the core asked for itself, a
+download that prefetch started before the player asked, a peer's failure with
+HTTP off, a storage fault — is reported as `502`: HLS.js retries no fragment
+without a status, since status 0 reads as a CORS failure, and on a stream of
+one rendition the first such failure would be fatal. A fragment the core stops on
 its own — P2P turned off for its stream, or the core destroyed — is not one
 HLS.js asked to stop and is still waiting for, so it is handed to
 `config.loader`, as a fragment the core does not serve is, rather than

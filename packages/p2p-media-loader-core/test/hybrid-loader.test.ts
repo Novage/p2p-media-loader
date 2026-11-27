@@ -185,7 +185,7 @@ import { EventTarget } from "../src/utils/event-target.js";
 import { rankForSegment } from "../src/utils/election.js";
 import debug from "debug";
 import { diagnostics as compiledLedger } from "../src/diagnostics.js";
-import { RequestError } from "../src/types.js";
+import { RequestError, type CoreRequestError } from "../src/types.js";
 
 // Absent only in a prebuilt bundle; the tests run on the source.
 if (!compiledLedger) throw new Error("diagnostics are compiled out");
@@ -195,6 +195,14 @@ debug.enable("p2pml:diagnostics");
 ledger.snapshot();
 debug.disable();
 const count = (name: string) => ledger.snapshot()?.counters[name] ?? 0;
+
+/** The one error that the player's request failed with. */
+function failureOf(callbacks: {
+  onError: ReturnType<typeof vi.fn>;
+}): CoreRequestError {
+  expect(callbacks.onError).toHaveBeenCalledTimes(1);
+  return callbacks.onError.mock.calls[0][0] as CoreRequestError;
+}
 
 const SEGMENT_DURATION = 4;
 
@@ -401,6 +409,43 @@ describe("HybridLoader: making room for an urgent request", () => {
     expect(state.p2pStarted).toEqual(["seg-0"]);
     expect(status(0)).toBe("loading");
     expect(state.httpStarted).toEqual([]);
+    loader.destroy();
+  });
+
+  it("ends the request on a peer's failure when HTTP is off", async () => {
+    // httpErrorRetries 0: no HTTP attempt will come, so the player is told,
+    // rather than left waiting for a peer that may never have the segment.
+    const { loader, segment, callbacks, state } = setup({
+      httpErrorRetries: 0,
+    });
+    state.loadedBySomeone.add("seg-0");
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+    expect(state.p2pStarted).toEqual(["seg-0"]);
+
+    state.p2pControls
+      .get("seg-0")!
+      .failWithError(new RequestError("peer-closed"));
+    await flush();
+
+    expect(failureOf(callbacks).httpStatus).toBeUndefined();
+    expect(state.httpStarted).toEqual([]);
+    loader.destroy();
+  });
+
+  it("tries a peer when HTTP is off, though a prefetch of the segment failed", async () => {
+    // The failure before the player asked is not the request's own.
+    const { loader, segment, callbacks, startLoading, state } = setup({
+      httpErrorRetries: 0,
+    });
+    state.loadedBySomeone.add("seg-0");
+    startLoading(0, "p2p").failWithError(new RequestError("peer-closed"));
+
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+
+    expect(callbacks.onError).not.toHaveBeenCalled();
+    expect(state.p2pStarted).toEqual(["seg-0"]);
     loader.destroy();
   });
 
@@ -1214,10 +1259,15 @@ describe("HybridLoader: a peer after a failed HTTP attempt", () => {
     fakes.state.httpStarted.filter((started) => started === id);
   const p2pOf = (id: string) =>
     fakes.state.p2pStarted.filter((started) => started === id);
-  const httpError = () => new RequestError("http-error", "503");
+  const httpError = () =>
+    new RequestError("http-error", "Service Unavailable", undefined, 503);
+  const notFound = () =>
+    new RequestError("http-error", "Not Found", undefined, 404);
   const peerError = () => new RequestError("peer-closed");
 
-  it("tries a peer that has the segment once, between two HTTP attempts", async () => {
+  it("tries a peer that has the segment once, and then ends the request", async () => {
+    // The player's retries are its own: each of its requests costs the origin
+    // one request, as without P2P.
     fakes.state.loadedBySomeone.add("seg-0");
     const tried = count("SegmentRequest:peer-after-http-failure");
     const { loader, segment, callbacks, startLoading, status, state } = setup({
@@ -1247,22 +1297,18 @@ describe("HybridLoader: a peer after a failed HTTP attempt", () => {
     expect(state.p2pAborted).toEqual(["seg-8"]);
     expect(httpOf("seg-0")).toEqual(["seg-0"]);
 
-    // The peer fails too: HTTP again at once, and no second P2P attempt.
+    // The peer fails too: the request ends with the HTTP failure, which the
+    // player retries by, and no second HTTP attempt. P2P prefetch may fetch
+    // the segment after that, for the player's next request.
     state.p2pControls.get("seg-0")!.failWithError(peerError());
     await flush();
-    expect(httpOf("seg-0")).toEqual(["seg-0", "seg-0"]);
-    state.httpControls.get("seg-0")!.failWithError(httpError());
-    await flush();
-    expect(httpOf("seg-0")).toEqual(["seg-0", "seg-0", "seg-0"]);
-    expect(callbacks.onError).not.toHaveBeenCalled();
-    state.httpControls.get("seg-0")!.failWithError(httpError());
-    await flush();
 
-    expect(p2pOf("seg-0")).toEqual(["seg-0"]);
-    expect(callbacks.onError).toHaveBeenCalledTimes(1);
-    expect(callbacks.onError.mock.calls[0][0]).toMatchObject({
-      type: "failed",
-    });
+    expect(httpOf("seg-0")).toEqual(["seg-0"]);
+    expect(count("SegmentRequest:peer-after-http-failure")).toBe(tried + 1);
+    const error = failureOf(callbacks);
+    expect(error.type).toBe("failed");
+    expect(error.httpStatus).toBe(503);
+    expect(error.message).toBe("Service Unavailable");
     loader.destroy();
   });
 
@@ -1413,22 +1459,25 @@ describe("HybridLoader: a peer after a failed HTTP attempt", () => {
     loader.destroy();
   });
 
-  it("goes to HTTP again when no peer has the segment", async () => {
+  it("ends the request at once when no peer has the segment", async () => {
     const { loader, segment, callbacks, state } = setup();
 
     await loader.loadSegment(segment(0), callbacks);
     await flush();
-    state.httpControls.get("seg-0")!.failWithError(httpError());
+    const failure = httpError();
+    state.httpControls.get("seg-0")!.failWithError(failure);
     await flush();
 
     expect(state.p2pStarted).toEqual([]);
-    expect(httpOf("seg-0")).toEqual(["seg-0", "seg-0"]);
+    expect(httpOf("seg-0")).toEqual(["seg-0"]);
+    const error = failureOf(callbacks);
+    expect(error.cause).toBe(failure);
+    expect(error.httpStatus).toBe(503);
     loader.destroy();
   });
 
-  it("tries no peer when no HTTP attempt would remain after it", async () => {
-    // The last attempt is HTTP: with one HTTP attempt, the player's request
-    // fails with it. P2P prefetch may fetch the segment after that.
+  it("tries the peer whatever httpErrorRetries allows prefetch", async () => {
+    // The limit is prefetch's: the player's request makes one HTTP attempt.
     fakes.state.loadedBySomeone.add("seg-0");
     const tried = count("SegmentRequest:peer-after-http-failure");
     const { loader, segment, callbacks, state } = setup({
@@ -1440,8 +1489,9 @@ describe("HybridLoader: a peer after a failed HTTP attempt", () => {
     state.httpControls.get("seg-0")!.failWithError(httpError());
     await flush();
 
-    expect(callbacks.onError).toHaveBeenCalledTimes(1);
-    expect(count("SegmentRequest:peer-after-http-failure")).toBe(tried);
+    expect(p2pOf("seg-0")).toEqual(["seg-0"]);
+    expect(callbacks.onError).not.toHaveBeenCalled();
+    expect(count("SegmentRequest:peer-after-http-failure")).toBe(tried + 1);
     loader.destroy();
   });
 
@@ -1498,9 +1548,101 @@ describe("HybridLoader: a peer after a failed HTTP attempt", () => {
     loader.destroy();
   });
 
-  it("gives the player's next request for the segment its own P2P attempt", async () => {
+  it("gives the player no status from a prefetch it joined, and its own next request one", async () => {
+    // The owner fetched the live segment as soon as the playlist listed it,
+    // and the CDN edge did not have it yet: a 404 the player's own, later
+    // request would not meet. HLS.js does not retry a 404, so the failure
+    // goes to it with no status, as 502, which it retries.
+    const { loader, segment, callbacks, startLoading, state } = setup();
+    const prefetch = startLoading(0, "http");
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+    prefetch.failWithError(notFound());
+    await flush();
+
+    const joined = failureOf(callbacks);
+    expect(joined.httpStatus).toBeUndefined();
+    expect((joined.cause as RequestError).httpStatus).toBe(404);
+
+    // The player's retry makes its own attempt, whose status it gets.
+    const retry = { onSuccess: vi.fn(), onError: vi.fn() };
+    await loader.loadSegment(segment(0), retry);
+    await flush();
+    state.httpControls.get("seg-0")!.failWithError(notFound());
+    await flush();
+    expect(failureOf(retry).httpStatus).toBe(404);
+    loader.destroy();
+  });
+
+  it("gives the player the status of its own attempt after a joined one failed on a peer's bytes", async () => {
+    // The joined download failed on a peer's data, not at the origin: the
+    // request goes on with an HTTP attempt of its own, whose status it gets.
+    const { loader, segment, callbacks, startLoading, state } = setup();
+    const prefetch = startLoading(0, "http");
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+    prefetch.failWithError(new RequestError("p2p-segment-validation-failed"));
+    await flush();
+    expect(callbacks.onError).not.toHaveBeenCalled();
+
+    state.httpControls.get("seg-0")!.failWithError(notFound());
+    await flush();
+
+    expect(failureOf(callbacks).httpStatus).toBe(404);
+    loader.destroy();
+  });
+
+  it("ends the request when its peer attempt is stopped, with no second HTTP attempt", async () => {
+    // A stopped attempt is not a failed one, but the request has had its one
+    // HTTP attempt all the same. The peer's bytes keep the request, and its
+    // failures, in place.
     fakes.state.loadedBySomeone.add("seg-0");
-    const { loader, segment, state } = setup({ httpErrorRetries: 2 });
+    const { loader, segment, callbacks, state } = setup();
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+    state.httpControls.get("seg-0")!.failWithError(httpError());
+    await flush();
+    expect(p2pOf("seg-0")).toEqual(["seg-0"]);
+
+    state.requests.get(segment(0))!.setTotalBytes(32);
+    state.p2pControls.get("seg-0")!.addLoadedChunk(new Uint8Array(16));
+    state.requests.get(segment(0))!.cancel();
+    loader.updatePlayback({ bufferAhead: 0, rate: 2 }); // a forced pass
+    await flush();
+
+    expect(httpOf("seg-0")).toEqual(["seg-0"]);
+    expect(failureOf(callbacks).httpStatus).toBe(503);
+    loader.destroy();
+  });
+
+  it("keeps the failure of the attempt it joined while the storage is read", async () => {
+    // The storage claims the segment and reads back nothing; the HTTP
+    // download the player joined fails during the read. That failure is the
+    // request's one HTTP attempt.
+    let finishRead: (data: ArrayBuffer) => void = () => undefined;
+    const storage = {
+      ...emptyStorage,
+      hasSegment: (_s: string, _ss: string, id: number) => id === 0,
+      getSegmentData: () =>
+        new Promise<ArrayBuffer>((resolve) => (finishRead = resolve)),
+    } as unknown as SegmentStorage;
+    const { loader, segment, callbacks, startLoading } = setup({}, storage);
+    const http = startLoading(0, "http");
+
+    const loading = loader.loadSegment(segment(0), callbacks);
+    http.failWithError(httpError());
+    finishRead(new ArrayBuffer(0));
+    await loading;
+    await flush();
+
+    expect(callbacks.onError).toHaveBeenCalledTimes(1);
+    expect(httpOf("seg-0")).toEqual([]);
+    loader.destroy();
+  });
+
+  it("gives the player's next request for the segment its own attempts", async () => {
+    fakes.state.loadedBySomeone.add("seg-0");
+    const { loader, segment, state } = setup();
     const first = { onSuccess: vi.fn(), onError: vi.fn() };
 
     await loader.loadSegment(segment(0), first);
@@ -1511,11 +1653,10 @@ describe("HybridLoader: a peer after a failed HTTP attempt", () => {
     state.loadedBySomeone.delete("seg-0");
     state.p2pControls.get("seg-0")!.failWithError(peerError());
     await flush();
-    state.httpControls.get("seg-0")!.failWithError(httpError());
-    await flush();
     expect(first.onError).toHaveBeenCalledTimes(1);
 
-    // Another peer has it. The player retries: HTTP first, then the peer.
+    // Another peer has it. The player retries: one HTTP attempt, then the
+    // peer.
     state.loadedBySomeone.add("seg-0");
     const second = { onSuccess: vi.fn(), onError: vi.fn() };
     await loader.loadSegment(segment(0), second);
@@ -1523,8 +1664,9 @@ describe("HybridLoader: a peer after a failed HTTP attempt", () => {
     state.httpControls.get("seg-0")!.failWithError(httpError());
     await flush();
 
-    expect(httpOf("seg-0")).toEqual(["seg-0", "seg-0", "seg-0"]);
+    expect(httpOf("seg-0")).toEqual(["seg-0", "seg-0"]);
     expect(p2pOf("seg-0")).toEqual(["seg-0", "seg-0"]);
+    expect(second.onError).not.toHaveBeenCalled();
     loader.destroy();
   });
 });
@@ -1904,9 +2046,10 @@ describe("HybridLoader: the start-of-stream wait for peers", () => {
 });
 
 describe("HybridLoader: the wait between HTTP retries", () => {
-  // An origin that just failed is often still failing. A retry waits 1 s,
-  // then twice as long after each failure, unless the player's request is
-  // urgent; a peer may send the segment meanwhile.
+  // An origin that just failed is often still failing. A prefetch's retry
+  // waits 1 s, then twice as long after each failure; a peer may send the
+  // segment meanwhile. A player's request makes no retry: it ends with its
+  // HTTP failure, and the player retries by its own policy.
   let clock = 0;
   beforeEach(() => {
     vi.stubGlobal("window", globalThis);
@@ -2007,9 +2150,11 @@ describe("HybridLoader: the wait between HTTP retries", () => {
     loader.destroy();
   });
 
-  it("holds a backup's HTTP retry too", async () => {
+  it("ends the player's request with its backup's HTTP failure, and makes no retry", async () => {
     // A slow link brings the backup's deadline at once, while the buffer is
-    // well above the urgency threshold: the request is not urgent.
+    // well above the urgency threshold: the request is not urgent. A backup
+    // fetches only the segment its player asked for, so its attempt is the
+    // player's, and its retry the player's next request.
     const backup = segmentRanked(1);
     fakes.state.peerCount = 1;
     const { loader, segment, callbacks, bandwidth } = setup(
@@ -2028,17 +2173,15 @@ describe("HybridLoader: the wait between HTTP retries", () => {
     expect(started(`seg-${backup}`)).toBe(1);
 
     await failHttp(`seg-${backup}`);
-    await at(999);
-    expect(started(`seg-${backup}`)).toBe(1);
+    expect(callbacks.onError).toHaveBeenCalledTimes(1);
     await at(1000);
-    expect(started(`seg-${backup}`)).toBe(2);
+    expect(started(`seg-${backup}`)).toBe(1);
     loader.destroy();
   });
 
   it("does not hold the player's request for a segment whose prefetch just failed", async () => {
     // The player's request starts with no failed attempts, so the wait the
     // prefetch started is gone, and its first attempt is no retry.
-    const urgent = count("HttpRetry:urgent");
     const afterWait = count("HttpRetry:after-wait");
     const { loader, segment, callbacks } = await prefetching();
     await failHttp(`seg-${owned}`);
@@ -2049,7 +2192,6 @@ describe("HybridLoader: the wait between HTTP retries", () => {
     await flush();
 
     expect(started(`seg-${owned}`)).toBe(2);
-    expect(count("HttpRetry:urgent")).toBe(urgent);
     expect(count("HttpRetry:after-wait")).toBe(afterWait);
     loader.destroy();
   });
@@ -2080,9 +2222,8 @@ describe("HybridLoader: the wait between HTTP retries", () => {
     loader.destroy();
   });
 
-  it("counts the urgent request's own peer attempt only as that", async () => {
-    // An urgent request does not wait; its P2P attempt after an HTTP failure
-    // has counters of its own.
+  it("counts the player's own peer attempt only as that", async () => {
+    // The P2P attempt after a player's HTTP failure has counters of its own.
     const servedByPeer = count("HttpRetry:served-by-peer");
     const served = count("SegmentRequest:peer-after-http-failure:served");
     fakes.state.peerCount = 1;
@@ -2100,46 +2241,8 @@ describe("HybridLoader: the wait between HTTP retries", () => {
     loader.destroy();
   });
 
-  it("counts an urgent request's retry as urgent, also after a slow peer attempt", async () => {
-    // The peer attempt between the two HTTP attempts outlasts the 1 s wait;
-    // the request still never waited.
-    const urgent = count("HttpRetry:urgent");
-    const afterWait = count("HttpRetry:after-wait");
-    fakes.state.peerCount = 1;
-    fakes.state.loadedBySomeone.add("seg-0");
-    const { loader, segment, callbacks, state } = setup();
-    await loader.loadSegment(segment(0), callbacks);
-    await flush();
-    await failHttp("seg-0");
-    expect(state.p2pStarted).toContain("seg-0");
-
-    clock = 1500;
-    state.p2pControls
-      .get("seg-0")!
-      .failWithError(new RequestError("bytes-receiving-timeout"));
-    await flush();
-
-    expect(started("seg-0")).toBe(2);
-    expect(count("HttpRetry:urgent")).toBe(urgent + 1);
-    expect(count("HttpRetry:after-wait")).toBe(afterWait);
-    loader.destroy();
-  });
-
-  it("does not hold an urgent request: its retry goes at once", async () => {
-    const urgent = count("HttpRetry:urgent");
-    // No report: the request is urgent, and no peer has the segment.
-    const { loader, segment, callbacks } = setup();
-    await loader.loadSegment(segment(0), callbacks);
-    await flush();
-
-    await failHttp("seg-0");
-
-    expect(started("seg-0")).toBe(2);
-    expect(count("HttpRetry:urgent")).toBe(urgent + 1);
-    loader.destroy();
-  });
-
-  it("holds a request that is not urgent, with no peer to wait for", async () => {
+  it("ends a request that is not urgent with its HTTP failure, with no wait", async () => {
+    // No peer is connected: nobody could send the segment during a wait.
     const { loader, segment, callbacks } = setup();
     loader.updatePlayback({ bufferAhead: 10, rate: 1 });
     await loader.loadSegment(segment(0), callbacks);
@@ -2147,15 +2250,46 @@ describe("HybridLoader: the wait between HTTP retries", () => {
     expect(started("seg-0")).toBe(1);
 
     await failHttp("seg-0");
-    expect(started("seg-0")).toBe(1);
+    expect(callbacks.onError).toHaveBeenCalledTimes(1);
 
     clock = 1000;
     loader.updatePlayback({ bufferAhead: 9, rate: 1 });
     // A pass, as the prefetch timer or a playlist refresh runs one.
     loader.updateStream(segment(0).stream);
     await flush();
-    expect(started("seg-0")).toBe(2);
-    expect(callbacks.onError).not.toHaveBeenCalled();
+    expect(started("seg-0")).toBe(1);
+    loader.destroy();
+  });
+
+  it("ends the player's request when the prefetch it joined fails", async () => {
+    // The owner's prefetch of the segment is loading when the player asks
+    // for it: that is the request's one HTTP attempt.
+    const { loader, segment } = await prefetching();
+    const player = { onSuccess: vi.fn(), onError: vi.fn() };
+    await loader.loadSegment(segment(owned), player);
+    await flush();
+    expect(started(`seg-${owned}`)).toBe(1);
+
+    await failHttp(`seg-${owned}`);
+
+    expect(player.onError).toHaveBeenCalledTimes(1);
+    expect(started(`seg-${owned}`)).toBe(1);
+    loader.destroy();
+  });
+
+  it("ends the player's request with no status after a timeout", async () => {
+    const { loader, segment, callbacks } = setup();
+    await loader.loadSegment(segment(0), callbacks);
+    await flush();
+
+    fakes.state.httpControls
+      .get("seg-0")!
+      .failWithError(new RequestError("bytes-receiving-timeout"));
+    await flush();
+
+    const error = failureOf(callbacks);
+    expect(error.type).toBe("failed");
+    expect(error.httpStatus).toBeUndefined();
     loader.destroy();
   });
 });
@@ -2306,7 +2440,7 @@ describe("HybridLoader: counting how the P2P attempt after an HTTP failure goes"
         count(`SegmentRequest:peer-after-http-failure:${way}`),
       ]),
     ),
-    freed: count("Prefetch:peer-freed-for-urgent"),
+    freed: count("Prefetch:peer-freed-for-player"),
   });
   const delta = (before: ReturnType<typeof counts>) => {
     const after = counts();
@@ -2345,26 +2479,18 @@ describe("HybridLoader: counting how the P2P attempt after an HTTP failure goes"
     loader.destroy();
   });
 
-  it("goes on over HTTP at once when the peer fails the attempt at once", async () => {
+  it("ends the request at once when the peer fails the attempt at once", async () => {
     // The peer's channel is closing: the attempt fails before downloadSegment
     // returns, in a pass that has handled the settled requests already.
     fakes.state.loadedBySomeone.add("seg-0");
     fakes.state.p2pFailsAtOnce = true;
     const before = counts();
-    const { loader, state } = await afterHttpFailure();
+    const { loader, state, callbacks } = await afterHttpFailure();
 
-    expect(state.p2pStarted).toEqual(["seg-0"]);
-    expect(state.httpStarted.filter((id) => id === "seg-0")).toHaveLength(2);
+    expect(state.p2pStarted[0]).toBe("seg-0");
+    expect(state.httpStarted.filter((id) => id === "seg-0")).toHaveLength(1);
+    expect(callbacks.onError).toHaveBeenCalledTimes(1);
     expect(delta(before)).toEqual({ failed: 1 });
-
-    // The attempt kept its tag: the next HTTP failure gets no second one.
-    state.p2pFailsAtOnce = false;
-    state.httpControls
-      .get("seg-0")!
-      .failWithError(new RequestError("http-error", "503"));
-    await flush();
-    expect(state.p2pStarted).toEqual(["seg-0"]);
-    expect(state.httpStarted.filter((id) => id === "seg-0")).toHaveLength(3);
     loader.destroy();
   });
 

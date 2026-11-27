@@ -28,7 +28,7 @@ export type LoadProgress = {
 
 /**
  * Why an attempt was started, where that changes how the core treats it:
- * `"peer-after-http-failure"` is a player's urgent request's one P2P attempt
+ * `"peer-after-http-failure"` is a player's request's one P2P attempt
  * after an HTTP attempt failed. An attempt with no tag is an ordinary one.
  */
 export type AttemptTag = "peer-after-http-failure";
@@ -772,6 +772,12 @@ class FailedRequestAttempts {
   /** The HTTP attempts that failed at the origin. */
   get httpAttemptsCount() {
     return this.originHttpFailures().length;
+  }
+
+  /** The error of the last HTTP attempt that failed at the origin. */
+  get lastHttpFailure(): RequestError | undefined {
+    const failures = this.originHttpFailures();
+    return failures[failures.length - 1]?.error;
   }
 
   /**

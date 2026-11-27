@@ -6,7 +6,11 @@ import type {
   LoaderConfiguration,
   LoaderContext,
 } from "hls.js";
-import { CoreRequestError, type Core } from "p2p-media-loader-core";
+import {
+  CoreRequestError,
+  RequestError,
+  type Core,
+} from "p2p-media-loader-core";
 import { FragmentLoaderBase } from "../src/fragment-loader.js";
 
 const URL = "https://cdn.example/vod/media.mp4";
@@ -142,22 +146,52 @@ describe("HLS.js fragment loader", () => {
 });
 
 describe("HLS.js fragment loader when the core does not deliver", () => {
-  it("reports a core failure with a status HLS.js retries", async () => {
-    // HLS.js retries a fragment by its status and never one with none: status
-    // 0 reads as a CORS failure, which on a stream of one rendition is fatal.
+  /** The code and text HLS.js is given for a core failure. */
+  async function reported(failure: CoreRequestError) {
     const { core, loader, callbacks } = setup(true);
-    core.loadSegment.mockImplementation(() =>
-      Promise.reject(new CoreRequestError("failed")),
-    );
+    core.loadSegment.mockImplementation(() => Promise.reject(failure));
     loader.load(context(), loaderConfig, callbacks);
     await Promise.resolve();
     await Promise.resolve();
 
     expect(callbacks.onError).toHaveBeenCalledTimes(1);
     const [response] = vi.mocked(callbacks.onError).mock.calls[0];
+    return response;
+  }
+
+  it("reports a core failure with no HTTP status as one HLS.js retries", async () => {
+    // A timeout: HLS.js retries a fragment by its status and never one with
+    // none — status 0 reads as a CORS failure, which on a stream of one
+    // rendition is fatal.
+    const response = await reported(
+      new CoreRequestError(
+        "failed",
+        "timed out",
+        new RequestError("bytes-receiving-timeout", "timed out"),
+      ),
+    );
+
     // HLS.js's retryForHttpStatus: anything but none and 4xx is retried.
-    expect(response.code).toBeGreaterThan(499);
+    expect(response.code).toBe(502);
+    expect(response.text).toBe("timed out");
   });
+
+  it.each([404, 503])(
+    "reports a core failure with the %i the origin gave, as HLS.js's own loader would",
+    async (status) => {
+      // HLS.js retries a 503, and not a 404, as it does without P2P.
+      const response = await reported(
+        new CoreRequestError(
+          "failed",
+          "refused",
+          new RequestError("http-error", "refused", undefined, status),
+          status,
+        ),
+      );
+
+      expect(response.code).toBe(status);
+    },
+  );
 
   it("hands a fragment the core stopped on its own to HLS.js's loader", async () => {
     // P2P turned off for the stream, or the core destroyed, while HLS.js

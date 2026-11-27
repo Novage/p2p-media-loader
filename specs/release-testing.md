@@ -310,8 +310,11 @@ cancelled. Use the wrappers to:
   the iframe's window when its document's `readyState` leaves `loading`:
   module scripts run after that and before `DOMContentLoaded`.
 
-Pass: failed requests are tried again; a segment that fails over HTTP comes
-over P2P where a peer has it; playback continues or recovers when the fault
+Pass: failed requests are tried again, a player's by the player, with one
+origin request for each of its requests (measure it with `runSegmentFaults` in
+one tab, where no prefetch runs), and on HLS.js a 404 retried only where HLS.js
+alone retries one; a segment that fails
+over HTTP comes over P2P where a peer has it; playback continues or recovers when the fault
 stops; tracker sockets reconnect with a growing delay, and peer connections
 already open stay open; an unreachable tracker gives HTTP-only playback, and
 its reconnect delay grows rather than looping. Without WebRTC, the stream

@@ -32,6 +32,11 @@ function execute(body: BodyInit | null, status = 200) {
   return executeWith(() => Promise.resolve(new Response(body, { status })));
 }
 
+/** An origin that answers every request with `status` and no body. */
+function respondWith(status: number) {
+  return () => Promise.resolve(new Response(null, { status }));
+}
+
 function executeWith(
   respond: (request: globalThis.Request) => Promise<Response>,
   byteRange?: { start: number; end: number },
@@ -191,6 +196,26 @@ describe("HttpRequestExecutor on a response refused on its headers", () => {
     expect(body.cancelled).toBe(true);
   });
 
+  it.each([404, 503])(
+    "keeps the status of a %i, which the player retries by",
+    async (status) => {
+      const request = execute(watchedBody().stream, status);
+      await settle();
+
+      expect(request.failedAttempts.lastAttempt?.error.httpStatus).toBe(status);
+    },
+  );
+
+  it("keeps the status of a refusal of the player's own byte range", async () => {
+    // The range the playlist gave: HLS.js alone would see the 416.
+    const request = executeWith(respondWith(416), { start: 0, end: 3 });
+    await settle();
+
+    const error = request.failedAttempts.lastAttempt?.error;
+    expect(error?.type).toBe("http-bytes-mismatch");
+    expect(error?.httpStatus).toBe(416);
+  });
+
   it("cancels the whole file sent for a byte range", async () => {
     // A server that ignores the range answers 200 with the whole file: the
     // body can be far larger than the segment, and nobody reads it.
@@ -244,10 +269,14 @@ describe("HttpRequestExecutor on bytes another source sent", () => {
     vi.unstubAllGlobals();
   });
 
-  /** Starts HTTP on a request that holds 16 bytes from `source`. */
+  /**
+   * Starts HTTP on a request that holds 16 bytes from `source`; the answer
+   * never comes unless `respond` gives one.
+   */
   function resume(
     source: "http" | "p2p",
     validateP2PSegment?: StreamConfig["validateP2PSegment"],
+    respond: () => Promise<Response> = () => new Promise(() => undefined),
   ) {
     vi.stubGlobal("window", globalThis);
     const eventTarget = new EventTarget<CoreEventMap>();
@@ -271,7 +300,7 @@ describe("HttpRequestExecutor on bytes another source sent", () => {
     const ranges: (string | null)[] = [];
     const fetch = vi.fn((sent: globalThis.Request) => {
       ranges.push(sent.headers.get("Range"));
-      return new Promise<Response>(() => undefined);
+      return respond();
     });
     vi.stubGlobal("window", { ...globalThis, fetch });
     new HttpRequestExecutor(
@@ -307,6 +336,44 @@ describe("HttpRequestExecutor on bytes another source sent", () => {
 
     expect(ranges).toEqual(["bytes=16-"]);
   });
+
+  it("gives the player no status for a 416 to the range it went on from", async () => {
+    // The player never asked for that range; its retry starts from byte 0.
+    const { request } = resume("http", undefined, respondWith(416));
+    await settle();
+
+    const error = request.failedAttempts.lastAttempt?.error;
+    expect(error?.type).toBe("http-bytes-mismatch");
+    expect(error?.httpStatus).toBeUndefined();
+  });
+
+  it("gives the player no status for a refusal of the range it went on from", async () => {
+    // The player never asked for that range, and does not retry a 4xx; a
+    // plain request of its own may well succeed.
+    const { request } = resume("p2p", undefined, respondWith(403));
+    await settle();
+
+    const error = request.failedAttempts.lastAttempt?.error;
+    expect(error?.type).toBe("http-error");
+    expect(error?.httpStatus).toBeUndefined();
+    // The next attempt asks for the whole segment, not the refused range.
+    expect(request.loadedBytes).toBe(0);
+  });
+
+  it.each([503, 429, 408])(
+    "keeps the bytes held through a %i to the range it went on from",
+    async (status) => {
+      // An origin that fails, or asks for a later try, has not refused the
+      // range.
+      const { request } = resume("p2p", undefined, respondWith(status));
+      await settle();
+
+      expect(
+        request.failedAttempts.lastAttempt?.error.httpStatus,
+      ).toBeUndefined();
+      expect(request.loadedBytes).toBe(16);
+    },
+  );
 });
 
 describe("HttpRequestExecutor on a byte-range segment whose bytes were cleared", () => {

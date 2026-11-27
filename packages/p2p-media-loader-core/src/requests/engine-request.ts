@@ -1,5 +1,5 @@
 import { diagnostics, type DiagnosticsToken } from "../diagnostics.js";
-import { CoreRequestError } from "../types.js";
+import { CoreRequestError, type RequestError } from "../types.js";
 import { EngineCallbacks, SegmentWithStream } from "../internal-types.js";
 
 export class EngineRequest {
@@ -11,6 +11,13 @@ export class EngineRequest {
    * loader holds no reference to a request that has settled.
    */
   waitingNotUrgent = false;
+
+  /**
+   * The request joined an HTTP download that prefetch had started before the
+   * player asked. Its failure is the request's one HTTP attempt, but its
+   * status is not given to the player: see `CoreRequestError.httpStatus`.
+   */
+  joinedHttpDownload = false;
 
   /** Open until the request settles: one never settled is a player left waiting. */
   private readonly diagnosticsToken: DiagnosticsToken | undefined;
@@ -60,12 +67,23 @@ export class EngineRequest {
     });
   }
 
-  reject() {
+  /**
+   * @param cause - The HTTP failure that ends the request, whose status the
+   * player retries by.
+   */
+  reject(cause?: RequestError) {
     if (this._status !== "pending") return;
     this._status = "failed";
     diagnostics?.close(this.diagnosticsToken, "failed");
     diagnostics?.count("PlayerRequest:failed");
-    this.engineCallbacks.onError(new CoreRequestError("failed"));
+    this.engineCallbacks.onError(
+      new CoreRequestError(
+        "failed",
+        cause?.message,
+        cause,
+        this.joinedHttpDownload ? undefined : cause?.httpStatus,
+      ),
+    );
   }
 
   abort() {

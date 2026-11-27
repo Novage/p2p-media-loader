@@ -276,6 +276,23 @@ The tests themselves are in
   [specs/segment-identity.md](specs/segment-identity.md), "HLS: the stream's
   place in the master".
 
+- **A player's request ends with its first HTTP failure, a core timeout
+  included.** The core makes one HTTP attempt for each request of the player
+  and leaves the retries to the player, so that each request costs the origin
+  one request, as without P2P ([specs/playback-contract.md](specs/playback-contract.md),
+  "Urgency"). A timeout of the core's own — no first byte within
+  `httpFirstByteTimeoutMs`, or a body that stalls for
+  `httpNotReceivingBytesTimeoutMs` — ends the request too, reported to HLS.js
+  as `502`; HLS.js alone waits up to 120 s for a stalled body. Video.js 8
+  (VHS) may exclude a rendition after one such failure, where 4.x failed the
+  request only after `httpErrorRetries` attempts, and Shaka, whose default
+  `retryParameters` make two attempts, fails a segment on an origin that
+  fails for about 2 s, which the core's retries used to last out. The same
+  holds for a refusal of the range the core sends when it goes on from bytes
+  it holds — a `406`, a `416`, a `403`: the request ends, the bytes are
+  dropped, and the player's retry, from byte 0, succeeds; the core used to
+  retry at once. It needs an origin that refuses ranges, or a segment whose
+  size changed.
 - **No retry after a failed WebRTC handshake**, and no reconnect of a dropped
   peer. Two peers then stay apart until the tracker's next announce, up to
   120–180 s. Most failures on the Internet are pairs of networks that cannot

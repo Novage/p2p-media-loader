@@ -509,10 +509,17 @@ export type StreamConfig = {
   httpFirstByteTimeoutMs: number;
 
   /**
-   * The number of HTTP attempts a request gets, the first included: `3` is one attempt and
+   * The number of HTTP attempts a prefetch gets, the first included: `3` is one attempt and
    * two retries, and `1` allows no retry. A failure on a peer's data does not count.
-   * A retry waits 1 s after the first failure and twice as long after each next one, up to 30 s,
-   * unless the player's request is urgent; a peer may send the segment meanwhile.
+   * A retry waits 1 s after the first failure and twice as long after each next one, up to 30 s;
+   * a peer may send the segment meanwhile.
+   *
+   * A request the player makes gets one HTTP attempt, whatever this is above 0: after it
+   * fails at the origin, and one attempt from a peer that has the segment where there is
+   * one, the request fails with a `CoreRequestError` that carries the HTTP status, and the
+   * player retries by its own policy: each request of the player costs the origin one
+   * request, as without P2P. `0` turns HTTP off, for prefetch and the player alike, and a
+   * peer's failure then ends the player's request.
    *
    * @default
    * ```typescript
@@ -1485,14 +1492,27 @@ export class RequestError<
   readonly timestamp: number;
 
   /**
+   * The status of an HTTP response the core refused for its status — a 404,
+   * a 503 — to a request for the segment as the playlist gives it. Prefetch
+   * makes such requests too: `CoreRequestError.httpStatus` is the status for
+   * the player. Absent otherwise: a timeout, a network error, a body of the
+   * wrong length, a peer's failure, and any answer to a range the core asked
+   * for to go on from bytes it held (a `416`, a `403`), or to a byte range
+   * answered with another status than `206`.
+   */
+  readonly httpStatus?: number;
+
+  /**
    * Constructs a new RequestError.
    * @param type - The specific error type.
    * @param message - Optional message describing the error.
    * @param cause - Optional underlying cause of the error.
+   * @param httpStatus - The status of the HTTP response refused for it.
    */
-  constructor(type: T, message?: string, cause?: unknown) {
+  constructor(type: T, message?: string, cause?: unknown, httpStatus?: number) {
     super(type, message, cause);
     this.timestamp = performance.now();
+    this.httpStatus = httpStatus;
   }
 }
 
@@ -1519,8 +1539,46 @@ export type SegmentResponse = {
   streamType: StreamType;
 };
 
-/** Custom error class for errors that occur during core network requests. */
+/**
+ * Custom error class for errors that occur during core network requests.
+ *
+ * A `"failed"` request is most often one whose HTTP attempt failed at the
+ * origin: the core makes one for each request of the player, after a peer
+ * that has the segment was tried where there was one, and leaves the
+ * retries to the player. Its `cause` is then that attempt's `RequestError`.
+ * A request also fails with no HTTP attempt, and then has no `cause` and no
+ * `httpStatus`: when the segment storage throws, when the loader cannot
+ * start, and, with HTTP off (`httpErrorRetries` 0), when a peer fails it.
+ */
 export class CoreRequestError extends TypedError<"failed" | "aborted"> {
   /** Always `"CoreRequestError"`; logs and stack traces show it in place of the generic `"Error"`. */
   readonly name = "CoreRequestError";
+
+  /**
+   * The status of the HTTP response that failed the request, for an
+   * integration to report to its player as the player's own loader would —
+   * a player retries by it. Absent where the failure has no such status: a
+   * timeout, a network error, a body of the wrong length, or an answer to a
+   * range the core asked for itself (see `RequestError.httpStatus`). Absent
+   * too where the request joined an HTTP download that prefetch had started
+   * before the player asked: a live segment fetched as soon as the playlist
+   * lists it can meet a 404 that the player's own, later request would not.
+   */
+  readonly httpStatus?: number;
+
+  /**
+   * @param type - The specific error type.
+   * @param message - Optional message describing the error.
+   * @param cause - Optional underlying cause of the error.
+   * @param httpStatus - The status for the player to retry by.
+   */
+  constructor(
+    type: "failed" | "aborted",
+    message?: string,
+    cause?: unknown,
+    httpStatus?: number,
+  ) {
+    super(type, message, cause);
+    this.httpStatus = httpStatus;
+  }
 }
