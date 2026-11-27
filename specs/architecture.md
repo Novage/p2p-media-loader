@@ -117,6 +117,10 @@ can be met at.
   transfer, where the bytes are already held.
 - **To a peer.** A stored segment that reads back empty is never uploaded;
   `SegmentAbsent` is sent instead.
+  So is a segment the stream does not hold — one that left the live window
+  between an announcement and the request for it: a requester that hears
+  nothing waits out its receive timeout and counts it against a peer that is
+  fine.
 - **To the player.** A stored segment that reads back empty is not a hit: the
   segment is loaded again, at once.
 

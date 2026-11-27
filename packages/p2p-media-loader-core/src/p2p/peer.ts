@@ -285,8 +285,8 @@ export class Peer {
     this.#bandwidthDownload = undefined;
   }
 
-  #onSegmentChunkReceived = (chunk: Uint8Array) => {
-    if (!this.#downloadingContext?.isSegmentDataCommandReceived) return;
+  #onSegmentChunkReceived = (chunk: Uint8Array): boolean => {
+    if (!this.#downloadingContext?.isSegmentDataCommandReceived) return false;
 
     const { request, controls } = this.#downloadingContext;
 
@@ -295,7 +295,7 @@ export class Peer {
         "bytes-length-mismatch",
         "Peer response bytes length mismatch",
       );
-      return;
+      return false;
     }
 
     if (this.#bandwidthDownload) {
@@ -306,6 +306,7 @@ export class Peer {
     }
     this.#cachedDownloadBandwidth.timestamp = 0; // invalidate cache
     controls.addLoadedChunk(chunk);
+    return true;
   };
 
   /**
