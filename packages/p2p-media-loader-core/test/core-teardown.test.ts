@@ -101,13 +101,19 @@ describe("Core.destroy", () => {
     const state = core as unknown as {
       segmentStorage?: unknown;
       mainStreamLoader?: unknown;
-      manifestResponseUrl?: string;
       storageInitPromise?: unknown;
     };
     expect(state.segmentStorage).toBeUndefined();
     expect(state.mainStreamLoader).toBeUndefined();
-    expect(state.manifestResponseUrl).toBeUndefined();
     expect(state.storageInitPromise).toBeUndefined();
     expect(core.getStreams()).toHaveLength(0);
+
+    // The old source's swarm name is gone too: the next source names its own.
+    const next = "https://cdn.example/next/media.m3u8";
+    core.processManifest({
+      url: `${next}?token=abc`,
+      data: readFixture("mux-720p-media.m3u8"),
+    });
+    expect(core.getStreams()[0]?.swarmId).toBe(next);
   });
 });

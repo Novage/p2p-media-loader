@@ -3,22 +3,8 @@ import { diagnostics, type DiagnosticsToken } from "./diagnostics.js";
 import { HybridLoader } from "./hybrid-loader.js";
 import { runAll } from "./run-all.js";
 import type { PlaybackState } from "./playback.js";
-import type {
-  ManifestParser,
-  ManifestProtocol,
-  ParsedManifest,
-} from "./manifest/types.js";
-import {
-  ClockedManifest,
-  type ManifestSource,
-} from "./manifest/clocked-manifest.js";
-import type { SidxBox } from "./manifest/mp4-sidx.js";
-import {
-  ManifestRegistry,
-  type RegistryStream,
-  type RegistryUpdate,
-} from "./manifest/registry.js";
-import { segmentKey, stripQuery } from "./manifest/url-key.js";
+import type { ManifestProtocol } from "./manifest/types.js";
+import { segmentKey } from "./manifest/url-key.js";
 import debug from "debug";
 import {
   Stream,
@@ -31,81 +17,31 @@ import {
   StreamConfig,
   DefinedCoreConfig,
   SegmentResponse,
-  StreamProperties,
   StreamType,
   DynamicStreamConfig,
   ProcessedManifest,
-  SwarmIdContext,
 } from "./types.js";
 import {
   BandwidthCalculators,
   EngineCallbacks,
-  StreamDetails,
   StreamWithSegments,
   SegmentWithStream,
 } from "./internal-types.js";
-import * as StreamUtils from "./utils/stream.js";
-import {
-  liveDelayForSegments,
-  pickLiveTarget,
-  type LiveDelay,
-} from "./live-delay.js";
-import { buildStreamSwarmId, computeInfoHash } from "./stream-identity.js";
+import { Presentation } from "./presentation.js";
 import { BandwidthCalculator } from "./bandwidth-calculator.js";
 import { SegmentMemoryStorage } from "./segment-storage/segment-memory-storage.js";
 import { EventTarget } from "./utils/event-target.js";
+import { overrideConfig, deepCopy } from "./utils/utils.js";
+import { generatePeerId } from "./utils/peer.js";
 import {
-  overrideConfig,
-  mergeAndFilterConfig,
-  deepCopy,
-  filterUndefinedProps,
-} from "./utils/utils.js";
-import { TRACKER_CLIENT_VERSION_PREFIX, generatePeerId } from "./utils/peer.js";
+  DEFAULT_COMMON_CORE_CONFIG,
+  DEFAULT_STREAM_CONFIG,
+  mergeCoreConfig,
+  reportObsoleteConfigKeys,
+  stripStaticOnlyProps,
+} from "./core-config.js";
 import { SegmentStorage } from "./segment-storage/index.js";
 import { WebTorrentSocketPool } from "./webtorrent/webtorrent-socket-pool/index.js";
-
-/**
- * Config keys a major release renamed or removed, each with its counter and
- * the reason it is ignored. The config merge keeps only known keys, so an old
- * one would vanish without a word; a caller in plain JavaScript, or with a
- * config object that is not a literal, gets no compile error for it. Each is
- * reported instead, and never carried over: the meaning of a renamed key can
- * change with it.
- */
-const OBSOLETE_CONFIG_KEYS: Readonly<
-  Record<
-    string,
-    { counter: "Config:renamed-key" | "Config:removed-key"; reason: string }
-  >
-> = {
-  highDemandTimeWindow: {
-    counter: "Config:renamed-key",
-    reason:
-      'it is renamed "urgentBufferThreshold", and its meaning changed. Choose a value for "urgentBufferThreshold"',
-  },
-  streamSwarmIdBuilder: {
-    counter: "Config:renamed-key",
-    reason:
-      'it is renamed "streamIdBuilder", which returns only the stream ID; the core adds the protocol version and the swarm ID. A prefix such as a tenant moves to the stream ID: streamIdBuilder: ({ defaultStreamId }) => `tenant-a-${defaultStreamId}`',
-  },
-  validateHTTPSegment: {
-    counter: "Config:removed-key",
-    reason:
-      "it is removed. HTTP is trusted. A download that holds a peer's bytes is validated with validateP2PSegment, whichever source finishes it",
-  },
-};
-
-/**
- * Stream config keys that cannot change at runtime: stream identity, read
- * once when a stream is registered, and the segment filter, read once when
- * the registry is made.
- */
-const STATIC_ONLY_KEYS = [
-  "swarmId",
-  "streamIdBuilder",
-  "segmentFilter",
-] as const;
-type StaticOnlyKey = (typeof STATIC_ONLY_KEYS)[number];
 
 /** Core class for managing media streams loading via P2P. */
 export class Core {
@@ -120,71 +56,31 @@ export class Core {
   static readonly diagnostics: typeof diagnostics | undefined = diagnostics;
 
   /** Default configuration for common core settings. */
-  static readonly DEFAULT_COMMON_CORE_CONFIG: CommonCoreConfig = {
-    segmentMemoryStorageLimit: undefined,
-    customSegmentStorageFactory: undefined,
-    trackerClientVersionPrefix: TRACKER_CLIENT_VERSION_PREFIX,
-  };
+  static readonly DEFAULT_COMMON_CORE_CONFIG: CommonCoreConfig =
+    DEFAULT_COMMON_CORE_CONFIG;
 
   /** Default configuration for stream settings. */
-  static readonly DEFAULT_STREAM_CONFIG: StreamConfig = {
-    isP2PUploadDisabled: false,
-    isP2PDisabled: false,
-    simultaneousHttpDownloads: 2,
-    simultaneousP2PDownloads: 3,
-    urgentBufferThreshold: undefined,
-    httpDownloadInitialTimeoutMs: 0,
-    httpDownloadTimeWindow: 3000,
-    p2pDownloadTimeWindow: 6000,
-    webRtcMaxMessageSize: 64 * 1024 - 1,
-    p2pNotReceivingBytesTimeoutMs: 2000,
-    p2pInactiveLoaderDestroyTimeoutMs: 30 * 1000,
-    httpNotReceivingBytesTimeoutMs: 3000,
-    httpFirstByteTimeoutMs: 10000,
-    httpErrorRetries: 3,
-    p2pErrorRetries: 3,
-    announceTrackers: [
-      "wss://tracker.novage.com.ua",
-      "wss://tracker.webtorrent.dev",
-      "wss://tracker.openwebtorrent.com",
-    ],
-    rtcConfig: {
-      iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:global.stun.twilio.com:3478" },
-      ],
-    },
-    validateP2PSegment: undefined,
-    httpRequestSetup: undefined,
-    swarmId: undefined,
-    streamIdBuilder: undefined,
-    segmentFilter: undefined,
-    p2pMaxPeers: 50,
-    p2pChurnMaxPeersMultiplier: 1.5,
-    p2pChurnCleanupIntervalMs: 30000,
-    p2pChurnGracePeriodMs: 15000,
-    webRtcOffersCount: 5,
-    webRtcOfferTimeoutMs: 50000,
-    webRtcIceGatheringTimeoutMs: 5000,
-    webRtcConnectionTimeoutMs: 15000,
-  };
+  static readonly DEFAULT_STREAM_CONFIG: StreamConfig = DEFAULT_STREAM_CONFIG;
 
   private readonly eventTarget = new EventTarget<CoreEventMap>();
-  private manifestResponseUrl?: string;
-  /** The same URL with its query, for a `swarmId` function. */
-  private manifestRequestedUrl?: string;
-  /** What each `swarmId` function returned for the source playing. */
-  private readonly sourceSwarmIds = new Map<
-    (context: SwarmIdContext) => string,
-    string
-  >();
-  /** Registered streams, keyed by the manifest-derived stream key. */
-  private readonly streams = new Map<string, StreamWithSegments>();
-  /** Stream keys whose registration failed; reported once, then left alone. */
-  private readonly failedStreamKeys = new Set<string>();
-  private readonly unshareableLogged = new Set<string>();
-  private mainStreamConfig: StreamConfig;
-  private secondaryStreamConfig: StreamConfig;
+  /** The source playing: its manifests, registry, streams and their names. */
+  private readonly presentation: Presentation;
+  // The presentation's state, under the names `Core` had for it before it
+  // moved there. `streamDetails` is read here too: the segment storage and
+  // every stream loader take it. Tests of `Core` read all three.
+  private get streams() {
+    return this.presentation.streams;
+  }
+  private get streamDetails() {
+    return this.presentation.streamDetails;
+  }
+  private get clockedManifest() {
+    return this.presentation.clockedManifest;
+  }
+  // One object each for the core's life: a dynamic config update changes
+  // them in place, and the presentation holds them by reference.
+  private readonly mainStreamConfig: StreamConfig;
+  private readonly secondaryStreamConfig: StreamConfig;
   private commonCoreConfig: CommonCoreConfig;
   /**
    * The player's last report on the current source, and when it came: a
@@ -217,10 +113,6 @@ export class Core {
   private readonly peerId: string;
   private mainStreamLoader?: HybridLoader;
   private secondaryStreamLoader?: HybridLoader;
-  private streamDetails: StreamDetails = {
-    isLive: false,
-    liveTarget: undefined,
-  };
   private storageInitPromise?: Promise<void>;
   /** Bumped by every initialization and every `destroy()`; see below. */
   private storageGeneration = 0;
@@ -234,18 +126,7 @@ export class Core {
     key: string;
     aborted: boolean;
   }>();
-  private readonly manifestParsers: readonly ManifestParser[];
-  private manifestRegistry: ManifestRegistry;
-  private readonly manifestLogger = debug("p2pml-core:manifest");
   private readonly registryMissLogger = debug("p2pml-core:registry-miss");
-  /**
-   * The presentation's manifest when its segment list follows from the
-   * clock, parsed again as time passes. It decides when; the core parses.
-   */
-  private readonly clockedManifest = new ClockedManifest((source, now) =>
-    this.reapplyManifest(source, now),
-  );
-
   /**
    * Constructs a new Core instance with optional initial configuration.
    *
@@ -269,34 +150,31 @@ export class Core {
    * const core = new Core();
    */
   constructor(config?: Partial<CoreConfig>) {
-    this.reportObsoleteConfigKeys(config);
-    const filteredConfig = filterUndefinedProps(config ?? {});
-
-    this.commonCoreConfig = mergeAndFilterConfig<CommonCoreConfig>({
-      defaultConfig: Core.DEFAULT_COMMON_CORE_CONFIG,
-      baseConfig: filteredConfig,
-    });
-
-    this.mainStreamConfig = mergeAndFilterConfig<StreamConfig>({
-      defaultConfig: Core.DEFAULT_STREAM_CONFIG,
-      baseConfig: filteredConfig,
-      specificStreamConfig: filteredConfig.mainStream,
-    });
-
-    this.secondaryStreamConfig = mergeAndFilterConfig<StreamConfig>({
-      defaultConfig: Core.DEFAULT_STREAM_CONFIG,
-      baseConfig: filteredConfig,
-      specificStreamConfig: filteredConfig.secondaryStream,
-    });
-    this.manifestRegistry = this.createManifestRegistry();
+    reportObsoleteConfigKeys(config, this.reportedObsoleteKeys);
+    const merged = mergeCoreConfig(config);
+    this.commonCoreConfig = merged.common;
+    this.mainStreamConfig = merged.main;
+    this.secondaryStreamConfig = merged.secondary;
+    this.presentation = new Presentation(
+      config?.manifestParsers ?? [],
+      { main: this.mainStreamConfig, secondary: this.secondaryStreamConfig },
+      {
+        onStreamAdded: (params) =>
+          this.eventTarget.dispatchEvent("onStreamAdded", params),
+        onStreamRegistrationError: (params) =>
+          this.eventTarget.dispatchEvent("onStreamRegistrationError", params),
+        onSegmentsChanged: (stream) => {
+          this.mainStreamLoader?.updateStream(stream);
+          this.secondaryStreamLoader?.updateStream(stream);
+        },
+        onSegmentsLeft: (stream, segmentIds) =>
+          this.releaseFromStorage(stream, segmentIds),
+      },
+    );
 
     this.peerId = generatePeerId(
       this.commonCoreConfig.trackerClientVersionPrefix,
     );
-
-    // Parsers are capabilities, not tunables: kept as given, outside the
-    // merged config, so they are never deep-copied or surfaced by getConfig().
-    this.manifestParsers = config?.manifestParsers ?? [];
 
     this.webTorrentSocketPool.addEventListener("error", (error, url) => {
       this.socketPoolLogger(`WebSocket error for tracker url ${url}:`, error);
@@ -343,7 +221,7 @@ export class Core {
    * core.applyDynamicConfig(dynamicConfig);
    */
   applyDynamicConfig(dynamicConfig: DynamicCoreConfig) {
-    this.reportObsoleteConfigKeys(dynamicConfig);
+    reportObsoleteConfigKeys(dynamicConfig, this.reportedObsoleteKeys);
     const { mainStream, secondaryStream } = dynamicConfig;
 
     const mainStreamConfigCopy = deepCopy(this.mainStreamConfig);
@@ -361,37 +239,6 @@ export class Core {
       dynamicConfig,
       "secondary",
     );
-  }
-
-  /**
-   * Warns once for each renamed or removed key a config still names, at its
-   * top level or in `mainStream` or `secondaryStream`: the key is ignored.
-   * For a renamed key the integrator has to choose a value for the new one;
-   * for a removed one, the warning says what replaces it.
-   */
-  private reportObsoleteConfigKeys(config: unknown) {
-    if (typeof config !== "object" || config === null) return;
-    const levels = [config as Record<string, unknown>];
-    for (const key of ["mainStream", "secondaryStream"]) {
-      const nested = (config as Record<string, unknown>)[key];
-      if (typeof nested === "object" && nested !== null) {
-        levels.push(nested as Record<string, unknown>);
-      }
-    }
-    for (const level of levels) {
-      for (const oldKey of Object.keys(OBSOLETE_CONFIG_KEYS)) {
-        if (!(oldKey in level) || this.reportedObsoleteKeys.has(oldKey)) {
-          continue;
-        }
-        const { counter, reason } = OBSOLETE_CONFIG_KEYS[oldKey];
-        this.reportedObsoleteKeys.add(oldKey);
-        diagnostics?.count(counter);
-        // eslint-disable-next-line no-console
-        console.warn(
-          `[p2p-media-loader] The config key "${oldKey}" is ignored: ${reason}; see https://github.com/Novage/p2p-media-loader/blob/main/MIGRATION.md`,
-        );
-      }
-    }
   }
 
   private processSpecificDynamicConfigParams(
@@ -481,8 +328,7 @@ export class Core {
    * @param url - The URL to name the swarm by; its query string is discarded.
    */
   setManifestResponseUrl(url: string): void {
-    this.manifestResponseUrl = stripQuery(url);
-    this.manifestRequestedUrl = url;
+    this.presentation.nameBy(url);
   }
 
   /**
@@ -523,49 +369,7 @@ export class Core {
       this.sourceDiagnosticsToken = diagnostics?.open("CoreSource");
       if (this.sourceDiagnosticsToken) this.probeBandwidth();
     }
-    const text =
-      typeof manifest.data === "string"
-        ? manifest.data
-        : new TextDecoder().decode(manifest.data);
-
-    const parser = manifest.protocol
-      ? this.manifestParsers.find((p) => p.protocol === manifest.protocol)
-      : this.manifestParsers.find((p) => p.canParse(text));
-    if (!parser) {
-      this.manifestLogger("no parser for manifest %s", manifest.url);
-      return undefined;
-    }
-
-    const { requestedUrl } = manifest;
-    const source = {
-      parser,
-      text,
-      url: manifest.url,
-      requestedUrl,
-      receivedAt: Date.now(),
-    };
-    const applied = this.applyManifest(source);
-    if (!applied) {
-      diagnostics?.count("ManifestParse:failed");
-      this.clockedManifest.failed(source);
-      return undefined;
-    }
-    diagnostics?.count("ManifestParse:succeed");
-
-    // The first manifest that registers a stream names the swarm unless the
-    // integration already did. By what was asked for: every viewer asks for
-    // the same URL, and a CDN may answer each of them from a different one.
-    // A manifest that registered nothing — an I-frame playlist handed over
-    // before its master — is not the presentation's name.
-    if (this.manifestRegistry.hasStreams()) {
-      this.manifestRequestedUrl ??= requestedUrl ?? manifest.url;
-      this.manifestResponseUrl ??= stripQuery(this.manifestRequestedUrl);
-    }
-
-    this.syncStreamsFromRegistry();
-
-    this.logRegistryUpdates(manifest.url, applied.updates, applied.ignored);
-    return summarize(applied.updates);
+    return this.presentation.processManifest(manifest);
   }
 
   /**
@@ -590,44 +394,7 @@ export class Core {
     byteRange?: ByteRange;
     data: ArrayBuffer | ArrayBufferView;
   }): ProcessedManifest | undefined {
-    // Reading the index is the protocol tokenizer's job, as reading the
-    // manifest is; where the subsegments it describes sit is decided below.
-    // Only a protocol with an external index supplies a reader, and only such
-    // a protocol leaves a stream awaiting one, so the parser that registered
-    // the stream is the parser that reads this.
-    let sidx: SidxBox | undefined;
-    for (const parser of this.manifestParsers) {
-      if (parser.parseSegmentIndex) {
-        sidx = parser.parseSegmentIndex(index.data);
-        break;
-      }
-    }
-
-    if (!sidx) {
-      this.manifestLogger(
-        "no sidx box in the index fetched from %s",
-        index.url,
-      );
-      return undefined;
-    }
-
-    const updates = this.manifestRegistry.resolveExternalIndex(
-      index.url,
-      index.byteRange,
-      sidx,
-    );
-    if (!updates.length) {
-      this.manifestLogger("no stream awaits an index at %s", index.url);
-      return undefined;
-    }
-
-    this.syncStreamsFromRegistry();
-    this.logRegistryUpdates(index.url, updates);
-    // Every stream, not only the one this index resolved: a presentation whose
-    // streams each carry their own index would otherwise be described one
-    // stream at a time, and a caller sizing a live window from it would size
-    // it from whichever index arrived last.
-    return summarize(this.manifestRegistry.describeAll());
+    return this.presentation.processSegmentIndex(index);
   }
 
   /**
@@ -640,183 +407,7 @@ export class Core {
    * @param byteRange - Its byte range, if any; a range covering the index counts.
    */
   isSegmentIndex(url: string, byteRange?: ByteRange): boolean {
-    return (
-      this.manifestRegistry.streamsAwaitingIndex(url, byteRange).length > 0
-    );
-  }
-
-  /**
-   * Parses a manifest on the synchronized clock and applies it to the
-   * registry. A manifest whose segment list follows from the clock is kept, to
-   * be parsed again as time passes; see `ClockedManifest`.
-   *
-   * @param now - The moment a clock-based segment list is computed for.
-   * @returns The registry's account of the change, or `undefined` when the
-   * manifest failed to parse, which leaves the registry as it was.
-   */
-  private applyManifest(
-    source: ManifestSource,
-    now = this.clockedManifest.listingTime(),
-  ) {
-    const { parser, text, url, requestedUrl } = source;
-    let parsed: ParsedManifest;
-    let applied;
-    try {
-      parsed = parser.parse(text, url, { now });
-      applied = this.manifestRegistry.apply(
-        requestedUrl !== undefined && requestedUrl !== url
-          ? { ...parsed, requestedUrl }
-          : parsed,
-        // Only a streamIdBuilder reads the text; without one, the registry
-        // need not keep each live MPD that declares new streams.
-        this.mainStreamConfig.streamIdBuilder ||
-          this.secondaryStreamConfig.streamIdBuilder
-          ? text
-          : undefined,
-      );
-    } catch (error) {
-      this.manifestLogger("failed to parse %s: %O", url, error);
-      return undefined;
-    }
-    this.clockedManifest.track(source, parsed.clock);
-    return applied;
-  }
-
-  /**
-   * Parses a kept clock-based manifest again for `now`, as though the player
-   * had fetched it again, and brings the streams up to date with it.
-   *
-   * @returns Whether the parse succeeded.
-   */
-  private reapplyManifest(source: ManifestSource, now: number): boolean {
-    const applied = this.applyManifest(source, now);
-    if (!applied) return false;
-    this.syncStreamsFromRegistry();
-    this.logRegistryUpdates(source.url, applied.updates, applied.ignored);
-    return true;
-  }
-
-  /**
-   * The segment a player's request is for. A miss under a clock-based list is
-   * answered with a parse for the present before it counts, where one can list
-   * something new; see `ClockedManifest.reparseForMiss`.
-   */
-  private findSegment(key: string): SegmentWithStream | undefined {
-    const segment = StreamUtils.getSegmentFromStreamsMap(this.streams, key);
-    if (
-      segment ||
-      this.manifestRegistry.isInitSegment(key) ||
-      this.manifestRegistry.isPassThroughSegment(key) ||
-      !this.clockedManifest.reparseForMiss()
-    ) {
-      return segment;
-    }
-    return StreamUtils.getSegmentFromStreamsMap(this.streams, key);
-  }
-
-  private logRegistryUpdates(
-    url: string,
-    updates: RegistryUpdate[],
-    ignored: string[] = [],
-  ): void {
-    if (!this.manifestLogger.enabled) return;
-    if (ignored.length) {
-      // A media playlist is one manifest, so this is the whole story of it.
-      // Named by the master as no stream, or told from one by query string
-      // alone; the registry does not say which.
-      this.manifestLogger(
-        "%s — not a stream of this presentation by the master's word; ignored",
-        url,
-      );
-      return;
-    }
-    const changed = updates.filter((u) => u.added || u.removed);
-    this.manifestLogger(
-      "%s — %d streams registered, %s",
-      url,
-      this.streams.size,
-      changed.length
-        ? changed
-            .map((u) => `${u.streamKey}: +${u.added} -${u.removed}`)
-            .join(", ")
-        : "no segment changes",
-    );
-  }
-
-  /**
-   * Makes the registered streams mirror the manifest registry: registers
-   * streams the registry has and the core does not, and diffs every stream's
-   * segments by URL key. A stream whose registration failed is skipped.
-   */
-  private syncStreamsFromRegistry(): void {
-    let isLive = false;
-    const liveStreams: {
-      type: StreamType;
-      target: LiveDelay | undefined;
-    }[] = [];
-    for (const registryStream of this.manifestRegistry.getStreams()) {
-      if (registryStream.isLive === true) {
-        isLive = true;
-        liveStreams.push({
-          type: registryStream.type,
-          target: liveDelayForSegments(
-            registryStream.segments.values(),
-            registryStream.declaredWindow,
-          ),
-        });
-      }
-
-      let stream = this.streams.get(registryStream.key);
-      if (!stream) {
-        if (this.failedStreamKeys.has(registryStream.key)) continue;
-        stream = this.registerStream(registryStream);
-        if (!stream) continue;
-      }
-      this.syncSegments(stream, registryStream);
-    }
-    this.streamDetails.isLive = isLive;
-    this.streamDetails.liveTarget = pickLiveTarget(liveStreams);
-  }
-
-  private syncSegments(
-    stream: StreamWithSegments,
-    registryStream: RegistryStream,
-  ): void {
-    let changed = false;
-    // What the manifest stopped listing, by identity rather than by key: a key
-    // can change under a segment that stays, as when a CDN signs the URLs of
-    // every refresh anew, and only a segment gone from the stream has left
-    // its window.
-    const left = new Set<number>();
-    for (const [key, segment] of stream.segments) {
-      if (!registryStream.segments.get(key)?.shared) {
-        stream.segments.delete(key);
-        left.add(segment.externalId);
-        changed = true;
-      }
-    }
-    for (const [key, segment] of registryStream.segments) {
-      // A segment the segmentFilter keeps off P2P is the player's alone: it
-      // is never downloaded, stored or announced, and leaves storage if it
-      // was there.
-      if (!segment.shared) continue;
-      left.delete(segment.externalId);
-      if (stream.segments.has(key)) continue;
-      stream.segments.set(key, {
-        runtimeId: key,
-        externalId: segment.externalId,
-        url: segment.url,
-        byteRange: segment.byteRange,
-        startTime: segment.startTime,
-        endTime: segment.endTime,
-        stream,
-      });
-      changed = true;
-    }
-    if (left.size) this.releaseFromStorage(stream, [...left]);
-    if (!changed) return;
-    this.mainStreamLoader?.updateStream(stream);
-    this.secondaryStreamLoader?.updateStream(stream);
+    return this.presentation.isSegmentIndex(url, byteRange);
   }
 
   /**
@@ -849,10 +440,7 @@ export class Core {
    * `segmentFilter` keeps off P2P, is not held.
    */
   hasSegment(url: string, byteRange?: ByteRange): boolean {
-    return !!StreamUtils.getSegmentFromStreamsMap(
-      this.streams,
-      segmentKey(url, byteRange),
-    );
+    return this.presentation.hasSegment(url, byteRange);
   }
 
   /**
@@ -865,8 +453,7 @@ export class Core {
    * after registration, so the snapshot stays accurate for the stream's lifetime.
    */
   getStream(streamRuntimeId: string): Stream | undefined {
-    const stream = this.streams.get(streamRuntimeId);
-    return stream && this.toStreamSnapshot(stream);
+    return this.presentation.getStream(streamRuntimeId);
   }
 
   /**
@@ -878,136 +465,7 @@ export class Core {
    * @returns Detached snapshots of the registered streams, in registration order.
    */
   getStreams(): Stream[] {
-    return Array.from(this.streams.values(), (stream) =>
-      this.toStreamSnapshot(stream),
-    );
-  }
-
-  /**
-   * Builds a detached snapshot of a registered stream: its identity and
-   * integration-specific fields without the internal segments registry.
-   * Everything the core hands out — event payloads and getters — is a
-   * snapshot, so consumers can never reach or retain core state.
-   */
-  private toStreamSnapshot(stream: StreamWithSegments): Stream {
-    // The core's own state stays out of the public payload.
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { segments, ...snapshot } = stream;
-    return snapshot;
-  }
-
-  /**
-   * Registers a stream the manifest registry produced, computing its identity
-   * (`swarmId`, `streamId`, `streamSwarmId`, `infoHash`) exactly once.
-   *
-   * Never throws: a stream that fails to register (an invalid custom stream
-   * ID) stays unknown to the core — its segments load
-   * through the player's default path without P2P — and the failure is
-   * reported once via the `onStreamRegistrationError` event.
-   */
-  private registerStream(
-    registryStream: RegistryStream,
-  ): StreamWithSegments | undefined {
-    const properties = Object.freeze({ ...registryStream.properties });
-    try {
-      const stream = this.addStream(registryStream, properties);
-      diagnostics?.count("StreamRegistration:added");
-      return stream;
-    } catch (error) {
-      diagnostics?.count("StreamRegistration:failed");
-      this.failedStreamKeys.add(registryStream.key);
-      this.logger(
-        "failed to register stream %s: %O",
-        registryStream.key,
-        error,
-      );
-      this.eventTarget.dispatchEvent("onStreamRegistrationError", {
-        runtimeId: registryStream.key,
-        streamType: registryStream.type,
-        properties,
-        error: error instanceof Error ? error : new Error(String(error)),
-      });
-      return undefined;
-    }
-  }
-
-  private addStream(
-    stream: RegistryStream,
-    properties: Readonly<StreamProperties>,
-  ): StreamWithSegments {
-    const config =
-      stream.type === "main"
-        ? this.mainStreamConfig
-        : this.secondaryStreamConfig;
-
-    const { manifestResponseUrl } = this;
-    const configured = config.swarmId;
-    let swarmId: string | undefined;
-    if (typeof configured !== "function") {
-      swarmId = configured ?? manifestResponseUrl;
-    } else if (manifestResponseUrl !== undefined) {
-      // Once per source, and again for the next one: `destroy()` forgets
-      // both the answer and the URL that names the source. A stream that
-      // registers later in the source — a period added on a refresh — gets
-      // the answer the source's first stream got.
-      swarmId = this.sourceSwarmIds.get(configured);
-      if (swarmId === undefined) {
-        swarmId = configured({
-          manifestUrl: manifestResponseUrl,
-          requestedUrl: this.manifestRequestedUrl ?? manifestResponseUrl,
-        });
-        if (swarmId === "") {
-          throw new Error("swarmId must return a non-empty string");
-        }
-        this.sourceSwarmIds.set(configured, swarmId);
-      }
-    }
-    if (swarmId === undefined) {
-      throw new Error(
-        "Failed to register stream: no swarmId is configured and no manifest has named the swarm.",
-      );
-    }
-
-    let { streamId } = stream;
-    if (config.streamIdBuilder) {
-      const customStreamId = config.streamIdBuilder({
-        swarmId,
-        runtimeId: stream.key,
-        streamType: stream.type,
-        properties,
-        defaultStreamId: stream.streamId,
-        index: stream.index,
-        manifest: stream.manifest,
-      });
-
-      if (customStreamId !== undefined) {
-        if (typeof customStreamId !== "string" || customStreamId === "") {
-          throw new Error(
-            "streamIdBuilder must return a non-empty string or undefined",
-          );
-        }
-        streamId = customStreamId;
-      }
-    }
-    const streamSwarmId = buildStreamSwarmId(swarmId, streamId);
-
-    const registeredStream: StreamWithSegments = {
-      runtimeId: stream.key,
-      type: stream.type,
-      properties,
-      swarmId,
-      streamId,
-      streamSwarmId,
-      infoHash: computeInfoHash(streamSwarmId),
-      segments: new Map<string, SegmentWithStream>(),
-    };
-
-    this.streams.set(stream.key, registeredStream);
-
-    this.eventTarget.dispatchEvent("onStreamAdded", {
-      stream: this.toStreamSnapshot(registeredStream),
-    });
-    return registeredStream;
+    return this.presentation.getStreams();
   }
 
   /**
@@ -1145,15 +603,14 @@ export class Core {
    */
   isSegmentLoadable(url: string, byteRange?: ByteRange): boolean {
     const key = segmentKey(url, byteRange);
-    const segment = this.findSegment(key);
+    const segment = this.presentation.findSegment(key);
     if (!segment) {
       // A key the registry recognises (isInitSegment, isPassThroughSegment)
       // or an external index passes through knowingly; only an unknown URL
       // is a miss.
       if (
-        !this.manifestRegistry.isInitSegment(key) &&
-        !this.manifestRegistry.isPassThroughSegment(key) &&
-        !this.isSegmentIndex(url, byteRange)
+        !this.presentation.isRecognised(key) &&
+        !this.presentation.isSegmentIndex(url, byteRange)
       ) {
         // Logged as well as dispatched: a miss makes the segment load without
         // P2P and leaves no other trace, so without this a stream that stops
@@ -1175,7 +632,7 @@ export class Core {
     if (config.isP2PDisabled) return false;
     if (!this.hasWebRtc()) return false;
 
-    return this.isShareable(segment.stream);
+    return this.presentation.isShareable(segment.stream);
   }
 
   /**
@@ -1192,42 +649,6 @@ export class Core {
       diagnostics?.count("WebRtc:unavailable");
     }
     return false;
-  }
-
-  /**
-   * A stream no manifest identified carries the stream ID every unidentified
-   * stream of its type carries — its type alone, `main` — so it is the same
-   * swarm for all of them. That is right for a media playlist loaded on its
-   * own, which is the whole stream: every viewer of that URL plays the same
-   * bytes. It is wrong as soon as another stream of that type is registered
-   * in the same swarm, which means a rendition whose media playlist the
-   * registry could not match to the master that named it — a CDN that signs
-   * its playlist URLs per response is enough. Peers would then exchange
-   * segments of different renditions by number, so it is not shared.
-   */
-  private isShareable(stream: StreamWithSegments): boolean {
-    if (
-      this.manifestRegistry.getStream(stream.runtimeId)?.identified !== false
-    ) {
-      return true;
-    }
-
-    for (const other of this.streams.values()) {
-      if (other === stream) continue;
-      if (other.type !== stream.type || other.swarmId !== stream.swarmId) {
-        continue;
-      }
-      if (!this.unshareableLogged.has(stream.runtimeId)) {
-        this.unshareableLogged.add(stream.runtimeId);
-        this.logger(
-          "no manifest identified %s and it is not the only %s stream of its swarm; it loads without P2P",
-          stream.runtimeId,
-          stream.type,
-        );
-      }
-      return false;
-    }
-    return true;
   }
 
   /**
@@ -1253,12 +674,7 @@ export class Core {
     // Nothing that was waiting for the old segment storage may go on to load
     // against the new one.
     for (const starting of this.startingRequests) starting.aborted = true;
-    this.manifestRegistry = this.createManifestRegistry();
-    // The next source names its own time sources and keeps its own list.
-    this.clockedManifest.reset();
-    this.streams.clear();
-    this.failedStreamKeys.clear();
-    this.unshareableLogged.clear();
+    this.presentation.reset();
     // Each part is torn down whatever the ones before it made of themselves,
     // and this core is left empty either way. An integrator's own segment
     // storage is destroyed here and is free to throw; stopping at it would
@@ -1302,10 +718,6 @@ export class Core {
     this.unprobeBandwidth?.();
     this.unprobeBandwidth = undefined;
     this.segmentStorage = undefined;
-    this.manifestResponseUrl = undefined;
-    this.manifestRequestedUrl = undefined;
-    this.sourceSwarmIds.clear();
-    this.streamDetails = { isLive: false, liveTarget: undefined };
     this.storageInitPromise = undefined;
     this.storageGeneration++;
     if (failures.length) throw failures[0];
@@ -1396,7 +808,7 @@ export class Core {
   }
 
   private identifySegment(key: string): SegmentWithStream {
-    const segment = this.findSegment(key);
+    const segment = this.presentation.findSegment(key);
     if (!segment) {
       throw new Error(`Segment is not in the registry: ${key}`);
     }
@@ -1412,11 +824,14 @@ export class Core {
     // segment filter is read once, when the registry is made; changing them
     // at runtime would silently desynchronize the announced swarms from the
     // registered streams.
-    const sanitizedDynamicConfig = this.stripStaticOnlyProps(dynamicConfig);
+    const sanitizedDynamicConfig = stripStaticOnlyProps(
+      dynamicConfig,
+      this.logger,
+    );
     const sanitizedMainStream =
-      mainStream && this.stripStaticOnlyProps(mainStream);
+      mainStream && stripStaticOnlyProps(mainStream, this.logger);
     const sanitizedSecondaryStream =
-      secondaryStream && this.stripStaticOnlyProps(secondaryStream);
+      secondaryStream && stripStaticOnlyProps(secondaryStream, this.logger);
 
     overrideConfig(this.commonCoreConfig, sanitizedDynamicConfig);
     overrideConfig(this.mainStreamConfig, sanitizedDynamicConfig);
@@ -1429,42 +844,6 @@ export class Core {
     if (sanitizedSecondaryStream) {
       overrideConfig(this.secondaryStreamConfig, sanitizedSecondaryStream);
     }
-  }
-
-  private stripStaticOnlyProps<T extends object>(
-    config: T,
-  ): Omit<T, StaticOnlyKey> {
-    const passed = STATIC_ONLY_KEYS.filter((key) => key in config);
-    if (!passed.length) return config;
-
-    // TypeScript excludes these properties from DynamicCoreConfig, but
-    // plain-JS callers can still pass them — signal instead of silently
-    // ignoring the update.
-    this.logger(
-      `${passed.join(", ")} cannot be changed at runtime; ignoring them in the dynamic configuration update`,
-    );
-
-    const sanitized = { ...config } as T &
-      Partial<Record<StaticOnlyKey, unknown>>;
-    delete sanitized.swarmId;
-    delete sanitized.streamIdBuilder;
-    delete sanitized.segmentFilter;
-    return sanitized;
-  }
-
-  /**
-   * A registry that asks each stream type's `segmentFilter` whether a
-   * segment is shared; with no filter configured, a registry that asks
-   * nothing. `segmentFilter` cannot change at runtime.
-   */
-  private createManifestRegistry(): ManifestRegistry {
-    const main = this.mainStreamConfig.segmentFilter;
-    const secondary = this.secondaryStreamConfig.segmentFilter;
-    if (!main && !secondary) return new ManifestRegistry();
-    return new ManifestRegistry((context) => {
-      const filter = context.streamType === "main" ? main : secondary;
-      return filter ? filter(context) : true;
-    });
   }
 
   private destroyStreamLoader(streamType: StreamType) {
@@ -1512,20 +891,4 @@ export class Core {
     }
     return loader;
   }
-}
-
-function summarize(updates: readonly RegistryUpdate[]): ProcessedManifest {
-  return {
-    streams: updates.map((u) => ({
-      key: u.streamKey,
-      type: u.type,
-      isLive: u.isLive,
-      start: u.start,
-      end: u.end,
-      segmentCount: u.segmentCount,
-      ...(u.declaredWindow === undefined
-        ? {}
-        : { declaredWindow: u.declaredWindow }),
-    })),
-  };
 }
