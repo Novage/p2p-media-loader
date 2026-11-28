@@ -169,18 +169,32 @@ export class Presentation {
     let sidx: SidxBox | undefined;
     for (const parser of this.manifestParsers) {
       if (parser.parseSegmentIndex) {
-        sidx = parser.parseSegmentIndex(index.data);
+        // An integrator's own reader may throw on data it cannot read; the
+        // index then loads without P2P, as one with no sidx box does.
+        try {
+          sidx = parser.parseSegmentIndex(index.data);
+        } catch (error) {
+          diagnostics?.count("SegmentIndex:read-failed");
+          this.manifestLogger(
+            "failed to read the index fetched from %s: %O",
+            index.url,
+            error,
+          );
+          return undefined;
+        }
         break;
       }
     }
 
     if (!sidx) {
+      diagnostics?.count("SegmentIndex:no-box");
       this.manifestLogger(
         "no sidx box in the index fetched from %s",
         index.url,
       );
       return undefined;
     }
+    diagnostics?.count("SegmentIndex:read-succeed");
 
     const updates = this.manifestRegistry.resolveExternalIndex(
       index.url,

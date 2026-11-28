@@ -208,7 +208,9 @@ the groups and the cases a reader of a snapshot must know.
   (`Segment:filter-failed`) — these three once for each URL and byte
   range, when it first goes off P2P (a URL with a new token is counted
   again) — registry misses, evictions by reason, closed peers by cause,
-  parses of the player's manifests by result (`ManifestParse`), and clock synchronizations
+  parses of the player's manifests by result (`ManifestParse`), reads of an
+  external segment index by result (`SegmentIndex:read-succeed`, `:no-box`,
+  and `:read-failed` where the parser's reader threw), and clock synchronizations
   and re-parses by result. Each player request that the store cannot serve is
   counted by its urgency when it arrives (`SegmentRequest:urgent` and
   `:not-urgent`), and each one that waited and then became urgent

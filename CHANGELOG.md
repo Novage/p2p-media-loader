@@ -112,6 +112,9 @@ throughout.
   `updatePlayback` with `getPlaybackStateFromMediaElement`,
   `byteRangeFromRangeHeader`, and the
   `onSegmentRegistryMiss` event for a segment request the registry did not know.
+  `processSegmentIndex` catches a throw from a custom parser's
+  `parseSegmentIndex`: the index loads without P2P, and
+  `SegmentIndex:read-failed` counts it.
 - **`SegmentResponse.streamType` gives the type of the segment's stream.**
   The core measures the `bandwidth` of each stream type in its own way, and
   can give an audio rendition more than the main stream. A player that

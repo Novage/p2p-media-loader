@@ -292,6 +292,9 @@ export type ManifestParser = {
    * the timeline is the core's to say. Absent on a protocol that lists its
    * segments in the manifest, which is what keeps the box reader out of
    * bundles built for that protocol alone. See specs/packaging.md.
+   *
+   * Returns `undefined` for data with no index. A throw is caught by the
+   * core, which logs and counts it; the index then loads without P2P.
    */
   parseSegmentIndex?(data: ArrayBuffer | ArrayBufferView): SidxBox | undefined;
 };

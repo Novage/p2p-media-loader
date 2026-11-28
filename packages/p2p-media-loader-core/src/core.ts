@@ -378,8 +378,10 @@ export class Core {
    * The stream, registered from the MPD without segments, gains them here.
    * See specs/manifest-registry.md, "Resolving an external index".
    *
-   * Never throws. Data with no parsable `sidx` box, or for which no stream is
-   * waiting, changes nothing.
+   * Data with no parsable `sidx` box, or for which no stream is waiting,
+   * changes nothing. A throw from a parser's `parseSegmentIndex` is caught,
+   * logged and counted, and also changes nothing: the index loads without
+   * P2P. The index is read by the first parser that has `parseSegmentIndex`.
    *
    * @param index.url - The media file the index was read from.
    * @param index.byteRange - The range that was fetched, if the request had one.
