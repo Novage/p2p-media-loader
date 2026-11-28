@@ -27,8 +27,10 @@ The tests themselves are in
   stream, though the origin works.** Such a failure reaches the player as a
   `CoreRequestError` with no status, which the HLS.js adapter reports as
   `502`; each HLS.js retry goes to the same core, and the last one is fatal.
-  A storage that fails to start is handled: the adapter hands those fragments
-  to HLS.js's own loader. Not fixed: telling a storage fault from a peer's
+  The Shaka adapter reports it as a recoverable `HTTP_ERROR`: each Shaka retry
+  goes to the same core too, and with Shaka's default two attempts the segment
+  fails. A storage that fails to start is handled: both adapters hand those
+  segments to the player's own loader. Not fixed: telling a storage fault from a peer's
   failure with HTTP off needs a failure class of its own in the public API.
   It needs a custom storage that fails at runtime, such as an IndexedDB over
   its quota.

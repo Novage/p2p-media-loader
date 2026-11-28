@@ -403,9 +403,12 @@ A core failure with the status of the core's one HTTP attempt
 failed status: a recoverable `BAD_HTTP_STATUS`, the status in `data[1]`, where
 an application and the `downloadfailed` event read it. Shaka 5 retries every
 recoverable status alike: the status is for the application, not for retries.
-Any other failure is a recoverable
-`HTTP_ERROR` carrying the cause, and one Shaka aborted is its
-`OPERATION_ABORTED`.
+Any other core failure is a recoverable `HTTP_ERROR` carrying the cause, and
+one Shaka aborted is its `OPERATION_ABORTED`. A segment the core threw on — it
+left the live window while the segment storage started, or the storage failed
+to start — is loaded by Shaka's own plugin, as a segment the core does not
+serve is: a retry would go to the same core, and a storage that never starts
+would fail every attempt.
 
 The live window is sized from a main stream once one has been seen, for as
 long as the source lasts. Loading another starts that over, and puts the

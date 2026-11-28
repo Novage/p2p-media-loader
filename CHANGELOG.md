@@ -494,7 +494,11 @@ These predate 5.0.0 and affect 4.x deployments as well.
   loads it (`HlsFragment:core-abort-to-hlsjs`). So does a fragment the core
   threw on, which reached HLS.js with status 0 and was never retried: a
   segment the live window left while the segment storage started, or a
-  storage that failed to start (`HlsFragment:core-throw-to-hlsjs`).
+  storage that failed to start (`HlsFragment:core-throw-to-hlsjs`). The
+  Shaka adapter now hands such a segment to Shaka's own plugin
+  (`ShakaSegment:core-throw-to-shaka`). Before, with a storage that failed to
+  start, the segment's request never ended, and playback waited at that
+  segment.
 - A peer asked for a segment that had left its live window did not answer at
   all. The requester waited `p2pNotReceivingBytesTimeoutMs`, failed the
   attempt with `bytes-receiving-timeout` and counted a timeout against a

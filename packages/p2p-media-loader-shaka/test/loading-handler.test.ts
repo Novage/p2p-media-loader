@@ -2,10 +2,22 @@ import { describe, expect, it, vi } from "vitest";
 import {
   CoreRequestError,
   RequestError,
+  debug,
   type Core,
 } from "p2p-media-loader-core";
 import { Loader } from "../src/loading-handler.js";
+import { diagnostics as compiledLedger } from "../src/diagnostics.js";
 import type { Shaka } from "../src/types.js";
+
+// Absent only in a prebuilt bundle; the tests run on the source.
+if (!compiledLedger) throw new Error("diagnostics are compiled out");
+const ledger = compiledLedger;
+// The ledger decides once, at its first record: on, for the whole file.
+debug.enable("p2pml:diagnostics");
+ledger.snapshot();
+debug.disable();
+
+const count = (name: string) => ledger.snapshot()?.counters[name] ?? 0;
 
 const RequestType = { MANIFEST: 0, SEGMENT: 1, LICENSE: 2, KEY: 3 };
 
@@ -373,6 +385,38 @@ describe("Shaka loading handler", () => {
     expect(error.severity).toBe(FakeShakaError.Severity.RECOVERABLE);
     expect(error.code).toBe(FakeShakaError.Code.HTTP_ERROR);
     expect(error.data).toEqual([url, abort, RequestType.SEGMENT]);
+  });
+
+  it("hands a segment the core threw on to Shaka's own plugin", async () => {
+    // Core.loadSegment throws a plain Error for a storage that failed to
+    // start. Each retry would go to the same core, though the origin works.
+    const { loader, core, parse, manifestResponse } = setup();
+    core.loadSegment.mockRejectedValueOnce(
+      new Error("segment storage failed to start"),
+    );
+    const before = count("ShakaSegment:core-throw-to-shaka");
+    const response = await loader.load(url, request(), RequestType.SEGMENT)
+      .promise;
+    expect(response).toBe(manifestResponse);
+    expect(parse).toHaveBeenCalledTimes(1);
+    expect(count("ShakaSegment:core-throw-to-shaka")).toBe(before + 1);
+  });
+
+  it("aborts Shaka's own load of a segment the core threw on, not the core's", async () => {
+    const { loader, core, parse } = setup();
+    const pluginAbort = vi.fn(() => Promise.resolve());
+    parse.mockReturnValueOnce({
+      promise: new Promise(() => undefined),
+      abort: pluginAbort,
+    });
+    core.loadSegment.mockRejectedValueOnce(
+      new Error("segment storage failed to start"),
+    );
+    const op = loader.load(url, request(), RequestType.SEGMENT);
+    await vi.waitFor(() => expect(parse).toHaveBeenCalledTimes(1));
+    await op.abort();
+    expect(pluginAbort).toHaveBeenCalledTimes(1);
+    expect(core.abortSegmentLoading).not.toHaveBeenCalled();
   });
 
   it("falls back to Shaka's fetch for a segment the core does not serve", () => {

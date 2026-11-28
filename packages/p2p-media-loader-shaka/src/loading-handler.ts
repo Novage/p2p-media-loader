@@ -1,6 +1,7 @@
 import type shaka from "shaka-player/dist/shaka-player.compiled.d.ts";
 import { Shaka } from "./types.js";
 import { defaultPluginFor } from "./default-plugin.js";
+import { diagnostics } from "./diagnostics.js";
 import {
   Core,
   CoreRequestError,
@@ -138,6 +139,8 @@ export class Loader {
     }
 
     let aborted = false;
+    /** Shaka's own load of the segment, once the core threw on it. */
+    let fallback: LoadingHandlerResult | undefined;
     const loadSegment = async (): Promise<Response> => {
       try {
         this.reportPlayback();
@@ -158,8 +161,9 @@ export class Loader {
         };
       } catch (error) {
         // Shaka's networking engine retries and reports only its own error
-        // type, so a core failure is translated. Anything but the operation
-        // Shaka itself cancelled becomes a recoverable network error, which
+        // type. The operation Shaka cancelled is reported as its abort; a
+        // segment the core threw on is loaded by Shaka's own plugin; any
+        // other core failure becomes a recoverable network error, which
         // Shaka's retry parameters govern.
         const { Error: ShakaError } = this.shaka.util;
         const { RequestType } = this.shaka.net.NetworkingEngine;
@@ -173,10 +177,19 @@ export class Loader {
             RequestType.SEGMENT,
           );
         }
+        // The core threw: the segment left the live window while the
+        // segment storage started, or the storage failed to start. A retry
+        // would go to the same core, and a storage that never starts fails
+        // every attempt, though the origin may work. So the segment loads as
+        // one the core does not serve does.
+        if (!(error instanceof CoreRequestError)) {
+          diagnostics?.count("ShakaSegment:core-throw-to-shaka");
+          fallback = this.defaultLoad();
+          return fallback.promise;
+        }
         // The status of the core's one HTTP attempt goes where Shaka's own
         // loader puts a failed status: see specs/player-adapters.md.
-        const httpStatus =
-          error instanceof CoreRequestError ? error.httpStatus : undefined;
+        const { httpStatus } = error;
         if (httpStatus !== undefined) {
           throw new ShakaError(
             ShakaError.Severity.RECOVERABLE,
@@ -190,12 +203,12 @@ export class Loader {
             segmentUrl,
           );
         }
-        // Any other failure carries the cause. That includes an abort Shaka
-        // did not ask for: the core keeps one request for each stream and
-        // aborts it when the player asks for another segment of that stream,
-        // as Shaka does when it prefetches ahead. Reported as Shaka's own
-        // abort, the segment would never be asked for again, and playback
-        // would wait at its hole for ever.
+        // Any other core failure carries the cause. That includes an abort
+        // Shaka did not ask for: the core keeps one request for each stream
+        // and aborts it when the player asks for another segment of that
+        // stream, as Shaka does when it prefetches ahead. Reported as Shaka's
+        // own abort, the segment would never be asked for again, and
+        // playback would wait at its hole for ever.
         throw new ShakaError(
           ShakaError.Severity.RECOVERABLE,
           ShakaError.Category.NETWORK,
@@ -209,6 +222,9 @@ export class Loader {
 
     return new this.shaka.util.AbortableOperation(loadSegment(), () => {
       aborted = true;
+      // The core no longer has the request: an abort there could stop
+      // another request for the same segment.
+      if (fallback) return fallback.abort();
       this.core.abortSegmentLoading(segmentUrl, byteRange);
       return Promise.resolve();
     });
