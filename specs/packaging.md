@@ -203,10 +203,10 @@ parsers and their bundler carries each module once.
 
 ## Where standalone core is actually used
 
-The native proxy runs core in a WebView with no JavaScript player beside it, so
-core's own size is the entire payload and the protocol split matters most there.
-An iOS application playing HLS loads the HLS bundle and never carries the DASH
-parser. See [mobile-proxy.md](mobile-proxy.md).
+The mobile library runs core in an embedded JS engine with no JavaScript player
+beside it, so core's own size is the entire payload and the protocol split
+matters most there. It embeds the HLS bundle and carries no DASH parser. See
+[native-apps.md](native-apps.md).
 
 ## Before a release
 

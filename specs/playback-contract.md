@@ -50,7 +50,7 @@ exists because no absolute comparison is ever made.
 
 **Every integration reports.** A browser adapter reports from the media
 element, through `trackMediaElementPlayback`. A native integration reports from
-its player through a shim ([mobile-proxy.md](mobile-proxy.md)). Before the
+its player ([native-apps.md](native-apps.md)). Before the
 first report, core takes `bufferAhead` as 0 and `rate` as 1: the player has
 nothing buffered yet, so its first requests are urgent. A stream that starts
 later than the others — the audio of a presentation, say — starts from the

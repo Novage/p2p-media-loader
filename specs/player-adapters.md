@@ -924,9 +924,10 @@ not been tested, and each of these exercises a different part of it.
 
 ### Native players
 
-ExoPlayer and AVPlayer reach core through a local HTTP proxy rather than an
-in-process adapter. That proxy is a separate project in its own repository;
-what belongs here is the shape core must present to it, which is the same three
-responsibilities. It is the case that motivates the playback contract carrying
-no absolute position, since the proxy and the player are in different processes.
-See [mobile-proxy.md](mobile-proxy.md).
+Media3 and AVPlayer reach core through the mobile library, a separate project
+in its own repository, which runs core in an embedded JS engine: Media3
+through a data source, AVPlayer and other players through a local HTTP server.
+What belongs here is the shape core must present to it, which is the same three
+responsibilities. It is one case that motivates the playback contract carrying
+no absolute position, since the player and core run on different threads. See
+[native-apps.md](native-apps.md).

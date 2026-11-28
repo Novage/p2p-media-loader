@@ -47,7 +47,7 @@ translate timelines, or tell core which variant is active.
 
 **Identity must be identical across players.** `externalId` is on the wire. Two
 peers only exchange a segment if they agree on its identity, so a browser peer
-on HLS.js, a browser peer on Shaka, and a mobile peer behind the proxy must all
+on HLS.js, a browser peer on Shaka, and a mobile peer of a native app must all
 derive it the same way. One parser, running everywhere, guarantees that by
 construction. Per-player derivation cannot.
 
@@ -142,9 +142,15 @@ fetching the manifest on its own timer.
 - **The active variant follows for free**, as described above.
 - **No duplicated CDN traffic** and no additional rate-limit exposure.
 
-Independent polling is available as an opt-in for live streams, where seeing a
-segment slightly before the player does gives P2P more time to fetch it. It is
-never the default.
+Core never fetches a manifest itself. Where an MPD's segments follow from the
+clock — a `SegmentTemplate@duration`, or a `SegmentTimeline` that repeats until
+the present — core parses the player's MPD again as time passes, so it knows
+each new segment when it becomes available, with no request of its own
+([manifest-registry.md](manifest-registry.md), "Segments computed from the
+clock"). Seeing a segment earlier than
+that would gain little: the player sits deep in the live window, so peers
+already have tens of seconds for each segment
+([playback-contract.md](playback-contract.md), "The urgency threshold").
 
 ## What is explicitly out of scope
 

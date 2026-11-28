@@ -18,9 +18,9 @@ as one with nothing buffered, so every request that the store cannot serve is
 urgent and goes over HTTP. Such a player still plays, but it gets from peers
 only what prefetch puts in the store before it asks.
 
-That case is the proxy architecture of [mobile-proxy.md](../mobile-proxy.md)
-without its shim: a native player that fetches through a local HTTP proxy, with
-nothing that reads the player. There, a player that emits CMCD (CTA-5004,
+That case is the local HTTP server of [native-apps.md](../native-apps.md)
+with no report from the player: a native player that fetches through the
+mobile library's local server, with nothing that reads the player. There, a player that emits CMCD (CTA-5004,
 Common Media Client Data) already gives its buffer in the request that core
 handles. The `bl` key is the buffer length ahead of the playhead in
 milliseconds, `dl` the deadline until it drains, and `pr` the playback rate.
@@ -70,8 +70,9 @@ but implementations report the media element's `playbackRate`, which stays at 1
 while paused. More fundamentally, CMCD comes with requests, and a pause is the
 absence of requests. A paused player's reading ages as if it were playing, so a
 request that waits during a pause can become urgent and go over HTTP where P2P
-had time. The cost is P2P share, never playback. The shim does not have this
-limit, which is why [mobile-proxy.md](../mobile-proxy.md) prefers it.
+had time. The cost is P2P share, never playback. A report from the player does not
+have this limit, which is why [native-apps.md](../native-apps.md) reads the
+player.
 
 **Precedence.** A report from the integration and a CMCD reading are the same
 kind of value. Core uses the most recent of them for a stream.

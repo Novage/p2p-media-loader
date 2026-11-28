@@ -16,7 +16,7 @@ before changing anything that crosses a package boundary.
 | [prefetch.md](prefetch.md)                   | Which peer fetches a segment over HTTP so that the rest can share it         |
 | [player-adapters.md](player-adapters.md)     | What an adapter must do, for every supported player                          |
 | [encryption.md](encryption.md)               | What core may and may not do with protected content                          |
-| [mobile-proxy.md](mobile-proxy.md)           | Native players via a local HTTP proxy and a WebView-hosted core              |
+| [native-apps.md](native-apps.md)             | Native players with the core in an embedded JS engine, and what that asks    |
 | [packaging.md](packaging.md)                 | How parsers are selected, and what each consumer downloads                   |
 | [verification.md](verification.md)           | The real streams the design is verified against, and what is checked on them |
 | [diagnostics.md](diagnostics.md)             | The ledger of open resources, counters and anomalies that tests read         |
