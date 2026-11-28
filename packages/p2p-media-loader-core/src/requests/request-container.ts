@@ -1,9 +1,5 @@
-import {
-  Playback,
-  BandwidthCalculators,
-  SegmentWithStream,
-} from "../internal-types.js";
-import { CoreEventMap, StreamConfig } from "../types.js";
+import { BandwidthCalculators, SegmentWithStream } from "../internal-types.js";
+import { CoreEventMap } from "../types.js";
 import { EventTarget } from "../utils/event-target.js";
 import { Request } from "./request.js";
 
@@ -13,15 +9,13 @@ export class RequestsContainer {
   constructor(
     private readonly requestProcessQueueCallback: () => void,
     private readonly bandwidthCalculators: BandwidthCalculators,
-    private readonly playback: Playback,
-    private readonly config: StreamConfig,
     private readonly eventTarget: EventTarget<CoreEventMap>,
   ) {}
 
   get executingHttpCount() {
     let count = 0;
-    for (const request of this.httpRequests()) {
-      if (request.status === "loading") count++;
+    for (const request of this.requests.values()) {
+      if (isHttpDownloadUnderWay(request)) count++;
     }
     return count;
   }
@@ -45,8 +39,6 @@ export class RequestsContainer {
         segment,
         this.requestProcessQueueCallback,
         this.bandwidthCalculators,
-        this.playback,
-        this.config,
         this.eventTarget,
         segment.stream.infoHash,
       );
@@ -63,9 +55,10 @@ export class RequestsContainer {
     return this.requests.values();
   }
 
-  *httpRequests(): Generator<Request, void> {
+  /** The HTTP downloads under way (`isHttpDownloadUnderWay`). */
+  *loadingHttpRequests(): Generator<Request, void> {
     for (const request of this.requests.values()) {
-      if (request.downloadSource === "http") yield request;
+      if (isHttpDownloadUnderWay(request)) yield request;
     }
   }
 
@@ -77,9 +70,18 @@ export class RequestsContainer {
 
   destroy() {
     for (const request of this.requests.values()) {
+      request.endKept("destroyed");
       if (request.status !== "loading") continue;
       request.cancel();
     }
     this.requests.clear();
   }
+}
+
+/**
+ * An HTTP download under way: what slots, announcements and the yield count
+ * as one. A request keeps its source after its attempt ends.
+ */
+function isHttpDownloadUnderWay(request: Request): boolean {
+  return request.downloadSource === "http" && request.status === "loading";
 }

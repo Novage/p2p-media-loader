@@ -4,5 +4,4 @@ export {
   deserializeCommand,
   isCommandChunk,
   BinaryCommandChunksJoiner,
-  BinaryCommandJoiningError,
 } from "./binary-command-creator.js";

@@ -19,6 +19,7 @@
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
     "composite": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "stripInternal": true
   }
 }

@@ -1,32 +1,25 @@
 import * as d3 from "d3";
+// `selection.transition()` exists only once d3-transition has patched the
+// selection prototype. The `d3` package declares itself free of side effects.
+// Thus a production bundler drops the d3-transition that `d3` re-exports when
+// no named export of it is used. A direct import keeps the patch.
+import "d3-transition";
 
 export interface Node extends d3.SimulationNodeDatum {
   id: string;
-  isMain?: boolean;
-  group?: number;
+  isMain: boolean;
 }
 
 export interface Link extends d3.SimulationLinkDatum<Node> {
   source: Node;
   target: Node;
-  linkId: string;
 }
 
 const COLORS = {
   links: "#C8C8C8",
-  nodeHover: "#A9A9A9",
-  node: (d: { isMain?: boolean }) => {
-    return d.isMain ? "hsl(210, 70%, 72.5%)" : "hsl(55, 70%, 72.5%)";
-  },
+  node: (d: Node) =>
+    d.isMain ? "hsl(210, 70%, 72.5%)" : "hsl(55, 70%, 72.5%)",
 };
-
-function handleNodeMouseOver(this: SVGCircleElement) {
-  d3.select(this).style("fill", COLORS.nodeHover);
-}
-
-function handleNodeMouseOut(this: SVGCircleElement, _event: unknown, d: Node) {
-  d3.select(this).style("fill", COLORS.node(d));
-}
 
 function getLinkText(d: Link) {
   return `${d.source.id}-${d.target.id}`;
@@ -36,114 +29,61 @@ function getNodeId(d: Node) {
   return d.id;
 }
 
-function removeD3Item(this: d3.BaseType) {
-  d3.select(this).remove();
-}
-
 export const updateGraph = (
-  newNodes: Node[],
-  newLinks: Link[],
+  nodes: Node[],
+  links: Link[],
   simulation: d3.Simulation<Node, Link> | null,
   svgElement: SVGSVGElement | null,
 ) => {
   if (!simulation || !svgElement) return;
 
-  simulation.nodes(newNodes);
-  simulation.force<d3.ForceLink<Node, Link>>("link")?.links(newLinks);
+  simulation.nodes(nodes);
+  simulation.force<d3.ForceLink<Node, Link>>("link")?.links(links);
   simulation.alpha(0.5).restart();
 
-  const link = d3
-    .select(svgElement)
+  const svg = d3.select(svgElement);
+  const nodeGroup = svg.select(".nodes");
+
+  svg
     .select(".links")
     .selectAll<SVGLineElement, Link>("line")
-    .data(newLinks, getLinkText);
-
-  link
-    .enter()
-    .append("line")
-    .merge(link)
-    .attr("stroke", COLORS.links)
+    .data(links, getLinkText)
+    .join(
+      (enter) => enter.append("line").attr("stroke", COLORS.links),
+      undefined,
+      (exit) => exit.transition().duration(200).style("opacity", 0).remove(),
+    )
     .transition()
     .duration(500)
-    .attr("stroke-width", 0.5);
+    .attr("stroke-width", 0.5)
+    // Fades in again a link that comes back during its exit fade.
+    .style("opacity", 1);
 
-  link
-    .exit()
-    .transition()
-    .duration(200)
-    .style("opacity", 0)
-    .on("end", removeD3Item);
-
-  const node = d3
-    .select(svgElement)
-    .select(".nodes")
+  nodeGroup
     .selectAll<SVGCircleElement, Node>("circle")
-    .data(newNodes, getNodeId);
-
-  const mergedNode = node
-    .enter()
-    .append("circle")
-    .attr("r", 0)
-    .merge(node)
-    .attr("fill", (d) => COLORS.node(d))
-    .on("mouseover", handleNodeMouseOver)
-    .on("mouseout", handleNodeMouseOut)
-    .call(drag(simulation));
-
-  mergedNode
+    .data(nodes, getNodeId)
+    .join(
+      (enter) => enter.append("circle").attr("r", 0).attr("fill", COLORS.node),
+      undefined,
+      (exit) => exit.transition().duration(200).attr("r", 0).remove(),
+    )
+    .call(drag(simulation))
     .transition()
     .duration(500)
     .attr("r", (d) => (d.isMain ? 15 : 13));
 
-  node.exit().transition().duration(200).attr("r", 0).remove();
-
-  const text = d3
-    .select(svgElement)
-    .select(".nodes")
+  nodeGroup
     .selectAll<SVGTextElement, Node>("text")
-    .data(newNodes, getNodeId);
-
-  text
-    .enter()
-    .append("text")
-    .style("fill-opacity", 0)
-    .merge(text)
-    .text(getNodeId)
-    .style("text-anchor", "middle")
-    .style("font-size", "12px")
-    .style("font-family", "sans-serif")
+    .data(nodes, getNodeId)
+    .join(
+      (enter) => enter.append("text").text(getNodeId).style("fill-opacity", 0),
+      undefined,
+      (exit) =>
+        exit.transition().duration(200).style("fill-opacity", 0).remove(),
+    )
     .transition()
     .duration(500)
     .style("fill-opacity", 1);
-
-  text
-    .exit()
-    .transition()
-    .duration(200)
-    .style("fill-opacity", 0)
-    .on("end", removeD3Item);
-
-  simulation.on("tick", () => {
-    d3.select(svgElement)
-      .select(".links")
-      .selectAll<SVGLineElement, Link>("line")
-      .attr("x1", (d) => d.source.x ?? 0)
-      .attr("y1", (d) => d.source.y ?? 0)
-      .attr("x2", (d) => d.target.x ?? 0)
-      .attr("y2", (d) => d.target.y ?? 0);
-
-    d3.select(svgElement)
-      .select(".nodes")
-      .selectAll<SVGCircleElement, Node>("circle")
-      .attr("cx", (d) => d.x ?? 0)
-      .attr("cy", (d) => d.y ?? 0);
-
-    d3.select(svgElement)
-      .select(".nodes")
-      .selectAll<SVGTextElement, Node>("text")
-      .attr("x", (d) => d.x ?? 0)
-      .attr("y", (d) => (d.y === undefined ? 0 : d.y - 20));
-  });
 };
 
 const drag = (simulation: d3.Simulation<Node, Link>) => {
@@ -180,27 +120,55 @@ const drag = (simulation: d3.Simulation<Node, Link>) => {
     .on("end", dragEnded);
 };
 
-export const prepareGroups = (svg: SVGElement) => {
-  if (d3.select(svg).select("g.links").empty()) {
-    d3.select(svg).append("g").attr("class", "links");
-  }
+export const createSimulation = (svgElement: SVGSVGElement) => {
+  const svg = d3.select(svgElement);
+  const linkGroup = svg.select(".links");
+  const nodeGroup = svg.select(".nodes");
 
-  if (d3.select(svg).select("g.nodes").empty()) {
-    d3.select(svg).append("g").attr("class", "nodes");
-  }
+  return (
+    d3
+      .forceSimulation<Node, Link>()
+      .force("link", d3.forceLink<Node, Link>().distance(110))
+      .force("charge", d3.forceManyBody())
+      .force("center", d3.forceCenter())
+      .force(
+        "collide",
+        d3
+          .forceCollide<Node>()
+          .radius((d) => (d.isMain ? 20 : 15))
+          .iterations(2),
+      )
+      // Selects on each tick, so exiting elements follow their nodes while
+      // they fade out.
+      .on("tick", () => {
+        linkGroup
+          .selectAll<SVGLineElement, Link>("line")
+          .attr("x1", (d) => d.source.x ?? 0)
+          .attr("y1", (d) => d.source.y ?? 0)
+          .attr("x2", (d) => d.target.x ?? 0)
+          .attr("y2", (d) => d.target.y ?? 0);
+
+        nodeGroup
+          .selectAll<SVGCircleElement, Node>("circle")
+          .attr("cx", (d) => d.x ?? 0)
+          .attr("cy", (d) => d.y ?? 0);
+
+        nodeGroup
+          .selectAll<SVGTextElement, Node>("text")
+          .attr("x", (d) => d.x ?? 0)
+          .attr("y", (d) => (d.y === undefined ? 0 : d.y - 20));
+      })
+  );
 };
 
-export const createSimulation = (width: number, height: number) => {
-  return d3
-    .forceSimulation<Node, Link>()
-    .force("link", d3.forceLink<Node, Link>().id(getNodeId).distance(110))
-    .force("charge", d3.forceManyBody())
-    .force("center", d3.forceCenter(width / 2, height / 2))
-    .force(
-      "collide",
-      d3
-        .forceCollide<Node>()
-        .radius((d) => (d.isMain ? 20 : 15))
-        .iterations(2),
-    );
+export const centerSimulation = (
+  simulation: d3.Simulation<Node, Link>,
+  width: number,
+  height: number,
+) => {
+  simulation
+    .force<d3.ForceCenter<Node>>("center")
+    ?.x(width / 2)
+    .y(height / 2);
+  simulation.alpha(0.5).restart();
 };

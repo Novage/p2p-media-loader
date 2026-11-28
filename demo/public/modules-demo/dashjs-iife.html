@@ -1,0 +1,86 @@
+<!doctype html>
+<html>
+  <head>
+    <title>dash.js with P2P Media Loader (IIFE)</title>
+
+    <!-- Load dash.js. The legacy build is the one dash.js makes for older
+         browsers and Smart TVs, which are what the IIFE bundle is for. -->
+    <script src="https://cdn.jsdelivr.net/npm/dashjs@~5/dist/legacy/umd/dash.all.min.js"></script>
+
+    <!-- Load P2P Media Loader IIFE bundle. This does not use type="module" -->
+    <!-- <script src="./dashjs/p2p-media-loader-dashjs.iife.js"></script> -->
+    <script src="./dashjs/p2p-media-loader-dashjs.iife.min.js"></script>
+  </head>
+  <body>
+    <h1>P2P Media Loader dash.js IIFE Bundle Test</h1>
+    <video id="video" width="640" controls autoplay></video>
+
+    <h2>Downloaded segments</h2>
+    <ol id="segment-log"></ol>
+
+    <script>
+      const manifestUri =
+        "https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd";
+
+      // The IIFE bundle exists for browsers without ES module support — old
+      // Smart TVs among them — and is built for ES2015. This page must parse
+      // there too, so it uses functions rather than async/await (ES2017) and
+      // no trailing commas in argument lists.
+      function initApp() {
+        if (!window.dashjs.supportsMediaSource()) {
+          console.error("dash.js not supported in this browser.");
+          return;
+        }
+        const video = document.getElementById("video");
+
+        // The IIFE bundle exports its contents on the global variable defined in vite config
+        const { DashJsP2PEngine } = window.p2pml.dashjs;
+
+        const player = window.dashjs.MediaPlayer().create();
+        const engine = new DashJsP2PEngine();
+
+        // Every segment the core delivered, appended to the page with where it
+        // came from: "http" or "p2p" (with the peer's id).
+        const segmentLog = document.getElementById("segment-log");
+        engine.addEventListener("onSegmentLoaded", function (details) {
+          const segment = details.segment;
+          // The file name tells quality levels apart: each representation
+          // numbers its own segments, so one externalId recurs after a
+          // quality switch.
+          const fileName = segment.url.split("?")[0].split("/").pop();
+          const source =
+            details.downloadSource === "p2p"
+              ? "p2p from " + details.peerId
+              : details.downloadSource;
+          const item = document.createElement("li");
+          item.textContent =
+            details.streamType +
+            " segment " +
+            segment.externalId +
+            " " +
+            fileName +
+            " (" +
+            segment.startTime.toFixed(1) +
+            "s–" +
+            segment.endTime.toFixed(1) +
+            "s, " +
+            (details.bytesLength / 1024).toFixed(0) +
+            " KiB) — " +
+            source;
+          segmentLog.appendChild(item);
+        });
+
+        player.on(window.dashjs.MediaPlayer.events.ERROR, function (event) {
+          console.error("Error", event.error);
+        });
+
+        // The engine must be bound before initialize(): it takes the player's
+        // requests from the first MPD on.
+        engine.bindPlayer(player);
+        player.initialize(video, manifestUri, true);
+      }
+
+      document.addEventListener("DOMContentLoaded", initApp);
+    </script>
+  </body>
+</html>

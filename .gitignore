@@ -19,10 +19,15 @@ node_modules
 /packages/*/dist-ssr
 *.local
 *.tgz
+*.tsbuildinfo
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
+# Agent tooling; share the checked-in settings, keep everything else local
+.claude/*
+!.claude/settings.json
+!.claude/skills
 .idea
 .DS_Store
 *.suo

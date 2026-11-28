@@ -1,4 +1,5 @@
 import debug from "debug";
+import { diagnostics } from "../diagnostics.js";
 import { CoreEventMap, StreamConfig, StreamType } from "../types.js";
 import * as Command from "./commands/index.js";
 import { EventTarget } from "../utils/event-target.js";
@@ -14,7 +15,8 @@ export type PeerConfig = Pick<
 
 export type PeerProtocolEventHandlers = {
   onCommandReceived: (command: Command.PeerCommand) => void;
-  onSegmentChunkReceived: (data: Uint8Array) => void;
+  /** @returns Whether the chunk was taken into the segment being downloaded. */
+  onSegmentChunkReceived: (data: Uint8Array) => boolean;
   onProtocolError: (error: unknown) => void;
 };
 
@@ -51,11 +53,15 @@ export class PeerProtocol {
       eventTarget.getEventDispatcher("onChunkDownloaded");
     this.#onChunkUploaded = eventTarget.getEventDispatcher("onChunkUploaded");
 
-    if (channel.binaryType !== "arraybuffer") {
-      throw new Error(
-        `Expected binaryType "arraybuffer", got "${channel.binaryType}"`,
-      );
-    }
+    // The protocol reads every message as an ArrayBuffer, so it sets the
+    // channel to deliver them that way rather than refusing one that does
+    // not. The WebRTC specification initializes `binaryType` to
+    // "arraybuffer", but engines that predate that default — the client
+    // supports some — hand over a "blob" channel, and refusing it would leave
+    // the peer connected with nothing reading it. Setting it here is in time:
+    // the peer is built in the same task its channel opened in, before any
+    // message event can run.
+    channel.binaryType = "arraybuffer";
     channel.addEventListener("message", this.#onMessageReceived);
   }
 
@@ -66,7 +72,13 @@ export class PeerProtocol {
       if (Command.isCommandChunk(data)) {
         this.#receivingCommandBytes(data);
       } else {
-        this.#eventHandlers.onSegmentChunkReceived(data);
+        // A chunk with no download to go to — the rest of a cancelled
+        // transfer, or one that overflowed — is dropped, so it is not counted
+        // as downloaded either.
+        if (!this.#eventHandlers.onSegmentChunkReceived(data)) {
+          diagnostics?.count("PeerChunk:dropped");
+          return;
+        }
         this.#onChunkDownloaded(
           data.byteLength,
           "p2p",
