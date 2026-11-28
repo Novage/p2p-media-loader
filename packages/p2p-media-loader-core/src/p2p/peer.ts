@@ -375,16 +375,17 @@ export class Peer {
             }
             this.#downloadingContext = undefined;
 
-            if (error.type === "bytes-receiving-timeout") {
-              this.#consecutiveTimeouts++;
-            }
+            // Only a timeout counts, and only a timeout can close the peer:
+            // an abort is the engine's, not the peer's fault.
+            if (error.type !== "bytes-receiving-timeout") return;
+            this.#consecutiveTimeouts++;
 
             if (this.#consecutiveTimeouts >= this.#peerConfig.p2pErrorRetries) {
               this.destroy(
                 false,
                 new PeerError("timeout", "Too many timeout errors"),
               );
-            } else if (error.type === "bytes-receiving-timeout") {
+            } else {
               this.#eventHandlers.onWarning(
                 new PeerWarning(
                   "timeout-strike",

@@ -93,6 +93,34 @@ describe("Peer.downloadSegment", () => {
     expect(request.failedAttempts.hasTag("peer-after-http-failure")).toBe(true);
   });
 
+  it("stays connected when the engine aborts its download, with no P2P retries", () => {
+    // A seek aborts the download: that is no timeout, and not the peer's
+    // fault, also when p2pErrorRetries 0 lets no timeout pass.
+    const { peer, request } = setup({ p2pErrorRetries: 0 });
+    peer.downloadSegment(request);
+    request.cancel();
+
+    expect(peer.downloadSegment(request)).toBe(true);
+  });
+
+  it("closes at its first timeout, with no P2P retries", () => {
+    vi.useFakeTimers();
+    try {
+      const { peer, request } = setup({ p2pErrorRetries: 0 });
+      peer.downloadSegment(request);
+      vi.advanceTimersByTime(
+        Core.DEFAULT_STREAM_CONFIG.p2pNotReceivingBytesTimeoutMs + 1,
+      );
+
+      expect(request.failedAttempts.lastAttempt?.error.type).toBe(
+        "bytes-receiving-timeout",
+      );
+      expect(peer.downloadSegment(request)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("starts no attempt when the peer is destroyed", () => {
     const { peer, request } = setup();
     peer.destroy();

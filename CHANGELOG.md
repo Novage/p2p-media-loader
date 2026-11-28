@@ -527,6 +527,11 @@ These predate 5.0.0 and affect 4.x deployments as well.
   cause, though `onPeerError` received the fault. The `PeerError` is now the
   `cause` of that `peer-closed` error, as it already was for a peer the core
   closed on a fault.
+- With `p2pErrorRetries: 0`, a peer closed whenever the engine aborted its
+  download, for example at a seek, with the error "Too many timeout errors",
+  though no timeout occurred. The limit was checked after every abort, and
+  `0 >= 0` was true. Now only a timeout counts, and only a timeout can close
+  the peer. The default of 3 was not affected.
 
 ## 4.0.0
 
