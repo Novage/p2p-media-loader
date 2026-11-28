@@ -62,10 +62,11 @@ tabs and install the probe again.
 
 With `count: 1`, `faults.runSegmentFaults` plays tab A alone, so every
 segment request is its player's. The driver resolves a call that expects no
-other tab at once. On `98b27be` it ran so on HLS.js and Shaka (503 and 404 at
-0.4): one origin request for each player request, retries at the player's own
-delays, no 404 retried by HLS.js. A storage that fails to start was checked by
-hand: replace `indexedDB.open` with a function that throws, then switch to the
+other tab at once. On `98b27be` it ran so on HLS.js and Shaka, with
+`{ count: 1, modes: ["503", "404"], segFail: 0.4, ms: 20000 }`: one origin
+request for each player request, retries at the player's own delays, no 404
+retried by HLS.js. A storage that fails to start was checked by hand: replace
+`indexedDB.open` with a function that throws, then switch to the
 `hlsjs_indexeddb_hls` player with `__h.go`; each fragment then counts
 `HlsFragment:core-throw-to-hlsjs` and plays.
 
